@@ -208,7 +208,6 @@ for (const view of stateViews.filter((entry) => entry.real))
         test(`${view.name} has no serious or critical issue (${locale}, ${width} px)`, async ({ browser }) => {
           const context = await browser.newContext({
             baseURL: project!.baseURL,
-            storageState: project!.storageState,
             locale: "en-US",
             timezoneId: "UTC",
           });

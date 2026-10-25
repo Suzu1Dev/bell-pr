@@ -14,8 +14,8 @@ import { formatters, htmlLang, parseLocale } from "../shared/i18n/locale.js";
 import { defaultStaticDir } from "./config.js";
 import { currentLocale, sm, withLocale } from "./i18n/index.js";
 import { log } from "./log.js";
+import { setAgentDataDirectory } from "./sandbox.js";
 import { registerAppSettingsRoutes } from "./routes/app-settings.js";
-import { registerAuthRoutes } from "./routes/auth.js";
 import { registerDiscoveryRoutes } from "./routes/discovery.js";
 import { registerDoctorRoutes } from "./routes/doctor.js";
 import { registerFollowUpsRoutes } from "./routes/follow-ups.js";
@@ -88,8 +88,6 @@ export interface AppOptions {
    * read for each agent call so a changed app setting applies.
    */
   agentTimeoutScale?: number;
-  /** The session secret for sign-in; passed to the guard. */
-  sessionToken?: string;
   /** The app version the API reports. */
   version?: string;
   /** Development mode, with the UI dev server in front. Off by default. */
@@ -124,6 +122,8 @@ export function createApp(workbench: Workbench, options: AppOptions = {}) {
   const app = express();
   app.locals.insights = insights;
   app.locals.discovery = discovery;
+  // Agents are denied reading BELL's data directory outside their own checkout.
+  setAgentDataDirectory(workbench.store.directory);
   app.disable("x-powered-by");
   // req.secure and req.ip follow X-Forwarded-* only from a proxy on this
   // machine, such as a TLS terminator in front of BELL PR.
@@ -154,8 +154,6 @@ export function createApp(workbench: Workbench, options: AppOptions = {}) {
             : configuredOrigins,
         ),
       ],
-      sessionToken: options.sessionToken,
-      publicPaths: ["/api/health", "/auth"],
     }),
   );
   app.use(express.json({ limit: "160kb", strict: true }));
@@ -180,7 +178,6 @@ export function createApp(workbench: Workbench, options: AppOptions = {}) {
   // Route modules that later work fills in, in a fixed order, so none of
   // them needs to edit this list.
   registerHealthRoutes(app, deps);
-  registerAuthRoutes(app, deps);
   registerMaintenanceRoutes(app, deps);
   registerLearningRoutes(app, deps);
   registerDoctorRoutes(app, deps);

@@ -14,7 +14,7 @@ export default {
       "",
       "Commands:",
       `  start      Start ${name} (the default command)`,
-      "  open       Print a new one-time sign-in link and open it in the browser",
+      "  open       Print the address of the running server and open it in the browser",
       "  doctor     Check git, gh and the agent CLIs (--json for machine output)",
       "  version    Show the version, Node.js, platform and data directory",
       "  help       Show this help",
@@ -27,11 +27,11 @@ export default {
       "  --env-file <file>   Load settings such as BELLPR_PORT from a file first",
       "",
       "Options for open:",
-      "  --print             Only print the link",
+      "  --print             Only print the address",
       "  --no-open           Do not open the browser",
       `  --data-dir <dir>    Data directory of the running ${name}`,
       "",
-      `${name} signs browsers in with a link. Run \`${bin} open\` on this computer for a new one; in Docker, run \`docker exec <container> ${bin} open --print\`.`,
+      `Lost the address? Run \`${bin} open\` on this computer to print and open it again.`,
     ].join("\n"),
   /** A command that does not exist. */
   unknownCommand: ({ command }: { command: string }) =>
@@ -77,25 +77,25 @@ export default {
     publicUrlInvalid: ({ value }: { value: string }) =>
       `BELLPR_PUBLIC_URL must be the address browsers use for ${name}, such as https://bell.example.com: http or https, with no path, query or user name, and https for any address other than this computer. "${value}" is not.`,
     devNeedsLoopback: ({ host }: { host: string }) =>
-      `Development mode turns sign-in off, so it only listens on this computer. Use --host 127.0.0.1 instead of ${host}.`,
+      `Development mode only listens on this computer. Use --host 127.0.0.1 instead of ${host}.`,
     /** A host other than this computer or all addresses, without BELLPR_PUBLIC_URL. */
     publicUrlRequired: ({ host }: { host: string }) =>
       `To listen on ${host}, set BELLPR_PUBLIC_URL to the HTTPS address browsers use to reach ${name}, such as https://bell.example.com behind a reverse proxy; without it every request would be refused. To use ${name} on this computer only, leave --host at 127.0.0.1.`,
   },
   /** `bell-pr start`. */
   start: {
-    /** The startup line with the sign-in link (or the address in development mode). */
+    /** The startup line with the address. */
     startup: ({ version, url }: { version: string; url: string }) =>
       `${name} ${version} → ${url}`,
     /** Data left by an older version in the current folder; nothing moves. */
     legacyDataDir: ({ dataDir }: { dataDir: string }) =>
       `Found ${name} data in ./.bellpr. ${name} now uses ${dataDir} and moved nothing. To keep using the old folder, start it with: ${bin} start --data-dir ./.bellpr`,
     alreadyRunning: ({ url }: { url: string }) =>
-      `${name} is already running at ${url}. Run \`${bin} open\` to get a sign-in link; add --data-dir <dir> if that ${name} was started with another data directory.`,
+      `${name} is already running at ${url}. Run \`${bin} open\` to open it; add --data-dir <dir> if that ${name} was started with another data directory.`,
     portInUse: ({ port }: { port: number }) =>
       `Port ${port} is already in use by another program. Start ${name} on a free port with \`${bin} start --port <port>\`.`,
     dataDirInUse: ({ dataDir, pid }: { dataDir: string; pid: number }) =>
-      `${name} is already running with the data directory ${dataDir} (process ${pid}). Run \`${bin} open\` to get a sign-in link, or stop that process first.`,
+      `${name} is already running with the data directory ${dataDir} (process ${pid}). Run \`${bin} open\` to open it, or stop that process first.`,
     listenFailed: ({ address, reason }: { address: string; reason: string }) =>
       `${name} could not listen on ${address}: ${reason}`,
     failed: ({ reason }: { reason: string }) =>
@@ -111,14 +111,5 @@ export default {
   open: {
     notRunning: ({ dataDir }: { dataDir: string }) =>
       `No ${name} is running with the data directory ${dataDir}. Start it with \`${bin}\`, or, for a ${name} started with another data directory, run \`${bin} open --data-dir <dir>\`.`,
-    noAnswer:
-      `${name} did not answer within 5 seconds. Check that it is still running, or restart it and use the sign-in link it prints.`,
-    unavailable:
-      `Sign-in links are unavailable in this version of ${name}. Restart ${name} and use the sign-in link it prints.`,
-    signalFailed: ({ reason }: { reason: string }) =>
-      `Could not reach the running ${name} process: ${reason}`,
-    windows: `\`${bin} open\` does not work on Windows. Run ${name} in WSL2 and use \`${bin} open\` there.`,
-    /** After the link: how long it lasts. */
-    linkHint: "This link signs in one browser. It works once, within 2 minutes.",
   },
 };

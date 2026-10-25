@@ -106,7 +106,6 @@ test("a seeded real run is approved through the UI and the publish dialog opens 
   const server = await launchServer({ seed });
   const context = await browser.newContext({
     baseURL: server.baseURL,
-    storageState: server.storageState,
     viewport: { width: 1440, height: 900 },
     locale: "en-US",
     timezoneId: "UTC",
@@ -235,7 +234,6 @@ test("a passed check counts after the setting is turned off: publishing asks not
   });
   const context = await browser.newContext({
     baseURL: server.baseURL,
-    storageState: server.storageState,
     viewport: { width: 1440, height: 900 },
     locale: "en-US",
     timezoneId: "UTC",

@@ -40,7 +40,6 @@ test.describe("the contribution journey on a seeded real run with a fake gh", ()
   async function openPage(browser: Browser) {
     const context = await browser.newContext({
       baseURL: project.baseURL,
-      storageState: project.storageState,
       viewport: { width: 1440, height: 900 },
       locale: "en-US",
       timezoneId: "UTC",
@@ -635,7 +634,6 @@ test("with the check off a real run is approved and marked; turned back on, publ
   const project = await startRealProject({ appSettings: { skipUnderstandingCheck: true } });
   const context = await browser.newContext({
     baseURL: project.baseURL,
-    storageState: project.storageState,
     viewport: { width: 1440, height: 900 },
     locale: "en-US",
     timezoneId: "UTC",

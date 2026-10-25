@@ -4,7 +4,6 @@
  * branch on `code`, never on the text.
  */
 export const errorCodes = [
-  "auth_required",
   "server_unreachable",
   "git_missing",
   "git_identity_missing",

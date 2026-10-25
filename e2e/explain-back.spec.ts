@@ -176,11 +176,10 @@ for (const width of [1440, 390])
     await expectAccessible(page, `passed at ${width} px`);
   });
 
-/** A signed-in page on a spec-local server. */
+/** A page on a spec-local server. */
 async function openOn(browser: Browser, server: LaunchedServer) {
   const context = await browser.newContext({
     baseURL: server.baseURL,
-    storageState: server.storageState,
     viewport: { width: 1440, height: 900 },
     locale: "en-US",
     timezoneId: "UTC",

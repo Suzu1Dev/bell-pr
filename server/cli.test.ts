@@ -60,20 +60,19 @@ async function withDataDir<T>(fn: (dataDir: string, directory: string) => Promis
   }
 }
 
-/** A BELL PR running in this process, so `open` signals this very process. */
+/** A BELL PR running in this process, for `open` to find. */
 async function inProcessServer(
   dataDir: string,
-  mintOneTimeToken?: () => string | undefined,
   host?: string,
+  env: NodeJS.ProcessEnv = {},
 ): Promise<RunningServer> {
   return startServer({
     config: resolveConfig(
       { port: await freePort(), dataDir, host },
-      { BELLPR_STATIC_DIR: path.join(path.dirname(dataDir), "ui") },
+      { BELLPR_STATIC_DIR: path.join(path.dirname(dataDir), "ui"), ...env },
     ),
     handleExit: false,
     print: () => {},
-    ...(mintOneTimeToken ? { mintOneTimeToken } : {}),
   });
 }
 
@@ -88,27 +87,23 @@ test("bell-pr open without a running instance exits 1 and says how to start", as
     );
 
     // A lock left by a process that is gone, or one whose pid now runs
-    // something that is not BELL PR, never gets the signal.
+    // something that is not BELL PR, is not a running instance.
     mkdirSync(dataDir, { recursive: true });
     const gone = spawn(process.execPath, ["-e", ""]);
     await once(gone, "exit");
-    const signalled: number[] = [];
     for (const pid of [gone.pid!, process.pid]) {
       writeFileSync(
         path.join(dataDir, "bellpr.lock"),
         JSON.stringify({ pid, port: await freePort(), version: "1.0.0" }),
       );
-      const stale = await cli(["open", "--data-dir", dataDir], {
-        kill: (target) => signalled.push(target),
-      });
+      const stale = await cli(["open", "--data-dir", dataDir]);
       assert.equal(stale.code, 1);
       assert.match(stale.stderr, /No BELL PR is running with the data directory/);
     }
-    assert.deepEqual(signalled, []);
   });
 });
 
-test("bell-pr open never signals a reused pid, even where BELL PR answers on the lock's port", { skip: process.platform === "win32" }, async () => {
+test("bell-pr open never reports another instance's address through a stale lock whose pid was reused", { skip: process.platform === "win32" }, async () => {
   await withDataDir(async (dataDir, directory) => {
     // Another BELL PR, with its own data directory, now uses the port the
     // stale lock names, and the lock's pid belongs to another program.
@@ -121,13 +116,10 @@ test("bell-pr open never signals a reused pid, even where BELL PR answers on the
         path.join(dataDir, "bellpr.lock"),
         JSON.stringify({ pid: stranger.pid, port: Number(new URL(other.url).port), version: "1.0.0" }),
       );
-      const signalled: number[] = [];
-      const result = await cli(["open", "--data-dir", dataDir], {
-        kill: (target) => signalled.push(target),
-      });
+      const result = await cli(["open", "--data-dir", dataDir]);
       assert.equal(result.code, 1);
       assert.match(result.stderr, /No BELL PR is running with the data directory/);
-      assert.deepEqual(signalled, []);
+      assert.equal(result.stdout, "");
     } finally {
       stranger.kill("SIGKILL");
       await other.shutdown();
@@ -135,34 +127,66 @@ test("bell-pr open never signals a reused pid, even where BELL PR answers on the
   });
 });
 
-test("bell-pr open prints a fresh one-time link from the running server and deletes the link file", async () => {
+test("bell-pr open prints the address of the running server and opens it where a browser is allowed", async () => {
   await withDataDir(async (dataDir) => {
-    const minted: string[] = [];
-    const server = await inProcessServer(dataDir, () => {
-      const token = `one-time-${minted.length + 1}`;
-      minted.push(token);
-      return token;
-    });
+    const server = await inProcessServer(dataDir);
     try {
-      const started = Date.now();
-      const result = await cli(["open", "--data-dir", dataDir, "--print"]);
-      assert.equal(result.code, 0, result.stderr);
-      assert.ok(Date.now() - started < 5000);
-      assert.equal(result.stdout, `${server.url}/auth?t=one-time-1\n`);
-      assert.match(result.stderr, /works once, within 2 minutes/);
-      assert.deepEqual(result.opened, []);
-      // The link file is gone; the run dir stays private.
-      assert.equal(existsSync(path.join(dataDir, "run", "open-link.json")), false);
+      const printed = await cli(["open", "--data-dir", dataDir, "--print"]);
+      assert.equal(printed.code, 0, printed.stderr);
+      assert.equal(printed.stdout, `${server.url}\n`);
+      assert.equal(printed.stderr, "");
+      assert.deepEqual(printed.opened, []);
 
-      // Each call mints a new link. A terminal that allows it gets the browser.
+      // A terminal that allows it gets the browser.
       const second = await cli(["open", "--data-dir", dataDir], {
         env: {},
         stdout: { write: () => true, isTTY: true },
       });
       assert.equal(second.code, 0);
-      if (!existsSync("/.dockerenv"))
-        assert.deepEqual(second.opened, [`${server.url}/auth?t=one-time-2`]);
-      assert.deepEqual(minted, ["one-time-1", "one-time-2"]);
+      if (!existsSync("/.dockerenv")) assert.deepEqual(second.opened, [server.url]);
+    } finally {
+      await server.shutdown();
+    }
+  });
+});
+
+test("bell-pr open prints the address browsers use: the public URL when BELL PR has one, else the local address", async () => {
+  for (const [env, expected] of [
+    // Behind a proxy, or listening on another address of this computer.
+    [{ BELLPR_PUBLIC_URL: "https://bell.example.com" }, "https://bell.example.com"],
+    // Docker: published on another port than the one BELL PR listens on.
+    [{ BELLPR_PUBLIC_URL: "http://localhost:8080" }, "http://localhost:8080"],
+    [{}, undefined],
+  ] as const) {
+    await withDataDir(async (dataDir) => {
+      const server = await inProcessServer(dataDir, undefined, env);
+      try {
+        const result = await cli(["open", "--data-dir", dataDir, "--print"]);
+        assert.equal(result.code, 0, result.stderr);
+        assert.equal(result.stdout, `${expected ?? server.url}\n`);
+        assert.equal(JSON.parse(readFileSync(path.join(dataDir, "bellpr.lock"), "utf8")).url, server.url);
+      } finally {
+        await server.shutdown();
+      }
+    });
+  }
+});
+
+test("bell-pr open falls back to the local address for a lock without a usable web address", async () => {
+  await withDataDir(async (dataDir) => {
+    const server = await inProcessServer(dataDir, undefined, {
+      BELLPR_PUBLIC_URL: "https://bell.example.com",
+    });
+    try {
+      const lockFile = path.join(dataDir, "bellpr.lock");
+      const lock = JSON.parse(readFileSync(lockFile, "utf8"));
+      // A lock from an older build has no url; the others are not addresses a browser should be sent to.
+      for (const url of [undefined, "file:///etc/hosts", "not a url", 42]) {
+        writeFileSync(lockFile, JSON.stringify({ ...lock, url }));
+        const result = await cli(["open", "--data-dir", dataDir, "--print"]);
+        assert.equal(result.code, 0, result.stderr);
+        assert.equal(result.stdout, `http://127.0.0.1:${lock.port}\n`, String(url));
+      }
     } finally {
       await server.shutdown();
     }
@@ -170,7 +194,7 @@ test("bell-pr open prints a fresh one-time link from the running server and dele
 });
 
 test(
-  "bell-pr start opens a one-time link: the opener's command line never holds the session token",
+  "bell-pr start opens the address it prints",
   {
     skip:
       process.platform === "win32" ||
@@ -179,10 +203,9 @@ test(
   },
   async () => {
     await withDataDir(async (dataDir, directory) => {
-      // Stand-ins for open (macOS) and xdg-open that record their arguments,
-      // as another user would read them in the process list. The file
-      // appears whole, through a rename, so the wait below never reads it
-      // half written.
+      // Stand-ins for open (macOS) and xdg-open that record their arguments.
+      // The file appears whole, through a rename, so the wait below never
+      // reads it half written.
       const bin = path.join(directory, "bin");
       const argvFile = path.join(directory, "opener-argv");
       mkdirSync(bin);
@@ -212,16 +235,8 @@ test(
         while (!existsSync(argvFile) && Date.now() < deadline)
           await new Promise((resolve) => setTimeout(resolve, 25));
         const argv = readFileSync(argvFile, "utf8").trimEnd().split("\n");
-        const sessionToken = new URL(running.signInUrl).searchParams.get("t")!;
-        assert.match(sessionToken, /^[A-Za-z0-9_-]{43}$/);
-        assert.equal(argv.length, 1, argv.join(" "));
-        assert.ok(!argv.join(" ").includes(sessionToken));
-        const opened = new URL(argv[0]);
-        assert.equal(opened.origin, running.url);
-        assert.equal(opened.pathname, "/auth");
-        assert.match(opened.searchParams.get("t")!, /^[A-Za-z0-9_-]{43}$/);
-        // The session link is only printed, on the person's own terminal.
-        assert.ok(printed.includes(`→ ${running.signInUrl}\n`), printed);
+        assert.deepEqual(argv, [running.url]);
+        assert.ok(printed.includes(`→ ${running.url}\n`), printed);
       } finally {
         process.env.PATH = previousPath;
         await running?.shutdown();
@@ -242,40 +257,17 @@ test("bell-pr open reaches a server that listens on ::1 only", async (t) => {
     probe.close();
   }
   await withDataDir(async (dataDir) => {
-    const server = await inProcessServer(dataDir, () => "one-time", "::1");
+    const server = await inProcessServer(dataDir, "::1");
     try {
-      // The printed links go to the address the server listens on.
+      // The printed address is the one the server listens on.
       assert.match(server.url, /^http:\/\/\[::1\]:\d+$/);
-      assert.match(server.signInUrl, /^http:\/\/\[::1\]:\d+\/auth\?t=/);
       const result = await cli(["open", "--data-dir", dataDir, "--print"]);
       assert.equal(result.code, 0, result.stderr);
-      assert.equal(result.stdout, `${server.url}/auth?t=one-time\n`);
+      assert.equal(result.stdout, `${server.url}\n`);
     } finally {
       await server.shutdown();
     }
   });
-});
-
-test("bell-pr open reports unavailable links while sign-in links do not exist", async () => {
-  await withDataDir(async (dataDir) => {
-    // A server that cannot mint a link, as with sign-in turned off.
-    const server = await inProcessServer(dataDir, () => undefined);
-    try {
-      const result = await cli(["open", "--data-dir", dataDir, "--print"]);
-      assert.equal(result.code, 1);
-      assert.equal(result.stdout, "");
-      assert.match(result.stderr, /unavailable/);
-      assert.equal(existsSync(path.join(dataDir, "run", "open-link.json")), false);
-    } finally {
-      await server.shutdown();
-    }
-  });
-});
-
-test("bell-pr open on Windows points to WSL2", async () => {
-  const result = await cli(["open"], { platform: "win32" });
-  assert.equal(result.code, 1);
-  assert.match(result.stderr, /WSL2/);
 });
 
 test("bell-pr version prints the version, Node.js, the platform and the data directory", async () => {
@@ -304,7 +296,6 @@ test("bell-pr help lists every command, and mistakes exit 2", async () => {
       assert.match(result.stdout, new RegExp(`^  ${command} `, "m"));
     for (const option of ["--port", "--host", "--data-dir", "--no-open", "--env-file", "--print"])
       assert.ok(result.stdout.includes(option), option);
-    assert.match(result.stdout, /docker exec <container> bell-pr open --print/);
   }
   let zhText = "";
   const zh = await withLocale("zh-TW", () =>
@@ -498,7 +489,7 @@ test("bell-pr start runs the server with the flags and --env-file settings", asy
       assert.equal(process.env.BELLPR_TEST_ENV_FILE_LOADED, "yes");
       assert.ok(running);
       assert.equal(running.url, `http://127.0.0.1:${port}`);
-      assert.match(stdout.text(), new RegExp(`→ http://127\\.0\\.0\\.1:${port}/auth\\?t=`));
+      assert.match(stdout.text(), new RegExp(`→ http://127\\.0\\.0\\.1:${port}\\n`));
       assert.equal(
         JSON.parse(readFileSync(path.join(dataDir, "bellpr.lock"), "utf8")).port,
         port,

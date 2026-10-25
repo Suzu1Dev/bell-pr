@@ -1,7 +1,7 @@
 import { Component, useState, type ErrorInfo, type ReactNode } from "react";
 import { AlertCircle } from "lucide-react";
 import { product } from "../../shared/product";
-import { api, sessionEnded } from "../api";
+import { api } from "../api";
 import { useT } from "../i18n";
 import { appVersion } from "../version";
 
@@ -118,10 +118,10 @@ export class ErrorBoundary extends Component<
 const preloadReloadKey = "bellpr-preload-reload";
 
 /**
- * Whether the server still accepts this tab's session. A 401 answer also
- * makes the API client report the ended session, which the app shows.
+ * Whether the server answers the API. A reload while it does not would only
+ * replace this page, and what the person typed, with the browser's error page.
  */
-async function sessionValid() {
+async function serverAnswers() {
   try {
     await api("/app-settings");
     return true;
@@ -133,25 +133,18 @@ async function sessionValid() {
 /**
  * Handles Vite's `vite:preloadError`, fired when a lazy chunk fails to load,
  * usually because the server now serves a newer build. The first time in a
- * tab session the page reloads to fetch that build, once the server has
- * answered for this session. After that, or when session storage is
- * unavailable, the error reaches the error boundary instead, so a missing
- * chunk never reloads in a loop.
- *
- * An ended session never reloads: the chunk came back as the sign-in page,
- * and a reload would replace the page, and what the person typed, with it.
- * The error reaches the error boundary and the app says how to sign in
- * again. Returns whether it took the error over to reload.
+ * tab session the page reloads to fetch that build, once the server answers.
+ * After that, or when session storage is unavailable, the error reaches the
+ * error boundary instead, so a missing chunk never reloads in a loop.
+ * Returns whether it took the error over to reload.
  */
 export function reloadOnPreloadError(
   event: Pick<Event, "preventDefault">,
   storage: () => Pick<Storage, "getItem" | "setItem" | "removeItem"> = () =>
     window.sessionStorage,
   reload: () => void = reloadPage,
-  checkSession: () => Promise<boolean> = sessionValid,
-  ended: () => boolean = sessionEnded,
+  checkServer: () => Promise<boolean> = serverAnswers,
 ) {
-  if (ended()) return false;
   let session: Pick<Storage, "getItem" | "setItem" | "removeItem">;
   try {
     session = storage();
@@ -161,7 +154,7 @@ export function reloadOnPreloadError(
     return false;
   }
   event.preventDefault();
-  void checkSession().then((valid) => {
+  void checkServer().then((valid) => {
     if (valid) {
       reload();
       return;

@@ -7,10 +7,8 @@
 #   systemctl --user daemon-reload
 #   systemctl --user enable --now bell-pr
 #
-# Signing in: the service never opens a browser, and the sign-in session
-# lives only in memory, so every start or restart signs all browsers out.
-# After each start or restart, run `bell-pr open` in a terminal on this
-# machine to get a one-time sign-in link.
+# The service never opens a browser. To get its address, run `bell-pr open`
+# in a terminal on this machine.
 #
 # Settings: put BELLPR_* variables (see .env.example) in
 # ~/.config/bell-pr/environment, one NAME=value per line, and keep that file

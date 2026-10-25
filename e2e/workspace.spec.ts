@@ -71,11 +71,10 @@ const launchSeeded = () =>
       ]),
   });
 
-/** A signed-in page on a spec-local server; closed with the server. */
+/** A page on a spec-local server; closed with the server. */
 async function openOn(browser: Browser, server: LaunchedServer, width = 1440) {
   const context = await browser.newContext({
     baseURL: server.baseURL,
-    storageState: server.storageState,
     viewport: { width, height: width > 600 ? 900 : 844 },
     locale: "en-US",
     timezoneId: "UTC",

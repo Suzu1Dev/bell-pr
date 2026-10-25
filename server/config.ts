@@ -51,11 +51,11 @@ export interface Config {
   staticDir: string;
   /** BELLPR_ALLOWED_ORIGINS plus the BELLPR_PUBLIC_URL origin. */
   allowedOrigins: string[];
-  /** --dev or BELLPR_DEV=1: no sign-in, and the dev server port is trusted. */
+  /** --dev or BELLPR_DEV=1: the dev server port is trusted. */
   dev: boolean;
   /** The Vite dev server port (BELLPR_FRONTEND_PORT, 4310); only in dev. */
   frontendPort?: number;
-  /** Open the sign-in link in a browser: not --no-open, BELLPR_NO_OPEN, CI or dev. */
+  /** Open the address in a browser: not --no-open, BELLPR_NO_OPEN, CI or dev. */
   open: boolean;
   limits: Limits;
   /**
@@ -108,16 +108,11 @@ export function resolveDataDir(
 
 /** Files BELL PR keeps in the data directory next to state.json. */
 export function dataPaths(dataDir: string) {
-  const run = path.join(dataDir, "run");
   return {
-    /** `{pid, port, version, host, startedAt}` of the running instance. */
+    /** `{pid, port, version, host, url, startedAt}` of the running instance. */
     lock: path.join(dataDir, "bellpr.lock"),
     /** The agent CLI process groups that are running. */
     children: path.join(dataDir, "children.json"),
-    /** Transient files for the running instance (0700). */
-    run,
-    /** A one-time sign-in link for `bell-pr open`, deleted once read. */
-    openLink: path.join(run, "open-link.json"),
   };
 }
 
@@ -212,8 +207,8 @@ function parsePublicUrl(value: string): string {
     url.pathname !== "/" ||
     url.search ||
     url.hash ||
-    // Sign-in links and the session cookie must not cross a network in
-    // the clear: plain http only for this computer.
+    // The API would cross a network in the clear: plain http only for
+    // this computer.
     (url.protocol === "http:" &&
       !isLoopbackHost(url.hostname.replace(/^\[(.*)\]$/, "$1")))
   )
@@ -249,7 +244,7 @@ export function resolveConfig(
   const port = resolvePort(flags.port, env);
   const host = parseHost(setting(flags.host) ?? setting(env.BELLPR_HOST) ?? defaultHost);
   const dev = flags.dev === true || envFlag(env.BELLPR_DEV);
-  // Without a session there is no sign-in, so dev mode stays on this computer.
+  // The UI dev server's port is trusted, so dev mode stays on this computer.
   if (dev && !isLoopbackHost(host))
     throw new ConfigError(sm().cli.config.devNeedsLoopback({ host }));
   const frontendPort = dev
@@ -262,7 +257,7 @@ export function resolveConfig(
     : undefined;
   // The request guard accepts this computer's addresses and the public URL
   // only: on another address without one, every request would be refused,
-  // the printed sign-in link included.
+  // the printed address included.
   if (!publicUrl && !isLoopbackHost(host) && !isWildcardHost(host))
     throw new ConfigError(sm().cli.config.publicUrlRequired({ host }));
   const configured = parsed(() => parseAllowedOrigins(env.BELLPR_ALLOWED_ORIGINS ?? ""));

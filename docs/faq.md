@@ -191,12 +191,6 @@ lacks, the run's overview lists it with a suggested command, for you to
 check against the project's documentation and run yourself; BELL PR never
 runs it.
 
-### Why do I need a sign-in link for a program on my own computer?
-
-BELL PR is a local web server. The link proves that the browser belongs to
-you and not to another user of the computer, another machine or a web page
-you visit. Lost it? Run `bell-pr open`.
-
 ## Using it
 
 ### Which platforms does it run on?

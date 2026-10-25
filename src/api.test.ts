@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test, { afterEach, beforeEach } from "node:test";
 import { product } from "../shared/product";
-import { ApiError, api, apiUrl, authRequiredEvent, send } from "./api";
+import { ApiError, api, apiUrl, send } from "./api";
 import { setLocale } from "./i18n";
 
 interface Call {
@@ -36,17 +36,10 @@ beforeEach(() => {
     if (init?.signal?.aborted) throw init.signal.reason;
     return respond(call);
   }) as typeof fetch;
-  const target = new EventTarget();
-  Object.defineProperty(globalThis, "window", {
-    value: target,
-    configurable: true,
-    writable: true,
-  });
 });
 
 afterEach(async () => {
   globalThis.fetch = realFetch;
-  delete (globalThis as { window?: unknown }).window;
   await setLocale("en");
 });
 
@@ -229,31 +222,4 @@ test("apiUrl adds the UI locale for plain links", async () => {
 test("send builds a JSON request body", () => {
   assert.deepEqual(send("POST", { a: 1 }), { method: "POST", body: '{"a":1}' });
   assert.deepEqual(send("DELETE"), { method: "DELETE", body: "{}" });
-});
-
-test("an ended session is reported once and reloads the page into the sign-in page", async () => {
-  const reported: CustomEvent[] = [];
-  let reloads = 0;
-  const target = globalThis.window as unknown as EventTarget & {
-    location?: { reload(): void };
-  };
-  target.location = { reload: () => reloads++ };
-  target.addEventListener(authRequiredEvent, (event) =>
-    reported.push(event as CustomEvent),
-  );
-  const body = {
-    error: "Sign in to BELL PR first.",
-    code: "auth_required",
-  };
-  respond = () => json(401, body);
-  const first = await rejection(api("/runs"));
-  assert.ok(first instanceof ApiError);
-  assert.equal(first.status, 401);
-  assert.equal(first.code, "auth_required");
-  // Every poll fails the same way, but the page reloads once.
-  await rejection(api("/status"));
-  assert.equal(reported.length, 1);
-  assert.equal(reported[0].cancelable, true);
-  assert.deepEqual(reported[0].detail, body);
-  assert.equal(reloads, 1);
 });

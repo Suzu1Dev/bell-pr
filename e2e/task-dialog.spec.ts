@@ -40,7 +40,6 @@ test.afterAll(async () => {
 test("a link typed the moment the saved settings unlock the form is kept when they arrive", async ({ browser }) => {
   const context = await browser.newContext({
     baseURL: server.baseURL,
-    storageState: server.storageState,
     viewport: { width: 1440, height: 900 },
     locale: "en-US",
   });
@@ -89,7 +88,6 @@ test("a link typed the moment the saved settings unlock the form is kept when th
 test("the team size is a plain choice of two, three or four teammates", async ({ browser }) => {
   const context = await browser.newContext({
     baseURL: server.baseURL,
-    storageState: server.storageState,
     viewport: { width: 1440, height: 900 },
     locale: "en-US",
   });

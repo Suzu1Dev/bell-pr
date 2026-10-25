@@ -2,10 +2,8 @@
  * BELL PR servers for the e2e tests.
  *
  * The default export is Playwright's globalSetup: it builds the app once
- * (skipped with BELLPR_E2E_SKIP_BUILD=1), starts the real `bell-pr start`
- * on BELLPR_E2E_PORT (default 4599) and signs in, so every test's browser
- * context carries the session cookie (playwright.config.ts reads
- * BELLPR_E2E_STORAGE_STATE). The function it returns is the global
+ * (skipped with BELLPR_E2E_SKIP_BUILD=1), then starts the real `bell-pr start`
+ * on BELLPR_E2E_PORT (default 4599). The function it returns is the global
  * teardown.
  *
  * `launchServer()` is the same path for spec-local servers, for example a
@@ -26,12 +24,9 @@ import { request } from "@playwright/test";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
 const bin = path.join(root, "bin", "bellpr.mjs");
-const signInPattern = /http:\/\/127\.0\.0\.1:\d+\/auth\?t=[\w-]+/;
+const addressPattern = /→ (http:\/\/\S+)\s/;
 const startTimeoutMs = 60_000;
 const stopTimeoutMs = 10_000;
-
-/** The server log with sign-in tokens masked, for error messages. */
-const masked = (text) => text.replace(/([?&]t=)[\w-]+/g, "$1***");
 
 /** A free port on 127.0.0.1, from the operating system. */
 export async function freePort() {
@@ -81,29 +76,29 @@ function serverEnvironment({ home, dataDir, fakeBin, env }) {
   return result;
 }
 
-/** Resolves with the sign-in link the server prints at startup. */
-function waitForSignIn(child, log) {
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => {
-      finish(new Error(`BELL PR did not print a sign-in link within ${startTimeoutMs / 1000} s:\n${masked(log.text)}`));
-    }, startTimeoutMs);
-    const check = () => {
-      const match = signInPattern.exec(log.text);
-      if (match) finish(undefined, match[0]);
-    };
-    const exited = (code, signal) =>
-      finish(new Error(`BELL PR exited (${signal ?? code}) before it printed a sign-in link:\n${masked(log.text)}`));
-    function finish(error, link) {
-      clearTimeout(timer);
-      log.onData = undefined;
-      child.off("exit", exited);
-      if (error) reject(error);
-      else resolve(link);
-    }
-    log.onData = check;
-    child.once("exit", exited);
-    check();
-  });
+/** Resolves with the address the server prints at startup. */
+function waitForAddress(child, log) {
+  const { promise, resolve, reject } = Promise.withResolvers();
+  const timer = setTimeout(() => {
+    finish(new Error(`BELL PR did not print its address within ${startTimeoutMs / 1000} s:\n${log.text}`));
+  }, startTimeoutMs);
+  const check = () => {
+    const match = addressPattern.exec(log.text);
+    if (match) finish(undefined, match[1]);
+  };
+  const exited = (code, signal) =>
+    finish(new Error(`BELL PR exited (${signal ?? code}) before it printed its address:\n${log.text}`));
+  function finish(error, address) {
+    clearTimeout(timer);
+    log.onData = undefined;
+    child.off("exit", exited);
+    if (error) reject(error);
+    else resolve(address);
+  }
+  log.onData = check;
+  child.once("exit", exited);
+  check();
+  return promise;
 }
 
 /** Ends the server's process group, then forcefully if it does not exit. */
@@ -137,15 +132,14 @@ async function completeOnboarding(context) {
 }
 
 /**
- * Starts `bell-pr start` and signs in. Options:
+ * Starts `bell-pr start`. Options:
  * - `port`: default a free port from the operating system;
  * - `env`: extra environment variables (undefined removes one);
  * - `dataDir`: use this data dir, which stop() leaves in place;
  * - `seed(dataDir)`: writes files into the data dir before the start;
  * - `settingsPut`: false skips marking onboarding done, to see a first
  *   start.
- * Resolves with the base URL, a storage state file holding the session
- * cookie, the data dir and stop().
+ * Resolves with the base URL, the data dir and stop().
  */
 export async function launchServer(options = {}) {
   const { env = {}, seed, settingsPut = true } = options;
@@ -188,20 +182,17 @@ export async function launchServer(options = {}) {
     };
     child.stdout.setEncoding("utf8").on("data", collect);
     child.stderr.setEncoding("utf8").on("data", collect);
-    const signIn = new URL(await waitForSignIn(child, log));
+    const address = new URL(await waitForAddress(child, log));
     const baseURL = `http://127.0.0.1:${port}`;
-    if (signIn.origin !== baseURL)
-      throw new Error(`BELL PR printed a sign-in link for ${signIn.origin}, not ${baseURL}.`);
-    const storageState = path.join(temp, "storage-state.json");
-    const context = await request.newContext({ baseURL });
-    try {
-      const signedIn = await context.get(signIn.pathname + signIn.search);
-      if (!signedIn.ok())
-        throw new Error(`Signing in answered ${signedIn.status()}.`);
-      if (settingsPut) await completeOnboarding(context);
-      await context.storageState({ path: storageState });
-    } finally {
-      await context.dispose();
+    if (address.origin !== baseURL)
+      throw new Error(`BELL PR printed ${address.origin}, not ${baseURL}.`);
+    if (settingsPut) {
+      const context = await request.newContext({ baseURL });
+      try {
+        await completeOnboarding(context);
+      } finally {
+        await context.dispose();
+      }
     }
     let stopped;
     const stop = () =>
@@ -210,7 +201,7 @@ export async function launchServer(options = {}) {
         process.off("exit", killOnExit);
         await removeTemp();
       })());
-    return { baseURL, storageState, dataDir, stop };
+    return { baseURL, dataDir, stop };
   } catch (error) {
     if (child) await stopProcess(child);
     process.off("exit", killOnExit);
@@ -226,7 +217,6 @@ export default async function globalSetup() {
   const port = Number(process.env.BELLPR_E2E_PORT || 4599);
   const server = await launchServer({ port });
   process.env.BELLPR_E2E_BASE_URL = server.baseURL;
-  process.env.BELLPR_E2E_STORAGE_STATE = server.storageState;
   process.env.BELLPR_E2E_DATA_DIR = server.dataDir;
   return () => server.stop();
 }

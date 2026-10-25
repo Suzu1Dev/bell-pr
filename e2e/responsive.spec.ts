@@ -230,7 +230,6 @@ async function expectFits(
 ) {
   const context = await browser.newContext({
     baseURL: server.baseURL,
-    storageState: server.storageState,
     locale: "en-US",
     timezoneId: "UTC",
     viewport,
@@ -299,7 +298,6 @@ test.describe("every page", () => {
       for (const width of [900, 1024, 1100, 1181, 1280, 1440]) {
         const context = await browser.newContext({
           baseURL: server!.baseURL,
-          storageState: server!.storageState,
           viewport: { width, height: 800 },
         });
         try {

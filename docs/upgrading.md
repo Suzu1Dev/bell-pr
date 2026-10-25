@@ -19,8 +19,8 @@ Nothing is migrated or moved behind your back.
      version;
    - Docker: build or pull the new image and replace the container with
      the same volumes, as [Docker](docker.md#update) describes.
-4. Start BELL PR again and sign in with the link it prints, or with
-   `bell-pr open`. Every restart signs browsers out.
+4. Start BELL PR again. It prints its address, and `bell-pr open` opens it
+   again whenever you need it.
 
 `bell-pr version` shows the version you run and its release date.
 

@@ -7,6 +7,15 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Removed
+
+- **Sign-in.** BELL PR no longer signs anyone in: the session cookie, the
+  one-time sign-in links, the `/auth` page and the `auth_required` error code
+  are gone. The start line prints the plain address (`http://127.0.0.1:4311`),
+  and `bell-pr open` prints that address and opens it (`--print` only prints
+  it). BELL PR does not authenticate anyone, so put an authenticating proxy in
+  front of it before you reach it from another machine.
+
 ## [1.0.0-rc.1] - 2026-10-20
 
 The first public release candidate of BELL PR, open source under the

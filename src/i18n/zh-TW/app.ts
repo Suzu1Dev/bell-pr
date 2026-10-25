@@ -56,11 +56,6 @@ const m: Translation<typeof en> = {
     openOnGitHub: "在 GitHub 上開啟",
     profile: "個人設定",
   },
-  sessionEnded: {
-    title: "工作階段已結束。",
-    text: "請在終端機執行這個指令，取得新的登入連結並開啟。在那之前這個頁面會維持原樣，你可以先複製輸入過的內容。",
-    command: `${product.binNames[0]} open`,
-  },
   presentation: {
     sampleBadge: "示範專案",
   },

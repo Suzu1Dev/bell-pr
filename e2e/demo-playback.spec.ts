@@ -75,7 +75,6 @@ test("demo=play plays the sample from queued to a published sample PR, with no t
   test.setTimeout(90_000);
   const context = await browser.newContext({
     baseURL: server.baseURL,
-    storageState: server.storageState,
     viewport: { width: 1440, height: 900 },
     locale: "en-US",
     timezoneId: "UTC",
@@ -214,7 +213,6 @@ test("while capturing, a played answer starts on the same tick every time and th
   test.setTimeout(90_000);
   const context = await browser.newContext({
     baseURL: server.baseURL,
-    storageState: server.storageState,
     viewport: { width: 1440, height: 900 },
     locale: "en-US",
     timezoneId: "UTC",
@@ -267,7 +265,6 @@ test("the chat scrolls smoothly unless the person prefers reduced motion", async
   for (const reducedMotion of ["no-preference", "reduce"] as const) {
     const context = await browser.newContext({
       baseURL: server.baseURL,
-      storageState: server.storageState,
       viewport: { width: 1440, height: 900 },
       locale: "en-US",
       reducedMotion,
@@ -305,7 +302,6 @@ test("the chat scrolls smoothly unless the person prefers reduced motion", async
 test("stopping the sample's team sends nothing and leaves it stopped", async ({ browser }) => {
   const context = await browser.newContext({
     baseURL: server.baseURL,
-    storageState: server.storageState,
     viewport: { width: 1440, height: 900 },
     locale: "en-US",
     timezoneId: "UTC",

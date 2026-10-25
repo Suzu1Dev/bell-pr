@@ -20,11 +20,10 @@ import { launchServer, type LaunchedServer } from "./start-server.mjs";
 const panel = (page: Page) => page.locator(".settings-panel");
 const sectionTitle = (page: Page) => panel(page).locator("h2");
 
-/** A signed-in page on a spec-local server; closed with the server. */
+/** A page on a spec-local server; closed with the server. */
 async function openOn(browser: Browser, server: LaunchedServer) {
   const context = await browser.newContext({
     baseURL: server.baseURL,
-    storageState: server.storageState,
     locale: "en-US",
   });
   return { page: await context.newPage(), close: () => context.close() };

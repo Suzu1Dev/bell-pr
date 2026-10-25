@@ -139,7 +139,6 @@ function opener(project: () => RealProject) {
   return async (browser: Browser) => {
     const context = await browser.newContext({
       baseURL: project().baseURL,
-      storageState: project().storageState,
       viewport: { width: 1440, height: 900 },
       locale: "en-US",
       timezoneId: "UTC",
@@ -321,7 +320,7 @@ test.describe("a Learn-by-hand run in review, marked ready", () => {
     // it from a first one, and mark that version ready on the second.
     const first = await startRealProject();
     try {
-      const api = await request.newContext({ baseURL: first.baseURL, storageState: first.storageState });
+      const api = await request.newContext({ baseURL: first.baseURL });
       const { files: diff } = (await (await api.get(`/api/runs/${runId}/diff`)).json()) as {
         files: { path: string; fingerprint: string }[];
       };

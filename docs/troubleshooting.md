@@ -19,54 +19,33 @@ none runs, the port that a start would use.
 
 Contents:
 
-- [I lost the sign-in link](#i-lost-the-sign-in-link)
+- [I lost the address](#i-lost-the-address)
 - [Error codes](#error-codes), one section per code
 - [Publishing was blocked by a project rule, an issue or pacing](#publishing-was-blocked-by-a-project-rule-an-issue-or-pacing)
 - [BELL PR does not start](#bell-pr-does-not-start)
 - [Runs that wait, stop or cannot be reviewed](#runs-that-wait-stop-or-cannot-be-reviewed)
 - [Collecting details for a support request](#collecting-details-for-a-support-request)
 
-## I lost the sign-in link
+## I lost the address
 
-BELL PR has no accounts and no passwords. A browser signs in with a link
-that the server prints when it starts:
-
-```text
-BELL PR 1.0.0-rc.1 → http://127.0.0.1:4311/auth?t=…
-```
-
-That printed link works until BELL PR restarts. Once a browser has signed
-in, its session cookie lasts 30 days, but every restart of BELL PR signs
-all browsers out.
-
-To get a new link at any time, run this on the computer where BELL PR runs,
-as the same user:
+`bell-pr open` prints the address of the BELL PR that runs with the data
+directory and opens it in your browser. Run it on the computer where BELL PR
+runs, as the same user:
 
 ```sh
 bell-pr open
 ```
 
-It asks the running BELL PR for a one-time link and opens it in your
-browser. The link works once, within two minutes.
-
 - **Started with `npx`:** run `npx bell-pr open`.
 - **No browser on that machine** (a server, SSH): `bell-pr open --print`
-  only prints the link; open it in a browser that reaches BELL PR.
+  only prints the address; open it in a browser that reaches BELL PR.
 - **Another data directory:** `bell-pr open --data-dir <dir>`, with the
   directory you started BELL PR with.
 - **Docker:** `docker exec <container> bell-pr open --print`.
-- **systemd service:** the service never opens a browser. Run
-  `bell-pr open` in a terminal on that machine after every start or
-  restart.
-- **Windows:** `bell-pr open` works inside WSL2, where BELL PR runs, not in
-  a Windows terminal.
-
-When the session ends while the app is open, BELL PR shows a "Your session
-ended" message with the command to run. Your page stays as it is, so you
-can copy anything you typed before you sign in again.
+- **systemd service:** run `bell-pr open` in a terminal on that machine.
 
 If `bell-pr open` says that no BELL PR is running with that data directory,
-start BELL PR (`bell-pr`) and use the link it prints.
+start BELL PR (`bell-pr`) and use the address it prints.
 
 ## Error codes
 
@@ -74,13 +53,6 @@ The errors below carry a stable code (`code` in the API's JSON body;
 `server_unreachable` comes from the app itself), and many come with the
 commands that fix them, which the app shows with a copy button. Text in
 quotes is the English message; the app shows it in your language.
-
-### `auth_required`
-
-"Sign in to BELL PR first …" The browser has no valid session (HTTP 401),
-because BELL PR restarted, the cookie is older than 30 days, or the browser
-opened BELL PR at another address or port. Get a new link as described in
-[I lost the sign-in link](#i-lost-the-sign-in-link).
 
 ### `server_unreachable`
 
@@ -91,7 +63,7 @@ restarting, or it now runs on another port.
 - Look at the terminal (or `docker logs <container>`, or
   `journalctl --user -u bell-pr` for the systemd service) to see whether it
   is still running.
-- Start it again with `bell-pr`, then sign in with the new link.
+- Start it again with `bell-pr`, then use the address it prints.
 - `curl http://127.0.0.1:4311/api/health` answers
   `{"name":"bell-pr","version":"…"}` while BELL PR runs on port 4311.
 

@@ -223,7 +223,6 @@ for (const locale of locales)
     test(`${route.name} in ${locale} fits and is captured at every width`, async ({ browser }) => {
       const context = await browser.newContext({
         baseURL: server!.baseURL,
-        storageState: server!.storageState,
         locale: "en-US",
         timezoneId: "UTC",
       });
@@ -259,7 +258,6 @@ for (const locale of locales)
   test(`run-check in ${locale} fits and is captured at every width once the check passed`, async ({ browser }) => {
     const context = await browser.newContext({
       baseURL: server!.baseURL,
-      storageState: server!.storageState,
       locale: "en-US",
       timezoneId: "UTC",
     });

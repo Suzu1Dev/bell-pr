@@ -70,7 +70,7 @@ body:
     id: logs
     attributes:
       label: Error codes, messages and logs
-      description: The error code and text BELL PR showed, and the relevant lines of the local service log. Remove sign-in links, tokens and private data.
+      description: The error code and text BELL PR showed, and the relevant lines of the local service log. Remove tokens and private data.
       render: text
   - type: checkboxes
     id: checks
@@ -79,7 +79,7 @@ body:
       options:
         - label: I searched the existing issues and found no report of this problem.
           required: true
-        - label: I removed sign-in links, tokens and private data from everything I pasted.
+        - label: I removed tokens and private data from everything I pasted.
           required: true
         - label: This is not a security vulnerability (those go through SECURITY.md).
           required: true

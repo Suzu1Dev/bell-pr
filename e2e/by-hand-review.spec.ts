@@ -185,7 +185,6 @@ async function expectAccessible(page: Page, selector: string) {
 async function open(browser: Browser, hash: string) {
   const context = await browser.newContext({
     baseURL: server.baseURL,
-    storageState: server.storageState,
     viewport: { width: 1440, height: 900 },
     locale: "en-US",
     timezoneId: "UTC",

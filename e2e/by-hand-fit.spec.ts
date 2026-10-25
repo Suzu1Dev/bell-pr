@@ -82,7 +82,6 @@ async function openDialog(page: Page) {
 test("on a QEMU-like project the dialog offers the fitted guide, starts a fitted run, and shows the server's refusal when the rules changed", async ({ browser }) => {
   const context = await browser.newContext({
     baseURL: server.baseURL,
-    storageState: server.storageState,
     viewport: { width: 1440, height: 900 },
     locale: "en-US",
     timezoneId: "UTC",

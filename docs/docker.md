@@ -38,17 +38,17 @@ docker run -d --name bell-pr \
 ```
 
 - `-p 127.0.0.1:4311:4311` publishes BELL PR on this computer only. Do not
-  publish it on all interfaces; for access from other machines, put an
-  HTTPS reverse proxy in front as [docs/self-hosting.md](self-hosting.md)
-  describes.
+  publish it on all interfaces: BELL PR has no sign-in, so anything that
+  reaches the port can use it. For access from other machines, put an HTTPS
+  reverse proxy that authenticates in front, as
+  [docs/self-hosting.md](self-hosting.md) describes.
 - `bellpr-data` holds repositories, worktrees and run records (`/data`,
   `BELLPR_DATA_DIR`). `bellpr-home` keeps the container user's home:
   CLI sign-ins, the git configuration and anything you install with
   `npm install -g`.
 - `BELLPR_PUBLIC_URL` must be the address your browser uses. BELL PR refuses
-  requests for any other address, and prints its sign-in links for this
-  one. If you publish another port, for example `-p 127.0.0.1:8080:4311`,
-  set `BELLPR_PUBLIC_URL=http://localhost:8080`.
+  requests for any other address. If you publish another port, for example
+  `-p 127.0.0.1:8080:4311`, set `BELLPR_PUBLIC_URL=http://localhost:8080`.
 - `GH_TOKEN` lets `gh` and git push to GitHub. Instead, you can sign in once
   with `docker exec -it bell-pr gh auth login`; the login stays in
   `bellpr-home`.
@@ -67,26 +67,25 @@ Every `BELLPR_*` setting in [.env.example](../.env.example) works with
 `-e`; [Configuration](configuration.md) describes them. The image sets
 `BELLPR_HOST=0.0.0.0`, `BELLPR_DATA_DIR=/data` and `BELLPR_NO_OPEN=1`.
 
-## Sign in
+## Get the address
 
-BELL PR prints a sign-in link when it starts. Read it from the log:
+BELL PR prints its address when it starts. Read it from the log:
 
 ```sh
 docker logs bell-pr
 ```
 
-or ask the running server for a new one-time link (it works once, within
-two minutes), with your container's name in place of `bell-pr`:
+or ask the running server for its address again, with your container's name
+in place of `bell-pr`:
 
 ```sh
 docker exec <container> bell-pr open --print
 ```
 
-The browser never opens by itself from a container, so `--print` is the
-way to go: open the printed link in your browser. The session lives in
-memory: after a restart or an update, sign in again with a new link. The
-health check (`GET /api/health`) is built into the image, so `docker ps`
-shows when BELL PR is ready.
+The browser never opens by itself from a container, so `--print` is the way to
+go: open the printed address in your browser. The health check
+(`GET /api/health`) is built into the image, so `docker ps` shows when BELL PR
+is ready.
 
 To check the tools inside the container, run
 `docker exec bell-pr bell-pr doctor`.
@@ -160,11 +159,7 @@ Docker stays **beta** in 1.0.0-rc.1 because the agent sandbox needs the
 three `--security-opt` options above. What the release candidate verified
 on Linux (Docker Engine 29.7):
 
-- the image builds, reports healthy within seconds and prints its sign-in
-  link;
-- `docker exec <container> bell-pr open --print` gives a one-time link that
-  signs in once; after `docker restart`, the old session is refused and a
-  new link signs in;
+- the image builds, reports healthy within seconds and prints its address;
 - git, the GitHub CLI, the Codex CLI, bubblewrap and socat are in the
   image, and `bell-pr doctor` runs in it;
 - the sandbox probe in the table above: it fails with the default options

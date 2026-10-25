@@ -234,7 +234,6 @@ test.afterAll(async () => {
 async function open(browser: Browser, hash: string, { locale = "en", width = 1440 }: { locale?: Locale; width?: number } = {}) {
   const context = await browser.newContext({
     baseURL: server.baseURL,
-    storageState: server.storageState,
     viewport: { width, height: width < 760 ? 844 : 900 },
     locale: locale === "en" ? "en-US" : locale,
     timezoneId: "UTC",

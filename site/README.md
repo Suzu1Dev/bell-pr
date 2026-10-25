@@ -12,7 +12,7 @@ as an HTTP header. Light theme only; the layout works from 390 to 1440 px.
 | Path | What it is |
 | --- | --- |
 | `index.html` | Hero with the `npx bell-pr` command, how it works, screenshots, features, the open-source license, privacy and trust, FAQ |
-| `install.html` | Requirements, platforms, npm, sign-in and `bell-pr open`, Docker, next steps |
+| `install.html` | Requirements, platforms, npm, the address and `bell-pr open`, Docker, next steps |
 | `site.css`, `site.js` | Styles, and the copy buttons (the pages work without the script) |
 | `assets/brand/` | Logo, favicons and the social preview image, copied from `public/` |
 | `assets/fonts/` | Self-hosted DM Sans and IBM Plex Mono (SIL Open Font License 1.1, licenses included) |

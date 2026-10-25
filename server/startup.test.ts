@@ -192,7 +192,7 @@ test("resolveConfig refuses settings that cannot work, in the request locale", (
       [{ port: "4311x" }, {}, /--port/],
       [{}, { BELLPR_PORT: "70000" }, /BELLPR_PORT/],
       [{ host: "bad host" }, {}, /--host/],
-      [{ dev: true, host: "0.0.0.0" }, {}, /Development mode turns sign-in off/],
+      [{ dev: true, host: "0.0.0.0" }, {}, /Development mode only listens on this computer/],
       [{}, { BELLPR_DEV: "1", BELLPR_HOST: "192.168.1.5" }, /Development mode/],
       // Another address needs the public URL, or the guard refuses every request.
       [{ host: "192.168.1.5" }, {}, /To listen on 192\.168\.1\.5, set BELLPR_PUBLIC_URL/],
@@ -297,7 +297,7 @@ test("resolveConfig points at data in ./.bellpr without moving it", async () => 
   }
 });
 
-test("startServer serves the app with an in-memory session token, takes the lock and releases it", async () => {
+test("startServer serves the app, takes the lock and releases it", async () => {
   const box = await sandbox();
   const port = await freePort();
   const lines: string[] = [];
@@ -326,29 +326,17 @@ test("startServer serves the app with an in-memory session token, takes the lock
         JSON.parse(readFileSync(path.join(repoRoot, "package.json"), "utf8")).version,
       );
       assert.equal(running.url, `http://127.0.0.1:${port}`);
-      const token = new URL(running.signInUrl).searchParams.get("t")!;
-      assert.match(token, /^[A-Za-z0-9_-]{43}$/);
-      assert.equal(new URL(running.signInUrl).pathname, "/auth");
-      assert.ok(lines.some((line) => line.endsWith(`→ ${running.signInUrl}`)), lines.join("\n"));
+      assert.ok(lines.some((line) => line.endsWith(`→ ${running.url}`)), lines.join("\n"));
       assert.ok(lines.some((line) => line.startsWith(`BELL PR ${version} → `)), lines.join("\n"));
       // The old ./.bellpr only gets a hint.
       assert.ok(lines.some((line) => line.includes("bell-pr start --data-dir ./.bellpr")));
-      // The browser gets a one-time link of its own, never the session link.
-      assert.equal(opened.length, 1);
-      const openedUrl = new URL(opened[0]);
-      assert.equal(openedUrl.origin, running.url);
-      assert.equal(openedUrl.pathname, "/auth");
-      assert.match(openedUrl.searchParams.get("t")!, /^[A-Za-z0-9_-]{43}$/);
-      assert.ok(!opened[0].includes(token));
-      // The token exists in memory only.
-      assert.ok(!JSON.stringify(process.env).includes(token));
-      assert.ok(!process.argv.join(" ").includes(token));
-      assert.ok(!readFileSync(path.join(box.data, "bellpr.lock"), "utf8").includes(token));
-      assert.ok(!readFileSync(path.join(box.data, "state.json"), "utf8").includes(token));
+      // The browser gets the address that was printed.
+      assert.deepEqual(opened, [running.url]);
 
       const lock = JSON.parse(readFileSync(path.join(box.data, "bellpr.lock"), "utf8"));
       assert.equal(lock.pid, process.pid);
       assert.equal(lock.port, port);
+      assert.equal(lock.url, running.url);
       assert.equal(lock.version, version);
       assert.equal(statSync(path.join(box.data, "bellpr.lock")).mode & 0o777, 0o600);
       assert.equal(statSync(path.join(box.data, "state.json")).mode & 0o777, 0o600);
@@ -357,21 +345,10 @@ test("startServer serves the app with an in-memory session token, takes the lock
       const health = await get(`http://127.0.0.1:${port}/api/health`);
       assert.equal(health.status, 200);
       assert.deepEqual(JSON.parse(health.body), { name: "bell-pr", version });
-      // Without a session the app answers the sign-in page; the printed link signs in.
-      assert.equal((await get(`http://127.0.0.1:${port}/`)).status, 401);
-      const signIn = await get(running.signInUrl);
-      assert.equal(signIn.status, 200);
-      const cookie = (signIn.headers["set-cookie"] as string[])[0].split(";")[0];
-      const page = await get(`http://127.0.0.1:${port}/`, { cookie });
+      // The app answers without a sign-in.
+      const page = await get(`http://127.0.0.1:${port}/`);
       assert.equal(page.status, 200);
       assert.match(String(page.headers["content-type"]), /text\/html/);
-      // The opened link sets the same session cookie, once.
-      const openedSignIn = await get(opened[0]);
-      assert.equal(openedSignIn.status, 200);
-      assert.equal((openedSignIn.headers["set-cookie"] as string[])[0].split(";")[0], cookie);
-      const reused = await get(opened[0]);
-      assert.equal(reused.status, 401);
-      assert.equal(reused.headers["set-cookie"], undefined);
 
       // A second start in this process sees the lock it holds.
       const otherPort = await freePort();
@@ -609,7 +586,7 @@ test("a symlinked bin entry starts the server", async () => {
   try {
     await started(server);
     assert.ok(
-      server.stdout().includes(`BELL PR ${version} → http://127.0.0.1:${port}/auth?t=`),
+      server.stdout().includes(`BELL PR ${version} → http://127.0.0.1:${port}\n`),
       server.stdout(),
     );
     const health = await get(`http://127.0.0.1:${port}/api/health`);
@@ -660,7 +637,7 @@ test("a second instance on the same data dir exits 1 and leaves state.json byte-
   }
 });
 
-test("an occupied port exits non-zero and points to bell-pr open, never to a bare URL", async () => {
+test("an occupied port exits non-zero and points to bell-pr open", async () => {
   const box = await sandbox();
   const port = await freePort();
   const first = launch(cliEntry, ["start", "--port", String(port), "--data-dir", box.data], box.env);
@@ -676,12 +653,7 @@ test("an occupied port exits non-zero and points to bell-pr open, never to a bar
     const { code } = await second.exited;
     assert.notEqual(code, 0);
     const output = second.stdout() + second.stderr();
-    assert.match(output, /BELL PR is already running at http:\/\/127\.0\.0\.1:\d+\. Run `bell-pr open` to get a sign-in link; add --data-dir <dir> if that BELL PR was started with another data directory\./);
-    assert.doesNotMatch(output, /auth\?t=/);
-    assert.ok(
-      !output.split("\n").some((line) => /^\s*https?:\/\/\S+\s*$/.test(line)),
-      output,
-    );
+    assert.match(output, /BELL PR is already running at http:\/\/127\.0\.0\.1:\d+\. Run `bell-pr open` to open it; add --data-dir <dir> if that BELL PR was started with another data directory\./);
     // The port is checked before anything is written.
     assert.equal(existsSync(otherData), false);
 

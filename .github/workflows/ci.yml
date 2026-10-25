@@ -81,7 +81,7 @@ jobs:
           version="$(node -p "require(process.env.GITHUB_WORKSPACE + '/package.json').version")"
           bell-pr --version
           bell-pr --version | grep -F "$version"
-      - name: Start the installed server and sign in
+      - name: Start the installed server
         working-directory: ${{ runner.temp }}
         env:
           BELLPR_DATA_DIR: ${{ runner.temp }}/d
@@ -93,13 +93,9 @@ jobs:
           export PATH="$RUNNER_TEMP/fake-bin:$RUNNER_TEMP/p/bin:$PATH"
           bell-pr start --port 4598 > server.log 2>&1 &
           server=$!
-          # The log holds the sign-in token; mask it.
-          trap 'kill "$server" 2>/dev/null || true; sed "s/t=[A-Za-z0-9_-]*/t=***/" server.log' EXIT
+          trap 'kill "$server" 2>/dev/null || true; cat server.log' EXIT
           curl -fsS --retry 30 --retry-connrefused --retry-delay 1 http://127.0.0.1:4598/api/health
           echo
-          signin="$(grep -o 'http://127\.0\.0\.1:4598/auth?t=[A-Za-z0-9_-]*' server.log | head -1)"
-          test -n "$signin"
-          curl -fsS -c jar -b jar -o /dev/null "$signin"
           type="$(curl -fsS -b jar -o /dev/null -w '%{content_type}' http://127.0.0.1:4598/)"
           echo "GET / -> $type"
           case "$type" in text/html*) ;; *) exit 1 ;; esac

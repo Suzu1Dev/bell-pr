@@ -48,10 +48,10 @@ seconds.
    npx bell-pr
    ```
 
-2. It prints a sign-in link and opens BELL PR in your browser, signed in:
+2. It prints its address and opens BELL PR in your browser:
 
    ```text
-   BELL PR 1.0.0-rc.1 → http://127.0.0.1:4311/auth?t=…
+   BELL PR 1.0.0-rc.1 → http://127.0.0.1:4311
    ```
 
 3. Walk through Welcome: choose your **language**, check your
@@ -60,8 +60,8 @@ seconds.
 4. Take the sample tour, import a repository, or find a project to
    contribute to.
 
-**Lost the sign-in link? Run `bell-pr open`** (or `npx bell-pr open` if you
-started with `npx`). It opens a new one-time link.
+**Lost the address? Run `bell-pr open`** (or `npx bell-pr open` if you
+started with `npx`). It prints the address again and opens it.
 
 To keep BELL PR installed, run `npm install -g bell-pr`, then start it with
 `bell-pr`. The [getting started guide](docs/getting-started.md) walks
@@ -323,9 +323,10 @@ Details: [Privacy and your data](docs/privacy-and-data.md).
   and a repository whose Git configuration could run programs is refused.
   Agents still run the project's code, so import only projects you are
   willing to run on this computer.
-- **Session sign-in.** BELL PR listens on `127.0.0.1` and accepts a browser
-  only after it opened a sign-in link. The session secret lives in memory,
-  so a restart signs everyone out. Requests from other sites are refused.
+- **No sign-in.** BELL PR does not authenticate anyone. It listens on
+  `127.0.0.1` by default, so only this computer can reach it. Anyone who can
+  reach its address can use everything it can do. Requests from other sites
+  are refused.
 - **Unsandboxed agents are an explicit opt-in.** Without the sandbox (for
   example in Docker with default settings), a Claude Code agent that edits
   files is refused. You can allow it under **Settings → Agent safety** or

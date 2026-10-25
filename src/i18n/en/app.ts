@@ -76,13 +76,6 @@ const app = {
     openOnGitHub: "Open on GitHub",
     profile: "Profile settings",
   },
-  /** Shown when the sign-in session ended (for example after a restart). */
-  sessionEnded: {
-    title: "Your session ended.",
-    text: "Run this command in a terminal to get a new sign-in link and open it. This page stays as it is until then, so you can copy anything you typed.",
-    /** The command that prints and opens a new sign-in link; never translated. */
-    command: `${product.binNames[0]} open`,
-  },
   /** Presentation mode (present=1). */
   presentation: {
     /** The top bar's badge while the sample project is shown. */

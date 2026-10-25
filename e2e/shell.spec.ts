@@ -31,11 +31,10 @@ const homeHeading = (page: Page) => page.locator(".home-page h1");
 const sidebarButton = (page: Page, name: string) =>
   page.locator(`#workspace-sidebar button[title="${name}"]`);
 
-/** A signed-in page on a spec-local server; closed with the server. */
+/** A page on a spec-local server; closed with the server. */
 async function openOn(browser: Browser, server: LaunchedServer) {
   const context = await browser.newContext({
     baseURL: server.baseURL,
-    storageState: server.storageState,
     locale: "en-US",
   });
   return { page: await context.newPage(), close: () => context.close() };
@@ -431,7 +430,6 @@ test("the import dialog suggests ~/projects/repository, which imports, and adds 
     // A browser on Windows, where BELL PR may run inside WSL2.
     const context = await browser.newContext({
       baseURL: server.baseURL,
-      storageState: server.storageState,
       locale: "en-US",
     });
     try {
@@ -561,59 +559,6 @@ test("freeing a published run's disk space warns that follow-ups and syncing sto
     await expect(freeing).toContainText(modals.runs.freeConfirmPublished);
     await freeing.getByRole("button", { name: common.actions.cancel }).click();
     await expect(freeing).toHaveCount(0);
-  } finally {
-    await close();
-    await server.stop();
-  }
-});
-
-test("an ended session keeps the page and says how to sign in again", async ({ page }) => {
-  await page.goto("/#/runs/demo-run/draft");
-  await expect(page.locator("#workspace-tab-draft")).toHaveAttribute("aria-selected", "true");
-  let loads = 0;
-  page.on("load", () => loads++);
-  // The next runs-list poll finds the session gone.
-  await page.route("**/api/runs", (route) =>
-    route.fulfill({ status: 401, json: { error: "Sign in again.", code: "auth_required" } }),
-  );
-  const notice = page.getByRole("alert").filter({ hasText: app.sessionEnded.title });
-  await expect(notice).toBeVisible({ timeout: 15_000 });
-  await expect(notice.locator("code")).toHaveText(app.sessionEnded.command);
-  expect(loads).toBe(0);
-  await expect(page).toHaveURL(/#\/runs\/demo-run\/draft$/);
-  await notice.getByRole("button", { name: app.dismissNotice }).click();
-  await expect(notice).toHaveCount(0);
-});
-
-test("after the session ends, a view whose code cannot load keeps the page and the typed text", async ({ browser }) => {
-  const server = await launchServer({ seed });
-  const { page, close } = await openOn(browser, server);
-  const [run] = seededState(server.dataDir).runs;
-  const typed = "Typed before the session ended";
-  try {
-    await page.goto(`/#/runs/${run.id}/draft`);
-    // The saved title shows first; then the person types over it.
-    await expect(page.locator("#pr-title")).toHaveValue(run.title);
-    await page.locator("#pr-title").fill(typed);
-    let loads = 0;
-    page.on("load", () => loads++);
-    // The session ends; code that was not loaded yet now comes back as
-    // the sign-in page, which must not replace the page.
-    await page.context().clearCookies();
-    await page.locator("#workspace-tab-overview").click();
-    const notice = page.getByRole("alert").filter({ hasText: app.sessionEnded.title });
-    const fallback = page.getByRole("alert").filter({ hasText: app.errorBoundary.title });
-    await expect(notice).toBeVisible({ timeout: 15_000 });
-    await expect(fallback).toBeVisible();
-    await page.locator("#workspace-tab-draft").click();
-    await expect(page.locator("#pr-title")).toHaveValue(typed);
-
-    await sidebarButton(page, app.pages.settings).click();
-    await expect(fallback).toBeVisible();
-    await expect(notice).toBeVisible();
-    await page.goBack();
-    await expect(page.locator("#pr-title")).toHaveValue(typed);
-    expect(loads).toBe(0);
   } finally {
     await close();
     await server.stop();

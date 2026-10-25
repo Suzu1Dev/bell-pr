@@ -61,7 +61,6 @@ function byHandRun(extra: Record<string, unknown> = {}, byHand: Record<string, u
 async function open(browser: Browser, project: RealProject) {
   const context = await browser.newContext({
     baseURL: project.baseURL,
-    storageState: project.storageState,
     viewport: { width: 1440, height: 900 },
     locale: "en-US",
     timezoneId: "UTC",
@@ -483,7 +482,6 @@ test("against the real server: no AI draft or AI line, a PR title of the person'
   });
   const context = await browser.newContext({
     baseURL: project.baseURL,
-    storageState: project.storageState,
     viewport: { width: 1440, height: 900 },
     locale: "en-US",
     timezoneId: "UTC",
@@ -575,7 +573,6 @@ test("against the real server: a run fitted to a QEMU-shaped project's carve-out
   });
   const context = await browser.newContext({
     baseURL: project.baseURL,
-    storageState: project.storageState,
     viewport: { width: 1440, height: 900 },
     locale: "en-US",
     timezoneId: "UTC",

@@ -284,7 +284,6 @@ test("agents are denied credentials and BELL's data outside their own checkout",
     path.join(data, "team-worktrees", "run-1", "task-1"),
     path.join(clone, ".git", "worktrees", "run-1"),
     path.join(data, "repositories", "other-project-2"),
-    path.join(data, "run"),
     path.join(data, "insights"),
   ])
     await mkdir(directory, { recursive: true });
@@ -310,8 +309,6 @@ test("agents are denied credentials and BELL's data outside their own checkout",
   ])
     assert.ok(rules.includes(credential), credential);
   for (const denied of [
-    // One-time sign-in links, also before the folder or file exists.
-    `${data}/run/**`,
     `${data}/*.json`,
     `${data}/*.lock`,
     `${data}/insights/**`,
@@ -342,7 +339,7 @@ test("agents are denied credentials and BELL's data outside their own checkout",
   assert.ok(agentReadDenials(outside).includes(rule(`${data}/**`)));
   // Without the registered directory, BELL's checkout layout still finds it.
   setAgentDataDirectory();
-  assert.ok(agentReadDenials(checkout).includes(rule(`${data}/run/**`)));
+  assert.ok(agentReadDenials(checkout).includes(rule(`${data}/insights/**`)));
 });
 
 test("the sandbox canary's fake mode checks the harness without a model call", () => {
@@ -373,11 +370,11 @@ test("the sandbox canary's fake mode checks the harness without a model call", (
         ["gh-hosts", "blocked"],
         ["network", "blocked"],
         ["env-token", "blocked"],
-        ["open-link", "blocked"],
+        ["data-dir", "blocked"],
       ],
     );
   }
-  assert.ok(report.results[0].argv.sandboxEnabled && report.results[0].argv.deniesSignInLinks);
+  assert.ok(report.results[0].argv.sandboxEnabled && report.results[0].argv.deniesDataDirectory);
   assert.ok(report.results[3].argv.ignoresRules && report.results[3].argv.ignoresProjectDocs);
   // Without the hardening flags the stand-ins behave unsandboxed, and the canary fails.
   const stripped = run(["--fake", "--fake-strip"]);

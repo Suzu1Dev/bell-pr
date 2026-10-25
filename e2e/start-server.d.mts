@@ -23,8 +23,6 @@ export interface LaunchServerOptions {
 export interface LaunchedServer {
   /** For example http://127.0.0.1:41234 */
   baseURL: string;
-  /** A Playwright storage state file holding the session cookie. */
-  storageState: string;
   dataDir: string;
   /** Ends the server and removes its temporary directories. */
   stop(): Promise<void>;
@@ -33,7 +31,7 @@ export interface LaunchedServer {
 /** A free port on 127.0.0.1, from the operating system. */
 export function freePort(): Promise<number>;
 
-/** Starts `bell-pr start` with temporary HOME and data dir, and signs in. */
+/** Starts `bell-pr start` with temporary HOME and data dir. */
 export function launchServer(
   options?: LaunchServerOptions,
 ): Promise<LaunchedServer>;

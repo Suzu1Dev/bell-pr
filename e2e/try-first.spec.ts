@@ -320,7 +320,6 @@ test.describe("the walkthrough's Check yourself on a real agent run", () => {
   async function open(browser: Browser) {
     const context = await browser.newContext({
       baseURL: project.baseURL,
-      storageState: project.storageState,
       viewport: { width: 1440, height: 900 },
       locale: "en-US",
       timezoneId: "UTC",
@@ -357,7 +356,6 @@ test("a tab still open on the question can't change the answer another tab saved
   const project = await startRealProject();
   const context = await browser.newContext({
     baseURL: project.baseURL,
-    storageState: project.storageState,
     viewport: { width: 1440, height: 900 },
     locale: "en-US",
     timezoneId: "UTC",

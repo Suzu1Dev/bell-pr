@@ -119,7 +119,6 @@ test("seeded notes load from /api/learning, 20 contributions at a time", async (
   });
   const context = await browser.newContext({
     baseURL: server.baseURL,
-    storageState: server.storageState,
     locale: "en-US",
   });
   try {
@@ -186,7 +185,7 @@ test("seeded notes load from /api/learning, 20 contributions at a time", async (
   }
 });
 
-/** A signed-in page on a spec-local server; closed with the server. */
+/** A page on a spec-local server; closed with the server. */
 async function onServer(
   browser: Browser,
   options: Parameters<typeof launchServer>[0],
@@ -195,7 +194,6 @@ async function onServer(
   const server = await launchServer(options);
   const context = await browser.newContext({
     baseURL: server.baseURL,
-    storageState: server.storageState,
     locale: "en-US",
   });
   try {

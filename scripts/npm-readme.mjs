@@ -765,15 +765,15 @@ function selfTest() {
   const real = productValues(fs.readFileSync(path.join(repoRoot, "shared", "product.ts"), "utf8"));
   assert.equal(real.name, "BELL PR");
   assert.equal(typeof real.homepageUrl, "string");
-  assert.ok(errorCodesOf(fs.readFileSync(path.join(repoRoot, "shared", "errors.ts"), "utf8")).includes("auth_required"));
+  assert.ok(errorCodesOf(fs.readFileSync(path.join(repoRoot, "shared", "errors.ts"), "utf8")).includes("server_unreachable"));
 
   // Anchors as GitHub makes them.
   const headings = anchors(
-    "# BELL PR\n\n## Support\n\n## Support\n\n### `auth_required`: sign in again\n\n## 快速開始（60 秒）\n\n```\n# not a heading\n```\n\n## [Linked](x.md) *heading*\n",
+    "# BELL PR\n\n## Support\n\n## Support\n\n### `server_unreachable`: reconnect\n\n## 快速開始（60 秒）\n\n```\n# not a heading\n```\n\n## [Linked](x.md) *heading*\n",
   );
   assert.deepEqual(
     [...headings],
-    ["bell-pr", "support", "support-1", "auth_required-sign-in-again", "快速開始60-秒", "linked-heading"],
+    ["bell-pr", "support", "support-1", "server_unreachable-reconnect", "快速開始60-秒", "linked-heading"],
   );
 
   const temp = fs.mkdtempSync(path.join(os.tmpdir(), "bellpr-npm-readme-"));
@@ -856,7 +856,7 @@ function selfTest() {
 
     // --check-docs on a small repository.
     write("shared/product.ts", source(""));
-    write("shared/errors.ts", 'export const errorCodes = [\n  "auth_required",\n  "git_missing",\n] as const;\n');
+    write("shared/errors.ts", 'export const errorCodes = [\n  "server_unreachable",\n  "git_missing",\n] as const;\n');
     write(
       "README.md",
       [
@@ -879,7 +879,7 @@ function selfTest() {
       "# Start\n\n## Install\n\n[Back](../README.md#fixture) [Up](../../x.md)\n[Bad escape](#100%) [Bad file](../README.md#%zz)\n",
     );
     write("docs/images/a.png", "png");
-    write("docs/troubleshooting.md", "# Troubleshooting\n\n## `auth_required`\n\nText about `git_missing` outside a heading.\n");
+    write("docs/troubleshooting.md", "# Troubleshooting\n\n## `server_unreachable`\n\nText about `git_missing` outside a heading.\n");
     write(".gitignore", "ignored.md\n");
     write("ignored.md", "# Ignored\n");
     const git = (...args) => {

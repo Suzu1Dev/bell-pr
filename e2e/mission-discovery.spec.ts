@@ -16,11 +16,10 @@ import { launchServer, type LaunchedServer } from "./start-server.mjs";
 const demo = getDemo("en");
 const widths = [1440, 390];
 
-/** A signed-in page on a spec-local server; closed with `close()`. */
+/** A page on a spec-local server; closed with `close()`. */
 async function openOn(browser: Browser, server: LaunchedServer) {
   const context = await browser.newContext({
     baseURL: server.baseURL,
-    storageState: server.storageState,
     locale: "en-US",
   });
   return { page: await context.newPage(), close: () => context.close() };

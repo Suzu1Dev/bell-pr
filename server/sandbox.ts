@@ -199,10 +199,9 @@ export async function enforceAgentSandbox(
 let agentDataDirectory: string | undefined;
 
 /**
- * Tells the agent settings where BELL keeps its data (state, the
- * one-time sign-in links in `run/`, other runs' checkouts), so agents are
- * denied reading it outside their own checkout. The server sets it when the
- * app is created.
+ * Tells the agent settings where BELL keeps its data (state, other runs'
+ * checkouts), so agents are denied reading it outside their own checkout.
+ * The server sets it when the app is created.
  */
 export function setAgentDataDirectory(directory?: string) {
   agentDataDirectory = directory ? path.resolve(directory) : undefined;
@@ -279,7 +278,7 @@ function owningClone(cwd: string) {
  * of it. A checkout inside it may read its own path only: every other entry
  * on the way down is denied, except the repository its Git metadata lives
  * in (Git inside the sandbox reads it). Files that may appear later, such
- * as the sign-in link in `run/`, are denied whether they exist yet or not.
+ * as the insights cache, are denied whether they exist yet or not.
  */
 function dataDirectoryRules(dataDirectory: string, cwd: string): string[] {
   const root = resolved(dataDirectory);
@@ -290,7 +289,7 @@ function dataDirectoryRules(dataDirectory: string, cwd: string): string[] {
     rules.push(absoluteRule(root, "/**"));
     return rules.filter((rule): rule is string => !!rule);
   }
-  for (const pattern of ["run/**", "insights/**", "*.json", "*.lock", "*-index-*"])
+  for (const pattern of ["insights/**", "*.json", "*.lock", "*-index-*"])
     rules.push(absoluteRule(root, `/${pattern}`));
   const clone = owningClone(cwd);
   let directory = root;

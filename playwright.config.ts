@@ -1,4 +1,4 @@
-// End-to-end tests against the real `bell-pr start`, signed in, with a
+// End-to-end tests against the real `bell-pr start`, with a
 // temporary data dir (see e2e/start-server.mjs).
 //
 //   BELLPR_E2E_PORT=<port> npm run test:e2e
@@ -31,8 +31,6 @@ export default defineConfig({
       use: {
         ...devices["Desktop Chrome"],
         baseURL: `http://127.0.0.1:${port}`,
-        // The shared server's session cookie, written by the global setup.
-        storageState: process.env.BELLPR_E2E_STORAGE_STATE,
         viewport: { width: 1440, height: 900 },
         locale: "en-US",
         timezoneId: "UTC",

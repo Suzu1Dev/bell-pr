@@ -49,20 +49,20 @@ npm install -g bell-pr
 bell-pr
 ```
 
-BELL PR starts on your computer, prints a sign-in link and opens BELL PR
-in your browser, signed in with a one-time link:
+BELL PR starts on your computer, prints its address and opens BELL PR in your
+browser:
 
 ```text
-BELL PR 1.0.0-rc.1 → http://127.0.0.1:4311/auth?t=…
+BELL PR 1.0.0-rc.1 → http://127.0.0.1:4311
 ```
 
-Keep the terminal open: BELL PR runs until you stop it with Ctrl+C. The
-printed link signs a browser in until BELL PR restarts; treat it like a
-password.
+Keep the terminal open: BELL PR runs until you stop it with Ctrl+C. BELL PR has
+no sign-in of its own: anyone who can reach its address can use it. By default
+only this computer can reach it; see [Security model](security-model.md).
 
-> **Lost the sign-in link?** Run `bell-pr open` (or `npx bell-pr open`) on
-> the same computer. It opens a new one-time link. More in
-> [Troubleshooting](troubleshooting.md#i-lost-the-sign-in-link).
+> **Lost the address?** Run `bell-pr open` (or `npx bell-pr open`) on the same
+> computer. It prints the address again and opens it. More in
+> [Troubleshooting](troubleshooting.md#i-lost-the-address).
 
 BELL PR listens on `127.0.0.1:4311`, so only this computer can reach it.
 `bell-pr start --port <port>` picks another port. To run it as a service,

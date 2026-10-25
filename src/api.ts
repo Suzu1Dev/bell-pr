@@ -1,45 +1,9 @@
 import {
   isErrorCode,
-  type ApiErrorBody,
   type ErrorCode,
   type Fix,
 } from "../shared/errors";
 import { getCurrentLocale, getCurrentMessages } from "./i18n";
-
-/**
- * Window event sent once per page when the server answers 401
- * `auth_required`: the session ended, for example because BELL PR
- * restarted. It is cancelable; unless a listener calls preventDefault(),
- * the page reloads, and the server then shows its sign-in page with the
- * steps to get a new link.
- */
-export const authRequiredEvent = "bellpr:auth-required";
-
-declare global {
-  interface WindowEventMap {
-    "bellpr:auth-required": CustomEvent<ApiErrorBody>;
-  }
-}
-
-let sessionEndReported = false;
-
-/** Tells the page once that its session ended; see authRequiredEvent. */
-function reportSessionEnd(body: ApiErrorBody) {
-  if (sessionEndReported || typeof window === "undefined") return;
-  sessionEndReported = true;
-  const proceed = window.dispatchEvent(
-    new CustomEvent<ApiErrorBody>(authRequiredEvent, {
-      detail: body,
-      cancelable: true,
-    }),
-  );
-  if (proceed) window.location?.reload();
-}
-
-/** Whether a request found the session ended; it stays true until a reload. */
-export function sessionEnded() {
-  return sessionEndReported;
-}
 
 interface ApiErrorInit {
   status: number;
@@ -132,8 +96,6 @@ function errorFromBody(status: number, body: unknown) {
     fixes: readFixes(rawFixes),
     details,
   };
-  if (status === 401 && code === "auth_required")
-    reportSessionEnd({ ...raw, error: message } as ApiErrorBody);
   return new ApiError(message, init);
 }
 
@@ -147,9 +109,6 @@ const plainTextType = /^text\/(?!html\b)/i;
  *
  * Failures throw `ApiError` with a message in the UI language:
  * - an error body from the server keeps its status, code, params and fixes;
- * - 401 `auth_required` (the session ended) also sends the
- *   `bellpr:auth-required` event once, which reloads the page into the
- *   server's sign-in page unless a listener cancels it;
  * - no response, or a body that is not the API's JSON (for example a proxy
  *   page while the service is down), gives code `server_unreachable`.
  * Aborting through `options.signal` rejects with the abort error unchanged.

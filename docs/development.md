@@ -37,9 +37,9 @@ npm run dev
 
 This starts the API on port 4311 and the Vite dev server on port 4310,
 both on `127.0.0.1`; open `http://127.0.0.1:4310`. Development mode
-(`BELLPR_DEV=1`, set by the script) turns sign-in off and lets the API
-trust the dev server's port; that trust exists only in development mode,
-and development mode only listens on `127.0.0.1`. `BELLPR_FRONTEND_PORT`
+(`BELLPR_DEV=1`, set by the script) lets the API trust the dev server's port;
+that trust exists only in development mode, and development mode only listens
+on `127.0.0.1`. `BELLPR_FRONTEND_PORT`
 changes the trusted port; keep the `dev:web` script and the proxy in
 `vite.config.ts` in step with it and with `BELLPR_PORT`.
 
@@ -63,8 +63,7 @@ npm start
 
 `npm start` runs the built `bell-pr start --no-open`, so build first:
 without `dist/`, the server warns that the web interface is not built and
-only the API answers. It prints the sign-in link as an installed BELL PR
-does.
+only the API answers. It prints its address as an installed BELL PR does.
 
 In a source checkout, `npx bell-pr` and `bell-pr` run the checkout's own
 `bin/bellpr.mjs`, not the package from npm, and `build/` and `dist/` exist

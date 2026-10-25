@@ -35,7 +35,7 @@ Please include:
 - the steps to reproduce the problem, and what an attacker gains;
 - whether and when you plan to publish your findings.
 
-Do not include real tokens, sign-in links or private data; use test values.
+Do not include real tokens or private data; use test values.
 
 ## What to expect
 
@@ -54,8 +54,7 @@ guarantees:
 
 In scope, because the design relies on them:
 
-- the local server: sign-in, the session token and one-time sign-in links,
-  the host and origin checks, and the content security policy;
+- the local server: the host and origin checks, and the content security policy;
 - the agent sandbox and the environment agents get: the agent CLIs' sandbox
   settings, the credential files agents are denied, the refusal to start
   agents that change code without a sandbox, and the masking of secrets in

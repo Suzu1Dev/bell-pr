@@ -1,7 +1,7 @@
 /**
  * The BELL PR server process: `startServer` binds the port, takes the data
  * directory lock, stops agents a crash left behind, loads the store and
- * serves the app with an in-memory session token.
+ * serves the app.
  *
  * Run directly (`tsx server/index.ts`, as `npm run dev:server` does), this
  * module behaves like `bell-pr start` with the given flags.
@@ -9,7 +9,6 @@
 import { spawnSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import {
-  chmodSync,
   closeSync,
   existsSync,
   linkSync,
@@ -19,7 +18,6 @@ import {
   realpathSync,
   renameSync,
   rmSync,
-  writeFileSync,
   writeSync,
 } from "node:fs";
 import http from "node:http";
@@ -49,7 +47,6 @@ import {
 import { sm } from "./i18n/index.js";
 import { log } from "./log.js";
 import { redact } from "./process.js";
-import { mintOneTimeToken, oneTimeTokenLifetimeMs } from "./routes/auth.js";
 import { Store } from "./store.js";
 import { Workbench } from "./workbench.js";
 
@@ -72,13 +69,8 @@ export interface StartServerOptions {
   env?: NodeJS.ProcessEnv;
   /** Where the startup line and hints go; console.log by default. */
   print?: (line: string) => void;
-  /** Opens a one-time sign-in link when the configuration says to open a browser. */
+  /** Opens the app's URL when the configuration says to open a browser. */
   openBrowser?: (url: string) => void;
-  /**
-   * Mints one-time sign-in links for `bell-pr open` and the browser opened
-   * at start; routes/auth by default.
-   */
-  mintOneTimeToken?: (app: Express) => string | undefined;
   /**
    * Shut down and exit the process on SIGINT, SIGTERM, SIGHUP and fatal
    * errors (true by default). In-process callers such as tests pass false
@@ -92,8 +84,6 @@ export interface RunningServer {
   app: Express;
   /** The base URL: BELLPR_PUBLIC_URL, or the local address. */
   url: string;
-  /** The URL that signs a browser in (the base URL in development mode). */
-  signInUrl: string;
   /** Stops the server and its work and releases the lock; never exits. */
   shutdown: () => Promise<void>;
 }
@@ -105,6 +95,8 @@ export interface LockInfo {
   version: string;
   /** The address it listens on, so `bell-pr open` can reach it. */
   host?: string;
+  /** The base URL browsers use: BELLPR_PUBLIC_URL, or the local address. */
+  url?: string;
   startedAt?: string;
 }
 
@@ -192,7 +184,7 @@ function lockHolderAlive(lock: LockInfo, file: string): boolean {
 /**
  * Whether the BELL PR that wrote `lock` in `dataDir` may still be running,
  * by the checks a start makes before it replaces the lock. `bell-pr open`
- * signals only such a process: SIGUSR2 ends most other programs.
+ * reports the address of such a process only.
  */
 export function lockHolderRunning(dataDir: string, lock: LockInfo): boolean {
   return lockHolderAlive(lock, dataPaths(dataDir).lock);
@@ -298,16 +290,6 @@ function listen(server: http.Server, port: number, host: string) {
   });
 }
 
-/** Writes `file` with mode 0600 through a temp name and a rename. */
-function writePrivateAtomically(file: string, data: string) {
-  const temporary = path.join(
-    path.dirname(file),
-    `.${path.basename(file)}.${process.pid}.${randomBytes(4).toString("hex")}.tmp`,
-  );
-  writeFileSync(temporary, data, { mode: 0o600, flag: "wx" });
-  renameSync(temporary, file);
-}
-
 /**
  * Starts BELL PR and resolves once it serves requests. Rejects with a
  * StartupError (or a ConfigError from resolving the configuration) when it
@@ -320,7 +302,6 @@ export async function startServer(
   const config =
     options.config ?? resolveConfig(options.flags ?? {}, options.env ?? process.env);
   const print = options.print ?? ((line: string) => console.log(line));
-  const mint = options.mintOneTimeToken ?? mintOneTimeToken;
   const messages = sm().cli.start;
   const paths = dataPaths(config.dataDir);
   const url = baseUrl(config);
@@ -338,38 +319,6 @@ export async function startServer(
   };
 
   let app: Express | undefined;
-  let linkRequested = false;
-  /** A sign-in link that works once, within two minutes; undefined when none can be minted. */
-  const oneTimeLink = () => {
-    const token = mint(app!);
-    return token
-      ? {
-          url: `${url}/auth?t=${token}`,
-          expiresAt: new Date(Date.now() + oneTimeTokenLifetimeMs).toISOString(),
-        }
-      : undefined;
-  };
-  const writeOpenLink = () => {
-    try {
-      const link = config.dev ? { url } : (oneTimeLink() ?? { error: "unavailable" });
-      mkdirSync(paths.run, { recursive: true, mode: 0o700 });
-      chmodSync(paths.run, 0o700);
-      writePrivateAtomically(paths.openLink, `${JSON.stringify(link)}\n`);
-    } catch (error) {
-      log.warn("Could not write a sign-in link for bell-pr open", { error });
-    }
-  };
-  // `bell-pr open` sends SIGUSR2 once the lock names this process. The
-  // handler is in place before that, since the default action would end
-  // the process; a request during startup is answered once the app exists.
-  const onLinkRequest = () => {
-    if (app) writeOpenLink();
-    else linkRequested = true;
-  };
-  if (process.platform !== "win32") {
-    process.on("SIGUSR2", onLinkRequest);
-    cleanups.push(() => process.off("SIGUSR2", onLinkRequest));
-  }
 
   // Until the app is ready, answer the health check and ask others to wait.
   let handler: http.RequestListener = (req, res) => {
@@ -390,7 +339,6 @@ export async function startServer(
     const code = (error as NodeJS.ErrnoException).code;
     if (code === "EADDRINUSE") {
       const running = await probeHealth(config.host, config.port);
-      // Never only the address: without a session it shows the sign-in page.
       throw new StartupError(
         running
           ? messages.alreadyRunning({ url })
@@ -450,6 +398,7 @@ export async function startServer(
         port: config.port,
         version,
         host: config.host,
+        url,
         startedAt: new Date().toISOString(),
       },
       config.dataDir,
@@ -512,34 +461,21 @@ export async function startServer(
       maxActiveRuns: config.limits.maxActiveRuns,
       agentTimeoutScale: config.limits.agentTimeoutScale,
     });
-    // The session secret lives in memory only: never in env, argv or a file.
-    const sessionToken = config.dev
-      ? undefined
-      : randomBytes(32).toString("base64url");
     app = createApp(workbench, {
       port: config.port,
       ...(config.frontendPort ? { frontendPort: config.frontendPort } : {}),
       dev: config.dev,
       allowedOrigins: config.allowedOrigins,
       ...(config.publicUrl ? { publicUrl: config.publicUrl } : {}),
-      sessionToken,
       staticDirectory: config.staticDir,
       version,
       agentSlots,
     });
     handler = app;
-    if (linkRequested) writeOpenLink();
 
-    const signInUrl = sessionToken ? `${url}/auth?t=${sessionToken}` : url;
-    print(messages.startup({ version, url: signInUrl }));
-    // The browser gets a one-time link, never the session link: the opener
-    // (open, xdg-open) takes it on its command line, which other users of
-    // this computer may see in the process list.
-    if (config.open && options.openBrowser) {
-      const link = sessionToken ? oneTimeLink() : { url };
-      if (link) options.openBrowser(link.url);
-    }
-    return { server, app, url, signInUrl, shutdown };
+    print(messages.startup({ version, url }));
+    if (config.open && options.openBrowser) options.openBrowser(url);
+    return { server, app, url, shutdown };
   } catch (error) {
     if (workbench) await shutdown();
     else cleanUp();

@@ -4,13 +4,12 @@
  * (build/cli.mjs) and calls `run`.
  */
 import { spawn } from "node:child_process";
-import { existsSync, readFileSync, rmSync } from "node:fs";
-import { setTimeout as sleep } from "node:timers/promises";
+import { existsSync } from "node:fs";
 import { parseArgs, type ParseArgsConfig } from "node:util";
 import { buildDate, version } from "./build-info.js";
 import {
+  browserHost,
   ConfigError,
-  dataPaths,
   envFlag,
   resolveConfig,
   resolveDataDir,
@@ -25,6 +24,7 @@ import {
   readLock,
   startServer,
   StartupError,
+  type LockInfo,
   type RunningServer,
   type StartServerOptions,
 } from "./index.js";
@@ -43,14 +43,10 @@ export interface CliDeps {
   platform?: NodeJS.Platform;
   /** Opens a URL in the default browser. */
   openUrl?: (url: string) => void;
-  /** Sends a signal to a process (`process.kill`). */
-  kill?: (pid: number, signal: NodeJS.Signals) => void;
   /** Passed to startServer by `start`. */
   startOptions?: Partial<StartServerOptions>;
   /** Called with the running server after `start`. */
   onStarted?: (server: RunningServer) => void;
-  /** How long `open` waits for the link (5 s). */
-  openTimeoutMs?: number;
 }
 
 /** A command-line mistake: the message, then exit code 2. */
@@ -230,23 +226,19 @@ async function start(args: string[], ctx: Context): Promise<number | undefined> 
   return undefined;
 }
 
-type OpenLink = { url: string; expiresAt?: string } | { error: string };
-
-/** Reads and deletes the link file once it appears; undefined on timeout. */
-async function takeOpenLink(file: string, timeoutMs: number) {
-  const deadline = Date.now() + timeoutMs;
-  for (;;) {
-    try {
-      const link = JSON.parse(readFileSync(file, "utf8")) as OpenLink;
-      // The link signs a browser in: it does not stay on disk.
-      rmSync(file, { force: true });
-      return link;
-    } catch {
-      // Not written yet.
-    }
-    if (Date.now() >= deadline) return undefined;
-    await sleep(50);
+/**
+ * The address the running instance serves: the base URL it wrote to its lock,
+ * which names BELLPR_PUBLIC_URL when there is one. A lock from an older build,
+ * or one without a web address, falls back to the local address.
+ */
+function lockUrl(lock: LockInfo) {
+  try {
+    const url = new URL(lock.url ?? "");
+    if (url.protocol === "http:" || url.protocol === "https:") return url.origin;
+  } catch {
+    // Not an address: use the local one.
   }
+  return `http://${browserHost(lock.host ?? "127.0.0.1")}:${lock.port}`;
 }
 
 async function open(args: string[], ctx: Context): Promise<number> {
@@ -257,13 +249,8 @@ async function open(args: string[], ctx: Context): Promise<number> {
   });
   loadEnvFile(values["env-file"]);
   const m = sm().cli.open;
-  if (ctx.platform === "win32") {
-    ctx.stderr.write(`${m.windows}\n`);
-    return 1;
-  }
   const dataDir = resolveDataDir({ dataDir: values["data-dir"] }, ctx.env);
   const lock = readLock(dataDir);
-  // Only a live BELL PR gets the signal: SIGUSR2 ends other programs.
   if (
     !lock ||
     !lockHolderRunning(dataDir, lock) ||
@@ -272,29 +259,10 @@ async function open(args: string[], ctx: Context): Promise<number> {
     ctx.stderr.write(`${m.notRunning({ dataDir })}\n`);
     return 1;
   }
-  const { openLink } = dataPaths(dataDir);
-  rmSync(openLink, { force: true });
-  try {
-    (ctx.deps.kill ?? process.kill)(lock.pid, "SIGUSR2");
-  } catch (error) {
-    ctx.stderr.write(
-      `${m.signalFailed({ reason: error instanceof Error ? error.message : String(error) })}\n`,
-    );
-    return 1;
-  }
-  const link = await takeOpenLink(openLink, ctx.deps.openTimeoutMs ?? 5000);
-  if (!link) {
-    ctx.stderr.write(`${m.noAnswer}\n`);
-    return 1;
-  }
-  if (!("url" in link) || typeof link.url !== "string") {
-    ctx.stderr.write(`${m.unavailable}\n`);
-    return 1;
-  }
-  ctx.stdout.write(`${link.url}\n`);
-  if (link.expiresAt) ctx.stderr.write(`${m.linkHint}\n`);
+  const url = lockUrl(lock);
+  ctx.stdout.write(`${url}\n`);
   if (!values.print && !values["no-open"] && canOpenBrowser(ctx.env, ctx.stdout))
-    ctx.openUrl(link.url);
+    ctx.openUrl(url);
   return 0;
 }
 

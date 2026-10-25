@@ -195,7 +195,6 @@ test.describe("a real project", () => {
   async function openOn(browser: Browser, width = 1440) {
     const context = await browser.newContext({
       baseURL: server.baseURL,
-      storageState: server.storageState,
       viewport: { width, height: 900 },
       locale: "en-US",
     });

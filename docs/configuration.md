@@ -28,8 +28,8 @@ the settings in the app.
 
 | Command | What it does |
 | --- | --- |
-| `bell-pr` or `bell-pr start` | Starts BELL PR and prints the sign-in link |
-| `bell-pr open` | Asks the running BELL PR for a one-time sign-in link and opens it; `--print` only prints it |
+| `bell-pr` or `bell-pr start` | Starts BELL PR and prints its address |
+| `bell-pr open` | Prints the address of the running BELL PR and opens it; `--print` only prints it |
 | `bell-pr doctor` | Checks Node.js, Git, the GitHub CLI, the agent CLIs, the sandbox and the data directory; `--json` for scripts |
 | `bell-pr version` | Shows the version, its release date, Node.js, the platform and the data directory |
 | `bell-pr help` | Lists the commands and options |
@@ -53,7 +53,7 @@ and `version` find the data directory of the BELL PR you mean.
 | --- | --- | --- |
 | `BELLPR_PORT` | `4311` | Port of the web interface and the API, 1024 to 65535. Also `--port`. |
 | `BELLPR_HOST` | `127.0.0.1` | Address to listen on. Also `--host`. The default accepts connections from this computer only. `0.0.0.0` or `::` listen on every address (the Docker image uses this inside the container) but still answer only requests addressed to this computer or to `BELLPR_PUBLIC_URL`. Any other address needs `BELLPR_PUBLIC_URL`. |
-| `BELLPR_PUBLIC_URL` | none | The address browsers use when BELL PR sits behind a reverse proxy or a different published port, without a path, such as `https://bell.example.com`. BELL PR accepts requests for it and prints its sign-in links for it. It must be `https` unless it points to this computer. |
+| `BELLPR_PUBLIC_URL` | none | The address browsers use when BELL PR sits behind a reverse proxy or a different published port, without a path, such as `https://bell.example.com`. BELL PR accepts requests for it and prints it as its address. It must be `https` unless it points to this computer. |
 | `BELLPR_ALLOWED_ORIGINS` | none | Extra exact origins to accept, separated by commas. Rarely needed: `BELLPR_PUBLIC_URL` already adds its own. Plain `http` only for loopback addresses. |
 | `BELLPR_DATA_DIR` | `~/.bellpr` | Where repositories, worktrees, run records and settings live. Also `--data-dir`. An absolute path is safest. |
 | `BELLPR_NO_OPEN` | not set | Any value other than `0` or `false` stops BELL PR from opening a browser at start and for `bell-pr open`. It also stays closed in CI, in containers and when the output is not a terminal. Also `--no-open`. |
@@ -65,7 +65,7 @@ and `version` find the data directory of the BELL PR you mean.
 | `BELLPR_ALLOW_UNSANDBOXED_AGENTS` | not set | `1` lets Claude Code agents that edit files run without the operating-system sandbox when it is unavailable. They then have your full user rights, and their runs are marked "Ran without sandbox". Locks **Settings → Agent safety**. |
 | `BELLPR_REQUIRE_UNDERSTANDING_CHECK` | not set | `1` keeps the understanding check on, so you explain each change back before you approve it, and locks the switch in **Settings → Learning**; for example on a classroom or shared computer. Any other value locks nothing, and BELL PR warns about it at start. No value turns the check off. |
 | `BELLPR_RETENTION_DAYS` | `14` | Days after which the working files of a cancelled or failed run are removed, 1 to 365. Records, reports and notes stay; published runs are never removed automatically. Locks **Settings → Data & privacy**. |
-| `BELLPR_DEV` | not set | Development mode, for working on BELL PR itself: sign-in is off and the API trusts the Vite dev server. `npm run dev` sets it; it only works on `127.0.0.1`. |
+| `BELLPR_DEV` | not set | Development mode, for working on BELL PR itself: the API trusts the Vite dev server. `npm run dev` sets it; it only works on `127.0.0.1`. |
 | `BELLPR_FRONTEND_PORT` | `4310` | Port of the Vite dev server that the API trusts, in development mode only. |
 | `BELLPR_STATIC_DIR` | the `dist/` folder of the package | The built web interface to serve. |
 
@@ -117,11 +117,11 @@ command-line messages before a language is chosen.
 
 ## Ports
 
-BELL PR serves the web interface and the API on one port, 4311 by
-default, on `127.0.0.1`. The session cookie is named after the port in the
-browser's address (`bellpr_session_4311`), so two BELL PR servers on one
-computer, for example one from `npx` and one in Docker, keep their
-sign-ins apart.
+BELL PR serves the web interface and the API on one port, 4311 by default, on
+`127.0.0.1`. Two BELL PR servers on one computer, for example one from `npx`
+and one in Docker, need different ports. BELL PR does not authenticate anyone,
+so keep the default `127.0.0.1` unless a proxy that authenticates sits in front
+(see [Self-hosting](self-hosting.md)).
 
 ## Logs
 
