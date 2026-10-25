@@ -215,7 +215,7 @@ test("the publish dialog's record says when the server's checks couldn't be read
   // An unknown is never a pass: first it reads, then it says so, with a retry.
   const reading = record({ checking: true, failed: false });
   assertNoHan(reading);
-  assert.match(reading, /^<p class="publish-fact" role="status"><svg[^>]*lucide-loader-circle spin[^>]*>.*<\/svg> Checking…<\/p><section/);
+  assert.match(reading, /^<p class="publish-fact" role="status"><svg[^>]*lucide-loader-circle[^"]* spin[^>]*>.*<\/svg> Checking…<\/p><section/);
   const failed = record({ checking: false, failed: true });
   assertNoHan(failed);
   assert.match(

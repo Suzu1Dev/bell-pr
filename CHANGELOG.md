@@ -65,6 +65,11 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **globals 17.13.** The lint setup's lists of browser and Node globals come
   from globals 17.13 (was 17.12). Development only; the package does not
   change.
+- **Icons.** The app's icons come from lucide-react 1.59 (was 0.468). An
+  icon without a label of its own is now hidden from screen readers
+  (`aria-hidden`), and the icons' chunk is 2.5 kB larger (gzip). Lucide's
+  license now includes Feather's MIT notice itself, so
+  `THIRD_PARTY_NOTICES.md` quotes it from there instead of adding it.
 
 ### Fixed
 
