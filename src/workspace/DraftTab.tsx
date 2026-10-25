@@ -90,7 +90,7 @@ interface DraftTabProps {
     | "serverChecksRead"
     | "loadPublishChecks"
   >;
-  actions: Pick<RunActions, "feedbackLoading" | "fetchPrFeedback">;
+  actions: Pick<RunActions, "feedbackLoading" | "fetchPrFeedback" | "openSplit">;
   rounds: RunRounds;
   currentRepo?: Repo;
   /** The Explain-it-back check and the person's other records (useUnderstanding, useRunRecords). */
@@ -636,7 +636,7 @@ export function DraftTab({
       )}
       {!followUp && files.length > 0 && (
         <Deferred resetKey={run.id}>
-          <Reviewability run={run} files={files} repo={currentRepo} demo={demo} onSaveReasons={records?.saveTestReasons} onAskSplit={records?.askSplit} />
+          <Reviewability run={run} files={files} repo={currentRepo} demo={demo} onSaveReasons={records?.saveTestReasons} onAskSplit={records?.askSplit} onSplit={actions.openSplit} />
         </Deferred>
       )}
       {!run.prUrl && sync}

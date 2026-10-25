@@ -35,6 +35,8 @@ export function changesOf(
   return reviewabilitySnapshot({
     files,
     planScopes: run.team?.tasks.map((task) => task.files),
+    // The sample's published checks are fixed: it offers no split.
+    planTasks: sample ? undefined : run.team?.tasks,
     generated: repo?.contributionRules?.generated,
     mergedSizes: sample?.mergedSizes ?? repo?.contributionRules?.mergedSizes,
   });

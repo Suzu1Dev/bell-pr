@@ -146,6 +146,8 @@ const messages = {
       "The project asks for an issue first, and you have not commented on this one. Say hello on the issue before you publish.",
     split: ({ lines, files }: { lines: number; files: number }) =>
       `${fmt.number(lines)} changed lines in ${fmt.number(files)} files is above ${product.name}'s default of 1,000 lines or 20 files. Could this be split into separate changes?`,
+    parts: ({ count }: { count: number }) =>
+      `The plan has ${fmt.number(count)} groups of files that do not depend on one another. A maintainer reviews one fix faster: if each group is its own fix, consider splitting this into separate contributions.`,
     noTests: "Source code changed, but no test did.",
     outsidePlan: ({ files }: { files: string[] }) =>
       `Outside every task of the plan: ${fmt.list(files)}.`,

@@ -192,7 +192,10 @@ publishing asks you to confirm it, and waits if the project asks for
 descriptions in the contributor's own words. A snapshot shows how
 reviewable the change is, next to the sizes of the project's last merged
 pull requests, and a skipped, deleted or loosened test needs a one-line
-reason before you publish.
+reason before you publish. When the plan has parts that do not depend on one
+another, the confirm before publishing lists them, and **Split into
+contributions** on the Draft tab can turn each part into its own contribution,
+by file. A part is a group of files, not always one fix, so check the grouping.
 
 It checks the text before anything is sent: credentials and unfinished
 placeholders block it, and a local path, a CI change or a public commit

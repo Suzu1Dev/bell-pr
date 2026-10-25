@@ -15,6 +15,20 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   a rate limit. The bar fills with that time, not with how much work is
   left, and only moves while no try is being timed.
 
+- **Split a contribution.** When the plan has parts that do not depend on one
+  another, the reviewability snapshot and its publish confirm list them, and
+  **Split into contributions** on the Draft tab turns chosen files into
+  separate contributions. A part is a group of files the plan keeps apart, not
+  always one fix: tasks that cite the same issue number are joined, and the
+  dialog says so when a part cites several issues, because BELL PR cannot
+  separate fixes inside a file.
+  Each new contribution gets its own branch, working copy and pull request
+  draft from the same base commit, with its files as they are now, the plan
+  tasks that changed them, and the explanations, notes and review marks for
+  those files. The split is by file, never by hunk. The original run is kept,
+  a banner asks you to publish the parts, and BELL PR cannot check that each
+  part works on its own.
+
 ### Removed
 
 - **Sign-in.** BELL PR no longer signs anyone in: the session cookie, the

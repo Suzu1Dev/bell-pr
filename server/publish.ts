@@ -119,6 +119,7 @@ function changesOf(run: Run, files: DiffFile[], repo?: Repository) {
   return reviewabilitySnapshot({
     files,
     planScopes: run.team?.tasks.map((task) => task.files),
+    planTasks: run.team?.tasks,
     generated: repo?.contributionRules?.generated,
     mergedSizes: repo?.contributionRules?.mergedSizes,
   });

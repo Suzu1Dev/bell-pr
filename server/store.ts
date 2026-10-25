@@ -19,6 +19,7 @@ import {
 } from "./types.js";
 import { activeFollowUp } from "../shared/followups.js";
 import { withStoredReach } from "../shared/project-policy.js";
+import { splitLimits } from "../shared/split.js";
 import { sm } from "./i18n/index.js";
 import { writeDurable } from "./fs-atomic.js";
 import { initLog, log } from "./log.js";
@@ -465,6 +466,11 @@ export const repositoryReadSchema = loose({
 
 const repositorySchema = lenientRead(repositoryReadSchema);
 
+const splitRefSchema = loose({
+  runId: text.min(1).max(80),
+  title: text.max(splitLimits.titleChars),
+});
+
 /** Read schema of a run in state.json (lenientRead wraps it below). */
 export const runReadSchema = loose({
     id: text.min(1),
@@ -602,6 +608,9 @@ export const runReadSchema = loose({
     // v1.2 (Learn by hand), optional in the same way.
     learnByHand: later(z.literal(true)),
     byHand: later(byHandSchema),
+    // Splitting a contribution, optional in the same way.
+    splitFrom: later(splitRefSchema),
+    splitInto: later(z.array(splitRefSchema).max(splitLimits.maxContributions)),
 });
 
 const runSchema = lenientRead(runReadSchema);

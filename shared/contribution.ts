@@ -757,6 +757,7 @@ export function respectChecks(
   const changes = input.changes;
   if (changes) {
     const details = [
+      ...(changes.parts && changes.parts >= 2 ? [m.parts({ count: changes.parts })] : []),
       ...(changes.band === "very-large"
         ? [m.split({ lines: changes.changedLines, files: changes.files })]
         : []),

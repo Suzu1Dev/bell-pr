@@ -4,6 +4,7 @@ import { createElement } from "react";
 import { changeFingerprint } from "../../shared/change-fingerprint";
 import { getDemo } from "../demo";
 import { setCheckSettingsForTests } from "../app/hooks/useUnderstanding";
+import workspace from "../i18n/en/workspace";
 import { assertNoHan, renderEn, renderZh } from "../test-utils/render";
 import type { Run } from "../types";
 import { WorkspacePage } from "./WorkspacePage";
@@ -336,4 +337,36 @@ test("a learn-by-hand run's footer hint asks the guide, not the agent", () => {
   assert.match(html, /<span class="footer-hint">Select code to ask the guide about it\.<\/span>/);
   assert.match(renderZh(element({ run: byHand, tab: "overview" })), /<span class="footer-hint">選取程式碼，就能向嚮導提問。<\/span>/);
   assert.match(renderEn(element({ tab: "overview" })), /<span class="footer-hint">Select code to ask the agent about it\.<\/span>/);
+});
+
+test("a contribution split from another says so and links back to the original", () => {
+  const fromRun: Run = { ...realRun, splitFrom: { runId: "run-0", title: "Retry on timeout and cache" } };
+  const html = renderEn(element({ run: fromRun, tab: "overview" }));
+  assertNoHan(html);
+  assert.match(
+    html,
+    /<p class="run-notice" role="status"><svg[\s\S]*?<\/svg><span>Split from “Retry on timeout and cache”\. This contribution has its own branch, files and PR draft\.<\/span><button type="button" class="run-notice-link">Open the original<\/button><\/p>/,
+  );
+  assert.match(renderZh(element({ run: fromRun, tab: "overview" })), /已從「Retry on timeout and cache」拆分出來，這份貢獻有自己的分支、檔案與 PR 草稿。/);
+  assert.doesNotMatch(renderEn(element({ tab: "overview" })), /Split from/);
+});
+
+test("a split original says it was split and lists the contributions it became", () => {
+  const intoRun: Run = {
+    ...realRun,
+    splitInto: [
+      { runId: "run-2", title: "Retry on timeout" },
+      { runId: "run-3", title: "Cache the token" },
+    ],
+  };
+  const html = renderEn(element({ run: intoRun, tab: "overview" }));
+  assertNoHan(html);
+  assert.ok(html.replaceAll("&#x27;", "'").includes(`<p>${workspace.splitNotice.into({ count: 2 })}</p>`));
+  // The parts are a list, in the order the split made them, each a link that opens it.
+  const listed = [...html.matchAll(/<li><button type="button" class="run-notice-link">([^<]*)<\/button><\/li>/g)].map(
+    (match) => match[1],
+  );
+  assert.deepEqual(listed, ["Retry on timeout", "Cache the token"]);
+  assert.match(renderZh(element({ run: intoRun, tab: "overview" })), /已拆成 2 份貢獻/);
+  assert.doesNotMatch(renderEn(element({ tab: "overview" })), /Split into \d/);
 });

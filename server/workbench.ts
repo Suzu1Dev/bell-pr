@@ -49,6 +49,7 @@ import * as followUps from "./followup-runs.js";
 import * as walkthroughs from "./walkthrough-runs.js";
 import * as premises from "./premise-runs.js";
 import { commitDetail, listCommits } from "./commits.js";
+import { splitRun } from "./split-run.js";
 import { synchronizeWalkthroughs } from "./walkthroughs.js";
 import {
   synchronizeUnderstanding,
@@ -62,6 +63,7 @@ import {
 import { learningLoopFacade, type LearningLoopFacade } from "./learning-loop.js";
 import { byHandFacade, type ByHandFacade } from "./by-hand.js";
 import type { GuardOverride } from "../shared/contribution.js";
+import type { SplitRequest } from "../shared/split.js";
 import type { WorkbenchContext } from "./workbench-context.js";
 
 export type { WorkbenchContext };
@@ -496,6 +498,11 @@ export class Workbench {
 
   async approve(id: string, displayedDraft: Run["draft"]) {
     return publishing.approve(this.context, id, displayedDraft);
+  }
+
+  /** Splits a contribution into separate ones (split-run.ts). */
+  async split(id: string, input: SplitRequest) {
+    return splitRun(this.context, id, input);
   }
 
   /** The commits on a published contribution's branch, oldest first (commits.ts). */

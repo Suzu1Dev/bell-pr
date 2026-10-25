@@ -125,7 +125,7 @@ const element = (
         async loadPublishChecks() {},
         ...draft,
       },
-      actions: { feedbackLoading: false, async fetchPrFeedback() {} },
+      actions: { feedbackLoading: false, async fetchPrFeedback() {}, openSplit() {} },
       rounds: {
         followUpSelection: [],
         setFollowUpSelection() {},

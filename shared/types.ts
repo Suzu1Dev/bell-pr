@@ -23,6 +23,7 @@ import type {
 } from "./contribution.js";
 import type { CoachDebrief } from "./coach.js";
 import type { ByHandRecord } from "./by-hand.js";
+import type { SplitRef } from "./split.js";
 
 export type RunStatus =
   | "queued"
@@ -199,4 +200,11 @@ export interface RunCore {
    * agent runs and until the run records something.
    */
   byHand?: ByHandRecord;
+  /** The contribution this one was split from; set only by a split and never changed. Absent on every other run. */
+  splitFrom?: SplitRef;
+  /**
+   * The contributions a split made from this run, in the order they were
+   * made. The run itself stays as it was. Absent until the run is split.
+   */
+  splitInto?: SplitRef[];
 }

@@ -77,6 +77,7 @@ export type ModalName =
   | "task"
   | "models"
   | "publish"
+  | "split"
   | "help"
   | "runs"
   | "about"
@@ -119,6 +120,9 @@ const LearningPage = lazy(() =>
 // load with the dialog that needs them.
 const NewTaskModal = lazy(() =>
   withMessages(import("../modals/NewTaskModal")).then((module) => ({ default: module.NewTaskModal })),
+);
+const SplitModal = lazy(() =>
+  withMessages(import("../modals/SplitModal")).then((module) => ({ default: module.SplitModal })),
 );
 const ModelSettingsModal = lazy(() =>
   withMessages(import("../settings/ModelSettingsModal")).then((module) => ({
@@ -1199,6 +1203,20 @@ function AppShell({
               publish={publish}
               closeModal={closeModal}
               setTab={setTab}
+            />
+          </Suspense>
+        </ErrorBoundary>
+      )}
+      {modal === "split" && (
+        <ErrorBoundary>
+          <Suspense fallback={null}>
+            <SplitModal
+              run={run}
+              files={files}
+              busy={busy}
+              formError={formError}
+              splitRun={actions.splitRun}
+              closeModal={closeModal}
             />
           </Suspense>
         </ErrorBoundary>

@@ -26,6 +26,8 @@ export interface ReviewabilitySnapshotProps {
   onSaveReasons?(reasons: Record<string, string>): void | Promise<void>;
   /** Opens the Ask-the-agent preset "How could this be split into separate changes?". */
   onAskSplit?(): void;
+  /** Opens the split dialog for this contribution. */
+  onSplit?(): void;
   /** The short form at the top of the check panel. */
   compact?: boolean;
 }
@@ -87,6 +89,7 @@ export default function ReviewabilitySnapshot({
   reasons,
   onSaveReasons,
   onAskSplit,
+  onSplit,
   compact = false,
 }: ReviewabilitySnapshotProps) {
   const t = useT("draft").reviewability;
@@ -219,10 +222,20 @@ export default function ReviewabilitySnapshot({
       <div className="reviewability-split">
         <h4>{t.split}</h4>
         <p>{t.splitLead}</p>
-        {onAskSplit && (
-          <button type="button" className="button secondary" onClick={onAskSplit}>
-            <Split size={14} aria-hidden="true" /> {t.askSplit}
-          </button>
+        {snapshot.parts ? <p>{t.parts({ count: snapshot.parts })}</p> : null}
+        {(onSplit || onAskSplit) && (
+          <div className="reviewability-split-actions">
+            {onSplit && (
+              <button type="button" className="button primary" onClick={onSplit}>
+                <Split size={14} aria-hidden="true" /> {t.splitNow}
+              </button>
+            )}
+            {onAskSplit && (
+              <button type="button" className="button secondary" onClick={onAskSplit}>
+                <Split size={14} aria-hidden="true" /> {t.askSplit}
+              </button>
+            )}
+          </div>
         )}
       </div>
       {weakened.length > 0 && (

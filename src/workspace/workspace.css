@@ -129,6 +129,25 @@
   font-size: var(--text-xs);
   text-decoration: underline;
 }
+/* A notice with a list under its sentence, such as the contributions a run was split into. */
+.run-notices .run-notice-body {
+  flex: 1;
+  min-width: 0;
+}
+.run-notices .run-notice-body p {
+  margin: 0 0 var(--space-1);
+}
+.run-notices .run-notice-list {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.run-notices .run-notice-list .run-notice-link {
+  text-align: left;
+  overflow-wrap: anywhere;
+}
 @media (max-width: 760px) {
   .run-notices {
     margin: -6px 17px 18px;

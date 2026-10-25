@@ -17,6 +17,7 @@ import {
   History,
   Plus,
   ShieldCheck,
+  Split,
   Sparkles,
 } from "lucide-react";
 import { useT, withMessages } from "../i18n";
@@ -271,6 +272,7 @@ export function WorkspacePage({
         </div>
       </section>
       <RunNotices run={run} queued={queued} />
+      <SplitNotices run={run} onOpen={actions.chooseRun} />
       <section className="workflow-strip" aria-label={t.progress}>
         {[
           { n: "01", ...t.steps.define, icon: FileText },
@@ -594,5 +596,43 @@ export function WorkspacePage({
         </ErrorBoundary>
       )}
     </>
+  );
+}
+
+/** The split banners: the contribution a run was split from, or the contributions it was split into. */
+function SplitNotices({ run, onOpen }: { run: Run; onOpen(runId: string): void }) {
+  const t = useT("workspace").splitNotice;
+  const from = run.splitFrom;
+  const into = run.splitInto ?? [];
+  if (!from && !into.length) return null;
+  return (
+    <div className="run-notices">
+      {from && (
+        <p className="run-notice" role="status">
+          <Split size={15} aria-hidden="true" />
+          <span>{t.from({ title: from.title })}</span>
+          <button type="button" className="run-notice-link" onClick={() => onOpen(from.runId)}>
+            {t.openOriginal}
+          </button>
+        </p>
+      )}
+      {into.length > 0 && (
+        <div className="run-notice" role="status">
+          <Split size={15} aria-hidden="true" />
+          <div className="run-notice-body">
+            <p>{t.into({ count: into.length })}</p>
+            <ul className="run-notice-list">
+              {into.map((part) => (
+                <li key={part.runId}>
+                  <button type="button" className="run-notice-link" onClick={() => onOpen(part.runId)}>
+                    {part.title}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }

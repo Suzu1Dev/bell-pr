@@ -392,6 +392,37 @@ could be split. A skipped, deleted or loosened test is listed here; give
 each one a one-line reason of at least 3 words, which is offered for your
 Testing section.
 
+**Splitting a change into parts.** When the plan has two or more parts that
+do not depend on one another, the snapshot and the reviewability confirm say
+so. Tasks that depend on one another, change the same file or cite the same
+issue number (such as `#42`, in a task's title or description) form one part;
+a part needs a source file, so a task that only changes tests or documents is
+not a part of its own. A part is a group of files the plan keeps apart, not
+always one fix: the plan splits work by file, often for speed, so two tasks
+can serve one issue and one task can hold several. When a part cites more than
+one issue, the split dialog says so, because BELL PR cannot separate fixes
+inside a file: split those by hand or keep them together. **Split into
+contributions** on the Draft tab, beside
+**Ask how to split it**, turns the parts into separate contributions: 2 to
+8 contributions, each with a title of up to 120 characters and 1 to 150
+files. A file goes to one new contribution or is left out of them all, and
+stays in the original. BELL PR does not cut a file into hunks, so a file
+that two fixes both touch cannot be separated. Each new contribution gets
+its own branch and working copy at the same base commit and target branch
+as the original, with its files as they are now (your hand edits included),
+the plan tasks that changed them, and the explanations, walkthroughs, notes
+and review marks for those files. It does not carry over the original's pull
+request text, approval, understanding check, reports or logs, so you explain
+and approve each part on its own, and BELL PR starts a pull request draft
+for each. The original run keeps every file and can still be published, but
+a banner asks you to publish the parts instead. Files BELL PR holds back from
+review (binary, sensitive, containing a secret, or symbolic links) cannot be
+moved; they can only be left out. The split is offered for a run in review
+or approved that is not published, is not a Learn-by-hand run and still has
+its working copy; it is not offered on the sample run. BELL PR cannot check
+that a part works on its own, because one part's tests may need another
+part, so run each part's tests.
+
 **The maintainer checklist** shows, row by row, the project's rules,
 whether pull requests are open to you, the linked issue, your pace in this
 repository, your own words, reviewability, disclosing AI help and the

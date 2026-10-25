@@ -39,6 +39,11 @@ const m: Translation<typeof en> = {
     tooltipSetting:
       "理解檢查已關閉，因此不用先講一遍也能核准。這樣核准的任務會一直被標示。可在「設定 → 學習」重新開啟。",
   },
+  splitNotice: {
+    from: ({ title }) => `已從「${title}」拆分出來，這份貢獻有自己的分支、檔案與 PR 草稿。`,
+    openOriginal: "開啟原本的貢獻",
+    into: ({ count }) => `已拆成 ${count} 份貢獻：請改為發布各部分，原本這份維持原狀。`,
+  },
   runNotices: {
     waiting: ({ date }) =>
       `維護者在 ${date} 要求修改。請在 GitHub 上用自己的話回覆，或開始一輪修正。`,

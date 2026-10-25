@@ -214,6 +214,26 @@ Edit the files in your own editor (do not commit; BELL PR does that when
 you publish), then choose **Refresh the diff**. Changed files get new
 explanations and need another review.
 
+### Can I split a contribution that holds several fixes?
+
+Yes, by file. When the plan has parts that do not depend on one another,
+**Split into contributions** on the Draft tab (beside **Ask how to split it**)
+turns each part into its own contribution, with its own branch, working copy
+and pull request draft, all from the same base commit. A part is a group of
+files the plan keeps apart, not always one fix: the plan splits work by file,
+often for speed, so check the grouping. BELL PR joins tasks that cite the same
+issue number and warns when a part cites several issues. It puts each file in
+one new contribution or leaves it out, and never cuts a file into hunks: a file
+that two fixes both touch cannot be separated, so keep those fixes together. Each new
+contribution carries its files as they are now, the plan tasks that changed
+them, and the explanations, notes and review marks for those files. It does
+not carry over the original's pull request text, approval, understanding
+check, reports or logs, so you explain and approve each part on its own. The
+original run keeps every file and stays as it was, but a banner asks you to
+publish the parts instead. BELL PR cannot check that a part works on its
+own, so run each part's tests. The split is not offered for the sample run,
+a Learn by hand run, a published run, or a run whose working copy is gone.
+
 ### Can several people use one BELL PR?
 
 No. BELL PR is a single-user tool: it works with one person's Git, GitHub

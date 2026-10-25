@@ -5,6 +5,32 @@ import type en from "../en/modals";
 
 const m: Translation<typeof en> = {
   close: "關閉視窗",
+  split: {
+    title: "拆分為不同的貢獻",
+    subtitle: "讓每個 PR 只包含一項修正，方便維護者獨立審查。",
+    creates: "每份貢獻會從同一個基底提交建立自己的分支、檔案與 PR 草稿。",
+    original: "這份貢獻會維持原樣，並標記為已拆分。",
+    filesOnly: `${product.name} 只會將一個檔案分配給一份貢獻，不會把檔案切成幾部分。涉及同一個檔案的修正無法在這裡分開。`,
+    testEach: `${product.name} 無法確認各部分能否獨立運作。發布前，請分別執行每份貢獻的測試。`,
+    contribution: ({ number }) => `貢獻 ${number}`,
+    titleLabel: ({ number }) => `貢獻 ${number} 的標題`,
+    add: "新增一份貢獻",
+    remove: ({ number }) => `移除貢獻 ${number}`,
+    goesTo: ({ path }) => `${path} 的貢獻`,
+    leaveOut: "不移動",
+    titlePlaceholder: "這份貢獻的標題",
+    empty: "還沒有檔案。請用每個檔案旁的選單把檔案移到這裡。",
+    leftOutTitle: "不移動",
+    leftOutHint: "這些檔案只會留在原本那份。",
+    blocked: ({ reason }) => `這個檔案目前無法審閱，因此無法移動：${reason}`,
+    summary: ({ contributions, leftOut }) => `${contributions} 份貢獻；${leftOut} 個檔案不移動。`,
+    pathLimit: ({ count }) => `每份貢獻最多可分配 ${count} 個檔案。`,
+    suggestionLimit: ({ count }) => `僅預先分配前 ${count} 個部分。請分配其餘檔案，或選擇不移動。`,
+    mixed: ({ title, issues }) =>
+      `「${title}」提到 ${issues.join("、")}：它的檔案涉及不只一個議題，而 ${product.name} 無法把檔案裡的變更分開。請自行分開，或維持在同一份。`,
+    submit: "拆分",
+    submitting: "拆分中…",
+  },
   help: {
     title: "從想法，到你的下一個 PR。",
     subtitle: "四個步驟，把開發、審查與學習串在一起。",

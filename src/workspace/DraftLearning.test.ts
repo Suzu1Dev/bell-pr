@@ -72,3 +72,27 @@ test("a run fitted to rules that don't name planning help offers no question on 
   // Whoever answers (the agent or the guide), the card names no agent.
   assert.doesNotMatch(card({}), /ask the agent/);
 });
+
+test("an open contribution of two files or more offers to split; the sample, learn-by-hand, published and removed runs do not", () => {
+  const demo = getDemo("en");
+  const open: Run = { ...demo.run, status: "review", learnByHand: undefined, prUrl: undefined, workspaceRemovedAt: undefined };
+  const card = (props: Partial<Run> = {}, files = demo.files, sample = false) =>
+    renderEn(
+      createElement(Reviewability, {
+        run: { ...open, ...props },
+        files,
+        repo: demo.repo,
+        demo: sample,
+        onAskSplit() {},
+        onSplit() {},
+      }),
+    );
+  const html = card();
+  assertNoHan(html);
+  assert.match(html, /Split into contributions/);
+  assert.doesNotMatch(card({}, demo.files, true), /Split into contributions/);
+  assert.doesNotMatch(card({ learnByHand: true }), /Split into contributions/);
+  assert.doesNotMatch(card({ prUrl: "https://github.com/octo/widgets/pull/9" }), /Split into contributions/);
+  assert.doesNotMatch(card({ workspaceRemovedAt: "2026-10-20T09:00:00.000Z" }), /Split into contributions/);
+  assert.doesNotMatch(card({}, demo.files.slice(0, 1)), /Split into contributions/);
+});

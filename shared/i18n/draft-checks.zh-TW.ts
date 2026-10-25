@@ -94,6 +94,8 @@ const messages: Translation<typeof en> = {
     sayHello: "專案要求先有 issue，而你還沒在這個 issue 留言。發布前請先在 issue 上打個招呼。",
     split: ({ lines, files }) =>
       `${files} 個檔案共 ${lines} 行變更，超過 ${product.name} 預設的 1,000 行或 20 個檔案。能不能拆成幾份獨立的變更？`,
+    parts: ({ count }) =>
+      `計畫有 ${count} 組彼此不相依的檔案。維護者審閱單一修正比較快：若每一組各是一項獨立的修正，請考慮拆成獨立的貢獻。`,
     noTests: "程式碼有變更，但測試沒有。",
     outsidePlan: ({ files }) => `不在計畫任何任務範圍內的檔案：${fmt.list(files)}。`,
     whitespace: ({ files }) => `只改了空白的變更：${fmt.list(files)}。`,

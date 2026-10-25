@@ -8,6 +8,7 @@ import {
   type ReviewabilitySnapshot as Snapshot,
 } from "../../shared/reviewability";
 import { getDemo } from "../demo";
+import draft from "../i18n/en/draft";
 import { assertNoHan, renderEn, renderZh } from "../test-utils/render";
 import ReviewabilitySnapshot, {
   bandTone,
@@ -180,4 +181,21 @@ test("saving sends every weakened item, an emptied field as \"\" so the server r
     reasonsToSave(weakened, {}),
     Object.fromEntries(weakened.map((item) => [item.id, ""])),
   );
+});
+
+test("a snapshot with independent parts says so and offers to split now, and the button needs a handler", () => {
+  const text = draft.reviewability;
+  const parts = { ...demoSnapshot, parts: 2 };
+  const html = english({ snapshot: parts, onSplit() {}, onAskSplit() {} });
+  assert.ok(html.includes(`<p>${text.parts({ count: 2 })}</p>`));
+  assert.match(html, new RegExp(`<button type="button" class="button primary"><svg[\\s\\S]*?${text.splitNow}</button>`));
+  assert.ok(html.includes(text.askSplit));
+  // Without a handler the sentence stays, and no split button appears.
+  const withoutHandler = english({ snapshot: parts });
+  assert.ok(withoutHandler.includes(text.parts({ count: 2 })));
+  assert.ok(!withoutHandler.includes(text.splitNow));
+  // A change with no parts gets no sentence; the split button stays when a handler is given (the dialog starts empty).
+  const noParts = english({ onSplit() {} });
+  assert.ok(!noParts.includes(text.parts({ count: 2 })));
+  assert.ok(noParts.includes(text.splitNow));
 });

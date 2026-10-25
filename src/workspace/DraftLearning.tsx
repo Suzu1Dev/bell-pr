@@ -92,11 +92,24 @@ export function Reviewability({
   demo,
   onSaveReasons,
   onAskSplit,
+  onSplit,
 }: RunFacts & {
   onSaveReasons?(reasons: Record<string, string>): void | Promise<void>;
   onAskSplit?(): void;
+  onSplit?(): void;
 }) {
   const snapshot = changesOf(run, files, repo, useSample(demo));
+  // A contribution is split while it is open for review: not the sample, not learn-by-hand, not published or being published, not already split, workspace present, and two files at least to divide.
+  const splittable =
+    !demo &&
+    !run.learnByHand &&
+    !run.prUrl &&
+    !run.publishedBranch &&
+    !run.publishing &&
+    !run.splitInto?.length &&
+    !run.workspaceRemovedAt &&
+    (run.status === "review" || run.status === "approved") &&
+    files.length >= 2;
   return (
     <ReviewabilitySnapshot
       snapshot={snapshot}
@@ -105,6 +118,7 @@ export function Reviewability({
       onSaveReasons={onSaveReasons}
       // The sample has no agent to ask; a run fitted to rules that don't name planning help isn't offered it.
       onAskSplit={demo || run.byHand?.helpLock?.kinds.includes("plan") === false ? undefined : onAskSplit}
+      onSplit={splittable ? onSplit : undefined}
     />
   );
 }

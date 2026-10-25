@@ -5,6 +5,7 @@
  * server, the draft tab and the demo agree.
  */
 import type { MergedPrSize } from "./contribution.js";
+import { splitLimits, type SplitPart, type SplitSuggestion, type SplitTask } from "./split.js";
 
 const lockfileNames = new Set([
   "package-lock.json",
@@ -411,6 +412,11 @@ export interface ReviewabilitySnapshot {
   /** Only documentation changed. */
   docsOnly: boolean;
   newDependencies: NewDependency[];
+  /**
+   * How many independent parts the plan shows (see suggestSplit); absent or
+   * 0 unless there are at least 2, since one part has nothing to split.
+   */
+  parts?: number;
   /** Changed files outside every plan task's scope; empty without a plan. */
   outsidePlan: string[];
   /** Files with hunks that change nothing but whitespace. */
@@ -424,12 +430,127 @@ export interface ReviewabilitySnapshot {
 }
 
 /** Whether a path is inside one of a task's scopes: exact file names or directory prefixes ending with "/". */
-function inScope(filePath: string, scopes: readonly (readonly string[])[]) {
+export function inScope(filePath: string, scopes: readonly (readonly string[])[]) {
   return scopes.some((scope) =>
     scope.some((entry) =>
       entry.endsWith("/") ? filePath.startsWith(entry) : filePath === entry,
     ),
   );
+}
+
+/** A source file: not a test, not documentation, not a lockfile and not generated. */
+function isSource(filePath: string, generated: readonly string[]) {
+  return (
+    !isTestPath(filePath) &&
+    !isDocsPath(filePath) &&
+    !isLockfile(filePath) &&
+    !isGeneratedPath(filePath, generated)
+  );
+}
+
+/**
+ * The changed paths a plan task answers for: the files it integrated, or,
+ * for a run saved before that was recorded, the files its scopes cover.
+ */
+export function planTaskPaths(changed: readonly string[], task: SplitTask) {
+  const present = new Set(changed);
+  return task.integratedFiles?.length
+    ? task.integratedFiles.filter((path) => present.has(path))
+    : changed.filter((path) => inScope(path, [[...task.files]]));
+}
+
+/**
+ * The issue numbers a plan task cites in its title or description, as `#42`.
+ * A hash that follows a word character, `&` or `/` is not one: `C#7`, `&#39;`
+ * and a URL fragment are not issues.
+ */
+export function taskIssues(task: Pick<SplitTask, "title" | "description">): string[] {
+  const text = `${task.title}\n${task.description ?? ""}`;
+  return [...new Set([...text.matchAll(/(?<![\w&/])#(\d{1,5})\b/g)].map((match) => `#${match[1]}`))];
+}
+
+/**
+ * The groups of a change that the plan keeps apart, read from the plan alone:
+ * tasks that depend on one another, changed the same file or cite the same
+ * issue are one part, and a part needs at least one source file, so a task
+ * that only adds a test or a document never makes a part of its own. This is
+ * a suggestion, not a verdict that each part is a fix: the plan splits work
+ * for speed, so one fix can span tasks, and one task can hold several fixes
+ * in the same files (`issues` shows what each part cites).
+ */
+export function suggestSplit(
+  files: readonly { path: string }[],
+  tasks: readonly SplitTask[],
+  generated: readonly string[] = [],
+): SplitSuggestion {
+  const changed = files.map((file) => file.path);
+  const owned = tasks.map((task) => planTaskPaths(changed, task));
+  const cited = tasks.map(taskIssues);
+
+  // Union-find over the tasks: a dependency, a shared file or a shared issue joins two of them.
+  const root = tasks.map((_, index) => index);
+  const find = (index: number): number => {
+    while (root[index] !== index) {
+      root[index] = root[root[index]];
+      index = root[index];
+    }
+    return index;
+  };
+  const join = (a: number, b: number) => {
+    root[find(a)] = find(b);
+  };
+  const indexById = new Map(tasks.map((task, index) => [task.id, index]));
+  const firstOwner = new Map<string, number>();
+  const firstCiting = new Map<string, number>();
+  tasks.forEach((task, index) => {
+    for (const dependency of task.dependsOn ?? []) {
+      const other = indexById.get(dependency);
+      if (other !== undefined) join(index, other);
+    }
+    for (const path of owned[index]) {
+      const earlier = firstOwner.get(path);
+      if (earlier === undefined) firstOwner.set(path, index);
+      else join(index, earlier);
+    }
+    for (const issue of cited[index]) {
+      const earlier = firstCiting.get(issue);
+      if (earlier === undefined) firstCiting.set(issue, index);
+      else join(index, earlier);
+    }
+  });
+
+  const components = new Map<number, number[]>();
+  tasks.forEach((_, index) => {
+    const key = find(index);
+    components.set(key, [...(components.get(key) ?? []), index]);
+  });
+
+  const placed = new Set<string>();
+  const parts: SplitPart[] = [];
+  for (const indexes of [...components.values()].sort((a, b) => a[0] - b[0])) {
+    const own = new Set(indexes.flatMap((index) => owned[index]));
+    const paths = changed.filter((path) => own.has(path));
+    if (!paths.some((path) => isSource(path, generated))) continue;
+    for (const path of paths) placed.add(path);
+    const named = indexes.map((index) => tasks[index]).find((task) => task.title.trim());
+    parts.push({
+      title: (named?.title ?? "").trim().slice(0, splitLimits.titleChars),
+      paths,
+      taskIds: indexes.map((index) => tasks[index].id),
+      issues: [...new Set(indexes.flatMap((index) => cited[index]))],
+    });
+  }
+  return { parts, unassigned: changed.filter((path) => !placed.has(path)) };
+}
+
+/** The number of independent parts, or 0 when there are fewer than 2. */
+function partCount(
+  files: readonly { path: string }[],
+  tasks: readonly SplitTask[] | undefined,
+  generated: readonly string[] | undefined,
+) {
+  const { parts } = suggestSplit(files, tasks ?? [], generated);
+  return parts.length >= splitLimits.minContributions ? parts.length : 0;
 }
 
 /**
@@ -441,6 +562,7 @@ function inScope(filePath: string, scopes: readonly (readonly string[])[]) {
 export function reviewabilitySnapshot({
   files,
   planScopes,
+  planTasks,
   generated,
   mergedSizes,
 }: {
@@ -453,6 +575,8 @@ export function reviewabilitySnapshot({
   }[];
   /** Each plan task's files (`run.team.tasks[].files`). */
   planScopes?: readonly (readonly string[])[];
+  /** The plan's tasks, for the independent parts; without them there are none. */
+  planTasks?: readonly SplitTask[];
   generated?: readonly string[];
   mergedSizes?: ReviewabilitySnapshot["mergedSizes"];
 }): ReviewabilitySnapshot {
@@ -466,6 +590,7 @@ export function reviewabilitySnapshot({
   const tests = reviewable.filter((file) => isTestPath(file.path));
   const docs = reviewable.filter((file) => isDocsPath(file.path));
   const scopes = (planScopes ?? []).filter((scope) => scope.length);
+  const parts = partCount(files, planTasks, generated);
   const band: ReviewabilityBand =
     changedLines > reviewabilityBands.large ||
     reviewable.length > reviewabilityBands.files
@@ -483,6 +608,7 @@ export function reviewabilitySnapshot({
       (file) => !isTestPath(file.path) && !isDocsPath(file.path),
     ),
     docsOnly: reviewable.length > 0 && docs.length === reviewable.length,
+    ...(parts ? { parts } : {}),
     newDependencies: newDependencies(files),
     outsidePlan: scopes.length
       ? reviewable

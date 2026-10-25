@@ -9,6 +9,35 @@ const { plural } = formatters("en");
 
 const modals = {
   close: "Close dialog",
+  split: {
+    title: "Split into separate contributions",
+    subtitle: "Give each pull request one fix that a maintainer can review on its own.",
+    creates: "Each contribution gets its own branch, files and PR draft from the same base commit.",
+    original: "This contribution stays as it is, marked as split.",
+    filesOnly: `${product.name} gives a file to one contribution only and does not cut files into parts. Fixes that touch the same file cannot be separated here.`,
+    testEach: `${product.name} cannot check that each part works alone. Run each part's tests before publishing.`,
+    contribution: ({ number }: { number: number }) => `Contribution ${number}`,
+    titleLabel: ({ number }: { number: number }) => `Contribution ${number} title`,
+    add: "Add a contribution",
+    remove: ({ number }: { number: number }) => `Remove contribution ${number}`,
+    goesTo: ({ path }: { path: string }) => `Contribution for ${path}`,
+    leaveOut: "Leave out",
+    titlePlaceholder: "Title of this contribution",
+    empty: "No files yet. Move files here from the menu next to each file.",
+    leftOutTitle: "Left out",
+    leftOutHint: "These stay only in the original.",
+    blocked: ({ reason }: { reason: string }) => `Held back from review, so it can't move: ${reason}`,
+    summary: ({ contributions, leftOut }: { contributions: number; leftOut: number }) =>
+      `${contributions} ${plural(contributions) === "one" ? "contribution" : "contributions"}; ${leftOut} ${plural(leftOut) === "one" ? "file" : "files"} left out.`,
+    pathLimit: ({ count }: { count: number }) =>
+      `Give each contribution at most ${count} ${plural(count) === "one" ? "file" : "files"}.`,
+    suggestionLimit: ({ count }: { count: number }) =>
+      `Only the first ${count} ${plural(count) === "one" ? "part is" : "parts are"} assigned. Place the remaining files or leave them out.`,
+    mixed: ({ title, issues }: { title: string; issues: string[] }) =>
+      `"${title}" cites ${issues.join(", ")}: its files carry more than one issue, and ${product.name} cannot separate changes inside a file. Split them by hand, or keep them together.`,
+    submit: "Split",
+    submitting: "Splitting…",
+  },
   help: {
     title: "From an idea to your next PR.",
     subtitle: "Four steps that connect building, reviewing and learning.",

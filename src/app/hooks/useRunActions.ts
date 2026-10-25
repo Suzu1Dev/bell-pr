@@ -21,6 +21,7 @@ import type { Locale } from "../../../shared/i18n/locale";
 import type { ContributionSettings } from "../../../shared/insights";
 import { summarizeRun } from "../../../shared/runs";
 import { activeFollowUp } from "../../../shared/followups";
+import type { SplitRequest } from "../../../shared/split";
 import type { ModalName, Notify, Page, Tab } from "../AppShell";
 import { usePresentation, type PresentationFlags } from "../presentation";
 import {
@@ -718,6 +719,35 @@ export function useRunActions({
       setBusy(false);
     }
   }
+  /** Opens the split dialog for the contribution on screen. */
+  function openSplit() {
+    openModal("split");
+  }
+  /** Splits the open contribution; the first part opens, and the dialog stays open on an error. */
+  async function splitRun(request: SplitRequest) {
+    const id = run.id;
+    setBusy(true);
+    setFormError("");
+    try {
+      const { run: original, created } = await api<{ run: Run; created: Run[] }>(
+        `${runPath(id)}/split`,
+        send("POST", request),
+      );
+      setRuns((previous) => [
+        ...created.map(summarizeRun),
+        ...previous.map((summary) =>
+          summary.id === original.id ? summarizeRun(original) : summary,
+        ),
+      ]);
+      if (runIdRef.current === original.id) setRun(original);
+      closeModal();
+      if (created[0]) await chooseRun(created[0].id);
+    } catch (error) {
+      setFormError((error as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
   async function reviewFile() {
     if (!file) return;
     const reviewed = !run.reviewedFiles.includes(file.path);
@@ -1087,6 +1117,8 @@ export function useRunActions({
     rerunReview,
     importRepo,
     startTask,
+    splitRun,
+    openSplit,
     reviewFile,
     saveNote,
     ask,

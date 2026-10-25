@@ -329,6 +329,9 @@ const draft = {
     splitLead:
       "A change that a maintainer can review in one sitting gets reviewed sooner. If this one does several things, ask how it could be split.",
     askSplit: "Ask how to split it",
+    splitNow: "Split into contributions",
+    parts: ({ count }: { count: number }) =>
+      `The plan has ${fmt.number(count)} groups of files that do not depend on one another. If each is its own fix, each can be a contribution of its own.`,
     weakened: "Weakened tests",
     weakenedLead:
       "Each skipped, deleted or loosened test needs a one-line reason before you publish: why is the change right?",

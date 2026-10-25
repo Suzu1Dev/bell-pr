@@ -396,6 +396,20 @@ const m: Translation<typeof en> = {
       `這是你本機的 repository，${product.name} 不會更動它；請在終端機自行 git pull 後再重新分析。`,
     cloneChanged: `${product.name} 的專案副本有未預期的修改，已停止更新；請檢查後再試。`,
   },
+  split: {
+    byHand: "親手學的工作由你逐行撰寫，無法拆分。",
+    published: "這個貢獻已經發布，無法拆分。",
+    alreadySplit: ({ count }) =>
+      `這個貢獻已經拆成 ${count} 個。請開啟其中一個，或再拆其中一個。`,
+    followUp: "這個貢獻有一輪修正正在進行，目前無法拆分。",
+    unknownPath: ({ path }) => `「${path}」不是這個貢獻有變更的檔案。`,
+    duplicatePath: ({ path }) => `「${path}」出現在多個貢獻中；一個檔案只能放進一個貢獻。`,
+    heldBack: ({ path }) => `「${path}」已被擋下、不納入審閱，無法移動；請選擇不移動。`,
+    notReproduced:
+      "複製出來的檔案與原檔不一致，所以沒有拆分。改寫檔案內容的 Git 設定（例如換行轉換）可能造成這種情況。",
+    startedFrom: ({ title }) => `拆分自「${title}」。`,
+    wasSplit: ({ count }) => `已拆成 ${count} 個貢獻。`,
+  },
   publish: {
     commitMessageInvalid: "提交訊息只能包含文字與換行。",
     invalidBranch:

@@ -656,6 +656,24 @@ export default {
     cloneChanged:
       `${product.name}'s copy of the project has unexpected changes, so the update stopped; check it and try again.`,
   },
+  /** Splitting a contribution into separate ones (shared/split.ts). */
+  split: {
+    byHand: "A Learn by hand run is written by you, line by line, so it cannot be split.",
+    published: "This contribution is already published, so it cannot be split.",
+    alreadySplit: ({ count }: { count: number }) =>
+      `This contribution was already split into ${count}. Open one of those, or split one of them.`,
+    followUp: "A follow-up round is open on this contribution, so it cannot be split now.",
+    unknownPath: ({ path }: { path: string }) =>
+      `"${path}" is not a changed file of this contribution.`,
+    duplicatePath: ({ path }: { path: string }) =>
+      `"${path}" is in more than one contribution; a file goes to only one.`,
+    heldBack: ({ path }: { path: string }) =>
+      `"${path}" is held back from review, so it cannot be moved; leave it out.`,
+    notReproduced:
+      "The copied files did not match the originals, so nothing was split. A Git setting that rewrites files, such as line-ending conversion, can cause this.",
+    startedFrom: ({ title }: { title: string }) => `Split from "${title}".`,
+    wasSplit: ({ count }: { count: number }) => `Split into ${count} contributions.`,
+  },
   /** The human review gate and publishing: draft, file reviews, approval and push. */
   publish: {
     commitMessageInvalid: "A commit message may only contain text and line breaks.",

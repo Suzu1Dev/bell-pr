@@ -53,6 +53,13 @@ const workspace = {
     tooltipSetting:
       "The understanding check is off, so you can approve without explaining the change back. Runs approved this way stay marked. Turn it back on in Settings → Learning.",
   },
+  splitNotice: {
+    from: ({ title }: { title: string }) =>
+      `Split from “${title}”. This contribution has its own branch, files and PR draft.`,
+    openOriginal: "Open the original",
+    into: ({ count }: { count: number }) =>
+      `Split into ${count} contributions: publish the parts instead of this one, which stays as it was.`,
+  },
   runNotices: {
     /** After a feedback read whose review decision asks for changes; never polled. */
     waiting: ({ date }: { date: string }) =>

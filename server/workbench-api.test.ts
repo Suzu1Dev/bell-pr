@@ -49,6 +49,7 @@ const methods = [
   "draft",
   "review",
   "approve",
+  "split",
   "commits",
   "commit",
   "checkPremise",

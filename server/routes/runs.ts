@@ -1,6 +1,7 @@
 import type { Express } from "express";
 import { z } from "zod";
 import { summarizeRun } from "../../shared/runs.js";
+import { splitLimits } from "../../shared/split.js";
 import { contributionSettingsSchema } from "../insights.js";
 import { sm } from "../i18n/index.js";
 import type { RouteDeps } from "./types.js";
@@ -75,5 +76,24 @@ export function registerRunsRoutes(
   });
   app.post("/api/runs/:id/cancel", async (req, res) => {
     res.json({ run: await workbench.cancel(req.params.id) });
+  });
+  app.post("/api/runs/:id/split", async (req, res) => {
+    const input = z
+      .object({
+        contributions: z
+          .array(
+            z
+              .object({
+                title: z.string().trim().min(1).max(splitLimits.titleChars),
+                paths: z.array(z.string().min(1).max(4096)).min(1).max(splitLimits.maxPaths),
+              })
+              .strict(),
+          )
+          .min(splitLimits.minContributions)
+          .max(splitLimits.maxContributions),
+      })
+      .strict()
+      .parse(req.body);
+    res.status(201).json(await workbench.split(req.params.id, input));
   });
 }
