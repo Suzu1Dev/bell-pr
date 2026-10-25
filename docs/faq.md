@@ -230,9 +230,11 @@ them, and the explanations, notes and review marks for those files. It does
 not carry over the original's pull request text, approval, understanding
 check, reports or logs, so you explain and approve each part on its own. The
 original run keeps every file and stays as it was, but a banner asks you to
-publish the parts instead. BELL PR cannot check that a part works on its
-own, so run each part's tests. The split is not offered for the sample run,
-a Learn by hand run, a published run, or a run whose working copy is gone.
+publish the parts instead. A part you delete leaves that banner, and once
+every part is deleted you can split the original again. BELL PR cannot
+check that a part works on its own, so run each part's tests. The split is
+not offered for the sample run, a Learn by hand run, a published run, or a
+run whose working copy is gone.
 
 ### Can several people use one BELL PR?
 

@@ -21,6 +21,7 @@ import "../mission/mission.css";
 import "../team/team.css";
 import type { AppSettingsView } from "../../shared/app-settings";
 import { summarizeRun } from "../../shared/runs";
+import { dropSplitLinks } from "../../shared/split";
 import { api, ApiError, send } from "../api";
 import { Logo } from "../brand/Logo";
 import { getDemo } from "../demo";
@@ -881,6 +882,12 @@ function AppShell({
     await api(`/runs/${encodeURIComponent(id)}`, send("DELETE"));
     setRuns((list) => list.filter((item) => item.id !== id));
     if (runIdRef.current === id) dropOpenRun();
+    else
+      // The server drops the split links to the deleted run; the open run does the same.
+      setRun((open) => {
+        const next = { ...open };
+        return dropSplitLinks(next, id) ? next : open;
+      });
     notify(runMessages.deleted);
   }
 

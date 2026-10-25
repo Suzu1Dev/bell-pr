@@ -200,11 +200,13 @@ export interface RunCore {
    * agent runs and until the run records something.
    */
   byHand?: ByHandRecord;
-  /** The contribution this one was split from; set only by a split and never changed. Absent on every other run. */
+  /** The contribution this one was split from; set only by a split, and dropped when that contribution is deleted. Absent on every other run. */
   splitFrom?: SplitRef;
   /**
    * The contributions a split made from this run, in the order they were
-   * made. The run itself stays as it was. Absent until the run is split.
+   * made. The run itself stays as it was. Absent until the run is split; a
+   * deleted contribution leaves the list, and the last one takes the list
+   * with it, so the run can be split again.
    */
   splitInto?: SplitRef[];
 }

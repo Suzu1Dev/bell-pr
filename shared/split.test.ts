@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { planTaskPaths, reviewabilitySnapshot, suggestSplit, taskIssues } from "./reviewability.js";
-import type { SplitTask } from "./split.js";
+import { dropSplitLinks, type SplitTask } from "./split.js";
 
 const task = (
   id: string,
@@ -152,4 +152,22 @@ test("a part's issues are those of its tasks, and tasks without any reference st
     [["a", "c"], ["#5"]],
     [["b"], []],
   ]);
+});
+
+test("a deleted contribution leaves the links of the runs split from or into it, and the rest stay", () => {
+  const original = { splitInto: [{ runId: "a", title: "A" }, { runId: "b", title: "B" }] };
+  const part = { splitFrom: { runId: "source", title: "Source" } };
+  assert.equal(dropSplitLinks(original, "other"), false);
+  assert.equal(dropSplitLinks(part, "other"), false);
+  assert.deepEqual([original.splitInto.length, part.splitFrom.runId], [2, "source"]);
+  // On a copy, as the browser updates its open run, the run it was copied from keeps its list.
+  const copy = { ...original };
+  assert.equal(dropSplitLinks(copy, "a"), true);
+  assert.deepEqual(copy.splitInto, [{ runId: "b", title: "B" }]);
+  assert.equal(original.splitInto.length, 2);
+  // The last part takes the list with it, and the original its part's link back.
+  assert.equal(dropSplitLinks(copy, "b"), true);
+  assert.equal("splitInto" in copy, false);
+  assert.equal(dropSplitLinks(part, "source"), true);
+  assert.equal("splitFrom" in part, false);
 });

@@ -15,6 +15,7 @@ import path from "node:path";
 import { git } from "./process.js";
 import { AppError, withRunLocale, type Repository, type Run } from "./types.js";
 import { activeFollowUp } from "../shared/followups.js";
+import { dropSplitLinks } from "../shared/split.js";
 import { runBusy } from "./sync-runs.js";
 import { log } from "./log.js";
 import { redact } from "./secrets.js";
@@ -286,6 +287,8 @@ export async function removeRun(ctx: WorkbenchContext, id: string) {
       await removeWorkspace(ctx, run, findRepository(ctx, run.repoId));
     const index = ctx.store.data.runs.indexOf(run);
     if (index >= 0) ctx.store.data.runs.splice(index, 1);
+    // No banner links to a deleted run, and an original whose parts are all gone can be split again.
+    for (const other of ctx.store.data.runs) dropSplitLinks(other, id);
     log.info("run.removed", { runId: id });
     invalidateStorageReport(ctx);
     await ctx.store.save();

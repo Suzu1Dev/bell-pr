@@ -316,6 +316,39 @@ test("a contribution that was split cannot be split again, but its parts can", a
   assert.deepEqual(again.created.map((made) => made.splitFrom?.runId), [a.id, a.id]);
 });
 
+test("a deleted part leaves the original's list, the original can be split again once every part is gone, and a deleted original leaves its parts", async (t) => {
+  // The parts' PR drafts fail at once, so they are not busy when they are deleted.
+  const f = await fixture(t, {
+    collectDraftContext: async () => {
+      throw new Error("no draft in tests");
+    },
+  });
+  const draftsEnded = async (runs: Run[]) => {
+    while (runs.some((run) => run.draftPreparation?.status !== "failed"))
+      await new Promise((resolve) => setTimeout(resolve, 10));
+  };
+  const { created } = await en(() => f.workbench.split(f.run.id, { contributions: three }));
+  await draftsEnded(created);
+  const [a, b, c] = created;
+  await f.workbench.removeRun(b.id);
+  assert.deepEqual(f.run.splitInto, [
+    { runId: a.id, title: "Fix a" },
+    { runId: c.id, title: "Fix c" },
+  ]);
+  await f.workbench.removeRun(a.id);
+  await f.workbench.removeRun(c.id);
+  assert.equal("splitInto" in f.run, false);
+
+  const again = await en(() => f.workbench.split(f.run.id, { contributions: three.slice(0, 2) }));
+  await draftsEnded(again.created);
+  assert.equal(f.run.splitInto?.length, 2);
+  await f.workbench.removeRun(f.run.id);
+  assert.deepEqual(
+    again.created.map((part) => "splitFrom" in part),
+    [false, false],
+  );
+});
+
 test("a split that fails halfway removes what it made and leaves the original alone", { skip: process.platform === "win32" }, async (t) => {
   const f = await fixture(t);
   const before = await fingerprints(f.run);

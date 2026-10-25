@@ -213,6 +213,12 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   split went on anyway: on success the app jumped to the first part, and a
   failure was never shown. The dialog now stays open until the split ends.
 
+- **Split links to deleted runs.** After a split, deleting a part left it
+  in the original's banner, where it opened a "not found" error, and once
+  every part was gone the original could never be split again. Deleting the
+  original also left a dead "Open the original" link in each part. A deleted
+  run now leaves those links, and the original can be split again.
+
 ### Security
 
 - **zod 4.** The server validates requests, agent answers and saved files

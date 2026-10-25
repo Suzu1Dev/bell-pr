@@ -20,6 +20,29 @@ export const splitLimits = {
   maxPaths: 150,
 } as const;
 
+/**
+ * Drops what `run` links to a deleted contribution, in place: the original it
+ * was split from, or the part from its list. A list left empty goes, so the
+ * original can be split again. Returns whether anything changed.
+ */
+export function dropSplitLinks(
+  run: { splitFrom?: SplitRef; splitInto?: SplitRef[] },
+  removedId: string,
+) {
+  let changed = false;
+  if (run.splitFrom?.runId === removedId) {
+    delete run.splitFrom;
+    changed = true;
+  }
+  const into = run.splitInto?.filter((ref) => ref.runId !== removedId);
+  if (into && into.length !== run.splitInto?.length) {
+    if (into.length) run.splitInto = into;
+    else delete run.splitInto;
+    changed = true;
+  }
+  return changed;
+}
+
 /** The body of `POST /api/runs/:id/split`. */
 export interface SplitRequest {
   contributions: { title: string; paths: string[] }[];
