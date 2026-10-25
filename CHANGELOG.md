@@ -238,6 +238,13 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   The sandbox now closes the whole data directory and opens only the
   agent's own checkout and its clone's Git data.
 
+- **A finished run's changes show up even if you save the draft just then.**
+  Saving the PR draft while BELL was loading a finished team's changes
+  threw them away. A failed load was also never retried. The Changes tab
+  stayed empty or out of date until you pressed Refresh. Now the changes
+  are shown after a save, and a failed load is tried again on the next
+  poll.
+
 ### Security
 
 - **zod 4.** The server validates requests, agent answers and saved files

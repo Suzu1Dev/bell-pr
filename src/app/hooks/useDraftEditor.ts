@@ -334,7 +334,15 @@ export function useDraftEditor({
           }),
         );
         open = runIdRef.current === updated.id;
-        if (open) setRun(updated);
+        // A team that finished before the save is left for the poll to show,
+        // so it also loads the team's diff; only the saved draft is taken.
+        const working = ["running", "queued", "awaiting_plan"];
+        if (open)
+          setRun((previous) =>
+            working.includes(previous.status) && !working.includes(updated.status)
+              ? { ...previous, draft: updated.draft }
+              : updated,
+          );
       }
       // The editor shows the saved line, or no longer shows it.
       if (open && body !== draftBody) setDraftBody(body);

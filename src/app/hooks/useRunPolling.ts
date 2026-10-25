@@ -16,7 +16,7 @@ interface RunPollingOptions {
   active: boolean;
   preparingDraft: boolean;
   reviewRerunning: boolean;
-  /** Bumped by draft saves; a poll begun before a save is discarded. */
+  /** Bumped by draft saves; a poll begun before a save does not apply its run. */
   draftMutationEpoch: RefObject<number>;
   setRun: Dispatch<SetStateAction<Run>>;
   setRuns: Dispatch<SetStateAction<RunSummary[]>>;
@@ -75,7 +75,8 @@ export function useRunPolling({
           const { files: changed } = await api<{ files: DiffFile[] }>(
             `/runs/${run.id}/diff`,
           );
-          if (!cancelled && epoch === draftMutationEpoch.current) {
+          // A draft saved meanwhile leaves the diff as it is: show it all the same.
+          if (!cancelled) {
             setFiles(changed);
             setSelectedPath(changed[0]?.path || "");
             if (updated.status === "review")
