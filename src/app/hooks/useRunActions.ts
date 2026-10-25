@@ -996,7 +996,8 @@ export function useRunActions({
           ...(overrides.length ? { overrides } : {}),
         }),
       );
-      setRun(result.run);
+      // The person may have opened another run while the PR was created.
+      if (runIdRef.current === result.run.id) setRun(result.run);
       closeModal();
       notify(pushingRound ? t.roundPushed : t.prCreated);
     } catch (error) {

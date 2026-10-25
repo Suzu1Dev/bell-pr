@@ -178,6 +178,12 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   replace it, the startup error contained the English phrase "Invalid state
   format" even in Traditional Chinese. That reason is now translated too.
 
+- **A created PR no longer takes over another run.** If you left the publish
+  dialog while the PR was being created and opened another run, the answer
+  replaced that run: the workspace showed the published run with the other
+  run's files, and unsaved draft edits on it were lost. Now the open run
+  stays as it is, and you still get the "PR created" notice.
+
 ### Security
 
 - **zod 4.** The server validates requests, agent answers and saved files

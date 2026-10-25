@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import test, { mock } from "node:test";
+import { act, createElement } from "react";
 import { assertNoHan } from "../../test-utils/render";
+import { mount } from "../../mission/test-dom";
 import en from "../../i18n/en";
 import zhTW from "../../i18n/zh-TW";
 import {
@@ -12,8 +14,12 @@ import {
   stopNotice,
   stopSampleRun,
   typeOut,
+  useRunActions,
   withSampleFeedback,
+  type RunActions,
 } from "./useRunActions";
+import type { DraftEditor } from "./useDraftEditor";
+import type { TaskSetup } from "./useTaskSetup";
 import { getDemo } from "../../demo";
 import type { Run } from "../../types";
 
@@ -369,6 +375,120 @@ test("under fake timers the answer types out on the same ticks every time", asyn
     assert.deepEqual(stopped, [typing.slices[0]]);
   } finally {
     mock.timers.reset();
+  }
+});
+
+const respond = (body: unknown, status = 200) =>
+  new Response(JSON.stringify(body), {
+    status,
+    headers: { "Content-Type": "application/json" },
+  });
+
+/**
+ * Mounts useRunActions on `run` with stand-ins for the shell: the runs it
+ * is asked to show and its notices are recorded. A test that passes
+ * `runIdRef` moves it to stand for the person opening another run.
+ */
+async function mountActions(
+  run: Run,
+  options: { draftDirty?: boolean; runIdRef?: { current: string } } = {},
+) {
+  const runIdRef = options.runIdRef ?? { current: run.id };
+  const shown: Run[] = [];
+  const notices: string[] = [];
+  let latest: RunActions | undefined;
+  const ignore = () => {};
+  const draft = {
+    draftDirty: options.draftDirty ?? false,
+    editorDraft: { current: { ...run.draft, commitMessage: "", publishBranch: "" } },
+    draftTitle: run.draft.title,
+    draftBody: run.draft.body,
+    draftCommitMessage: "",
+    draftPublishBranch: "",
+    acknowledged: [],
+    setAcknowledged: ignore,
+    overrides: [],
+    loadPublishChecks: async () => {},
+    followUp: undefined,
+    draftMutationEpoch: { current: 0 },
+  } as unknown as DraftEditor;
+  const setup = {
+    source: "",
+    setSource: ignore,
+    taskRepoId: "repo-2",
+    setTaskRepoId: ignore,
+    prompt: "Wait longer between retries",
+    setPrompt: ignore,
+    taskTitle: "",
+    setTaskTitle: ignore,
+    contributionSettings: {},
+    settingsLoading: false,
+    settingsReady: true,
+    runRequest: { current: {} },
+  } as unknown as TaskSetup;
+  function Probe() {
+    latest = useRunActions({
+      run,
+      setRun: (value) => {
+        if (typeof value !== "function") shown.push(value);
+      },
+      runIdRef,
+      file: undefined,
+      setFiles: ignore,
+      setSelectedPath: ignore,
+      demo: false,
+      reviewRerunning: false,
+      setBusy: ignore,
+      setFormError: ignore,
+      notify: (message) => notices.push(message),
+      openModal: ignore,
+      closeModal: ignore,
+      navigate: ignore,
+      setTab: ignore,
+      setShowExplanation: ignore,
+      setFocusMode: ignore,
+      setRepos: ignore,
+      setRuns: ignore,
+      setExploreRepoId: ignore,
+      navigationIntent: { current: 0 },
+      selectionSequence: { current: 0 },
+      draft,
+      setup,
+    });
+    return null;
+  }
+  const mounted = await mount(createElement(Probe));
+  return {
+    actions: () => latest!,
+    shown,
+    notices,
+    unmount: () => mounted.unmount(),
+  };
+}
+
+test("a PR created after the person opened another run leaves that run on screen", async (t) => {
+  const realFetch = globalThis.fetch;
+  t.after(() => {
+    globalThis.fetch = realFetch;
+  });
+  const approved: Run = { ...base, id: "run-a", status: "approved", approvedFingerprint: "f" };
+  const asked: string[] = [];
+  const runIdRef = { current: approved.id };
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    asked.push(`${init?.method ?? "GET"} ${String(input)}`);
+    // While the PR is being created, the person leaves the dialog and opens run B.
+    runIdRef.current = "run-b";
+    return respond({ run: { ...approved, status: "published", prUrl: "https://example.test/pull/7" } });
+  }) as typeof fetch;
+  const shell = await mountActions(approved, { runIdRef });
+  try {
+    await act(() => shell.actions().publish());
+    assert.deepEqual(asked, ["POST /api/runs/run-a/publish"]);
+    // Run B stays open, with its own files; the PR is still announced.
+    assert.deepEqual(shell.shown, []);
+    assert.deepEqual(shell.notices, [en.workspace.notices.prCreated]);
+  } finally {
+    await shell.unmount();
   }
 });
 
