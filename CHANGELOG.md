@@ -62,6 +62,9 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   recommendations and the discovery opportunities now ask for one fix a
   maintainer can review on its own, and the plan names its independent fixes
   so they can be split. The effect on the agents' output is not measured yet.
+- **globals 17.13.** The lint setup's lists of browser and Node globals come
+  from globals 17.13 (was 17.12). Development only; the package does not
+  change.
 
 ### Fixed
 
