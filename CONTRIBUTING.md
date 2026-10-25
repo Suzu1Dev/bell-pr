@@ -17,7 +17,7 @@ By taking part, you agree to the [Code of Conduct](CODE_OF_CONDUCT.md).
 
 ## Set up
 
-You need Node.js 22 or later and Git. See
+You need Node.js 22.13 or later (ESLint 10 needs it) and Git. See
 [docs/development.md](docs/development.md) for the layout, how to run from
 source and the checks.
 

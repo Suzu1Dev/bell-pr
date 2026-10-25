@@ -23,7 +23,8 @@ at the root of the repository; read them before your first change.
 
 ## Set up
 
-You need Node.js 22 or later and Git.
+You need Node.js 22.13 or later (ESLint 10 needs it) and Git. Running
+BELL PR itself needs Node.js 22 or later.
 
 ```sh
 npm ci

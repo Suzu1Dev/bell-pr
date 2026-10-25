@@ -70,6 +70,9 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   (`aria-hidden`), and the icons' chunk is 2.5 kB larger (gzip). Lucide's
   license now includes Feather's MIT notice itself, so
   `THIRD_PARTY_NOTICES.md` quotes it from there instead of adding it.
+- **ESLint 10.** The lint runs on ESLint 10.13 (was 9.39) with the same
+  rules, so developing BELL PR needs Node.js 22.13 or later. Running it
+  still needs Node.js 22 or later.
 
 ### Fixed
 
