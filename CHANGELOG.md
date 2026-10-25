@@ -190,6 +190,13 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   asks whether to discard them, the way opening another run already does;
   keeping them leaves the dialog open.
 
+- **Guide options stay with the R3 hint.** In a run fitted to a project's
+  rules that leave out planning help, an R1 hint or a question could still
+  come with ways forward and their trade-offs. That is planning help, but
+  the run recorded it as an answer, and choosing one of those options always
+  failed. Now only an R3 hint and questions on your plan keep options, and
+  you can only choose from an R3 hint's options.
+
 ### Security
 
 - **zod 4.** The server validates requests, agent answers and saved files

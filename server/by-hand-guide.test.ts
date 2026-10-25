@@ -500,6 +500,28 @@ test("a run without a lock gets every rung, plan questions and a routed question
   assert.ok(f.calls.every((call) => call.readonly));
 });
 
+test("options, which are planning help, stay only on R3 and plan questions, never on help a fitted run records as another kind", async (t) => {
+  const f = await fixture(t, { helpLock: { ...lock, kinds: ["explain", "answer"] } });
+  const options = [
+    { name: "Throw on a 503", tradeoff: "Every caller sees the failure." },
+    { name: "Retry once more", tradeoff: "Slower, but a short outage goes unnoticed." },
+  ];
+  for (let index = 0; index < 5; index++) f.answers.push(answer({ options }));
+  // Under a lock without planning help, an R1 hint and a question stay answers: no ways forward with trade-offs.
+  await f.ask({ kind: "hint", stepId: "s1", rung: 1 });
+  await f.ask({ kind: "ask", entry: "project", stepId: "s1", question: "How does the project treat a 503?" });
+  assert.deepEqual(f.run.byHand?.thread?.map((entry) => entry.options), [undefined, undefined]);
+  assert.deepEqual(f.run.byHand?.events?.map((event) => event.kind), ["answer", "answer"]);
+  // Without a lock, R2 keeps none either; R3 and plan questions keep theirs.
+  delete f.run.byHand!.helpLock;
+  await f.ask({ kind: "hint", stepId: "s1", rung: 2, tried: "I looked at the retry helper loop" });
+  await f.ask({ kind: "hint", stepId: "s1", rung: 3, tried: "I moved the status check above the return" });
+  assert.deepEqual(f.run.byHand?.thread?.map((entry) => entry.options), [undefined, undefined, undefined, options]);
+  f.run.status = "awaiting_plan";
+  await f.questions();
+  assert.deepEqual(f.run.byHand?.planQuestions?.[0].options, options);
+});
+
 test("plan questions see the person's plan, never the outline, at most three times, and only before confirming", async (t) => {
   const f = await fixture(t, { status: "awaiting_plan" });
   f.run.byHand!.guidePlan = { summary: "OUTLINE-SUMMARY", steps: [{ title: "OUTLINE-STEP", files: [] }], at: "2026-10-20T00:05:00.000Z" };

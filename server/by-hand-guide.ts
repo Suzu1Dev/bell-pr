@@ -86,7 +86,9 @@ function answerEntry(run: GuideRun, request: GuideRequest, filtered: Filtered<Fi
   if (!/[\p{L}\p{N}]/u.test(text.replaceAll(removedMark, "")))
     text = value.refs.length ? pointers(value.refs) : removed ? sm().byHand.guide.nothingLeft : text;
   const quotes = offTopic ? [] : value.quotes.map(fitQuote);
-  const options = offTopic ? undefined : value.options;
+  // Options are planning help (R3, plan questions): any other answer drops them, so it never gives more than its recorded kind and a fitted run's lock allow.
+  const keepsOptions = request.kind === "plan" || (request.kind === "hint" && request.rung === 3);
+  const options = keepsOptions ? value.options : undefined;
   const execution = run.modelExecution;
   const model = execution?.reported?.model ?? execution?.model;
   return {

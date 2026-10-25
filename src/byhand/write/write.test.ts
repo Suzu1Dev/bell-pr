@@ -185,6 +185,19 @@ test("the guide says the agents can't edit files, lists the steps, and offers th
   assert.match(renderZh(guide({ plan: { steps, savedAt: at } })), /我卡住了/);
 });
 
+test("only R3's options can be chosen for a step, as the server allows; options an older build stored on another answer stay hidden", () => {
+  const options = [
+    { name: "Cap in the wrapper", tradeoff: "One place to change." },
+    { name: "Cap per call", tradeoff: "Each caller decides." },
+  ];
+  const entry = (id: string, kind: string, rung?: number) => ({ id, at, kind, stepId: "s2", rung, text: `Answer ${id}.`, options });
+  const others = html(guide({ plan: { steps, savedAt: at }, thread: [entry("r1", "hint", 1), entry("q1", "ask")] }));
+  assert.ok(others.includes("Answer r1.") && others.includes("Answer q1."));
+  assert.doesNotMatch(others, /Cap in the wrapper|>Choose</);
+  const r3 = html(guide({ plan: { steps, savedAt: at }, thread: [entry("r3", "hint", 3)] }));
+  assert.match(r3, /<strong id="r3-option-0">Cap in the wrapper<\/strong> One place to change\. <button type="button" class="mission-text-button" aria-describedby="r3-option-0">Choose<\/button>/);
+});
+
 test("each step's buttons and fields say which step they belong to", () => {
   const text = html(guide({ plan: { steps, savedAt: at } }));
   assert.match(text, /<span id="run-1-on-s2">Cap the retries at three<\/span>/);

@@ -36,7 +36,7 @@ export function GuideThread({ entries, steps, onStep, busy }: { entries: GuideEn
                 </figure>
               ))}
               {(entry.removed ?? 0) > 0 && <p className="by-hand-note">{t.removed}</p>}
-              {step && !!entry.options?.length && (
+              {step && entry.kind === "hint" && entry.rung === 3 && !!entry.options?.length && (
                 <ol>
                   {entry.options.map((option, index) => {
                     const chosen = step.chosen?.entryId === entry.id && step.chosen.option === index;
