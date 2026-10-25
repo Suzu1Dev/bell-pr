@@ -11,6 +11,7 @@ import { formatters, type Locale } from "../../../shared/i18n/locale";
 import type {
   ContributionDirection,
   ContributionRecommendation,
+  InsightsPhase,
   RecommendationVerification,
 } from "../../../shared/insights";
 import type { AgentProvider } from "../../../shared/models";
@@ -63,6 +64,23 @@ const mission = {
     start: "Start the project analysis",
     progressLabel: "Analysis progress",
     note: "Until the analysis is done, nothing is guessed about what this project does and no change is recommended.",
+  },
+  /** The steps of a running analysis; the server reports where the run is. */
+  progress: {
+    phases: {
+      reading: "Reading the project's files",
+      agent: "The Agent reads the code and writes the analysis",
+      checking: "Checking the answer against the source",
+      saving: "Saving the analysis",
+    } satisfies Record<InsightsPhase, string>,
+    /** `waited` and `limit` arrive as clock times such as "3:05"; the limit is the most this step may take. */
+    waited: ({ waited, limit }: { waited: string; limit: string }) =>
+      `${waited} of up to ${limit}`,
+    attempt: ({ attempt, attempts }: { attempt: number; attempts: number }) =>
+      `try ${n(attempt)} of ${n(attempts)}`,
+    /** `elapsed` arrives as a clock time such as "3:05". */
+    elapsed: ({ elapsed }: { elapsed: string }) => `Running for ${elapsed}`,
+    note: "The bar fills with the time used against the most this step may take, not with how much of the work is done. While it only moves, there is no such time to show.",
   },
   project: {
     sourceDemo: "Sample analysis",

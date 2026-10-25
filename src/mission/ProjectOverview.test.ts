@@ -512,6 +512,66 @@ test("while the sample's analysis plays, the loading state lists its lines so fa
   }
 });
 
+test("while a real analysis runs, the overview lists its steps with the time used and the CLI's latest notice", () => {
+  const progress = {
+    phase: "agent",
+    elapsedSeconds: 190,
+    more: false,
+    attempt: 2,
+    attempts: 3,
+    waitedSeconds: 65,
+    limitSeconds: 600,
+    notice: "Claude Code is retrying (attempt 2 of 10, rate_limit, retrying in 4 s).",
+  } as const;
+  // Not the sample repository: its playback state is shared by the tests above.
+  const html = renderEnglish({ repo: { ...repo, id: "repo-1" }, insights: null, loading: true, progress });
+  assertNoHan(html);
+  // The bar is the time used against the limit itself: 65 of 600 seconds is 10.8%, no phase mark.
+  assert.match(
+    html,
+    /<div class="mission-analysis-progress" role="progressbar" aria-label="Analysis progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="11" aria-valuetext="[^"]*"><span style="width:10\.8%"><\/span><\/div>/,
+  );
+  assert.match(html, /<li class="done">.*?Reading the project&#x27;s files<\/span>/);
+  assert.match(
+    html,
+    /<li class="current">.*?The Agent reads the code and writes the analysis<small>try 2 of 3 · 1:05 of up to 10:00<\/small>/,
+  );
+  assert.match(html, /<p class="mission-analysis-notice" role="status">Claude Code is retrying/);
+  // Re-analysis shows the steps above the analysis it replaces, "generate more" under its button.
+  assert.match(renderEnglish({ loading: true, progress }), /mission-analysis-steps/);
+  assert.match(renderEnglish({ recommending: true, progress: { ...progress, more: true } }), /mission-analysis-steps/);
+  // A server that has not answered yet, or a run that ended, shows no steps.
+  assert.doesNotMatch(renderEnglish({ repo: { ...repo, id: "repo-1" }, insights: null, loading: true }), /mission-analysis-steps/);
+  assert.doesNotMatch(renderEnglish({ loading: false, progress }), /mission-analysis-steps/);
+  assert.match(
+    renderWith("zh-TW", createElement(ProjectOverview, overviewProps({ insights: null, loading: true, progress }))),
+    /已等待 1:05，上限 10:00/,
+  );
+});
+
+test("the progress bar has a value only while a started try is timed; everywhere else it just moves", () => {
+  const base = { elapsedSeconds: 30, more: false } as const;
+  const bar = (progress: ProjectOverviewProps["progress"]) =>
+    renderEnglish({ repo: { ...repo, id: "repo-1" }, insights: null, loading: true, progress }).match(
+      /<div class="mission-analysis-progress[^"]*" role="progressbar".*?<\/div>/,
+    )?.[0] ?? "";
+  for (const progress of [
+    { ...base, phase: "reading" },
+    // Waiting for a free Agent slot, or between two tries: no try is running.
+    { ...base, phase: "agent", attempt: 2, attempts: 3 },
+    { ...base, phase: "checking" },
+    { ...base, phase: "saving" },
+  ] as const) {
+    const markup = bar(progress);
+    assert.match(markup, /is-indeterminate/, progress.phase);
+    assert.doesNotMatch(markup, /aria-valuenow|width:/, progress.phase);
+  }
+  const timed = { ...base, phase: "agent", attempt: 1, attempts: 3, limitSeconds: 600 } as const;
+  assert.match(bar({ ...timed, waitedSeconds: 1 }), /aria-valuenow="0"[^>]*><span style="width:0\.2%">/);
+  assert.match(bar({ ...timed, waitedSeconds: 300 }), /aria-valuenow="50"[^>]*><span style="width:50%">/);
+  assert.match(bar({ ...timed, waitedSeconds: 900 }), /aria-valuenow="100"[^>]*><span style="width:100%">/);
+});
+
 /** The section ids in the order the page shows them. */
 const sectionOrder = (html: string) =>
   [...html.matchAll(/<section id="(overview-[a-z]+)"/g)].map((match) => match[1]);

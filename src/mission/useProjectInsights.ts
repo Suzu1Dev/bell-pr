@@ -9,6 +9,7 @@ import type { Locale } from "../../shared/i18n/locale";
 import {
   maxProjectRecommendations,
   projectRecommendationBatchSize,
+  type InsightsProgress,
   type InsightsStaleDetail,
   type ProjectInsights,
   type RecommendationPreferences,
@@ -16,7 +17,7 @@ import {
 import { api, send } from "../api";
 import { usePresentation } from "../app/presentation";
 import { getDemo } from "../demo";
-import type { PlaybackClock } from "../demo/playback";
+import { systemClock, type PlaybackClock } from "../demo/playback";
 import { getCurrentLocale, getCurrentMessages, useLocale } from "../i18n";
 import { playSampleAnalysis, stopSampleAnalysis } from "./sample-analysis";
 
@@ -90,6 +91,8 @@ interface InsightsState extends InsightsResult {
   recommendationPreferences: RecommendationPreferences;
   savingPreferences: boolean;
   preferenceError: string;
+  /** Where the server's run is while this operation waits; absent until it answers. */
+  progress?: InsightsProgress;
 }
 
 type InsightsOperation = "load" | "analyze" | "recommend";
@@ -110,14 +113,23 @@ const emptyState: InsightsState = {
   preferenceError: "",
 };
 
+/** How often the overview asks where a running analysis is. */
+const progressPollMs = 2000;
+
 export interface ProjectInsightsCacheOptions {
   /**
    * The sample's analysis plays (`demo=play`): it starts out loading, and
    * playSample() reveals it, instead of showing it at once.
    */
   playSample?: boolean;
-  /** The clock of the sample's playback; tests pass a fake one. */
+  /** The clock of the sample's playback and of the progress questions; tests pass a fake one. */
   clock?: PlaybackClock;
+  /**
+   * Where the server's run is. Asked while an analysis or "generate more"
+   * waits, because that request says nothing before it ends. Without it,
+   * nothing is asked.
+   */
+  progress?: (repoId: string) => Promise<InsightsProgress | undefined>;
 }
 
 /** One cache belongs to the mounted workbench, so changing repositories keeps active work. */
@@ -356,6 +368,35 @@ export class ProjectInsightsCache {
     return operation;
   }
 
+  /**
+   * Asks the server where the run of `repoId` is, one question after the
+   * other, until the returned function is called.
+   */
+  private watchProgress(repoId: string): () => void {
+    const read = this.options.progress;
+    if (!read) return () => {};
+    const clock = this.options.clock ?? systemClock;
+    let stopped = false;
+    let timer: unknown;
+    const poll = (): Promise<void> =>
+      read(repoId)
+        .then(
+          (progress) => {
+            if (!stopped) this.update(repoId, { progress });
+          },
+          // A missed answer leaves the last one on screen; the run itself is not affected.
+          () => undefined,
+        )
+        .then(() => {
+          if (!stopped) timer = clock.setTimeout(poll, progressPollMs);
+        });
+    void poll();
+    return () => {
+      stopped = true;
+      clock.clearTimeout(timer);
+    };
+  }
+
   private generate(
     repoId: string,
     action: "analyze" | "recommend",
@@ -371,6 +412,7 @@ export class ProjectInsightsCache {
         ? { recommending: true, recommendationError: "" }
         : { loading: true, error: "", recommendationError: "" },
     );
+    const stopWatching = this.watchProgress(repoId);
     const operation = Promise.resolve()
       .then(() => this.request(repoId, action))
       .then((result) => {
@@ -396,9 +438,14 @@ export class ProjectInsightsCache {
           });
       })
       .finally(() => {
+        stopWatching();
         if (this.mutations.get(repoId) === operation) {
           this.mutations.delete(repoId);
-          this.update(repoId, { loading: false, recommending: false });
+          this.update(repoId, {
+            loading: false,
+            recommending: false,
+            progress: undefined,
+          });
         }
       });
     this.mutations.set(repoId, operation);
@@ -406,11 +453,21 @@ export class ProjectInsightsCache {
   }
 }
 
+/** Where the server's run of the analysis is; undefined when it does not run. */
+const readProgress = (repoId: string) =>
+  api<{ progress: InsightsProgress | null }>(
+    `/repos/${repoId}/insights/progress`,
+  ).then(({ progress }) => progress ?? undefined);
+
 export function useProjectInsights(repoId?: string) {
   const [locale] = useLocale();
   const { play, speed } = usePresentation();
   const [cache] = useState(
-    () => new ProjectInsightsCache(undefined, undefined, { playSample: play }),
+    () =>
+      new ProjectInsightsCache(undefined, undefined, {
+        playSample: play,
+        progress: readProgress,
+      }),
   );
   const getSnapshot = useCallback(
     () => cache.snapshot(repoId),

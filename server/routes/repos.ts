@@ -40,6 +40,11 @@ export function registerReposRoutes(
   app.post("/api/repos/:id/insights", async (req, res) => {
     res.json(await insights.generate(req.params.id));
   });
+  // The two requests above hold their connection until the Agent is done, so
+  // the overview asks here, in between, where the run is.
+  app.get("/api/repos/:id/insights/progress", (req, res) =>
+    res.json({ progress: insights.analysisProgress(req.params.id) ?? null }),
+  );
   app.post("/api/repos/:id/insights/recommendations", async (req, res) =>
     res.json(await insights.generateMore(req.params.id, req.body)),
   );

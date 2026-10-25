@@ -6,6 +6,7 @@ import {
 } from "../shared/insights.js";
 import { setLocale } from "../src/i18n/index.js";
 import { ProjectInsightsCache } from "../src/mission/useProjectInsights.js";
+import type { PlaybackClock } from "../src/demo/playback.js";
 
 // The cache words its messages in the active client locale; these
 // assertions check the zh-TW wording.
@@ -229,4 +230,58 @@ test("追加結果保留伺服器設定，示範卡片調整不呼叫儲存 API"
   await cache.savePreferences("demo-repo", { order: [demoId], hidden: [demoId] });
   assert.deepEqual(cache.snapshot("demo-repo").recommendationPreferences.hidden, [demoId]);
   assert.equal(cache.snapshot("demo-repo").preferenceError, "");
+});
+
+test("分析等待期間詢問伺服器進度，一次詢問失敗不清掉畫面上的進度，結束後清除並不再詢問", async () => {
+  const result = deferred<{ insights: ProjectInsights; stale: boolean }>();
+  const first = { phase: "reading", elapsedSeconds: 2, more: false } as const;
+  const later = {
+    phase: "agent",
+    elapsedSeconds: 14,
+    more: false,
+    attempt: 1,
+    attempts: 3,
+    waitedSeconds: 12,
+    limitSeconds: 600,
+  } as const;
+  // The questions are spaced by the clock: each one is asked when a test fires its timer.
+  const timers = new Set<{ callback: () => void }>();
+  const clock: PlaybackClock = {
+    now: () => 0,
+    setTimeout(callback) {
+      const timer = { callback };
+      timers.add(timer);
+      return timer;
+    },
+    clearTimeout: (timer) => timers.delete(timer as { callback: () => void }),
+  };
+  const fire = async () => {
+    const [next] = timers;
+    timers.delete(next);
+    next.callback();
+    await new Promise((resolve) => setImmediate(resolve));
+  };
+  let asked = 0;
+  const cache = new ProjectInsightsCache(() => result.promise, undefined, {
+    clock,
+    progress: async () => {
+      asked++;
+      if (asked === 2) throw new Error("offline");
+      return asked === 1 ? first : later;
+    },
+  });
+  const pending = cache.analyze("first");
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepEqual(cache.snapshot("first").progress, first);
+  assert.equal(cache.snapshot("first").loading, true);
+  await fire();
+  assert.equal(asked, 2);
+  assert.deepEqual(cache.snapshot("first").progress, first);
+  await fire();
+  assert.deepEqual(cache.snapshot("first").progress, later);
+  result.resolve({ insights: insights("first"), stale: false });
+  await pending;
+  assert.equal(cache.snapshot("first").progress, undefined);
+  assert.equal(cache.snapshot("first").loading, false);
+  assert.equal(timers.size, 0, "no question stays scheduled after the run");
 });

@@ -38,6 +38,19 @@ const m: Translation<typeof en> = {
     progressLabel: "分析進度",
     note: "分析完成前，不會推測這個專案的用途或推薦改動。",
   },
+  progress: {
+    phases: {
+      reading: "讀取專案檔案",
+      agent: "Agent 閱讀程式碼並撰寫分析",
+      checking: "對照原始碼檢查答案",
+      saving: "儲存分析",
+    },
+    waited: ({ waited, limit }) => `已等待 ${waited}，上限 ${limit}`,
+    attempt: ({ attempt, attempts }) =>
+      `第 ${n(attempt)} / ${n(attempts)} 次嘗試`,
+    elapsed: ({ elapsed }) => `已執行 ${elapsed}`,
+    note: "進度條依已用時間占這一步上限的比例填滿，不代表完成了多少工作；只在移動時，表示目前沒有可顯示的時間。",
+  },
   project: {
     sourceDemo: "示範分析",
     sourceAi: "AI 生成的專案分析",

@@ -143,6 +143,29 @@ export interface InsightsStaleDetail {
   citedChanged: string[];
 }
 
+/** The steps of one analysis run, in order. */
+export type InsightsPhase = "reading" | "agent" | "checking" | "saving";
+
+/**
+ * Where a running analysis is. It lives in the server's memory only: it is
+ * never saved, and an analysis that is not running has none.
+ */
+export interface InsightsProgress {
+  phase: InsightsPhase;
+  /** Whole seconds since the run began. */
+  elapsedSeconds: number;
+  /** Whether the run adds recommendations to an analysis instead of making one. */
+  more: boolean;
+  /** The agent step: which try this is out of how many; a try that lost the sign-in refresh is repeated. */
+  attempt?: number;
+  attempts?: number;
+  /** The agent step: whole seconds this try has run and the most it may run. Absent while the try has not started. */
+  waitedSeconds?: number;
+  limitSeconds?: number;
+  /** The CLI's latest notice (a retry, a rate limit), in the language of the request that started the run. */
+  notice?: string;
+}
+
 export interface ContributionBrief {
   problem: string;
   motivation: string;

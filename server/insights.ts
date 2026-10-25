@@ -17,6 +17,8 @@ import {
   projectRecommendationBatchSize,
   type ContributionRecommendation,
   type ContributionSettings,
+  type InsightsPhase,
+  type InsightsProgress,
   type InsightsStaleDetail,
   type ProjectInsights,
   type RecommendationPreferences,
@@ -68,6 +70,7 @@ import {
   agentLoginCheck,
   applyReportedModel,
   retryTransientAuth,
+  transientRetryDelays,
   type TransientSleep,
 } from "./agent-cli.js";
 import {
@@ -624,11 +627,23 @@ export function analysisRunning(store: Store, repoId?: string): boolean {
  */
 const analysisLogRun = (repoId: string) => ({ id: `analysis:${repoId}` });
 
+/** What the running analysis of one project reports; analysisProgress() turns it into seconds. */
+interface AnalysisState {
+  phase: InsightsPhase;
+  more: boolean;
+  startedAt: number;
+  attempt?: number;
+  attemptStartedAt?: number;
+  limitMs?: number;
+  notice?: string;
+}
+
 /** Separate persistence keeps contribution preferences independent of run lifecycle writes. */
 export class ProjectInsightsService {
   private writes = new Map<string, Promise<unknown>>();
   private modelWrite: Promise<unknown> = Promise.resolve();
   private generating = new Set<string>();
+  private progress = new Map<string, AnalysisState>();
   private controllers = new Map<string, AbortController>();
   private jobs = new Set<Promise<void>>();
   private stopping = false;
@@ -685,6 +700,30 @@ export class ProjectInsightsService {
   /** Whether an analysis of `repoId` (any project when absent) is running. */
   analysisRunning(repoId?: string): boolean {
     return repoId === undefined ? this.generating.size > 0 : this.generating.has(repoId);
+  }
+
+  /** Where the analysis of `repoId` is, or undefined when none runs. */
+  analysisProgress(repoId: string): InsightsProgress | undefined {
+    const state = this.progress.get(repoId);
+    if (!state) return undefined;
+    const now = Date.now();
+    const seconds = (since: number) =>
+      Math.max(0, Math.floor((now - since) / 1000));
+    return {
+      phase: state.phase,
+      more: state.more,
+      elapsedSeconds: seconds(state.startedAt),
+      ...(state.attempt !== undefined
+        ? { attempt: state.attempt, attempts: transientRetryDelays.length + 1 }
+        : {}),
+      ...(state.attemptStartedAt !== undefined && state.limitMs !== undefined
+        ? {
+            waitedSeconds: seconds(state.attemptStartedAt),
+            limitSeconds: Math.round(state.limitMs / 1000),
+          }
+        : {}),
+      ...(state.notice ? { notice: state.notice } : {}),
+    };
   }
 
   private repository(id: string): Repository {
@@ -1111,6 +1150,12 @@ export class ProjectInsightsService {
     if (this.generating.size >= 2)
       throw new AppError((m) => m.analysis.insights.tooManyRunning, 429);
     this.generating.add(repoId);
+    const progress: AnalysisState = {
+      phase: "reading",
+      more,
+      startedAt: Date.now(),
+    };
+    this.progress.set(repoId, progress);
     const controller = new AbortController();
     const signal = controller.signal;
     this.controllers.set(repoId, controller);
@@ -1284,6 +1329,8 @@ export class ProjectInsightsService {
             wait: describeAgentTimeout(timeoutMs),
           }),
         );
+      progress.phase = "agent";
+      progress.limitMs = timeoutMs;
       await retryTransientAuth(
         async () => {
           answer = "";
@@ -1291,7 +1338,12 @@ export class ProjectInsightsService {
           let retryable = false;
           let reported: string | undefined;
           efficiency = trackEfficiency(mode);
+          // A try that waits for a free Agent slot has not started yet.
+          progress.attempt = (progress.attempt ?? 0) + 1;
+          progress.attemptStartedAt = undefined;
+          progress.notice = undefined;
           const releaseSlot = await this.slots.acquire(signal);
+          progress.attemptStartedAt = Date.now();
           try {
             const spawned = agentSpawn(
               analysisLogRun(repoId),
@@ -1318,6 +1370,8 @@ export class ProjectInsightsService {
                       retryable = item.retryable === true;
                       reported = redact(item.message);
                     }
+                    if (item.kind === "notice")
+                      progress.notice = redact(item.message);
                     if (item.kind === "message" || item.kind === "final")
                       answer = item.text;
                     applyReportedModel(modelExecution, item);
@@ -1346,15 +1400,21 @@ export class ProjectInsightsService {
         {
           signal,
           sleep: this.sleep,
-          onRetry: () => {
+          onRetry: (notice) => {
             retriedAttempts = addEfficiency(
               retriedAttempts,
               efficiency.finish(false),
             );
+            // Until the next try starts, the wait is what the person sees.
+            progress.attemptStartedAt = undefined;
+            progress.notice = notice;
           },
         },
       );
       this.assertActive(signal);
+      progress.phase = "checking";
+      progress.attemptStartedAt = undefined;
+      progress.notice = undefined;
       if (failed || !answer || Buffer.byteLength(answer) > 120_000)
         throw new AppError((m) => m.analysis.insights.unfinished, 422);
       const { value: analysis, verification } = parseAgentOutput(
@@ -1414,6 +1474,7 @@ export class ProjectInsightsService {
         };
       }
       let recommendationPreferences!: RecommendationPreferences;
+      progress.phase = "saving";
       await this.update(repoId, (cache) => {
         this.assertActive(signal);
         // A project deleted meanwhile (or all data) gets no cache again.
@@ -1433,6 +1494,7 @@ export class ProjectInsightsService {
         if (temporary) await rm(temporary, { recursive: true, force: true });
       } finally {
         this.generating.delete(repoId);
+        this.progress.delete(repoId);
         this.controllers.delete(repoId);
         this.jobs.delete(finished);
         finish();

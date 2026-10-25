@@ -17,6 +17,7 @@ import { randomUUID } from "node:crypto";
 import {
   defaultContributionSettings,
   projectRecommendationBatchSize,
+  type InsightsProgress,
   type ProjectInsights,
 } from "../shared/insights.js";
 import type { ModelCatalog } from "../shared/models.js";
@@ -1745,7 +1746,7 @@ test("analysis merges the latest display preferences, retains hidden ideas for d
   }
 });
 
-test("analyzing a project that is being analyzed answers 409 with the code already_running", async () => {
+test("analyzing a project that is being analyzed answers 409 with the code already_running, and the progress endpoint says where the run is", async () => {
   const f = await fixture();
   const { createApp } = await import("./index.js");
   const { Workbench } = await import("./workbench.js");
@@ -1762,13 +1763,14 @@ test("analyzing a project that is being analyzed answers 409 with the code alrea
     getModelCatalog: async () => ({ source: "codex", models: [] }),
   });
   app.locals.insights.generate = service.generate.bind(service);
+  app.locals.insights.analysisProgress = service.analysisProgress.bind(service);
   const server = app.listen(0, "127.0.0.1");
   await once(server, "listening");
   const address = server.address();
   assert.ok(address && typeof address !== "string");
-  const analyze = () => new Promise<{ status: number; body: unknown }>((resolve, reject) => {
-    const req = request(`http://127.0.0.1:${address.port}/api/repos/${f.repo.id}/insights`, {
-      method: "POST",
+  const call = (method: "GET" | "POST", suffix = "") => new Promise<{ status: number; body: unknown }>((resolve, reject) => {
+    const req = request(`http://127.0.0.1:${address.port}/api/repos/${f.repo.id}/insights${suffix}`, {
+      method,
       headers: { "Content-Type": "application/json", Host: "127.0.0.1:4311", "X-Bell-Locale": "en" },
     }, (res) => {
       let body = "";
@@ -1777,11 +1779,21 @@ test("analyzing a project that is being analyzed answers 409 with the code alrea
       res.on("end", () => resolve({ status: res.statusCode!, body: JSON.parse(body) }));
     });
     req.on("error", reject);
-    req.end("{}");
+    req.end(method === "POST" ? "{}" : undefined);
   });
+  const analyze = () => call("POST");
+  const progress = async () => {
+    const { status, body } = await call("GET", "/progress");
+    assert.equal(status, 200);
+    assert.ok(typeof body === "object" && body !== null && "progress" in body);
+    return body.progress;
+  };
   try {
     const first = analyze();
     await started;
+    const running = await progress();
+    assert.ok(typeof running === "object" && running !== null && "phase" in running);
+    assert.equal(running.phase, "agent");
     assert.deepEqual(await analyze(), {
       status: 409,
       body: {
@@ -1791,6 +1803,7 @@ test("analyzing a project that is being analyzed answers 409 with the code alrea
     });
     release();
     assert.equal((await first).status, 200);
+    assert.equal(await progress(), null);
   } finally {
     release();
     await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
@@ -1966,6 +1979,81 @@ test("Claude Code analysis retries once after losing the OAuth refresh lock and 
   } finally {
     await service.shutdown();
     await plain.shutdown();
+    await f.cleanup();
+  }
+});
+
+test("a running analysis reports its step, try, wait against the limit and the CLI's latest notice; a finished one reports nothing", async () => {
+  const f = await fixture();
+  const seen: (InsightsProgress | undefined)[] = [];
+  const service: ProjectInsightsService = new ProjectInsightsService(f.store, {
+    command: async (executable, args, options = {}) => {
+      if (executable === "claude" && args[0] === "-p") {
+        const emit = (event: unknown) => options.onLine?.(JSON.stringify(event), "stdout");
+        seen.push(service.analysisProgress(f.repo.id));
+        emit({ type: "system", subtype: "api_retry", attempt: 2, max_retries: 10, error: "rate_limit", retry_delay_ms: 4000 });
+        seen.push(service.analysisProgress(f.repo.id));
+        emit({ type: "result", subtype: "success", is_error: false, result: "", structured_output: validAnalysis() });
+      }
+      return { stdout: "", stderr: "", code: 0 };
+    },
+  });
+  try {
+    await service.setSettings(f.repo.id, { ...defaultContributionSettings, provider: "claude" });
+    assert.equal(service.analysisProgress(f.repo.id), undefined);
+    await service.generate(f.repo.id);
+    const [started, noticed] = seen;
+    assert.equal(started?.phase, "agent");
+    assert.equal(started?.more, false);
+    assert.equal(started?.attempt, 1);
+    assert.equal(started?.attempts, 3);
+    assert.ok(started?.waitedSeconds !== undefined, "the try has started");
+    assert.ok((started?.limitSeconds ?? 0) > 0);
+    assert.equal(started?.notice, undefined);
+    assert.match(noticed?.notice ?? "", /rate_limit/);
+    assert.equal(service.analysisProgress(f.repo.id), undefined);
+  } finally {
+    await service.shutdown();
+    await f.cleanup();
+  }
+});
+
+test("an analysis that waits to try again shows the wait and no running try, and the next try starts without the notice", async () => {
+  const f = await fixture();
+  const refreshRace =
+    "Failed to refresh OAuth token: another Claude Code process is refreshing it or exited mid-refresh. This is usually transient; retry in a minute, and if it persists close other Claude Code processes or sign in again";
+  const seen: Record<string, InsightsProgress | undefined> = {};
+  let tries = 0;
+  const service: ProjectInsightsService = new ProjectInsightsService(f.store, {
+    sleep: async () => {
+      seen.waiting = service.analysisProgress(f.repo.id);
+    },
+    command: async (executable, args, options = {}) => {
+      if (executable === "claude" && args[0] === "-p") {
+        const emit = (event: unknown) => options.onLine?.(JSON.stringify(event), "stdout");
+        if (++tries === 1) {
+          emit({ type: "result", subtype: "success", is_error: true, terminal_reason: "api_error", result: refreshRace });
+          // command() flushes the events above through onLine, then rejects on claude's exit code 1.
+          throw new AppError(`claude 執行失敗：${refreshRace}`, 422);
+        }
+        seen.second = service.analysisProgress(f.repo.id);
+        emit({ type: "result", subtype: "success", is_error: false, result: "", structured_output: validAnalysis() });
+      }
+      return { stdout: "", stderr: "", code: 0 };
+    },
+  });
+  try {
+    await service.setSettings(f.repo.id, { ...defaultContributionSettings, provider: "claude" });
+    await service.generate(f.repo.id);
+    assert.equal(seen.waiting?.phase, "agent");
+    assert.equal(seen.waiting?.attempt, 1);
+    assert.equal(seen.waiting?.waitedSeconds, undefined);
+    assert.match(seen.waiting?.notice ?? "", /15/);
+    assert.equal(seen.second?.attempt, 2);
+    assert.ok(seen.second?.waitedSeconds !== undefined);
+    assert.equal(seen.second?.notice, undefined);
+  } finally {
+    await service.shutdown();
     await f.cleanup();
   }
 });

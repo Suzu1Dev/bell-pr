@@ -7,6 +7,14 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- **Analysis progress.** While a project analysis or **Generate 5 more**
+  runs, the overview lists its steps and shows how long the agent has worked
+  against the longest it will wait, with the CLI's notices such as a retry or
+  a rate limit. The bar fills with that time, not with how much work is
+  left, and only moves while no try is being timed.
+
 ### Removed
 
 - **Sign-in.** BELL PR no longer signs anyone in: the session cookie, the

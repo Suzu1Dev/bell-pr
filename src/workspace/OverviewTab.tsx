@@ -94,6 +94,7 @@ export function OverviewTab({
       onSavePreferences={intelligence.savePreferences}
       stale={intelligence.stale}
       staleDetail={intelligence.staleDetail}
+      progress={intelligence.progress}
       onAnalyze={intelligence.analyze}
       onRecommendMore={intelligence.recommendMore}
       onChooseRecommendation={chooseRecommendation}

@@ -152,6 +152,13 @@ dropped and listed.
 code changes, the analysis is marked out of date; analyze again to
 refresh it.
 
+While it runs, the page lists its steps and shows how long the agent has
+worked against the longest it will wait, with any notice from the CLI, such
+as a retry or a rate limit. The bar fills with that time, not with how much
+work is left, and only moves while no try is being timed, such as while
+the files are read or before it tries again. **Generate 5 more** shows the
+same.
+
 ## 3. Choose a direction
 
 **Choose a contribution direction**, or start from a recommendation. Pick

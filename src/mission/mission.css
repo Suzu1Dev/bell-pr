@@ -1242,7 +1242,7 @@
   color: var(--color-text-muted);
   margin-top: 15px;
 }
-/* The sample's analysis lines while it plays (demo=play). */
+/* The analysis's steps: the sample's lines while it plays (demo=play), and a real run's, from the server. */
 .mission-analysis-steps {
   width: 100%;
   max-width: 460px;
@@ -1285,9 +1285,43 @@
   color: var(--color-text);
   font-weight: 500;
 }
+.mission-analysis-steps li small {
+  display: block;
+  font-size: var(--text-xs);
+  font-weight: 400;
+  color: var(--color-text-muted);
+}
+.mission-analysis-notice,
+.mission-analysis-note {
+  margin: 10px 0 0;
+  font-size: var(--text-xs);
+  line-height: 1.6;
+  color: var(--color-text-muted);
+}
+.mission-analysis-notice {
+  color: var(--color-text-secondary);
+}
+/* No time to measure (reading, a wait between tries, checking, saving): the bar only moves. */
+.mission-analysis-progress.is-indeterminate > span {
+  width: 30%;
+  animation: mission-analysis-sweep 1.4s ease-in-out infinite;
+}
+@keyframes mission-analysis-sweep {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(333%);
+  }
+}
 @media (prefers-reduced-motion: reduce) {
   .mission-analysis-progress > span {
     transition: none;
+  }
+  .mission-analysis-progress.is-indeterminate > span {
+    width: 100%;
+    opacity: 0.35;
+    animation: none;
   }
 }
 .mission-discovery-points {

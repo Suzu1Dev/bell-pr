@@ -28,6 +28,7 @@ import {
   projectRecommendationBatchSize,
   type ContributionBrief,
   type ContributionRecommendation,
+  type InsightsProgress,
   type InsightsStaleDetail,
   type ProjectInsights,
   type RecommendationPreferences,
@@ -39,6 +40,7 @@ import type { Repo, Run } from "../types";
 import { EfficiencySummary } from "../efficiency/EfficiencySummary";
 import { ModelSummary } from "../models/ModelSummary";
 import { directionOptions } from "./DirectionSettings";
+import { AnalysisProgress } from "./AnalysisProgress";
 import { useSampleAnalysis } from "./sample-analysis";
 import { FailureText } from "../FailureText";
 import { knownVerdict, PremiseNotice } from "../team/PremiseNotice";
@@ -66,6 +68,8 @@ export interface ProjectOverviewProps {
   stale: boolean;
   /** Absent when the server could not list changes; the notice then says so. */
   staleDetail?: InsightsStaleDetail;
+  /** Where the server's run is while an analysis or "generate more" waits. */
+  progress?: InsightsProgress;
   onAnalyze: () => void;
   onRecommendMore: () => void;
   onSavePreferences: (preferences: RecommendationPreferences) => void;
@@ -586,6 +590,7 @@ export function ProjectOverview({
   preferenceError,
   stale,
   staleDetail,
+  progress,
   onAnalyze,
   onRecommendMore,
   onSavePreferences,
@@ -1139,6 +1144,10 @@ export function ProjectOverview({
         </div>
       )}
 
+      {loading && insights && progress && (
+        <AnalysisProgress progress={progress} />
+      )}
+
       <Suspense fallback={null}>
         <ContributionRulesCard repoId={repo.id} rules={repo.contributionRules} demo={sampleRepo} byHandRun={run?.learnByHand ? run : undefined} />
       </Suspense>
@@ -1193,6 +1202,7 @@ export function ProjectOverview({
               </ol>
             </div>
           )}
+          {loading && progress && <AnalysisProgress progress={progress} />}
           <div className="mission-discovery-points">
             <span>
               <Target size={18} />
@@ -1382,6 +1392,9 @@ export function ProjectOverview({
                 </>
               ) : null}
             </div>
+            {recommending && progress && (
+              <AnalysisProgress progress={progress} />
+            )}
             {expansion && (
               <details className="mission-more-provenance">
                 <summary>
