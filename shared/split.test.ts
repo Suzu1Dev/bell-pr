@@ -84,6 +84,23 @@ test("a run saved before tasks recorded their files falls back to their scopes, 
   assert.deepEqual(planTaskPaths(files.map((file) => file.path), integrated), ["server/a.ts"]);
 });
 
+test("a finished task that changed nothing owns no file, even with a broad scope", () => {
+  const files = [change("src/a.js"), change("src/b.js")];
+  const tasks = [
+    task("a", "A (#1)", ["src/a.js"], { integratedFiles: ["src/a.js"] }),
+    task("b", "B (#2)", ["src/b.js"], { integratedFiles: ["src/b.js"] }),
+    task("verify", "Verify the build", ["src/"], { integratedFiles: [] }),
+  ];
+  assert.deepEqual(planTaskPaths(files.map((file) => file.path), tasks[2]), []);
+  assert.deepEqual(
+    suggestSplit(files, tasks).parts.map((part) => [part.paths, part.taskIds, part.issues]),
+    [
+      [["src/a.js"], ["a"], ["#1"]],
+      [["src/b.js"], ["b"], ["#2"]],
+    ],
+  );
+});
+
 test("the reviewability snapshot counts the parts only when there are two or more", () => {
   assert.equal(reviewabilitySnapshot({ files: bundle, planTasks: bundleTasks }).parts, 3);
   assert.equal(reviewabilitySnapshot({ files: bundle, planTasks: bundleTasks.slice(0, 1) }).parts, undefined);

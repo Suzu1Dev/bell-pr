@@ -104,6 +104,13 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   part's new fix/ branch and any files already written stayed in BELL PR's
   copy of the repository, with nothing left to remove them. A failed checkout
   now removes both.
+
+- **A task that changed nothing no longer merges the split parts.** A
+  finished plan task that changed no file, such as a build check scoped to
+  a whole folder, was credited with every changed file in that folder. This
+  joined independent fixes into one part, so the split suggestion found
+  nothing to split and a split copied the task into every new
+  contribution. Such a task now owns no file.
 ### Security
 
 - **zod 4.** The server validates requests, agent answers and saved files

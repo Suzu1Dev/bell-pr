@@ -454,7 +454,7 @@ function isSource(filePath: string, generated: readonly string[]) {
  */
 export function planTaskPaths(changed: readonly string[], task: SplitTask) {
   const present = new Set(changed);
-  return task.integratedFiles?.length
+  return task.integratedFiles
     ? task.integratedFiles.filter((path) => present.has(path))
     : changed.filter((path) => inScope(path, [[...task.files]]));
 }
