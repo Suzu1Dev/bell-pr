@@ -245,6 +245,14 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   are shown after a save, and a failed load is tried again on the next
   poll.
 
+- **The open premise check folds again when you move on.** In Code
+  changes, the premise check's evidence stayed open over the code, so
+  pressing Tab past the diff tools put the focus on Whole file, the
+  Reviewed checkbox and the code lines, all hidden under it. It now folds
+  when the focus moves elsewhere on the page or you click outside it.
+  Escape also folds it and puts the focus back on its heading, without
+  also leaving focus mode.
+
 ### Security
 
 - **zod 4.** The server validates requests, agent answers and saved files

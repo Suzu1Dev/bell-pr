@@ -46,7 +46,28 @@ export function PremiseNotice({
       aria-label={t.label}
     >
       {compact ? (
-        <details>
+        // Open, the evidence lies over the code, so it folds again when focus
+        // moves on or on Escape: it never hides the control that has the focus.
+        <details
+          onKeyDown={(event) => {
+            const details = event.currentTarget;
+            if (event.key !== "Escape" || !details.open) return;
+            // Handled here, so the page's Escape does not also leave focus mode.
+            event.stopPropagation();
+            details.open = false;
+            details.querySelector("summary")?.focus();
+          }}
+          onBlur={(event) => {
+            const details = event.currentTarget;
+            // Leaving the window keeps it open: the reader may be checking the cited lines.
+            if (!details.ownerDocument.hasFocus()) return;
+            const next = event.relatedTarget as Element | null;
+            if (details.contains(next)) return;
+            // A dialog over the page (help, command palette) gives the focus back here when it closes.
+            if (next?.closest('[aria-modal="true"], dialog[open]')) return;
+            details.open = false;
+          }}
+        >
           <summary>
             {heading}
             <span>{premise.statement}</span>

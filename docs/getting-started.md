@@ -264,7 +264,8 @@ When the team is done, the run waits for your review in **Code changes**:
 - The **premise check** sits in the diff's top bar, folded to its verdict.
   Open it to read the assumption, the evidence and where it came from over
   the code; it can be reached with the keyboard (**Tab**, then the arrow
-  keys or **Page Down** to scroll).
+  keys or **Page Down** to scroll). **Escape**, a click elsewhere or
+  moving on with **Tab** folds it again.
 - **My understanding**: write a note in your own words, then mark the file
   as **Reviewed**.
 
