@@ -45,6 +45,24 @@ async function onServer(
   }
 }
 
+/**
+ * Serious and critical axe findings in the open dialog, once it has stopped
+ * moving: it fades in, and mid-fade axe reads its text lighter than it is.
+ * Endless animations (a spinner) are not waited for.
+ */
+async function dialogProblems(page: Page) {
+  await page.evaluate(() =>
+    Promise.all(
+      document
+        .getAnimations()
+        .filter((animation) => animation.effect?.getComputedTiming().endTime !== Infinity)
+        .map((animation) => animation.finished),
+    ),
+  );
+  const results = await new AxeBuilder({ page }).include('[role="dialog"]').analyze();
+  return results.violations.filter((violation) => ["serious", "critical"].includes(violation.impact ?? ""));
+}
+
 async function appSettings(page: Page) {
   const response = await page.request.get("/api/app-settings");
   expect(response.ok()).toBe(true);
@@ -144,10 +162,7 @@ test("turning on unsandboxed agents needs a confirmation that explains the risk"
     await expect(dialog).toContainText(settings.safety.unsandboxed.confirmText);
     await expect(dialog).toContainText(settings.safety.unsandboxed.confirmBadge);
     await expect(toggle).not.toBeChecked();
-    const results = await new AxeBuilder({ page }).include('[role="dialog"]').analyze();
-    expect(
-      results.violations.filter((violation) => ["serious", "critical"].includes(violation.impact ?? "")),
-    ).toEqual([]);
+    expect(await dialogProblems(page)).toEqual([]);
 
     // Keeping the sandbox changes nothing.
     await dialog.getByRole("button", { name: settings.safety.unsandboxed.cancel }).click();
@@ -194,10 +209,7 @@ test("turning the understanding check off needs a confirmation that keeps the ch
     const keep = dialog.getByRole("button", { name: t.keep });
     await expect(keep).toBeFocused();
     expect(await page.evaluate(() => document.activeElement?.textContent)).toBe(t.keep);
-    const results = await new AxeBuilder({ page }).include('[role="dialog"]').analyze();
-    expect(
-      results.violations.filter((violation) => ["serious", "critical"].includes(violation.impact ?? "")),
-    ).toEqual([]);
+    expect(await dialogProblems(page)).toEqual([]);
 
     // Escape keeps the check and saves nothing.
     await page.keyboard.press("Escape");
