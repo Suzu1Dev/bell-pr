@@ -10,10 +10,14 @@ import type {
 } from "./contribution.js";
 import {
   draftPreflight,
+  markdownProse,
+  markdownReadable,
+  referencesIssue,
   type DraftCheck,
   type DraftPreflightInput,
 } from "./draft-checks.js";
 import { aiDisclosureLine, type DraftSource } from "./drafts.js";
+import { hasAiDisclosure } from "./project-policy.js";
 import { reviewabilitySnapshot, type ReviewabilitySnapshot } from "./reviewability.js";
 
 const finding = (
@@ -455,4 +459,35 @@ test("every respect message has a why line, no Han in English, and the same ids 
     for (const value of chinese) assert.match(value.message, /\p{Script=Han}/u, value.id);
   }
   assert.deepEqual([...seen].sort(), [...respectIds].sort());
+});
+
+test("PR text nested too deep for the call stack is still read, its code still hidden", () => {
+  // Deep quotes and lists the parser still reads: their code is still hidden.
+  for (const [prefix, depth] of [[">", 3000], ["> ", 3000], ["- ", 1000], ["> - ", 1000]] as const) {
+    const body = `${prefix.repeat(depth)}See \`secret()\` here.\nFixes #`;
+    const lines = markdownProse(body);
+    assert.equal(lines.length, 2, prefix);
+    assert.ok(lines[0].endsWith("See            here."), `${prefix}: ${lines[0].slice(-30)}`);
+  }
+  // Deeper than the parser itself can go: the lines are read as written.
+  const tooDeep = `${">".repeat(20_000)} x\nFixes #`;
+  assert.deepEqual(markdownProse(tooDeep), tooDeep.split("\n"));
+  assert.equal(markdownReadable(tooDeep), false);
+  assert.equal(markdownReadable("Retries a GET twice."), true);
+});
+
+test("a disclosure or an issue link hidden in a comment of a body too deep to parse does not count", () => {
+  const body = `${">".repeat(20_000)} quoted\n\nRetries a GET twice.\n\n<!--\nI used Copilot to write the tests.\nFixes #12\n-->\n`;
+  assert.equal(referencesIssue(body), false);
+  assert.equal(hasAiDisclosure(body), false);
+  // The same comment in a body that parses does not count either; visible text does.
+  const shallow = body.slice(20_000);
+  assert.equal(referencesIssue(shallow), false);
+  assert.equal(hasAiDisclosure(shallow), false);
+  assert.equal(referencesIssue("Retries a GET twice. Fixes #12"), true);
+});
+
+test("PR text with a very wide tree is read without overflowing the stack", () => {
+  const wide = `${"a\\\n".repeat(70_000)}a`;
+  assert.equal(markdownProse(wide).length, 70_001);
 });

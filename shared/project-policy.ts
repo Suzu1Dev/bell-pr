@@ -9,7 +9,7 @@
  * comments: pull request templates and contributing guides put rules there
  * (and notes addressed to AI agents). Fenced code is skipped.
  */
-import { markdownProse, type DraftRuleQuote } from "./draft-checks.js";
+import { markdownProse, markdownReadable, type DraftRuleQuote } from "./draft-checks.js";
 import { aiDisclosureLine, type DraftSource } from "./drafts.js";
 import type { HelpKind } from "./by-hand.js";
 import { carveOutKinds } from "./by-hand-rules.js";
@@ -1576,6 +1576,8 @@ export function hasAiDisclosure(
 ) {
   if (body.includes(aiDisclosureLine)) return true;
   if (toolTrailer.test(commitMessage)) return true;
+  // A body too deep to parse still holds its comments and code: nothing in it counts.
+  if (!markdownReadable(body)) return false;
   const lines = markdownProse(body);
   if (lines.some((line) => toolTrailer.test(line))) return true;
   const fields = lines.map((line) => disclosureField.exec(line)?.[1].trim());

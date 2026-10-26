@@ -501,6 +501,14 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   and Settings stops offering it. A run already stuck this way can now be
   discarded, which puts it back to published.
 
+- **Deeply nested PR text no longer fails the draft checks.** A PR body or
+  a project's guidance nested thousands of quote or list levels deep
+  overflowed the stack, so the draft, approval or publish check, and the
+  request that ran it, failed. Such text is now checked. A body too deep
+  even for the parser is read as written, and a disclosure or an issue link
+  in it counts only when the text can be read, so a comment cannot satisfy
+  the AI-disclosure or issue check.
+
 ### Security
 
 - **zod 4.** The server validates requests, agent answers and saved files

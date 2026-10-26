@@ -41,7 +41,22 @@ const safetyDictionaries: Record<Locale, typeof safetyEn> = {
 export function markdownProse(markdown: string) {
   if (markdown === lastProse.markdown) return lastProse.lines;
   const hidden = markdown.split("");
-  const visit = (node: MdastNode) => {
+  let tree: MdastNode | undefined;
+  try {
+    tree = fromMarkdown(markdown, {
+      extensions: [gfm()],
+      mdastExtensions: [gfmFromMarkdown()],
+    });
+  } catch {
+    // Nesting too deep for the parser itself (thousands of quote or list
+    // levels): every line is read as written, code and comments included.
+    // Checks for something present (a disclosure, an issue link) must not
+    // count text a maintainer would not see, so they ask markdownReadable.
+  }
+  // An explicit stack: PR text is untrusted, and a walk that recursed once
+  // per level would overflow on deep nesting.
+  const pending: MdastNode[] = tree ? [tree] : [];
+  for (let node = pending.pop(); node; node = pending.pop()) {
     const hide =
       node.type === "code" ||
       node.type === "inlineCode" ||
@@ -51,28 +66,35 @@ export function markdownProse(markdown: string) {
     if (hide && start !== undefined && end !== undefined) {
       for (let index = start; index < end; index++)
         if (hidden[index] !== "\n") hidden[index] = " ";
-      return;
+      continue;
     }
-    if ("children" in node) for (const child of node.children) visit(child);
-  };
-  visit(
-    fromMarkdown(markdown, {
-      extensions: [gfm()],
-      mdastExtensions: [gfmFromMarkdown()],
-    }),
-  );
+    // One at a time: spreading a node with a very wide list of children
+    // would overflow the call stack too.
+    if ("children" in node) for (const child of node.children) pending.push(child);
+  }
   const lines = hidden
     .join("")
     .split("\n")
     .map((line) => (line.trim() ? line : ""));
   // The draft tab re-checks the same body several times per keystroke.
-  lastProse = { markdown, lines };
+  lastProse = { markdown, lines, readable: tree !== undefined };
   return lines;
 }
-let lastProse: { markdown: string; lines: string[] } = {
+let lastProse: { markdown: string; lines: string[]; readable: boolean } = {
   markdown: "",
   lines: [""],
+  readable: true,
 };
+
+/**
+ * Whether markdownProse could parse the body. When it could not, its lines
+ * still hold code and comments, so a check that passes on something present
+ * must count nothing from them.
+ */
+export function markdownReadable(markdown: string) {
+  markdownProse(markdown);
+  return lastProse.readable;
+}
 
 /**
  * An issue line left as a template slot: "Closes #", "Fixes # (issue)",
@@ -244,6 +266,7 @@ export function issueRule(sources: DraftSource[]): DraftRuleQuote | undefined {
 
 /** True when the body cites an issue as #N, owner/repo#N or an issue URL. */
 export function referencesIssue(body: string) {
+  if (!markdownReadable(body)) return false;
   return markdownProse(body).some((prose) =>
     /(?:^|[\s(:])(?:[\w.-]+\/[\w.-]+)?#\d+\b|https:\/\/github\.com\/[^\s/]+\/[^\s/]+\/issues\/\d+/.test(
       prose,
