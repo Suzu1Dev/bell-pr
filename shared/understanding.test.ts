@@ -90,6 +90,9 @@ test("lockfiles, generated output, whitespace-only patches and small docs change
   assert.ok(isTrivialFile(file("docs/guide/setup.ts", 2)));
   assert.ok(!isTrivialFile(file("README.md", 4)));
   assert.ok(!isTrivialFile(file("src/a.ts", 1)));
+  // Dependency manifests and build files are code, whatever their extension.
+  assert.ok(!isTrivialFile(file("requirements.txt", 2)));
+  assert.ok(!isTrivialFile(file("native/CMakeLists.txt", 2)));
   // No rename rule: BELL diffs with --no-renames, so a rename is two files.
   assert.ok(!isTrivialFile(file("src/new-name.ts", 20, { status: "added" })));
   // A held-back file is still a change to ask about.
@@ -175,6 +178,8 @@ test("the plan asks about the top-ranked files, falls back without a card and ad
   assert.deepEqual(blocked.map((item) => item.id), ["fallback:src/a.ts", "untested"]);
   assert.ok(!needsUntestedQuestion([file("README.md", 40), file("tests/x.test.ts", 40)]));
   assert.ok(needsUntestedQuestion([file("src/x.ts", 1)]));
+  assert.ok(needsUntestedQuestion([file("requirements.txt", 2)]));
+  assert.ok(needsUntestedQuestion([file("CMakeLists.txt", 40)]));
   assert.deepEqual(planCheck({ files: [file("README.md", 40)], questions }).map((item) => item.id), [
     "fallback:README.md",
   ]);

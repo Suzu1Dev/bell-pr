@@ -48,8 +48,16 @@ export function isTestPath(filePath: string) {
   return testPathPattern.test(filePath);
 }
 
-/** Documentation: Markdown, reStructuredText, AsciiDoc and plain text, or anything under docs/. */
+/** Build files whose names end in a documentation extension. */
+const buildFileNames = /(^|\/)CMakeLists\.txt$/i;
+
+/**
+ * Documentation: Markdown, reStructuredText, AsciiDoc and plain text, or
+ * anything under docs/. Dependency manifests (`requirements.txt`) and build
+ * files (`CMakeLists.txt`) are code, not documentation.
+ */
 export function isDocsPath(filePath: string) {
+  if (isManifest(filePath) || buildFileNames.test(filePath)) return false;
   return (
     /(^|\/)docs\//.test(filePath) ||
     /\.(?:md|mdx|markdown|rst|adoc|txt)$/i.test(filePath)

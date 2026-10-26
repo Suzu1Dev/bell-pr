@@ -338,6 +338,13 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   "failed". Now the second request waits for the job already running and
   gets its result.
 
+- **Dependency and build files no longer count as documentation.** A change
+  to requirements.txt or CMakeLists.txt was treated as a docs edit, so a
+  small dependency bump got no understanding-check question at all, and a
+  larger one was never asked "What did you not test, and why?". The
+  reviewability snapshot also called such a change docs-only. These files
+  are now treated like package.json or a Makefile.
+
 ### Security
 
 - **zod 4.** The server validates requests, agent answers and saved files

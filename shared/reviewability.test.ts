@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  isDocsPath,
   isGeneratedPath,
   isLockfile,
   isManifest,
@@ -34,6 +35,10 @@ test("paths are told apart: lockfiles, tests, manifests and generated output", (
   for (const path of ["package.json", "sub/Cargo.toml", "requirements-dev.txt", "app.gemspec", "App.csproj", "go.mod"])
     assert.ok(isManifest(path), path);
   assert.ok(!isManifest("src/package.ts"));
+  for (const path of ["README.md", "docs/guide/setup.ts", "NOTES.txt"])
+    assert.ok(isDocsPath(path), path);
+  for (const path of ["requirements.txt", "requirements-dev.txt", "native/CMakeLists.txt"])
+    assert.ok(!isDocsPath(path), path);
   assert.ok(isGeneratedPath("dist/app.min.js"));
   assert.ok(isGeneratedPath("api/v1/service.pb.go"));
   assert.ok(isGeneratedPath("src/gen/types.ts", ["src/gen/**"]));
