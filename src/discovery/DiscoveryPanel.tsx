@@ -274,7 +274,7 @@ export default function DiscoveryPanel({
       <header className="discovery-hero">
         <div>
           <span className="eyebrow">{t.eyebrow}</span>
-          <h1>
+          <h1 tabIndex={-1}>
             {t.title.lead}
             <br />
             <em>{t.title.emphasis}</em>

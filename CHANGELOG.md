@@ -474,6 +474,12 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   message appeared. The list now stays open until the request ends and shows
   why it failed, and Ctrl+K asks you to wait a moment.
 
+- **Keyboard focus after leaving Home or the palette.** Home's start and
+  **Continue where you left off** buttons, and the command palette's
+  **Sample project** and **Settings**, left the keyboard and screen reader
+  focus on the page body. The focus now moves to the new page's heading, as
+  the palette's other commands already did.
+
 ### Security
 
 - **zod 4.** The server validates requests, agent answers and saved files

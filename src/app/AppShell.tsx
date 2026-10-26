@@ -1035,10 +1035,22 @@ function AppShell({
             maskUser={presentation.maskUser}
             maskPath={presentation.maskPath}
             lastRunId={lastRunId}
-            openSample={() => navigateTo({ name: "demo" })}
+            // Each of these replaces Home and the button that was pressed,
+            // so the focus moves to the next page's heading.
+            openSample={() => {
+              navigateTo({ name: "demo" });
+              focusDestination();
+            }}
             openImport={() => openModal("import")}
-            openDiscovery={() => navigate("discovery")}
-            chooseRun={chooseRun}
+            openDiscovery={() => {
+              navigate("discovery");
+              focusDestination();
+            }}
+            chooseRun={async (id) => {
+              const opened = await chooseRun(id);
+              if (opened) focusDestination();
+              return opened;
+            }}
           />
         ) : page === "workspace" && addressRunLoading ? (
           <div className="empty-state" role="status">
@@ -1170,8 +1182,14 @@ function AppShell({
               onClose={closeCommandPalette}
               onSelectRun={openPaletteRun}
               onSelectRepo={openPaletteRepo}
-              onOpenSample={() => navigateTo({ name: "demo" })}
-              onOpenSettings={() => navigate("settings")}
+              onOpenSample={() => {
+                navigateTo({ name: "demo" });
+                focusDestination();
+              }}
+              onOpenSettings={() => {
+                navigate("settings");
+                focusDestination();
+              }}
               onOpenAbout={() => openModal("about")}
             />
           </Suspense>

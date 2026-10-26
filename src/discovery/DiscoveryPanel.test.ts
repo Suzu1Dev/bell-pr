@@ -113,6 +113,8 @@ test("an English render of a finished discovery has no Han", () => {
   const html = renderEnglish(job);
   // The form
   assert.match(html, /<span class="eyebrow">FIND YOUR NEXT CONTRIBUTION<\/span>/);
+  // Like every page's heading, it can take the focus when the app opens the page.
+  assert.match(html, /<h1 tabindex="-1">Find the next contribution<br\/>/);
   assert.match(html, /<h2>Where do you want to start\?<\/h2>/);
   assert.match(html, /placeholder="For example: accessibility, developer tools"/);
   assert.match(html, /<option value="beginner" selected="">Beginner-friendly<\/option>/);
