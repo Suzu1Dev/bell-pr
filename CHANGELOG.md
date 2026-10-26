@@ -399,6 +399,13 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   server then refused. The run now shows its files as removed right away,
   just as when you free it from the contributions list.
 
+- **Freeing a run's files in Settings keeps your keyboard place.** Confirming
+  Free space in Settings > Data & privacy moved the focus to the top of the
+  page, whether the free worked or failed. If the storage figures then failed
+  to reload, the row stayed on "Freeing..." for good. After a free the focus
+  now moves to Measure again. After a failure it goes back to the run's Free
+  space button. The row always becomes usable again.
+
 ### Security
 
 - **zod 4.** The server validates requests, agent answers and saved files

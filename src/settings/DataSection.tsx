@@ -96,7 +96,8 @@ function RunFiles({
   onRunFreed,
 }: {
   run: StorageRun;
-  onFreed: (message: string) => void;
+  /** Settles once the report is measured again, which drops this row. */
+  onFreed: (message: string) => Promise<void>;
   onRunFreed?: (run: Run) => void;
 }) {
   const settingsT = useT("settings");
@@ -117,9 +118,14 @@ function RunFiles({
         send("DELETE", {}),
       );
       onRunFreed?.(freed);
-      onFreed(t.freed({ size: formatSize(freed.workspaceBytes ?? run.bytes ?? 0, format) }));
+      await onFreed(t.freed({ size: formatSize(freed.workspaceBytes ?? run.bytes ?? 0, format) }));
     } catch (failure) {
       setError(messageOf(failure));
+      // The confirmation goes with the focused button; the toggle is
+      // disabled until this render lands.
+      window.requestAnimationFrame(() => freeButton.current?.focus());
+    } finally {
+      // Still here after a free when the report did not load again.
       setBusy(false);
       setConfirming(false);
     }
@@ -198,19 +204,23 @@ function StorageUsage({
   report: StorageReport | null;
   error: string;
   loading: boolean;
-  reload: () => void;
+  reload: () => Promise<void>;
   onRunFreed?: (run: Run) => void;
 }) {
   const t = useT("settings").data.storage;
   const format = useFormat();
   const [message, setMessage] = useState("");
+  const refreshButton = useRef<HTMLButtonElement>(null);
   const size = (bytes: number) => formatSize(bytes, format);
   const clones = report?.repos.reduce((sum, repo) => sum + (repo.bytes ?? 0), 0) ?? 0;
   const runs = report ? runsWithFiles(report.runs) : { published: [], others: [] };
   const runBytes = report?.runs.reduce((sum, run) => sum + (run.bytes ?? 0), 0) ?? 0;
   const freed = (text: string) => {
     setMessage(text);
-    reload();
+    // The freed run's row goes with the new report, so the keyboard waits
+    // on Measure again, which stays focusable while it measures.
+    refreshButton.current?.focus();
+    return reload();
   };
   const list = (title: string, help: string | undefined, items: StorageRun[]) =>
     items.length > 0 && (
@@ -229,12 +239,14 @@ function StorageUsage({
       title={t.title}
       aside={
         <button
+          ref={refreshButton}
           type="button"
           className="button secondary"
-          disabled={loading}
+          aria-disabled={loading}
           onClick={() => {
+            if (loading) return;
             setMessage("");
-            reload();
+            void reload();
           }}
         >
           <RefreshCw size={15} aria-hidden="true" />
@@ -520,7 +532,7 @@ export function DataSection({
         report={report}
         error={error}
         loading={loading}
-        reload={() => void load(true)}
+        reload={() => load(true)}
         onRunFreed={onRunFreed}
       />
       <SettingsGroup title={t.data.retention.title} className="settings-retention-group">

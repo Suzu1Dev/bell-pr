@@ -46,21 +46,26 @@ afterEach(() => {
   globalThis.fetch = realFetch;
 });
 
-/** Answers the storage report and DELETE /api/runs/:id/workspace. */
-function stubFetch() {
+/**
+ * Answers the storage report and DELETE /api/runs/:id/workspace; `fail`
+ * names the request that answers 500 instead.
+ */
+function stubFetch(fail?: "free" | "refresh") {
   let freed = false;
   const requests: string[] = [];
   globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
     const method = init?.method ?? "GET";
     const url = String(input);
     requests.push(`${method} ${url}`);
-    if (method === "DELETE") freed = true;
-    const body =
-      method === "DELETE"
+    const failed = fail === (method === "DELETE" ? "free" : url.includes("refresh=1") ? "refresh" : "");
+    if (method === "DELETE" && !failed) freed = true;
+    const body = failed
+      ? { error: "The disk is busy." }
+      : method === "DELETE"
         ? { run: freedRun }
         : storage(freed ? { ...kept, workspaceRemovedAt: freedRun.workspaceRemovedAt, removable: false } : kept);
     return new Response(JSON.stringify(body), {
-      status: 200,
+      status: failed ? 500 : 200,
       headers: { "Content-Type": "application/json" },
     });
   }) as typeof fetch;
@@ -105,6 +110,67 @@ test("freeing a run's files tells the shell, so the open run shows them gone", a
       [{ id: "run-1", workspaceRemovedAt: freedRun.workspaceRemovedAt }],
     );
     assert.match(view.text(), /Freed 4 kB\./);
+  } finally {
+    await view.unmount();
+  }
+});
+
+/** The element that has the keyboard focus in the fake DOM. */
+const focused = () => document.activeElement as unknown as FakeElement | null;
+
+/** Mounts the section with its report loaded and the run's confirmation open. */
+async function confirming() {
+  const view = await mount(createElement(DataSection, { doctor, settings, maskPath: (value: string) => value }));
+  await settle();
+  const find = (match: (element: FakeElement) => boolean) => view.container.querySelectorAll(match)[0];
+  const toggle = () => find((element) => element.getAttribute("aria-label") === "Free the space of Retry on timeout");
+  await click(toggle()!);
+  const confirm = find((element) => element.getAttribute("class") === "button primary settings-danger-button")!;
+  // Pressed from the keyboard.
+  confirm.focus();
+  return { view, find, toggle, confirm };
+}
+
+test("after a free the keyboard waits on Measure again, since the run's row goes", async () => {
+  stubFetch();
+  const { view, find, confirm } = await confirming();
+  try {
+    await click(confirm);
+    await settle();
+    const again = find((element) => element.nodeName === "BUTTON" && element.textContent === "Measure again");
+    assert.ok(focused() === again, "the focus is on Measure again");
+    assert.equal(again?.getAttribute("aria-disabled"), "false");
+    assert.doesNotMatch(view.text(), /Retry on timeout/);
+  } finally {
+    await view.unmount();
+  }
+});
+
+test("a free that fails gives the keyboard back to the run's button", async () => {
+  stubFetch("free");
+  const { view, toggle, confirm } = await confirming();
+  try {
+    await click(confirm);
+    await settle();
+    assert.ok(focused() === toggle(), "the focus is on the run's Free space button");
+    assert.equal(toggle()?.getAttribute("aria-expanded"), "false");
+    assert.match(view.text(), /The disk is busy\./);
+  } finally {
+    await view.unmount();
+  }
+});
+
+test("when the storage does not load again after a free, the run's button works again", async () => {
+  stubFetch("refresh");
+  const { view, toggle, confirm } = await confirming();
+  try {
+    await click(confirm);
+    await settle();
+    assert.equal(toggle()?.textContent, "Free space");
+    assert.ok(!toggle()?.hasAttribute("disabled"));
+    assert.equal(toggle()?.getAttribute("aria-expanded"), "false");
+    assert.match(view.text(), /Freed 4 kB\./);
+    assert.match(view.text(), /Storage use did not load: The disk is busy\./);
   } finally {
     await view.unmount();
   }
