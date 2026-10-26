@@ -207,15 +207,17 @@ const prohibition = new RegExp(
     String.raw`\b(?:(?:do|does|must|may|shall|should|can|will)\s*(?:not|n't)|cannot|never)\s+(?:be\s+)?involv(?:e|ed)\b`,
     String.raw`\bnot\s+(?:be\s+)?(?:accepted|allowed|permitted|welcome|tolerated|merged|committed|included|reviewed|considered)\b`,
     humanOnly,
-    String.raw`\b(?:prohibited|forbidden|forbids?|banned|disallowed|unacceptable|declined?)\b`,
+    // Not negated: "is not forbidden", "neither forbidden nor", "won't be explicitly
+    // declined" refuse nothing; "not only forbidden" still refuses.
+    String.raw`(?=\w)(?<!(?:\bnot|\bnever|\bnor|\bneither|n't)\s+(?:(?:be|been)\s+)?(?:(?!(?:only|merely|simply|solely)\b)\w+ly\s+)?)\b(?:prohibited|forbidden|forbids?|banned|disallowed|unacceptable|declined?)\b`,
     // "Please refrain from using AI tools …"
     String.raw`\brefrain\s+from\s+(?:\w+\s+)?(?:us(?:e|ing)|submitt?ing|contributing|includ(?:e|ing)|posting|pasting|sending|relying)\b`,
     String.raw`\bno\s+(?:AI|LLM|machine)[\w-]*`,
     String.raw`\b(?:will|shall|may)\s+be\s+(?:closed|rejected|refused|declined)\b`,
     // "must be written without any help from AI tools" (the AI after "without" is its help)
     String.raw`\b(?:must|shall|should|(?:are|is)\s+required\s+to|ha(?:ve|s)\s+to|needs?\s+to)\s+(?:only\s+)?be\s+(?:(?:entirely|fully|completely|wholly)\s+)?(?:written|made|created|authored|produced|done|developed|prepared|crafted)\s+(?:(?:entirely|fully|completely|wholly)\s+)?without\b`,
-    // "we will flag and reject …"
-    String.raw`\b(?:will|shall|must|we)\s+(?:\w+\s+){0,2}?(?:reject|refuse)\w*`,
+    // "we will flag and reject …", "we will not only reject …", never "we will not reject …"
+    String.raw`\b(?:will|shall|must|we)\s+(?:(?!(?:not|never|neither|nor)\b(?!\s+(?:only|merely|simply|solely)\b))\w+\s+){0,2}?(?:reject|refuse)\w*`,
     String.raw`\bzero[- ]tolerance\b`,
     // "a strict no-AI policy" (see `noAiPolicy`)
     String.raw`\bno-(?:AI|LLMs?)\b`,

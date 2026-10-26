@@ -460,6 +460,14 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   files now counts as a real change. Blank lines and spacing within a line
   still do not.
 
+- **A rule that allows AI help no longer reads as a ban.** A contributing
+  guide saying AI-assisted work is "not forbidden", "not prohibited",
+  "will not be rejected" or "won't be declined" was taken as a ban of AI
+  help. Agent runs on that project were blocked with no override, and
+  Learn-by-hand runs lost the quoted confirm. A negated refusal word now
+  refuses nothing, and a "not prohibited" sentence next to a real ban
+  counts as its carve-out.
+
 ### Security
 
 - **zod 4.** The server validates requests, agent answers and saved files
