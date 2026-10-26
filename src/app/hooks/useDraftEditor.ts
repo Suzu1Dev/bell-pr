@@ -137,6 +137,8 @@ export function useDraftEditor({
   // until the checks module has loaded, and the server enforces them anyway.
   const draftSources = run.draftPreparation?.context?.sources;
   const proposalBody = run.draftPreparation?.proposal?.body;
+  const appliedBody = run.draftPreparation?.appliedBody;
+  const earlierBodies = run.draftPreparation?.earlierBodies;
   const draftUnfinished = draftChecks
     ?.draftPreflight({ body: draftBody }, locale)
     .find((check) => check.kind === "block");
@@ -151,9 +153,12 @@ export function useDraftEditor({
       .entries(),
   ];
   // Ticking template boxes is not a rewrite of the model's text.
-  const draftIsProposal =
-    !!proposalBody?.trim() &&
-    !!draftChecks?.sameDraftProse(draftBody, proposalBody);
+  const draftIsProposal = !!draftChecks?.unrevisedDraft({
+    body: draftBody,
+    proposalBody,
+    appliedBody,
+    earlierBodies,
+  });
   const publishBranchError = !draftPublishBranch.trim()
     ? ""
     : !validBranchName(draftPublishBranch.trim())
@@ -179,6 +184,8 @@ export function useDraftEditor({
             body: run.draft.body,
             sources: draftSources,
             proposalBody,
+            appliedBody,
+            earlierBodies,
           },
           locale,
         ) ?? [],

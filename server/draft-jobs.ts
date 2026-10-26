@@ -20,6 +20,7 @@ import {
   parseDraftProposal,
 } from "./drafts.js";
 import { AppError, type Run } from "./types.js";
+import { sameDraftProse } from "../shared/draft-checks.js";
 import { activeFollowUp } from "../shared/followups.js";
 import { editable } from "./publish.js";
 import { runAgent } from "./run-executor.js";
@@ -99,10 +100,17 @@ async function generateDraft(
   ctx.controllers.set(key, controller);
   const fingerprint = draftFingerprint(run, files);
   const startingDraft = initialDraft ?? { ...run.draft };
+  const appliedBody = appliedSuggestion(run.draftPreparation, run.draft);
+  const sameDiff = run.draftPreparation?.fingerprint === fingerprint;
+  // The editor may still hold a dropped suggestion, unsaved.
+  const earlierBodies = sameDiff
+    ? run.draftPreparation?.earlierBodies
+    : earlierSuggestions(run.draftPreparation);
   const preparation: NonNullable<Run["draftPreparation"]> = {
-    ...(run.draftPreparation?.fingerprint === fingerprint
-      ? run.draftPreparation
-      : {}),
+    ...(sameDiff ? run.draftPreparation : {}),
+    // Another diff drops the suggestion; the draft may still be its text.
+    ...(appliedBody ? { appliedBody } : {}),
+    ...(earlierBodies ? { earlierBodies } : {}),
     status: "generating",
     fingerprint,
   };
@@ -146,6 +154,12 @@ async function generateDraft(
         return;
       }
       preparation.status = "ready";
+      // The draft may still be the suggestion this one replaces.
+      const replaced = appliedSuggestion(preparation, run.draft);
+      if (replaced) preparation.appliedBody = replaced;
+      // The editor may hold it unsaved, to be saved after this one lands.
+      const earlier = earlierSuggestions(preparation);
+      if (earlier) preparation.earlierBodies = earlier;
       preparation.proposal = proposal;
       preparation.generatedAt = now();
       if (
@@ -189,6 +203,36 @@ async function generateDraft(
     if (temporary) await rm(temporary, { recursive: true, force: true });
     await ctx.store.save();
   }
+}
+
+/**
+ * The suggestion's body while the draft is still that text, else the one
+ * kept earlier: what the checks on unrevised text compare the draft with
+ * once a regeneration drops or replaces `proposal`.
+ */
+function appliedSuggestion(
+  preparation: Run["draftPreparation"],
+  draft: Run["draft"],
+) {
+  const body = preparation?.proposal?.body;
+  return body?.trim() && sameDraftProse(draft.body, body)
+    ? body
+    : preparation?.appliedBody;
+}
+
+/**
+ * The suggestion bodies a regeneration replaced or dropped, newest first and
+ * at most five, with the current suggestion's body added: what the checks
+ * on unrevised text also compare the draft with, whether or not it was saved.
+ */
+function earlierSuggestions(preparation: Run["draftPreparation"]) {
+  const body = preparation?.proposal?.body;
+  const kept = preparation?.earlierBodies;
+  if (!body?.trim()) return kept;
+  return [
+    body,
+    ...(kept ?? []).filter((earlier) => !sameDraftProse(earlier, body)),
+  ].slice(0, 5);
 }
 
 /** At most three templates, each at most 20 kB; a larger one is left out rather than cut. */

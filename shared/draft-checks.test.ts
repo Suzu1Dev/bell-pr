@@ -123,11 +123,24 @@ test("own-words: unrevised suggested text is a confirm everywhere and a block wh
   // Ticking boxes or adding BELL's disclosure line is no rewrite; editing the prose is.
   assert.deepEqual(ids({ proposalBody, body: `${body}\n\n${aiDisclosureLine}` }), ["own-words:confirm"]);
   assert.deepEqual(ids({ proposalBody, body: `${body} Rewritten by me.` }), []);
+  // The suggestion last put into the draft still counts after a later one replaced it.
+  const later = { proposalBody: "A later suggestion.", appliedBody: body };
+  assert.deepEqual(ids({ ...later, rules: rules(finding("own-words", "Describe your change in your own words.")) }), [
+    "own-words:block",
+  ]);
+  assert.deepEqual(ids({ appliedBody: body, body: `${body} Rewritten by me.` }), []);
+  // So does any suggestion a later one replaced, saved into the draft or not.
+  const earlier = { proposalBody: "A later suggestion.", earlierBodies: ["Another suggestion.", body] };
+  assert.deepEqual(ids({ ...earlier, rules: rules(finding("own-words", "Describe your change in your own words.")) }), [
+    "own-words:block",
+  ]);
+  assert.deepEqual(ids({ ...earlier, body: `${body} Rewritten by me.` }), []);
   // A project with a brevity rule keeps its brevity confirm for it, quoting the rule.
   const sources: DraftSource[] = [
     { id: "c", kind: "contributing", label: "CONTRIBUTING.md", content: "Write short, focused descriptions in your own words." },
   ];
   assert.deepEqual(ids({ proposalBody, sources }), ["brevity:confirm"]);
+  assert.deepEqual(ids({ ...later, sources }), ["brevity:confirm"]);
   assert.deepEqual(
     ids({ proposalBody, sources, rules: rules(finding("own-words", "Write short, focused descriptions in your own words.")) }),
     ["own-words:block"],

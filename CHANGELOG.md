@@ -443,6 +443,15 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   Chinese, agent text that used a footnote still showed the English heading
   "Footnotes". It now shows "註腳".
 
+- **Regenerating the suggestion no longer lifts the own-words check.** Once
+  BELL's suggested description was in the draft, clicking Refresh (or
+  regenerating after the diff changed, even if that run failed or was
+  stopped) made the checks compare the draft only with the newest
+  suggestion. The draft was still the old suggestion word for word, but
+  approval and publishing went through on projects that ask for the
+  contributor's own words. BELL now remembers the suggestion that is in the
+  draft, so the description still counts as unrevised until you rewrite it.
+
 ### Security
 
 - **zod 4.** The server validates requests, agent answers and saved files

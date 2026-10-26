@@ -593,6 +593,110 @@ test("stale late proposals and failed generation never replace a draft or fail c
   }
 });
 
+test("a later suggestion, or a failed one after the diff changed, keeps the applied one unrevised", async () => {
+  let answer = proposal;
+  let fail = false;
+  let gate: Promise<void> | undefined;
+  let started: (() => void) | undefined;
+  const f = await fixture(async () => {
+    started?.();
+    await gate;
+    if (fail) throw new Error("Draft failed");
+    return JSON.stringify(answer);
+  });
+  try {
+    const quote = "Describe your change in your own words.";
+    f.workbench.repo(f.run.repoId).contributionRules = {
+      checkedAt: new Date().toISOString(),
+      findings: [{ kind: "own-words", path: "CONTRIBUTING.md", line: 1, quote, contribution: true }],
+      filesRead: ["CONTRIBUTING.md"],
+    };
+    const approve = async () => {
+      const [file] = await f.workbench.diff(f.run.id);
+      await f.workbench.review(f.run.id, file.path, true, file.fingerprint);
+      return f.workbench.approve(f.run.id, { ...f.run.draft });
+    };
+    await automatic(f.workbench, f.run.id);
+    assert.equal(f.run.draft.body, proposal.body);
+    // Refresh writes another suggestion and leaves the draft as it is.
+    answer = { ...proposal, body: "Another wording of the same change." };
+    await f.workbench.prepareDraft(f.run.id, { refresh: true });
+    assert.equal(f.run.draftPreparation?.proposal?.body, answer.body);
+    await assert.rejects(approve(), new RegExp(quote));
+    const reopened = new Store(f.store.directory);
+    await reopened.initialize();
+    assert.equal(reopened.data.runs[0].draftPreparation?.appliedBody, proposal.body);
+    // The person applies that suggestion and saves it while the next one is generated.
+    const applied = answer;
+    answer = { ...proposal, body: "A third wording of the same change." };
+    let release!: () => void;
+    gate = new Promise((resolve) => (release = resolve));
+    const entered = new Promise<void>((resolve) => (started = resolve));
+    const pending = f.workbench.prepareDraft(f.run.id, { refresh: true });
+    await entered;
+    await f.workbench.draft(f.run.id, { title: applied.title, body: applied.body });
+    release();
+    await pending;
+    gate = undefined;
+    assert.equal(f.run.draftPreparation?.proposal?.body, answer.body);
+    await assert.rejects(approve(), new RegExp(quote));
+    // A changed diff drops the suggestion when generating starts.
+    await writeFile(path.join(f.repository, "a.ts"), "export const value = 3;\n");
+    fail = true;
+    await f.workbench.prepareDraft(f.run.id, { refresh: true });
+    assert.equal(f.run.draftPreparation?.status, "failed");
+    assert.equal(f.run.draftPreparation?.proposal, undefined);
+    await assert.rejects(approve(), new RegExp(quote));
+    assert.equal(f.run.status, "review");
+    await f.workbench.draft(f.run.id, { ...f.run.draft, body: "I changed the value to 3." });
+    await approve();
+    assert.equal(f.run.status, "approved");
+  } finally {
+    await f.cleanup();
+  }
+});
+
+test("a suggestion saved from the editor after the next Refresh, or after a failed one, stays unrevised", async () => {
+  const quote = "Describe your change in your own words.";
+  const second = { ...proposal, body: "Another wording of the same change." };
+  for (const next of ["another suggestion", "a failed refresh"]) {
+    let answer = proposal;
+    let fail = false;
+    const f = await fixture(async () => {
+      if (fail) throw new Error("Draft failed");
+      return JSON.stringify(answer);
+    });
+    try {
+      f.workbench.repo(f.run.repoId).contributionRules = {
+        checkedAt: new Date().toISOString(),
+        findings: [{ kind: "own-words", path: "CONTRIBUTING.md", line: 1, quote, contribution: true }],
+        filesRead: ["CONTRIBUTING.md"],
+      };
+      await automatic(f.workbench, f.run.id);
+      answer = second;
+      await f.workbench.prepareDraft(f.run.id, { refresh: true });
+      // Apply only fills the editor; the person refreshes again before saving.
+      if (next === "a failed refresh") {
+        await writeFile(path.join(f.repository, "a.ts"), "export const value = 3;\n");
+        fail = true;
+      } else {
+        answer = { ...proposal, body: "A third wording of the same change." };
+      }
+      await f.workbench.prepareDraft(f.run.id, { refresh: true });
+      await f.workbench.draft(f.run.id, { title: second.title, body: second.body });
+      const [file] = await f.workbench.diff(f.run.id);
+      await f.workbench.review(f.run.id, file.path, true, file.fingerprint);
+      await assert.rejects(f.workbench.approve(f.run.id, { ...f.run.draft }), new RegExp(quote), next);
+      assert.equal(f.run.status, "review");
+      const reopened = new Store(f.store.directory);
+      await reopened.initialize();
+      assert.deepEqual(reopened.data.runs[0].draftPreparation?.earlierBodies, [second.body, proposal.body]);
+    } finally {
+      await f.cleanup();
+    }
+  }
+});
+
 test("shutdown cancels draft generation and waits for temporary workspace cleanup", async () => {
   let started!: () => void;
   const entered = new Promise<void>((resolve) => {

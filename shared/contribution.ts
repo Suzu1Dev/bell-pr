@@ -11,7 +11,7 @@
 import {
   brevityRule,
   draftProseWords,
-  sameDraftProse,
+  unrevisedDraft,
   type DraftCheck,
   type DraftPreflightInput,
 } from "./draft-checks.js";
@@ -585,9 +585,7 @@ export function respectChecks(
 
   // The description is still BELL's suggestion: a block where the project
   // asks for the contributor's own words, a confirm on every other project.
-  const unrevised =
-    !!input.proposalBody?.trim() &&
-    sameDraftProse(input.body, input.proposalBody);
+  const unrevised = unrevisedDraft(input);
   const ownWords = found("own-words");
   const brevity = brevityRule(input.sources ?? []);
   if (unrevised && ownWords.length)

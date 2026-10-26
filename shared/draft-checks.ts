@@ -204,6 +204,22 @@ export function sameDraftProse(a: string, b: string) {
   return prose(a) === prose(b);
 }
 
+/** True when the description is still BELL's suggestion, the current one or an earlier one it kept. */
+export function unrevisedDraft(
+  input: Pick<
+    DraftPreflightInput,
+    "body" | "proposalBody" | "appliedBody" | "earlierBodies"
+  >,
+) {
+  return [
+    input.proposalBody,
+    input.appliedBody,
+    ...(input.earlierBodies ?? []),
+  ].some(
+    (suggestion) => !!suggestion?.trim() && sameDraftProse(input.body, suggestion),
+  );
+}
+
 /** A contributing or template line asking for short descriptions written by the contributor. */
 export function brevityRule(sources: DraftSource[]): DraftRuleQuote | undefined {
   return findRule(
@@ -377,6 +393,10 @@ export interface DraftPreflightInput {
   commitMessage?: string;
   sources?: DraftSource[];
   proposalBody?: string;
+  /** An earlier suggestion the draft was when a later one replaced it (`DraftPreparation.appliedBody`). */
+  appliedBody?: string;
+  /** The suggestions later ones replaced or dropped (`DraftPreparation.earlierBodies`). */
+  earlierBodies?: string[];
   /**
    * Directories of this computer that must not appear in the text, such as
    * the home and data directories; the server passes them.
@@ -493,9 +513,7 @@ export function draftPreflight(
   if (brevity) {
     const words = draftProseWords(input.body);
     const budget = draftWordBudget(sources);
-    const unrevised =
-      !!input.proposalBody?.trim() &&
-      sameDraftProse(input.body, input.proposalBody);
+    const unrevised = unrevisedDraft(input);
     // Where the project's quoted rules ask for the contributor's own words,
     // unrevised text is the own-words block instead (respectChecks).
     const ownWordsRule = input.rules?.findings.some(

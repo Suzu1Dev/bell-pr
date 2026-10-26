@@ -517,7 +517,12 @@ export const runReadSchema = loose({
       .record(text, loose({ fingerprint: text, status: text }))
       .optional(),
     walkthroughs: later(z.record(text, loose({ fingerprint: text, status: text }))),
-    draftPreparation: loose({ status: text, fingerprint: text }).optional(),
+    draftPreparation: loose({
+      status: text,
+      fingerprint: text,
+      appliedBody: later(text),
+      earlierBodies: later(list),
+    }).optional(),
     conversations: z.record(text, loose({})).optional(),
     team: loose({
       config: loose({}),

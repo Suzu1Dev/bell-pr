@@ -63,6 +63,8 @@ export function samplePublishChecks(
       ...(run.draft.commitMessage ? { commitMessage: run.draft.commitMessage } : {}),
       sources: run.draftPreparation?.context?.sources,
       proposalBody: run.draftPreparation?.proposal?.body,
+      appliedBody: run.draftPreparation?.appliedBody,
+      earlierBodies: run.draftPreparation?.earlierBodies,
       changedPaths: files.map((file) => file.path),
       rules: sampleRules(sample),
       facts: sample.contributionFacts,

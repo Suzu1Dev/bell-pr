@@ -57,6 +57,18 @@ export interface DraftPreparation {
   proposal?: DraftProposal;
   error?: string;
   generatedAt?: string;
+  /**
+   * A suggestion's body the draft still was when a later generation
+   * replaced or dropped `proposal`; the checks on unrevised text compare
+   * the draft with it too.
+   */
+  appliedBody?: string;
+  /**
+   * The bodies of the suggestions later generations replaced or dropped,
+   * newest first and at most five, saved into the draft or not; the checks
+   * on unrevised text compare the draft with them too.
+   */
+  earlierBodies?: string[];
 }
 
 /**

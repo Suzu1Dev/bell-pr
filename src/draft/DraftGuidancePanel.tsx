@@ -249,6 +249,8 @@ export function DraftGuidancePanel({
           {
             body: draftBody ?? "",
             proposalBody: proposal?.body,
+            appliedBody: preparation?.appliedBody,
+            earlierBodies: preparation?.earlierBodies,
             sources,
             rules,
             facts,
