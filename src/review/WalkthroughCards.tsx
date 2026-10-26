@@ -20,6 +20,7 @@ import { getDemo } from "../demo";
 import { useFormat, useLocale, useT } from "../i18n";
 import type { DiffFile } from "../types";
 import { inPanel } from "./focus";
+import { InlineCode } from "./InlineCode";
 import { MarkdownContent } from "./MarkdownContent";
 import { WalkthroughAttempt, type WalkthroughInput } from "./WalkthroughAttempt";
 import { withNodes } from "./withNodes";
@@ -46,18 +47,6 @@ export interface WalkthroughCardsProps {
   onAttempt?: (input: WalkthroughInput) => Promise<void>;
   /** A Learn-by-hand run: a unit's answer counts toward nothing (WalkthroughAttempt). */
   byHand?: boolean;
-}
-
-/**
- * A one-sentence note with its `code` spans shown as code, the way the
- * cards' Markdown shows them; phrasing content, so it fits a <summary>.
- */
-function InlineCode({ text }: { text: string }) {
-  return text
-    .split(/(`[^`\n]+`)/)
-    .map((part, index) =>
-      index % 2 ? <code key={index}>{part.slice(1, -1)}</code> : part,
-    );
 }
 
 function References({

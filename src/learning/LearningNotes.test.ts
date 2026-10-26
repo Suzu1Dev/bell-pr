@@ -310,6 +310,37 @@ test("English notes render the page, the filters and each note in English", () =
   assert.equal(html.match(/AI-generated<\/span>/g)?.length, 2);
 });
 
+test("a concept title's inline code renders as code, as in the explanation panel", () => {
+  const [first] = englishRuns;
+  const html = renderEnglish({
+    initial: {
+      runs: [
+        {
+          ...first,
+          notes: {},
+          explanations: {
+            "src/fetch.ts": {
+              fingerprint: "i",
+              status: "ready",
+              content: {
+                summary: "Summary",
+                reason: "Reason",
+                concept:
+                  "`AbortController` cancellation\nPass `signal` to `fetch` so the request stops.",
+                tip: "Abort in the cleanup.",
+              },
+            },
+          },
+        },
+      ],
+    },
+  });
+  assert.match(
+    html,
+    /<h2 tabindex="-1"><code>AbortController<\/code> cancellation<\/h2>/,
+  );
+});
+
 test("English filters count the visible notes and say when nothing matches", () => {
   assert.match(renderEnglish({ defaultKeyword: "invalidation" }), /Showing 1 of 3 notes/);
   // The person's notes are searched too.

@@ -283,6 +283,11 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   to the new run, and a failure was never shown. The dialog now stays open
   until the request ends, as the split dialog does.
 
+- **Code in learning note titles.** On the Learning page, a concept title
+  with an identifier in backticks, such as "`AbortController` cancellation",
+  showed the backticks literally, while the explanation panel showed the
+  same name as code. The note's heading now shows it as code too.
+
 ### Security
 
 - **zod 4.** The server validates requests, agent answers and saved files

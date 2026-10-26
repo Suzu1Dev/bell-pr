@@ -12,6 +12,7 @@ import type { ByHandSummary } from "../../shared/by-hand";
 import { api } from "../api";
 import { getDemo } from "../demo";
 import { useFormat, useLocale, useT } from "../i18n";
+import { InlineCode } from "../review/InlineCode";
 import type { DiffFile, Repo } from "../types";
 import { LearningCounts } from "./LearningCounts";
 import { LearningHeading } from "./LearningHeading";
@@ -172,7 +173,9 @@ function NoteCard({
         )}
       </div>
       {/* Focused after "Load more" brings this note in. */}
-      <h2 tabIndex={-1}>{heading || note.path}</h2>
+      <h2 tabIndex={-1}>
+        {heading ? <InlineCode text={heading} /> : note.path}
+      </h2>
       {note.explanation && (
         <>
           <Suspense fallback={<p>{body}</p>}>
