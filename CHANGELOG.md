@@ -393,6 +393,12 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   "true". Both now say "The option ... needs a value." and exit 2, the same
   as the other commands.
 
+- **Freeing a run in Settings now updates the workbench.** If you freed the
+  open run's files from Settings > Data & privacy, the workbench kept showing
+  its old changes and still offered Explain it back and Split, which the
+  server then refused. The run now shows its files as removed right away,
+  just as when you free it from the contributions list.
+
 ### Security
 
 - **zod 4.** The server validates requests, agent answers and saved files

@@ -6,6 +6,7 @@ import { api, send } from "../api";
 import { useFormat, useT } from "../i18n";
 import { CopyCommand } from "../setup/CopyCommand";
 import type { DoctorState } from "../setup/useDoctor";
+import type { Run } from "../types";
 import {
   Feedback,
   NumberField,
@@ -92,9 +93,11 @@ function DataDirectory({
 function RunFiles({
   run,
   onFreed,
+  onRunFreed,
 }: {
   run: StorageRun;
   onFreed: (message: string) => void;
+  onRunFreed?: (run: Run) => void;
 }) {
   const settingsT = useT("settings");
   const t = settingsT.data.storage;
@@ -109,10 +112,11 @@ function RunFiles({
     setBusy(true);
     setError("");
     try {
-      const { run: freed } = await api<{ run: { workspaceBytes?: number } }>(
+      const { run: freed } = await api<{ run: Run }>(
         `/runs/${encodeURIComponent(run.id)}/workspace`,
         send("DELETE", {}),
       );
+      onRunFreed?.(freed);
       onFreed(t.freed({ size: formatSize(freed.workspaceBytes ?? run.bytes ?? 0, format) }));
     } catch (failure) {
       setError(messageOf(failure));
@@ -189,11 +193,13 @@ function StorageUsage({
   error,
   loading,
   reload,
+  onRunFreed,
 }: {
   report: StorageReport | null;
   error: string;
   loading: boolean;
   reload: () => void;
+  onRunFreed?: (run: Run) => void;
 }) {
   const t = useT("settings").data.storage;
   const format = useFormat();
@@ -213,7 +219,7 @@ function StorageUsage({
         {help && <p className="settings-help">{help}</p>}
         <ul>
           {items.map((run) => (
-            <RunFiles key={run.id} run={run} onFreed={freed} />
+            <RunFiles key={run.id} run={run} onFreed={freed} onRunFreed={onRunFreed} />
           ))}
         </ul>
       </div>
@@ -465,12 +471,15 @@ export function DataSection({
   settings,
   maskPath,
   reload = reloadPage,
+  onRunFreed,
 }: {
   doctor: DoctorState;
   settings: AppSettingsState;
   maskPath: (value: string) => string;
   /** Reloads the page after all data was deleted. */
   reload?: () => void;
+  /** Receives a run whose files were freed here, as the server answered. */
+  onRunFreed?: (run: Run) => void;
 }) {
   const t = useT("settings");
   const [report, setReport] = useState<StorageReport | null>(null);
@@ -512,6 +521,7 @@ export function DataSection({
         error={error}
         loading={loading}
         reload={() => void load(true)}
+        onRunFreed={onRunFreed}
       />
       <SettingsGroup title={t.data.retention.title} className="settings-retention-group">
         {view ? (

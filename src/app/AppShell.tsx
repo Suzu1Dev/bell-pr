@@ -862,19 +862,24 @@ function AppShell({
     setFiles(sample.files);
   };
 
+  /** Shows a run whose working files were freed, in the list and when open. */
+  function runFreed(updated: Run) {
+    setRuns((list) =>
+      list.map((item) => (item.id === updated.id ? summarizeRun(updated) : item)),
+    );
+    if (runIdRef.current === updated.id) {
+      setRun(updated);
+      setFiles([]);
+    }
+  }
+
   /** Frees a finished run's working files; the run and its notes stay. */
   async function freeRunSpace(id: string) {
     const { run: updated } = await api<{ run: Run }>(
       `/runs/${encodeURIComponent(id)}/workspace`,
       send("DELETE"),
     );
-    setRuns((list) =>
-      list.map((item) => (item.id === id ? summarizeRun(updated) : item)),
-    );
-    if (runIdRef.current === id) {
-      setRun(updated);
-      setFiles([]);
-    }
+    runFreed(updated);
     notify(runMessages.freed);
   }
 
@@ -1135,6 +1140,7 @@ function AppShell({
               navigate={navigate}
               doctor={doctor}
               onAppSettingsSaved={(view) => setAppSettings(view.settings)}
+              onRunFreed={runFreed}
             />
           </Suspense>
           </ErrorBoundary>

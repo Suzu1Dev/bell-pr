@@ -18,6 +18,7 @@ import { usePresentation } from "../app/presentation";
 import { useT } from "../i18n";
 import { serializeRoute, useHashRoute, type RouteFlags } from "../navigation/route";
 import type { DoctorState } from "../setup/useDoctor";
+import type { Run } from "../types";
 import { AboutSection } from "./AboutSection";
 import { DataSection } from "./DataSection";
 import { EnvironmentSection } from "./EnvironmentSection";
@@ -47,6 +48,11 @@ interface SettingsPageProps {
    * elsewhere (the shell's, for the sample project) can follow.
    */
   onAppSettingsSaved?: (view: AppSettingsView) => void;
+  /**
+   * Receives a run whose files Data & privacy freed, so the shell's copy
+   * of it (the run list, the open run) shows them gone.
+   */
+  onRunFreed?: (run: Run) => void;
 }
 
 const icons: Record<SettingsSection, LucideIcon> = {
@@ -80,6 +86,7 @@ export function SettingsPage({
   navigate,
   doctor,
   onAppSettingsSaved,
+  onRunFreed,
 }: SettingsPageProps) {
   const t = useT("settings");
   const route = useHashRoute();
@@ -153,7 +160,14 @@ export function SettingsPage({
       );
       break;
     case "data":
-      content = <DataSection doctor={doctor} settings={settings} maskPath={maskPath} />;
+      content = (
+        <DataSection
+          doctor={doctor}
+          settings={settings}
+          maskPath={maskPath}
+          onRunFreed={onRunFreed}
+        />
+      );
       break;
     case "about":
       content = (
