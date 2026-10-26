@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import test from "node:test";
-import { markdownNestingLimit, markdownTooNested } from "./markdown-nesting.js";
+import { markdownNestingLimit, markdownTooNested, markdownTooSlow } from "./markdown-nesting.js";
 
 const limit = markdownNestingLimit;
 const root = path.join(import.meta.dirname, "..");
@@ -23,6 +23,42 @@ const shapes: Record<string, (depth: number) => string> = {
   images: (depth) => `${"![".repeat(depth)}a${"](b)".repeat(depth)}`,
   "footnote definitions": (depth) => `${"[^a]: ".repeat(depth)}x`,
   "emphasis past openers of another kind": (depth) => `${"*a _b ".repeat(depth)}x${" a*".repeat(depth)}`,
+};
+/**
+ * Text that does not nest but took the parser a second or more (up to
+ * minutes) at the 60,000-character cap: closers it walks back from, HTML it
+ * reads to the end, runs the autolink finders read from every start, lists
+ * and quotes whose closing copies the document, and splices of a long
+ * paragraph's events.
+ */
+const slow: Record<string, string> = {
+  "closers with no opener": "a* ".repeat(20_000),
+  "underscore closers": "a_ ".repeat(20_000),
+  "strikethrough closers": "a~ ".repeat(20_000),
+  "double strikethrough closers": "a~~ ".repeat(15_000),
+  "closing brackets": "](b) ".repeat(12_000),
+  "bare closing brackets": "]".repeat(60_000),
+  "closing brackets after escapes": "\\*]".repeat(20_000),
+  "processing instructions": `x ${"<?".repeat(29_999)}`,
+  comments: `x ${"<!--".repeat(14_999)}`,
+  declarations: `x ${"<!A ".repeat(14_999)}`,
+  CDATA: `x ${"<![CDATA[".repeat(6_666)}`,
+  "dots for the email finder": "a.".repeat(30_000),
+  "a run of dots": `x ${".".repeat(59_998)}`,
+  "URL punctuation": `www.a.b/${"!".repeat(59_990)}x`,
+  "words after an open bracket": `[x ${"a ".repeat(29_998)}`,
+  "lists in lists": "- - x\n\n".repeat(8_500),
+  quotes: "> x\n\n".repeat(12_000),
+  "items in items": "- x\n  - y\n".repeat(6_000),
+  "emphasis siblings": "*a* ".repeat(15_000),
+  "short lines": "a b\n".repeat(15_000),
+  "lines of text the parser merges": "\n'~~~h".repeat(10_000),
+  "lines ending in a tag": "<a \n~".repeat(12_000),
+  // Closing brackets after opening ones the parser reads as code, a comment, a URL or a tag across lines.
+  "brackets in code": "`[`] ".repeat(12_000),
+  "brackets in comments": `x ${"<!--[-->]]]] ".repeat(4_615)}`,
+  "brackets in URLs": "www.a.b/[ ]]]] ".repeat(4_000),
+  "brackets in tags across lines": `x ${"<a\nb='['>]]]] ".repeat(4_285)}`,
 };
 const deep = shapes["emphasis with text"](4_000);
 const deepLists = `${"- ".repeat(8_000)}x`;
@@ -187,9 +223,39 @@ test("code under four times the limit, thematic breaks, redactions, fill-in line
     assert.equal(markdownTooNested(text), false, JSON.stringify(text.slice(0, 40)));
 });
 
+test("text that does not nest but takes the parser seconds is too slow, nesting or not", () => {
+  for (const [name, text] of Object.entries(slow)) {
+    assert.ok(text.length <= 60_000, name);
+    assert.equal(markdownTooNested(text), false, name);
+    assert.equal(markdownTooSlow(text), true, name);
+  }
+  for (const make of Object.values(shapes)) assert.equal(markdownTooSlow(make(5_000)), true);
+});
+
+test("long real text is not too slow: tables, fenced JSON, wrapped prose, quotes, ordered lists and changelogs", () => {
+  for (const text of [
+    // A table whose first cells leave a bracket open: GFM reads each cell as text of its own.
+    `| Validator | Description |\n| --- | --- |\n${"| **isAlpha(str [, locale])** | check if the string contains only letters, one of `['ar', 'bg']` and more |\n".repeat(400)}`,
+    // Fenced JSON with no blank line, whose strings hold backticks, tags and brackets.
+    `\`\`\`json\n{"messages": [\n${'  {"text": "Run `npm test` <rules_for_code> and [11, 12] here"},\n'.repeat(800)}]}\n\`\`\``,
+    // A wrapped paragraph with code, a link and bold on every line, also quoted and in an ordered list.
+    "Use `foo()` to call [bar](http://x.y) and **baz** then qux.\n".repeat(950),
+    "> Use `foo()` to call [bar](http://x.y) and **baz** then qux.\n".repeat(900),
+    `1. x\n${"2. Use `foo()` to call [bar](http://x.y) and **baz** then qux.\n".repeat(900)}`,
+    // Short lines, such as names one to a line, in one paragraph.
+    "a b c d e f g h\n".repeat(3_700),
+    // A changelog: a short list under each heading.
+    Array.from({ length: 400 }, (_, i) => `## ${i}.0.0\n\n### Patch Changes\n\n- abc${i}: Fix [#${i}](https://x.y/${i}) in \`f()\`\n- def${i}: Update deps\n`).join("\n"),
+  ]) {
+    assert.ok(text.length <= 60_000, text.slice(0, 40));
+    assert.equal(markdownTooSlow(text), false, JSON.stringify(text.slice(0, 40)));
+  }
+});
+
 test("no Markdown the app renders or checks counts: the renderer's corpus, the docs and the policy fixtures", () => {
-  const corpus = JSON.parse(readFileSync(path.join(root, "src/review/markdown/corpus.json"), "utf8")) as { source: string }[];
-  for (const { source } of corpus) assert.equal(markdownTooNested(source), false, source.slice(0, 60));
+  const corpus = JSON.parse(readFileSync(path.join(root, "src/review/markdown/corpus.json"), "utf8")) as { text: string }[];
+  assert.ok(corpus.length > 500);
+  for (const { text } of corpus) assert.equal(markdownTooSlow(text), false, text.slice(0, 60));
   const files = (directory: string): string[] =>
     readdirSync(directory).flatMap((name) => {
       const full = path.join(directory, name);
@@ -201,7 +267,7 @@ test("no Markdown the app renders or checks counts: the renderer's corpus, the d
     ...files(path.join(root, "server/fixtures/policy")),
   ];
   assert.ok(documents.length > 20);
-  for (const file of documents) assert.equal(markdownTooNested(readFileSync(file, "utf8")), false, file);
+  for (const file of documents) assert.equal(markdownTooSlow(readFileSync(file, "utf8")), false, file);
 });
 
 test("reading takes linear time, however the text nests", () => {
@@ -219,4 +285,21 @@ test("reading takes linear time, however the text nests", () => {
   ])
     markdownTooNested(text);
   assert.ok(performance.now() - started < 3_000, "reading took too long");
+});
+
+test("estimating the parser's other work takes linear time too", () => {
+  const started = performance.now();
+  // Tags open to the line's end, table rows, URLs, backtick runs that never close, and the slow shapes.
+  for (const text of [
+    `<a${" b".repeat(100_000)}`,
+    "<a b ".repeat(100_000),
+    `<a b='${"<x ".repeat(100_000)}`,
+    `${"| a ".repeat(100_000)}\n${"| - ".repeat(100_000)}\n${"| [b ".repeat(100_000)}`,
+    "www.".repeat(100_000),
+    `www.a/${"&amp;".repeat(60_000)}x`,
+    Array.from({ length: 400 }, (_, index) => "`".repeat(index + 1)).join(" a "),
+    ...Object.values(slow),
+  ])
+    markdownTooSlow(text);
+  assert.ok(performance.now() - started < 3_000, "estimating took too long");
 });

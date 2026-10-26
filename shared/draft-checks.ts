@@ -8,7 +8,7 @@ import { fromMarkdown } from "mdast-util-from-markdown";
 import { gfmFromMarkdown } from "mdast-util-gfm";
 import { gfm } from "micromark-extension-gfm";
 import { withoutAiDisclosure, type DraftSource } from "./drafts.js";
-import { markdownTooNested } from "./markdown-nesting.js";
+import { markdownTooSlow } from "./markdown-nesting.js";
 import en from "./i18n/draft-checks.en.js";
 import zhTW from "./i18n/draft-checks.zh-TW.js";
 import type { Locale } from "./i18n/locale.js";
@@ -43,12 +43,14 @@ export function markdownProse(markdown: string) {
   if (markdown === lastProse.markdown) return lastProse.lines;
   const hidden = markdown.split("");
   let tree: MdastNode | undefined;
-  // Nesting past markdownNestingLimit is not parsed: a few thousand levels
-  // take the parser seconds or minutes, and deeper still it throws. Every line
-  // is then read as written, code and comments included. Checks for
-  // something present (a disclosure, an issue link) must not count text a
-  // maintainer would not see, so they ask markdownReadable.
-  if (!markdownTooNested(markdown))
+  // Text the parser would take too long on is not parsed: nesting past
+  // markdownNestingLimit (a few thousand levels take seconds or minutes, and
+  // deeper still it throws), or other shapes markdownTooSlow estimates past
+  // its budget. Every line is then read as written, code and comments
+  // included. Checks for something present (a disclosure, an issue link)
+  // must not count text a maintainer would not see, so they ask
+  // markdownReadable.
+  if (!markdownTooSlow(markdown))
     try {
       tree = fromMarkdown(markdown, {
         extensions: [gfm()],
@@ -91,7 +93,7 @@ let lastProse: { markdown: string; lines: string[]; readable: boolean } = {
 };
 
 /**
- * Whether markdownProse parsed the body: it does not when markdownTooNested
+ * Whether markdownProse parsed the body: it does not when markdownTooSlow
  * flags it or the parser throws. When it did not, its lines still hold code
  * and comments, so a check that passes on something present must count
  * nothing from them.

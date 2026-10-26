@@ -4,7 +4,7 @@ import { gfmFromMarkdown } from "mdast-util-gfm";
 import { gfm } from "micromark-extension-gfm";
 import { normalizeUri } from "micromark-util-sanitize-uri";
 import { createElement, Fragment, type ComponentType, type ReactNode } from "react";
-import { markdownTooNested } from "../../../shared/markdown-nesting";
+import { markdownTooSlow } from "../../../shared/markdown-nesting";
 
 /*
  * GitHub Flavored Markdown to React elements, without raw HTML. It renders
@@ -393,8 +393,9 @@ function toReact(child: Child, options: Options, key: number): ReactNode {
  * name. Anything but a string renders nothing, as with the earlier pipeline.
  * Text that cannot be rendered, such as nesting deeper than the parser can
  * take, shows as written instead of taking down the view. So does text
- * nested past markdownNestingLimit, which never reaches the parser: a few
- * thousand levels take it seconds or minutes, and deeper still it throws.
+ * markdownTooSlow flags, which never reaches the parser: nesting past
+ * markdownNestingLimit (a few thousand levels take it seconds or minutes,
+ * and deeper still it throws), and other text it would take too long on.
  */
 export function Markdown({
   children,
@@ -408,7 +409,7 @@ export function Markdown({
 }) {
   const source = typeof children === "string" ? children : "";
   const asWritten = createElement("p", { style: { whiteSpace: "pre-wrap" } }, source);
-  if (markdownTooNested(source)) return asWritten;
+  if (markdownTooSlow(source)) return asWritten;
   try {
     const tree = fromMarkdown(source, {
       extensions: [gfm()],

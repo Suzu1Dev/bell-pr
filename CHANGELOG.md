@@ -517,9 +517,18 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   minutes before it overflowed. Text nested more than 32 levels deep now
   never reaches the parser: it shows as written, and the PR checks read it
   as written. Code counts against a looser limit, so pasted logs, license
-  headers and stack traces still render. Other slow shapes that are not
-  nesting, such as long runs of unmatched closers or unclosed HTML, can
-  still take the parser a second or more.
+  headers and stack traces still render.
+
+- **Other slow Markdown no longer keeps the page or the server busy.** Text
+  that does not nest could still take the parser one to twenty seconds at
+  60 KB: closers with nothing to close ("a* a* …", "] ] …"), unclosed HTML
+  ("<?", "<!--"), long runs of dots or URL punctuation, a bracket left open
+  before many words, lists or quotes closing one after another, and long
+  paragraphs of short lines. The same check now estimates the parser's
+  work in one pass over the text: text it puts past 0.4 seconds shows as
+  written, and the PR checks read it as written, as with deep nesting. Real
+  Markdown stays well under that, long tables, fenced code and changelogs
+  included.
 
 ### Security
 

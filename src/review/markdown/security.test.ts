@@ -113,6 +113,27 @@ test("nesting past the limit renders as written, at once, instead of keeping the
   assert.ok(performance.now() - started < 3_000, "rendering took too long");
 });
 
+test("text the parser would take seconds on without nesting renders as written, at once", () => {
+  // Closers that find no opener, unclosed HTML, runs the autolink finders
+  // read from every start, and lists closing in lists: each took the parser
+  // one to ten seconds at 60,000 characters.
+  const started = performance.now();
+  for (const source of [
+    `${"a* ".repeat(20_000)}x`,
+    `${"](b) ".repeat(12_000)}x`,
+    `x ${"<?".repeat(29_000)}`,
+    `x ${"<!--".repeat(14_000)}`,
+    `${"a.".repeat(29_000)}x`,
+    `www.a.b/${"!".repeat(59_000)}x`,
+    `${"- - x\n\n".repeat(8_000)}`,
+  ]) {
+    const html = render(source);
+    assert.match(html, /white-space:pre-wrap/, source.slice(0, 20));
+    assert.ok(html.replace(/<[^>]*>/g, "").includes("x"), source.slice(0, 20));
+  }
+  assert.ok(performance.now() - started < 3_000, "rendering took too long");
+});
+
 test("lists nested by indentation or under footnote definitions past the limit render as written, at once", () => {
   // Each line opens or continues every level, so the parser's time grew with
   // the cube of the depth: 60 KB of tab-indented items took it seconds.

@@ -500,6 +500,31 @@ test("a disclosure or an issue link hidden in a comment of a body too deep to pa
   assert.equal(referencesIssue("Retries a GET twice. Fixes #12"), true);
 });
 
+test("PR text the parser would take seconds on without nesting is read as written, at once, and counts nothing", () => {
+  const started = performance.now();
+  for (const slow of [
+    "a* ".repeat(20_000),
+    "](b) ".repeat(12_000),
+    `x ${"<?".repeat(29_000)}`,
+    "a.".repeat(29_000),
+    `[x ${"a ".repeat(29_000)}`,
+    "- - x\n\n".repeat(8_000),
+  ]) {
+    const body = `${slow}\nSee \`secret()\` here.`;
+    assert.deepEqual(markdownProse(body), body.split("\n"), slow.slice(0, 20));
+    assert.equal(markdownReadable(body), false, slow.slice(0, 20));
+    const disclosed = `${slow}\n\nWritten with Claude Code.\n\nFixes #12`;
+    assert.equal(hasAiDisclosure(disclosed), false, slow.slice(0, 20));
+    assert.equal(referencesIssue(disclosed), false, slow.slice(0, 20));
+  }
+  assert.ok(performance.now() - started < 3_000, "reading took too long");
+  // Long PR text that is merely long is still parsed.
+  const long = `${"Use `foo()` to call [bar](http://x.y) and **baz** then qux.\n".repeat(900)}\nWritten with Claude Code.\n\nFixes #12`;
+  assert.equal(markdownReadable(long), true);
+  assert.equal(hasAiDisclosure(long), true);
+  assert.equal(referencesIssue(long), true);
+});
+
 test("a zh-TW body with bold labels ending in a fullwidth colon is parsed, so its issue link and disclosure count", () => {
   const body = [
     "## 摘要",
