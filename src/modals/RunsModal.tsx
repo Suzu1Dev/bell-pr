@@ -17,6 +17,8 @@ interface RunsModalProps {
   chooseRun: (id: string) => Promise<boolean>;
   beginContribution: () => void;
   closeModal: () => void;
+  /** True while any request of the app runs, this dialog's own included. */
+  busy?: boolean;
   /** DELETE /api/runs/:id/workspace; rejects with the server's reason. */
   freeRunSpace?: (id: string) => Promise<void>;
   /** DELETE /api/runs/:id; rejects with the server's reason. */
@@ -47,6 +49,7 @@ export function RunsModal({
   chooseRun,
   beginContribution,
   closeModal,
+  busy = false,
   freeRunSpace,
   deleteRun,
 }: RunsModalProps) {
@@ -62,7 +65,8 @@ export function RunsModal({
 
   const confirm = async ({ id, action }: Pending) => {
     const act = action === "free" ? freeRunSpace : deleteRun;
-    if (!act) return;
+    // `busy` is shared by every request: one started now would end another's.
+    if (!act || busy) return;
     setWorking(true);
     setError(null);
     try {
@@ -80,12 +84,16 @@ export function RunsModal({
     }
   };
 
+  // A deletion or a freeing cannot be called back once sent: the dialog stays
+  // until it ends, so a failure still shows in the run's row.
+  const close = working ? () => {} : closeModal;
+
   return (
     <Modal
       wide
       title={t.title}
       subtitle={t.subtitle}
-      onClose={closeModal}
+      onClose={close}
     >
       <div className="all-runs">
         {[...runs, demoRun].map((job) => {
@@ -96,6 +104,7 @@ export function RunsModal({
             <div className="run-list-entry" key={job.id}>
               <button
                 className="run-list-row"
+                disabled={working}
                 onClick={() => {
                   closeModal();
                   void chooseRun(job.id);
@@ -153,7 +162,7 @@ export function RunsModal({
                         <button
                           type="button"
                           className={`button ${asked.action === "delete" ? "danger" : "primary"}`}
-                          disabled={working}
+                          disabled={working || busy}
                           onClick={() => void confirm(asked)}
                         >
                           {working
@@ -172,7 +181,7 @@ export function RunsModal({
                           type="button"
                           className="run-list-action"
                           data-run-action={`${job.id}:free`}
-                          disabled={active || working}
+                          disabled={active || working || busy}
                           aria-label={t.freeSpaceLabel({ title: job.title })}
                           onClick={() => {
                             setError(null);
@@ -188,7 +197,7 @@ export function RunsModal({
                           type="button"
                           className="run-list-action run-list-action-danger"
                           data-run-action={`${job.id}:delete`}
-                          disabled={active || working}
+                          disabled={active || working || busy}
                           aria-label={t.deleteRunLabel({ title: job.title })}
                           onClick={() => {
                             setError(null);
@@ -214,6 +223,7 @@ export function RunsModal({
       </div>
       <button
         className="button primary full-width"
+        disabled={working}
         onClick={() => beginContribution()}
       >
         <Plus size={15} />

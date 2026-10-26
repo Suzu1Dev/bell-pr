@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createElement } from "react";
+import { act, createElement } from "react";
 import { getDemo } from "../demo";
+import { mount, type FakeElement } from "../mission/test-dom";
 import { assertNoHan, renderEn, renderZh } from "../test-utils/render";
 import type { Repo, RunSummary } from "../types";
 import { HelpModal } from "./HelpModal";
@@ -73,7 +74,7 @@ test("a run of the person's own can free its disk space or be deleted; the sampl
       branch: "fix/retry",
       ...extra,
     }) as RunSummary;
-  const render = (runs: RunSummary[], handlers = true) =>
+  const render = (runs: RunSummary[], handlers = true, busy?: boolean) =>
     renderEn(
       createElement(RunsModal, {
         runs,
@@ -83,6 +84,7 @@ test("a run of the person's own can free its disk space or be deleted; the sampl
         },
         beginContribution() {},
         closeModal() {},
+        busy,
         ...(handlers ? { async freeRunSpace() {}, async deleteRun() {} } : {}),
       }),
     );
@@ -103,6 +105,12 @@ test("a run of the person's own can free its disk space or be deleted; the sampl
   assert.match(running, /<span class="run-list-hint">Stop this contribution before you free its space or delete it\.<\/span>/);
   assert.match(running, /class="run-list-action" data-run-action="run-1:free" disabled="" aria-label="Free disk space/);
   assert.match(running, /class="run-list-action run-list-action-danger" data-run-action="run-1:delete" disabled=""/);
+
+  // While another request runs, neither starts: its end would clear that request's busy state.
+  const busy = render([own("review")], true, true);
+  assert.match(busy, /class="run-list-action" data-run-action="run-1:free" disabled=""/);
+  assert.match(busy, /class="run-list-action run-list-action-danger" data-run-action="run-1:delete" disabled=""/);
+  assert.doesNotMatch(busy, /run-list-hint/);
 
   const removed = render([own("published", { workspaceRemovedAt: "2026-10-02T08:00:00.000Z" })]);
   assert.match(removed, /<span class="run-files-removed">Files removed<\/span>/);
@@ -137,4 +145,64 @@ test("in the runs list a learn-by-hand run the person still writes reads as thei
   assert.match(html, /<strong>Cap retries<\/strong>[\s\S]*?<em><span title="Learn by hand"><svg[^>]*lucide-hand[\s\S]*?<\/svg><span class="visually-hidden">Learn by hand<\/span><\/span> Your turn<\/em>/);
   assert.match(list([run("complete")]), /<strong>Cap retries<\/strong>[\s\S]*?<\/span><\/span> Ready for your review<\/em>/);
   assert.doesNotMatch(list([run("developing", false)]), /Your turn|title="Learn by hand"/);
+});
+
+/** Calls the click handler React gave `element` (the fake DOM dispatches no events), without waiting for what it starts. */
+const click = (element: FakeElement) =>
+  act(async () => {
+    const props = Object.entries(element).find(([key]) => key.startsWith("__reactProps$"))?.[1] as {
+      onClick(event: { preventDefault(): void }): unknown;
+    };
+    void props.onClick({ preventDefault() {} });
+  });
+
+test("while a run is deleted the runs list cannot be closed or left, so a failure still shows in its row", async () => {
+  let closed = 0;
+  let fail = (_error: Error) => {};
+  const run = {
+    ...getDemo("en").run,
+    id: "run-1",
+    repoId: repo.id,
+    title: "Retry timeouts",
+    status: "review",
+    branch: "fix/retry",
+  } as RunSummary;
+  const view = await mount(
+    createElement(RunsModal, {
+      runs: [run],
+      repos: [repo],
+      async chooseRun() {
+        return true;
+      },
+      beginContribution() {},
+      closeModal: () => void closed++,
+      deleteRun: () => new Promise<void>((_resolve, reject) => (fail = reject)),
+    }),
+  );
+  try {
+    const all = (match: (element: FakeElement) => boolean) => view.container.querySelectorAll(match);
+    const withClass = (name: string) => all((element) => element.getAttribute("class") === name);
+    // The close button, Escape and the backdrop all close through the Modal's onClose.
+    const close = () => click(withClass("icon-button modal-close")[0]!);
+    await click(all((element) => element.getAttribute("data-run-action") === "run-1:delete")[0]!);
+    await click(withClass("button danger")[0]!);
+    await close();
+    assert.equal(closed, 0);
+    // Opening a run or starting a contribution would leave the dialog too.
+    const rows = withClass("run-list-row");
+    assert.equal(rows.length, 2);
+    for (const row of rows) assert.ok(row.hasAttribute("disabled"), row.textContent);
+    assert.ok(withClass("button primary full-width")[0]!.hasAttribute("disabled"));
+    // The failure shows in the run's row, and then the dialog closes again.
+    await act(async () => fail(new Error("Stop this contribution before deleting it.")));
+    assert.equal(
+      all((element) => element.getAttribute("role") === "alert")[0]?.textContent,
+      "Stop this contribution before deleting it.",
+    );
+    assert.ok(!rows[0]!.hasAttribute("disabled"));
+    await close();
+    assert.equal(closed, 1);
+  } finally {
+    await view.unmount();
+  }
 });

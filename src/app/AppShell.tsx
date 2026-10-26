@@ -873,27 +873,39 @@ function AppShell({
     }
   }
 
+  // The runs dialog shows their failures. The app is busy while they run, as
+  // for every request, so the command palette cannot replace that dialog.
   /** Frees a finished run's working files; the run and its notes stay. */
   async function freeRunSpace(id: string) {
-    const { run: updated } = await api<{ run: Run }>(
-      `/runs/${encodeURIComponent(id)}/workspace`,
-      send("DELETE"),
-    );
-    runFreed(updated);
-    notify(runMessages.freed);
+    setBusy(true);
+    try {
+      const { run: updated } = await api<{ run: Run }>(
+        `/runs/${encodeURIComponent(id)}/workspace`,
+        send("DELETE"),
+      );
+      runFreed(updated);
+      notify(runMessages.freed);
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function deleteRun(id: string) {
-    await api(`/runs/${encodeURIComponent(id)}`, send("DELETE"));
-    setRuns((list) => list.filter((item) => item.id !== id));
-    if (runIdRef.current === id) dropOpenRun();
-    else
-      // The server drops the split links to the deleted run; the open run does the same.
-      setRun((open) => {
-        const next = { ...open };
-        return dropSplitLinks(next, id) ? next : open;
-      });
-    notify(runMessages.deleted);
+    setBusy(true);
+    try {
+      await api(`/runs/${encodeURIComponent(id)}`, send("DELETE"));
+      setRuns((list) => list.filter((item) => item.id !== id));
+      if (runIdRef.current === id) dropOpenRun();
+      else
+        // The server drops the split links to the deleted run; the open run does the same.
+        setRun((open) => {
+          const next = { ...open };
+          return dropSplitLinks(next, id) ? next : open;
+        });
+      notify(runMessages.deleted);
+    } finally {
+      setBusy(false);
+    }
   }
 
   /** Deletes a project with its runs (and BELL's own clone of it). */
@@ -1252,6 +1264,7 @@ function AppShell({
           chooseRun={chooseRun}
           beginContribution={beginContribution}
           closeModal={closeModal}
+          busy={busy}
           freeRunSpace={freeRunSpace}
           deleteRun={deleteRun}
         />

@@ -468,6 +468,12 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   refuses nothing, and a "not prohibited" sentence next to a real ban
   counts as its carve-out.
 
+- **A failed run deletion is no longer lost.** While the list of all
+  contributions deleted a run or freed its disk space, Ctrl+K, Escape or a
+  click elsewhere could close the list, and if the request then failed no
+  message appeared. The list now stays open until the request ends and shows
+  why it failed, and Ctrl+K asks you to wait a moment.
+
 ### Security
 
 - **zod 4.** The server validates requests, agent answers and saved files

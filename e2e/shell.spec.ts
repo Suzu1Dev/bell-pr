@@ -5,7 +5,7 @@ import { execFileSync } from "node:child_process";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { expect, test, type Browser, type Page } from "@playwright/test";
+import { expect, test, type Browser, type Page, type Route } from "@playwright/test";
 import { locales } from "../shared/i18n/locale";
 import { product } from "../shared/product";
 import { getDemo } from "../src/demo/all";
@@ -519,6 +519,44 @@ test("a run and a repository can be freed and deleted, and the workbench reopens
     await expect(page.locator(".repository-card", { hasText: "seeded" })).toHaveCount(0);
     expect((await (await page.request.get("/api/repos")).json()).repos).toEqual([]);
     expect((await (await page.request.get("/api/runs")).json()).runs).toEqual([]);
+  } finally {
+    await close();
+    await server.stop();
+  }
+});
+
+test("while a run is deleted the list stays open, Ctrl+K asks to wait, and a failure shows in the list", async ({ browser }) => {
+  const server = await launchServer({ seed });
+  const { page, close } = await openOn(browser, server);
+  const [opened, withFiles] = seededState(server.dataDir).runs;
+  try {
+    await page.goto(`/#/runs/${opened.id}/overview`);
+    await expect(heading(page)).toHaveText(opened.title);
+    // The deletion waits until the test answers it.
+    let hold!: (route: Route) => void;
+    const held = new Promise<Route>((resolve) => (hold = resolve));
+    await page.route(`**/api/runs/${withFiles.id}`, (route) =>
+      route.request().method() === "DELETE" ? hold(route) : route.fallback(),
+    );
+    await page.locator(".all-runs-link").click();
+    const list = page.getByRole("dialog", { name: modals.runs.title });
+    const label = modals.runs.deleteRunLabel({ title: withFiles.title });
+    await list.getByRole("button", { name: label }).click();
+    await list.getByRole("group", { name: label }).getByRole("button", { name: modals.runs.deleteYes }).click();
+    const deletion = await held;
+
+    // The app is busy, so the palette cannot open over the list and replace it.
+    await page.keyboard.press("ControlOrMeta+k");
+    await expect(page.locator(".toast")).toContainText(app.busySwitching);
+    await expect(page.locator("dialog[open]")).toHaveCount(0);
+    await page.keyboard.press("Escape");
+    await list.locator(".modal-close").click();
+    await expect(list).toBeVisible();
+
+    const reason = "Stop this contribution before deleting it.";
+    await deletion.fulfill({ status: 409, json: { error: reason } });
+    await expect(list.getByRole("alert")).toHaveText(reason);
+    await expect(list.locator(".run-list-entry", { hasText: withFiles.title })).toHaveCount(1);
   } finally {
     await close();
     await server.stop();
