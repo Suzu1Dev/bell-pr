@@ -457,7 +457,8 @@ test("Codex events keep their existing meaning", () => {
   assert.deepEqual(executed, [
     {
       kind: "command",
-      outcome: "exit 0",
+      // The second line, rm, set the exit status.
+      outcome: "exit 0，未經確認：一起執行的其他指令可能掩蓋失敗",
       command: "export GITHUB_TOKEN=[REDACTED] && npm test -- a.test.ts",
     },
   ]);
@@ -581,7 +582,8 @@ test("Claude Code stream-json events map to messages, checks, edits and the fina
     { kind: "file-change" },
     {
       kind: "command",
-      outcome: "成功",
+      // The second line, cat, set the exit status.
+      outcome: "成功，未經確認：一起執行的其他指令可能掩蓋失敗",
       command: "npm test -- --token [REDACTED]",
     },
     { kind: "file-change", path: "/work/tree/src/a.ts" },
@@ -625,6 +627,54 @@ test("Claude Code stream-json events map to messages, checks, edits and the fina
       },
     ],
   );
+});
+
+test("a successful command whose exit status another command in the line could set is not verified", () => {
+  const unverified = (outcome: string) =>
+    `${outcome}, not verified: another command run with it can hide a failure`;
+  const outcomes = withLocale("en", () => {
+    const codex = agentEventReader("codex");
+    const run = (command: string, exit_code: number) =>
+      codex({
+        type: "item.completed",
+        item: { type: "command_execution", command, exit_code },
+      });
+    const claude = agentEventReader("claude");
+    claude({
+      type: "assistant",
+      message: {
+        content: [
+          { type: "tool_use", id: "piped", name: "Bash", input: { command: "npm test 2>&1 | tail -40" } },
+          { type: "tool_use", id: "plain", name: "Bash", input: { command: "npm test" } },
+          { type: "tool_use", id: "masked", name: "Bash", input: { command: "npm test || true" } },
+        ],
+      },
+    });
+    return [
+      ...run("bash -lc 'npm test 2>&1 | tail -40'", 0),
+      ...run("npm test 2>&1 | tail -40", 1),
+      ...run("npm test", 0),
+      ...claude({
+        type: "user",
+        message: {
+          content: [
+            { type: "tool_result", tool_use_id: "piped" },
+            { type: "tool_result", tool_use_id: "plain" },
+            { type: "tool_result", tool_use_id: "masked", is_error: true },
+          ],
+        },
+      }),
+    ].map((event) => (event as { outcome: string }).outcome);
+  });
+  // tail's exit 0 is not the tests' result; a failure and a plain test command keep their outcome.
+  assert.deepEqual(outcomes, [
+    unverified("exit 0"),
+    "exit 1",
+    "exit 0",
+    unverified("succeeded"),
+    "succeeded",
+    "failed",
+  ]);
 });
 
 test("Claude Code result.modelUsage keys become a usage-by-model event before the final answer", () => {

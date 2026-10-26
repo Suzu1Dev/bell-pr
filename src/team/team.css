@@ -430,6 +430,7 @@
 }
 .team-task-checks li {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   align-items: baseline;
   font-family: var(--font-mono);
@@ -445,7 +446,7 @@
 }
 .team-task-checks li > span {
   color: var(--color-text-muted);
-  white-space: nowrap;
+  white-space: normal;
 }
 .team-task-report {
   font: var(--text-xs)/1.9 var(--font-sans);

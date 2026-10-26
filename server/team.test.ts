@@ -2186,8 +2186,10 @@ if (prompt.includes('You are the team lead with read-only access')) {
     const task = run.team!.tasks[0];
     assert.equal(task.status, "complete");
     // Observed checks: first line only, token masked, exit codes kept, no output.
+    // The second line, cat, set the first check's exit 0, so it is not verified.
+    const unverified = "exit 0，未經確認：一起執行的其他指令可能掩蓋失敗";
     assert.deepEqual(task.checks, [
-      { command: "npm test -- a.test.ts", outcome: "exit 0" },
+      { command: "npm test -- a.test.ts", outcome: unverified },
       {
         command:
           'curl -H "Authorization: token [REDACTED]" https://example.invalid',
@@ -2201,7 +2203,7 @@ if (prompt.includes('You are the team lead with read-only access')) {
         .filter((log) => log.kind === "command")
         .map(({ message, detail }) => ({ message, detail })),
       [
-        { message: "npm test -- a.test.ts", detail: "exit 0" },
+        { message: "npm test -- a.test.ts", detail: unverified },
         {
           message:
             'curl -H "Authorization: token [REDACTED]" https://example.invalid',
@@ -2267,7 +2269,7 @@ if (prompt.includes('You are the team lead with read-only access')) {
       );
       assert.match(
         entry.prompt,
-        /\{"id":"alpha","checks":\[\{"command":"npm test -- a.test.ts","outcome":"exit 0"\},\{"command":"curl -H \\"Authorization: token \[REDACTED\]\\" https:\/\/example.invalid","outcome":"exit 7"\}\],"integratedFiles":\["a.ts"\]\}/,
+        /\{"id":"alpha","checks":\[\{"command":"npm test -- a.test.ts","outcome":"exit 0，未經確認：一起執行的其他指令可能掩蓋失敗"\},\{"command":"curl -H \\"Authorization: token \[REDACTED\]\\" https:\/\/example.invalid","outcome":"exit 7"\}\],"integratedFiles":\["a.ts"\]\}/,
       );
     }
     assert.ok(reviewer);

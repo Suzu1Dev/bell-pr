@@ -9,6 +9,7 @@ import { formatters } from "../shared/i18n/locale.js";
 import { modelArguments, modelExecutionSchema, modelId } from "./models.js";
 import { AppError } from "./types.js";
 import { redact } from "./secrets.js";
+import { exitStatusCanHideFailure } from "./exit-status.js";
 import {
   agentReadDenials,
   agentSandboxReadPaths,
@@ -371,7 +372,10 @@ function systemNotice(value: Json): AgentEvent[] {
  */
 export function agentEventReader(provider: AgentProvider = "codex") {
   // Claude Code reports a tool's input on tool_use and its outcome on a later tool_result, keyed by id.
-  const tools = new Map<string, { name: string; summary?: string }>();
+  const tools = new Map<
+    string,
+    { name: string; summary?: string; hidesFailure?: boolean }
+  >();
   return (event: unknown): AgentEvent[] => {
     if (!event || typeof event !== "object") return [];
     const value = event as Json;
@@ -383,7 +387,12 @@ export function agentEventReader(provider: AgentProvider = "codex") {
         return [
           {
             kind: "command",
-            outcome: `exit ${item.exit_code ?? "?"}`,
+            outcome:
+              item.exit_code === 0 &&
+              typeof item.command === "string" &&
+              exitStatusCanHideFailure(item.command)
+                ? sm().run.agentCli.commandUnverified({ outcome: "exit 0" })
+                : `exit ${item.exit_code ?? "?"}`,
             ...withField("command", summarize(item.command)),
           },
         ];
@@ -461,6 +470,11 @@ export function agentEventReader(provider: AgentProvider = "codex") {
                   ? input.file_path
                   : undefined,
             ),
+            // The whole command, not only the summarized first line, decides.
+            hidesFailure:
+              name === "Bash" &&
+              typeof input.command === "string" &&
+              exitStatusCanHideFailure(input.command),
           });
         }
       }
@@ -476,7 +490,11 @@ export function agentEventReader(provider: AgentProvider = "codex") {
             kind: "command",
             outcome: block.is_error
               ? sm().run.agentCli.commandFailed
-              : sm().run.agentCli.commandSucceeded,
+              : tool.hidesFailure
+                ? sm().run.agentCli.commandUnverified({
+                    outcome: sm().run.agentCli.commandSucceeded,
+                  })
+                : sm().run.agentCli.commandSucceeded,
             ...withField("command", tool.summary),
           });
         else if (

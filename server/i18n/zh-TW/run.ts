@@ -102,6 +102,8 @@ const m: Translation<typeof en> = {
   agentCli: {
     commandSucceeded: "成功",
     commandFailed: "失敗",
+    commandUnverified: ({ outcome }) =>
+      `${outcome}，未經確認：一起執行的其他指令可能掩蓋失敗`,
     codexTurnFailed: "Codex 工作回合失敗。",
     codexError: "Codex 回報執行錯誤。",
     claudeTurnFailed: ({ subtype }) => `Claude Code 工作回合失敗（${subtype}）。`,

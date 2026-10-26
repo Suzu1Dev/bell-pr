@@ -162,6 +162,13 @@ export default {
     /** The outcome of a shell command Claude Code ran, kept with the task's checks. */
     commandSucceeded: "succeeded",
     commandFailed: "failed",
+    /**
+     * A success that does not show the commands in the line succeeded, as in
+     * `npm test | tail` (tail's status) or `npm test || true`; outcome is
+     * "exit 0" (Codex) or commandSucceeded (Claude Code).
+     */
+    commandUnverified: ({ outcome }: { outcome: string }) =>
+      `${outcome}, not verified: another command run with it can hide a failure`,
     codexTurnFailed: "The Codex turn failed.",
     codexError: "Codex reported an error.",
     claudeTurnFailed: ({ subtype }: { subtype: string }) =>

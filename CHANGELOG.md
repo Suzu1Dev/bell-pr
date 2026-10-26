@@ -539,6 +539,14 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   says that AI helped: a sentence under the heading, a filled-in field, BELL
   PR's own line, or an Assisted-by trailer.
 
+- **Piped test commands no longer count as passing.** When an agent ran a
+  command such as `npm test 2>&1 | tail -40`, BELL PR recorded the exit
+  status of `tail` as a successful check, and the suggested PR description
+  could say all tests passed. Now, when a pipe, `||`, `;`, a newline or `&`
+  could hide a failure, the success is marked "not verified", and the
+  draft and the reviewers are told it is no evidence of a pass. A plain
+  test command, or one joined with `&&`, still counts.
+
 ### Security
 
 - **zod 4.** The server validates requests, agent answers and saved files

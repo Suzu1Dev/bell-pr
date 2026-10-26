@@ -15,7 +15,11 @@ export const maxTeamTaskChecks = 40;
 export interface TeamCheck {
   /** First line of the command, credential shapes masked, at most 300 characters. */
   command: string;
-  /** Exit code (Codex) or success/failure wording (Claude Code). */
+  /**
+   * Exit code (Codex) or success/failure wording (Claude Code); a success
+   * another command in the line could have set (`npm test | tail`) says it
+   * is not verified.
+   */
   outcome: string;
 }
 

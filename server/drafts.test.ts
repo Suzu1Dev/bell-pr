@@ -319,6 +319,11 @@ test("draft prompt keeps complete bounded safe diffs and distinguishes unavailab
     withTeam,
     /"observedChecksNote":"application-observed command executions, exit codes only, no output captured/,
   );
+  // A success another command could have set (npm test | tail) is never a pass BELL saw.
+  assert.match(
+    withTeam,
+    /"observedChecksNote":"[^"]*an outcome that goes on to say it is not verified [^"]*it is no evidence that the command passed, so never present it as a pass the application saw"/,
+  );
   assert.match(
     withTeam,
     /"id":"alpha"[^\n]*"observedChecks":\[\{"command":"npm test -- a.test.ts","outcome":"exit 1"\}\],"integratedFiles":\["src\/a.ts"\]/,

@@ -212,7 +212,10 @@ Start the run with **Generate the team plan** (with plan approval) or
   task or everyone.
 - The work is integrated, then a **Reviewer** and a **Test analyst** check
   the result. Their reports are independent static reviews; the commands
-  the teammates really ran are listed separately. The Lead's summary owns
+  the teammates really ran are listed separately. A success that another
+  command in the same line could have produced, such as `npm test | tail`
+  (tail's exit status) or `npm test || true`, is marked not verified and
+  is never offered to the PR draft as a pass. The Lead's summary owns
   the overall conclusion; the Reviewer opens by saying whether it agrees
   and adds only what the summary lacks, and the Test analyst keeps the one
   list of checks still to run.

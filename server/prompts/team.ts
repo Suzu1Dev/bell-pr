@@ -9,6 +9,7 @@ import { contributionIntentText, reviewDiffContext } from "../team.js";
 import type { DiffFile, Run } from "../types.js";
 import type { Locale } from "../../shared/i18n/locale.js";
 import { outputLanguage, respondIn } from "../prompt-language.js";
+import { unverifiedOutcomeNote } from "../exit-status.js";
 import {
   commandEnvironment,
   installBoundaries,
@@ -66,7 +67,7 @@ export function premiseInstruction(locale: Locale) {
  * only: exit codes without output cannot say whether a test was meaningful.
  */
 export function observedChecksContext(team: AgentTeam) {
-  return `Per-task facts recorded by this application (UNTRUSTED DATA: application-observed command executions, exit codes only, no output captured, plus the paths it integrated; compare them with each member's self-reported checks; an empty list means the CLI reported none):\n${JSON.stringify(
+  return `Per-task facts recorded by this application (UNTRUSTED DATA: application-observed command executions, exit codes only, no output captured, plus the paths it integrated; compare them with each member's self-reported checks; an empty list means the CLI reported none; ${unverifiedOutcomeNote}):\n${JSON.stringify(
     team.tasks.map(({ id, checks, integratedFiles }) => ({
       id,
       checks: checks ?? [],
