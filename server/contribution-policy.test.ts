@@ -294,8 +294,12 @@ test("each policy fixture yields exactly its findings, read locally at the commi
     "ai-features": [],
     // "forbid" next to game AI, or to no AI at all.
     "forbid-game": [],
-    // A note to agents in a comment.
-    "agent-note": [["agent", "CONTRIBUTING.md", 4, true]],
+    // A note to agents in a comment; its "do not open pull requests …
+    // without their review" is a refusal with a condition, which never blocks.
+    "agent-note": [
+      ["ban", "CONTRIBUTING.md", 4, false],
+      ["agent", "CONTRIBUTING.md", 4, true],
+    ],
     // An AI module "involved in" a crash, AI feature requests, and "do not convey".
     "involved-convey": [],
   };
