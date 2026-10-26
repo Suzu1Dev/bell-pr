@@ -121,6 +121,23 @@ test("nesting too deep for the call stack renders, with its innermost text", () 
   assert.match(quotes.replace(/<[^>]*>/g, ""), /x\s*$/);
 });
 
+test("short table rows are filled only within a budget, so a few kilobytes cannot make millions of cells", () => {
+  // Every row got a cell per column of the head: a head of 1,000 columns
+  // over 2,000 one-cell rows (8 KB) made 2,000,000 cells, seconds and
+  // gigabytes, and twelve tables of 316 by 316 almost 1,200,000. Past
+  // 100,000 empty cells in a document, a short row shows only its own cells.
+  const table = (columns: number, rows: number) =>
+    `${"|a".repeat(columns)}\n${"|-".repeat(columns)}\n${"x\n".repeat(rows)}`;
+  const started = performance.now();
+  for (const [source, cells] of [
+    [table(1_000, 2_000), 2_000],
+    [Array.from({ length: 12 }, () => table(316, 316)).join("\n"), 316 * 316 + 11 * 316],
+  ] as const)
+    assert.equal(render(source).match(/<td>/g)?.length, cells);
+  assert.ok(performance.now() - started < 3_000, "rendering took too long");
+  assert.match(render(table(3, 1)), /<tbody><tr><td>x<\/td><td><\/td><td><\/td><\/tr><\/tbody>/);
+});
+
 test("children that are not a string render an empty container instead of throwing", () => {
   // As the earlier pipeline did in a production build: a null or other
   // value read from a stored run must not take down the view.

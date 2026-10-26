@@ -433,6 +433,12 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   it opened. Nesting past a hundred levels now shows as plain text, and text
   too deep even for the parser shows as written.
 
+- **Huge Markdown tables no longer freeze the tab.** Short table rows were
+  always padded to the header's width, so 8 KB of agent text with a wide
+  header over many one-cell rows made two million cells and could freeze or
+  crash the tab. A document now adds at most 100,000 empty cells; past that,
+  a short row shows only its own cells.
+
 ### Security
 
 - **zod 4.** The server validates requests, agent answers and saved files

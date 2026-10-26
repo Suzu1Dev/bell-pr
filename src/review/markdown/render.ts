@@ -1,4 +1,4 @@
-import type { Definition, FootnoteDefinition, Nodes, Parents, Root } from "mdast";
+import type { Definition, FootnoteDefinition, Nodes, Parents, Root, TableRow } from "mdast";
 import { fromMarkdown } from "mdast-util-from-markdown";
 import { gfmFromMarkdown } from "mdast-util-gfm";
 import { gfm } from "micromark-extension-gfm";
@@ -135,12 +135,19 @@ function plainText(node: Nodes) {
  */
 const maxDepth = 100;
 
+/**
+ * How many empty cells a document's tables may add to fill short rows: a
+ * wide head over many one-cell rows would otherwise make millions.
+ */
+const maxPadding = 100_000;
+
 function toTree(tree: Root) {
   const definitions = new Map<string, Definition>();
   const footnotes = new Map<string, FootnoteDefinition>();
   const footnoteOrder: string[] = [];
   const footnoteCounts = new Map<string, number>();
   let depth = 0;
+  let paddingLeft = maxPadding;
 
   // The first definition of an identifier wins, wherever it is.
   walk(tree, (node) => {
@@ -271,13 +278,26 @@ function toTree(tree: Root) {
         return element("li", properties, children);
       }
       case "table": {
-        // Every row has a cell per column. Line breaks between a table's
-        // parts would be dropped, so there are none.
+        // Every row has a cell per column, as long as the empty cells this
+        // adds fit in what is left of maxPadding; past it, a short row shows
+        // only its own cells. Line breaks between a table's parts would be
+        // dropped, so there are none.
+        const columns = node.align?.length ?? 0;
+        const padding = node.children.reduce(
+          (sum, row) => sum + Math.max(0, columns - row.children.length),
+          0,
+        );
+        const pad = padding <= paddingLeft;
+        if (pad) paddingLeft -= padding;
+        const cells = (row: TableRow) => {
+          const align = node.align ?? row.children.map(() => null);
+          return pad ? align : align.slice(0, row.children.length);
+        };
         const [head, ...body] = node.children.map((row, rowIndex) =>
           element(
             "tr",
             {},
-            (node.align ?? row.children.map(() => null)).map((align, cellIndex) => {
+            cells(row).map((align, cellIndex) => {
               const cell = row.children[cellIndex];
               return element(
                 rowIndex ? "td" : "th",
