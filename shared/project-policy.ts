@@ -88,6 +88,14 @@ function restProse(text: string): ProseLine[] {
   return lines;
 }
 
+/**
+ * The prose of a document by its path: restProse for reStructuredText,
+ * whose "~~~" lines are section adornments, else rawProse.
+ */
+export function documentProse(path: string, text: string): ProseLine[] {
+  return /\.rst$/i.test(path) ? restProse(text) : rawProse(text);
+}
+
 const flags = "i";
 
 /** Models and chatbots by kind. */
@@ -954,9 +962,7 @@ export function classifyPolicy(path: string, document: string): PolicyFinding[] 
         once("contribution", sentence, () => contributionContext.test(search.slice(sentence.start, sentence.end))),
     });
   };
-  // reStructuredText has no fences: its "~~~" lines are section adornments.
-  const prose = /\.rst$/i.test(path) ? restProse(text) : rawProse(text);
-  for (const block of blocks(prose)) {
+  for (const block of blocks(documentProse(path, text))) {
     const search = searchable(block.text);
     perSentence.clear();
     // One AI finding per sentence: a reserved learning area wins over a ban.
@@ -1233,7 +1239,7 @@ function readCarveOuts(path: string, document: string): PolicyAllowance[] {
   const rest = /\.rst$/i.test(path);
   const text = withoutComments(visibleText(document), rest);
   const raw = text.split(/\r?\n/);
-  const all = blocks(rest ? restProse(text) : rawProse(text));
+  const all = blocks(documentProse(path, text));
   // A Markdown indented code block: four spaces in, after a block that is no list item.
   const indentedCode = (index: number) =>
     !rest && /^(?: {4}|\t)/.test(raw[all[index].starts[0].line - 1] ?? "") && !(index && listItem.test(all[index - 1].text));

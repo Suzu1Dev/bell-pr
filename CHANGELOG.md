@@ -365,6 +365,13 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   confirm before starting never mentioned that someone had taken the issue.
   Those comments now count as claims, the same as with a typed apostrophe.
 
+- **Help channels in reStructuredText guides.** In a CONTRIBUTING.rst, BELL
+  read a `~~~` section underline as the start of a code block. It skipped
+  the rest of the file, so Zulip, Discord or mailing-list links below the
+  first such title never showed up in the card's channels or in the guide's
+  "Ask a human". These guides are now read as reStructuredText, and channel
+  links after any title are found with their line numbers.
+
 ### Security
 
 - **zod 4.** The server validates requests, agent answers and saved files

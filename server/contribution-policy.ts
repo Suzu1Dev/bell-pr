@@ -11,7 +11,7 @@
  */
 import path from "node:path";
 import type { HelpChannel, PolicyFinding, PolicyKind } from "../shared/contribution.js";
-import { attachCarveOuts, classifyPolicy, rawProse, stopsQuotedConfirm, withStoredReach } from "../shared/project-policy.js";
+import { attachCarveOuts, classifyPolicy, documentProse, stopsQuotedConfirm, withStoredReach } from "../shared/project-policy.js";
 import {
   accountDefaults,
   defaultsKind,
@@ -233,13 +233,14 @@ const addressPattern = /https?:\/\/[^\s<>()[\]"'`*]+/gi;
  * The project's own human help channels in the files the card read (DESIGN
  * v1.2 F14), in reading order: at most 5, each with the file and line
  * that names it, and the words the file links it with (else its host and
- * path). Fenced code is left out. `repository` (owner/name) lets the
- * repository's own GitHub Discussions count.
+ * path). Code is left out (Markdown fences, reStructuredText code
+ * blocks). `repository` (owner/name) lets the repository's own GitHub
+ * Discussions count.
  */
 export function channelLinks(documents: readonly PolicyDocument[], repository?: string): HelpChannel[] {
   const channels: HelpChannel[] = [];
   for (const document of documents)
-    for (const { line, text } of rawProse(document.content))
+    for (const { line, text } of documentProse(document.path, document.content))
       for (const match of text.matchAll(addressPattern)) {
         // Sentence punctuation after the address, read from where its run starts.
         const address = match[0].replace(/(?<![.,;:!?])[.,;:!?]+$/, "");

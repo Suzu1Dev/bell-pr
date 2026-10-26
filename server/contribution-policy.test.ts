@@ -496,3 +496,27 @@ test("help channels: only the repository's own Discussions, no other address, no
   assert.deepEqual(capped.map((channel) => channel.line), [1, 2, 3, 4, 5]);
   assert.deepEqual(channelLinks([]), []);
 });
+
+test("help channels in reStructuredText: a ~~~ underline is a section title, a code block is left out", () => {
+  const content = [
+    "Contributing",
+    "~~~~~~~~~~~~",
+    "",
+    "Questions? Ask on `our Zulip <https://example.zulipchat.com>`_.",
+    "",
+    "Chat",
+    "~~~~",
+    "",
+    ".. code-block:: sh",
+    "",
+    "   curl https://lists.example.org/should-not-count",
+    "",
+    "Or join us on Discord: https://discord.gg/abc123.",
+  ].join("\n");
+  assert.deepEqual(channelLinks([{ path: "CONTRIBUTING.rst", kind: "contributing", content }]), [
+    { label: "our Zulip", url: "https://example.zulipchat.com", path: "CONTRIBUTING.rst", line: 4 },
+    { label: "discord.gg/abc123", url: "https://discord.gg/abc123", path: "CONTRIBUTING.rst", line: 13 },
+  ]);
+  // In Markdown, the same ~~~ line opens a code fence.
+  assert.deepEqual(channelLinks([{ path: "CONTRIBUTING.md", kind: "contributing", content }]), []);
+});
