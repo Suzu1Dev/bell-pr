@@ -59,6 +59,13 @@ the data, and a start on a port that BELL PR already uses says so and
 points to `bell-pr open`. A lock left behind by a crash is detected and
 replaced at the next start.
 
+Containers and machines that share a data directory cannot see each other's
+processes. On Linux, the lock names the host and PID namespace it was
+written in, and the running instance renews it every 10 seconds. A start
+elsewhere waits up to 30 seconds: a lock that is no longer renewed, such as
+one left by a removed container, is then replaced; one that is still
+renewed makes the start exit with the message.
+
 If BELL PR stops unexpectedly while agents are working, it records their
 process groups in `<data dir>/children.json`; the next start stops those
 leftover agents before it marks the interrupted runs.

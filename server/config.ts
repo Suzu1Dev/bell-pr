@@ -109,7 +109,7 @@ export function resolveDataDir(
 /** Files BELL PR keeps in the data directory next to state.json. */
 export function dataPaths(dataDir: string) {
   return {
-    /** `{pid, port, version, host, url, startedAt}` of the running instance. */
+    /** The running instance's `LockInfo` (index.ts): pid, port, address. */
     lock: path.join(dataDir, "bellpr.lock"),
     /** The agent CLI process groups that are running. */
     children: path.join(dataDir, "children.json"),

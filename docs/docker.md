@@ -190,4 +190,10 @@ docker exec bell-pr bell-pr open --print
 ```
 
 Agents that were still running when the old container stopped are gone;
-their runs show as interrupted and can be retried.
+their runs show as interrupted and can be retried. The new container waits
+up to 30 seconds for the lock the old one left behind to lapse before it
+loads the data.
+
+Run one container per data volume. A second container started on the same
+volume, for example by an orchestrator that starts the new container before
+it stops the old one, waits for the lock and then exits with a message.

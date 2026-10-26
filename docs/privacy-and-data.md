@@ -128,7 +128,7 @@ with mode 0600.
 | `app-settings.json` | Language, limits, onboarding progress, safety settings and the retention period. |
 | `author-emails.json` | SHA-256 digests of the commit e-mail addresses you confirmed when publishing, never the addresses themselves. |
 | `logs/` | Daily log files, at most 7 files and 50 MB, with secrets redacted. Prompts and page contents are never logged. |
-| `children.json`, `bellpr.lock` | The agent processes that are running (so a crash leaves none behind), and the running instance's process id and port. |
+| `children.json`, `bellpr.lock` | The agent processes that are running (so a crash leaves none behind), and the running instance's process id and port (on Linux also its host name and PID namespace). |
 
 Your browser keeps, for this local site only: the language you chose,
 layout preferences such as the code font size and the collapsed sidebar,

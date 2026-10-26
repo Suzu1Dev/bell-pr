@@ -372,6 +372,14 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   "Ask a human". These guides are now read as reStructuredText, and channel
   links after any title are found with their line numbers.
 
+- **One BELL PR per data volume, also across containers.** A second container
+  started on the same data volume, for example during a rolling update, could
+  take the lock from the running one. Both then wrote the same data. On Linux,
+  BELL PR now renews its lock every 10 seconds, and other containers treat it
+  as held while it stays fresh. A second container waits up to 30 seconds,
+  then exits with a message. After `docker rm -f`, the new container starts
+  once the old lock runs out.
+
 ### Security
 
 - **zod 4.** The server validates requests, agent answers and saved files

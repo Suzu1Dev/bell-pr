@@ -15,9 +15,12 @@ import {
   mkdirSync,
   openSync,
   readFileSync,
+  readlinkSync,
   realpathSync,
   renameSync,
   rmSync,
+  statSync,
+  utimesSync,
   writeSync,
 } from "node:fs";
 import http from "node:http";
@@ -98,6 +101,12 @@ export interface LockInfo {
   /** The base URL browsers use: BELLPR_PUBLIC_URL, or the local address. */
   url?: string;
   startedAt?: string;
+  /**
+   * Linux: the host name and PID namespace of the process. A start in
+   * another container or on another machine cannot see that pid, so it
+   * judges the lock by its age instead: the holder renews it.
+   */
+  pidNamespace?: string;
 }
 
 /**
@@ -164,14 +173,45 @@ function commandLine(pid: number): string[] | undefined {
 /** Lock files this process holds, so a pid match is told apart from reuse. */
 const heldLocks = new Set<string>();
 
+/** How often the holder renews its lock, and how long a renewal counts. */
+const lockRenewMs = 10_000;
+const lockLeaseMs = 30_000;
+
+/** Linux: where this process's pid is valid; undefined elsewhere. */
+function currentPidNamespace(): string | undefined {
+  if (process.platform !== "linux") return undefined;
+  try {
+    return `${os.hostname()} ${readlinkSync("/proc/self/ns/pid")}`;
+  } catch {
+    return undefined;
+  }
+}
+
+/** Whether the lock was written in another container or on another machine. */
+function writtenElsewhere(lock: LockInfo) {
+  return lock.pidNamespace !== undefined && lock.pidNamespace !== currentPidNamespace();
+}
+
+/** Whether the lock file at `file` was renewed within the lease. */
+function renewedWithinLease(file: string) {
+  try {
+    return Date.now() - statSync(file).mtimeMs < lockLeaseMs;
+  } catch {
+    return false;
+  }
+}
+
 /**
- * Whether the lock's process can still be a running BELL PR. A lock is
- * stale when its process is gone, when it carries this process's pid
- * without being held here (a container restart reuses pids), when it was
- * written before the machine booted, or when its pid now runs something
- * other than Node.js.
+ * Whether the lock's process can still be a running BELL PR. A lock written
+ * in another container or on another machine is alive while its holder
+ * renews it. Otherwise a lock is stale when its process is gone, when it
+ * carries this process's pid without being held here (a container restart
+ * reuses pids), when it was written before the machine booted, or when its
+ * pid now runs something other than Node.js. `copy` is where the lock lies
+ * when it was moved aside.
  */
-function lockHolderAlive(lock: LockInfo, file: string): boolean {
+function lockHolderAlive(lock: LockInfo, file: string, copy = file): boolean {
+  if (writtenElsewhere(lock)) return renewedWithinLease(copy);
   if (lock.pid === process.pid) return heldLocks.has(file);
   if (!processAlive(lock.pid)) return false;
   const startedAt = Date.parse(lock.startedAt ?? "");
@@ -190,8 +230,17 @@ export function lockHolderRunning(dataDir: string, lock: LockInfo): boolean {
   return lockHolderAlive(lock, dataPaths(dataDir).lock);
 }
 
-/** Writes the lock exclusively, replacing a stale one. Returns its release. */
-function acquireLock(file: string, info: LockInfo, dataDir: string): () => void {
+/**
+ * Writes the lock exclusively, replacing a stale one, and renews it while
+ * it is held. Returns its release.
+ */
+async function acquireLock(
+  file: string,
+  info: LockInfo,
+  dataDir: string,
+): Promise<() => void> {
+  // A lock from elsewhere lapses at most a lease after its last renewal.
+  const deadline = Date.now() + lockLeaseMs + 1000;
   for (let attempt = 0; attempt < 3; attempt += 1) {
     try {
       const fd = openSync(file, "wx", 0o600);
@@ -201,15 +250,37 @@ function acquireLock(file: string, info: LockInfo, dataDir: string): () => void 
         closeSync(fd);
       }
       heldLocks.add(file);
+      const renewal = setInterval(() => {
+        const now = new Date();
+        try {
+          utimesSync(file, now, now);
+        } catch {
+          // Removed or unreachable for now: the next renewal tries again.
+        }
+      }, lockRenewMs);
+      renewal.unref();
       return () => {
+        clearInterval(renewal);
         heldLocks.delete(file);
         // Only remove the lock while it is still ours.
-        if (readLockFile(file)?.pid === process.pid) rmSync(file, { force: true });
+        const lock = readLockFile(file);
+        if (lock?.pid === process.pid && lock.pidNamespace === info.pidNamespace)
+          rmSync(file, { force: true });
       };
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
     }
-    const holder = readLockFile(file);
+    let holder = readLockFile(file);
+    // Its holder may have just stopped: wait for the lease to run out.
+    while (
+      holder &&
+      writtenElsewhere(holder) &&
+      lockHolderAlive(holder, file) &&
+      Date.now() < deadline
+    ) {
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      holder = readLockFile(file);
+    }
     if (holder && lockHolderAlive(holder, file))
       throw new StartupError(
         sm().cli.start.dataDirInUse({ dataDir, pid: holder.pid }),
@@ -224,7 +295,7 @@ function acquireLock(file: string, info: LockInfo, dataDir: string): () => void 
       continue;
     }
     const moved = readLockFile(aside);
-    if (moved && lockHolderAlive(moved, file)) {
+    if (moved && lockHolderAlive(moved, file, aside)) {
       try {
         linkSync(aside, file);
       } catch {
@@ -391,7 +462,7 @@ export async function startServer(
 
   try {
     mkdirSync(config.dataDir, { recursive: true, mode: 0o700 });
-    const releaseLock = acquireLock(
+    const releaseLock = await acquireLock(
       paths.lock,
       {
         pid: process.pid,
@@ -400,6 +471,7 @@ export async function startServer(
         host: config.host,
         url,
         startedAt: new Date().toISOString(),
+        pidNamespace: currentPidNamespace(),
       },
       config.dataDir,
     );

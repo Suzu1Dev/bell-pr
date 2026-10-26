@@ -8,6 +8,7 @@ import {
   readFileSync,
   statSync,
   symlinkSync,
+  utimesSync,
   writeFileSync,
 } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -18,7 +19,7 @@ import path from "node:path";
 import { baseUrl, resolveConfig, ConfigError, defaultStaticDir } from "./config.js";
 import { createApp } from "./app.js";
 import { version } from "./build-info.js";
-import { startServer, StartupError } from "./index.js";
+import { lockHolderRunning, startServer, StartupError } from "./index.js";
 import { withLocale } from "./i18n/index.js";
 import { Store } from "./store.js";
 import { Workbench } from "./workbench.js";
@@ -477,6 +478,93 @@ test("startServer replaces a stale lock left by a process that is gone", async (
       print: () => {},
     });
     await again.shutdown();
+  } finally {
+    await box.cleanup();
+  }
+});
+
+/**
+ * A lock written by BELL PR in another container on the same volume. The
+ * same entrypoint got the same pid there, so this process's pid says
+ * nothing about it.
+ */
+const otherContainer = "f00dcafe1234 pid:[4026532001]";
+
+test("a lock from another PID namespace counts while its holder renews it, whatever its pid", async () => {
+  const box = await sandbox();
+  try {
+    mkdirSync(box.data, { recursive: true });
+    const file = path.join(box.data, "bellpr.lock");
+    const gone = spawn(process.execPath, ["-e", ""]);
+    await once(gone, "exit");
+    for (const pid of [process.pid, gone.pid!]) {
+      const lock = { pid, port: 4311, version, pidNamespace: otherContainer };
+      writeFileSync(file, JSON.stringify(lock));
+      assert.equal(lockHolderRunning(box.data, lock), true, String(pid));
+      // Not renewed for longer than the lease: its holder is gone.
+      const lapsed = new Date(Date.now() - 31_000);
+      utimesSync(file, lapsed, lapsed);
+      assert.equal(lockHolderRunning(box.data, lock), false, String(pid));
+    }
+  } finally {
+    await box.cleanup();
+  }
+});
+
+test("startServer waits for a lock from another PID namespace to lapse before it takes over", async () => {
+  const box = await sandbox();
+  try {
+    mkdirSync(box.data, { recursive: true });
+    const file = path.join(box.data, "bellpr.lock");
+    writeFileSync(
+      file,
+      JSON.stringify({ pid: process.pid, port: 4311, version: "1.0.0", pidNamespace: otherContainer }),
+    );
+    // Last renewed 28.5 seconds ago, as by a container that was just removed.
+    const renewed = new Date(Date.now() - 28_500);
+    utimesSync(file, renewed, renewed);
+    const begun = Date.now();
+    const running = await startServer({
+      config: resolveConfig({ port: await freePort(), dataDir: box.data }, box.env),
+      handleExit: false,
+      print: () => {},
+    });
+    try {
+      assert.ok(Date.now() - begun >= 1000, `took over after ${Date.now() - begun} ms`);
+      const lock = JSON.parse(readFileSync(file, "utf8"));
+      assert.equal(lock.pid, process.pid);
+      assert.notEqual(lock.pidNamespace, otherContainer);
+    } finally {
+      await running.shutdown();
+    }
+  } finally {
+    await box.cleanup();
+  }
+});
+
+test("the running instance renews its lock and leaves one that another PID namespace took", async (t) => {
+  const box = await sandbox();
+  t.mock.timers.enable({ apis: ["setInterval"] });
+  try {
+    const file = path.join(box.data, "bellpr.lock");
+    const running = await startServer({
+      config: resolveConfig({ port: await freePort(), dataDir: box.data }, box.env),
+      handleExit: false,
+      print: () => {},
+    });
+    try {
+      const old = new Date(Date.now() - 60_000);
+      utimesSync(file, old, old);
+      t.mock.timers.tick(10_000);
+      assert.ok(Date.now() - statSync(file).mtimeMs < 5000);
+      // Another container took the data directory over meanwhile, with the
+      // same pid in its own namespace.
+      const lock = JSON.parse(readFileSync(file, "utf8"));
+      writeFileSync(file, JSON.stringify({ ...lock, pidNamespace: otherContainer }));
+    } finally {
+      await running.shutdown();
+    }
+    assert.equal(JSON.parse(readFileSync(file, "utf8")).pidNamespace, otherContainer);
   } finally {
     await box.cleanup();
   }
