@@ -325,6 +325,12 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   with cards in two languages. Explanations now always follow the language
   the run started in.
 
+- **Explanations follow a changed premise verdict.** If an explanation was
+  being written while a premise check ran (for example after a Retry) and the
+  check changed its verdict, the explanation written with the old verdict
+  was still saved as finished and was never made again. It is now thrown
+  away, and the explanation is made again with the new verdict.
+
 ### Security
 
 - **zod 4.** The server validates requests, agent answers and saved files

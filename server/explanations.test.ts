@@ -770,6 +770,88 @@ test("late explanation results never label a newer diff and shutdown waits for i
   }
 });
 
+test("an explanation that finishes after a premise check changed its verdict is made again with the new one", async () => {
+  const premise = {
+    verdict: "refuted",
+    statement: "呼叫端會傳入空陣列。",
+    evidence: "a.ts:1 只定義常數。",
+  };
+  const prompts: string[] = [];
+  let premiseStarted!: () => void;
+  let finishPremise!: () => void;
+  let explanationStarted!: () => void;
+  let finishExplanation!: () => void;
+  const premiseRunning = new Promise<void>((resolve) => {
+    premiseStarted = resolve;
+  });
+  const premiseGate = new Promise<void>((resolve) => {
+    finishPremise = resolve;
+  });
+  const explanationRunning = new Promise<void>((resolve) => {
+    explanationStarted = resolve;
+  });
+  const explanationGate = new Promise<void>((resolve) => {
+    finishExplanation = resolve;
+  });
+  const f = await fixture(async (input) => {
+    if (input.role === "premise") {
+      premiseStarted();
+      await premiseGate;
+      return JSON.stringify({ premise });
+    }
+    prompts.push(input.prompt);
+    if (prompts.length === 1) {
+      explanationStarted();
+      await explanationGate;
+    }
+    return response(input.prompt);
+  });
+  try {
+    f.run.team = {
+      config: {
+        maxTeammates: 2,
+        requirePlanApproval: false,
+        provider: "claude",
+        protocol: "bell-shared-tasks",
+        messageDelivery: "between-turns",
+      },
+      phase: "complete",
+      planSummary: "更新常數。",
+      tasks: [],
+      messages: [],
+    };
+    const statuses = (files: DiffFile[]) =>
+      files.map((file) => [file.path, file.explanationStatus, file.explanation?.summary]);
+    // The files are explained while the lead checks the premise again.
+    const checking = f.workbench.checkPremise(f.run.id);
+    await premiseRunning;
+    const generating = f.workbench.explanations(f.run.id);
+    await explanationRunning;
+    finishPremise();
+    const checked = await checking;
+    const remade = [
+      ["a.ts", "pending", undefined],
+      ["b.ts", "pending", undefined],
+    ];
+    assert.deepEqual(statuses(checked.files), remade);
+    // The job's answer was written with no premise: it is not stored as ready.
+    finishExplanation();
+    assert.deepEqual(statuses((await generating).files), remade);
+    const again = await f.workbench.explanations(f.run.id);
+    assert.equal(prompts.length, 2);
+    assert.equal(prompts[0].includes(premise.statement), false);
+    assert.equal(prompts[1].includes(premise.statement), true);
+    assert.deepEqual(statuses(again.files), [
+      ["a.ts", "ready", "更新輸出"],
+      ["b.ts", "ready", "更新輸出"],
+    ]);
+  } finally {
+    finishPremise();
+    finishExplanation();
+    await f.cleanup();
+  }
+});
+
 test("a request waiting for the run lock cannot start a new explanation agent after shutdown", async () => {
   let calls = 0;
   let release!: () => void;

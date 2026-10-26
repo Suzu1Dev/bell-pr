@@ -285,6 +285,14 @@ async function generateExplanations(
           const filtered = run.learnByHand
             ? await filterExplanation(run, [...current.values()], file.path, content)
             : undefined;
+          // A premise check whose verdict changed meanwhile dropped this
+          // job's entry: the one in its place is made again with the new verdict.
+          const stored = run.explanations?.[file.path];
+          if (
+            stored?.status !== "generating" ||
+            stored.fingerprint !== file.fingerprint
+          )
+            continue;
           if (filtered) recordStoredHelp(run, "explanation", filtered.removed);
           run.explanations![file.path] = {
             fingerprint: file.fingerprint,
