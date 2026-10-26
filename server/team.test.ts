@@ -1711,6 +1711,38 @@ test("maxActiveRuns 1 serialises queued runs", async () => {
   }
 });
 
+test("a cancelled queued run that is deleted is skipped by the queue and at shutdown", async () => {
+  const started = new Set<string>();
+  const f = await fixture(blockingRunner(started), { maxActiveRuns: 1 });
+  const rejections: unknown[] = [];
+  const onRejection = (reason: unknown) => rejections.push(reason);
+  process.on("unhandledRejection", onRejection);
+  try {
+    const create = (title: string) =>
+      f.workbench.createRun(f.repo.id, title, undefined, settings);
+    const first = await create("First");
+    const second = await create("Second");
+    const third = await create("Third");
+    await waitUntil(() => started.size === 1, "first run");
+    await f.workbench.cancel(second.id);
+    await f.workbench.removeRun(second.id);
+    // The first run finishing drains the queue past the deleted run.
+    await f.workbench.cancel(first.id);
+    await waitUntil(() => started.size === 2, "third run");
+    assert.equal(third.status, "running");
+    // Shutdown empties a queue that still names a deleted run.
+    const fourth = await create("Fourth");
+    await f.workbench.cancel(fourth.id);
+    await f.workbench.removeRun(fourth.id);
+    await f.workbench.shutdown();
+    await delay(50);
+    assert.deepEqual(rejections, []);
+  } finally {
+    process.off("unhandledRejection", onRejection);
+    await f.cleanup();
+  }
+});
+
 test("the queue cap follows maxActiveRuns and the 429 message states the number", async () => {
   const started = new Set<string>();
   const f = await fixture(blockingRunner(started), { maxActiveRuns: 5 });

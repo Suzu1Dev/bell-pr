@@ -412,6 +412,13 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   Settings and gives the focus back to the link when it closes; a click with
   a modifier key still opens it in a new tab.
 
+- **Deleting a cancelled queued run no longer stops BELL PR.** If you
+  cancelled a run that was still waiting in the queue and then deleted it
+  (or deleted its project), the server stopped as soon as another run
+  finished, and the runs queued behind it never started. Shutdown could
+  also fail before stopping the running agents. The queue now skips runs
+  that are gone, so the next run starts and shutdown completes.
+
 ### Security
 
 - **zod 4.** The server validates requests, agent answers and saved files

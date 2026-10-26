@@ -95,8 +95,9 @@ export class RunQueue {
     if (this.ctx.stopping()) return;
     while (this.active < this.limits.active() && this.queue.length) {
       const id = this.queue.shift()!;
-      const run = this.ctx.run(id);
-      if (run.status !== "queued") continue;
+      // A run cancelled while it waited may since have been deleted.
+      const run = this.find(id);
+      if (run?.status !== "queued") continue;
       this.active++;
       // Whoever drains the queue (a request, another run finishing), the
       // run executes in its own locale.
@@ -131,9 +132,14 @@ export class RunQueue {
    */
   clear() {
     for (const id of this.queue) {
-      const run = this.ctx.run(id);
-      if (run.status === "queued" && run.baseSha) run.status = "cancelled";
+      const run = this.find(id);
+      if (run?.status === "queued" && run.baseSha) run.status = "cancelled";
     }
     this.queue = [];
+  }
+
+  /** The queued id's run, or undefined once the run was deleted. */
+  private find(id: string) {
+    return this.ctx.store.data.runs.find((run) => run.id === id);
   }
 }
