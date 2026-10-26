@@ -299,10 +299,15 @@ export function notReadyLabel(name: string) {
   );
 }
 
-/** A comment that claims an issue: "I'd like to work on this", "/assign", "can I take it?". */
+/**
+ * A comment that claims an issue: "I'd like to work on this", "/assign", "can I take it?".
+ * Typographic apostrophes ("I’d", as phones and smart punctuation write
+ * them) read as typed ones, the same characters the policy search folds.
+ */
 export function claimComment(body: string) {
+  const text = body.replace(/[\u2018\u2019\u02bc\u2032]/g, "'");
   return /^\s*\/(?:assign|claim|take)\b|\b(?:i(?:'d| would) (?:like|love) to (?:work on|take|tackle|pick up|fix)|i(?:'m| am) (?:working on|taking|on) (?:this|it)|i(?:'ll| will) (?:work on|take|fix|tackle|pick up) (?:this|it)|can i (?:work on|take|tackle|pick up|fix) (?:this|it)|(?:please )?assign (?:(?:this|it) )?(?:to )?me|let me (?:work on|take|fix) (?:this|it))\b/i.test(
-    body,
+    text,
   );
 }
 

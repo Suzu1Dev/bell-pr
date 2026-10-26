@@ -42,7 +42,7 @@ test("learning and not-ready labels are read from the repository's own names", (
 });
 
 test("claim comments and maintainer associations", () => {
-  for (const body of ["I'd like to work on this!", "/assign", "Can I take this?", "I'm working on it.", "Please assign this to me", "I will take this one"])
+  for (const body of ["I'd like to work on this!", "/assign", "Can I take this?", "I'm working on it.", "Please assign this to me", "I will take this one", "I’d like to work on this", "I’m working on it.", "I’ll take this"])
     assert.ok(claimComment(body), body);
   for (const body of ["Is anyone working on this?", "This also happens on Windows.", "I would like this fixed too."])
     assert.ok(!claimComment(body), body);

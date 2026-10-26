@@ -359,6 +359,12 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   check could be stored as 45 minutes, which pushed up the median check time
   in Settings > Learning. Each check is now timed from when it opens.
 
+- **Claims written with a typographic apostrophe.** A comment such as
+  "I’d like to work on this" or "I’m working on it", as GitHub's mobile apps
+  and smart punctuation write it, was not recognized as a claim, so the
+  confirm before starting never mentioned that someone had taken the issue.
+  Those comments now count as claims, the same as with a typed apostrophe.
+
 ### Security
 
 - **zod 4.** The server validates requests, agent answers and saved files
