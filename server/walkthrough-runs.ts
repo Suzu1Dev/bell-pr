@@ -72,10 +72,14 @@ export async function walkthrough(
     assertReaderView(run, files, filePath, ctx.store.data.repos.find((repo) => repo.id === run.repoId));
   }
   const key = `${id}\0${filePath}`;
-  const existing = ctx.walkthroughJobs.get(key);
-  if (existing) await existing;
-  else {
-    const files = await ctx.lock(id, () => ctx.diff(id));
+  // Looked up and started under the run lock, where no other request can
+  // start one: a request that waited for the lock finds the job started
+  // meanwhile instead of taking its "generating" for a stopped one.
+  let pending: Promise<void> | undefined;
+  await ctx.lock(id, async () => {
+    pending = ctx.walkthroughJobs.get(key);
+    if (pending) return;
+    const files = await ctx.diff(id);
     const file = files.find((entry) => entry.path === filePath);
     if (!file) throw new AppError((m) => m.run.review.fileNotFound, 404);
     // Learn by hand: the version walked through is the one checked, never one edited since (F5, F10).
@@ -101,9 +105,11 @@ export async function walkthrough(
         });
       ctx.walkthroughJobs.set(key, job);
       ctx.jobs.add(job);
-      await job;
+      // Waited for outside the lock, which the job takes to keep its result.
+      pending = job;
     }
-  }
+  });
+  await pending;
   return { run, files: await ctx.lock(id, () => ctx.diff(id)) };
 }
 

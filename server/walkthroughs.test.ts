@@ -424,6 +424,79 @@ test("walkthroughs written in the background let a sync and a premise check go a
   }
 });
 
+test("two requests at once for one file's walkthrough share one agent job and its result", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "bell-walkthrough-shared-test-"));
+  const repository = path.join(directory, "repo");
+  const walkthroughs: TeamAgentInput[] = [];
+  const answer = JSON.stringify({
+    functions: [
+      {
+        name: "count",
+        kind: "函式",
+        startLine: 1,
+        endLine: 4,
+        summary: "回傳陣列長度。",
+        change: "多加了 0。",
+        steps: [{ startLine: 2, endLine: 3, explanation: "計算並回傳。" }],
+        callers: [],
+        callees: [],
+        analogy: "像數人頭。",
+        selfCheck: { question: "空陣列回傳什麼？", answer: "0。" },
+      },
+    ],
+  });
+  try {
+    await git(directory, ["init", "-q", "-b", "main", repository]);
+    await git(repository, ["config", "user.name", "Walkthrough Test"]);
+    await git(repository, ["config", "user.email", "walkthrough@example.invalid"]);
+    const source = ["export function count(items: number[]) {", "  const total = items.length;", "  return total;", "}"];
+    await writeFile(path.join(repository, "count.ts"), source.join("\n") + "\n");
+    await git(repository, ["add", "."]);
+    await git(repository, ["commit", "-qm", "base"]);
+    const baseSha = (await git(repository, ["rev-parse", "HEAD"])).stdout.trim();
+    await writeFile(path.join(repository, "count.ts"), source.join("\n").replace("items.length", "items.length + 0") + "\n");
+    const store = new Store(path.join(directory, "state"));
+    await store.initialize();
+    const workbench = new Workbench(store, async (input) => {
+      walkthroughs.push(input);
+      // Only a second agent job could fail and throw the first one's result away.
+      if (walkthroughs.length > 1) throw new Error("second job");
+      return answer;
+    });
+    const repo = await workbench.importRepository(repository);
+    const run: Run = {
+      id: "shared-run",
+      repoId: repo.id,
+      title: "Count items",
+      prompt: "Count items",
+      status: "review",
+      branch: "main",
+      baseBranch: "main",
+      baseSha,
+      worktreePath: repository,
+      createdAt: new Date().toISOString(),
+      agents: [],
+      logs: [],
+      draft: { title: "t", body: "b" },
+      reviewedFiles: [],
+      reviewedFingerprints: {},
+    };
+    store.data.runs.push(run);
+    // Two tabs open on the run ask together; the second finds the first one's job.
+    const [first, second] = await Promise.all([
+      workbench.walkthrough(run.id, "count.ts"),
+      workbench.walkthrough(run.id, "count.ts"),
+    ]);
+    assert.equal(walkthroughs.length, 1);
+    assert.equal(first.files[0].walkthroughStatus, "ready");
+    assert.equal(second.files[0].walkthroughStatus, "ready");
+    assert.equal(run.walkthroughs!["count.ts"].status, "ready");
+    await workbench.shutdown();
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
 test("a function the diff adds whole is listed as new instead of explained", () => {
   // Lines 10 to 14 are a new test; line 3 changes an existing function.
   const patch = [

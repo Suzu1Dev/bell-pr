@@ -331,6 +331,13 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   was still saved as finished and was never made again. It is now thrown
   away, and the explanation is made again with the new verdict.
 
+- **One walkthrough job when a file is asked for twice at once.** If two
+  tabs asked for the same file's walkthrough together, BELL started two
+  agent jobs. The first agent could then no longer be stopped, and if one
+  job failed, a good walkthrough was thrown away and both tabs showed
+  "failed". Now the second request waits for the job already running and
+  gets its result.
+
 ### Security
 
 - **zod 4.** The server validates requests, agent answers and saved files
