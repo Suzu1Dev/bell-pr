@@ -406,6 +406,12 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   now moves to Measure again. After a failure it goes back to the run's Free
   space button. The row always becomes usable again.
 
+- **About from Settings stays on Settings.** In **Settings → About**,
+  **About BELL PR** switched the page behind the dialog to Home, so closing
+  it left you on Home with the keyboard focus lost. The dialog now opens over
+  Settings and gives the focus back to the link when it closes; a click with
+  a modifier key still opens it in a new tab.
+
 ### Security
 
 - **zod 4.** The server validates requests, agent answers and saved files

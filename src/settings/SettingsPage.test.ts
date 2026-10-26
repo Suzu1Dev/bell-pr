@@ -6,6 +6,7 @@ import type { DoctorCheck, DoctorReport } from "../../shared/doctor";
 import { product } from "../../shared/product";
 import type { Status } from "../app/hooks/useAppData";
 import { withoutOtherLanguages } from "../app/test-markup";
+import { mount } from "../mission/test-dom";
 import type { DoctorState } from "../setup/useDoctor";
 import { assertNoHan, renderEn, renderZh } from "../test-utils/render";
 import { appVersion } from "../version";
@@ -137,6 +138,7 @@ const page = (value: Status | null) =>
     setTab() {},
     navigate() {},
     doctor: doctor(null),
+    openAbout() {},
   });
 
 /** The text a person reads: tags and attributes dropped. */
@@ -488,13 +490,58 @@ test("Data & privacy has the data directory, storage, retention, erasing and the
 });
 
 test("About shows the version and the About link", () => {
-  const about = renderEn(createElement(AboutSection, { aboutHref: "#/about?present=1" }));
+  const about = renderEn(
+    createElement(AboutSection, { aboutHref: "#/about?present=1", openAbout() {} }),
+  );
   assertNoHan(about);
   assert.ok(about.includes(`<code>${appVersion}</code>`));
   assert.match(about, /<a class="button secondary" href="#\/about\?present=1">.*?About BELL PR<\/a>/);
   // Product links show only once they are set.
   assert.doesNotMatch(about, /Documentation|Website/);
-  assert.match(renderZh(createElement(AboutSection, { aboutHref: "#/about" })), /關於 BELL PR/);
+  assert.match(
+    renderZh(createElement(AboutSection, { aboutHref: "#/about", openAbout() {} })),
+    /關於 BELL PR/,
+  );
+});
+
+test("a plain click on the About link opens the dialog over Settings; a modified one keeps the link", async () => {
+  let opened = 0;
+  const view = await mount(
+    createElement(AboutSection, { aboutHref: "#/about?present=1", openAbout: () => void opened++ }),
+  );
+  try {
+    const link = view.container.querySelectorAll(
+      (element) => element.nodeName === "A" && element.getAttribute("href") === "#/about?present=1",
+    )[0]!;
+    /** Calls the click handler React gave the link (the fake DOM dispatches no events); true when it kept the link from navigating. */
+    const click = (modifiers: { button?: number; ctrlKey?: boolean; metaKey?: boolean; shiftKey?: boolean; altKey?: boolean }) => {
+      let prevented = false;
+      const props = Object.entries(link).find(([key]) => key.startsWith("__reactProps$"))?.[1] as {
+        onClick(event: object): void;
+      };
+      props.onClick({
+        button: 0,
+        ctrlKey: false,
+        metaKey: false,
+        shiftKey: false,
+        altKey: false,
+        ...modifiers,
+        preventDefault() {
+          prevented = true;
+        },
+      });
+      return prevented;
+    };
+    // The address stays on Settings, so closing the dialog comes back to this link.
+    assert.equal(click({}), true);
+    assert.equal(opened, 1);
+    // A new tab or window still opens the dialog's own address.
+    for (const modifiers of [{ ctrlKey: true }, { metaKey: true }, { shiftKey: true }, { altKey: true }, { button: 1 }])
+      assert.equal(click(modifiers), false, JSON.stringify(modifiers));
+    assert.equal(opened, 1);
+  } finally {
+    await view.unmount();
+  }
 });
 
 test("every section reads in English with no Chinese left, and in zh-TW", () => {
@@ -516,7 +563,7 @@ test("every section reads in English with no Chinese left, and in zh-TW", () => 
     }),
     createElement(EnvironmentSection, { doctor: doctor(null), refresh() {}, ...plain }),
     createElement(DataSection, { doctor: doctor(null), settings: appSettings(view), ...plain }),
-    createElement(AboutSection, { aboutHref: "#/about" }),
+    createElement(AboutSection, { aboutHref: "#/about", openAbout() {} }),
   ];
   for (const element of elements) {
     assertNoHan(withoutOtherLanguages(renderEn(element)));

@@ -53,6 +53,8 @@ interface SettingsPageProps {
    * of it (the run list, the open run) shows them gone.
    */
   onRunFreed?: (run: Run) => void;
+  /** Opens the About dialog over this page, which the address keeps. */
+  openAbout: () => void;
 }
 
 const icons: Record<SettingsSection, LucideIcon> = {
@@ -87,6 +89,7 @@ export function SettingsPage({
   doctor,
   onAppSettingsSaved,
   onRunFreed,
+  openAbout,
 }: SettingsPageProps) {
   const t = useT("settings");
   const route = useHashRoute();
@@ -171,7 +174,10 @@ export function SettingsPage({
       break;
     case "about":
       content = (
-        <AboutSection aboutHref={serializeRoute({ name: "about", ...(flags ? { flags } : {}) })} />
+        <AboutSection
+          aboutHref={serializeRoute({ name: "about", ...(flags ? { flags } : {}) })}
+          openAbout={openAbout}
+        />
       );
       break;
     default:

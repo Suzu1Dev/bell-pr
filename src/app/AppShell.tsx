@@ -1141,6 +1141,7 @@ function AppShell({
               doctor={doctor}
               onAppSettingsSaved={(view) => setAppSettings(view.settings)}
               onRunFreed={runFreed}
+              openAbout={() => openModal("about")}
             />
           </Suspense>
           </ErrorBoundary>

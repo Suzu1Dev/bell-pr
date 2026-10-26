@@ -5,10 +5,18 @@ import { appVersion } from "../version";
 import { SettingsGroup, SettingsSectionFrame } from "./controls";
 
 /**
- * About: the version of this build, the About dialog (the app opens it at
- * `#/about`) and the product's public links while they are set.
+ * About: the version of this build, the About dialog and the product's
+ * public links while they are set. The dialog opens over this section, so
+ * closing it comes back here; its link keeps the dialog's own address
+ * (`#/about`) for a new tab or window.
  */
-export function AboutSection({ aboutHref }: { aboutHref: string }) {
+export function AboutSection({
+  aboutHref,
+  openAbout,
+}: {
+  aboutHref: string;
+  openAbout: () => void;
+}) {
   const t = useT("settings").about;
   const links = [
     { href: productLink("docsUrl"), text: t.docs },
@@ -26,7 +34,16 @@ export function AboutSection({ aboutHref }: { aboutHref: string }) {
           </div>
         </dl>
         <div className="settings-actions settings-about-links">
-          <a className="button secondary" href={aboutHref}>
+          <a
+            className="button secondary"
+            href={aboutHref}
+            onClick={(event) => {
+              if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey)
+                return;
+              event.preventDefault();
+              openAbout();
+            }}
+          >
             <Info size={15} aria-hidden="true" />
             {t.open}
           </a>
