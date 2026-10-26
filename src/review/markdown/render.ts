@@ -104,26 +104,57 @@ const listLoose = (parent: Parents) =>
         : item.spread,
     ));
 
+/** Visits every node in document order, without recursion: nesting can be thousands deep. */
+function walk(node: Nodes, visit: (node: Nodes) => void) {
+  const stack = [node];
+  while (stack.length) {
+    const current = stack.pop()!;
+    visit(current);
+    if ("children" in current)
+      for (let index = current.children.length - 1; index >= 0; index--)
+        stack.push(current.children[index]);
+  }
+}
+
+const textBlocks = new Set(["paragraph", "heading", "code", "tableCell", "break"]);
+
+/** A subtree's text, each block and hard break on its own line. */
+function plainText(node: Nodes) {
+  let value = "";
+  walk(node, (current) => {
+    if (value && textBlocks.has(current.type)) value += "\n";
+    if (current.type === "text" || current.type === "inlineCode" || current.type === "code")
+      value += current.value;
+  });
+  return value;
+}
+
+/**
+ * How deep nodes nest before the rest shows as its text: each level takes
+ * stack frames here and in React, so thousands of levels would overflow.
+ */
+const maxDepth = 100;
+
 function toTree(tree: Root) {
   const definitions = new Map<string, Definition>();
   const footnotes = new Map<string, FootnoteDefinition>();
   const footnoteOrder: string[] = [];
   const footnoteCounts = new Map<string, number>();
+  let depth = 0;
 
   // The first definition of an identifier wins, wherever it is.
-  const collect = (node: Nodes) => {
+  walk(tree, (node) => {
     if (node.type === "definition" || node.type === "footnoteDefinition") {
       const map: Map<string, Definition | FootnoteDefinition> =
         node.type === "definition" ? definitions : footnotes;
       const id = node.identifier.toUpperCase();
       if (!map.has(id)) map.set(id, node);
     }
-    if ("children" in node) node.children.forEach(collect);
-  };
-  collect(tree);
+  });
 
   function all(parent: Parents) {
     const values: Child[] = [];
+    depth++;
     parent.children.forEach((node, index) => {
       const result = one(node, parent);
       if (!result) return;
@@ -135,10 +166,12 @@ function toTree(tree: Root) {
       if (Array.isArray(result)) values.push(...result);
       else values.push(result);
     });
+    depth--;
     return values;
   }
 
   function one(node: Nodes, parent: Parents): Child | Child[] | undefined {
+    if (depth > maxDepth && "children" in node) return text(plainText(node));
     switch (node.type) {
       case "blockquote":
         return element("blockquote", {}, wrap(all(node), true));
@@ -335,15 +368,22 @@ function toReact(child: Child, options: Options, key: number): ReactNode {
  * Renders Markdown as React elements. Raw HTML never renders, `urlTransform`
  * rewrites every link's target, and `components` replace elements by tag
  * name. Anything but a string renders nothing, as with the earlier pipeline.
+ * Text that cannot be rendered, such as nesting deeper than the parser can
+ * take, shows as written instead of taking down the view.
  */
 export function Markdown({
   children,
   urlTransform,
   components,
 }: Options & { children: string }) {
-  const tree = fromMarkdown(typeof children === "string" ? children : "", {
-    extensions: [gfm()],
-    mdastExtensions: [gfmFromMarkdown()],
-  });
-  return createElement(Fragment, null, toReactChildren(toTree(tree), { urlTransform, components }));
+  const source = typeof children === "string" ? children : "";
+  try {
+    const tree = fromMarkdown(source, {
+      extensions: [gfm()],
+      mdastExtensions: [gfmFromMarkdown()],
+    });
+    return createElement(Fragment, null, toReactChildren(toTree(tree), { urlTransform, components }));
+  } catch {
+    return createElement("p", { style: { whiteSpace: "pre-wrap" } }, source);
+  }
 }

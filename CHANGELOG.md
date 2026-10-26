@@ -427,6 +427,12 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   same way. At startup the branch now goes back to where it was before the
   agent ran, with the edits kept uncommitted for review and push.
 
+- **Deeply nested Markdown no longer breaks a panel.** About 1,300 quote
+  markers or 800 list markers in an agent's explanation, report or chat
+  answer overflowed the stack, so the panel hit its error screen every time
+  it opened. Nesting past a hundred levels now shows as plain text, and text
+  too deep even for the parser shows as written.
+
 ### Security
 
 - **zod 4.** The server validates requests, agent answers and saved files

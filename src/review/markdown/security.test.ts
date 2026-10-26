@@ -92,6 +92,35 @@ test("a block with more children than a function call takes still renders", () =
   }
 });
 
+test("nesting too deep for the call stack renders, with its innermost text", () => {
+  // Each level of nesting took several stack frames, so about 1,300 quote
+  // markers (or 800 list markers) threw a RangeError, which would take down
+  // the view. Past a hundred levels the nesting now shows as its text; past
+  // what the parser itself can take, the whole text shows as written.
+  for (const source of [
+    `${">".repeat(5_000)} x`,
+    `${"- ".repeat(800)}x`,
+    `${"> - ".repeat(600)}x`,
+    `${"*a ".repeat(1_500)}x${" a*".repeat(1_500)}`,
+  ]) {
+    const html = render(source);
+    const tags = html.match(/<blockquote>|<ul>|<em>/g)?.length ?? 0;
+    assert.ok(html.replace(/<[^>]*>/g, "").includes("x"), source.slice(0, 20));
+    // The depth limit, not the plain-text fallback, keeps these shallow:
+    // React renders the elements later, outside Markdown's try/catch.
+    assert.doesNotMatch(html, /white-space/, source.slice(0, 20));
+    assert.ok(tags > 0 && tags <= 100, source.slice(0, 20));
+  }
+  const tooDeep = render(`${">".repeat(20_000)} x`);
+  assert.ok(tooDeep.replace(/<[^>]*>/g, "").includes("x"));
+  assert.doesNotMatch(tooDeep, /<blockquote>/);
+
+  const quotes = render(`${"> ".repeat(500)}x`);
+  assert.ok(quotes.startsWith('<div class="markdown-content"><blockquote>\n<blockquote>'));
+  assert.equal(quotes.match(/<blockquote>/g)?.length, 100);
+  assert.match(quotes.replace(/<[^>]*>/g, ""), /x\s*$/);
+});
+
 test("children that are not a string render an empty container instead of throwing", () => {
   // As the earlier pipeline did in a production build: a null or other
   // value read from a stored run must not take down the view.
