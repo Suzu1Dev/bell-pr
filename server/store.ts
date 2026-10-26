@@ -677,6 +677,14 @@ export class Store {
    * restored backup would still need.
    */
   backupsWithoutState?: string[];
+  /**
+   * The writable agents the last initialize() found stopped: a follow-up
+   * round or a conflict resolution, with the commit the run's branch sat on
+   * before the agent ran (`sync`: a conflict agent, whose index goes back to
+   * the base too). Kept in memory only; the Workbench puts each branch back
+   * at startup, as the agent's own end would have.
+   */
+  interruptedAgents: { runId: string; head: string; sync: boolean }[] = [];
   /** The write in progress and the one queued behind it (see save()). */
   private writing?: Promise<void>;
   private queued?: Promise<void>;
@@ -693,6 +701,7 @@ export class Store {
     initLog(this.directory);
     this.recovery = undefined;
     this.backupsWithoutState = undefined;
+    this.interruptedAgents = [];
     this.data = await this.load();
     // Rules an older build stored carry no reach: read it from each quote, as a rules read does now.
     for (const repo of this.data.repos)
@@ -738,6 +747,7 @@ export class Store {
         run.status = "review";
         for (const agent of run.agents)
           if (agent.status === "running") agent.status = "failed";
+        this.interruptedAgents.push({ runId: run.id, head: run.baseSha, sync: true });
         continue;
       }
       // An interrupted follow-up round leaves the published PR intact: its
@@ -746,6 +756,7 @@ export class Store {
       if (round?.resolving) {
         round.resolving = false;
         round.report = recovery.conflicts;
+        this.interruptedAgents.push({ runId: run.id, head: round.parentCommit, sync: true });
       }
       if (round && (run.status === "running" || run.publishing)) {
         if (round.status === "running") {
@@ -753,6 +764,7 @@ export class Store {
           round.error = recovery.round;
           // Rounds saved before startFollowUp cleared it still hold the last pushed message.
           delete run.draft.commitMessage;
+          this.interruptedAgents.push({ runId: run.id, head: round.parentCommit, sync: false });
         }
         run.status = "review";
         run.publishing = false;

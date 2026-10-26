@@ -527,7 +527,7 @@ async function runConflictResolution(
  * Puts HEAD back after a conflict agent moved it. The index returns to the
  * base the diff is read from, which for a PR's sync round is not HEAD.
  */
-async function restoreSyncHead(run: Run, head: string) {
+export async function restoreSyncHead(run: Run, head: string) {
   const moved = await restoreAgentHead(run, head);
   if (moved) await git(run.worktreePath, ["read-tree", run.baseSha]);
   return moved;

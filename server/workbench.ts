@@ -32,6 +32,7 @@ import {
 } from "../shared/followups.js";
 import * as cleanup from "./cleanup.js";
 import { runJanitor } from "./janitor.js";
+import { restoreAgentHead } from "./pr-branch.js";
 
 import { collectDraftContext } from "./draft-sources.js";
 import { synchronizeDraftPreparation } from "./drafts.js";
@@ -208,16 +209,42 @@ export class Workbench {
   }
 
   /**
-   * Removes crash leftovers (janitor.ts), then frees the files of runs
-   * past the retention period. Entries newer than `startedAt` are kept.
+   * Puts back the branches of agents a restart stopped, then removes crash
+   * leftovers (janitor.ts), then frees the files of runs past the retention
+   * period. Entries newer than `startedAt` are kept.
    */
   private async startMaintenance(startedAt: number) {
     try {
+      await this.restoreInterruptedHeads();
       await runJanitor(this.context, { startedAt });
       await this.applyRetention();
     } catch (error) {
       log.warn("maintenance.failed", { error });
     }
+  }
+
+  /**
+   * A writable agent the restart stopped may have committed or switched
+   * branches, which its own end undoes (followup-runs.ts, sync-runs.ts):
+   * the same is done here, so the kept edits can be pushed. Each run's lock
+   * is taken while the Workbench is created, so a push or discard waits.
+   */
+  private async restoreInterruptedHeads() {
+    await Promise.all(
+      this.store.interruptedAgents.splice(0).map(({ runId, head, sync }) =>
+        this.lock(runId, async () => {
+          const run = this.run(runId);
+          const moved = sync
+            ? await syncing.restoreSyncHead(run, head)
+            : await restoreAgentHead(run, head);
+          if (!moved) return;
+          log.warn("run.head_restored", { runId, head });
+          await this.diff(runId);
+        }).catch((error: unknown) =>
+          log.warn("run.head_restore_failed", { runId, error }),
+        ),
+      ),
+    );
   }
 
   /** Queues again the runs a restart left queued (run-queue.ts). */

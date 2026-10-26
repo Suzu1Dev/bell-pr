@@ -765,6 +765,95 @@ test("a restart during a round's push reopens the round for review with the PR i
   assert.equal(await readFile(remote.remoteHead, "utf8"), round.commit);
 });
 
+test("a restart while a round's agent had committed puts the branch back, so the kept edits can be pushed", async (t) => {
+  const f = await fixture();
+  t.after(f.cleanup);
+  const realGit = (await command("which", ["git"])).stdout.trim();
+  const remote = roundBinaries(f, realGit);
+  await f.binaries(remote.scripts);
+  const store = new Store(f.dataDir);
+  let crashState = "";
+  let agentCommit = "";
+  const runner: TeamAgentRunner = async (input) => {
+    await writeFile(path.join(input.cwd, "hello.ts"), 'export const hello = "world";\n');
+    // Against the prompt, the agent commits its edit.
+    await git(input.cwd, ["commit", "-q", "-am", "Greet the world"]);
+    agentCommit = (await git(input.cwd, ["rev-parse", "HEAD"])).stdout.trim();
+    // The server "crashes" here: the round is running and HEAD is the agent's commit.
+    crashState = JSON.stringify(store.data);
+    return JSON.stringify({
+      summary: "Changed the greeting to world.",
+      addressed: [],
+      notAddressed: [],
+      checks: [],
+      commitMessage: "Greet the world",
+    });
+  };
+  await store.initialize();
+  const workbench = new Workbench(store, runner);
+  // Imported in place by an earlier build: the run works in the checkout.
+  const repo = Object.assign(repository(f.repository), {
+    url: "https://github.com/test-owner/example",
+    fullName: "test-owner/example",
+    owner: "test-owner",
+    name: "example",
+  });
+  store.data.repos.push(repo);
+  const run = reviewRun("run-round-commit", repo, f.repository, f.baseSha);
+  run.draft.commitMessage = "Improve the greeting";
+  store.data.runs.push(run);
+  await git(f.repository, ["checkout", "-q", "-b", run.branch]);
+  const reviewAll = async (bench: Workbench, target: Run) => {
+    for (const file of await readDiff(target))
+      await bench.review(target.id, file.path, true, file.fingerprint);
+  };
+  await writeFile(path.join(f.repository, "hello.ts"), 'export const hello = "after";\n');
+  await reviewAll(workbench, run);
+  await workbench.approve(run.id, { ...run.draft });
+  await workbench.publish(run.id, run.approvedFingerprint!, ["facts-unknown"]);
+  const firstCommit = run.publishCommit!;
+  await workbench.startFollowUp(run.id, { feedbackUrls: [], note: "Greet the world." });
+  await waitUntil(() => run.status !== "running", "the round");
+  await workbench.shutdown();
+
+  // Restart from the disk and the checkout as the crash left them.
+  await git(f.repository, ["reset", "-q", "--mixed", agentCommit]);
+  await writeFile(f.statePath, crashState);
+  const restarted = new Store(f.dataDir);
+  await restarted.initialize();
+  const [recovered] = restarted.data.runs;
+  const round = recovered.followUps!.at(-1)!;
+  assert.equal(recovered.status, "review");
+  assert.equal(round.status, "review");
+  assert.equal(round.commit, undefined);
+
+  const second = new Workbench(restarted, runner);
+  f.defer(() => second.shutdown());
+  await second.maintenance;
+  // The branch is back on the pushed PR, with the agent's edit uncommitted.
+  assert.equal((await git(f.repository, ["rev-parse", "HEAD"])).stdout.trim(), firstCommit);
+  assert.equal(
+    (await git(f.repository, ["symbolic-ref", "--short", "HEAD"])).stdout.trim(),
+    run.branch,
+  );
+  assert.equal(
+    await readFile(path.join(f.repository, "hello.ts"), "utf8"),
+    'export const hello = "world";\n',
+  );
+  // The person writes the round's message, as the recovery text asks.
+  await second.draft(recovered.id, { ...recovered.draft, commitMessage: "Greet the world" });
+  await reviewAll(second, recovered);
+  await second.approve(recovered.id, { ...recovered.draft });
+  await second.publish(recovered.id, recovered.approvedFingerprint!);
+  assert.equal(recovered.status, "published");
+  assert.equal(round.status, "published");
+  assert.equal(
+    (await git(f.repository, ["rev-parse", `${round.commit}^`])).stdout.trim(),
+    firstCommit,
+  );
+  assert.equal(await readFile(remote.remoteHead, "utf8"), round.commit);
+});
+
 test("a restart during a conflict resolution reopens the run in review and the conflicts read again", async (t) => {
   const f = await fixture();
   t.after(f.cleanup);
@@ -788,6 +877,9 @@ test("a restart during a conflict resolution reopens the run in review and the c
       resolving: true,
     },
   };
+  // Against the prompt, the agent committed its edit before the restart.
+  await git(f.repository, ["checkout", "-q", "-b", run.branch]);
+  await git(f.repository, ["commit", "-q", "-am", "Resolve the conflicts"]);
   await writeState(f.dataDir, { version: 1, repos: [repo], runs: [run] });
   const store = new Store(f.dataDir);
   await store.initialize();
@@ -802,6 +894,13 @@ test("a restart during a conflict resolution reopens the run in review and the c
   assert.equal(loaded.agents[0].status, "failed");
   const workbench = new Workbench(store);
   f.defer(() => workbench.shutdown());
+  await workbench.maintenance;
+  // The branch and the index are back on the run's base; the edit stays in the files.
+  assert.equal((await git(f.repository, ["rev-parse", "HEAD"])).stdout.trim(), f.baseSha);
+  assert.equal(
+    (await git(f.repository, ["diff", "--cached", "--name-only", f.baseSha])).stdout,
+    "",
+  );
   await workbench.diff(loaded.id);
   assert.deepEqual(loaded.sync?.unresolved, ["hello.ts"]);
 });

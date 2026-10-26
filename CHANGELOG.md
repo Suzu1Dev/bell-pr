@@ -419,6 +419,14 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   also fail before stopping the running agents. The queue now skips runs
   that are gone, so the next run starts and shutdown completes.
 
+- **Kept edits from an interrupted follow-up round can be pushed again.** If
+  BELL PR stopped while a round's agent had made its own commit, the round
+  came back for review but every push was refused because the branch had
+  moved, and discarding the round (losing the edits) was the only way out.
+  An interrupted conflict resolution left its run on the agent's commit the
+  same way. At startup the branch now goes back to where it was before the
+  agent ran, with the edits kept uncommitted for review and push.
+
 ### Security
 
 - **zod 4.** The server validates requests, agent answers and saved files
