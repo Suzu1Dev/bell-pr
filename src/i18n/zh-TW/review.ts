@@ -77,6 +77,7 @@ const m: Translation<typeof en> = {
     imageOmitted: "圖片已省略",
     imageOmittedWithAlt: ({ alt }) => `圖片已省略：${alt}`,
     tableLabel: "解說表格",
+    footnotes: "註腳",
   },
   panel: {
     label: "程式碼學習助手",

@@ -157,6 +157,7 @@ const review = {
     imageOmitted: "Image omitted",
     imageOmittedWithAlt: ({ alt }: { alt: string }) => `Image omitted: ${alt}`,
     tableLabel: "Explanation table",
+    footnotes: "Footnotes",
   },
   /** ExplanationPanel: the frame around the three tabs. */
   panel: {

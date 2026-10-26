@@ -307,8 +307,11 @@ test("the corpus covers every Markdown node the parser makes and both locales' o
   );
   const sources = new Set(corpus.map((entry) => entry.source));
   for (const name of [...Object.keys(samples), "brief", "demo"]) assert.ok(sources.has(name), name);
-  // The image note and the table label are the renderer's own, localized text.
+  // The image note, the table label and the footnotes heading are the
+  // renderer's own, localized text.
   const localized = corpus.filter((entry) => entry["zh-TW"] !== undefined);
   assert.ok(localized.some((entry) => entry.en.includes("Image omitted") && entry["zh-TW"]?.includes("圖片已省略")));
   assert.ok(localized.some((entry) => entry.en.includes('aria-label="Explanation table"')));
+  const footnoted = corpus.filter((entry) => entry.en.includes("<h4>Footnotes</h4>"));
+  assert.ok(footnoted.length && footnoted.every((entry) => entry["zh-TW"]?.includes("<h4>註腳</h4>")));
 });

@@ -46,6 +46,7 @@ export function MarkdownContent({ children }: { children: string }) {
     <div className="markdown-content">
       <Markdown
         urlTransform={safeLink}
+        footnoteLabel={t.markdown.footnotes}
         components={{
           a: ({ href, children }) =>
             href ? (

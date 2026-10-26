@@ -439,6 +439,10 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   crash the tab. A document now adds at most 100,000 empty cells; past that,
   a short row shows only its own cells.
 
+- **Footnotes heading is translated.** With the interface in Traditional
+  Chinese, agent text that used a footnote still showed the English heading
+  "Footnotes". It now shows "註腳".
+
 ### Security
 
 - **zod 4.** The server validates requests, agent answers and saved files

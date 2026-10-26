@@ -141,7 +141,7 @@ const maxDepth = 100;
  */
 const maxPadding = 100_000;
 
-function toTree(tree: Root) {
+function toTree(tree: Root, footnoteLabel: string) {
   const definitions = new Map<string, Definition>();
   const footnotes = new Map<string, FootnoteDefinition>();
   const footnoteOrder: string[] = [];
@@ -350,7 +350,7 @@ function toTree(tree: Root) {
     root.push(
       text("\n"),
       element("section", { "data-footnotes": true, className: "footnotes" }, [
-        element("h2", {}, [text("Footnotes")]),
+        element("h2", {}, [text(footnoteLabel)]),
         text("\n"),
         element("ol", {}, wrap(items, true)),
         text("\n"),
@@ -395,14 +395,19 @@ export function Markdown({
   children,
   urlTransform,
   components,
-}: Options & { children: string }) {
+  footnoteLabel,
+}: Options & {
+  children: string;
+  /** The heading of the footnotes section, in the reader's language. */
+  footnoteLabel: string;
+}) {
   const source = typeof children === "string" ? children : "";
   try {
     const tree = fromMarkdown(source, {
       extensions: [gfm()],
       mdastExtensions: [gfmFromMarkdown()],
     });
-    return createElement(Fragment, null, toReactChildren(toTree(tree), { urlTransform, components }));
+    return createElement(Fragment, null, toReactChildren(toTree(tree, footnoteLabel), { urlTransform, components }));
   } catch {
     return createElement("p", { style: { whiteSpace: "pre-wrap" } }, source);
   }
