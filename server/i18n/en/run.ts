@@ -602,6 +602,9 @@ export default {
       `This round is already on the PR; press Push again so ${product.name} records it as done.`,
     discarded:
       "Discarded the follow-up round; the working directory is back to the pushed PR.",
+    /** Discarding a round whose working files were already removed. */
+    discardedWithoutFiles:
+      "Discarded the follow-up round; its changes went with the working files removed earlier.",
     answerIncomplete: "The agent's answer about the round is incomplete",
     pushUnknown: "Cannot confirm whether this round was pushed to the PR.",
     remoteMoved: ({ branch }: { branch: string }) =>

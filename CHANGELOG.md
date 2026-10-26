@@ -493,6 +493,14 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   These now count as bans. Encouragement such as "Don't hesitate to open
   a pull request, even if you used AI tools" is no longer misread as one.
 
+- **Free space on a run with an open follow-up round.** Freeing a published
+  run's files while its follow-up or sync round waited for review deleted the
+  checkout but left the round open. After that the round could not be pushed
+  or discarded and no new round could start, so the run stayed in review until
+  you deleted it. Freeing is now refused until you push or discard the round,
+  and Settings stops offering it. A run already stuck this way can now be
+  discarded, which puts it back to published.
+
 ### Security
 
 - **zod 4.** The server validates requests, agent answers and saved files

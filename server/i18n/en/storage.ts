@@ -50,6 +50,9 @@ export default {
     retentionLog: ({ bytes, days }: { bytes: number; days: number }) =>
       `Removed this run's working files ${fmt.number(days)} ${fmt.plural(days) === "one" ? "day" : "days"} after it ended and freed ${size(bytes)}; reports, notes and explanations are kept.`,
     busy: "This run is still working. Stop it or wait until it finishes, then try again.",
+    /** Freeing a published run whose follow-up or sync round waits for review. */
+    roundOpen:
+      "This run has a follow-up round that is not finished. Push it or discard it first, then free the disk space.",
     outsideData:
       `This run's working directory is outside ${product.name}'s data directory, so it is left as it is.`,
   },

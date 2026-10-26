@@ -9,6 +9,7 @@ import { api, send } from "../../api";
 import { useT } from "../../i18n";
 import type { DiffFile, Run } from "../../types";
 import type { Notify, Tab } from "../AppShell";
+import { readRunFiles } from "./useRunActions";
 
 interface RunRoundsOptions {
   run: Run;
@@ -54,10 +55,13 @@ export function useRunRounds({
       return kept.length === previous.length ? previous : kept;
     });
   }, [run.prFeedback]);
-  /** Re-reads the diff after a sync, an undo or a discard moved the checkout. */
+  /**
+   * Re-reads the diff after a sync, an undo or a discard moved the checkout.
+   * A run whose files were freed has none: a discard can rescue such a run.
+   */
   async function refreshFiles(id: string) {
-    const result = await api<{ files: DiffFile[] }>(`/runs/${id}/diff`);
-    if (runIdRef.current === id) setFiles(result.files);
+    const files = await readRunFiles(id);
+    if (runIdRef.current === id) setFiles(files);
   }
   async function syncToLatest() {
     setBusy(true);

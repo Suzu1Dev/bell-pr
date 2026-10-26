@@ -240,8 +240,9 @@ async function removeWorkspace(
  * Frees a finished run's disk space: its Git worktree, its teammates'
  * checkouts, its branch in BELL's own clone and its sync ref. The run, its
  * reports, notes and explanations stay; the diff then answers 410
- * `workspace_removed`. Refused (409) while the run is still working, and
- * when its worktree lies outside the data directory.
+ * `workspace_removed`. Refused (409) while the run is still working or has
+ * a follow-up round open, and when its worktree lies outside the data
+ * directory.
  */
 export async function archiveRunWorkspace(
   ctx: WorkbenchContext,
@@ -253,6 +254,9 @@ export async function archiveRunWorkspace(
     if (run.workspaceRemovedAt) return run;
     if (runActive(ctx, run))
       throw new AppError((m) => m.storage.workspace.busy, 409);
+    // Pushing or discarding the round needs the checkout.
+    if (activeFollowUp(run.followUps))
+      throw new AppError((m) => m.storage.workspace.roundOpen, 409);
     if (!(await ownsWorkspace(ctx, run)))
       throw new AppError((m) => m.storage.workspace.outsideData, 409);
     const bytes = await removeWorkspace(ctx, run, repo);
@@ -545,7 +549,11 @@ async function buildStorageReport(ctx: WorkbenchContext): Promise<StorageReport>
               workspaceBytes: run.workspaceBytes,
             }
           : {}),
-        removable: !run.workspaceRemovedAt && owned && !runActive(ctx, run),
+        removable:
+          !run.workspaceRemovedAt &&
+          owned &&
+          !runActive(ctx, run) &&
+          !activeFollowUp(run.followUps),
       };
     }),
   );

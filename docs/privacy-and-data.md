@@ -151,7 +151,7 @@ this reaches the server's data directory.
 
 | To delete | Do this |
 | --- | --- |
-| A run's working files | **Settings → Data & privacy → Storage → Free space**, or **Free disk space** in the contributions list. The record and notes stay. |
+| A run's working files | **Settings → Data & privacy → Storage → Free space**, or **Free disk space** in the contributions list. The record and notes stay. While a follow-up round is open, push or discard it first. |
 | A run | **Delete run** in the contributions list (Workbench → View all contributions). |
 | A project | **Delete repository** on the Repositories page. Its runs, notes and analysis go too, and so does BELL PR's clone. A folder you imported from your computer stays where it is. |
 | Everything | **Settings → Data & privacy → Delete all data**, then type `ERASE`. Every project, run, analysis, discovery result, log and backup is deleted; your settings stay. Stop running work first. |

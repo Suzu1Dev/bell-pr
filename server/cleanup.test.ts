@@ -29,6 +29,7 @@ import {
 } from "./cleanup.js";
 import { learningPageSize } from "./routes/learning.js";
 import type { Repository, Run } from "./types.js";
+import type { FollowUpRound } from "../shared/followups.js";
 
 const dayMs = 24 * 60 * 60 * 1000;
 const token = `ghp_${"Z9y8X7w6".repeat(4)}`;
@@ -329,6 +330,60 @@ test("BELL's clone of a local-only checkout is its own: freeing a run deletes th
   assert.equal((await git(repo.path, ["branch", "--list", value.branch])).stdout.trim(), "");
   // The person's checkout never had the branch.
   assert.equal((await git(checkout, ["branch", "--list", value.branch])).stdout.trim(), "");
+});
+
+test("a published run keeps its files while a follow-up round is open, and a round left open without files can still be discarded", async (t) => {
+  const f = await fixture();
+  t.after(f.cleanup);
+  const clonePath = path.join(f.dataDir, "repositories", "test-owner-example-5e6f7a8b");
+  const baseSha = await gitRepository(clonePath, "https://github.com/test-owner/example.git");
+  const repo = addRepository(f, clonePath, "https://github.com/test-owner/example");
+  const prUrl = "https://github.com/test-owner/example/pull/1";
+  const round = (): FollowUpRound => ({
+    id: randomUUID(),
+    kind: "sync",
+    requestedAt: new Date().toISOString(),
+    feedbackUrls: [],
+    status: "review",
+    parentCommit: baseSha,
+    previousBase: "1".repeat(40),
+  });
+  // A round finished editing and waits for review or discard.
+  const open = await runWithWorkspace(f, repo, baseSha, "ffffffff-6666-4666-8666-666666666666", {
+    status: "review",
+    prUrl,
+    followUps: [round()],
+  });
+  const storage = (await f.call("GET", "/api/storage")).body;
+  assert.equal(storage.runs.find((entry: { id: string }) => entry.id === open.id).removable, false);
+  const refused = await f.call("DELETE", `/api/runs/${open.id}/workspace`, {});
+  assert.equal(refused.status, 409);
+  assert.equal(
+    refused.body.error,
+    "This run has a follow-up round that is not finished. Push it or discard it first, then free the disk space.",
+  );
+  assert.equal(await exists(open.worktreePath), true);
+  assert.equal(open.workspaceRemovedAt, undefined);
+
+  // An earlier build freed a run like this one: discarding closes the round
+  // without its files, so the run is a published PR again.
+  const stuck = await runWithWorkspace(f, repo, baseSha, "abcdabcd-8888-4888-8888-888888888888", { prUrl });
+  assert.equal((await f.call("DELETE", `/api/runs/${stuck.id}/workspace`, {})).status, 200);
+  stuck.followUps = [round()];
+  stuck.status = "approved";
+  stuck.approvedFingerprint = "approved";
+  stuck.draft = { ...stuck.draft, commitMessage: "Merge branch 'main' into feature" };
+  const discarded = await f.call("POST", `/api/runs/${stuck.id}/follow-ups/discard`, {});
+  assert.equal(discarded.status, 200, discarded.text);
+  assert.equal(discarded.body.run.status, "published");
+  assert.equal(discarded.body.run.followUps[0].status, "discarded");
+  assert.equal(discarded.body.run.baseSha, "1".repeat(40));
+  assert.equal(discarded.body.run.approvedFingerprint, undefined);
+  assert.equal(discarded.body.run.draft.commitMessage, undefined);
+  assert.equal(
+    stuck.logs.at(-1)!.message,
+    "Discarded the follow-up round; its changes went with the working files removed earlier.",
+  );
 });
 
 test("retention frees only failed and cancelled runs past the period and never touches active or published ones", async (t) => {

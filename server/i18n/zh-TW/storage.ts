@@ -41,6 +41,7 @@ const m: Translation<typeof en> = {
     retentionLog: ({ bytes, days }) =>
       `這個工作結束 ${days} 天後已移除工作檔案，釋出 ${size(bytes)}；報告、筆記與解說仍保留。`,
     busy: "這個工作仍在進行中。請先停止或等它完成，再試一次。",
+    roundOpen: "這個工作還有一輪修正尚未結束。請先推送或放棄這輪修正，再釋放磁碟空間。",
     outsideData: `這個工作的工作目錄不在 ${product.name} 的資料目錄內，因此不會移除。`,
   },
   repos: {

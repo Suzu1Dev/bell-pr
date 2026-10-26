@@ -371,6 +371,24 @@ export async function discardFollowUp(ctx: WorkbenchContext, id: string) {
       !["review", "approved"].includes(run.status)
     )
       throw new AppError((m) => m.run.followUp.nothingToDiscard, 409);
+    if (run.workspaceRemovedAt) {
+      // An earlier build freed the files with the round open: they took the
+      // edits with them, so only the round is closed.
+      if (round.commit && (await prHasCommit(ctx, run, round.commit)))
+        throw new AppError((m) => m.run.followUp.alreadyPushed, 409);
+      delete round.commit;
+      if (round.previousBase) run.baseSha = round.previousBase;
+      round.status = "discarded";
+      run.status = "published";
+      delete run.approvedFingerprint;
+      delete run.error;
+      // Reading the pushed message back needs the checkout, so the round's goes.
+      const { commitMessage: _round, ...draft } = run.draft;
+      run.draft = draft;
+      ctx.log(run, "user", sm().run.followUp.discardedWithoutFiles);
+      await ctx.store.save();
+      return run;
+    }
     // Learn by hand: refused rather than dropping the person's commits or deleting their files.
     const roundFiles = run.learnByHand ? await byHandDiscardable(run, round) : undefined;
     if (round.commit) {

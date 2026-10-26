@@ -355,6 +355,7 @@ const m: Translation<typeof en> = {
     nothingToDiscard: "目前沒有可以放棄的修正。",
     alreadyPushed: `這輪修正已推送到 PR；請再按一次推送，讓 ${product.name} 記錄完成。`,
     discarded: "已放棄這輪修正，工作目錄回到已推送的 PR 內容。",
+    discardedWithoutFiles: "已放棄這輪修正；它的修改已隨先前移除的工作檔案一併刪除。",
     answerIncomplete: "Agent 回傳的修正結果格式不完整",
     pushUnknown: "無法確認這輪修正是否已推送到 PR。",
     remoteMoved: ({ branch }) =>
