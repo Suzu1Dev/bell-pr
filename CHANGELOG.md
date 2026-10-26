@@ -380,6 +380,13 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   then exits with a message. After `docker rm -f`, the new container starts
   once the old lock runs out.
 
+- **A clock step no longer hides the running BELL PR.** If the clock jumped
+  forward after BELL PR started, `bell-pr open` said nothing was running and
+  a second start could take over the data directory. This happens on
+  computers without a hardware clock, which set the time after boot. The lock
+  now records the uptime and, on Linux, the boot ID. A clock step changes
+  neither.
+
 ### Security
 
 - **zod 4.** The server validates requests, agent answers and saved files

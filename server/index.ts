@@ -107,6 +107,14 @@ export interface LockInfo {
    * judges the lock by its age instead: the holder renews it.
    */
   pidNamespace?: string;
+  /**
+   * Linux: the kernel's boot id. With `uptime`, it tells a lock written
+   * before the machine restarted without trusting the clock, which may
+   * have been stepped since.
+   */
+  bootId?: string;
+  /** Seconds the machine had been up when the lock was written. */
+  uptime?: number;
 }
 
 /**
@@ -187,6 +195,30 @@ function currentPidNamespace(): string | undefined {
   }
 }
 
+/** Linux: an id that changes with every boot of the machine; undefined elsewhere. */
+function currentBootId(): string | undefined {
+  if (process.platform !== "linux") return undefined;
+  try {
+    return readFileSync("/proc/sys/kernel/random/boot_id", "utf8").trim() || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Whether the lock was written before the machine last started: by its
+ * boot id, else by an uptime more than a second above the current one
+ * (os.uptime() counts whole seconds on some systems). Only a lock from an
+ * older build, which has neither, is compared with the clock.
+ */
+function writtenBeforeBoot(lock: LockInfo) {
+  const bootId = currentBootId();
+  if (lock.bootId !== undefined && bootId !== undefined) return lock.bootId !== bootId;
+  if (typeof lock.uptime === "number") return os.uptime() + 1 < lock.uptime;
+  const startedAt = Date.parse(lock.startedAt ?? "");
+  return Number.isFinite(startedAt) && startedAt < Date.now() - os.uptime() * 1000 - 120_000;
+}
+
 /** Whether the lock was written in another container or on another machine. */
 function writtenElsewhere(lock: LockInfo) {
   return lock.pidNamespace !== undefined && lock.pidNamespace !== currentPidNamespace();
@@ -214,9 +246,7 @@ function lockHolderAlive(lock: LockInfo, file: string, copy = file): boolean {
   if (writtenElsewhere(lock)) return renewedWithinLease(copy);
   if (lock.pid === process.pid) return heldLocks.has(file);
   if (!processAlive(lock.pid)) return false;
-  const startedAt = Date.parse(lock.startedAt ?? "");
-  if (Number.isFinite(startedAt) && startedAt < Date.now() - os.uptime() * 1000 - 120_000)
-    return false;
+  if (writtenBeforeBoot(lock)) return false;
   const argv = commandLine(lock.pid);
   return !argv?.length || /node/i.test(path.basename(argv[0]));
 }
@@ -472,6 +502,8 @@ export async function startServer(
         url,
         startedAt: new Date().toISOString(),
         pidNamespace: currentPidNamespace(),
+        bootId: currentBootId(),
+        uptime: os.uptime(),
       },
       config.dataDir,
     );

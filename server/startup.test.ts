@@ -14,7 +14,7 @@ import {
 import { mkdtemp, rm } from "node:fs/promises";
 import { request } from "node:http";
 import { createServer, type AddressInfo } from "node:net";
-import { tmpdir } from "node:os";
+import { tmpdir, uptime } from "node:os";
 import path from "node:path";
 import { baseUrl, resolveConfig, ConfigError, defaultStaticDir } from "./config.js";
 import { createApp } from "./app.js";
@@ -354,6 +354,7 @@ test("startServer serves the app, takes the lock and releases it", async () => {
       assert.equal(lock.port, port);
       assert.equal(lock.url, running.url);
       assert.equal(lock.version, version);
+      assert.ok(lock.uptime > 0 && lock.uptime <= uptime(), String(lock.uptime));
       assert.equal(statSync(path.join(box.data, "bellpr.lock")).mode & 0o777, 0o600);
       assert.equal(statSync(path.join(box.data, "state.json")).mode & 0o777, 0o600);
       assert.equal(statSync(box.data).mode & 0o777, 0o700);
@@ -566,6 +567,42 @@ test("the running instance renews its lock and leaves one that another PID names
     }
     assert.equal(JSON.parse(readFileSync(file, "utf8")).pidNamespace, otherContainer);
   } finally {
+    await box.cleanup();
+  }
+});
+
+test("a lock from before the last boot is told by its boot id or uptime, not by a clock step", async () => {
+  const box = await sandbox();
+  // A live Node.js process stands in for the running instance.
+  const holder = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], { stdio: "ignore" });
+  try {
+    await once(holder, "spawn");
+    // The clock stepped forward since the instance started, as when NTP
+    // corrects a computer without a hardware clock: by the clock, it now
+    // started 10 minutes before the computer did.
+    const older = {
+      pid: holder.pid!,
+      port: 4311,
+      version,
+      startedAt: new Date(Date.now() - uptime() * 1000 - 10 * 60_000).toISOString(),
+    };
+    const lock = { ...older, uptime: uptime() };
+    assert.equal(lockHolderRunning(box.data, lock), true);
+    // Written when the computer had been up longer than it is now.
+    assert.equal(lockHolderRunning(box.data, { ...lock, uptime: uptime() + 3600 }), false);
+    if (process.platform === "linux") {
+      const bootId = readFileSync("/proc/sys/kernel/random/boot_id", "utf8").trim();
+      assert.equal(lockHolderRunning(box.data, { ...older, bootId }), true);
+      assert.equal(lockHolderRunning(box.data, { ...lock, bootId: "an earlier boot" }), false);
+    }
+    // A lock from an older build has neither: its start is compared with the clock.
+    assert.equal(lockHolderRunning(box.data, older), false);
+    assert.equal(
+      lockHolderRunning(box.data, { ...older, startedAt: new Date().toISOString() }),
+      true,
+    );
+  } finally {
+    holder.kill("SIGKILL");
     await box.cleanup();
   }
 });
