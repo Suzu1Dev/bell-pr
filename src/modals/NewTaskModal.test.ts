@@ -1,12 +1,14 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createElement } from "react";
+import { act, createElement } from "react";
 import type { DoctorReport } from "../../shared/doctor";
 import { defaultContributionSettings } from "../../shared/insights";
 import { getDemo } from "../demo";
+import { mount, type FakeElement } from "../mission/test-dom";
 import type { DoctorState } from "../setup/useDoctor";
 import { assertNoHan, renderEn, renderZh } from "../test-utils/render";
 import type { Repo } from "../types";
+import modals from "../i18n/en/modals";
 import { NewTaskModal } from "./NewTaskModal";
 
 type Props = Parameters<typeof NewTaskModal>[0];
@@ -71,7 +73,7 @@ const element = (
       repos: [repo],
       busy: false,
       formError: "",
-      startTask() {},
+      async startTask() {},
       closeModal() {},
       openModal() {},
       navigate() {},
@@ -251,4 +253,62 @@ test("under the request the dialog asks who writes the code; the sample shows th
   assert.ok(sample.includes("The sample shows the agent team. Learn by hand works on your own projects."));
   const hand = sample.match(/(<input type="radio"[^>]*-mode"[^>]*\/>)<svg(?:(?!<input)[\s\S])*?<strong>You write it/)?.[1];
   assert.match(hand ?? "", /disabled=""/);
+});
+
+/** Calls the handler React gave `element` (the fake DOM dispatches no events), without waiting for what it starts. */
+const react = (element: FakeElement, name: "onClick" | "onSubmit") =>
+  act(async () => {
+    const props = Object.entries(element).find(([key]) => key.startsWith("__reactProps$"))?.[1] as Record<
+      string,
+      (event: { preventDefault(): void }) => unknown
+    >;
+    void props[name]({ preventDefault() {} });
+  });
+
+test("while the task is being started the dialog cannot be closed or left, so it can still open the run or show the error", async () => {
+  let closed = 0;
+  let finish = () => {};
+  const props = (busy: boolean): Partial<Omit<Props, "setup">> => ({
+    busy,
+    closeModal: () => void closed++,
+    startTask: () => new Promise<void>((resolve) => (finish = resolve)),
+  });
+  const setup = { prompt: "Retry GET requests on timeout" };
+  const view = await mount(element(setup, props(false)));
+  try {
+    const find = (match: (element: FakeElement) => boolean) => view.container.querySelectorAll(match)[0]!;
+    const button = (text: string) => find((element) => element.nodeName === "BUTTON" && element.textContent === text);
+    // The close button, Escape and the backdrop all close through the Modal's onClose.
+    const close = () => react(find((element) => element.getAttribute("class") === "icon-button modal-close"), "onClick");
+    await react(find((element) => element.nodeName === "FORM"), "onSubmit");
+    // AppShell is busy while the run is created, as it is for every request.
+    await view.rerender(element(setup, props(true)));
+    await close();
+    assert.equal(closed, 0);
+    // Import and Recommendations would leave the dialog too.
+    for (const text of ["Cancel", modals.newTask.importOther, modals.newTask.recommendations])
+      assert.ok(button(text).hasAttribute("disabled"), text);
+    // A failed start leaves the dialog open, and then it closes again.
+    await act(async () => finish());
+    await view.rerender(element(setup, props(false)));
+    assert.ok(!button("Cancel").hasAttribute("disabled"));
+    await close();
+    assert.equal(closed, 1);
+  } finally {
+    await view.unmount();
+  }
+});
+
+test("another request that runs while the new-task dialog is open does not keep it from closing", async () => {
+  let closed = 0;
+  const view = await mount(element({}, { busy: true, closeModal: () => void closed++ }));
+  try {
+    const find = (match: (element: FakeElement) => boolean) => view.container.querySelectorAll(match)[0]!;
+    const cancel = find((element) => element.nodeName === "BUTTON" && element.textContent === "Cancel");
+    assert.ok(!cancel.hasAttribute("disabled"));
+    await react(find((element) => element.getAttribute("class") === "icon-button modal-close"), "onClick");
+    assert.equal(closed, 1);
+  } finally {
+    await view.unmount();
+  }
 });

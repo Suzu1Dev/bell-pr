@@ -276,6 +276,13 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   was removed. These are now removed too, unless the project's files have
   them word for word.
 
+- **Closing the new-task dialog while a task starts.** Cancel, Escape, the
+  close button, the backdrop, **Import another project** or **See
+  AI-recommended directions first** could leave the dialog while the run was
+  being created, but the request went on anyway: on success the app jumped
+  to the new run, and a failure was never shown. The dialog now stays open
+  until the request ends, as the split dialog does.
+
 ### Security
 
 - **zod 4.** The server validates requests, agent answers and saved files

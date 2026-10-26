@@ -43,7 +43,8 @@ interface NewTaskModalProps {
   repos: Repo[];
   busy: boolean;
   formError: string;
-  startTask: (event: FormEvent) => void;
+  /** Creates the run; resolves once the request has ended, whether it succeeded or failed. */
+  startTask: (event: FormEvent) => Promise<void>;
   closeModal: () => void;
   openModal: (value: ModalName) => void;
   navigate: (value: Page) => void;
@@ -98,20 +99,30 @@ export function NewTaskModal({
   // Who writes it (DESIGN v1.2 F1): the person's choice, else the suggestion; the fitted help set is preselected.
   const [modeChoice, setModeChoice] = useState<RunMode>();
   const [fitChoice, setFitChoice] = useState<boolean>();
+  // True while this dialog's own start request runs; `busy` is shared by every action in the app.
+  const [sending, setSending] = useState(false);
   const { rules, rulesCase, learningIssue = false } = startCheck;
   const mode = demo ? "agents" : (modeChoice ?? suggestedMode({ preferred: preferredMode, learningIssue, rules }));
   const fitted = mode === "hand" && rulesCase?.case === "fitted" && (fitChoice ?? true);
   const reasons = mode === "hand" ? byHandStartReasons(startCheck.reasons, rulesCase, fitted) : startCheck.reasons;
   const reasonsKey = startReasonsKey(reasons);
-  const submit = (event: FormEvent) => {
+  const submit = async (event: FormEvent) => {
     if (reasons.length && accepted.current !== reasonsKey) {
       event.preventDefault();
       setAsking(true);
       return;
     }
     runRequest.current = mode === "hand" ? { learnByHand: true, ...(fitted ? { byHandFit: { learningIssue } } : {}) } : {};
-    startTask(event);
+    setSending(true);
+    try {
+      await startTask(event);
+    } finally {
+      setSending(false);
+    }
   };
+  // A started run cannot be called back: the dialog stays until the request ends, then opens the run or shows why it failed.
+  // Another action that runs meanwhile does not hold the dialog open.
+  const close = sending ? () => {} : closeModal;
   // The sample needs no tools. Otherwise a run waits for a ready provider;
   // when the check itself cannot answer, the server decides on submit.
   const readiness = readinessOf(doctor.report, ["provider"]);
@@ -135,7 +146,7 @@ export function NewTaskModal({
       wide
       title={mode === "hand" ? modeText.start : t.title}
       subtitle={t.subtitle}
-      onClose={closeModal}
+      onClose={close}
     >
       <form ref={form} onSubmit={submit}>
         <label className="field-label" htmlFor="task-repo">
@@ -161,12 +172,13 @@ export function NewTaskModal({
           ))}
         </select>
         <div className="task-repo-actions">
-          <button type="button" onClick={() => openModal("import")}>
+          <button type="button" disabled={sending} onClick={() => openModal("import")}>
             <Plus size={13} />
             {t.importOther}
           </button>
           <button
             type="button"
+            disabled={sending}
             onClick={() => {
               closeModal();
               setExploreRepoId(taskRepoId);
@@ -288,6 +300,7 @@ export function NewTaskModal({
           <button
             type="button"
             className="button secondary"
+            disabled={sending}
             onClick={closeModal}
           >
             {common.actions.cancel}
