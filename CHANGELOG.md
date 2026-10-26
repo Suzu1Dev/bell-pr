@@ -353,6 +353,12 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   its questions can change. A refused lock also re-reads it, and what you
   typed is kept.
 
+- **Each understanding check is timed from its own opening.** A re-check
+  after a follow-up round, or a check after Start over, in the same tab was
+  timed from the first time the check opened in that session. A four-minute
+  check could be stored as 45 minutes, which pushed up the median check time
+  in Settings > Learning. Each check is now timed from when it opens.
+
 ### Security
 
 - **zod 4.** The server validates requests, agent answers and saved files

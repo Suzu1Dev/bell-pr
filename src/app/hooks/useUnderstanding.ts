@@ -98,6 +98,7 @@ export type CheckPanelMode = "check" | "forecast";
 
 let panel: { runId: string; mode: CheckPanelMode } | null = null;
 const panelListeners = new Set<() => void>();
+/** When each run's current check opened (see useUnderstanding), sent with the answers. */
 const openedAt = new Map<string, string>();
 const subscribePanel = (listener: () => void) => {
   panelListeners.add(listener);
@@ -110,15 +111,13 @@ function setPanel(value: typeof panel) {
 
 /**
  * Opens the check next to the diff of run `runId`: the Changes tab, with
- * its file kept. The first opening in this page session is when the check
- * started (sent with the answers).
+ * its file kept.
  */
 export function openCheckPanel(
   runId: string,
   mode: CheckPanelMode = "check",
   options: { replace?: boolean } = {},
 ) {
-  if (!openedAt.has(runId)) openedAt.set(runId, new Date().toISOString());
   setPanel({ runId, mode });
   const route = currentRoute();
   // `panel=check` only asks for the panel; it does not stay in the address.
@@ -283,6 +282,18 @@ export function useUnderstanding(
     return served?.runId === run.id ? served.view : undefined;
   }, [demo, rules, run, files, required, questions, open, served]);
 
+  const panelMode = useCheckPanel(run.id);
+  const passed = view?.passed;
+  // A check opens when the panel first shows it open and not passed;
+  // closing and reopening the panel keeps that time. A pass, or the run
+  // leaving review (a follow-up round), ends it, so the next check is
+  // timed from its own opening.
+  useEffect(() => {
+    if (passed || !open) openedAt.delete(run.id);
+    else if (passed === false && panelMode && !openedAt.has(run.id))
+      openedAt.set(run.id, new Date().toISOString());
+  }, [passed, open, panelMode, run.id]);
+
   /** Shows a real run's answer when it is still the open run. */
   function accept({ run: updated, understanding }: Saved) {
     if (openRun.current !== updated.id) return;
@@ -372,9 +383,11 @@ export function useUnderstanding(
       if (demo) {
         const record = demoRules().demoRestart(run);
         keep(() => ({ understanding: record }));
-        return;
+      } else {
+        await write("DELETE", "/understanding");
       }
-      await write("DELETE", "/understanding");
+      // Start over is taken in the open panel: the new check opens now.
+      openedAt.set(run.id, now());
     },
     /** The forecast alone (PUT /api/runs/:id/forecast). */
     async saveForecast(input: MaintainerForecastInput) {

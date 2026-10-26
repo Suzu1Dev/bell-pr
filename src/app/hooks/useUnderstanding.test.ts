@@ -125,3 +125,65 @@ test("a real run's check is read again when a walkthrough becomes ready, the rep
     globalThis.fetch = realFetch;
   }
 });
+
+test("each check is timed from its own opening: a re-check after a pass and a check after Start over", async (t) => {
+  const at = (time: string) => `2026-10-26T${time}:00.000Z`;
+  t.mock.timers.enable({ apis: ["Date"], now: Date.parse(at("10:00")) });
+  const clock = (time: string) => t.mock.timers.setTime(Date.parse(at(time)));
+  const run = (status: string) => ({ id: "run-1", repoId: "repo-1", status, agents: [] }) as unknown as Run;
+  const opened: unknown[] = [];
+  let passed = false;
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    if (url.endsWith("/understanding/answers")) opened.push(JSON.parse(String(init?.body)).openedAt);
+    const understanding = { required: true, passed, stale: false, plan: [], missing: [], changeFingerprint: "fp" };
+    const body = url.endsWith("/app-settings")
+      ? { settings: {}, lockedBy: {} }
+      : init?.method
+        ? { run: run("review"), understanding }
+        : { understanding };
+    return new Response(JSON.stringify(body), { headers: { "Content-Type": "application/json" } });
+  }) as typeof fetch;
+  let latest: Understanding | undefined;
+  function Live({ value }: { value: Run }) {
+    latest = useUnderstanding(value, [], { demo: false, setRun() {} });
+    return null;
+  }
+  const settle = () => act(async () => new Promise((resolve) => setTimeout(resolve, 10)));
+  const lock = () => act(async () => latest!.saveAnswers({ summary: "A summary.", items: [] }));
+  // Opened before the mount, without a window: the address stays as it is.
+  openCheckPanel("run-1");
+  const mounted = await mount(createElement(Live, { value: run("review") }));
+  try {
+    await settle();
+    // Closing and reopening the panel keeps the time the check opened.
+    Object.assign(globalThis.window, { history: { state: null, replaceState() {} } });
+    await act(async () => closeCheckPanel());
+    clock("10:01");
+    await act(async () => openCheckPanel("run-1", "check", { replace: true }));
+    clock("10:03");
+    await lock();
+    clock("10:04");
+    passed = true;
+    await act(async () => latest!.saveGrades({ items: [] }));
+    // A follow-up round moves the change while the panel stays open.
+    await mounted.rerender(createElement(Live, { value: run("running") }));
+    await settle();
+    passed = false;
+    clock("10:41");
+    await mounted.rerender(createElement(Live, { value: run("review") }));
+    await settle();
+    clock("10:44");
+    await lock();
+    clock("10:50");
+    await act(async () => latest!.restart());
+    clock("10:53");
+    await lock();
+    assert.deepEqual(opened, [at("10:00"), at("10:41"), at("10:50")]);
+  } finally {
+    await mounted.unmount();
+    globalThis.fetch = realFetch;
+    closeCheckPanel();
+  }
+});
