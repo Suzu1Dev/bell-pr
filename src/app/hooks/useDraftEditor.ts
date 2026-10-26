@@ -293,7 +293,9 @@ export function useDraftEditor({
    */
   async function persistDraft(aiDisclosure?: boolean) {
     const { body, choice } = savedDisclosure(draftBody, aiDisclosure, run.learnByHand);
-    if (!draftTitle.trim() || !body.trim()) {
+    // The server stores the title trimmed, so the editor saves it that way.
+    const title = draftTitle.trim();
+    if (!title || !body.trim()) {
       notify(t.draftRequired, "error");
       return;
     }
@@ -313,7 +315,7 @@ export function useDraftEditor({
           return {
             ...previous,
             draft: {
-              title: draftTitle,
+              title,
               body,
               ...(commitMessage ? { commitMessage } : {}),
               ...(publishBranch ? { publishBranch } : {}),
@@ -326,7 +328,7 @@ export function useDraftEditor({
         const { run: updated } = await api<{ run: Run }>(
           `/runs/${run.id}/draft`,
           send("PATCH", {
-            title: draftTitle,
+            title,
             body,
             commitMessage,
             publishBranch,
@@ -346,6 +348,9 @@ export function useDraftEditor({
       }
       // The editor shows the saved line, or no longer shows it.
       if (open && body !== draftBody) setDraftBody(body);
+      // And the saved title, unless the person typed on while it saved.
+      if (open && title !== draftTitle)
+        setDraftTitle((current) => (current === draftTitle ? title : current));
       if (aiDisclosure === undefined) notify(t.draftSaved);
     } catch (error) {
       notify((error as Error).message, "error");

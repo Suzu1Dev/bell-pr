@@ -304,6 +304,13 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   now follows the results on screen, and it no longer appears when there
   are no results.
 
+- **A PR title with a stray space no longer stays unsaved.** If the title
+  had a space at the start or end, saving said "Draft saved" but the editor
+  kept the space. The server stores the title without it, so the draft still
+  showed as unsaved, Approve stayed disabled with "save first", and
+  switching runs asked to discard changes. Saving now trims the title and
+  shows the saved title in the editor.
+
 ### Security
 
 - **zod 4.** The server validates requests, agent answers and saved files

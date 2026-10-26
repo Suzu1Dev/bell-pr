@@ -99,3 +99,53 @@ test("a draft saved after the team finished leaves the run to the poll, with the
     globalThis.fetch = realFetch;
   }
 });
+
+test("a title saved with a stray space shows as saved, so Approve no longer asks to save first", async () => {
+  const review = {
+    id: "run-1",
+    repoId: "repo-1",
+    status: "review",
+    baseBranch: "main",
+    agents: [],
+    draft: { title: "t", body: "b" },
+  } as unknown as Run;
+  const sent: { title: string }[] = [];
+  const realFetch = globalThis.fetch;
+  // Like PATCH /runs/:id/draft, the server trims the title it stores.
+  globalThis.fetch = (async (_url: string, init?: RequestInit) => {
+    const patch = JSON.parse(String(init?.body)) as { title: string; body: string };
+    sent.push(patch);
+    return new Response(
+      JSON.stringify({ run: { ...review, draft: { title: patch.title.trim(), body: patch.body } } }),
+      { headers: { "Content-Type": "application/json" } },
+    );
+  }) as typeof fetch;
+  let editor: DraftEditor | undefined;
+  function Probe() {
+    const [run, setRun] = useState(review);
+    editor = useDraftEditor({
+      run,
+      setRun,
+      demo: false,
+      runIdRef: { current: run.id },
+      notify() {},
+      setBusy() {},
+    });
+    return null;
+  }
+  const mounted = await mount(createElement(Probe));
+  try {
+    // A first save, then a save that leaves the stored title as it was.
+    for (const typed of ["Fix the retry bug ", "Fix the retry bug  "]) {
+      await act(async () => editor!.setDraftTitle(typed));
+      await act(async () => editor!.saveDraft());
+      assert.equal(editor!.draftDirty, false);
+      assert.equal(editor!.draftTitle, "Fix the retry bug");
+      // Approve sends the editor's title, which must match the stored one.
+      assert.equal(sent.at(-1)!.title, "Fix the retry bug");
+    }
+  } finally {
+    await mounted.unmount();
+    globalThis.fetch = realFetch;
+  }
+});
