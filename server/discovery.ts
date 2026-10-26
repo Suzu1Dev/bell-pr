@@ -701,7 +701,9 @@ export class DiscoveryService {
           }
           return true;
         });
-        repo.warnings = repo.warnings.slice(0, 30);
+        repo.warnings = repo.warnings
+          .map((warning) => redact(warning).slice(0, 2400))
+          .slice(0, 30);
         return true;
       });
       const eligible = job.candidates.filter((repo) =>

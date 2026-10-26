@@ -1282,3 +1282,46 @@ test("a discovery job marks the opportunities on learning-labelled issues it col
     await f.cleanup();
   }
 });
+
+test("a credential in a candidate warning reaches neither the Agent nor discovery.json", async () => {
+  let input = "";
+  const f = await fixture({
+    collectCandidates: async () => ({
+      candidates: [
+        {
+          ...copy(candidate),
+          warnings: ["Masked a source: ghp_abcdefghijklmnopqrstuvwxyz"],
+        },
+      ],
+      warnings: [],
+    }),
+    command: async (_executable, _args, options) => {
+      input = options!.input!;
+      options?.onLine?.(
+        JSON.stringify({
+          type: "item.completed",
+          item: { type: "agent_message", text: answer() },
+        }),
+        "stdout",
+      );
+      return { stdout: "", stderr: "", code: 0 };
+    },
+  });
+  try {
+    await f.service.start(defaultDiscoveryPreferences);
+    const job = await finished(f.service);
+    assert.equal(job.status, "ready");
+    assert.deepEqual(job.candidates[0].warnings, [
+      "Masked a source: [REDACTED]",
+    ]);
+    assert.ok(input.includes("Masked a source: [REDACTED]"));
+    assert.ok(!input.includes("ghp_"));
+    assert.ok(
+      !(
+        await readFile(path.join(f.directory, "discovery.json"), "utf8")
+      ).includes("ghp_"),
+    );
+  } finally {
+    await f.cleanup();
+  }
+});

@@ -207,13 +207,15 @@ export async function collectDiscoveryCandidates(
     limit: number,
   ) => {
     if (!source.content.trim() || candidate.sources.length >= 15) return;
+    // Issue titles are remote text, so warnings name the source by its masked title.
+    const title = redact(source.title).slice(0, 180);
     if (/[\x00-\x08\x0b\x0c\x0e-\x1f\ufffd]/.test(source.content)) {
-      candidate.warnings.push(messages.unreadableText({ title: source.title }));
+      candidate.warnings.push(messages.unreadableText({ title }));
       return;
     }
     const cleaned = redact(source.content);
     if (cleaned !== source.content)
-      candidate.warnings.push(messages.maskedCredentials({ title: source.title }));
+      candidate.warnings.push(messages.maskedCredentials({ title }));
     const used = candidate.sources.reduce(
       (total, item) => total + Buffer.byteLength(item.content),
       0,
@@ -224,13 +226,13 @@ export async function collectDiscoveryCandidates(
     if (bytes.length > available)
       candidate.warnings.push(
         messages.truncatedSource({
-          title: source.title,
+          title,
           bytes: number(available),
         }),
       );
     candidate.sources.push({
       ...source,
-      title: redact(source.title).slice(0, 180),
+      title,
       content: bytes
         .subarray(0, available)
         .toString("utf8")

@@ -464,6 +464,42 @@ test("remote content cannot redirect requests and sensitive or foreign evidence 
   );
 });
 
+test("a credential in an issue title is masked in the warnings that name the source", async () => {
+  const token = "ghp_abcdefghijklmnopqrstuvwxyz";
+  const stub = fakeGithub((endpoint) =>
+    endpoint === "graphql"
+      ? metadata("one", {
+          issues: {
+            nodes: [
+              {
+                ...issue(),
+                title: `Leaked token ${token} in CI logs`,
+                body: "x".repeat(4_000),
+              },
+              {
+                ...issue("one", 2),
+                title: `Another ${token} report`,
+                body: "Binary\0data",
+              },
+            ],
+          },
+        })
+      : undefined,
+  );
+  const result = await collectDiscoveryCandidates(preferences, {
+    command: stub.execute,
+  });
+  const [candidate] = result.candidates;
+  // Masked, truncated and unreadable sources each name the issue.
+  assert.equal(
+    candidate.warnings.filter((warning) => warning.includes("[REDACTED]"))
+      .length,
+    3,
+  );
+  assert.ok(candidate.warnings.every((warning) => !warning.includes("ghp_")));
+  assert.ok(candidate.sources.every((source) => !source.title.includes("ghp_")));
+});
+
 test("candidate count, source size and requests stay bounded while issues retain context", async () => {
   const stub = fakeGithub((endpoint, args) => {
     if (endpoint === "search/repositories")

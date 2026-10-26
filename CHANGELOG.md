@@ -288,6 +288,14 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   showed the backticks literally, while the explanation panel showed the
   same name as code. The note's heading now shows it as code too.
 
+- **Discovery no longer leaks a token from an issue title.** When an issue
+  title held something that looked like a credential, the warnings naming
+  that issue (masked credentials, truncated or unreadable source) kept it
+  unmasked. It then reached the Agent, the saved discovery results and the
+  card's rules details, and could make the whole search fail. These
+  warnings now show the masked title, and every candidate warning is masked
+  before it is passed on or saved.
+
 ### Security
 
 - **zod 4.** The server validates requests, agent answers and saved files
