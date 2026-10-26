@@ -311,6 +311,12 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   switching runs asked to discard changes. Saving now trims the title and
   shows the saved title in the editor.
 
+- **Ticked numbered checkboxes in a generated draft.** When a project's PR
+  template used numbered checkboxes ("1. [ ]"), the generated draft could
+  tick them for you, for example claiming you ran the tests or signed the
+  CLA, and nothing flagged it before you published. BELL PR now rejects
+  those drafts the same way it rejects ticked bulleted checkboxes.
+
 ### Security
 
 - **zod 4.** The server validates requests, agent answers and saved files

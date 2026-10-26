@@ -156,6 +156,9 @@ test("draft proposals require exact authoritative quotes, preserve template head
       body: good.body + "\nSigned-off-by: Somebody <somebody@example.invalid>",
     },
     { ...good, body: good.body + "\n- [x] Human confirmation" },
+    // GitHub renders ordered task items as checkboxes too.
+    { ...good, body: good.body + "\n1. [x] Human confirmation" },
+    { ...good, body: good.body + "\n2) [X] Human confirmation" },
   ])
     assert.throws(() =>
       parseDraftProposal(JSON.stringify(invalid), sourceContext),

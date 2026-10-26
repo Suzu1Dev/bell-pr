@@ -303,7 +303,8 @@ export function parseDraftProposal(
     /^\s*(?:Signed-off-by|Reviewed-by|Acked-by|Tested-by)\s*:/im.test(
       proposal.body,
     ) ||
-    /^\s*[-*+]\s*\[[xX]\]/m.test(proposal.body)
+    // Bulleted or ordered ("1. [x]"); GitHub renders both as checkboxes.
+    /^\s*(?:[-*+]|\d{1,9}[.)])\s*\[[xX]\]/m.test(proposal.body)
   )
     throw new AppError((m) => m.analysis.drafts.certifiesForPerson, 422);
   // The body is sent to GitHub as written; to-dos belong in the checklist.
