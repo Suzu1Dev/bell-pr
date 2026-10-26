@@ -575,6 +575,40 @@ test("explanation failure preserves completed work, requires explicit retry, and
   }
 });
 
+test("explanations asked for in another interface language keep the run's language", async () => {
+  const prompts: string[] = [];
+  const f = await fixture(async (input) => {
+    prompts.push(input.prompt);
+    return prompts.length === 1 ? "invalid JSON" : response(input.prompt);
+  });
+  try {
+    f.run.locale = "zh-TW";
+    await withLocale("en", () => f.workbench.explanations(f.run.id));
+    // The stored failure and its log entry are worded in the run's language.
+    assert.equal(
+      f.run.explanations?.["a.ts"].error,
+      "變更解說格式不完整，請重試產生解說。",
+    );
+    assert.ok(
+      f.run.logs.some(
+        (entry) => entry.message === "變更解說格式不完整，請重試產生解說。",
+      ),
+    );
+    // Retry from an English interface: the agent still answers in the run's language.
+    await withLocale("en", () =>
+      f.workbench.explanations(f.run.id, { retry: true }),
+    );
+    assert.equal(prompts.length, 2);
+    for (const prompt of prompts) {
+      assert.ok(prompt.includes(respondIn("zh-TW")));
+      assert.ok(!prompt.includes(respondIn("en")));
+    }
+    assert.equal(f.run.explanations?.["a.ts"].status, "ready");
+  } finally {
+    await f.cleanup();
+  }
+});
+
 test("legacy explanations remain readable during one automatic example migration and failed migrations only retry explicitly", async () => {
   let calls = 0;
   let start!: () => void;

@@ -317,6 +317,14 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   CLA, and nothing flagged it before you published. BELL PR now rejects
   those drafts the same way it rejects ticked bulleted checkboxes.
 
+- **Explanations keep the run's language.** After you switched the interface
+  language, retrying a failed explanation, explaining a file you edited by
+  hand, or asking for a Learn-by-hand explanation wrote the new card, its
+  error message and its log entry in the new interface language. The panel
+  still said the cards were in the run's language, so one run could end up
+  with cards in two languages. Explanations now always follow the language
+  the run started in.
+
 ### Security
 
 - **zod 4.** The server validates requests, agent answers and saved files

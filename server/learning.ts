@@ -176,7 +176,8 @@ export async function explanations(
       );
     });
     if (selected.length) {
-      const job = generateExplanations(ctx, run, selected)
+      // Background work of the run: its agent and its messages use the run's language.
+      const job = withRunLocale(run, () => generateExplanations(ctx, run, selected))
         // Waited on by later requests and at shutdown; a failed save must
         // not become an unhandled rejection that stops the server.
         .catch((error) =>
