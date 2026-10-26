@@ -249,10 +249,15 @@ export default function DiscoveryPanel({
     ? previous.candidates
     : (shown?.candidates ?? []);
   const disabled = loading || busy || running || !!choosing;
-  // Saved results in another language than the UI's say so.
+  // Results on screen in another language than the UI's say so: the
+  // previous results carry the locale of the search that found them.
+  const resultsSource = previous ?? shown;
   const resultsLocale =
-    !demo && shown?.locale && shown.locale !== locale
-      ? shown.locale
+    !demo &&
+    opportunities.length > 0 &&
+    resultsSource?.locale &&
+    resultsSource.locale !== locale
+      ? resultsSource.locale
       : undefined;
   // A live search needs the GitHub CLI and the chosen provider.
   const ownDoctor = useDoctor({ enabled: !demo && !doctor });

@@ -670,6 +670,42 @@ test("a discovery job records the locale it started in and keeps using it for it
   }
 });
 
+test("previous results keep the locale they were written in, across later searches and a restart", async () => {
+  let shouldFail = false;
+  const f = await fixture({
+    command: async (_executable, _args, options) => {
+      options?.onLine?.(
+        JSON.stringify(
+          shouldFail
+            ? { type: "turn.failed", error: { message: "Failure" } }
+            : { type: "item.completed", item: { type: "agent_message", text: answer() } },
+        ),
+        "stdout",
+      );
+      return { stdout: "", stderr: "", code: 0 };
+    },
+  });
+  try {
+    await withLocale("en", () => f.service.start({}));
+    assert.equal((await finished(f.service)).status, "ready");
+    shouldFail = true;
+    await withLocale("zh-TW", () => f.service.start({}));
+    const failed = await finished(f.service);
+    assert.equal(failed.status, "failed");
+    assert.equal(failed.locale, "zh-TW");
+    assert.equal(failed.previousResult?.locale, "en");
+    // Carried over again, the result keeps its own locale.
+    await withLocale("zh-TW", () => f.service.start({}));
+    assert.equal((await finished(f.service)).previousResult?.locale, "en");
+    await f.service.shutdown();
+    const reloaded = new DiscoveryService(f.store);
+    assert.equal((await reloaded.get()).job?.previousResult?.locale, "en");
+    await reloaded.shutdown();
+  } finally {
+    await f.cleanup();
+  }
+});
+
 test("restart words the interruption in the job's locale, or the current one for jobs saved without it", async () => {
   const f = await fixture();
   try {

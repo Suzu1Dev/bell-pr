@@ -296,6 +296,14 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   warnings now show the masked title, and every candidate warning is masked
   before it is passed on or saved.
 
+- **The language notice on Discovery matches the results you see.** When a
+  new search found nothing, was stopped or failed, the page kept showing
+  the previous results, but the note that they were written in another
+  language looked at the new search instead. Chinese results could appear
+  with no note, and English results could be labelled as Chinese. The note
+  now follows the results on screen, and it no longer appears when there
+  are no results.
+
 ### Security
 
 - **zod 4.** The server validates requests, agent answers and saved files

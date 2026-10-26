@@ -123,5 +123,10 @@ export interface DiscoveryJob {
     createdAt: string;
     candidates: DiscoveryCandidate[];
     opportunities: ContributionOpportunity[];
+    /**
+     * The locale of the job that found these results. Absent on results
+     * saved before it was recorded.
+     */
+    locale?: Locale;
   };
 }

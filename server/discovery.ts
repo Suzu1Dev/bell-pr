@@ -188,6 +188,7 @@ const previousSchema = z
     createdAt: z.string().datetime(),
     candidates: z.array(candidateSchema).max(6),
     opportunities: z.array(opportunitySchema).max(6),
+    locale: z.enum(locales).optional().catch(undefined),
   })
   .strict();
 /** The saved discovery job; read leniently through `discoveryFileSchema`. */
@@ -588,6 +589,7 @@ export class DiscoveryService {
             createdAt: this.job.createdAt,
             candidates: this.job.candidates,
             opportunities: this.job.opportunities,
+            ...(this.job.locale ? { locale: this.job.locale } : {}),
           }
         : this.job?.previousResult;
     const controller = new AbortController();

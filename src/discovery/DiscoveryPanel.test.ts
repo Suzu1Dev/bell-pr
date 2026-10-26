@@ -403,6 +403,30 @@ test("saved results in another language than the UI's say so", () => {
   );
 });
 
+test("the language notice follows the previous results on screen, not the search that found nothing", () => {
+  const earlier = (locale?: DiscoveryJob["locale"]): DiscoveryJob["previousResult"] => ({
+    createdAt: job.createdAt,
+    candidates: job.candidates,
+    opportunities: job.opportunities,
+    ...(locale ? { locale } : {}),
+  });
+  const empty = { ...job, message: "No suitable opportunity found.", candidates: [], opportunities: [] };
+  // Chinese results kept under an English search that found nothing.
+  const chinese = panel({ ...empty, locale: "en", previousResult: earlier("zh-TW") }, live);
+  assert.match(chinese, /PREVIOUS RESULTS/);
+  assert.match(chinese, /These results were written in Traditional Chinese\. Search again to get them in English\./);
+  // English results kept under a Chinese search, and results saved before
+  // their language was recorded, say nothing.
+  for (const previousResult of [earlier("en"), earlier()]) {
+    const html = panel({ ...empty, locale: "zh-TW", previousResult }, live);
+    assert.match(html, /PREVIOUS RESULTS/);
+    assert.doesNotMatch(html, /discovery-locale-notice/);
+  }
+  // No results on screen: nothing to describe.
+  for (const status of ["failed", "running"] as const)
+    assert.doesNotMatch(panel({ ...empty, status, locale: "zh-TW" }, live), /discovery-locale-notice/);
+});
+
 const realFetch = globalThis.fetch;
 afterEach(() => {
   globalThis.fetch = realFetch;
