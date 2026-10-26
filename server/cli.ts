@@ -128,6 +128,12 @@ function splitCommonOptions(args: string[]) {
   const used = new Set<number>();
   for (const token of tokens ?? [])
     if (token.kind === "option" && token.name in commonOptions) {
+      if (token.value === undefined)
+        throw new UsageError(
+          sm().cli.invalidArguments({
+            reason: sm().cli.arguments.missingValue({ option: token.rawName }),
+          }),
+        );
       used.add(token.index);
       if (token.inlineValue === false) used.add(token.index + 1);
     }

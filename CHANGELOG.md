@@ -387,6 +387,12 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   now records the uptime and, on Linux, the boot ID. A clock step changes
   neither.
 
+- **`bell-pr doctor` with an empty `--data-dir` or `--env-file`.** Ending the
+  command with `--data-dir` and no path crashed it with a stack trace and
+  exit code 1. A bare `--env-file` complained about a settings file named
+  "true". Both now say "The option ... needs a value." and exit 2, the same
+  as the other commands.
+
 ### Security
 
 - **zod 4.** The server validates requests, agent answers and saved files

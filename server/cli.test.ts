@@ -332,6 +332,8 @@ test("every command shows the help for --help, and argument mistakes read in the
   for (const [argv, reason] of [
     [["open", "--frob"], "Unknown option --frob."],
     [["start", "--port"], "The option --port needs a value."],
+    [["doctor", "--json", "--data-dir"], "The option --data-dir needs a value."],
+    [["doctor", "--json", "--env-file"], "The option --env-file needs a value."],
     [["open", "--print=yes"], "The option --print does not take a value."],
     [["open", "extra"], 'Unexpected argument "extra".'],
   ] as const) {
