@@ -4,6 +4,7 @@ import { gfmFromMarkdown } from "mdast-util-gfm";
 import { gfm } from "micromark-extension-gfm";
 import { normalizeUri } from "micromark-util-sanitize-uri";
 import { createElement, Fragment, type ComponentType, type ReactNode } from "react";
+import { markdownTooNested } from "../../../shared/markdown-nesting";
 
 /*
  * GitHub Flavored Markdown to React elements, without raw HTML. It renders
@@ -132,6 +133,8 @@ function plainText(node: Nodes) {
 /**
  * How deep nodes nest before the rest shows as its text: each level takes
  * stack frames here and in React, so thousands of levels would overflow.
+ * Text nested past markdownNestingLimit never gets here, which keeps most
+ * trees under this depth; text that limit reads as code may still reach it.
  */
 const maxDepth = 100;
 
@@ -389,7 +392,9 @@ function toReact(child: Child, options: Options, key: number): ReactNode {
  * rewrites every link's target, and `components` replace elements by tag
  * name. Anything but a string renders nothing, as with the earlier pipeline.
  * Text that cannot be rendered, such as nesting deeper than the parser can
- * take, shows as written instead of taking down the view.
+ * take, shows as written instead of taking down the view. So does text
+ * nested past markdownNestingLimit, which never reaches the parser: a few
+ * thousand levels take it seconds or minutes, and deeper still it throws.
  */
 export function Markdown({
   children,
@@ -402,6 +407,8 @@ export function Markdown({
   footnoteLabel: string;
 }) {
   const source = typeof children === "string" ? children : "";
+  const asWritten = createElement("p", { style: { whiteSpace: "pre-wrap" } }, source);
+  if (markdownTooNested(source)) return asWritten;
   try {
     const tree = fromMarkdown(source, {
       extensions: [gfm()],
@@ -409,6 +416,6 @@ export function Markdown({
     });
     return createElement(Fragment, null, toReactChildren(toTree(tree, footnoteLabel), { urlTransform, components }));
   } catch {
-    return createElement("p", { style: { whiteSpace: "pre-wrap" } }, source);
+    return asWritten;
   }
 }

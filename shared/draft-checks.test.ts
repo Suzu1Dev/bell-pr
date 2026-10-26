@@ -18,6 +18,7 @@ import {
 } from "./draft-checks.js";
 import { aiDisclosureLine, type DraftSource } from "./drafts.js";
 import { hasAiDisclosure } from "./project-policy.js";
+import { markdownNestingLimit } from "./markdown-nesting.js";
 import { reviewabilitySnapshot, type ReviewabilitySnapshot } from "./reviewability.js";
 
 const finding = (
@@ -461,18 +462,30 @@ test("every respect message has a why line, no Han in English, and the same ids 
   assert.deepEqual([...seen].sort(), [...respectIds].sort());
 });
 
-test("PR text nested too deep for the call stack is still read, its code still hidden", () => {
-  // Deep quotes and lists the parser still reads: their code is still hidden.
-  for (const [prefix, depth] of [[">", 3000], ["> ", 3000], ["- ", 1000], ["> - ", 1000]] as const) {
-    const body = `${prefix.repeat(depth)}See \`secret()\` here.\nFixes #`;
+test("PR text nested past the limit is read as written, at once; under it, its code is still hidden", () => {
+  // Up to the limit the parser reads the nesting, and code in it stays hidden.
+  for (const prefix of [">", "> ", "- ", "1. "]) {
+    const body = `${prefix.repeat(markdownNestingLimit)}See \`secret()\` here.\nFixes #`;
     const lines = markdownProse(body);
     assert.equal(lines.length, 2, prefix);
     assert.ok(lines[0].endsWith("See            here."), `${prefix}: ${lines[0].slice(-30)}`);
+    assert.equal(markdownReadable(body), true, prefix);
   }
-  // Deeper than the parser itself can go: the lines are read as written.
-  const tooDeep = `${">".repeat(20_000)} x\nFixes #`;
-  assert.deepEqual(markdownProse(tooDeep), tooDeep.split("\n"));
-  assert.equal(markdownReadable(tooDeep), false);
+  // Past it the parser would take seconds (and throw deeper still): the lines are read as written.
+  const started = performance.now();
+  for (const deep of [
+    `${">".repeat(20_000)} x`,
+    `${"- ".repeat(8_000)}x`,
+    `${"*a ".repeat(4_000)}x${" a*".repeat(4_000)}`,
+    `${"[a ".repeat(4_000)}x${"](b) ".repeat(4_000)}`,
+    Array.from({ length: 60 }, (_, index) => `${"  ".repeat(index)}- x`).join("\n"),
+    `${`[^a]: ${"- ".repeat(31)}`.repeat(300)}x`,
+  ]) {
+    const body = `${deep}\nSee \`secret()\` here.`;
+    assert.deepEqual(markdownProse(body), body.split("\n"), deep.slice(0, 20));
+    assert.equal(markdownReadable(body), false, deep.slice(0, 20));
+  }
+  assert.ok(performance.now() - started < 3_000, "reading took too long");
   assert.equal(markdownReadable("Retries a GET twice."), true);
 });
 
@@ -485,6 +498,69 @@ test("a disclosure or an issue link hidden in a comment of a body too deep to pa
   assert.equal(referencesIssue(shallow), false);
   assert.equal(hasAiDisclosure(shallow), false);
   assert.equal(referencesIssue("Retries a GET twice. Fixes #12"), true);
+});
+
+test("a zh-TW body with bold labels ending in a fullwidth colon is parsed, so its issue link and disclosure count", () => {
+  const body = [
+    "## 摘要",
+    "**目的：**修正登入後快取沒有失效的問題",
+    "**做法：**改用 LRU 快取並在登出時清除",
+    "**影響：**僅限 `auth` 模組",
+    "## 測試",
+    "**環境：**macOS 15、Node 22",
+    "**步驟：**執行 `npm test`",
+    "**結果：**全部通過",
+    "## 其他",
+    "**相關議題：**Fixes #123",
+    "**AI 協助：**是，使用 Claude Code",
+    "**AI assistance:** Written with Claude Code, reviewed by me.",
+  ].join("\n");
+  assert.equal(markdownReadable(body), true);
+  assert.equal(referencesIssue(body), true);
+  assert.equal(hasAiDisclosure(body), true);
+});
+
+test("a zh-TW body whose bold labels stay open is parsed when many bold terms close them", () => {
+  const body = [
+    "## 摘要",
+    "",
+    "**目的：**修正登入後快取沒有失效的問題",
+    "**問題根源：**登出流程沒有呼叫清除函式",
+    "**做法：**改用 LRU 快取並在登出時清除",
+    "**影響範圍：**僅限 auth 模組",
+    "**測試方式：**單元測試與整合測試",
+    "**風險評估：**低",
+    "**相容性：**與舊版設定檔相容",
+    "**回滾方式：**還原此 PR 即可",
+    "**詳細說明：**在**AuthService**新增**clearCache**方法並於**logout**時呼叫，**SessionStore**改為**LRU**實作，也移除了舊的**全域快取**和**計時器**以及**重試佇列**，並更新**README**與**CHANGELOG**。",
+    "",
+    "Written with Claude Code.",
+    "",
+    "Fixes #123",
+  ].join("\n");
+  assert.equal(markdownReadable(body), true);
+  assert.equal(referencesIssue(body), true);
+  assert.equal(hasAiDisclosure(body), true);
+});
+
+test("a pasted license header and pytest output leave PR text readable", () => {
+  const box = ["/" + "*".repeat(77), ` *${" ".repeat(75)}*`, " *   Copyright (c) 2026 Example Project. Licensed under GPL-2.0-or-later.  *", ` *${" ".repeat(75)}*`, ` ${"*".repeat(77)}/`];
+  for (const pasted of [
+    box.map((line) => `    ${line}`).join("\n"),
+    `${">".repeat(34)} traceback ${">".repeat(34)}\nE   AssertionError: 1 != 2\n${">".repeat(33)} entering PDB ${">".repeat(33)}`,
+  ]) {
+    const body = `Adds the header as CONTRIBUTING asks:\n\n${pasted}\n\nWritten with Claude Code.\n\nFixes #12`;
+    assert.equal(markdownReadable(body), true, pasted.slice(0, 20));
+    assert.equal(referencesIssue(body), true, pasted.slice(0, 20));
+    assert.equal(hasAiDisclosure(body), true, pasted.slice(0, 20));
+  }
+});
+
+test("a fenced block under a list item and an escaped backtick leave PR text readable", () => {
+  const body = `Written with Claude Code.\n\n1. Add the header:\n    \`\`\`c\n    /${"*".repeat(60)}/\n    \`\`\`\n\nEscape it as \\\`\` in prose.\n\nFixes #12`;
+  assert.equal(markdownReadable(body), true);
+  assert.equal(hasAiDisclosure(body), true);
+  assert.equal(referencesIssue(body), true);
 });
 
 test("PR text with a very wide tree is read without overflowing the stack", () => {

@@ -430,8 +430,9 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **Deeply nested Markdown no longer breaks a panel.** About 1,300 quote
   markers or 800 list markers in an agent's explanation, report or chat
   answer overflowed the stack, so the panel hit its error screen every time
-  it opened. Nesting past a hundred levels now shows as plain text, and text
-  too deep even for the parser shows as written.
+  it opened. Text nested more than 32 levels deep now shows as written (see
+  below), and deeper trees that remain show past a hundred levels as plain
+  text.
 
 - **Huge Markdown tables no longer freeze the tab.** Short table rows were
   always padded to the header's width, so 8 KB of agent text with a wide
@@ -504,10 +505,21 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **Deeply nested PR text no longer fails the draft checks.** A PR body or
   a project's guidance nested thousands of quote or list levels deep
   overflowed the stack, so the draft, approval or publish check, and the
-  request that ran it, failed. Such text is now checked. A body too deep
-  even for the parser is read as written, and a disclosure or an issue link
-  in it counts only when the text can be read, so a comment cannot satisfy
-  the AI-disclosure or issue check.
+  request that ran it, failed. Such text is now checked. A body nested more
+  than 32 levels deep is read as written, without parsing, and a disclosure
+  or an issue link in it counts only when the text can be read, so a comment
+  cannot satisfy the AI-disclosure or issue check.
+
+- **Deeply nested text no longer keeps the page or the server busy.** The
+  Markdown parser's time grows with the square of some nesting, so a few
+  kilobytes of nested lists, quotes, footnotes, emphasis, strikethrough or
+  links in an agent's answer or a PR body took seconds, and 60 KB took
+  minutes before it overflowed. Text nested more than 32 levels deep now
+  never reaches the parser: it shows as written, and the PR checks read it
+  as written. Code counts against a looser limit, so pasted logs, license
+  headers and stack traces still render. Other slow shapes that are not
+  nesting, such as long runs of unmatched closers or unclosed HTML, can
+  still take the parser a second or more.
 
 ### Security
 

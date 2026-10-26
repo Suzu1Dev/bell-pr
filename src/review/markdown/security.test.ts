@@ -92,33 +92,43 @@ test("a block with more children than a function call takes still renders", () =
   }
 });
 
-test("nesting too deep for the call stack renders, with its innermost text", () => {
-  // Each level of nesting took several stack frames, so about 1,300 quote
-  // markers (or 800 list markers) threw a RangeError, which would take down
-  // the view. Past a hundred levels the nesting now shows as its text; past
-  // what the parser itself can take, the whole text shows as written.
+test("nesting past the limit renders as written, at once, instead of keeping the parser busy for seconds", () => {
+  // The parser's time grows with the square of this nesting: 4,000 list
+  // markers on a line, or 4,000 nested emphasis or links, took seconds, and
+  // deeper ones threw a RangeError. Such text never reaches the parser now.
+  const started = performance.now();
   for (const source of [
-    `${">".repeat(5_000)} x`,
-    `${"- ".repeat(800)}x`,
-    `${"> - ".repeat(600)}x`,
-    `${"*a ".repeat(1_500)}x${" a*".repeat(1_500)}`,
+    `${">".repeat(20_000)} x`,
+    `${"- ".repeat(8_000)}x`,
+    `${"> - ".repeat(4_000)}x`,
+    `${"*a ".repeat(4_000)}x${" a*".repeat(4_000)}`,
+    `${"*".repeat(20_000)}x${"*".repeat(20_000)}`,
+    `${"[a ".repeat(4_000)}x${"](b) ".repeat(4_000)}`,
+    `${"![".repeat(4_000)}x${"](b)".repeat(4_000)}`,
   ]) {
     const html = render(source);
-    const tags = html.match(/<blockquote>|<ul>|<em>/g)?.length ?? 0;
+    assert.match(html, /white-space:pre-wrap/, source.slice(0, 20));
     assert.ok(html.replace(/<[^>]*>/g, "").includes("x"), source.slice(0, 20));
-    // The depth limit, not the plain-text fallback, keeps these shallow:
-    // React renders the elements later, outside Markdown's try/catch.
-    assert.doesNotMatch(html, /white-space/, source.slice(0, 20));
-    assert.ok(tags > 0 && tags <= 100, source.slice(0, 20));
   }
-  const tooDeep = render(`${">".repeat(20_000)} x`);
-  assert.ok(tooDeep.replace(/<[^>]*>/g, "").includes("x"));
-  assert.doesNotMatch(tooDeep, /<blockquote>/);
+  assert.ok(performance.now() - started < 3_000, "rendering took too long");
+});
 
-  const quotes = render(`${"> ".repeat(500)}x`);
-  assert.ok(quotes.startsWith('<div class="markdown-content"><blockquote>\n<blockquote>'));
-  assert.equal(quotes.match(/<blockquote>/g)?.length, 100);
-  assert.match(quotes.replace(/<[^>]*>/g, ""), /x\s*$/);
+test("lists nested by indentation or under footnote definitions past the limit render as written, at once", () => {
+  // Each line opens or continues every level, so the parser's time grew with
+  // the cube of the depth: 60 KB of tab-indented items took it seconds.
+  const started = performance.now();
+  for (const source of [
+    Array.from({ length: 60 }, (_, index) => `${"  ".repeat(index)}- x${index}`).join("\n"),
+    `${`[^a]: ${"- ".repeat(31)}`.repeat(300)}x`,
+  ]) {
+    const html = render(source);
+    assert.match(html, /white-space:pre-wrap/, source.slice(0, 20));
+  }
+  assert.ok(performance.now() - started < 3_000, "rendering took too long");
+});
+
+test("an escaped backtick before a longer run renders", () => {
+  assert.equal(render("Escape it as \\`` here."), '<div class="markdown-content"><p>Escape it as `` here.</p></div>');
 });
 
 test("short table rows are filled only within a budget, so a few kilobytes cannot make millions of cells", () => {
