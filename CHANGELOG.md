@@ -530,6 +530,15 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   Markdown stays well under that, long tables, fenced code and changelogs
   included.
 
+- **An empty AI-assistance section no longer counts as a disclosure.** When a
+  project required an AI disclosure and its PR template had a "## AI
+  assistance" heading with only a comment under it, the checklist said the
+  description already disclosed AI help, and publishing went ahead without
+  one. The same happened with an empty "AI assistance:" or "**AI
+  assistance**" label. Publishing now waits until the description actually
+  says that AI helped: a sentence under the heading, a filled-in field, BELL
+  PR's own line, or an Assisted-by trailer.
+
 ### Security
 
 - **zod 4.** The server validates requests, agent answers and saved files

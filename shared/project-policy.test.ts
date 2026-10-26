@@ -562,6 +562,38 @@ test("a disclosure in the person's own words or a filled-in template field count
   assert.ok(!hasAiDisclosure("This helps the enemy AI agents find paths."));
 });
 
+test("a template's section title or empty label is no disclosure; a sentence under it is", () => {
+  // Modelled on a real template: the section holds only a comment until it is filled in.
+  const section = (answer: string) =>
+    `## Summary\n\nFixes the cap.\n\n## AI assistance\n\n${answer}<!-- Did an AI tool help? Which one, and how? -->\n\n## Related issue\n\nFixes #1`;
+  assert.ok(!hasAiDisclosure(section("")));
+  assert.ok(!hasAiDisclosure(section("None.\n\n")));
+  assert.ok(hasAiDisclosure(section("Claude Code wrote this change; I reviewed every line.\n\n")));
+  // Setext, quoted and closed headings, a bold label and a field with nothing after it.
+  for (const label of [
+    "AI assistance\n-------------",
+    "Was this generated with AI?\n-------------",
+    "> ### Use of AI ###",
+    "## Was this generated with AI?",
+    "**AI assistance**",
+    "AI assistance:",
+    "- **AI-assisted:**",
+  ]) {
+    assert.ok(!hasAiDisclosure(`Fixes the cap.\n\n${label}\n\n<!-- Which tool? -->\n`), label);
+    assert.ok(hasAiDisclosure(`Fixes the cap.\n\n${label}\n\nI used Copilot to write the tests.\n`), label);
+  }
+  // A filled-in field or a trailer still counts when a "---" under it makes it a heading.
+  assert.ok(hasAiDisclosure("Fixes the cap.\n\nAI-assisted: yes\n---\n"));
+  assert.ok(hasAiDisclosure("Fixes the cap.\n\nAssisted-by: Claude Code\n---\n"));
+  // A free sentence does not; a blank line before the "---" keeps it a sentence.
+  assert.ok(!hasAiDisclosure("Fixes the cap.\n\nI used Copilot to write the tests.\n---\n"));
+  assert.ok(hasAiDisclosure("Fixes the cap.\n\nI used Copilot to write the tests.\n\n---\n"));
+  // A field written as a heading is judged as a field.
+  assert.ok(hasAiDisclosure("Fixes the cap.\n\n## AI-assisted: yes\n"));
+  assert.ok(hasAiDisclosure("Fixes the cap.\n\n### AI disclosure: Claude Code wrote the tests\n"));
+  assert.ok(!hasAiDisclosure("Fixes the cap.\n\n## AI assistance: None\n"));
+});
+
 test("with help verbs, a clean Learn-by-hand run's honest account of the guide is a disclosure", () => {
   const helpVerbs = { helpVerbs: true };
   for (const body of [

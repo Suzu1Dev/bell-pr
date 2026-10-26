@@ -110,6 +110,14 @@ test("ai-disclosure blocks until the description discloses what the project asks
     check({ rules: rules(disclose), commitMessage: "Fix the cap\n\nAssisted-by: Codex CLI" }, "ai-disclosure"),
     undefined,
   );
+  // A template's "## AI assistance" section left empty is no disclosure; a sentence in it is.
+  const template = (answer: string) =>
+    `## Summary\n\n${body}\n\n## AI assistance\n\n${answer}<!-- Did an AI tool help? Which one, and how? -->\n\n## Related issue\n\nFixes #1`;
+  assert.equal(check({ rules: rules(disclose), body: template("") }, "ai-disclosure")?.kind, "block");
+  assert.equal(
+    check({ rules: rules(disclose), body: template("Claude Code wrote this change; I reviewed every line.\n\n") }, "ai-disclosure"),
+    undefined,
+  );
   // The contributing guide's own rule counts while no rules were read yet.
   const sources: DraftSource[] = [
     { id: "c", kind: "contributing", label: "CONTRIBUTING.md", content: "Please disclose any use of AI assistance in your pull request." },

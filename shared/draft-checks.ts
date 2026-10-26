@@ -42,6 +42,7 @@ const safetyDictionaries: Record<Locale, typeof safetyEn> = {
 export function markdownProse(markdown: string) {
   if (markdown === lastProse.markdown) return lastProse.lines;
   const hidden = markdown.split("");
+  const headings = new Set<number>();
   let tree: MdastNode | undefined;
   // Text the parser would take too long on is not parsed: nesting past
   // markdownNestingLimit (a few thousand levels take seconds or minutes, and
@@ -74,6 +75,10 @@ export function markdownProse(markdown: string) {
         if (hidden[index] !== "\n") hidden[index] = " ";
       continue;
     }
+    // ATX and setext headings, the underline included.
+    if (node.type === "heading" && node.position)
+      for (let line = node.position.start.line; line <= node.position.end.line; line++)
+        headings.add(line - 1);
     // One at a time: spreading a node with a very wide list of children
     // would overflow the call stack too.
     if ("children" in node) for (const child of node.children) pending.push(child);
@@ -83,13 +88,19 @@ export function markdownProse(markdown: string) {
     .split("\n")
     .map((line) => (line.trim() ? line : ""));
   // The draft tab re-checks the same body several times per keystroke.
-  lastProse = { markdown, lines, readable: tree !== undefined };
+  lastProse = { markdown, lines, readable: tree !== undefined, headings };
   return lines;
 }
-let lastProse: { markdown: string; lines: string[]; readable: boolean } = {
+let lastProse: {
+  markdown: string;
+  lines: string[];
+  readable: boolean;
+  headings: ReadonlySet<number>;
+} = {
   markdown: "",
   lines: [""],
   readable: true,
+  headings: new Set(),
 };
 
 /**
@@ -101,6 +112,15 @@ let lastProse: { markdown: string; lines: string[]; readable: boolean } = {
 export function markdownReadable(markdown: string) {
   markdownProse(markdown);
   return lastProse.readable;
+}
+
+/**
+ * The indexes of markdownProse's lines that are headings as the parser
+ * read them, ATX or setext; none when it did not parse the body.
+ */
+export function markdownHeadings(markdown: string) {
+  markdownProse(markdown);
+  return lastProse.headings;
 }
 
 /**

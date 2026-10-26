@@ -9,7 +9,7 @@
  * comments: pull request templates and contributing guides put rules there
  * (and notes addressed to AI agents). Fenced code is skipped.
  */
-import { markdownProse, markdownReadable, type DraftRuleQuote } from "./draft-checks.js";
+import { markdownHeadings, markdownProse, markdownReadable, type DraftRuleQuote } from "./draft-checks.js";
 import { aiDisclosureLine, type DraftSource } from "./drafts.js";
 import type { HelpKind } from "./by-hand.js";
 import { carveOutKinds } from "./by-hand-rules.js";
@@ -1533,10 +1533,12 @@ const namesAssistance = (text: string) =>
 
 /**
  * A disclosure field of a PR template, "AI usage disclosure: …",
- * "AI-assisted: …", "AI used: …" or "Use of AI: …", with what follows it.
+ * "AI-assisted: …", "AI used: …" or "Use of AI: …", with what follows it,
+ * also written as a heading, "## AI-assisted: yes". The label alone on its
+ * line, "**AI assistance**", is a field left empty.
  */
 const disclosureField =
-  /^\s*(?:[-*+]\s+)?(?:\*\*|__)?(?:(?:AI|LLM)[- ]?(?:(?:usage|use|assistance|tools?)\s+disclosure|disclosure|usage|use|used|assistance|assisted)|use\s+of\s+(?:AI|LLMs?))(?:\*\*|__)?\s*:\s*(?:\*\*|__)?\s*(.*)$/i;
+  /^\s*(?:[-*+]\s+)?(?:#{1,6}\s+)?(?:\*\*|__)?(?:(?:AI|LLM)[- ]?(?:(?:usage|use|assistance|tools?)\s+disclosure|disclosure|usage|use|used|assistance|assisted)|use\s+of\s+(?:AI|LLMs?))(?:\*\*|__)?\s*(?::|$)\s*(?:\*\*|__)?\s*(.*)$/i;
 /**
  * A sentence that says no AI helped: "No AI tools were used.", "I did not
  * use AI", "written without AI assistance", "not AI-generated".
@@ -1562,7 +1564,9 @@ const deniedField = /^(?:no|none|n\/?a|nothing)\b/i;
  * visible sentence of the description that names an AI tool together with
  * used, assisted, generated, wrote, drafted or helped. A field answered
  * "NO" is not a disclosure, and text in comments or code does not count:
- * maintainers would not see it.
+ * maintainers would not see it. Nor does a heading or a field left empty:
+ * a template's "## AI assistance" or "AI assistance:" only names the
+ * section the disclosure goes in.
  *
  * With `helpVerbs` (only for a clean Learn-by-hand run, which
  * `respectChecks` decides), explain, answer, review, point out, hint and
@@ -1590,8 +1594,14 @@ export function hasAiDisclosure(
     )
   )
     return true;
+  // A heading names a section, such as a template's "## AI assistance", and
+  // a field left empty is only its label: neither says that AI helped.
+  const headings = markdownHeadings(body);
   const visible = lines
-    .filter((_, index) => fields[index] === undefined || !deniedField.test(fields[index]!))
+    .filter((_, index) => {
+      const field = fields[index];
+      return !headings.has(index) && (field === undefined || (!!field && !deniedField.test(field)));
+    })
     .join(" ");
   // Each clause on its own: "Codex wrote the parser; the tests were not
   // AI-generated" and "Not reviewed by AI, but written with Copilot" still
