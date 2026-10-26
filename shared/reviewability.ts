@@ -200,27 +200,47 @@ export function patchLines(patch = ""): PatchLine[] {
   return lines;
 }
 
-/** Whether removed and added lines differ only in whitespace (and something changed). */
-function sameIgnoringWhitespace(lines: PatchLine[]) {
+/**
+ * Files where leading indentation is syntax (Python, YAML, Makefiles and
+ * other off-side languages): re-indenting a line can change what it does.
+ */
+const indentSignificant =
+  /\.(?:py|pyi|pyw|ya?ml|coffee|pug|haml|sass|styl|nim|fs|elm|hs)$|(^|\/)(?:Makefile|[^/]*\.mk)$/i;
+
+/**
+ * Whether removed and added lines differ only in whitespace (and something
+ * changed). In a file whose indentation is syntax, each non-blank line keeps
+ * its leading whitespace, so only blank lines and spacing within a line count.
+ */
+function sameIgnoringWhitespace(lines: PatchLine[], filePath = "") {
   const removed = lines.filter((line) => line.kind === "-");
   const added = lines.filter((line) => line.kind === "+");
   if (!removed.length && !added.length) return false;
-  const squash = (side: PatchLine[]) =>
-    side.map((line) => line.text).join("").replace(/\s+/g, "");
+  const squash = indentSignificant.test(filePath)
+    ? (side: PatchLine[]) =>
+        side
+          .filter((line) => line.text.trim())
+          .map((line) => {
+            const indent = line.text.length - line.text.trimStart().length;
+            return line.text.slice(0, indent) + line.text.replace(/\s+/g, "");
+          })
+          .join("\n")
+    : (side: PatchLine[]) =>
+        side.map((line) => line.text).join("").replace(/\s+/g, "");
   return squash(removed) === squash(added);
 }
 
 /** The whole patch changes nothing but whitespace. */
-export function whitespaceOnlyPatch(patch?: string) {
-  return sameIgnoringWhitespace(patchLines(patch));
+export function whitespaceOnlyPatch(patch?: string, filePath?: string) {
+  return sameIgnoringWhitespace(patchLines(patch), filePath);
 }
 
 /** How many hunks of the patch change nothing but whitespace. */
-export function whitespaceOnlyHunks(patch?: string) {
+export function whitespaceOnlyHunks(patch?: string, filePath?: string) {
   const hunks = new Map<number, PatchLine[]>();
   for (const line of patchLines(patch))
     hunks.set(line.hunk, [...(hunks.get(line.hunk) ?? []), line]);
-  return [...hunks.values()].filter(sameIgnoringWhitespace).length;
+  return [...hunks.values()].filter((hunk) => sameIgnoringWhitespace(hunk, filePath)).length;
 }
 
 /** One flagged change to a test file: a deleted test file, an added skip or a removed assertion. */
@@ -624,7 +644,7 @@ export function reviewabilitySnapshot({
           .map((file) => file.path)
       : [],
     whitespaceOnly: reviewable
-      .filter((file) => whitespaceOnlyHunks(file.patch) > 0)
+      .filter((file) => whitespaceOnlyHunks(file.patch, file.path) > 0)
       .map((file) => file.path),
     weakened: weakenedTests(files),
     band,

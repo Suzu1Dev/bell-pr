@@ -280,9 +280,10 @@ other** or **It depends** for this project, with an optional why. An
 answer you gave before the reveal, on the current version of the file,
 counts toward the understanding check, so you are not asked it twice.
 Very small files (lockfiles, generated files, whitespace-only changes and
-tiny docs edits) get no prompts. **Settings → Learning → Try-first prompts
-during review** turns the prompts off; the answers then sit behind a plain
-reveal button.
+tiny docs edits) get no prompts; in Python, YAML, Makefiles and other
+files where indentation is syntax, a changed indent counts as a real
+change. **Settings → Learning → Try-first prompts during review** turns
+the prompts off; the answers then sit behind a plain reveal button.
 
 You can also change the code yourself: edit the files in the run's folder
 under `worktrees/` in the data directory (a Learn by hand run shows its

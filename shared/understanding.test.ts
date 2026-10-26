@@ -86,6 +86,11 @@ test("lockfiles, generated output, whitespace-only patches and small docs change
   };
   assert.ok(isTrivialFile(whitespace));
   assert.ok(!isTrivialFile({ ...whitespace, patch: "@@ -1 +1 @@\n-run(1);\n+run(2);\n" }));
+  // In Python or YAML a changed indent changes what the code does.
+  const dedent = "@@ -1,2 +1,2 @@\n-    commit()\n-x = f(a,b)\n+commit()\n+x = f(a, b)  \n";
+  assert.ok(!isTrivialFile({ ...whitespace, path: "app/jobs.py", patch: dedent }));
+  assert.ok(!isTrivialFile({ ...whitespace, path: "deploy/values.yaml", patch: dedent }));
+  assert.ok(isTrivialFile({ ...whitespace, path: "app/jobs.py", patch: "@@ -1 +1 @@\n-x = f(a,b)\n+x = f(a, b)  \n" }));
   assert.ok(isTrivialFile(file("README.md", 3)));
   assert.ok(isTrivialFile(file("docs/guide/setup.ts", 2)));
   assert.ok(!isTrivialFile(file("README.md", 4)));

@@ -452,6 +452,14 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   contributor's own words. BELL now remembers the suggestion that is in the
   draft, so the description still counts as unrevised until you rewrite it.
 
+- **Re-indenting Python or YAML is no longer called a whitespace-only
+  change.** Moving a line in or out of a block, such as taking commit() out
+  of a loop, was skipped by the understanding check like a spacing fix, so
+  approval went through with no question about it, and the reviewability
+  snapshot listed it as a whitespace-only change. A changed indent in these
+  files now counts as a real change. Blank lines and spacing within a line
+  still do not.
+
 ### Security
 
 - **zod 4.** The server validates requests, agent answers and saved files

@@ -64,6 +64,12 @@ test("patch lines carry old and new line numbers across hunks", () => {
   );
   assert.deepEqual(patchLines("This file is held back."), []);
   assert.equal(whitespaceOnlyHunks("@@ -1 +1 @@\n-a(b)\n+a( b )\n@@ -9 +9 @@\n-c\n+d\n"), 1);
+  // Where indentation is syntax, a re-indented line is a real change.
+  const dedent = "@@ -3,2 +3,2 @@\n-    commit()\n+commit()\n-x = 1\n+x  =  1   \n";
+  assert.equal(whitespaceOnlyHunks(dedent), 1);
+  for (const path of ["app/jobs.py", ".github/workflows/ci.yml", "Makefile"])
+    assert.equal(whitespaceOnlyHunks(dedent, path), 0, path);
+  assert.equal(whitespaceOnlyHunks("@@ -1,2 +1,3 @@\n-x = f(a,b)\n+x = f(a, b)  \n+\n", "app/jobs.py"), 1);
 });
 
 test("weakened tests: a deleted test file, added skips and removed assertions", () => {
@@ -149,6 +155,7 @@ test("the snapshot measures size without lockfiles and generated files and bands
     changed("package-lock.json", lines(900)),
     changed("src/gen/x.ts", lines(500)),
     changed("src/b.ts", ["-if (a){", "+if (a) {"]),
+    changed("src/c.py", ["-    commit()", "+commit()"]),
   ];
   const snapshot = reviewabilitySnapshot({
     files,
@@ -157,13 +164,13 @@ test("the snapshot measures size without lockfiles and generated files and bands
     mergedSizes: [{ number: 7, additions: 40, deletions: 2, changedFiles: 3 }],
   });
   assert.deepEqual(snapshot, {
-    changedLines: 72,
-    files: 3,
+    changedLines: 74,
+    files: 4,
     testFilesChanged: 0,
     sourceChanged: true,
     docsOnly: false,
     newDependencies: [],
-    outsidePlan: ["src/b.ts"],
+    outsidePlan: ["src/b.ts", "src/c.py"],
     whitespaceOnly: ["src/b.ts"],
     weakened: [],
     band: "small",

@@ -352,7 +352,7 @@ export function isTrivialFile(
 ) {
   if (isLockfile(file.path) || isGeneratedPath(file.path, generated))
     return true;
-  if (whitespaceOnlyPatch(file.patch)) return true;
+  if (whitespaceOnlyPatch(file.patch, file.path)) return true;
   return isDocsPath(file.path) && file.additions + file.deletions <= 3;
 }
 
