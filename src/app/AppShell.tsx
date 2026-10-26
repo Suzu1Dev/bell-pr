@@ -307,6 +307,16 @@ function pageFor(route: Route | null, knownRepo: boolean): Page {
   }
 }
 
+/**
+ * Whether the About dialog shows. It opens from the app as a dialog over
+ * the page, and from #/about over Home; closing the latter leaves the
+ * address on Home. The address waits while another dialog is open: About
+ * would cover it, and closing About would close it too, even mid-request.
+ */
+export function aboutShown(modal: ModalName, route: Route | null) {
+  return modal === "about" || (route?.name === "about" && modal === null);
+}
+
 /** The route of each page that takes no parameters. */
 const pageRoutes = {
   home: "home",
@@ -950,9 +960,7 @@ function AppShell({
     return opened;
   }
 
-  // About opens from the app as a dialog over the page, and from #/about
-  // over Home; closing the latter leaves the address on Home.
-  const aboutOpen = modal === "about" || route?.name === "about";
+  const aboutOpen = aboutShown(modal, route);
   const closeAbout = useCallback(() => {
     if (currentRoute()?.name === "about")
       navigateTo({ name: "home" }, { replace: true });

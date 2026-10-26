@@ -480,6 +480,12 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   focus on the page body. The focus now moves to the new page's heading, as
   the palette's other commands already did.
 
+- **About no longer closes another dialog.** Going Back to `#/about` (or
+  typing it) while another dialog was open laid About over it, and closing
+  About closed that dialog too, even while it was splitting a contribution or
+  starting a task. About from the address now waits until the other dialog
+  has closed.
+
 ### Security
 
 - **zod 4.** The server validates requests, agent answers and saved files
