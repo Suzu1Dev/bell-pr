@@ -7,7 +7,7 @@ import {
   type Dispatch,
   type SetStateAction,
 } from "react";
-import { api, send } from "../../api";
+import { api, ApiError, send } from "../../api";
 import { useT } from "../../i18n";
 import {
   currentRoute,
@@ -219,8 +219,14 @@ export function useUnderstanding(
     () => ({ fallback: (path) => t.fallbackQuestion({ path }), untested: t.untestedQuestion }),
     [t],
   );
+  // What the plan reads of the files: their versions, their explanations and
+  // whether their walkthroughs are ready (a unit's "Check yourself" can be a
+  // file's question). The reports that rank the files are in the deps below.
   const changes = files
-    .map((file) => `${file.path}:${file.fingerprint ?? ""}:${file.explanationStatus ?? ""}`)
+    .map(
+      (file) =>
+        `${file.path}:${file.fingerprint ?? ""}:${file.explanationStatus ?? ""}:${file.walkthroughStatus === "ready" ? "ready" : ""}`,
+    )
     .join("\n");
 
   // The deep link #/runs/:id/changes?panel=check opens the check.
@@ -254,7 +260,17 @@ export function useUnderstanding(
     return () => {
       cancelled = true;
     };
-  }, [demo, open, run.id, run.status, changes, version]);
+  }, [
+    demo,
+    open,
+    run.id,
+    run.status,
+    changes,
+    run.reports?.implementer,
+    run.reports?.reviewer,
+    run.reports?.tester,
+    version,
+  ]);
 
   // The server's answer decides for a real run; until it arrives, the setting.
   const required =
@@ -316,11 +332,19 @@ export function useUnderstanding(
         keep(() => ({ understanding: record }));
         return;
       }
-      await write("PUT", "/understanding/answers", {
-        ...input,
-        changeFingerprint: view?.changeFingerprint ?? "",
-        ...(opened ? { openedAt: opened } : {}),
-      });
+      try {
+        await write("PUT", "/understanding/answers", {
+          ...input,
+          changeFingerprint: view?.changeFingerprint ?? "",
+          ...(opened ? { openedAt: opened } : {}),
+        });
+      } catch (error) {
+        // A refusal can mean the questions moved on: show the current ones,
+        // keeping what the person typed.
+        if (error instanceof ApiError && (error.status === 409 || error.status === 422))
+          setVersion((value) => value + 1);
+        throw error;
+      }
     },
     /** Grades and corrections, with the optional forecast. */
     async saveGrades(input: UnderstandingGradesInput) {

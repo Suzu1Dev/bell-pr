@@ -1,9 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createElement } from "react";
+import { act, createElement } from "react";
 import { getDemo } from "../../demo";
+import { mount } from "../../mission/test-dom";
 import { renderEn } from "../../test-utils/render";
-import type { Run } from "../../types";
+import type { DiffFile, Run } from "../../types";
 import {
   checkSettings,
   closeCheckPanel,
@@ -12,6 +13,7 @@ import {
   setCheckSettingsForTests,
   useCheckPanel,
   useUnderstanding,
+  type Understanding,
 } from "./useUnderstanding";
 
 const demo = getDemo("en");
@@ -70,5 +72,56 @@ test("the sample's check follows the setting, and the open panel belongs to one 
   } finally {
     setCheckSettingsForTests(undefined);
     closeCheckPanel();
+  }
+});
+
+test("a real run's check is read again when a walkthrough becomes ready, the reports change or a lock is refused", async () => {
+  const reads: string[] = [];
+  const realFetch = globalThis.fetch;
+  const view = { required: true, passed: false, stale: false, plan: [], missing: [], changeFingerprint: "fp" };
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    if (url.endsWith("/understanding/answers"))
+      return new Response(JSON.stringify({ error: "Reload the check and answer again." }), {
+        status: 422,
+        headers: { "Content-Type": "application/json" },
+      });
+    if (url.endsWith("/understanding") && !init?.method) reads.push(url);
+    const body = url.endsWith("/app-settings") ? { settings: {}, lockedBy: {} } : { understanding: view };
+    return new Response(JSON.stringify(body), { headers: { "Content-Type": "application/json" } });
+  }) as typeof fetch;
+  const run = (reviewer: string) =>
+    ({ id: "run-1", repoId: "repo-1", status: "review", agents: [], reports: { reviewer } }) as unknown as Run;
+  const file = (walkthroughStatus: DiffFile["walkthroughStatus"]) =>
+    ({ path: "src/a.ts", fingerprint: "a1", explanationStatus: "failed", walkthroughStatus }) as DiffFile;
+  let latest: Understanding | undefined;
+  function Live({ value, files }: { value: Run; files: DiffFile[] }) {
+    latest = useUnderstanding(value, files, { demo: false, setRun() {} });
+    return null;
+  }
+  const settle = () => act(async () => new Promise((resolve) => setTimeout(resolve, 10)));
+  const mounted = await mount(createElement(Live, { value: run("Looks fine."), files: [file("pending")] }));
+  try {
+    await settle();
+    assert.equal(reads.length, 1);
+    // A walkthrough being written asks no new question yet.
+    await mounted.rerender(createElement(Live, { value: run("Looks fine."), files: [file("generating")] }));
+    await settle();
+    assert.equal(reads.length, 1);
+    // A ready walkthrough's "Check yourself" can replace the file's question.
+    await mounted.rerender(createElement(Live, { value: run("Looks fine."), files: [file("ready")] }));
+    await settle();
+    assert.equal(reads.length, 2);
+    // A re-review can rank other files first.
+    await mounted.rerender(createElement(Live, { value: run("src/a.ts needs a test."), files: [file("ready")] }));
+    await settle();
+    assert.equal(reads.length, 3);
+    // A refused lock reads the check again, so the current questions show.
+    await assert.rejects(async () => act(async () => latest!.saveAnswers({ summary: "A summary.", items: [] })));
+    await settle();
+    assert.equal(reads.length, 4);
+  } finally {
+    await mounted.unmount();
+    globalThis.fetch = realFetch;
   }
 });

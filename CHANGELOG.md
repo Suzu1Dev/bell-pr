@@ -345,6 +345,14 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   reviewability snapshot also called such a change docs-only. These files
   are now treated like package.json or a Makefile.
 
+- **The understanding check keeps its questions current.** When a file's
+  walkthrough finished, or a re-review changed the reports, while the check
+  was open, the panel kept showing the old questions. Lock then failed with
+  "Reload the check and answer again", and only a page reload helped, which
+  lost the typed explanation and answers. The check is now read again when
+  its questions can change. A refused lock also re-reads it, and what you
+  typed is kept.
+
 ### Security
 
 - **zod 4.** The server validates requests, agent answers and saved files
