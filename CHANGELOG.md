@@ -547,6 +547,15 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   draft and the reviewers are told it is no evidence of a pass. A plain
   test command, or one joined with `&&`, still counts.
 
+- **Split warning names the shared file.** When tasks for two different
+  issues both changed one file, the split dialog blamed the first task as
+  if it cited every issue, and it also said files could not be separated
+  when only a dependency joined them. The dialog now names the files that
+  hold changes for more than one issue ("src/index.js holds changes for #1
+  and #2"). When no file does, it says the plan links the tasks and that
+  their files can still be moved apart. The lead's plan no longer promises
+  per-task commits or cherry-picks that BELL PR never makes.
+
 ### Security
 
 - **zod 4.** The server validates requests, agent answers and saved files

@@ -140,24 +140,66 @@ test("tasks that cite the same issue start as one contribution, and a part that 
     ["src/runners.ts", "src/compiled.ts", "src/board.ts"].map((path) => goesTo(html, path)),
     ["1", "1", "2"],
   );
-  // And the part that holds #41 and #42 says so, once; the part with one issue does not.
-  const notice = modals.split.mixed({
-    title: "Runners: keep non-finite results (#41, #42 for JS and Python)",
-    issues: ["#41", "#42"],
-  });
+  // And the file that holds #41 and #42 says so, once; the part with one issue does not.
+  const notice = modals.split.mixed({ paths: ["src/runners.ts"], issues: ["#41", "#42"] });
   assert.equal(plain(html).split(notice).length - 1, 1);
-  assert.doesNotMatch(html, /cites #43/);
+  assert.equal(html.split('class="split-warning"').length - 1, 1);
+});
+
+// A real run: one task per issue, but both fixes are in src/index.js. The notice names that file, not
+// the first task as if it cited both issues.
+const sharedFile = (): Run =>
+  withPlan([
+    task("slugify", "Issue #1: slugify strips trailing dashes", ["src/index.js", "test/slugify.test.js"]),
+    task("truncate", "Issue #2: truncate counts the ellipsis", ["src/index.js", "test/truncate.test.js"]),
+  ]);
+const sharedFileFiles = () => [file("src/index.js"), file("test/slugify.test.js"), file("test/truncate.test.js")];
+
+test("tasks for different issues that changed the same file are reported by that file", () => {
+  const text = plain(renderEn(element(sharedFile(), sharedFileFiles())));
+  assert.ok(text.includes(modals.split.mixed({ paths: ["src/index.js"], issues: ["#1", "#2"] })));
+  assert.match(text, /src\/index\.js holds changes for #1 and #2\. BELL PR cannot separate changes inside a file/);
+  assert.doesNotMatch(text, /strips trailing dashes" cites/);
+});
+
+test("tasks for different issues that only a dependency joins can still be moved apart by file", () => {
+  const run = withPlan([
+    task("retry", "Retry (#1)", ["src/a.ts"]),
+    { ...task("cache", "Cache (#2)", ["src/b.ts"]), dependsOn: ["retry"] },
+  ]);
+  const html = renderEn(element(run, [file("src/a.ts"), file("src/b.ts")]));
+  const text = plain(html);
+  assert.ok(text.includes(modals.split.linked({ issues: ["#1", "#2"] })));
+  assert.doesNotMatch(text, /cannot separate changes inside a file/);
+  // One part is nothing to split, so both files start left out, and the note does not say otherwise.
+  assert.deepEqual(["src/a.ts", "src/b.ts"].map((path) => goesTo(html, path)), ["", ""]);
+  assert.doesNotMatch(text, /start in (one|a) contribution/);
+});
+
+test("a part with a shared file also names an issue that only a dependency joins to it", () => {
+  const run = withPlan([
+    task("a", "Slugify (#1)", ["src/index.js"]),
+    task("b", "Truncate (#2)", ["src/index.js"]),
+    { ...task("c", "Config (#3)", ["src/c.js"]), dependsOn: ["a"] },
+  ]);
+  const html = renderEn(element(run, [file("src/index.js"), file("src/c.js")]));
+  const text = plain(html);
+  assert.ok(text.includes(modals.split.mixed({ paths: ["src/index.js"], issues: ["#1", "#2"] })));
+  // #3's file holds only #3, so it can move: the note that the plan links the tasks names it.
+  assert.ok(text.includes(modals.split.linked({ issues: ["#1", "#2", "#3"] })));
+  assert.match(text, /links the tasks for #1, #2, and #3/);
+  assert.equal(html.split('class="split-warning"').length - 1, 2);
 });
 
 test("a plan whose parts each cite one issue, or none, shows no unresolved notice", () => {
   const html = renderEn(element(withPlan([task("retry", "Retry (#1)", ["src/a.ts"]), task("cache", "Cache", ["src/b.ts"])]), [file("src/a.ts"), file("src/b.ts")]));
-  assert.doesNotMatch(html, /its files carry more than one issue/);
+  assert.doesNotMatch(html, /split-warning/);
 });
 
 test("the unresolved notice reads in zh-TW", () => {
-  const html = renderZh(element(byFile(), byFileFiles()));
-  assert.match(html, /提到 #41、#42：它的檔案涉及不只一個議題/);
-  assert.doesNotMatch(html, /cites #41/);
+  const html = renderZh(element(sharedFile(), sharedFileFiles()));
+  assert.match(html, /src\/index\.js 含有 #1、#2 的變更/);
+  assert.doesNotMatch(html, /holds changes for/);
 });
 
 test("the dialog reads in zh-TW", () => {

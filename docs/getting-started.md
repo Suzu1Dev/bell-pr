@@ -405,9 +405,11 @@ a part needs a source file, so a task that only changes tests or documents is
 not a part of its own. A part is a group of files the plan keeps apart, not
 always one fix: the plan splits work by file, often for speed, so two tasks
 can serve one issue and one task can hold several. When a part cites more than
-one issue, the split dialog says so, because BELL PR cannot separate fixes
-inside a file: split those by hand or keep them together. **Split into
-contributions** on the Draft tab, beside
+one issue, the split dialog says so. It names each file whose tasks cite more
+than one issue, because BELL PR cannot separate fixes inside a file: split
+those by hand or keep them together. When an issue is in no such file, it
+says that the plan links the tasks, and you can move a fix's files apart.
+**Split into contributions** on the Draft tab, beside
 **Ask how to split it**, turns the parts into separate contributions: 2 to
 8 contributions, each with a title of up to 120 characters and 1 to 150
 files. A file goes to one new contribution or is left out of them all, and

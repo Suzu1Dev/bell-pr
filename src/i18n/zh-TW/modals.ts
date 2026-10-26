@@ -1,7 +1,9 @@
 /** Dialogs (Traditional Chinese, Taiwan). */
-import type { Translation } from "../../../shared/i18n/locale";
+import { formatters, type Translation } from "../../../shared/i18n/locale";
 import { product } from "../../../shared/product";
 import type en from "../en/modals";
+
+const fmt = formatters("zh-TW");
 
 const m: Translation<typeof en> = {
   close: "關閉視窗",
@@ -26,8 +28,10 @@ const m: Translation<typeof en> = {
     summary: ({ contributions, leftOut }) => `${contributions} 份貢獻；${leftOut} 個檔案不移動。`,
     pathLimit: ({ count }) => `每份貢獻最多可分配 ${count} 個檔案。`,
     suggestionLimit: ({ count }) => `僅預先分配前 ${count} 個部分。請分配其餘檔案，或選擇不移動。`,
-    mixed: ({ title, issues }) =>
-      `「${title}」提到 ${issues.join("、")}：它的檔案涉及不只一個議題，而 ${product.name} 無法把檔案裡的變更分開。請自行分開，或維持在同一份。`,
+    mixed: ({ paths, issues }) =>
+      `${fmt.list(paths, { type: "unit" })} 含有 ${fmt.list(issues, { type: "unit" })} 的變更，而 ${product.name} 無法把檔案裡的變更分開。請自行分開，或維持在同一份。`,
+    linked: ({ issues }) =>
+      `計畫把 ${fmt.list(issues, { type: "unit" })} 的任務連在一起，所以它們算作同一個部分。如果某項修正能獨立運作，可以把它的檔案放進自己的一份貢獻，或維持在同一份。`,
     submit: "拆分",
     submitting: "拆分中…",
   },

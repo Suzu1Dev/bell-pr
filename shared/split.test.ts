@@ -130,7 +130,34 @@ test("tasks that cite the same issue are one part, and a part that cites several
   assert.deepEqual(unassigned, []);
   // ...and the first part still cites two issues in files that cannot be separated: it is reported, not solved.
   assert.deepEqual(parts.filter((part) => part.issues.length > 1).map((part) => part.taskIds), [["runners", "compiled"]]);
+  // The runners task cites both, so its files hold both; the compiled harness holds only #42.
+  assert.deepEqual(parts[0].mixed, [{ paths: ["web/runners.js", "tests/browser/runners.test.js"], issues: ["#41", "#42"] }]);
+  assert.deepEqual(parts[1].mixed, []);
   assert.equal(reviewabilitySnapshot({ files: bundle, planTasks: byFile }).parts, 2);
+});
+
+test("a part names the files that tasks for different issues both changed, not its first task", () => {
+  // A real run: one task per issue, each with its own test, but both fixes are in src/index.js.
+  const files = [change("src/index.js"), change("test/slugify.test.js"), change("test/truncate.test.js")];
+  const tasks = [
+    task("slugify", "Issue #1: slugify strips trailing dashes", ["src/index.js", "test/slugify.test.js"], {
+      integratedFiles: ["src/index.js", "test/slugify.test.js"],
+    }),
+    task("truncate", "Issue #2: truncate counts the ellipsis", ["src/index.js", "test/truncate.test.js"], {
+      integratedFiles: ["src/index.js", "test/truncate.test.js"],
+    }),
+  ];
+  const { parts } = suggestSplit(files, tasks);
+  assert.deepEqual(parts.map((part) => [part.taskIds, part.issues]), [[["slugify", "truncate"], ["#1", "#2"]]]);
+  // Only the shared file holds both issues: each test file holds one.
+  assert.deepEqual(parts[0].mixed, [{ paths: ["src/index.js"], issues: ["#1", "#2"] }]);
+
+  // Tasks a dependency joins share no file, so no file holds both issues.
+  const linked = suggestSplit(bundle, [
+    task("a", "Fix A (#1)", bundleTasks[0].files),
+    task("b", "Fix B (#2)", bundleTasks[1].files, { dependsOn: ["a"] }),
+  ]).parts;
+  assert.deepEqual(linked.map((part) => [part.issues, part.mixed]), [[["#1", "#2"], []]]);
 });
 
 test("issue numbers come from a task's title and description, and only real references count", () => {

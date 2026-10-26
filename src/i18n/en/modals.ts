@@ -5,7 +5,7 @@
 import { formatters } from "../../../shared/i18n/locale";
 import { product } from "../../../shared/product";
 
-const { plural } = formatters("en");
+const { list, plural } = formatters("en");
 
 const modals = {
   close: "Close dialog",
@@ -33,8 +33,10 @@ const modals = {
       `Give each contribution at most ${count} ${plural(count) === "one" ? "file" : "files"}.`,
     suggestionLimit: ({ count }: { count: number }) =>
       `Only the first ${count} ${plural(count) === "one" ? "part is" : "parts are"} assigned. Place the remaining files or leave them out.`,
-    mixed: ({ title, issues }: { title: string; issues: string[] }) =>
-      `"${title}" cites ${issues.join(", ")}: its files carry more than one issue, and ${product.name} cannot separate changes inside a file. Split them by hand, or keep them together.`,
+    mixed: ({ paths, issues }: { paths: string[]; issues: string[] }) =>
+      `${list(paths)} ${plural(paths.length) === "one" ? "holds" : "hold"} changes for ${list(issues)}. ${product.name} cannot separate changes inside a file: split them by hand, or keep them together.`,
+    linked: ({ issues }: { issues: string[] }) =>
+      `The plan links the tasks for ${list(issues)}, so they form one part. If a fix works on its own, give its files their own contribution, or keep them together.`,
     submit: "Split",
     submitting: "Splitting…",
   },

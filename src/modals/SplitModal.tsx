@@ -58,7 +58,7 @@ function startingPlan(files: DiffFile[], tasks: SplitTask[]) {
   return {
     plan,
     dropped: usable.length > splitLimits.maxContributions,
-    // A part that cites several issues holds several fixes in files that cannot be cut apart.
+    // A part that cites several issues holds several fixes, in shared files that cannot be cut apart or in files the plan links.
     mixed: parts.filter((part) => part.issues.length > 1),
   };
 }
@@ -173,12 +173,21 @@ export function SplitModal({ run, files, busy, formError, splitRun, closeModal }
   return (
     <Modal title={t.title} subtitle={t.subtitle} onClose={close} wide>
       <form onSubmit={submit}>
-        {mixed.map((part) => (
-          <div className="split-warning" role="note" key={part.taskIds.join(",")}>
-            <TriangleAlert size={16} aria-hidden="true" />
-            <p>{t.mixed({ title: part.title, issues: part.issues })}</p>
-          </div>
-        ))}
+        {mixed
+          .flatMap((part) => [
+            ...part.mixed.map((group) => t.mixed(group)),
+            // An issue that no shared file holds is in the part only because the plan links its tasks.
+            ...(part.issues.some((issue) => !part.mixed.some((group) => group.issues.includes(issue)))
+              ? [t.linked({ issues: part.issues })]
+              : []),
+          ])
+          .map((note) => (
+            // Parts share no file and no issue, so each note's text is its own.
+            <div className="split-warning" role="note" key={note}>
+              <TriangleAlert size={16} aria-hidden="true" />
+              <p>{note}</p>
+            </div>
+          ))}
         <div className="split-cards">
           {groups.map((group, index) => {
             const members = membersOf(group.key);

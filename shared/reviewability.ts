@@ -504,7 +504,8 @@ export function taskIssues(task: Pick<SplitTask, "title" | "description">): stri
  * that only adds a test or a document never makes a part of its own. This is
  * a suggestion, not a verdict that each part is a fix: the plan splits work
  * for speed, so one fix can span tasks, and one task can hold several fixes
- * in the same files (`issues` shows what each part cites).
+ * in the same files (`issues` shows what each part cites, and `mixed` the
+ * files that hold several).
  */
 export function suggestSplit(
   files: readonly { path: string }[],
@@ -561,11 +562,23 @@ export function suggestSplit(
     if (!paths.some((path) => isSource(path, generated))) continue;
     for (const path of paths) placed.add(path);
     const named = indexes.map((index) => tasks[index]).find((task) => task.title.trim());
+    const issues = [...new Set(indexes.flatMap((index) => cited[index]))];
+    // A file holds the issues its tasks cite; one that holds several cannot be split by issue.
+    const mixed: SplitPart["mixed"] = [];
+    for (const path of paths) {
+      const holders = indexes.filter((index) => owned[index].includes(path));
+      const held = issues.filter((issue) => holders.some((index) => cited[index].includes(issue)));
+      if (held.length < 2) continue;
+      const same = mixed.find((group) => group.issues.join() === held.join());
+      if (same) same.paths.push(path);
+      else mixed.push({ paths: [path], issues: held });
+    }
     parts.push({
       title: (named?.title ?? "").trim().slice(0, splitLimits.titleChars),
       paths,
       taskIds: indexes.map((index) => tasks[index].id),
-      issues: [...new Set(indexes.flatMap((index) => cited[index]))],
+      issues,
+      mixed,
     });
   }
   return { parts, unassigned: changed.filter((path) => !placed.has(path)) };

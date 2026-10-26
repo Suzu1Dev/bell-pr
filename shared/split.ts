@@ -59,6 +59,11 @@ export interface SplitPart {
   paths: string[];
   taskIds: string[];
   issues: string[];
+  /**
+   * The part's files whose tasks cite more than one issue between them, grouped
+   * by those issues: each holds several fixes that no split can separate.
+   */
+  mixed: { paths: string[]; issues: string[] }[];
 }
 
 export interface SplitSuggestion {
