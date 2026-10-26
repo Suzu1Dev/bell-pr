@@ -556,6 +556,14 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   their files can still be moved apart. The lead's plan no longer promises
   per-task commits or cherry-picks that BELL PR never makes.
 
+- **The PR draft references every issue the task fixes.** A task that fixed
+  two issues got a suggested description with "Fixes #1" only, because the
+  draft read just the linked issue. The draft now also lists the project's
+  issues that the task or its plan cites, with one "Fixes #N" line for each
+  issue the change fully addresses and "Refs #N" for one it addresses in part.
+  Several links in the issue field now say that it takes one and that the
+  others belong in the task description.
+
 ### Security
 
 - **zod 4.** The server validates requests, agent answers and saved files

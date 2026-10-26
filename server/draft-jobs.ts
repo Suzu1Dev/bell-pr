@@ -121,12 +121,13 @@ async function generateDraft(
     await ctx.store.save();
     if (controller.signal.aborted)
       throw new AppError((m) => m.run.draft.cancelled, 409);
+    const repo = ctx.repo(run.repoId);
     preparation.context = await (
       ctx.dependencies.collectDraftContext ?? collectDraftContext
-    )(ctx.repo(run.repoId), run, { signal: controller.signal });
+    )(repo, run, { signal: controller.signal });
     if (controller.signal.aborted)
       throw new AppError((m) => m.run.draft.cancelled, 409);
-    const prompt = draftPrompt(run, files, preparation.context);
+    const prompt = draftPrompt(run, files, preparation.context, repo.url);
     temporary = await mkdtemp(path.join(os.tmpdir(), "bell-draft-"));
     const outputSchema = path.join(temporary, "response-schema.json");
     await writeFile(outputSchema, JSON.stringify(draftJsonSchema), {

@@ -17,6 +17,7 @@ import {
   knownDoor,
   rulesFrom,
   sampleFindings,
+  severalIssueLinks,
   sampleRules,
   startReasons,
   suggestedMode,
@@ -71,6 +72,17 @@ test("only GitHub issue page URLs have an issue number, as the server accepts th
   assert.equal(issueNumber("#sample-issue-42"), undefined);
   assert.equal(issueNumber(""), undefined);
   assert.equal(issueNumber(), undefined);
+});
+
+test("several GitHub issue links in the field are told apart from one", () => {
+  const one = "https://github.com/acme/widgets/issues/42";
+  assert.equal(severalIssueLinks(one), false);
+  assert.equal(severalIssueLinks(` ${one}/ `), false);
+  assert.equal(severalIssueLinks(`${one} ${one.replace("42", "43")}`), true);
+  assert.equal(severalIssueLinks(`${one},${one.replace("42", "43")}`), true);
+  assert.equal(severalIssueLinks(`${one} #43`), false);
+  assert.equal(severalIssueLinks(""), false);
+  assert.equal(severalIssueLinks(), false);
 });
 
 test("route answers are read bare or wrapped, and anything else is no answer", () => {

@@ -560,6 +560,8 @@ const mission = {
     noIssue: `Link the issue you will work on, and ${product.name} checks whether it is still open and whether someone else is already on it.`,
     notGitHub:
       "Issue facts are read for GitHub issue links, such as https://github.com/owner/repo/issues/123.",
+    oneIssue:
+      "This field takes one issue link, so nothing was read. Keep the main issue here and name the others in the task description, as #123.",
     checking: "Checking the issue on GitHub…",
     issue: ({ number }: { number: number }) => `Issue #${number}`,
     sampleIssue: ({ number }: { number: number }) => `#${number} (sample)`,

@@ -27,7 +27,9 @@ export interface ContributionSettings extends ModelSettings {
   /**
    * The GitHub issue this contribution addresses
    * (https://github.com/<owner>/<repo>/issues/<number>); empty or absent
-   * means none. Only a supplied issue may appear as Fixes/Refs in the PR draft.
+   * means none. Only this issue and the project's issues the task or its
+   * plan cites may appear as Fixes/Refs in the PR draft (`draftIssues` in
+   * server/drafts.ts).
    */
   issueUrl?: string;
 }

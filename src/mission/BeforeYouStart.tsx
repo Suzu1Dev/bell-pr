@@ -27,6 +27,7 @@ import {
   knownDoor,
   rulesFrom,
   sampleRules,
+  severalIssueLinks,
   startReasons,
   unknownParts,
 } from "./respect";
@@ -275,7 +276,7 @@ export default function BeforeYouStart({
       ) : !url ? (
         <p className="mission-field-note">{t.noIssue}</p>
       ) : number === undefined ? (
-        <p className="mission-field-note">{t.notGitHub}</p>
+        <p className="mission-field-note">{severalIssueLinks(url) ? t.oneIssue : t.notGitHub}</p>
       ) : (
         <p className="mission-field-note">{t.lead}</p>
       )}

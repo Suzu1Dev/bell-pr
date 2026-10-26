@@ -132,6 +132,11 @@ export function issueNumber(url = "") {
   return match ? Number(match[1]) : undefined;
 }
 
+/** Whether the issue field holds several GitHub issue links; it takes one. */
+export function severalIssueLinks(url = "") {
+  return url.split(/[\s,;]+/).filter((part) => issueNumber(part) !== undefined).length > 1;
+}
+
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 

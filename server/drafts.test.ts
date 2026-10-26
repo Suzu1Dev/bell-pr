@@ -253,7 +253,7 @@ test("draft prompt keeps complete bounded safe diffs and distinguishes unavailab
   assert.match(prompt, /member-reported executions/);
   assert.match(prompt, /never claim there are no repository rules/);
   // Without a user-supplied issue the prompt carries none and forbids inventing one.
-  assert.match(prompt, /"issue":null/);
+  assert.match(prompt, /"issues":\[\]/);
   assert.match(prompt, /never invent issues or Fixes\/Refs links/);
   const linked = draftPrompt(
     {
@@ -268,9 +268,9 @@ test("draft prompt keeps complete bounded safe diffs and distinguishes unavailab
   );
   assert.match(
     linked,
-    /"issue":\{"url":"https:\/\/github\.com\/acme\/widgets\/issues\/42","number":42\}/,
+    /"issues":\[\{"url":"https:\/\/github\.com\/acme\/widgets\/issues\/42","number":42,"linked":true\}\]/,
   );
-  assert.match(linked, /Only when the supplied issue is not null/);
+  assert.match(linked, /the body may reference only these/);
   // Member reports carry what the application observed next to what the member claimed; tasks saved without checks send empty lists.
   const withTeam = draftPrompt(
     {
@@ -339,6 +339,85 @@ test("draft prompt keeps complete bounded safe diffs and distinguishes unavailab
   assert.throws(
     () => draftPrompt(run, [{ ...diff, blocked: "Sensitive" }], context),
     /沒有可用/,
+  );
+});
+
+test("the draft may reference every issue of the project that the task or its plan cites, the linked one first", () => {
+  const task = (id: string, title: string, description: string) => ({
+    id,
+    title,
+    description,
+    owner: "member-1",
+    files: ["src/index.js"],
+    dependsOn: [],
+    status: "complete" as const,
+  });
+  const run = {
+    title: "Fix #1 and the truncate bug",
+    prompt:
+      "Fix https://github.com/Acme/Widgets/issues/2 too. Not C#7, &#39;, page#8, https://github.com/other/repo/issues/9 or https://github.com/acme/widgets/pull/10.",
+    reports: {},
+    contributionSettings: {
+      ...defaultContributionSettings,
+      issueUrl: "https://github.com/acme/widgets/issues/1",
+    },
+    team: {
+      config: {
+        maxTeammates: 2 as const,
+        requirePlanApproval: true,
+        provider: "claude" as const,
+        protocol: "bell-shared-tasks" as const,
+        messageDelivery: "between-turns" as const,
+      },
+      phase: "complete" as const,
+      planSummary: "plan",
+      messages: [],
+      tasks: [
+        task("slug", "Issue #1: slugify strips trailing dashes", "Own commit."),
+        task("truncate", "truncate keeps the limit", "Fixes #3 and refs #2."),
+      ],
+    },
+  };
+  const issues = (prompt: string) =>
+    JSON.parse(/"issues":(\[[^\]]*\])/.exec(prompt)![1]) as unknown[];
+  const url = (number: number) =>
+    `https://github.com/acme/widgets/issues/${number}`;
+  const prompt = draftPrompt(run, [diff], context, "https://github.com/acme/widgets");
+  assert.deepEqual(issues(prompt), [
+    { url: url(1), number: 1, linked: true },
+    { url: url(2), number: 2 },
+    { url: url(3), number: 3 },
+  ]);
+  assert.match(prompt, /give each one its own line: "Fixes #N"/);
+  // Without the project's GitHub address only the linked issue is known.
+  assert.deepEqual(issues(draftPrompt(run, [diff], context)), [
+    { url: url(1), number: 1, linked: true },
+  ]);
+  // Cited issues count without a linked one.
+  assert.deepEqual(
+    issues(
+      draftPrompt(
+        { ...run, contributionSettings: undefined },
+        [diff],
+        context,
+        "https://github.com/acme/widgets.git",
+      ),
+    ),
+    [1, 2, 3].map((number) => ({ url: url(number), number })),
+  );
+  assert.deepEqual(
+    issues(
+      draftPrompt(
+        { ...run, prompt: "Also fixes #123456.", team: { ...run.team, tasks: [] } },
+        [diff],
+        context,
+        "https://github.com/acme/widgets",
+      ),
+    ),
+    [
+      { url: url(1), number: 1, linked: true },
+      { url: url(123456), number: 123456 },
+    ],
   );
 });
 
@@ -781,6 +860,26 @@ test("draft prepare HTTP API returns a proposal without applying and rejects aut
     server.closeAllConnections();
     await new Promise<void>((resolve) => server.close(() => resolve()));
     await app.locals.insights.shutdown();
+    await f.cleanup();
+  }
+});
+
+test("the draft job passes the project's address, so the issues the task cites reach the prompt", async () => {
+  let prompt = "";
+  const f = await fixture(async (input) => {
+    prompt = input.prompt;
+    return JSON.stringify(proposal);
+  });
+  try {
+    f.store.data.repos.find((repo) => repo.id === f.run.repoId)!.url =
+      "https://github.com/acme/widgets";
+    f.run.prompt = "Update the exported value; this also fixes #2.";
+    await f.workbench.prepareDraft(f.run.id);
+    assert.match(
+      prompt,
+      /"issues":\[\{"url":"https:\/\/github\.com\/acme\/widgets\/issues\/2","number":2\}\]/,
+    );
+  } finally {
     await f.cleanup();
   }
 });

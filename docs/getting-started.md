@@ -169,7 +169,11 @@ experience, add tests, improve docs or maintenance) and describe:
 - what will be different for users when it is done;
 - the boundaries: what must not change;
 - what counts as done, one observable result or test per line;
-- optionally, the related GitHub issue.
+- optionally, the related GitHub issue. The field takes one link; name
+  any other issues in the task itself, as `#42`. The suggested PR
+  description references only the linked issue and this repository's
+  issues that the task or its plan cites, with a `Fixes #N` line for each
+  one the change fixes.
 
 When you link a GitHub issue, **Before you start** under the issue field
 reads it once from GitHub and shows whether it is open or closed, who is

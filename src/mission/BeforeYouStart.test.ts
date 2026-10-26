@@ -42,6 +42,13 @@ test("without a GitHub issue link nothing is read, and the field says what would
   assert.match(empty, /Link the issue you will work on, and BELL PR checks whether it is still open and whether someone else is already on it\./);
   assert.deepEqual(chips(empty), []);
   assert.match(renderEn(view({ issueUrl: "#42" })), /Issue facts are read for GitHub issue links/);
+  // Several links are not one link: the field says it takes one, and where the others go.
+  const several = `${issueUrl} https://github.com/acme/widgets/issues/8`;
+  const severalEn = renderEn(view({ issueUrl: several }));
+  assertNoHan(severalEn);
+  assert.match(severalEn, /This field takes one issue link, so nothing was read\. Keep the main issue here and name the others in the task description, as #123\./);
+  assert.doesNotMatch(severalEn, /Issue facts are read for GitHub issue links/);
+  assert.match(renderZh(view({ issueUrl: several })), /這個欄位只能填一個 issue 連結/);
   // A valid link names the issue and links to it while its facts load.
   assert.match(
     renderEn(view({ issueUrl })),

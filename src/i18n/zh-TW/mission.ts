@@ -414,6 +414,8 @@ const m: Translation<typeof en> = {
     noIssue: `連結你要處理的 issue，${product.name} 會確認它是否仍開著，以及是否已有別人在做。`,
     notGitHub:
       "只有 GitHub issue 連結會讀取 issue 資訊，例如 https://github.com/owner/repo/issues/123。",
+    oneIssue:
+      "這個欄位只能填一個 issue 連結，所以沒有讀取任何資訊。請在這裡留下主要的 issue，其他的寫在任務說明裡，例如 #123。",
     checking: "正在到 GitHub 確認這個 issue…",
     issue: ({ number }) => `Issue #${number}`,
     sampleIssue: ({ number }) => `#${number}（示範）`,
