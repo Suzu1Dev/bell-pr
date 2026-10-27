@@ -564,6 +564,14 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   Several links in the issue field now say that it takes one and that the
   others belong in the task description.
 
+- **The suggested commit message carries the AI trailer the project asks
+  for.** When a project's rules ask for an `Assisted-by:` or `Generated-by:`
+  trailer, the suggested commit message now ends with one naming the agent
+  that wrote the change (Claude Code or Codex). Before, it was the PR title
+  alone. The trailer reaches your commit message when you use the suggestion,
+  and on its own only while the AI-assistance note is on for all drafts.
+  Projects that do not ask get no trailer, and a message you wrote is kept.
+
 ### Security
 
 - **zod 4.** The server validates requests, agent answers and saved files

@@ -191,6 +191,8 @@ const m: Translation<typeof en> = {
     commitMessageTrailer:
       "提交訊息建議不能包含 Signed-off-by 等署名欄位；簽署只能由本人輸入。",
     commitMessageSource: "提交訊息建議引用的來源不存在，請重新產生。",
+    commitTrailer: ({ label, quote, line, title }) =>
+      `${title ? "主旨沿用 PR 標題。" : ""}${label} 要求加上 AI trailer（「${quote}」），所以訊息最後一行是 ${line}，寫明這次變更由哪個 Agent 撰寫。`,
     ruleQuoteMismatch: "PR 草稿的規範引用無法對應來源，請重新產生。",
     templateNotUsed: "PR 草稿未採用目標專案提供的範本，請重新產生。",
     templateHeadingsMissing: "PR 草稿缺少專案範本的段落標題，請重新產生。",

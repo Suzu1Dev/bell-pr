@@ -331,6 +331,19 @@ export default {
       "The suggested commit message cannot include sign-off trailers such as Signed-off-by. Only you can add your own sign-off.",
     commitMessageSource:
       "The suggested commit message cites a source that does not exist. Generate it again.",
+    /** Why a suggested commit message ends with the AI trailer the project's rules ask for; `title` when its subject is the PR title. */
+    commitTrailer: ({
+      label,
+      quote,
+      line,
+      title,
+    }: {
+      label: string;
+      quote: string;
+      line: string;
+      title: boolean;
+    }) =>
+      `${title ? "The subject is the PR title. " : ""}${label} asks for an AI trailer (“${quote}”), so the message ends with ${line}, which names the agent that wrote this change.`,
     ruleQuoteMismatch:
       "A rule quoted in the PR draft does not match its source. Generate it again.",
     templateNotUsed:

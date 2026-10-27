@@ -421,7 +421,7 @@ test("the draft may reference every issue of the project that the task or its pl
   );
 });
 
-async function fixture(runner: TeamAgentRunner) {
+async function fixture(runner: TeamAgentRunner, sources: DraftSource[] = []) {
   const directory = await mkdtemp(path.join(os.tmpdir(), "bell-draft-test-"));
   const repository = path.join(directory, "repo");
   await mkdir(repository);
@@ -438,7 +438,7 @@ async function fixture(runner: TeamAgentRunner) {
   const workbench = new Workbench(store, runner, {
     collectDraftContext: async () => {
       collections++;
-      return { ...context, baseSha };
+      return { ...context, sources, baseSha };
     },
   });
   const repo = await workbench.importRepository(repository);
@@ -622,6 +622,102 @@ test("automatic proposal fills an empty commit message from the suggestion and k
     assert.equal(f.store.data.runs[0].draftPreparation?.status, "ready");
     assert.equal(f.run.draft.commitMessage, own);
   } finally {
+    await f.cleanup();
+  }
+});
+
+const trailerRule =
+  "Disclose AI assistance in the PR description and add an `Assisted-by: <tool>` trailer to the commit message.";
+const trailerSources = (line = trailerRule): DraftSource[] => [
+  {
+    id: "contributing",
+    kind: "contributing",
+    label: "CONTRIBUTING.md",
+    content: `# Contributing\n\n1. One fix per PR.\n4. ${line}\n`,
+  },
+];
+const trailerAnswer = (suggestion: unknown, line = trailerRule) =>
+  JSON.stringify({
+    ...proposal,
+    policy: "repository",
+    rules: [{ text: "Rule.", sourceId: "contributing", quote: line }],
+    commitMessageSuggestion: suggestion,
+  });
+
+test("a project that asks for an AI trailer gets it on the suggested commit message, naming the agent that wrote the change", () => {
+  const parse = (
+    suggestion: unknown,
+    options: Parameters<typeof parseDraftProposal>[2] = { assistant: "Claude Code" },
+    line = trailerRule,
+    locale: "en" | "zh-TW" = "en",
+  ) =>
+    withLocale(locale, () =>
+      parseDraftProposal(trailerAnswer(suggestion, line), { ...context, sources: trailerSources(line) }, options),
+    ).commitMessageSuggestion;
+  const model = {
+    message: "slugify: strip the trailing dash\n\nFixes #1",
+    rationale: "CONTRIBUTING.md asks for Fixes lines.",
+    sources: ["contributing"],
+  };
+  const suggested = parse(model)!;
+  assert.equal(suggested.message, `${model.message}\n\nAssisted-by: Claude Code`);
+  assert.deepEqual(suggested.sources, ["contributing"]);
+  assert.match(
+    suggested.rationale,
+    /^CONTRIBUTING\.md asks for Fixes lines\. CONTRIBUTING\.md asks for an AI trailer \(“4\. Disclose AI assistance[^”]+”\), so the message ends with Assisted-by: Claude Code, which names the agent that wrote this change\.$/,
+  );
+  // Without a message from the model the PR title is the subject, and the rule is the source.
+  const made = parse(null, { assistant: "Codex" })!;
+  assert.equal(made.message, `${proposal.title}\n\nAssisted-by: Codex`);
+  assert.deepEqual(made.sources, ["contributing"]);
+  assert.match(made.rationale, /^The subject is the PR title\. CONTRIBUTING\.md asks for an AI trailer/);
+  assert.match(parse(null, { assistant: "Codex" }, trailerRule, "zh-TW")!.rationale, /^主旨沿用 PR 標題。CONTRIBUTING\.md 要求加上 AI trailer/);
+  // The trailer the rule names; none for a rule that refuses one or a project that does not ask.
+  assert.equal(
+    parse(null, undefined, "Add a `Generated-by:` trailer naming the tool.")?.message,
+    `${proposal.title}\n\nGenerated-by: Claude Code`,
+  );
+  for (const line of [
+    "Do not add an Assisted-by trailer to commits.",
+    "Commits with an Assisted-by trailer are rejected.",
+    "Use the imperative mood in commit subjects.",
+  ])
+    assert.deepEqual(parse(model, undefined, line), model, line);
+  // A Learn-by-hand run, or a run whose agent is unknown, gets none.
+  assert.deepEqual(parse(model, { assistant: "Claude Code", learnByHand: true }), model);
+  assert.deepEqual(parse(model, {}), model);
+  assert.equal(parse(null, {}), undefined);
+  // The model leaves the trailer to BELL, and writes issue lines only where commit conventions ask.
+  const prompt = draftPrompt({ title: "Update", prompt: "Update value", reports: {} }, [diff], context);
+  assert.match(prompt, /Never write an Assisted-by or Generated-by trailer either: BELL appends the one a source asks for/);
+  assert.match(prompt, /only when they ask for issue references in commits, add one "Fixes #N" line for each issue in issues/);
+});
+
+test("automatic proposal leaves BELL's AI trailer out of the commit message unless the person discloses AI help in every PR", async () => {
+  let suggestion: unknown = null;
+  const f = await fixture(async () => trailerAnswer(suggestion), trailerSources());
+  f.run.modelExecution = { ...f.run.modelExecution!, provider: "claude" };
+  try {
+    await automatic(f.workbench, f.run.id);
+    // The suggestion carries the trailer for the person to apply; the draft keeps the title alone.
+    assert.equal(
+      f.run.draftPreparation?.proposal?.commitMessageSuggestion?.message,
+      `${proposal.title}\n\nAssisted-by: Claude Code`,
+    );
+    assert.deepEqual(f.run.draft, { title: proposal.title, body: proposal.body });
+    suggestion = { message: "Update the value\n\nFixes #1", rationale: "Rule.", sources: ["contributing"] };
+    delete f.run.draftPreparation;
+    await automatic(f.workbench, f.run.id);
+    assert.equal(f.run.draft.commitMessage, "Update the value\n\nFixes #1");
+    // The person's standing choice to disclose takes the trailer along, as it does the description line.
+    setAlwaysDiscloseAiSource(() => true);
+    await f.workbench.draft(f.run.id, { title: proposal.title, body: proposal.body });
+    delete f.run.draftPreparation;
+    await automatic(f.workbench, f.run.id);
+    assert.equal(f.run.draft.commitMessage, "Update the value\n\nFixes #1\n\nAssisted-by: Claude Code");
+    assert.ok(f.run.draft.body.includes(aiDisclosureLine));
+  } finally {
+    setAlwaysDiscloseAiSource();
     await f.cleanup();
   }
 });

@@ -6,6 +6,7 @@ import assert from "node:assert/strict";
 import { byHandRulesCase } from "./by-hand-rules.js";
 import { aiDisclosureLine } from "./drafts.js";
 import {
+  aiTrailerRule,
   attachCarveOuts,
   classifyPolicy,
   disclosureRule,
@@ -287,6 +288,31 @@ test("a request to disclose AI assistance is a disclosure rule", () => {
     disclosureRule([{ id: "c", kind: "contributing", label: "CONTRIBUTING.md", content: text }])?.quote,
     text,
   );
+});
+
+test("a request for an AI trailer in commits names the trailer, read in inline code but never in code blocks or comments", () => {
+  const rule = (content: string, kind: "contributing" | "template" | "documentation" = "contributing") =>
+    aiTrailerRule([{ id: "c", kind, label: "CONTRIBUTING.md", content }]);
+  const asked =
+    "4. Disclose AI assistance in the PR description and add an `Assisted-by: <tool>` trailer to the commit message.";
+  assert.deepEqual(rule(`# Rules\n\n${asked}\n`), {
+    sourceId: "c",
+    label: "CONTRIBUTING.md",
+    quote: asked,
+    trailer: "Assisted-by",
+  });
+  assert.equal(rule(asked, "template")?.trailer, "Assisted-by");
+  assert.equal(rule("Use a commit message trailer like Generated-by: <tool>.")?.trailer, "Generated-by");
+  for (const content of [
+    asked.replace("4. ", "```\n") + "\n```",
+    `<!-- ${asked} -->`,
+    "Describe the change. <!-- add an `Assisted-by: <tool>` trailer -->",
+    "Do not add an `Assisted-by:` trailer.",
+    "Commits with an Assisted-by trailer are rejected.",
+    "Please disclose any use of AI assistance in your pull request description.",
+  ])
+    assert.equal(rule(content), undefined, content);
+  assert.equal(rule(asked, "documentation"), undefined);
 });
 
 test("\"say so\" asks for a disclosure too, unless it says there is no need", () => {

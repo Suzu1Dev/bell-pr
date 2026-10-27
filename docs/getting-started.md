@@ -377,7 +377,12 @@ apply, and you edit everything:
 - The title and the description, in English unless the project asks for
   another language.
 - The commit message. A `Signed-off-by` line, if the project requires it,
-  is yours to write; BELL PR never signs for you.
+  is yours to write; BELL PR never signs for you. When the project's rules
+  ask for an `Assisted-by:` or `Generated-by:` trailer, the suggested
+  message ends with one naming the agent that wrote the change (Claude
+  Code or Codex). It reaches your commit message when you use the
+  suggestion, or by itself only while the AI-assistance note is on for all
+  drafts under **Settings → Agent safety**.
 - The GitHub branch name, if the project has naming rules.
 - The template's checkboxes: you tick them yourself.
 

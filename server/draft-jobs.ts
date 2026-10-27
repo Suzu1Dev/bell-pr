@@ -14,11 +14,13 @@ import { collectDraftContext, documentKind } from "./draft-sources.js";
 import { assertWorkspacePresent } from "./cleanup.js";
 import type { ByHandTemplate } from "../shared/by-hand.js";
 import {
+  automaticCommitMessage,
   draftFingerprint,
   draftJsonSchema,
   draftPrompt,
   parseDraftProposal,
 } from "./drafts.js";
+import { agentLabel } from "./agent-cli.js";
 import { AppError, type Run } from "./types.js";
 import { sameDraftProse } from "../shared/draft-checks.js";
 import { activeFollowUp } from "../shared/followups.js";
@@ -145,7 +147,10 @@ async function generateDraft(
     );
     const context = preparation.context;
     const proposal = parseAgentOutput(run, "draft", () =>
-      parseDraftProposal(answer, context, { learnByHand: run.learnByHand }),
+      parseDraftProposal(answer, context, {
+        learnByHand: run.learnByHand,
+        assistant: agentLabel(run.modelExecution?.provider),
+      }),
     );
     await ctx.lock(run.id, async () => {
       const currentFiles = await readDiff(run);
@@ -173,8 +178,7 @@ async function generateDraft(
       ) {
         // A message the person already wrote wins over the suggestion.
         const commitMessage =
-          run.draft.commitMessage?.trim() ||
-          proposal.commitMessageSuggestion?.message;
+          run.draft.commitMessage?.trim() || automaticCommitMessage(proposal);
         run.draft = {
           title: proposal.title,
           body: proposal.body,

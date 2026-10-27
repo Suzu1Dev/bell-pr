@@ -12,6 +12,7 @@ import {
   draftWordBudget,
   findDraftPlaceholders,
 } from "../shared/draft-checks.js";
+import { aiTrailerRule } from "../shared/project-policy.js";
 import { formatters } from "../shared/i18n/locale.js";
 import { AppError, type DiffFile, type Run } from "./types.js";
 import { quoteMatches } from "./evidence.js";
@@ -225,7 +226,11 @@ function headings(markdown: string) {
 export function parseDraftProposal(
   answer: string,
   context: DraftContext,
-  options: { learnByHand?: boolean } = {},
+  options: {
+    learnByHand?: boolean;
+    /** The agent that wrote the change ("Claude Code", "Codex"), for an AI trailer a rule asks for. */
+    assistant?: string;
+  } = {},
 ): DraftProposal {
   let proposal: DraftProposal;
   try {
@@ -332,7 +337,47 @@ export function parseDraftProposal(
   // line, except in a Learn-by-hand run, whose AI note is the person's own.
   if (alwaysDiscloseAi() && !options.learnByHand)
     proposal.body = withAiDisclosure(proposal.body);
+  // Where the project's rules ask for an AI trailer, BELL ends the
+  // suggested commit message with it, naming the agent that wrote the
+  // change; the model writes no "-by:" line (personTrailer above).
+  const trailerRule = aiTrailerRule(context.sources);
+  if (trailerRule && options.assistant && !options.learnByHand) {
+    const line = `${trailerRule.trailer}: ${options.assistant}`;
+    const written = proposal.commitMessageSuggestion;
+    const reason = sm().analysis.drafts.commitTrailer({
+      label: trailerRule.label,
+      quote: trailerRule.quote,
+      line,
+      title: !written,
+    });
+    const sources = written?.sources ?? [];
+    proposal.commitMessageSuggestion = {
+      message: `${(written?.message ?? proposal.title).slice(0, 3998 - line.length).trimEnd()}\n\n${line}`,
+      rationale: written ? `${written.rationale} ${reason}` : reason,
+      sources:
+        sources.includes(trailerRule.sourceId) || sources.length >= 8
+          ? sources
+          : [...sources, trailerRule.sourceId],
+    };
+  }
   return proposal;
+}
+
+/** The AI trailer BELL put at the end of a suggested commit message. */
+const assistantTrailer = /\n+(?:Assisted|Generated)-by: [^\n]*$/;
+
+/**
+ * The suggested commit message the automatic apply after the review uses.
+ * Like BELL's line in the description, the AI trailer stays out unless the
+ * person chose to disclose AI help in every PR; it stays in the suggestion
+ * for them to apply. A message that is then only the PR title is left out,
+ * since the title is what a commit without a message carries.
+ */
+export function automaticCommitMessage(proposal: DraftProposal) {
+  const message = proposal.commitMessageSuggestion?.message;
+  if (!message || alwaysDiscloseAi()) return message;
+  const kept = message.replace(assistantTrailer, "");
+  return kept !== message && kept.trim() === proposal.title.trim() ? undefined : kept;
 }
 
 /**
@@ -431,6 +476,6 @@ Resolve writing guidance in this order: explicit target repository contribution 
 If a template is supplied, choose the most applicable one, set templateSourceId, preserve all its Markdown headings verbatim and relevant form/checklist items, and leave every checkbox UNCHECKED; in checklist, add one item per template heading that has checkboxes, quoting the exact text of each box the person has to decide on, because the person ticks them in BELL before publishing. Otherwise use an empty templateSourceId. If any applicable formal rule or maintainer preference exists, choose policy repository and cite it. Generic README content without submission guidance is not a rule. If NO applicable repository rule or template exists, choose policy linux with an empty rules array and adapt the writing principles of ${linuxContributionUrl} for a GitHub PR: concise imperative title (scope prefix only if supported by actual changes), explain the problem/motivation and user impact, describe the solution and tradeoffs, list actual reported test evidence and limitations. Use headings such as Problem, Changes, Validation, Limitations. Do NOT copy Linux-only email, [PATCH], SMTP, licensing, or kernel workflow requirements into unrelated projects. If source lookup was incomplete or sampled, explicitly call fallback provisional, never claim there are no repository rules. Use English for PR title/body unless explicit project instructions require another language. summary, the rules text, checklist and the commit message rationale are read by the person preparing this PR, not by maintainers; for those fields: ${respondIn(currentLocale())}
 Explain concrete changes grounded in whole provided diffs. issues lists the issue the person linked (linked true) and the issues of this repository that the task or its plan cites; the body may reference only these. Link the url of each issue referenced and give each one its own line: "Fixes #N" when the diff fully addresses it as far as the evidence shows, otherwise "Refs #N". Always reference the linked issue; leave out a cited issue the diff does not address. When issues is empty, never invent issues or Fixes/Refs links. Do not invent benchmarks, test executions, test success, reviewer approval, or user impact not supported by the diff. In body, describe verification in plain words without role labels: list only checks that were actually executed, with their results, and say plainly which were not run. Keep the distinction between member-reported executions, application-observed checks and the reviewer/tester's static analysis in summary and checklist, and disclose missing evidence there. Excluded/truncated context must not be described as comprehensively inspected. Reflect project sign-off, DCO, CLA, AI-assistance/disclosure policies as human checklist obligations with grounded sources when present. NEVER create Signed-off-by, Reviewed-by, Acked-by, or Tested-by trailers or tick completed checkboxes: only the person can certify these. Do not mention AI assistance, AI tools, BELL or agents in title, body or commitMessageSuggestion: whether to disclose is the person's decision. When a supplied source requires disclosing AI assistance, add a checklist item quoting that rule so the person can add a disclosure in their own words. Do not imply a project's AI policy permits the contribution; any restriction belongs prominently in checklist. Keep checklist actionable and specific, with unresolved evidence and human confirmations; rules and checklist each hold at most 24 items, so merge related items rather than exceed it. The proposal is not a compliance certification.
 body is published to GitHub verbatim as the person's PR description, so write it as finished text for maintainers: no TODO/TBD/FIXME markers (when the change itself concerns such a comment or file, write the identifier in backticks, for example \`TODO\`), no slots such as "(results go here)", no sentences addressed to the contributor, no unfilled template lines such as "Closes #" or "Fixes # (issue)", and no role labels (reviewer, tester, member, BELL). Everything the person must still do, run, fill in, tick or decide goes ONLY into checklist. When a template item cannot be completed truthfully yet, keep its heading and state the current fact in one plain sentence, for example "No issue is linked yet." or "Not run yet: <command>.". Evidence requested by any appended guidance belongs in summary and checklist, not body. Keep body prose to about bodyWordBudget words beyond template headings and checkbox lines; bodyWordBudget is BELL's writing default, never a repository rule, so never cite it in rules. When brevityRule is not null the repository asks for short descriptions in the contributor's own words: write fewer words and add a checklist item asking the person to rewrite the description in their own words. headBranch is the branch BELL will push for this PR; when a supplied source states branch naming rules and headBranch does not follow them, add a checklist item quoting the rule and suggesting a compliant name.
-commitMessageSuggestion: suggest the git commit message for this change ONLY when a supplied contributing/documentation/maintainer source states commit message conventions (for example Conventional Commits type(scope) subjects, subject length, body wrapping, or issue references). Follow exactly those conventions: a subject line, a blank line, then a body explaining why; reference an issue only when a supplied issue number exists in the task or sources, never an invented one. Set sources to the ids of the sources that required each convention and write rationale naming which source required what. NEVER include Signed-off-by, Co-authored-by, or any other "-by:" trailer naming a person: the person types their own sign-off. When no supplied source states commit conventions, set commitMessageSuggestion to null.
+commitMessageSuggestion: suggest the git commit message for this change ONLY when a supplied contributing/documentation/maintainer source states commit message conventions (for example Conventional Commits type(scope) subjects, subject length, body wrapping, issue references, or an AI trailer such as Assisted-by). Follow exactly those conventions: a subject line, a blank line, then a body explaining why; only when they ask for issue references in commits, add one "Fixes #N" line for each issue in issues the change fixes (otherwise "Refs #N"), never another issue. Set sources to the ids of the sources that required each convention and write rationale naming which source required what. NEVER include Signed-off-by, Co-authored-by, or any other "-by:" trailer naming a person: the person types their own sign-off. Never write an Assisted-by or Generated-by trailer either: BELL appends the one a source asks for, naming the tool that wrote the change. When no supplied source states commit conventions, set commitMessageSuggestion to null.
 Return {title,body,policy,summary,rules:[{text,sourceId,quote}],checklist:[string],templateSourceId,commitMessageSuggestion:{message,rationale,sources:[sourceId]}|null}. Provided data:\n${redact(JSON.stringify(data))}`;
 }

@@ -39,6 +39,8 @@ export interface DraftProposal {
    * A commit message following the conventions found in the supplied sources
    * (type(scope) subjects, body wrapping, issue references). The human applies
    * it by choice; it never carries Signed-off-by or any other person trailer.
+   * Where the rules ask for an AI trailer, BELL ends it with one naming the
+   * agent that wrote the change (`aiTrailerRule`).
    */
   commitMessageSuggestion?: CommitMessageSuggestion;
 }

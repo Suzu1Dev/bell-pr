@@ -1481,6 +1481,47 @@ export function disclosureRule(
   return undefined;
 }
 
+/** "Do not add an Assisted-by trailer", "Commits with Assisted-by are rejected": no request. */
+const trailerRefused =
+  /\b(?:not|never|no|nor|without|forbid\w*|prohibit\w*|banned|disallow\w*|reject\w*|refus\w*)\b|n't\b/i;
+
+/**
+ * The first contributing-guide or template line that asks for a trailer
+ * naming the AI tool in commits, with its source and the trailer it names
+ * (`Assisted-by` or `Generated-by`). Code blocks and comments are ignored
+ * like the other rule quotes, but inline code is read, since the trailer
+ * is usually written in it ("add an `Assisted-by: <tool>` trailer"). A
+ * line with a negation or a refusal in it is never a request.
+ */
+export function aiTrailerRule(
+  sources: readonly DraftSource[],
+): (DraftRuleQuote & { trailer: "Assisted-by" | "Generated-by" }) | undefined {
+  for (const source of sources) {
+    if (source.kind !== "contributing" && source.kind !== "template") continue;
+    const prose = markdownProse(source.content);
+    for (const [index, line] of source.content.split("\n").entries()) {
+      if (!prose[index]?.trim()) continue;
+      const words = line
+        .replace(/<!--.*?(?:-->|$)|^.*?-->/g, " ")
+        .replaceAll("`", "");
+      const request = trailerRequest.exec(words);
+      if (!request || trailerRefused.test(words)) continue;
+      return {
+        sourceId: source.id,
+        label: source.label,
+        quote: line
+          .replace(/\*\*|__/g, "")
+          .trim()
+          .replace(/^[-*>#\s]+/, "")
+          .replace(/^\[[ xX]\]\s*/, "")
+          .slice(0, 200),
+        trailer: /generated-by$/i.test(request[0]) ? "Generated-by" : "Assisted-by",
+      };
+    }
+  }
+  return undefined;
+}
+
 /**
  * A trailer naming the tool that helped, as kernel, LLVM and ASF policies
  * ask, after spaces on its own line (each line is tried, so the spaces
