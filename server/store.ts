@@ -24,6 +24,7 @@ import { sm } from "./i18n/index.js";
 import { writeDurable } from "./fs-atomic.js";
 import { initLog, log } from "./log.js";
 import { lenientRead } from "./persisted-schema.js";
+import { bindStoredGitDirs } from "./process.js";
 
 /** What loading state.json had to repair at this start; GET /api/status shows it. */
 export interface StoreRecovery {
@@ -483,6 +484,7 @@ export const runReadSchema = loose({
     baseBranch: text,
     baseSha: text,
     worktreePath: text,
+    gitDir: later(text),
     createdAt: text,
     agents: z.array(
       loose({
@@ -537,6 +539,7 @@ export const runReadSchema = loose({
           dependsOn: list,
           status: text,
           setup: later(setupNeedsSchema),
+          gitDir: later(text),
         }),
       ),
       messages: z.array(loose({})),
@@ -708,6 +711,7 @@ export class Store {
     this.backupsWithoutState = undefined;
     this.interruptedAgents = [];
     this.data = await this.load();
+    await bindStoredGitDirs(this.data.repos, this.data.runs);
     // Rules an older build stored carry no reach: read it from each quote, as a rules read does now.
     for (const repo of this.data.repos)
       if (repo.contributionRules)

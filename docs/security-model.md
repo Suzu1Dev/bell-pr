@@ -201,12 +201,12 @@ to both CLIs, and `DISABLE_TELEMETRY`, `DISABLE_ERROR_REPORTING`,
   settings above always replace them. Your global and system
   configuration are not checked. A `.gitattributes` file in the project
   can name a driver, but only configuration can define one.
-- **Run checkouts.** Before Git runs in a run or teammate checkout
-  (`<data>/worktrees/<run>` or `<data>/team-worktrees/<run>/<task>`), its
-  `.git` must be a plain file pointing at `<repository>/.git/worktrees/<name>`,
-  and Git's own record of that worktree must point back. A directory in
-  place of that file is refused (`worktreeForged`) before Git starts. The
-  resolved directory is passed as `--git-dir`. With Claude Code's sandbox
+- **Run checkouts.** When a worktree is created, BELL records its git
+  directory (`gitDir` on the run, and on a teammate task). Every later git
+  command for that checkout passes that path as `--git-dir` and the
+  checkout as `--work-tree`. The checkout's `.git` file is not read.
+  A checkout under `worktrees/` or `team-worktrees/` with no recorded git
+  directory is refused (`worktreeForged`). With Claude Code's sandbox
   on, writes to that file, to `<clone>/.git/hooks`, to `<clone>/.git/config`
   and to the worktree's `config.worktree` are denied. Codex's permission
   profile cannot deny those writes without also denying reads, so it does

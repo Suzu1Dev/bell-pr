@@ -1,6 +1,6 @@
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
 import { existsSync } from "node:fs";
-import { lstat, readFile, realpath } from "node:fs/promises";
+import { lstat, readdir, readFile, realpath } from "node:fs/promises";
 import path from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import type { AgentProvider } from "../shared/models.js";
@@ -595,36 +595,144 @@ function runCheckout(cwd: string) {
   return team > 0 && team === parts.length - 3;
 }
 
+/** Git directory recorded for a checkout path. The checkout's `.git` file is not read. */
+const checkoutGitDirs = new Map<string, string>();
+
+export function rememberCheckout(worktreePath: string, gitDir: string) {
+  checkoutGitDirs.set(path.resolve(worktreePath), path.resolve(gitDir));
+}
+
+export function recordedGitDir(worktreePath: string): string | undefined {
+  return checkoutGitDirs.get(path.resolve(worktreePath));
+}
+
 /**
- * Git directory of a run checkout, taken from its `gitdir:` file and checked
- * without running Git. A directory in place of that file is the agent's
- * repository, so it is refused before any command can read its config.
- * The resolved directory is passed as `--git-dir`, and `GIT_DIR` is not
- * taken from the environment.
+ * Admin directory of a linked worktree, found from the clone's git directory
+ * by the worktree path. Does not read the checkout's `.git` file.
+ */
+export async function locateWorktreeGitDir(
+  commonGit: string,
+  worktreePath: string,
+): Promise<string | undefined> {
+  const root = path.join(commonGit, "worktrees");
+  const names = await readdir(root).catch(() => [] as string[]);
+  const want = path.resolve(worktreePath);
+  const wantGit = path.join(want, ".git");
+  for (const name of names) {
+    const admin = path.join(root, name);
+    const text = (await readFile(path.join(admin, "gitdir"), "utf8").catch(() => "")).trim();
+    if (!text) continue;
+    const linked = path.resolve(admin, text);
+    if (linked === wantGit || path.dirname(linked) === want)
+      return realpath(admin).catch(() => admin);
+  }
+  return undefined;
+}
+
+/**
+ * Loads git directories BELL stored on runs and teammate tasks. A run saved
+ * before that field existed is filled from its repository's git directory.
+ */
+export async function bindStoredGitDirs(
+  repos: readonly { id: string; path: string }[],
+  runs: readonly {
+    repoId: string;
+    worktreePath?: string;
+    gitDir?: string;
+    team?: {
+      tasks: {
+        worktreePath?: string;
+        worktreeRemoved?: boolean;
+        gitDir?: string;
+      }[];
+    };
+  }[],
+) {
+  const bind = async (
+    repoPath: string | undefined,
+    worktreePath: string | undefined,
+    gitDir: string | undefined,
+    save: (gitDir: string) => void,
+  ) => {
+    if (!worktreePath) return;
+    if (gitDir) {
+      rememberCheckout(worktreePath, gitDir);
+      return;
+    }
+    if (!repoPath) return;
+    const dot = path.join(repoPath, ".git");
+    const metadata = await lstat(dot).catch(() => undefined);
+    if (!metadata?.isDirectory()) return;
+    const found = await locateWorktreeGitDir(dot, worktreePath);
+    if (!found) return;
+    save(found);
+    rememberCheckout(worktreePath, found);
+  };
+  for (const run of runs) {
+    const repoPath = repos.find((repo) => repo.id === run.repoId)?.path;
+    await bind(repoPath, run.worktreePath, run.gitDir, (gitDir) => {
+      run.gitDir = gitDir;
+    });
+    for (const task of run.team?.tasks ?? []) {
+      if (task.worktreeRemoved) continue;
+      await bind(repoPath, task.worktreePath, task.gitDir, (gitDir) => {
+        task.gitDir = gitDir;
+      });
+    }
+  }
+}
+
+/** Path argument of `worktree add`, when this command is one. */
+function worktreeAddPath(args: string[]): string | undefined {
+  const at = args.indexOf("worktree");
+  if (at < 0 || args[at + 1] !== "add") return undefined;
+  const valued = new Set(["-b", "-B", "--reason"]);
+  for (let index = at + 2; index < args.length; index++) {
+    const arg = args[index];
+    if (arg === "--") return args[index + 1];
+    if (valued.has(arg)) {
+      index++;
+      continue;
+    }
+    if (arg.startsWith("-")) continue;
+    return arg;
+  }
+  return undefined;
+}
+
+/** Common git directory of the repository `git()` just used. */
+async function commonGitDirectory(cwd: string, gitDir?: string): Promise<string | undefined> {
+  if (gitDir) {
+    const relative = (await readFile(path.join(gitDir, "commondir"), "utf8").catch(() => "")).trim();
+    if (relative) return path.resolve(gitDir, relative);
+    return undefined;
+  }
+  const dot = path.join(cwd, ".git");
+  const metadata = await lstat(dot).catch(() => undefined);
+  if (metadata?.isDirectory()) return dot;
+  return undefined;
+}
+
+async function rememberNewWorktree(cwd: string, gitDir: string | undefined, args: string[]) {
+  const added = worktreeAddPath(args);
+  if (!added) return;
+  const common = await commonGitDirectory(cwd, gitDir);
+  if (!common) return;
+  const admin = await locateWorktreeGitDir(common, path.resolve(cwd, added));
+  if (admin) rememberCheckout(path.resolve(cwd, added), admin);
+}
+
+/**
+ * Recorded git directory of a run checkout (`<data>/worktrees/<run>` or
+ * `<data>/team-worktrees/<run>/<task>`). A checkout of that shape with no
+ * record is refused. Anything else is left for Git to find. The checkout's
+ * `.git` file is not read.
  */
 export async function runCheckoutGitDir(cwd: string): Promise<string | undefined> {
+  const recorded = recordedGitDir(cwd);
+  if (recorded) return recorded;
   if (!runCheckout(cwd)) return undefined;
-  const forged = () => new AppError((m) => m.security.worktreeForged, 409);
-  const pointerPath = path.join(cwd, ".git");
-  const metadata = await lstat(pointerPath).catch(() => undefined);
-  if (!metadata?.isFile()) throw forged();
-  const pointer = /^gitdir: ([^\r\n]+)\r?\n?$/.exec(
-    await readFile(pointerPath, "utf8"),
-  )?.[1];
-  if (!pointer) throw forged();
-  const gitDir = path.resolve(cwd, pointer.trim());
-  const marker = `${path.sep}.git${path.sep}worktrees${path.sep}`;
-  if (!gitDir.includes(marker)) throw forged();
-  const back = await readFile(path.join(gitDir, "gitdir"), "utf8").catch(() => "");
-  const [expected, actual, resolved] = await Promise.all([
-    realpath(pointerPath).catch(() => undefined),
-    back.trim()
-      ? realpath(path.resolve(gitDir, back.trim())).catch(() => undefined)
-      : Promise.resolve(undefined),
-    realpath(gitDir).catch(() => undefined),
-  ]);
-  if (!expected || expected !== actual || !resolved) throw forged();
-  return resolved;
+  throw new AppError((m) => m.security.worktreeForged, 409);
 }
 
 const gitEnvKeys = [
@@ -761,11 +869,14 @@ export async function git(
   args: string[],
   options: Omit<CommandOptions, "cwd"> = {},
 ) {
-  return command("git", await serverGitArgs(cwd, args), {
+  const gitDir = recordedGitDir(cwd);
+  const result = await command("git", await serverGitArgs(cwd, args), {
     ...options,
     cwd,
     network: options.network === true,
   });
+  await rememberNewWorktree(cwd, gitDir, args);
+  return result;
 }
 
 /**

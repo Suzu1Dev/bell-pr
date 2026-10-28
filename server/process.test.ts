@@ -422,6 +422,7 @@ test("a run checkout whose .git file was replaced does not run its filter or cre
   await git(repo, ["add", "file.txt"]);
   await git(repo, ["commit", "-q", "-m", "initial"]);
   await git(repo, ["worktree", "add", "-q", "--detach", checkout]);
+  const gitDir = (await git(checkout, ["rev-parse", "--absolute-git-dir"])).stdout.trim();
   await git(checkout, ["status", "--porcelain"]);
 
   await git(attack, ["init", "-q", "-b", "main"]);
@@ -433,14 +434,13 @@ test("a run checkout whose .git file was replaced does not run its filter or cre
   await writeFile(path.join(checkout, ".gitattributes"), "* filter=pwn\n");
   await writeFile(path.join(checkout, "file.txt"), "v2\n");
 
-  const refused = (error: unknown) =>
-    error instanceof AppError && error.statusCode === 409;
-  await assert.rejects(git(checkout, ["add", "file.txt"]), refused);
-  await assert.rejects(git(checkout, ["status"]), refused);
-  await assert.rejects(
-    gitNetwork(checkout, ["push", "origin", "HEAD"]),
-    refused,
+  assert.equal(
+    (await git(checkout, ["rev-parse", "--absolute-git-dir"])).stdout.trim(),
+    gitDir,
   );
+  await git(checkout, ["status", "--porcelain"]);
+  await git(checkout, ["add", "file.txt"]);
+  await gitNetwork(checkout, ["push", "origin", "HEAD"]).catch(() => undefined);
   await assert.rejects(readFile(filterMarker, "utf8"));
   await assert.rejects(readFile(credentialMarker, "utf8"));
 });

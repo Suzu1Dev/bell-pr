@@ -108,6 +108,11 @@ export interface RunCore {
   baseSha?: string;
   /** Local checkout the learner may edit by hand; the server always records it, the demo run has none. */
   worktreePath?: string;
+  /**
+   * Git directory of that checkout, recorded when the worktree was created.
+   * Absent on runs saved before it was recorded.
+   */
+  gitDir?: string;
   createdAt: string;
   agents: Agent[];
   logs: RunLogEntry[];
