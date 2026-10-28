@@ -8,6 +8,8 @@ import contribution from "./contribution.js";
 import run from "./run.js";
 import security from "./security.js";
 import setup from "./setup.js";
+import sudo from "./sudo.js";
+import session from "./session.js";
 import storage from "./storage.js";
 import understanding from "./understanding.js";
 
@@ -16,6 +18,8 @@ const m: Translation<typeof en> = {
   run,
   analysis,
   setup,
+  sudo,
+  session,
   storage,
   security,
   cli,

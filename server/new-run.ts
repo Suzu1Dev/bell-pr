@@ -53,6 +53,7 @@ async function assertProviderReady(
   sources: NewRunSources,
   provider: AgentProvider,
   access: "read" | "write",
+  full = false,
 ) {
   const capability = await sources.status();
   if (provider === "claude") {
@@ -67,7 +68,7 @@ async function assertProviderReady(
         fixes: setupError("claude_unauthenticated").fixes,
       });
     // An agent run's teammates edit files; a Learn-by-hand run's agents only read.
-    await enforceAgentSandbox("claude", access);
+    if (!full || access !== "write") await enforceAgentSandbox("claude", access);
   } else {
     if (!capability.codex)
       throw new AppError((m) => m.run.queue.codexMissing, 503, {
@@ -125,6 +126,7 @@ export async function createRun(
     sources,
     modelExecution.provider ?? "codex",
     byHand ? "read" : "write",
+    modelExecution.agentAccess === "full",
   );
   ctx.assertQueueCapacity();
   const createdAt = now();

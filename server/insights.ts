@@ -338,6 +338,7 @@ function withoutModel(settings: ContributionSettings) {
     model: _model,
     reasoningEffort: _effort,
     webAccess: _webAccess,
+    agentAccess: _agentAccess,
     ...project
   } = settings;
   return project;
@@ -853,6 +854,9 @@ export class ProjectInsightsService {
       ...(settings.webAccess === undefined
         ? {}
         : { webAccess: settings.webAccess }),
+      ...(settings.agentAccess === undefined
+        ? {}
+        : { agentAccess: settings.agentAccess }),
     });
     await this.update(repoId, (cache) => {
       // A project deleted meanwhile (or all data) gets no cache again.

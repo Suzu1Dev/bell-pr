@@ -9,6 +9,15 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **Collaborate before publishing.** A conversation with a writable agent can
+  finish checks, fix failures and update the draft's Limitations section.
+  Each turn records changed files and observed commands, invalidates reviews
+  of changed files, and leaves approval and publication to you. Learn by hand
+  remains read-only for agents.
+- **Explicit full agent access.** Model settings can give writable roles full
+  machine access, with an optional Linux sudo setup. Workspace access remains
+  the default, and read-only roles keep their existing restrictions.
+
 - **Analysis progress.** While a project analysis or **Generate 5 more**
   runs, the overview lists its steps and shows how long the agent has worked
   against the longest it will wait, with the CLI's notices such as a retry or

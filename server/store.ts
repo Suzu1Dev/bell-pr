@@ -20,6 +20,7 @@ import {
 import { activeFollowUp } from "../shared/followups.js";
 import { withStoredReach } from "../shared/project-policy.js";
 import { splitLimits } from "../shared/split.js";
+import { sessionMessageLimit, sessionContentLimit } from "../shared/session.js";
 import { sm } from "./i18n/index.js";
 import { writeDurable } from "./fs-atomic.js";
 import { initLog, log } from "./log.js";
@@ -473,7 +474,29 @@ const splitRefSchema = loose({
 });
 
 /** Read schema of a run in state.json (lenientRead wraps it below). */
+const sessionSchema = loose({
+  messages: z.array(loose({
+    id: text,
+    role: text,
+    content: text.max(sessionContentLimit),
+    at: text,
+    changedFiles: later(list),
+    questions: later(z.array(text.max(500)).max(5)),
+    checks: later(z.array(loose({ command: text, outcome: text }))),
+    notRun: later(z.array(loose({ check: text.max(300), reason: text.max(600) })).max(10)),
+    setup: later(setupNeedsSchema),
+    failed: later(z.boolean()),
+    draftUpdate: later(loose({ before: text, after: text })),
+  })).max(sessionMessageLimit),
+  running: later(z.boolean()),
+  startedAt: later(text),
+  startingHead: later(text),
+  revision: count,
+  updatedAt: text,
+});
+
 export const runReadSchema = loose({
+    session: later(sessionSchema),
     id: text.min(1),
     repoId: text,
     title: text,
@@ -722,6 +745,22 @@ export class Store {
       if (run.draftPreparation?.status === "generating") {
         run.draftPreparation.status = "failed";
         run.draftPreparation.error = recovery.draft;
+      }
+      if (run.session?.running) {
+        const session = run.session;
+        session.running = false;
+        if (session.startingHead)
+          this.interruptedAgents.push({ runId: run.id, head: session.startingHead, sync: false });
+        delete session.startedAt;
+        delete session.startingHead;
+        session.updatedAt = new Date().toISOString();
+        session.messages.push({
+          id: `restart:${session.updatedAt}`,
+          role: "system",
+          content: withRunLocale(run, () => sm().session.restarted),
+          at: session.updatedAt,
+        });
+        session.messages = session.messages.slice(-sessionMessageLimit);
       }
       for (const explanation of Object.values(run.explanations ?? {})) {
         if (explanation.status === "generating") {

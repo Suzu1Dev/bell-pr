@@ -25,6 +25,7 @@ export default defineConfig(
     // Gitignored local output. .bellpr/ is the default data directory and
     // holds clones of other projects.
     ".bellpr/",
+    ".local/",
     "output/",
     ".playwright-cli/",
   ]),

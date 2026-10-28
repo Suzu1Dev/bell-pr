@@ -1,0 +1,22 @@
+import { product } from "../../../shared/product";
+export default {
+  label: "Agent permissions",
+  workspace: "Working directory (default)",
+  full: "Full access",
+  summary: "Full access (sandbox and command deny rules lifted)",
+  workspaceHelp: "Codex uses its working-directory sandbox. Claude Code keeps its OS sandbox and command deny rules unless you separately allowed it without a sandbox. Read-only roles remain restricted.",
+  fullHelp: "Writable agents run as your account without a sandbox or command deny rules. They may install packages, change system settings and use passwordless sudo. Untrusted project text could influence them and affect this computer. Use this only for projects you trust. Read-only roles keep their restrictions.",
+  sudoTitle: "Passwordless sudo",
+  loadFailed: ({ message }: { message: string }) => `Could not read sudo status: ${message}`,
+  loading: "Reading sudo status…",
+  unavailable: "sudo is not installed on this computer, so passwordless sudo cannot be configured.",
+  installed: ({ user }: { user: string }) => `Enabled: ${user} can use sudo without a password. ${product.name} created this rule; you can remove it here.`,
+  external: ({ user }: { user: string }) => `${user} already has passwordless sudo through another rule. ${product.name} will not remove that rule.`,
+  password: ({ user }: { user: string }) => `sudo password (${user})`,
+  enable: "Enable passwordless sudo",
+  enabling: "Configuring…",
+  remove: `Remove ${product.name}'s sudo rule`,
+  removing: "Removing…",
+  help: ({ user }: { user: string }) => `Enter the password once to create /etc/sudoers.d/bell-pr-agent for ${user}. The password is sent only to sudo for this setup and is never saved or logged. This rule grants ${user} root privileges without a password, including every program and agent running as that account.`,
+  failed: "The operation did not finish. Please try again.",
+};

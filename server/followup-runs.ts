@@ -266,6 +266,7 @@ async function runFollowUp(
         note: round.note,
         changedFiles: files.map((file) => file.path),
         provider: run.modelExecution?.provider,
+        agentAccess: run.modelExecution?.agentAccess,
       }),
       controller.signal,
       false,

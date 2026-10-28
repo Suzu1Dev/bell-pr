@@ -575,6 +575,7 @@ export function ChangesTab({
             file={file}
             reviewed={run.reviewedFiles.includes(file.path)}
             onReview={reviewFile}
+            reviewDisabled={!!run.session?.running}
             onAsk={checking ? () => setAskWaiting(true) : writing ? (question) => byHand?.ask(file, question) : ask}
             view={diffView}
             hasNote={Boolean(run.notes?.[file.path]?.text)}

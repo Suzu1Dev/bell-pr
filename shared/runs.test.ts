@@ -123,6 +123,7 @@ test("every detail field is left out", () => {
       "practice",
       "reports",
       "reviewability",
+      "session",
       "sync",
       "understanding",
       "walkthroughs",

@@ -288,6 +288,8 @@ test("the language switcher is labelled and lists each language by its own name"
 });
 
 const namespaces = [
+  "permissions",
+  "session",
   "common",
   "app",
   "workspace",

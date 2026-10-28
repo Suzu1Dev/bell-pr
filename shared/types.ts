@@ -1,3 +1,4 @@
+import type { WorkSession } from "./session.js";
 import type { LearnerNote, StoredExplanation } from "./explanations.js";
 import type { StoredWalkthrough } from "./walkthroughs.js";
 import type { EfficiencyMetrics } from "./efficiency.js";
@@ -90,6 +91,8 @@ export interface RunLogEntry {
  * `Run extends RunCore`; the server adds the fields only it records.
  */
 export interface RunCore {
+  /** Collaborative edits before publishing; absent on older records. */
+  session?: WorkSession;
   draftPreparation?: DraftPreparation;
   modelExecution?: ModelExecution;
   /** Stored per-file explanations keyed by path; the learning page aggregates the ready ones. */

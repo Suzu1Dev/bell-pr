@@ -378,3 +378,14 @@ test("in Learn by hand the team size is hidden and plan approval is always on", 
   assert.ok(team.slice(team.lastIndexOf('<label class="mission-plan-option">')).startsWith('<label class="mission-plan-option"><input type="checkbox"/>'));
   assert.match(renderZh(props({}, { byHand: true })), /親手學一律開啟/);
 });
+
+test("agent access defaults to workspace and exposes the sudo controls only for explicit full access", () => {
+  const normal = renderEn(props({}, { modelsOnly: true, demo: true }));
+  assert.match(normal, /value="workspace" selected=""/);
+  assert.doesNotMatch(normal, /Reading sudo status/);
+  const full = renderEn(props({ agentAccess: "full" }, { modelsOnly: true, demo: true }));
+  assert.match(full, /value="full" selected=""/);
+  assert.match(full, /Passwordless sudo/);
+  assert.match(full, /Read-only roles keep their restrictions/);
+  assertNoHan(full);
+});

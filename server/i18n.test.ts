@@ -208,8 +208,10 @@ test("every server namespace is registered for both locales", () => {
     "contribution",
     "run",
     "security",
+    "session",
     "setup",
     "storage",
+    "sudo",
     "understanding",
   ];
   assert.deepEqual(Object.keys(en).sort(), namespaces);

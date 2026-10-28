@@ -86,6 +86,9 @@ to both CLIs, and `DISABLE_TELEMETRY`, `DISABLE_ERROR_REPORTING`,
 
 ### Claude Code
 
+The following restrictions describe the default **Workspace** access. Explicit
+Full access changes writable roles as described [below](#explicit-full-access).
+
 - **Writable roles** (teammates, follow-up rounds, syncing) run every Bash
   command inside Claude Code's sandbox: bubblewrap with socat on Linux,
   `sandbox-exec` on macOS. Writes are limited to the run's checkout, network
@@ -126,12 +129,37 @@ to both CLIs, and `DISABLE_TELEMETRY`, `DISABLE_ERROR_REPORTING`,
 
 ### Codex
 
-- Writable roles run with `--sandbox workspace-write`: writes are limited to
+- With default Workspace access, writable roles run with `--sandbox workspace-write`: writes are limited to
   the checkout and network access is off by default. Read-only roles run with
   `--sandbox read-only`.
 - **Limit:** Codex's sandbox does not restrict reading. A Codex agent can read
   files your user can read, though it cannot send them anywhere over the
   network from its commands.
+
+### Explicit full access
+
+Model settings offer **Full access** for roles that write files: implementation,
+collaborative sessions, follow-up fixes and conflict resolution. It is off by
+default and is recorded with the run's model settings. These roles use Codex's
+`--sandbox danger-full-access` or Claude Code's `bypassPermissions` mode without
+its Bash sandbox. Claude turns using it are marked as unsandboxed. Lead,
+reviewer, test analyst, project analysis and other read-only roles keep their
+restrictions. Learn by hand never gains a writable agent from this setting.
+
+Full access lets an agent install required tools, change files outside its
+checkout and use existing sudo privileges. Imported code, issues and reviews
+are untrusted input: an induced command can affect anything the service account
+can access. Permission deny lists are not an operating-system boundary for an
+unsandboxed shell.
+
+On Linux, the optional sudo control accepts a password to install a validated
+`/etc/sudoers.d/bell-pr-agent` rule granting the service account `NOPASSWD: ALL`.
+The password is passed to sudo over standard input, never saved or logged, and
+cleared from the input after submission. This grants that account passwordless
+root commands, including to processes outside BELL PR. Three failed password
+attempts block this control for 15 minutes in process memory; restarting clears
+the counter. Removing BELL's rule does not remove privileges from other sudo
+rules. Enabling Full access alone does not install the sudo rule.
 
 ### Limits that apply to every agent
 

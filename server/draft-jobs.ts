@@ -20,6 +20,7 @@ import {
   draftPrompt,
   parseDraftProposal,
 } from "./drafts.js";
+import { sessionReport } from "./session.js";
 import { agentLabel } from "./agent-cli.js";
 import { AppError, type Run } from "./types.js";
 import { sameDraftProse } from "../shared/draft-checks.js";
@@ -129,7 +130,11 @@ async function generateDraft(
     )(repo, run, { signal: controller.signal });
     if (controller.signal.aborted)
       throw new AppError((m) => m.run.draft.cancelled, 409);
-    const prompt = draftPrompt(run, files, preparation.context, repo.url);
+    const evidence = run.session && sessionReport(run.session.messages);
+    const prompt = draftPrompt(
+      evidence ? { ...run, reports: { ...run.reports, session: evidence } } : run,
+      files, preparation.context, repo.url,
+    );
     temporary = await mkdtemp(path.join(os.tmpdir(), "bell-draft-"));
     const outputSchema = path.join(temporary, "response-schema.json");
     await writeFile(outputSchema, JSON.stringify(draftJsonSchema), {

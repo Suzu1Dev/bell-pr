@@ -31,6 +31,8 @@ export interface WorkbenchContext {
   walkthroughJobs: Map<string, Promise<void>>;
   /** PR draft preparation in progress, by run id. */
   draftJobs: Map<string, Promise<void>>;
+  /** Collaborative editing turns on unpublished runs, by run id. */
+  sessionJobs: Map<string, Promise<void>>;
   /** Learner-requested reviewer/tester reruns; one per run, aborted through controllers[run.id]. */
   reviewJobs: Map<string, Promise<void>>;
   /** Review follow-up rounds and sync conflict resolutions, by run id; aborted through controllers[run.id]. */

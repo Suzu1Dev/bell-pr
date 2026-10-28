@@ -30,6 +30,8 @@ export interface AgentCommandOptions {
   skipGitRepoCheck?: boolean;
   /** Web search and page fetching for "read" and "write"; "none" never gets it. */
   web?: boolean;
+  /** Write roles only: explicit permission to remove the sandbox and command deny rules. */
+  full?: boolean;
 }
 
 export const agentLabel = (provider: AgentProvider = "codex") =>
@@ -56,7 +58,7 @@ export const claudeWebFetchDomains = [
  * - `WebFetch(domain:…)` allows one host per rule; WebSearch takes no
  *   argument.
  */
-function claudeAccess(access: AgentAccess, web: boolean): string[] {
+function claudeAccess(access: AgentAccess, web: boolean, full: boolean): string[] {
   if (access === "none") return ["--tools", "", "--permission-mode", "dontAsk"];
   const tools =
     access === "read"
@@ -77,10 +79,10 @@ function claudeAccess(access: AgentAccess, web: boolean): string[] {
         : []),
     ].join(" "),
     "--permission-mode",
-    access === "read" ? "dontAsk" : "acceptEdits",
+    access === "read" ? "dontAsk" : full ? "bypassPermissions" : "acceptEdits",
     // acceptEdits approves file edits inside the working directory only.
     // Deny rules win over allow rules: pushing, GitHub CLI and raw downloads stay with BELL's own flow.
-    ...(access === "write"
+    ...(access === "write" && !full
       ? [
           "--disallowedTools",
           "Bash(git push:*)",
@@ -115,7 +117,18 @@ export function claudeSettings(options: {
   cwd: string;
   access: AgentAccess;
   sandbox: boolean;
-}) {
+  full?: boolean;
+}): {
+  permissions: { deny: string[]; blockReadsOutsideWorkingDirectories?: boolean };
+  sandbox?: {
+    enabled: boolean;
+    failIfUnavailable?: boolean;
+    autoAllowBashIfSandboxed?: boolean;
+    allowUnsandboxedCommands?: boolean;
+    filesystem?: ReturnType<typeof agentSandboxReadPaths>;
+    network?: { allowedDomains: string[]; strictAllowlist: boolean };
+  };
+} {
   return {
     permissions: {
       deny: agentReadDenials(options.cwd),
@@ -134,7 +147,9 @@ export function claudeSettings(options: {
             network: { allowedDomains: [], strictAllowlist: true },
           },
         }
-      : {}),
+      : options.full
+        ? { sandbox: { enabled: false } }
+        : {}),
   };
 }
 
@@ -160,13 +175,13 @@ export async function agentCommand(
   execution: ModelExecution,
   options: AgentCommandOptions,
 ): Promise<AgentCommand> {
+  const full = (options.full ?? execution.agentAccess === "full") && options.access === "write";
   const web = options.web === true && options.access !== "none";
   if (execution.provider === "claude") {
     const value = modelExecutionSchema.parse(execution);
-    const { sandbox, unsandboxed } = await enforceAgentSandbox(
-      "claude",
-      options.access,
-    );
+    const { sandbox, unsandboxed } = full
+      ? { sandbox: false, unsandboxed: true }
+      : await enforceAgentSandbox("claude", options.access);
     return {
       executable: "claude",
       args: [
@@ -182,11 +197,11 @@ export async function agentCommand(
         "user",
         "--settings",
         JSON.stringify(
-          claudeSettings({ cwd: options.cwd, access: options.access, sandbox }),
+          claudeSettings({ cwd: options.cwd, access: options.access, sandbox, full }),
         ),
         ...(value.model ? ["--model", value.model] : []),
         ...(value.reasoningEffort ? ["--effort", value.reasoningEffort] : []),
-        ...claudeAccess(options.access, web),
+        ...claudeAccess(options.access, web, full),
         ...(options.outputSchema
           ? ["--json-schema", await readFile(options.outputSchema, "utf8")]
           : []),
@@ -208,7 +223,7 @@ export async function agentCommand(
       "--ephemeral",
       ...modelArguments(execution),
       "--sandbox",
-      options.access === "write" ? "workspace-write" : "read-only",
+      full ? "danger-full-access" : options.access === "write" ? "workspace-write" : "read-only",
       "-c",
       'approval_policy="never"',
       // Codex 0.159 `exec` has no --search flag; live search is a config override.

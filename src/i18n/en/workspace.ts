@@ -30,6 +30,7 @@ const workspace = {
     `${n} ${title}: ${description}`,
   tabsLabel: "Task content",
   tabs: {
+    session: "Collaborate",
     overview: "Overview & motivation",
     changes: "Code changes",
     activity: "Agent activity",
