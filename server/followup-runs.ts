@@ -9,6 +9,7 @@ import { randomUUID } from "node:crypto";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { assertRunAgentAllowed } from "./codex-guard.js";
 import { git, redact } from "./process.js";
 import { readDiff } from "./git.js";
 import { AppError, withRunLocale, type Run } from "./types.js";
@@ -100,6 +101,7 @@ export async function startFollowUp(
   if (ctx.stopping()) throw new AppError(shuttingDown(), 503);
   return ctx.lock(id, async () => {
     const run = ctx.run(id);
+    assertRunAgentAllowed(run);
     // No AI round in Learn by hand (until v1.2.1): the person pushes with their own Git.
     if (run.learnByHand) throw new AppError((m) => m.byHand.followUpRefused, 409);
     if (activeFollowUp(run.followUps))

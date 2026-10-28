@@ -4,6 +4,7 @@ import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises
 import os from "node:os";
 import path from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
+import { setCodexEnabledForTests } from "../shared/codex-switch.js";
 import type { DoctorCheck, DoctorReport } from "../shared/doctor.js";
 import {
   claudeAuthDetail,
@@ -602,4 +603,61 @@ test("the GitHub user answer and the Claude auth JSON are read defensively", () 
     withLocale("zh-TW", () => formatDoctorReport(identity)),
     /\n已就緒：所有必要的檢查都通過了。有些步驟要先修正標示 ✗ 的檢查（Git 身分）才能進行。\n$/,
   );
+});
+
+test("Codex turned off is disabled, not a required failure, and a saved Codex choice falls back", async (t) => {
+  setCodexEnabledForTests(false);
+  t.after(() => setCodexEnabledForTests(true));
+  const f = await fakes(t, { git: git(), gh: gh(), codex: codex(), claude: claude() });
+  const dataDir = path.join(f.directory, "data");
+  await mkdir(dataDir);
+  await writeFile(
+    path.join(dataDir, "model-settings.json"),
+    JSON.stringify({ provider: "codex", model: "gpt-test" }),
+  );
+  const report = await withLocale("en", () =>
+    runDoctor({ force: true, dataDir, platform: "linux", provider: "codex" }),
+  );
+  assert.equal(report.ready, true);
+  const row = check(report, "codex");
+  assert.equal(row.status, "skip");
+  assert.equal(row.required, false);
+  assert.equal(row.reason, "disabled");
+  assert.match(row.detail ?? "", /^Disabled\./);
+  assert.equal(check(report, "codex-auth").status, "skip");
+  assert.equal(check(report, "codex-auth").reason, "disabled");
+  assert.equal(check(report, "codex-auth").required, false);
+  assert.equal(check(report, "provider-ready").status, "ok");
+  assert.match(formatDoctorReport(report), /Disabled\. Codex is turned off/);
+  const zh = await withLocale("zh-TW", () =>
+    runDoctor({ force: true, dataDir, platform: "linux", provider: "codex" }),
+  );
+  assert.equal(zh.ready, true);
+  assert.match(check(zh, "codex").detail ?? "", /已停用/);
+  assert.equal(check(zh, "provider-ready").status, "ok");
+});
+
+test("only Codex installed, with the switch off, asks for Claude Code and does not fail the Codex row", async (t) => {
+  setCodexEnabledForTests(false);
+  t.after(() => setCodexEnabledForTests(true));
+  await fakes(t, { git: git(), gh: gh(), codex: codex() });
+  const again = await withLocale("en", () => runDoctor({ force: true, platform: "linux" }));
+  const row = check(again, "provider-ready");
+  assert.equal(row.status, "fail");
+  assert.equal(row.reason, "claude-only");
+  assert.equal(
+    row.detail,
+    "Claude Code only in 1.0.0; Codex support is disabled\nPlease install Claude Code.",
+  );
+  assert.equal(row.fixes, undefined);
+  assert.equal(check(again, "codex").status, "skip");
+  assert.equal(check(again, "codex").reason, "disabled");
+  assert.equal(check(again, "codex").required, false);
+  assert.match(formatDoctorReport(again), /Claude Code only in 1\.0\.0; Codex support is disabled\n {4}Please install Claude Code\./);
+  const zh = await withLocale("zh-TW", () => runDoctor({ force: true, platform: "linux" }));
+  assert.equal(
+    check(zh, "provider-ready").detail,
+    "1.0.0 只支援 Claude Code；Codex 暫時停用\n請安裝 Claude Code。",
+  );
+  assert.equal(check(zh, "codex").status, "skip");
 });

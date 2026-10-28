@@ -150,6 +150,11 @@ export default {
       `Install and sign in to the Codex CLI or Claude Code: ${product.name} needs at least one.`,
     savedProviderNotReady: ({ provider }: { provider: string }) =>
       `${provider} is chosen in the model settings but is not ready.`,
+    /** Codex when the release switch `codexEnabled` is false. Not a failure. */
+    codexDisabled: "Disabled. Codex is turned off in this build.",
+    /** Only Codex is installed, and the release switch leaves it off. */
+    claudeOnlyRelease: "Claude Code only in 1.0.0; Codex support is disabled",
+    installClaudeCode: "Please install Claude Code.",
     dataDirReady: ({ free }: { free: number }) => `Writable, ${size(free)} free.`,
     dataDirWritable: "Writable.",
     dataDirNew: "Will be created at the first start.",

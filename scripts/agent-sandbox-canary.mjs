@@ -124,8 +124,15 @@ if (
 const { tsImport } = await import("tsx/esm/api");
 const load = (file) =>
   tsImport(pathToFileURL(path.join(root, file)).href, import.meta.url);
-const { agentCommand } = await load("server/agent-cli.ts");
-const { agentEnvironment, command, git } = await load("server/process.ts");
+const { agentCommand, setCodexEnabledForTests } = await load("server/agent-cli.ts");
+const { agentEnvironment, command, git, setCodexEnabledForTests: setCommandSwitch } =
+  await load("server/process.ts");
+// The loader can evaluate the switch twice. Fake mode opts both copies in so
+// it can print the Codex command. It is not a user control.
+if (options.fake) {
+  setCodexEnabledForTests(true);
+  setCommandSwitch(true);
+}
 
 /** The attempts, with what in a command identifies each. */
 const attempts = (dataDirectory, lateSecret) => [

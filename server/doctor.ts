@@ -16,6 +16,7 @@ import os from "node:os";
 import path from "node:path";
 import { doctorCheckIds, type DoctorCheck, type DoctorReport } from "../shared/doctor.js";
 import type { Fix } from "../shared/errors.js";
+import { codexEnabled } from "../shared/codex-switch.js";
 import {
   agentProviders,
   providerLabels,
@@ -416,11 +417,29 @@ async function probeDataDir(directory: string): Promise<Facts["dataDir"]> {
   };
 }
 
+/** Whether a Codex binary is on PATH. Does not run it. */
+async function codexOnPath(): Promise<ToolFacts> {
+  const name = process.platform === "win32" ? "codex.exe" : "codex";
+  for (const dir of (process.env.PATH ?? "").split(path.delimiter)) {
+    if (!dir) continue;
+    try {
+      await access(path.join(dir, name), constants.X_OK);
+      return { state: "ok" };
+    } catch {
+      // The next directory.
+    }
+  }
+  return { state: "missing" };
+}
+
 async function probe(exec: DoctorExec, dataDir?: string): Promise<Facts> {
   const [git, gh, codex, claude, dataDirFacts] = await Promise.all([
     probeTool(exec, "git"),
     probeTool(exec, "gh"),
-    probeTool(exec, "codex", agentEnvironment("codex")),
+    // The switch off must not start Codex. Presence is a PATH check only.
+    codexEnabled
+      ? probeTool(exec, "codex", agentEnvironment("codex"))
+      : codexOnPath(),
     probeTool(exec, "claude", agentEnvironment("claude")),
     dataDir ? probeDataDir(dataDir).catch(() => undefined) : undefined,
   ]);
@@ -431,7 +450,7 @@ async function probe(exec: DoctorExec, dataDir?: string): Promise<Facts> {
         )
       : undefined,
     gh.state === "ok" ? probeGithub(exec) : undefined,
-    codex.state === "ok" ? probeCodexAuth(exec) : undefined,
+    codexEnabled && codex.state === "ok" ? probeCodexAuth(exec) : undefined,
     claude.state === "ok" ? probeClaudeAuth(exec) : undefined,
     claude.state === "ok"
       ? detectClaudeSandbox().catch(() => undefined)
@@ -481,7 +500,9 @@ function gitSupportsSync(version?: string) {
 function readyProviders(facts: Facts): AgentProvider[] {
   return agentProviders.filter((provider) =>
     provider === "codex"
-      ? facts.codex.state === "ok" && facts.codexAuth?.signedIn === true
+      ? codexEnabled &&
+        facts.codex.state === "ok" &&
+        facts.codexAuth?.signedIn === true
       : facts.claude.state === "ok" && facts.claudeAuth?.signedIn === true,
   );
 }
@@ -687,6 +708,24 @@ function buildReport(
   });
 
   for (const provider of agentProviders) {
+    if (provider === "codex" && !codexEnabled) {
+      // Not a required failure: a start gate that looks at `ready` stays open
+      // when Claude Code is ready. The saved provider falls back below.
+      add({
+        id: "codex",
+        required: false,
+        status: "skip",
+        reason: "disabled",
+        detail: m.codexDisabled,
+      });
+      add({
+        id: "codex-auth",
+        required: false,
+        status: "skip",
+        reason: "disabled",
+      });
+      continue;
+    }
     const tool = facts[provider];
     const auth = provider === "codex" ? facts.codexAuth : facts.claudeAuth;
     add({
@@ -746,12 +785,25 @@ function buildReport(
   }
 
   const ready = readyProviders(facts);
-  const chosen = options.provider;
+  // A saved Codex choice falls back to Claude Code while the switch is off,
+  // so this required check does not fail only because Codex was saved.
+  const chosen =
+    !codexEnabled && options.provider === "codex" ? "claude" : options.provider;
+  const claudeOnly =
+    !codexEnabled &&
+    facts.claude.state === "missing" &&
+    facts.codex.state !== "missing";
   add({
     id: "provider-ready",
     required: true,
     ...(!ready.length
-      ? {
+      ? claudeOnly
+        ? {
+            status: "fail" as const,
+            reason: "claude-only",
+            detail: `${m.claudeOnlyRelease}\n${m.installClaudeCode}`,
+          }
+        : {
           status: "fail",
           reason: "none-ready",
           detail: m.noProvider,
@@ -1001,11 +1053,13 @@ export function formatDoctorReport(report: DoctorReport, dataDir?: string): stri
   const width = Math.max(...report.checks.map((check) => columns(labels[check.id])));
   const lines = [m.cli.title, ""];
   for (const check of report.checks) {
-    const text = [check.version, check.detail].filter(Boolean).join("  ");
+    const [first, ...rest] = (check.detail ?? "").split("\n");
+    const text = [check.version, first].filter(Boolean).join("  ");
     const label = labels[check.id];
     lines.push(
       `  ${symbols[check.status]} ${label}${" ".repeat(width - columns(label))}  ${text}`.trimEnd(),
     );
+    for (const line of rest) lines.push(`    ${line}`);
     // Fixes for what needs attention; a tool that is not used needs none.
     if (check.status === "fail" || check.status === "warn")
       for (const fix of check.fixes ?? [])

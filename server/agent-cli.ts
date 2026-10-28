@@ -1,6 +1,8 @@
 import { readFile } from "node:fs/promises";
 import { setTimeout as delay } from "node:timers/promises";
 import { sharedCredentialDenials } from "../shared/credential-denials.js";
+import { codexEnabled } from "../shared/codex-switch.js";
+export { setCodexEnabledForTests } from "../shared/codex-switch.js";
 import {
   providerLabels,
   type AgentProvider,
@@ -195,6 +197,9 @@ export async function agentCommand(
   execution: ModelExecution,
   options: AgentCommandOptions,
 ): Promise<AgentCommand> {
+  // Omitted provider means Codex. While the switch is off, neither starts.
+  if (!codexEnabled && execution.provider !== "claude")
+    throw new AppError((m) => m.setup.doctor.codexDisabled, 422);
   const web = options.web === true && options.access !== "none";
   if (execution.provider === "claude") {
     const value = modelExecutionSchema.parse(execution);

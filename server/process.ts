@@ -1,9 +1,14 @@
-import { spawn, type ChildProcess } from "node:child_process";
+import { spawn as nodeSpawn, type ChildProcess } from "node:child_process";
+
+/** The spawn both `command` and the Codex catalog use. Tests replace `spawn`. */
+export const processSpawn: { spawn: typeof nodeSpawn } = { spawn: nodeSpawn };
 import { existsSync } from "node:fs";
 import { setTimeout as sleep } from "node:timers/promises";
 import type { AgentProvider } from "../shared/models.js";
 import { log } from "./log.js";
 import { redact } from "./secrets.js";
+import { assertCodexExecutableAllowed } from "./codex-guard.js";
+export { setCodexEnabledForTests } from "./codex-guard.js";
 import { AppError } from "./types.js";
 import { cancelled, currentLocale, withLocale } from "./i18n/index.js";
 import { withCliSetupHint } from "./cli-errors.js";
@@ -253,10 +258,11 @@ export async function command(
   options: CommandOptions = {},
 ) {
   if (options.signal?.aborted) throw new AppError(cancelled(), 409);
+  assertCodexExecutableAllowed(executable);
   return await new Promise<{ stdout: string; stderr: string; code: number }>(
     (resolve, reject) => {
       const provider = agentProviderOf(executable);
-      const child = spawn(executable, args, {
+      const child = processSpawn.spawn(executable, args, {
         cwd: options.cwd,
         env: provider
           ? agentChildEnvironment(provider, options.env)

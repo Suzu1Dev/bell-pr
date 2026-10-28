@@ -53,6 +53,7 @@ import { log } from "./log.js";
 import { git, redact } from "./process.js";
 import { byHandPlanPrompt } from "./prompts/by-hand.js";
 import { enterPhase, parseAgentOutput } from "./run-events.js";
+import { assertRunAgentAllowed } from "./codex-guard.js";
 import { runAgent } from "./run-executor.js";
 import { AppError, withRunLocale, type DiffFile, type Repository, type Run } from "./types.js";
 import type { WorkbenchContext } from "./workbench.js";
@@ -67,6 +68,7 @@ export async function planByHand(
   locale: Locale,
   signal: AbortSignal,
 ): Promise<void> {
+  assertRunAgentAllowed(run);
   const team = run.team!;
   enterPhase(run, team, "planning");
   // Orientation and premise are `explain` help, which every help set holds.

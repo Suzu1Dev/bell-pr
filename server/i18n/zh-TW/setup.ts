@@ -134,6 +134,9 @@ const m: Translation<typeof en> = {
     noProvider: `請安裝並登入 Codex CLI 或 Claude Code：${product.name} 至少需要其中一個。`,
     savedProviderNotReady: ({ provider }) =>
       `模型設定選用的是 ${provider}，但它尚未就緒。`,
+    codexDisabled: "已停用。這個版本已關閉 Codex。",
+    claudeOnlyRelease: "1.0.0 只支援 Claude Code；Codex 暫時停用",
+    installClaudeCode: "請安裝 Claude Code。",
     dataDirReady: ({ free }) => `可以寫入，剩餘 ${size(free)}。`,
     dataDirWritable: "可以寫入。",
     dataDirNew: "會在第一次啟動時建立。",

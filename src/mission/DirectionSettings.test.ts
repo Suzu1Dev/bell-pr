@@ -10,6 +10,7 @@ import type { ModelCatalog } from "../../shared/models";
 import { ApiError } from "../api";
 import { setLocale } from "../i18n";
 import type { DoctorState } from "../setup/useDoctor";
+import { setCodexEnabledForTests } from "../../shared/codex-switch";
 import { assertNoHan, renderEn, renderZh } from "../test-utils/render";
 import {
   DirectionSettings,
@@ -67,6 +68,18 @@ test("the English form has no Han in any layout or provider", () => {
   assert.match(html, /<strong>2<\/strong><span>teammates<\/span>/);
   // Compact layouts leave out the direction hints.
   assert.doesNotMatch(renderEn(props({}, { compact: true })), /Make it easier to understand and start/);
+});
+
+test("Codex cannot be selected while the release switch is off", () => {
+  setCodexEnabledForTests(false);
+  try {
+    const html = renderEn(props({ provider: "codex", model: "saved-model" }));
+    assert.match(html, /<option value="codex" disabled="">/);
+    assert.match(html, /<option value="claude" selected="">/);
+    assert.ok(html.includes(claudeSentence));
+  } finally {
+    setCodexEnabledForTests(true);
+  }
 });
 
 test("the English Claude help is the neutral sentence, not the replaced sign-in copy", () => {

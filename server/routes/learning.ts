@@ -194,6 +194,7 @@ export function registerLearningRoutes(
   });
   app.post("/api/learning/debrief", async (req, res) => {
     const { repoId } = debriefRequestSchema.parse(req.body);
+    await insights.assertSavedProviderRunnable();
     // The debrief runs with the project's saved settings, as selected.
     const selected = await insights.getSettings(repoId);
     const debrief = await workbench.learningLoop.debrief(repoId, {

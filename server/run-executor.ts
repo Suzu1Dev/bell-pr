@@ -9,6 +9,7 @@ import { randomUUID } from "node:crypto";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { assertRunAgentAllowed } from "./codex-guard.js";
 import { command, git, agentEnvironment, redact } from "./process.js";
 import { readDiff } from "./git.js";
 import {
@@ -119,6 +120,7 @@ export async function runAgent(
     timeout?: Extract<AgentTimeoutKind, "explanations" | "draft">;
   } = {},
 ) {
+  assertRunAgentAllowed(run);
   // Learn by hand: BELL's agents never get a write turn (DESIGN v1.2 F2).
   if (run.learnByHand && !readonly) throw new AppError((m) => m.byHand.noWriteTurn, 409);
   const modelExecution = run.modelExecution ?? {
