@@ -446,8 +446,8 @@ repository, your own words, reviewability, disclosing AI help and the
 understanding check, each with its source and one sentence on why
 maintainers care.
 
-Before you can approve, BELL PR checks what will be sent: a credential in
-the text, or placeholders such as `TODO:` or an empty `Fixes #`, block it;
+Before you can approve, BELL PR checks what will be sent. Blocks common token formats and private keys before publishing.
+Placeholders such as `TODO:` or an empty `Fixes #` block it;
 a path from your computer, a change to CI workflows and a commit e-mail
 address that is not your GitHub no-reply address need your confirmation.
 The description mentions AI assistance only if the project's rules require

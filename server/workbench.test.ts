@@ -515,7 +515,9 @@ test("the base version around a modified file is served only for the current, re
     assert.equal(changed.blocked, undefined);
     await assert.rejects(
       f.workbench.contextLines(f.run.id, "secret.ts", changed.fingerprint, f.run.baseSha!),
-      (error: AppError) => error.statusCode === 422 && /憑證/.test(error.message),
+      (error: AppError) =>
+        error.statusCode === 422 &&
+        error.message === "發佈前會擋下常見格式的 token 與私鑰。",
     );
 
     // A password assignment is not a blocking secret, but it is masked line by line.

@@ -197,8 +197,8 @@ another, the confirm before publishing lists them, and **Split into
 contributions** on the Draft tab can turn each part into its own contribution,
 by file. A part is a group of files, not always one fix, so check the grouping.
 
-It checks the text before anything is sent: credentials and unfinished
-placeholders block it, and a local path, a CI change or a public commit
+It checks the text before anything is sent. Blocks common token formats and private keys before publishing.
+Unfinished placeholders block it, and a local path, a CI change or a public commit
 e-mail address needs your confirmation. AI assistance is mentioned only if
 the project requires it or you choose to, and publishing waits until a
 disclosure the project requires is there. Publishing pushes a branch (to
