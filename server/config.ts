@@ -113,6 +113,8 @@ export function dataPaths(dataDir: string) {
     lock: path.join(dataDir, "bellpr.lock"),
     /** The agent CLI process groups that are running. */
     children: path.join(dataDir, "children.json"),
+    /** The per-install API token (mode 0600). Not a setting and not logged. */
+    apiToken: path.join(dataDir, "api-token"),
   };
 }
 

@@ -3,6 +3,7 @@
 // section nav, and text that fits.
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Browser, type Page } from "@playwright/test";
+import { e2eApiHeaders } from "./api-token.mjs";
 import { locales } from "../shared/i18n/locale";
 import { playbackTiming } from "../src/demo/playback";
 import { getDemo } from "../src/demo/all";
@@ -19,6 +20,7 @@ const widths = [1440, 390];
 /** A page on a spec-local server; closed with `close()`. */
 async function openOn(browser: Browser, server: LaunchedServer) {
   const context = await browser.newContext({
+    extraHTTPHeaders: e2eApiHeaders,
     baseURL: server.baseURL,
     locale: "en-US",
   });

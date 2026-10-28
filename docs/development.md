@@ -37,7 +37,10 @@ npm run dev
 ```
 
 This starts the API on port 4311 and the Vite dev server on port 4310,
-both on `127.0.0.1`; open `http://127.0.0.1:4310`. Development mode
+both on `127.0.0.1`; open `http://127.0.0.1:4310`. The API requires the
+token in `<data dir>/api-token`. `bell-pr open --print` prints
+`#bell_token=` for the API origin; for the dev server, open
+`http://127.0.0.1:4310/#bell_token=<that value>` once per tab. Development mode
 (`BELLPR_DEV=1`, set by the script) lets the API trust the dev server's port;
 that trust exists only in development mode, and development mode only listens
 on `127.0.0.1`. `BELLPR_FRONTEND_PORT`

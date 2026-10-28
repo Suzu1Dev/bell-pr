@@ -5,6 +5,7 @@ import { execFileSync } from "node:child_process";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { expect, test, type Browser, type Page } from "@playwright/test";
+import { e2eApiHeaders } from "./api-token.mjs";
 import { aiDisclosureLine } from "../shared/drafts";
 import { getDemo } from "../src/demo/all";
 import security from "../server/i18n/en/security";
@@ -74,6 +75,7 @@ const launchSeeded = () =>
 /** A page on a spec-local server; closed with the server. */
 async function openOn(browser: Browser, server: LaunchedServer, width = 1440) {
   const context = await browser.newContext({
+    extraHTTPHeaders: e2eApiHeaders,
     baseURL: server.baseURL,
     viewport: { width, height: width > 600 ? 900 : 844 },
     locale: "en-US",

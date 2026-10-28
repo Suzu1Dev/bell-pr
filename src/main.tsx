@@ -1,6 +1,7 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
+import { adoptApiToken } from "./api";
 import { parsePresentationFlags } from "./app/presentation";
 import {
   addLocaleResource,
@@ -13,6 +14,10 @@ import { adoptViewSearch } from "./navigation/view-url";
 import { defaultLocale, type Locale } from "../shared/i18n/locale";
 import "./styles.css";
 import "./workspace-v2.css";
+
+// The address from `bell-pr open` carries the API token in the fragment.
+// Store it and drop it from the address before the router reads the hash.
+adoptApiToken(window);
 
 const root = ReactDOM.createRoot(document.getElementById("root")!);
 

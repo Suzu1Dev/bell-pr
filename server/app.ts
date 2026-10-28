@@ -97,6 +97,13 @@ export interface AppOptions {
    * trusted like an allowed origin.
    */
   publicUrl?: string;
+  /**
+   * The install's API token. When set, /api except GET and HEAD
+   * /api/health requires it. `readApiToken` is read per request so
+   * rotation applies at once.
+   */
+  apiToken?: string;
+  readApiToken?: () => string | undefined;
 }
 
 export function createApp(workbench: Workbench, options: AppOptions = {}) {
@@ -154,6 +161,8 @@ export function createApp(workbench: Workbench, options: AppOptions = {}) {
             : configuredOrigins,
         ),
       ],
+      ...(options.apiToken !== undefined ? { apiToken: options.apiToken } : {}),
+      ...(options.readApiToken ? { readApiToken: options.readApiToken } : {}),
     }),
   );
   app.use(express.json({ limit: "160kb", strict: true }));

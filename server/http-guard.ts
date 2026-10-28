@@ -1,4 +1,5 @@
-import type { RequestHandler } from "express";
+import type { Request, RequestHandler } from "express";
+import { tokensMatch } from "./api-token.js";
 import { sm } from "./i18n/index.js";
 
 const invalidOrigins = () => sm().security.invalidOrigins;
@@ -52,6 +53,13 @@ export interface GuardOptions {
    * one throws.
    */
   allowedOrigins: string[];
+  /**
+   * When `apiToken` or `readApiToken` is set, every `/api` request except
+   * GET and HEAD `/api/health` must send this token. `readApiToken` is
+   * called per request so `bell-pr token rotate` applies immediately.
+   */
+  apiToken?: string;
+  readApiToken?: () => string | undefined;
 }
 
 /** No scripts or styles from elsewhere, no framing, no form posts to other sites. */
@@ -121,6 +129,36 @@ export function localhostGuard(opts: GuardOptions): RequestHandler {
       res.status(415).json({ error: sm().common.jsonRequired });
       return;
     }
+    if (api && enforced(opts) && !publicHealth(req)) {
+      const expected = opts.readApiToken?.() ?? opts.apiToken;
+      if (!expected || !tokensMatch(expected, presentedToken(req))) {
+        res.status(401).json({ error: sm().common.apiTokenRequired });
+        return;
+      }
+    }
     next();
   };
+}
+
+function enforced(opts: GuardOptions) {
+  return opts.apiToken !== undefined || opts.readApiToken !== undefined;
+}
+
+/** Health stays open for local probes, `bell-pr open` and container checks. */
+function publicHealth(req: Request) {
+  return (
+    (req.method === "GET" || req.method === "HEAD") &&
+    /^\/api\/health$/i.test(req.path)
+  );
+}
+
+/** Authorization: Bearer, or X-Bell-Token when Authorization is absent. */
+function presentedToken(req: Request) {
+  const authorization = req.get("authorization");
+  const raw =
+    authorization !== undefined
+      ? (/^Bearer\s+(\S+)\s*$/i.exec(authorization)?.[1] ?? "")
+      : (req.get("x-bell-token")?.trim() ?? "");
+  // A huge header is not a token. The compare still runs on a fixed digest.
+  return raw.length > 256 ? "" : raw;
 }

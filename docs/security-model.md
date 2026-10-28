@@ -23,34 +23,42 @@ what BELL PR trusts, what it does not, and the limits of each protection.
 - **Agent output.** Agents edit files and run commands that the target
   project's content may have influenced. Nothing they produce is published
   without your review.
-- **Web pages and other local programs.** The host, origin and JSON checks keep
-  a web page in your browser from driving BELL PR. They do not stop a program
-  on this computer that can connect to the port, including one run by another
-  user, because BELL PR has no sign-in.
+- **Web pages and other local programs.** The host, origin, JSON and API
+  token checks keep a web page in your browser from driving BELL PR. A
+  program running as another user on this computer cannot read the token
+  file. A program running as your user can, because it can read your files.
 
 ## The local server
 
-- **No sign-in.** BELL PR does not authenticate anyone. Whoever can reach its
-  address can use everything it can do: start agents with your Codex or Claude
-  Code account and publish with your `gh` login.
-- **Loopback by default.** BELL PR listens on `127.0.0.1`. Requests must name
-  a trusted host (`localhost`, `127.0.0.1` or `[::1]` with BELL PR's port, or
-  an origin in `BELLPR_ALLOWED_ORIGINS`), and a request from another origin,
+- **API token.** The first start writes a random token to
+  `<data dir>/api-token` (mode 0600) and later starts reuse it.
+  `bell-pr token rotate` replaces it. Every API request except
+  `GET /api/health` must send `Authorization: Bearer <token>` or
+  `X-Bell-Token`. A missing or wrong token is rejected and changes nothing.
+  Whoever has the token can use everything BELL PR can do: start agents with
+  your Codex or Claude Code account and publish with your `gh` login.
+- **Loopback by default.** BELL PR listens on `127.0.0.1`. `--host` and
+  `BELLPR_HOST` are how you listen elsewhere, and BELL PR prints a warning
+  when the address is not a loopback address. Requests must name a trusted
+  host (`localhost`, `127.0.0.1` or `[::1]` with BELL PR's port, or an
+  origin in `BELLPR_ALLOWED_ORIGINS`), and a request from another origin,
   or marked `Sec-Fetch-Site: cross-site`, is refused. The one exception is
   opening the page itself, from a link on another site or a sign-in proxy's
   redirect; other sites still cannot call the API, load BELL PR's files or
-  frame it. Requests that change data must send JSON, which a plain HTML
-  form cannot.
+  frame it. There is no wildcard CORS. Requests that change data must send
+  JSON, which a plain HTML form cannot.
 - **Proxies.** `BELLPR_ALLOWED_ORIGINS` accepts plain HTTP only for loopback
   addresses; any other origin must be HTTPS, so requests and responses never
-  cross a network in clear text. BELL PR does not authenticate, so a proxy in
-  front of it has to.
+  cross a network in clear text. The API token is still required behind a
+  proxy. Keep the token URL private.
 - **Other computers.** `--host 0.0.0.0` outside Docker, and publishing the
-  Docker port beyond `127.0.0.1`, expose the API to every machine that can
-  reach the port. Put an authenticating proxy in front of BELL PR first (see
+  Docker port beyond `127.0.0.1`, let other machines reach the port. They
+  still need the API token. Put a proxy that limits who can connect in
+  front as well (see
   [Self-hosting](self-hosting.md#reach-bell-pr-from-another-machine)).
-- **Same-user programs.** Any program running as your OS user can reach the
-  local API. Agents you allowed to run without the sandbox are fully trusted.
+- **Same-user programs.** Any program running as your OS user can read the
+  token file and call the API. Agents you allowed to run without the
+  sandbox are fully trusted.
 - **Browser hardening.** Every response carries
   `Content-Security-Policy: default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'`,
   `Cross-Origin-Resource-Policy: same-origin`, `X-Frame-Options: DENY`,

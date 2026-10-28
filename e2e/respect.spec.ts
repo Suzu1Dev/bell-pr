@@ -7,6 +7,7 @@ import { writeFile } from "node:fs/promises";
 import path from "node:path";
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Browser, type Page } from "@playwright/test";
+import { e2eApiHeaders } from "./api-token.mjs";
 import type { ContributionFacts } from "../shared/contribution";
 import draft from "../src/i18n/en/draft";
 import mission from "../src/i18n/en/mission";
@@ -194,6 +195,7 @@ test.describe("a real project", () => {
 
   async function openOn(browser: Browser, width = 1440) {
     const context = await browser.newContext({
+      extraHTTPHeaders: e2eApiHeaders,
       baseURL: server.baseURL,
       viewport: { width, height: 900 },
       locale: "en-US",

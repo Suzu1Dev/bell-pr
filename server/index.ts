@@ -39,10 +39,12 @@ import {
 } from "./app-settings.js";
 import { bundled, version } from "./build-info.js";
 import { run } from "./cli.js";
+import { loadOrCreateApiToken, readApiToken, withApiToken } from "./api-token.js";
 import {
   baseUrl,
   browserHost,
   dataPaths,
+  isLoopbackHost,
   resolveConfig,
   type Config,
   type StartFlags,
@@ -492,6 +494,7 @@ export async function startServer(
 
   try {
     mkdirSync(config.dataDir, { recursive: true, mode: 0o700 });
+    await loadOrCreateApiToken(paths.apiToken);
     const releaseLock = await acquireLock(
       paths.lock,
       {
@@ -574,11 +577,18 @@ export async function startServer(
       staticDirectory: config.staticDir,
       version,
       agentSlots,
+      readApiToken: () => readApiToken(paths.apiToken),
     });
     handler = app;
 
     print(messages.startup({ version, url }));
-    if (config.open && options.openBrowser) options.openBrowser(url);
+    if (!isLoopbackHost(config.host)) {
+      const warning = messages.exposedHost({ host: config.host });
+      print(warning);
+      log.warn(warning);
+    }
+    if (config.open && options.openBrowser)
+      options.openBrowser(withApiToken(url, readApiToken(paths.apiToken)));
     return { server, app, url, shutdown };
   } catch (error) {
     if (workbench) await shutdown();

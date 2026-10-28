@@ -39,17 +39,27 @@ Data lives in `~/.bellpr` unless you pass `--data-dir` or set
 `BELLPR_DATA_DIR`. BELL PR never moves data by itself: if an older version
 left data in `./.bellpr`, it prints how to keep using that folder.
 
-## No sign-in
+## API token
 
-BELL PR does not authenticate anyone. Whoever can reach its address can use
-everything it can do: start agents with your Codex or Claude Code account and
-publish with your `gh` login. By default it listens on 127.0.0.1, so only this
-computer can reach it. `--host 0.0.0.0` outside Docker, and publishing the
-Docker port beyond `127.0.0.1`, expose the API to every machine that can reach
-the port. Put an authenticating proxy in front of BELL PR before you do that
-(see [Reach BELL PR from another machine](#reach-bell-pr-from-another-machine)).
-`bell-pr open` prints the address BELL PR serves again (`BELLPR_PUBLIC_URL`
-when you set it, else the local address) and opens it in your browser.
+The first start writes a random token to `<data dir>/api-token` (mode 0600)
+and later starts reuse it. A missing or damaged file is created again.
+`bell-pr token rotate` replaces it; restart is not required. Every API
+request except `GET /api/health` must send the token (`Authorization: Bearer`
+or `X-Bell-Token`). A missing or wrong token is HTTP 401 and changes nothing.
+
+BELL PR listens on 127.0.0.1 unless you set `--host` or `BELLPR_HOST`. Any
+other address prints a warning at start. `--host 0.0.0.0` outside Docker,
+and publishing the Docker port beyond `127.0.0.1`, let other machines reach
+the port; they still need the token. Put a proxy that limits who can connect
+in front as well (see
+[Reach BELL PR from another machine](#reach-bell-pr-from-another-machine)).
+
+`bell-pr open` and `bell-pr open --print` print the address browsers use
+(`BELLPR_PUBLIC_URL` when you set it, else the local address) with
+`#bell_token=` on the end, and `open` opens that address. The page stores
+the token and removes it from the address bar. The line printed at start
+does not include the token. Treat the `open --print` address like a
+password: it is not in the server log or in `bell-pr doctor --json`.
 
 ## One instance per data directory
 
@@ -100,9 +110,9 @@ pages, requests and API responses would cross the network unencrypted.
    example `BELLPR_PUBLIC_URL=https://bell.example.com`. BELL PR then accepts
    requests for that address. BELL PR must be served at the root of that
    address, not under a path.
-4. BELL PR does not authenticate anyone, so the proxy must. Put access control
-   in front of it, such as single sign-on, a VPN, HTTP basic authentication or
-   an IP allowlist. Without one, anyone who can reach the proxy can use BELL PR.
+4. The API token is still required. Also limit who can reach the proxy,
+   such as with single sign-on, a VPN, HTTP basic authentication or an IP
+   allowlist, so the token URL is not the only barrier on the network.
 
 Caddy (certificates, `Host` and `X-Forwarded-Proto` are handled for you):
 

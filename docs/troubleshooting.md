@@ -38,7 +38,9 @@ bell-pr open
 
 - **Started with `npx`:** run `npx bell-pr open`.
 - **No browser on that machine** (a server, SSH): `bell-pr open --print`
-  only prints the address; open it in a browser that reaches BELL PR.
+  only prints the address; open it in a browser that reaches BELL PR. The
+  address includes `#bell_token=`, which the page needs. The line printed
+  at start does not. Do not share the `open --print` address.
 - **Another data directory:** `bell-pr open --data-dir <dir>`, with the
   directory you started BELL PR with.
 - **Docker:** `docker exec <container> bell-pr open --print`.
@@ -46,6 +48,12 @@ bell-pr open
 
 If `bell-pr open` says that no BELL PR is running with that data directory,
 start BELL PR (`bell-pr`) and use the address it prints.
+
+The page says the request needs the API token when it was opened from the
+startup line, or from a bookmark, instead of from `bell-pr open`. Run
+`bell-pr open` on that computer (same user, same `--data-dir`). The token
+file is `<data dir>/api-token`. A restart reuses it. `bell-pr token rotate`
+replaces it; then run `bell-pr open` again.
 
 ## Error codes
 

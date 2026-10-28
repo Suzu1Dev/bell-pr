@@ -346,8 +346,11 @@ test("startServer serves the app, takes the lock and releases it", async () => {
       assert.ok(lines.some((line) => line.startsWith(`BELL PR ${version} → `)), lines.join("\n"));
       // The old ./.bellpr only gets a hint.
       assert.ok(lines.some((line) => line.includes("bell-pr start --data-dir ./.bellpr")));
-      // The browser gets the address that was printed.
-      assert.deepEqual(opened, [running.url]);
+      // The browser gets the token fragment; the printed line does not.
+      const token = readFileSync(path.join(box.data, "api-token"), "utf8").trim();
+      assert.deepEqual(opened, [`${running.url}#bell_token=${token}`]);
+      assert.equal(lines.some((line) => line.includes(token)), false);
+      assert.equal(statSync(path.join(box.data, "api-token")).mode & 0o777, 0o600);
 
       const lock = JSON.parse(readFileSync(path.join(box.data, "bellpr.lock"), "utf8"));
       assert.equal(lock.pid, process.pid);

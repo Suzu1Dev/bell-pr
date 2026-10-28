@@ -12,6 +12,7 @@ import { execFileSync } from "node:child_process";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
+import { e2eApiHeaders } from "./api-token.mjs";
 import { byHandRulesCase, type ByHandRulesCase } from "../shared/by-hand-rules";
 import { byHandBlockClause, type ContributionRules } from "../shared/contribution";
 import serverByHand from "../server/i18n/en/by-hand";
@@ -81,6 +82,7 @@ async function openDialog(page: Page) {
 
 test("on a QEMU-like project the dialog offers the fitted guide, starts a fitted run, and shows the server's refusal when the rules changed", async ({ browser }) => {
   const context = await browser.newContext({
+    extraHTTPHeaders: e2eApiHeaders,
     baseURL: server.baseURL,
     viewport: { width: 1440, height: 900 },
     locale: "en-US",

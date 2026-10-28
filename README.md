@@ -33,7 +33,8 @@ This is the open-source edition of BELL PR, licensed under
 
 [Quickstart](#quickstart) · [Requirements](#requirements) ·
 [Features](#features) · [Privacy](#privacy) ·
-[Security](#security-model) · [Configuration](#configuration) ·
+[Security](#security-model) · [Local API](#local-api) ·
+[Configuration](#configuration) ·
 [Troubleshooting](#troubleshooting) · [Documentation](#documentation) ·
 [Contributing](#contributing) · [License](#license-and-trademarks)
 
@@ -61,7 +62,8 @@ seconds.
    contribute to.
 
 **Lost the address? Run `bell-pr open`** (or `npx bell-pr open` if you
-started with `npx`). It prints the address again and opens it.
+started with `npx`). It prints the address again, including the API token
+the page needs, and opens it.
 
 To keep BELL PR installed, run `npm install -g bell-pr`, then start it with
 `bell-pr`. The [getting started guide](docs/getting-started.md) walks
@@ -326,10 +328,10 @@ Details: [Privacy and your data](docs/privacy-and-data.md).
   and a repository whose Git configuration could run programs is refused.
   Agents still run the project's code, so import only projects you are
   willing to run on this computer.
-- **No sign-in.** BELL PR does not authenticate anyone. It listens on
-  `127.0.0.1` by default, so only this computer can reach it. Anyone who can
-  reach its address can use everything it can do. Other sites may link to
-  its page, but cannot call its API or frame it.
+- **API token.** Each install keeps a token in its data directory, and
+  the API refuses a request that does not send it. BELL PR listens on
+  `127.0.0.1` by default. Other sites may link to its page, but cannot
+  call its API or frame it.
 - **Unsandboxed agents are an explicit opt-in.** Without the sandbox (for
   example in Docker with default settings), a Claude Code agent that edits
   files is refused. You can allow it under **Settings → Agent safety** or
@@ -341,6 +343,40 @@ Details: [Privacy and your data](docs/privacy-and-data.md).
 
 Details and limits: [Security model](docs/security-model.md). To report a
 vulnerability, see [SECURITY.md](SECURITY.md).
+
+## Local API
+
+BELL PR serves the web interface and the API on `127.0.0.1`, port 4311,
+unless you set `--host` or `BELLPR_HOST`. It does not listen on `0.0.0.0`
+unless you ask it to. Any other address is an explicit setting, and BELL PR
+prints a warning at start. The API token is still required.
+
+The first start writes a random token to `<data dir>/api-token` (32 bytes,
+mode `0600`, your user only). A later start reuses that file. A missing or
+damaged file is created again. `bell-pr token rotate` replaces it; a running
+BELL PR uses the new token on the next request. Run `bell-pr open` afterwards
+so the browser has the new one.
+
+Every API request except `GET /api/health` must send the token:
+
+```http
+Authorization: Bearer <token>
+```
+
+`X-Bell-Token: <token>` is the same. A missing or wrong token is HTTP 401.
+Requests must name a trusted host (`localhost`, `127.0.0.1` or `[::1]` with
+BELL PR's port, or a host you named with `BELLPR_PUBLIC_URL` or
+`BELLPR_ALLOWED_ORIGINS`). A browser `Origin` that is not this app's own
+origin, and not on that list, is rejected. There is no wildcard CORS.
+Requests that change data must use `application/json`.
+
+`bell-pr` opens the browser at an address whose fragment is
+`#bell_token=<token>`. The page stores the token and removes it from the
+address. The line printed at start does not include the token, so a service
+log does not either. To open the app yourself, use `bell-pr open` or
+`bell-pr open --print`: both print the address with the token. Treat that
+address like a password. It is not written to the server log or to
+`bell-pr doctor --json`.
 
 ## Configuration
 

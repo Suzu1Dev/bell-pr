@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test, { afterEach, beforeEach } from "node:test";
 import { product } from "../shared/product";
-import { ApiError, api, apiUrl, send } from "./api";
+import { adoptApiToken, ApiError, api, apiUrl, send } from "./api";
 import { setLocale } from "./i18n";
 
 interface Call {
@@ -70,8 +70,10 @@ test("every request carries the UI locale in X-Bell-Locale", async () => {
       ["DELETE", "/api/repos", "zh-TW"],
     ],
   );
-  for (const call of calls)
+  for (const call of calls) {
     assert.equal(call.headers.get("Content-Type"), "application/json");
+    assert.equal(call.headers.get("Authorization"), null);
+  }
   assert.equal(calls[1].body, '{"title":"Fix"}');
   assert.equal(calls[2].headers.get("X-Custom"), "1");
   assert.equal(calls[3].headers.get("Accept"), "text/markdown");
@@ -222,4 +224,52 @@ test("apiUrl adds the UI locale for plain links", async () => {
 test("send builds a JSON request body", () => {
   assert.deepEqual(send("POST", { a: 1 }), { method: "POST", body: '{"a":1}' });
   assert.deepEqual(send("DELETE"), { method: "DELETE", body: "{}" });
+});
+
+test("the page stores #bell_token and sends it, then drops it from the address", async () => {
+  const token = "ab".repeat(32);
+  const stored = new Map<string, string>();
+  const session = {
+    getItem: (key: string) => stored.get(key) ?? null,
+    setItem: (key: string, value: string) => void stored.set(key, value),
+    removeItem: (key: string) => void stored.delete(key),
+    clear: () => stored.clear(),
+    key: () => null,
+    get length() {
+      return stored.size;
+    },
+  } satisfies Storage;
+  let href = `http://127.0.0.1:4311/#/runs/abc?bell_token=${token}&demo=1`;
+  const win = {
+    location: {
+      get hash() {
+        return new URL(href).hash;
+      },
+      get search() {
+        return new URL(href).search;
+      },
+      get pathname() {
+        return new URL(href).pathname;
+      },
+    },
+    history: {
+      state: null,
+      replaceState: (_state: unknown, _title: string, url?: string | URL | null) => {
+        href = String(url);
+      },
+    },
+    sessionStorage: session,
+  };
+  adoptApiToken(win);
+  assert.equal(stored.get("bellpr-api-token"), token);
+  assert.equal(href, "/#/runs/abc?demo=1");
+  const previous = globalThis.sessionStorage;
+  globalThis.sessionStorage = session;
+  try {
+    await api("/status");
+    assert.equal(calls.at(-1)?.headers.get("Authorization"), `Bearer ${token}`);
+  } finally {
+    globalThis.sessionStorage = previous;
+    stored.clear();
+  }
 });
