@@ -74,7 +74,7 @@ BELL PR 是本機工作台。請先裝好並登入下列工具，再跑快速開
 
 **位址不見了？執行 `bell-pr open`**（若用 `npx` 啟動，請執行 `npx bell-pr open`）。它會再次印出位址並在瀏覽器中開啟。
 
-想要保留安裝，請執行 `npm install -g bell-pr`，之後用 `bell-pr` 啟動。[入門指南](docs/getting-started.zh-TW.md)會帶你走完一次完整的貢獻。
+想要保留安裝，請執行 `npm install -g bell-pr`，之後用 `bell-pr` 啟動。[入門指南](docs/getting-started.md)（英文）會帶你走完一次完整的貢獻。
 
 ## 系統需求
 
@@ -260,9 +260,9 @@ BELL PR 把所有資料放在 `~/.bellpr`（或 `--data-dir`／`BELLPR_DATA_DIR`
 
 ## 文件
 
-入門指南有繁體中文版；其餘文件目前為英文。
+文件目前只有英文版。
 
-- [入門指南](docs/getting-started.zh-TW.md)
+- [入門指南](docs/getting-started.md)
 - [設定說明](docs/configuration.md)
 - [疑難排解](docs/troubleshooting.md)
 - [負責任地貢獻](docs/contributing-responsibly.md)
@@ -283,7 +283,7 @@ BELL PR 把所有資料放在 `~/.bellpr`（或 `--data-dir`／`BELLPR_DATA_DIR`
 
 ## 支援
 
-請先執行 `bell-pr doctor`，再查看[疑難排解](docs/troubleshooting.md)與[常見問題](docs/faq.md)；其餘主題請見[文件](docs/README.md)（入門指南另有繁中版，其餘為英文）。「關於」對話框（**設定 → 關於 → 關於 BELL PR**）可以複製一份診斷資訊，其中的密鑰、路徑與你的 GitHub 帳號都已移除，可以直接貼到支援請求中。
+請先執行 `bell-pr doctor`，再查看[疑難排解](docs/troubleshooting.md)與[常見問題](docs/faq.md)；其餘主題請見[文件](docs/README.md)（皆為英文）。「關於」對話框（**設定 → 關於 → 關於 BELL PR**）可以複製一份診斷資訊，其中的密鑰、路徑與你的 GitHub 帳號都已移除，可以直接貼到支援請求中。
 
 私下回報安全性漏洞請見 [SECURITY.md](SECURITY.md)。請勿公開開 issue。
 

@@ -1,8 +1,7 @@
 # BELL PR documentation
 
-- [Getting started](getting-started.md) ([繁體中文](getting-started.zh-TW.md)):
-  install, sign in to your tools, and your first contribution from import
-  to Draft PR.
+- [Getting started](getting-started.md): install, sign in to your tools, and your first
+  contribution from import to Draft PR.
 - [Configuration](configuration.md): commands, `BELLPR_*` variables and
   the settings in the app.
 - [Troubleshooting](troubleshooting.md): every error code with its fix,
