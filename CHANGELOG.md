@@ -40,6 +40,12 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- **Agent sandbox deny list.** With the sandbox on, Claude Code and Codex
+  are denied the GitHub CLI config files, `~/.git-credentials` and
+  credential-store files, `~/.netrc`, and `~/.ssh/`. `GH_TOKEN` and
+  `GITHUB_TOKEN` are removed from the agent process environment even when
+  the sandbox is off. Tokens in the system keyring are not covered: the
+  agent can still read a GitHub token via `gh auth token`.
 - **Premise check.** In Code changes it sits in the diff's top bar instead
   of a row of its own, and opens as an overlay that scrolls and can be
   reached with the keyboard, so the code keeps its height.

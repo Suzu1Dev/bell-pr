@@ -317,9 +317,12 @@ Details: [Privacy and your data](docs/privacy-and-data.md).
 
 - **Sandboxed agents.** Agents that write code run in their CLI's
   operating-system sandbox: writes stay in the run's own worktree and the
-  network is closed. Claude Code agents are also denied your SSH keys, the
-  GitHub CLI's sign-in and BELL PR's own data; Codex's sandbox does not
-  limit reading.
+  network is closed. With the sandbox on, both agents are denied the GitHub
+  CLI config files, `~/.git-credentials` and credential-store files,
+  `~/.netrc`, and `~/.ssh/`. Tokens in your system keyring are not covered:
+  the agent can still read your GitHub token via `gh auth token`. Your main
+  protection is a fine-grained token with the minimum permissions you need.
+  Claude Code is also denied BELL PR's own data outside its checkout.
 - **Imported projects are untrusted.** Their code, documents and agent
   instructions (`AGENTS.md`, `CLAUDE.md`, `.claude/`) are treated as data:
   the CLIs never load the project's own settings, hooks or instructions,
