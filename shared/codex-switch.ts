@@ -8,7 +8,7 @@ import type { AgentProvider } from "./models.js";
  * selected. The sentence doctor and the provider picker show is
  * `setup.doctor.codexDisabled` (English and Traditional Chinese).
  */
-export let codexEnabled = false;
+export let codexEnabled = true;
 
 /** Tests flip the switch and must restore the previous value. */
 export function setCodexEnabledForTests(value: boolean): void {
