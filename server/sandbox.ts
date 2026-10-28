@@ -402,15 +402,17 @@ export function agentGitWriteDenials(cwd: string): string[] {
   try {
     metadata = lstatSync(dotGit);
   } catch {
-    return [];
+    metadata = undefined;
   }
-  const rules: string[] = [];
+  // The path itself and everything under it: editing the file, or replacing
+  // it with a directory and writing inside that directory.
+  const rules: string[] = [dotGit, `${dotGit}/**`];
   const deny = (target: string) => {
     rules.push(target);
     if (!target.endsWith("/**")) rules.push(`${target}/**`);
   };
+  if (!metadata) return [...new Set(rules)];
   if (metadata.isFile()) {
-    rules.push(dotGit);
     const pointer = /^gitdir: ([^\r\n]+)/.exec(readFileSync(dotGit, "utf8"))?.[1];
     if (!pointer) return [...new Set(rules)];
     const gitDir = path.resolve(cwd, pointer.trim());

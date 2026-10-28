@@ -1,5 +1,6 @@
 import test, { type TestContext } from "node:test";
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { mkdir, mkdtemp, readFile, rename, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -8,6 +9,7 @@ import {
   assertGitConfigSafe,
   command,
   git,
+  gitChildEnv,
   gitNetwork,
   gitNetworkConfig,
 } from "./process.js";
@@ -175,6 +177,7 @@ test("every Git command overrides hooks, monitors, pagers, editors, prompts, SSH
     "protocol.ext.allow=never",
   ]);
   assert.equal(call.args.at(-1), "status");
+  assert.ok(call.args.includes("--no-pager"));
 });
 
 test("network Git commands use gh credentials, HTTPS or SSH only, and never prompt", async (t) => {
@@ -483,4 +486,88 @@ test("server git runs neither hooks, fsmonitor, filters, nor credential or ssh c
     timeoutMs: 5_000,
   }).catch(() => undefined);
   assert.equal(await readFile(marker, "utf8").catch(() => ""), "");
+});
+
+test("server git does not pass askpass variables", (t) => {
+  withEnv(t, {
+    GIT_ASKPASS: "/tmp/bell-askpass",
+    SSH_ASKPASS: "/tmp/bell-ssh-askpass",
+    GIT_PAGER: "/tmp/bell-pager",
+    GH_TOKEN: "from-parent",
+  });
+  const env = gitChildEnv({ ...process.env }, false);
+  assert.equal(env.GIT_ASKPASS, undefined);
+  assert.equal(env.SSH_ASKPASS, undefined);
+  assert.equal(env.GIT_PAGER, "cat");
+  assert.equal(env.GH_TOKEN, undefined);
+});
+
+test("a checkout .gitattributes driver from local config, include.path, or includeIf does not run", async (t) => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "bell-process-attrs-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const repo = path.join(root, "repo");
+  const checkout = path.join(root, "worktrees", "run-1");
+  const bare = path.join(root, "bare.git");
+  const marker = path.join(root, "ran");
+  const script = path.join(root, "mark");
+  await mkdir(repo, { recursive: true });
+  await writeFile(
+    script,
+    `#!/bin/sh\necho "$0" >> ${JSON.stringify(marker)}\ncat\n`,
+    { mode: 0o755 },
+  );
+  await git(repo, ["init", "-q", "-b", "main"]);
+  await git(repo, ["config", "user.name", "Someone"]);
+  await git(repo, ["config", "user.email", "someone@example.invalid"]);
+  await writeFile(path.join(repo, "file.txt"), "v1\n");
+  await git(repo, ["add", "file.txt"]);
+  await git(repo, ["commit", "-q", "-m", "initial"]);
+  await git(repo, ["worktree", "add", "-q", "--detach", checkout]);
+  const gitDir = (await git(checkout, ["rev-parse", "--absolute-git-dir"])).stdout.trim();
+  const included = path.join(root, "included.gitconfig");
+  const conditional = path.join(root, "conditional.gitconfig");
+  await writeFile(
+    included,
+    `[filter "inc"]\n\tclean = ${script}\n\trequired = true\n[diff "inc"]\n\tcommand = ${script}\n\ttextconv = ${script}\n`,
+  );
+  await writeFile(
+    conditional,
+    `[filter "ifi"]\n\tclean = ${script}\n\trequired = true\n[diff "ifi"]\n\tcommand = ${script}\n\ttextconv = ${script}\n`,
+  );
+  await git(checkout, ["config", "filter.direct.clean", script]);
+  await git(checkout, ["config", "filter.direct.required", "true"]);
+  await git(checkout, ["config", "diff.direct.command", script]);
+  await git(checkout, ["config", "diff.direct.textconv", script]);
+  await git(checkout, ["config", "include.path", included]);
+  await git(checkout, ["config", `includeIf.gitdir:${gitDir}.path`, conditional]);
+  await git(checkout, ["config", "core.pager", script]);
+  await git(checkout, ["config", "core.askPass", script]);
+  await writeFile(
+    path.join(checkout, ".gitattributes"),
+    "a.txt filter=direct diff=direct\nb.txt filter=inc diff=inc\nc.txt filter=ifi diff=ifi\n",
+  );
+  for (const key of ["filter.direct.clean", "filter.inc.clean", "filter.ifi.clean"]) {
+    const seen = spawnSync(
+      "git",
+      ["--git-dir", gitDir, "--work-tree", checkout, "config", "--get", key],
+      { encoding: "utf8" },
+    );
+    assert.equal(seen.status, 0, key);
+    assert.equal(seen.stdout.trim(), script, key);
+  }
+  await writeFile(path.join(checkout, "a.txt"), "a\n");
+  await writeFile(path.join(checkout, "b.txt"), "b\n");
+  await writeFile(path.join(checkout, "c.txt"), "c\n");
+  withEnv(t, { GIT_ASKPASS: script, SSH_ASKPASS: script, GIT_PAGER: script });
+  await git(checkout, ["status", "--porcelain"]);
+  await git(checkout, ["add", "a.txt", "b.txt", "c.txt"]);
+  await git(checkout, ["diff", "--cached"]);
+  await git(checkout, ["commit", "-q", "-m", "edit"]);
+  await writeFile(path.join(checkout, "a.txt"), "a2\n");
+  await git(checkout, ["diff"]);
+  await mkdir(bare, { recursive: true });
+  await git(bare, ["init", "--bare", "-q"]);
+  await git(checkout, ["remote", "add", "origin", bare]);
+  await git(checkout, ["push", "origin", "HEAD:refs/heads/main"]);
+  await assert.rejects(readFile(marker));
 });

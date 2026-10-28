@@ -176,19 +176,24 @@ to both CLIs, and `DISABLE_TELEMETRY`, `DISABLE_ERROR_REPORTING`,
   still has a worktree in your repository; until then its runs, new ones
   included, keep working there. Branches those runs already added stay in
   your repository; delete them yourself if you no longer need them.
-- **Hardened Git.** Every server Git command runs with hooks, the
-  file-system monitor and the global attributes file switched off, and
-  with BELL PR's own pager, editor, password prompt and SSH command.
-  `credential.helper` is cleared and, for a command that talks to GitHub,
-  set to `gh auth git-credential` only. Local filter, diff, merge and
-  shell-alias drivers are blanked before the command runs. Logs never
-  verify commit signatures, which would run a signing program. Fetches,
-  `ls-remote` and pushes take credentials from the GitHub CLI only, allow
-  HTTPS and SSH transports only, never follow submodules and never prompt.
-  Those network commands are the only git children that receive
-  `GH_TOKEN` or `GITHUB_TOKEN`. System git config is not read
-  (`GIT_CONFIG_NOSYSTEM`). Your global `~/.gitconfig` still is, or the
-  file named by `GIT_CONFIG_GLOBAL` when that variable is set.
+- **Hardened Git.** Every server Git command runs with `--no-pager`,
+  hooks, the file-system monitor and the global attributes file switched
+  off, and with BELL PR's own pager (`GIT_PAGER=cat`), editor, password
+  prompt and SSH command. `core.askPass` is cleared. `GIT_ASKPASS` and
+  `SSH_ASKPASS` are not passed to git. `credential.helper` is cleared and,
+  for a command that talks to GitHub, set to `gh auth git-credential`
+  only. Local and worktree filter, diff, merge and shell-alias drivers
+  are blanked before the command runs, including drivers brought in by
+  `include.path` or `includeIf`. `git diff`, `git show` and `git log` also
+  pass `--no-textconv` and `--no-ext-diff`. A `.gitattributes` file in the
+  checkout can still name a driver; the blanked command is what does not
+  run. Logs never verify commit signatures, which would run a signing
+  program. Fetches, `ls-remote` and pushes take credentials from the
+  GitHub CLI only, allow HTTPS and SSH transports only, never follow
+  submodules and never prompt. Those network commands are the only git
+  children that receive `GH_TOKEN` or `GITHUB_TOKEN`. System git config
+  is not read (`GIT_CONFIG_NOSYSTEM`). Your global `~/.gitconfig` still
+  is, or the file named by `GIT_CONFIG_GLOBAL` when that variable is set.
 - **Repository configuration.** Before a diff is read, a teammate's work is
   integrated or a snapshot taken, a checkout is synced, an agent's moved
   HEAD is put back, or anything is published, BELL PR refuses a repository
@@ -207,11 +212,12 @@ to both CLIs, and `DISABLE_TELEMETRY`, `DISABLE_ERROR_REPORTING`,
   checkout as `--work-tree`. The checkout's `.git` file is not read.
   A checkout under `worktrees/` or `team-worktrees/` with no recorded git
   directory is refused (`worktreeForged`). With Claude Code's sandbox
-  on, writes to that file, to `<clone>/.git/hooks`, to `<clone>/.git/config`
-  and to the worktree's `config.worktree` are denied. Codex's permission
-  profile cannot deny those writes without also denying reads, so it does
-  not; the checkout check and the hardened git command above are what
-  stop a planted hook or filter.
+  on, writes to `<checkout>/.git` and `<checkout>/.git/**` are denied, so
+  that file cannot be edited or replaced with a directory, and writes to
+  `<clone>/.git/hooks`, `<clone>/.git/config` and the worktree's
+  `config.worktree` are denied as well. Codex extends `:workspace`, which
+  keeps the workspace `.git` read-only; a `deny` rule is not added,
+  because that would also hide the path from Git.
 - **Paths.** Diff paths that are absolute, contain `..` or `.git`, control
   characters, or the segments `__proto__`, `constructor` or `prototype` are
   refused. Conflict files are read and rewritten only when they are regular

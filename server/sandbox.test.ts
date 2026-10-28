@@ -462,6 +462,7 @@ test("Claude's sandbox denies writes to git hooks, config, and the checkout .git
   const denials = agentGitWriteDenials(checkout);
   for (const target of [
     pointer,
+    `${pointer}/**`,
     path.join(common, "config"),
     path.join(common, "hooks"),
     path.join(common, "hooks", "**"),

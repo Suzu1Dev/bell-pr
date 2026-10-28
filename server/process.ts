@@ -789,7 +789,8 @@ const gitNetworkEnvKeys = [
 /**
  * Environment for a server Git process. Not the server's full environment.
  * `GH_TOKEN` and `GITHUB_TOKEN` are included only for `gitNetwork`, whose
- * credential helper is `gh auth git-credential`.
+ * credential helper is `gh auth git-credential`. `GIT_ASKPASS` and
+ * `SSH_ASKPASS` are not passed: `core.askPass` is cleared and prompts are off.
  */
 export function gitChildEnv(
   explicit: NodeJS.ProcessEnv | undefined,
@@ -800,6 +801,7 @@ export function gitChildEnv(
     GIT_ATTR_NOSYSTEM: "1",
     GIT_CONFIG_NOSYSTEM: "1",
     GIT_TERMINAL_PROMPT: "0",
+    GIT_PAGER: "cat",
     GH_PROMPT_DISABLED: "1",
     NO_COLOR: "1",
   };
@@ -853,14 +855,38 @@ function childEnvironment(executable: string, options: CommandOptions): NodeJS.P
   );
 }
 
+/** First non-option word, skipping values that belong to `-c`. */
+function commandName(args: string[]): string | undefined {
+  for (let index = 0; index < args.length; index++) {
+    const arg = args[index];
+    if (arg === "-c" || arg === "--config-env") {
+      index++;
+      continue;
+    }
+    if (arg === "--") return args[index + 1];
+    if (arg.startsWith("-")) continue;
+    return arg;
+  }
+  return undefined;
+}
+
+/** External diff drivers and textconv do not run for diff, show, and log. */
+function withDiffSafety(args: string[]): string[] {
+  const name = commandName(args);
+  if (!name || !["diff", "show", "log"].includes(name)) return args;
+  const at = args.indexOf(name);
+  return [...args.slice(0, at + 1), "--no-textconv", "--no-ext-diff", ...args.slice(at + 1)];
+}
+
 /** Argv for one server git command: pinned git dir, static `-c`, local driver blanks. */
 export async function serverGitArgs(cwd: string, args: string[]): Promise<string[]> {
   const gitDir = await runCheckoutGitDir(cwd);
   return [
     ...(gitDir ? ["--git-dir", gitDir, "--work-tree", cwd] : []),
+    "--no-pager",
     ...hardenedGitConfig,
     ...repoDriverOverrides(cwd, gitDir),
-    ...args,
+    ...withDiffSafety(args),
   ];
 }
 

@@ -51,8 +51,11 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **Server git.** Git commands BELL PR runs itself ignore repository hooks,
   file monitors, and other config that would run a program. Each checkout's
   git directory is recorded when its worktree is created and passed to git
-  as `--git-dir` and `--work-tree`. `GH_TOKEN` is passed to `gh` and to git
-  only when that git command talks to GitHub.
+  as `--git-dir` and `--work-tree`. With the sandbox on, Claude Code
+  cannot write the checkout's `.git` path or anything under it.
+  `GIT_ASKPASS` and `SSH_ASKPASS` are not passed to server git.
+  `GH_TOKEN` is passed to `gh` and to git only when that git command
+  talks to GitHub.
 - **Premise check.** In Code changes it sits in the diff's top bar instead
   of a row of its own, and opens as an overlay that scrolls and can be
   reached with the keyboard, so the code keeps its height.
