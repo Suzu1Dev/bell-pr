@@ -517,8 +517,6 @@ export const gitSafetyArgs = [
   "protocol.ext.allow=never",
 ];
 
-const hardenedGitConfig = gitSafetyArgs;
-
 /** Commands named by repository config. `git config` does not run them. */
 const driverKey =
   /^(?:filter\.[^.]+\.(?:clean|smudge|process)|diff\.(?:external|.+\.(?:textconv|command))|merge\.[^.]+\.driver|alias\.[^.]+|gpg\.(?:.+\.)?program)$/i;
@@ -566,13 +564,23 @@ function repoDriverOverrides(cwd: string, gitDir?: string): string[] {
   const fields = stdout.split("\0");
   for (let index = 0; index + 1 < fields.length; index += 2) {
     const scope = fields[index];
-    if (scope !== "local" && scope !== "worktree") continue;
     const field = fields[index + 1];
     const split = field.indexOf("\n");
     if (split <= 0) continue;
     const key = field.slice(0, split);
     const value = field.slice(split + 1);
-    if (!driverKey.test(key)) continue;
+    const repoScope = scope === "local" || scope === "worktree";
+    const driverScope =
+      repoScope || scope === "global" || scope === "system" || scope === "command";
+    // Filter and diff drivers from every scope, so an include or a global
+    // file cannot leave a command. Other keys stay limited to this repository.
+    const blank =
+      (driverScope &&
+        /^(?:filter\.[^.]+\.(?:clean|smudge|process)|diff\.(?:external|.+\.(?:textconv|command)))$/i.test(
+          key,
+        )) ||
+      (repoScope && driverKey.test(key));
+    if (!blank) continue;
     if (/^alias\./i.test(key) && !value.startsWith("!")) continue;
     args.push("-c", `${key}=`);
     const filter = /^filter\.([^.]+)\./i.exec(key);
@@ -878,13 +886,38 @@ function withDiffSafety(args: string[]): string[] {
   return [...args.slice(0, at + 1), "--no-textconv", "--no-ext-diff", ...args.slice(at + 1)];
 }
 
-/** Argv for one server git command: pinned git dir, static `-c`, local driver blanks. */
-export async function serverGitArgs(cwd: string, args: string[]): Promise<string[]> {
-  const gitDir = await runCheckoutGitDir(cwd);
+/**
+ * Git directory passed to one command. A recorded worktree uses that record.
+ * An existing repository whose `.git` is a directory uses that directory.
+ * `init` and `clone` have no repository yet. A run checkout with no record
+ * is refused by `runCheckoutGitDir`.
+ */
+async function commandGitDir(cwd: string, args: string[]): Promise<string | undefined> {
+  const recorded = await runCheckoutGitDir(cwd);
+  if (recorded) return recorded;
+  const name = commandName(args);
+  if (name === "init" || name === "clone") return undefined;
+  const dot = path.join(cwd, ".git");
+  const metadata = await lstat(dot).catch(() => undefined);
+  if (metadata?.isDirectory()) return dot;
+  return undefined;
+}
+
+/** `--git-dir`, `--work-tree`, `--no-pager`, and the static `-c` list. No driver scan. */
+export async function gitInvocationPrefix(cwd: string, args: string[]): Promise<string[]> {
+  const gitDir = await commandGitDir(cwd, args);
   return [
     ...(gitDir ? ["--git-dir", gitDir, "--work-tree", cwd] : []),
     "--no-pager",
-    ...hardenedGitConfig,
+    ...gitSafetyArgs,
+  ];
+}
+
+/** Argv for one server git command: pinned git dir, static `-c`, driver blanks. */
+export async function serverGitArgs(cwd: string, args: string[]): Promise<string[]> {
+  const gitDir = await commandGitDir(cwd, args);
+  return [
+    ...(await gitInvocationPrefix(cwd, args)),
     ...repoDriverOverrides(cwd, gitDir),
     ...withDiffSafety(args),
   ];

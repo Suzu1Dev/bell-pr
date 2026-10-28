@@ -83,7 +83,7 @@ test("Codex arguments keep the existing sandbox, approval and schema flags", asy
       "--ephemeral",
       "--model",
       "codex-example",
-      ...codexSandboxConfig("write"),
+      ...codexSandboxConfig("write", "/work/tree"),
       "-c",
       'approval_policy="never"',
       "--json",
@@ -105,6 +105,11 @@ test("Codex arguments keep the existing sandbox, approval and schema flags", asy
   );
   assert.equal(readOnly.executable, "codex");
   assert.equal(codexAccessMode(readOnly.args), "read-only");
+  const writeTable = (
+    await agentCommand({ source: "cli-default" }, { cwd: "/work/tree", access: "write" })
+  ).args.find((arg) => arg.startsWith("permissions={bell-pr="));
+  assert.ok(writeTable?.includes('"/work/tree/.git"="read"'));
+  assert.ok(writeTable?.includes('"/work/tree/.git/**"="read"'));
   assert.ok(!readOnly.args.includes("--sandbox"));
   assert.ok(readOnly.args.includes("--skip-git-repo-check"));
   assert.equal(

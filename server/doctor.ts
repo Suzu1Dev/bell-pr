@@ -36,7 +36,7 @@ import {
 } from "./cli-errors.js";
 import { resolvePort } from "./config.js";
 import { sm } from "./i18n/index.js";
-import { agentEnvironment, command, git, gitSafetyArgs, redact } from "./process.js";
+import { agentEnvironment, command, git, gitInvocationPrefix, redact } from "./process.js";
 import {
   allowUnsandboxedAgents,
   detectClaudeSandbox,
@@ -417,10 +417,19 @@ async function probeDataDir(directory: string): Promise<Facts["dataDir"]> {
 }
 
 async function probe(exec: DoctorExec, dataDir?: string): Promise<Facts> {
-  const run = (executable: string, args: string[], options?: Parameters<DoctorExec>[2]) =>
+  const run = async (
+    executable: string,
+    args: string[],
+    options?: Parameters<DoctorExec>[2],
+  ) =>
     exec(
       executable,
-      executable === "git" ? [...gitSafetyArgs, ...args] : args,
+      executable === "git"
+        ? [
+            ...(await gitInvocationPrefix(options?.cwd ?? os.tmpdir(), args)),
+            ...args,
+          ]
+        : args,
       options,
     );
   const [git, gh, codex, claude, dataDirFacts] = await Promise.all([

@@ -215,9 +215,10 @@ to both CLIs, and `DISABLE_TELEMETRY`, `DISABLE_ERROR_REPORTING`,
   on, writes to `<checkout>/.git` and `<checkout>/.git/**` are denied, so
   that file cannot be edited or replaced with a directory, and writes to
   `<clone>/.git/hooks`, `<clone>/.git/config` and the worktree's
-  `config.worktree` are denied as well. Codex extends `:workspace`, which
-  keeps the workspace `.git` read-only; a `deny` rule is not added,
-  because that would also hide the path from Git.
+  `config.worktree` are denied as well. Codex sets that same checkout
+  `.git` path and `.git/**` to `read`, which forbids writes and still
+  allows Git to read them. A `deny` rule is not used there, because that
+  would hide the path from Git.
 - **Paths.** Diff paths that are absolute, contain `..` or `.git`, control
   characters, or the segments `__proto__`, `constructor` or `prototype` are
   refused. Conflict files are read and rewritten only when they are regular

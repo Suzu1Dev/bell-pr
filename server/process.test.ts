@@ -528,25 +528,45 @@ test("a checkout .gitattributes driver from local config, include.path, or inclu
   const conditional = path.join(root, "conditional.gitconfig");
   await writeFile(
     included,
-    `[filter "inc"]\n\tclean = ${script}\n\trequired = true\n[diff "inc"]\n\tcommand = ${script}\n\ttextconv = ${script}\n`,
+    `[filter "inc"]\n\tclean = ${script}\n\tsmudge = ${script}\n\tprocess = ${script}\n\trequired = true\n[diff "inc"]\n\ttextconv = ${script}\n`,
   );
   await writeFile(
     conditional,
-    `[filter "ifi"]\n\tclean = ${script}\n\trequired = true\n[diff "ifi"]\n\tcommand = ${script}\n\ttextconv = ${script}\n`,
+    `[filter "ifi"]\n\tclean = ${script}\n\tsmudge = ${script}\n\tprocess = ${script}\n\trequired = true\n[diff "ifi"]\n\ttextconv = ${script}\n`,
   );
+  const hooks = path.join(repo, ".git", "hooks");
+  await mkdir(hooks, { recursive: true });
+  await writeFile(path.join(hooks, "pre-commit"), script, { mode: 0o755 });
+  await writeFile(path.join(hooks, "post-commit"), script, { mode: 0o755 });
+  await git(checkout, ["config", "core.hooksPath", hooks]);
+  await git(checkout, ["config", "core.fsmonitor", script]);
   await git(checkout, ["config", "filter.direct.clean", script]);
+  await git(checkout, ["config", "filter.direct.smudge", script]);
+  await git(checkout, ["config", "filter.direct.process", script]);
   await git(checkout, ["config", "filter.direct.required", "true"]);
-  await git(checkout, ["config", "diff.direct.command", script]);
   await git(checkout, ["config", "diff.direct.textconv", script]);
+  await git(checkout, ["config", "diff.external", script]);
   await git(checkout, ["config", "include.path", included]);
   await git(checkout, ["config", `includeIf.gitdir:${gitDir}.path`, conditional]);
   await git(checkout, ["config", "core.pager", script]);
   await git(checkout, ["config", "core.askPass", script]);
+  await git(checkout, ["config", "credential.helper", `!${script}`]);
+  await git(checkout, ["config", "core.sshCommand", script]);
   await writeFile(
     path.join(checkout, ".gitattributes"),
-    "a.txt filter=direct diff=direct\nb.txt filter=inc diff=inc\nc.txt filter=ifi diff=ifi\n",
+    "* filter=direct diff=direct\n",
   );
-  for (const key of ["filter.direct.clean", "filter.inc.clean", "filter.ifi.clean"]) {
+  for (const key of [
+    "filter.direct.clean",
+    "filter.direct.smudge",
+    "filter.direct.process",
+    "filter.inc.clean",
+    "filter.ifi.clean",
+    "diff.direct.textconv",
+    "diff.inc.textconv",
+    "diff.ifi.textconv",
+    "diff.external",
+  ]) {
     const seen = spawnSync(
       "git",
       ["--git-dir", gitDir, "--work-tree", checkout, "config", "--get", key],
@@ -569,5 +589,36 @@ test("a checkout .gitattributes driver from local config, include.path, or inclu
   await git(bare, ["init", "--bare", "-q"]);
   await git(checkout, ["remote", "add", "origin", bare]);
   await git(checkout, ["push", "origin", "HEAD:refs/heads/main"]);
+  await git(checkout, ["checkout", "--", "a.txt"]);
+  await git(checkout, ["ls-remote", "git@127.0.0.1:none.git"], { timeoutMs: 5_000 }).catch(
+    () => undefined,
+  );
+  await git(
+    checkout,
+    ["credential", "fill"],
+    {
+      input: "protocol=https\nhost=example.invalid\n\n",
+      allowedCodes: [0, 1, 128],
+      timeoutMs: 5_000,
+    },
+  ).catch(() => undefined);
+  const listed = (
+    await git(checkout, ["config", "--list", "--show-origin", "--includes"])
+  ).stdout;
+  assert.match(listed, /included\.gitconfig/);
+  assert.match(listed, /conditional\.gitconfig/);
+  const effective = new Map<string, string>();
+  for (const line of listed.split("\n")) {
+    const tab = line.indexOf("\t");
+    if (tab < 0) continue;
+    const rest = line.slice(tab + 1);
+    const eq = rest.indexOf("=");
+    if (eq < 0) continue;
+    effective.set(rest.slice(0, eq).toLowerCase(), rest.slice(eq + 1));
+  }
+  const driver =
+    /^(?:filter\.[^.]+\.(?:clean|smudge|process)|diff\.external|diff\..+\.textconv)$/;
+  for (const [key, value] of effective)
+    if (driver.test(key)) assert.equal(value, "", key);
   await assert.rejects(readFile(marker));
 });

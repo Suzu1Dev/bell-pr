@@ -1,4 +1,5 @@
 import { readFile } from "node:fs/promises";
+import path from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { sharedCredentialDenials } from "../shared/credential-denials.js";
 import {
@@ -101,19 +102,20 @@ function claudeAccess(access: AgentAccess, web: boolean): string[] {
  * `glob_scan_max_depth` makes a `**` deny apply on Linux.
  *
  * Filesystem values are only `read`, `write`, or `deny`. `deny` blocks
- * reads and writes. `read` allows reads and forbids writes. Extending
- * `:workspace` already keeps the workspace root's `.git` read-only
- * (https://learn.chatgpt.com/docs/permissions). The clone's `.git` is
- * outside that root, and this profile does not grant writes there.
- * Those paths are not added as `deny`, which would hide them from Git.
- * Server-side `git()` refuses a replaced `.git` and ignores hook and
- * filter config whether or not this profile is in effect.
+ * reads and writes. `read` allows reads and forbids writes, including
+ * delete and replace. The checkout's `.git` and `.git/**` are `read`,
+ * so the file cannot be edited or replaced with a directory, and Git
+ * can still read it. Credential paths stay `deny`.
  */
-export function codexSandboxConfig(access: AgentAccess): string[] {
+export function codexSandboxConfig(access: AgentAccess, cwd: string): string[] {
+  const dotGit = path.join(cwd, ".git");
   const filesystem = [
     "glob_scan_max_depth=4",
     ...sharedCredentialDenials().flatMap((entry) =>
       /["\\\r\n{}]/.test(entry) ? [] : [`"${entry}"="deny"`],
+    ),
+    ...[dotGit, `${dotGit}/**`].flatMap((entry) =>
+      /["\\\r\n{}]/.test(entry) ? [] : [`"${entry}"="read"`],
     ),
   ].join(", ");
   const parent = access === "write" ? ":workspace" : ":read-only";
@@ -255,7 +257,7 @@ export async function agentCommand(
       "project_doc_max_bytes=0",
       "--ephemeral",
       ...modelArguments(execution),
-      ...codexSandboxConfig(options.access),
+      ...codexSandboxConfig(options.access, options.cwd),
       "-c",
       'approval_policy="never"',
       // Codex 0.159 `exec` has no --search flag; live search is a config override.
