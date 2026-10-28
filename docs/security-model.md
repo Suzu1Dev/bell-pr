@@ -199,20 +199,20 @@ to both CLIs, and `DISABLE_TELEMETRY`, `DISABLE_ERROR_REPORTING`,
   characters, or the segments `__proto__`, `constructor` or `prototype` are
   refused. Conflict files are read and rewritten only when they are regular
   files inside the checkout; symlinks are never followed.
-- **Held-back files.** Credentials, private keys, `.env` files and similar
-  are held back from review and publishing.
+- **Held-back files.** Blocks common token formats and private keys before publishing.
+  `.env` files and similar are held back from review and publishing.
 
 ## Publishing
 
 - Nothing reaches GitHub until you reviewed every changed file and approved
   the exact PR text. The commit is built from the reviewed files only, and
-  BELL PR never force-pushes.
+  BELL PR never force-pushes. The publish dialog shows the title, commit
+  message, and PR body that will be sent. Blocks common token formats and private keys before publishing.
 - Branch and repository names recorded for a run are validated before they
   reach a URL or refspec.
 - **Checks on what is sent**, shown in the draft tab and the publish dialog
   (`GET /api/runs/:id/preflight`):
-  - a credential in the title, description or commit message blocks
-    approval and publishing;
+  - Blocks common token formats and private keys before publishing.
   - a path from this computer (your home or data directory, `/home/<name>/`,
     `/Users/<name>/`) needs your confirmation;
   - changes to GitHub Actions workflows or other CI configuration need your

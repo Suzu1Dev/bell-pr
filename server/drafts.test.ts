@@ -1603,7 +1603,7 @@ test("preflight blocks a credential in the PR text and asks to confirm local pat
     "zh-TW",
   );
   assert.deepEqual(zh.map((check) => check.id), ["secret", "local-paths", "workflows", "author-email"]);
-  assert.match(zh[0].message, /憑證/);
+  assert.equal(zh[0].message, "發佈前會擋下常見格式的 token 與私鑰。");
   assert.deepEqual(zh[0].details, ["位於說明"]);
 });
 

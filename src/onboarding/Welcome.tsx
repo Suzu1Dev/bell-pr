@@ -310,7 +310,12 @@ function ProviderStep({
       {!report && <p role="status">{t.checking}</p>}
       {report && !ready.length && (
         <div className="welcome-provider-none">
-          <p>{t.none}</p>
+          {(report.checks.find((check) => check.id === "provider-ready" && check.reason === "claude-only")
+            ?.detail ?? t.none)
+            .split("\n")
+            .map((line) => (
+              <p key={line}>{line}</p>
+            ))}
           <button type="button" className="button secondary" onClick={() => void refresh()}>
             {recheck}
           </button>

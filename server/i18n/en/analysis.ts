@@ -182,8 +182,8 @@ export default {
     limitReached: "Discovery reached its request or time limit.",
     unreadableText: ({ title }: { title: string }) =>
       `Skipped ${title}: it is not text that can be read safely.`,
-    maskedCredentials: ({ title }: { title: string }) =>
-      `Masked what looks like a credential in ${title}.`,
+    maskedCredentials: (_title: { title: string }) =>
+      "Blocks common token formats and private keys before publishing.",
     truncatedSource: ({ title, bytes }: { title: string; bytes: string }) =>
       `Kept only the first ${bytes} bytes of ${title}; the rest was not read.`,
     searching:

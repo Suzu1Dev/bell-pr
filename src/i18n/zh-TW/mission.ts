@@ -293,6 +293,7 @@ const m: Translation<typeof en> = {
         missing: "未安裝",
         broken: "無法執行",
         "signed-out": "未登入",
+        disabled: "已關閉",
       },
       model: "執行模型",
       providerDefault: ({ provider, model }) =>

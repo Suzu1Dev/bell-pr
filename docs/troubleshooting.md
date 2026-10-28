@@ -470,9 +470,9 @@ there, then publish again.
 - **"The changes cover more than 150 files"** or **"… larger than 2 MB"**:
   make the task smaller and run it again.
 - **A file is held back from the pull request**: binary files, symbolic
-  links, new files over 512 KB, sensitive files (such as `.env` files and
-  private keys) and changes that look like credentials need a manual
-  review. Remove them from the changes, or handle them outside BELL PR.
+  links, new files over 512 KB, and sensitive files (such as `.env` files)
+  need a manual review. Blocks common token formats and private keys before publishing.
+  Remove them from the changes, or handle them outside BELL PR.
 - **A run stopped when BELL PR restarted**: a restart stops the agents.
   Interrupted runs show what happened; retry the failed subtasks from the
   task board.

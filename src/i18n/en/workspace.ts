@@ -497,7 +497,10 @@ const workspace = {
       author: ({ author }: { author: string }) => `Commit author: ${author}`,
       login: ({ login }: { login: string }) => `Pushing as @${login}`,
     },
-    commitPreview: "This round's commit message",
+    titlePreview: "PR title sent to GitHub",
+    titlePreviewDemo: "PR title",
+    commitPreview: "Commit message sent to GitHub",
+    commitPreviewDemo: "Commit message",
     bodyPreview: "PR description sent to GitHub",
     bodyPreviewWords: ({ count }: { count: number }) =>
       plural(count) === "one"

@@ -124,8 +124,11 @@ if (
 const { tsImport } = await import("tsx/esm/api");
 const load = (file) =>
   tsImport(pathToFileURL(path.join(root, file)).href, import.meta.url);
-const { agentCommand } = await load("server/agent-cli.ts");
+const { agentCommand, setCodexEnabledForTests } = await load("server/agent-cli.ts");
 const { agentEnvironment, command, git } = await load("server/process.ts");
+// Fake mode prints the Codex command through the same module agent-cli uses.
+// This is not a user control: the release constant stays the only way on.
+if (options.fake) setCodexEnabledForTests(true);
 
 /** The attempts, with what in a command identifies each. */
 const attempts = (dataDirectory, lateSecret) => [

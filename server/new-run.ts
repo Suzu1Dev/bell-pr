@@ -9,6 +9,7 @@ import type { AgentProvider, ModelCatalog } from "../shared/models.js";
 import { setupError } from "./cli-errors.js";
 import type { CliStatus } from "./doctor.js";
 import { currentLocale, sm } from "./i18n/index.js";
+import { presentedModelSettings } from "../shared/codex-switch.js";
 import { resolveModelExecution } from "./models.js";
 import { logRunQueued } from "./run-events.js";
 import { enforceAgentSandbox } from "./sandbox.js";
@@ -117,9 +118,10 @@ export async function createRun(
 ) {
   const repo = ctx.repo(repoId);
   const byHand = mode.learnByHand === true;
+  const used = presentedModelSettings(settings ?? {});
   const modelExecution = resolveModelExecution(
-    settings ?? {},
-    await sources.models(settings?.provider),
+    used,
+    await sources.models(used.provider),
   );
   await assertProviderReady(
     sources,

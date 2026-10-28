@@ -56,6 +56,11 @@ import { AppError, type Repository } from "./types.js";
 import { lenientRead } from "./persisted-schema.js";
 import { locales, type Locale } from "../shared/i18n/locale.js";
 import { setupError, withCliSetupHint } from "./cli-errors.js";
+import {
+  codexEnabled,
+  codexSelectionBlocked,
+  presentedModelSettings,
+} from "../shared/codex-switch.js";
 import { defaultProviderFrom, knownDoctorReport } from "./doctor.js";
 import { agentSpawn, parseAgentOutput } from "./run-events.js";
 import {
@@ -797,13 +802,17 @@ export class ProjectInsightsService {
   async getModelSettings(): Promise<ModelSettings> {
     await this.modelWrite.catch(() => undefined);
     try {
-      return persistedModelSettingsSchema.parse(
-        JSON.parse(await readFile(this.modelSettingsPath, "utf8")),
+      return presentedModelSettings(
+        persistedModelSettingsSchema.parse(
+          JSON.parse(await readFile(this.modelSettingsPath, "utf8")),
+        ),
       );
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === "ENOENT") {
         const provider = await this.defaultProvider().catch(() => undefined);
-        return sharedModelSettingsSchema.parse(provider ? { provider } : {});
+        return presentedModelSettings(
+          sharedModelSettingsSchema.parse(provider ? { provider } : {}),
+        );
       }
       throw new AppError(
         (m) => m.analysis.insights.modelSettingsUnreadable,
@@ -814,6 +823,8 @@ export class ProjectInsightsService {
 
   async setModelSettings(input: unknown): Promise<ModelSettings> {
     const settings = sharedModelSettingsSchema.parse(input);
+    if (codexSelectionBlocked(settings.provider))
+      throw new AppError((m) => m.setup.doctor.codexDisabled, 422);
     if (settings.model || settings.reasoningEffort)
       resolveModelExecution(
         settings,
@@ -1203,7 +1214,7 @@ export class ProjectInsightsService {
           )
         : projectRecommendationBatchSize;
       const settings = await this.getSettings(repoId);
-      const provider = settings.provider ?? "codex";
+      const provider = codexEnabled ? (settings.provider ?? "codex") : "claude";
       const login = agentLoginCheck(provider);
       try {
         await this.execute(login.executable, login.args, {

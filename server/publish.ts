@@ -53,6 +53,7 @@ import type {
   GuardOverride,
 } from "../shared/contribution.js";
 import { explainPrCreateFailure, refreshRunFacts } from "./contribution-facts.js";
+import { outgoingPublishText } from "../shared/publish-payload.js";
 
 const now = () => new Date().toISOString();
 
@@ -603,6 +604,7 @@ export async function publish(
       let commit = run.publishCommit;
       if (commit) await assertPriorCommit(run, commit, tree);
       else {
+        const outgoing = outgoingPublishText(run.draft, false);
         commit = (
           await git(
             run.worktreePath,
@@ -610,8 +612,7 @@ export async function publish(
             {
               // The person's full message (subject, body, their own trailers)
               // or, when none was written, the title alone as before.
-              input:
-                (run.draft.commitMessage?.trim() || run.draft.title) + "\n",
+              input: outgoing.commitMessage,
             },
           )
         ).stdout.trim();
@@ -673,6 +674,7 @@ export async function publish(
       const headRef = `${headOwner}:${headBranch}`;
       let prUrl = await openPrUrl(repo.fullName, headBranch, headOwner, commit);
       if (!prUrl) {
+        const outgoing = outgoingPublishText(run.draft, false);
         const result = await command(
           "gh",
           [
@@ -686,11 +688,11 @@ export async function publish(
             headRef,
             "--draft",
             "--title",
-            run.draft.title,
+            outgoing.title,
             "--body-file",
             "-",
           ],
-          { input: run.draft.body, timeoutMs: 120_000 },
+          { input: outgoing.body, timeoutMs: 120_000 },
         );
         prUrl = result.stdout.match(
           /https:\/\/github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+\/pull\/\d+/,
@@ -872,7 +874,7 @@ async function publishFollowUp(
             round.parentCommit,
             ...(round.mergeParent ? ["-p", round.mergeParent] : []),
           ],
-          { input: `${message}\n` },
+          { input: outgoingPublishText(run.draft, true).commitMessage },
         )
       ).stdout.trim();
     }
