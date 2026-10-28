@@ -18,6 +18,7 @@ import type {
   ContributionDirection,
   ContributionSettings,
 } from "../../shared/insights";
+import { codexEnabled } from "../../shared/codex-switch";
 import {
   agentProviders,
   providerLabels,
@@ -126,7 +127,8 @@ export function DirectionSettings({
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loadingModels, setLoadingModels] = useState(!initialCatalog);
   const [catalogAttempt, setCatalogAttempt] = useState(0);
-  const provider = value.provider ?? "codex";
+  const provider =
+    !codexEnabled && value.provider !== "claude" ? "claude" : (value.provider ?? "codex");
   const providerLabel = providerLabels[provider];
   useEffect(() => {
     const controller = new AbortController();
@@ -323,19 +325,25 @@ export function DirectionSettings({
             id={`${id}-provider`}
             value={provider}
             aria-describedby={`${id}-provider-help`}
-            onChange={(event) =>
+            onChange={(event) => {
+              const next = event.target.value as AgentProvider;
+              if (next === "codex" && !codexEnabled) return;
               onChange({
                 ...value,
-                provider: event.target.value as AgentProvider,
+                provider: next,
                 model: "",
                 reasoningEffort: "",
-              })
-            }
+              });
+            }}
           >
             {agentProviders.map((option) => {
               const state = readiness(option)?.state;
               return (
-                <option key={option} value={option}>
+                <option
+                  key={option}
+                  value={option}
+                  disabled={option === "codex" && !codexEnabled}
+                >
                   {state
                     ? t.model.providerOption({
                         provider: providerLabels[option],
