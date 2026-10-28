@@ -169,6 +169,8 @@ Authorization: Bearer <token>
 
 `bell-pr` 開啟瀏覽器時，位址的片段是 `#bell_token=<權杖>`。頁面會存下權杖，再從位址列移除。啟動時印出的那一行不含權杖，因此服務記錄裡也不會有。若要自己開啟，請用 `bell-pr open` 或 `bell-pr open --print`：兩者都會印出帶權杖的位址。請把那個位址當成密碼。它不會寫進伺服器記錄，也不會出現在 `bell-pr doctor --json`。
 
+token 可能留在瀏覽器歷史紀錄裡，如果這個瀏覽器設定檔有跟別人共用，請執行 `bell-pr token rotate`。
+
 ## 設定
 
 BELL PR 不需要任何設定就能啟動。下列設定都是啟動時讀取的環境變數；`bell-pr start` 另外接受 `--port`、`--host`、`--data-dir`、`--no-open` 與 `--env-file <file>`。在應用程式「設定」中調整的值，除非被環境變數指定，否則都會生效。

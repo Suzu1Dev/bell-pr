@@ -22,6 +22,7 @@ import "../team/team.css";
 import type { AppSettingsView } from "../../shared/app-settings";
 import { summarizeRun } from "../../shared/runs";
 import { dropSplitLinks } from "../../shared/split";
+import { ApiTokenEmptyState } from "./ApiTokenEmptyState";
 import { api, ApiError, send } from "../api";
 import { Logo } from "../brand/Logo";
 import { getDemo } from "../demo";
@@ -386,6 +387,7 @@ function AppShell({
     setAppSettings,
     apiError,
     setApiError,
+    apiTokenRequired,
   } = data;
   const [lastRunId, setLastRunId] = useState(readLastRun);
   const [run, setRunState] = useState<Run>(() => loadDemo(locale));
@@ -1022,7 +1024,9 @@ function AppShell({
           githubUser={status?.githubUser ?? ""}
           sampleBadge={presentation.present && showingSample}
         />
-        {apiError && (
+        {apiTokenRequired ? (
+          <ApiTokenEmptyState />
+        ) : apiError && (
           <div role="alert" className="connection-banner">
             <Terminal size={16} />
             <span>{apiError}</span>

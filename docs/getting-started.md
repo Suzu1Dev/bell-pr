@@ -56,8 +56,10 @@ browser:
 BELL PR 1.0.0-rc.1 → http://127.0.0.1:4311
 ```
 
-Keep the terminal open: BELL PR runs until you stop it with Ctrl+C. BELL PR has
-no sign-in of its own: anyone who can reach its address can use it. By default
+Keep the terminal open: BELL PR runs until you stop it with Ctrl+C. The API
+needs a token. It lives at `<data dir>/api-token`. `bell-pr open` passes it
+to the browser. `bell-pr token rotate` replaces it, and the old one stops
+working immediately. By default
 only this computer can reach it; see [Security model](security-model.md).
 
 > **Lost the address?** Run `bell-pr open` (or `npx bell-pr open`) on the same

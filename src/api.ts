@@ -85,9 +85,11 @@ function errorFromBody(status: number, body: unknown) {
     ...details
   } = raw;
   const message =
-    typeof text === "string" && text.trim()
-      ? text
-      : getCurrentMessages().common.errors.generic;
+    status === 401
+      ? getCurrentMessages().common.errors.apiTokenRequired
+      : typeof text === "string" && text.trim()
+        ? text
+        : getCurrentMessages().common.errors.generic;
   const code = isErrorCode(rawCode) ? rawCode : undefined;
   const init: ApiErrorInit = {
     status,
@@ -129,9 +131,8 @@ export function currentApiToken(): string | undefined {
 }
 
 /**
- * Reads `#bell_token=` (or `?bell_token=` on the hash or the address) into
- * session storage and removes it from the address, so a reload in this tab
- * keeps it and the address bar does not.
+ * Reads `#bell_token=` from the fragment into session storage and removes
+ * that fragment. A `?bell_token=` query is ignored.
  */
 export interface ApiTokenWindow {
   location: { hash: string; search: string; pathname: string };
@@ -146,39 +147,18 @@ export function adoptApiToken(win: ApiTokenWindow): void {
   const hash = win.location.hash.startsWith("#")
     ? win.location.hash.slice(1)
     : win.location.hash;
-  let token: string | undefined;
-  let nextHash = hash;
-  if (hash.startsWith("bell_token=")) {
-    token = decodePart(hash.slice("bell_token=".length));
-    nextHash = "";
-  } else {
-    const at = hash.indexOf("?");
-    if (at >= 0) {
-      const params = new URLSearchParams(hash.slice(at + 1));
-      const value = params.get("bell_token");
-      if (value) {
-        token = value;
-        params.delete("bell_token");
-        const query = params.toString();
-        nextHash = hash.slice(0, at) + (query ? `?${query}` : "");
-      }
-    }
-  }
-  const search = new URLSearchParams(win.location.search);
-  if (!token && search.has("bell_token")) token = search.get("bell_token") ?? undefined;
-  search.delete("bell_token");
-  if (!token || !apiTokenPattern.test(token)) return;
+  if (!hash.startsWith("bell_token=")) return;
+  const token = decodePart(hash.slice("bell_token=".length));
+  if (!apiTokenPattern.test(token)) return;
   try {
     win.sessionStorage.setItem(apiTokenStorageKey, token.toLowerCase());
   } catch {
-    // A private window that refuses storage still has the token for this load
-    // only when the caller also keeps it; the header below reads session storage.
+    // Storage can refuse the write. The fragment is still removed below.
   }
-  const query = search.toString();
   win.history.replaceState(
     win.history.state,
     "",
-    `${win.location.pathname}${query ? `?${query}` : ""}${nextHash ? `#${nextHash}` : ""}`,
+    `${win.location.pathname}${win.location.search}`,
   );
 }
 

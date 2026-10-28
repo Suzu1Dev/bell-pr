@@ -378,6 +378,8 @@ log does not either. To open the app yourself, use `bell-pr open` or
 address like a password. It is not written to the server log or to
 `bell-pr doctor --json`.
 
+The token can remain in browser history; run `bell-pr token rotate` if you share this browser profile.
+
 ## Configuration
 
 BELL PR needs no configuration. Every setting below is an environment

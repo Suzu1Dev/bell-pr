@@ -226,8 +226,7 @@ test("send builds a JSON request body", () => {
   assert.deepEqual(send("DELETE"), { method: "DELETE", body: "{}" });
 });
 
-test("the page stores #bell_token and sends it, then drops it from the address", async () => {
-  const token = "ab".repeat(32);
+function tokenWindow(initial: string) {
   const stored = new Map<string, string>();
   const session = {
     getItem: (key: string) => stored.get(key) ?? null,
@@ -239,7 +238,7 @@ test("the page stores #bell_token and sends it, then drops it from the address",
       return stored.size;
     },
   } satisfies Storage;
-  let href = `http://127.0.0.1:4311/#/runs/abc?bell_token=${token}&demo=1`;
+  let href = initial;
   const win = {
     location: {
       get hash() {
@@ -260,16 +259,53 @@ test("the page stores #bell_token and sends it, then drops it from the address",
     },
     sessionStorage: session,
   };
-  adoptApiToken(win);
-  assert.equal(stored.get("bellpr-api-token"), token);
-  assert.equal(href, "/#/runs/abc?demo=1");
+  return {
+    win,
+    session,
+    stored,
+    href: () => href,
+  };
+}
+
+test("?bell_token= is ignored and #bell_token= is stored then removed", async () => {
+  const token = "ab".repeat(32);
+  const query = tokenWindow(`http://127.0.0.1:4311/?bell_token=${token}`);
+  adoptApiToken(query.win);
+  assert.equal(query.stored.get("bellpr-api-token"), undefined);
+  assert.equal(query.href(), `http://127.0.0.1:4311/?bell_token=${token}`);
+
+  const hashed = tokenWindow(`http://127.0.0.1:4311/#/runs/abc?bell_token=${token}`);
+  adoptApiToken(hashed.win);
+  assert.equal(hashed.stored.get("bellpr-api-token"), undefined);
+  assert.equal(hashed.href(), `http://127.0.0.1:4311/#/runs/abc?bell_token=${token}`);
+
+  const fragment = tokenWindow(`http://127.0.0.1:4311/#bell_token=${token}`);
+  adoptApiToken(fragment.win);
+  assert.equal(fragment.stored.get("bellpr-api-token"), token);
+  assert.equal(fragment.href(), "/");
   const previous = globalThis.sessionStorage;
-  globalThis.sessionStorage = session;
+  globalThis.sessionStorage = fragment.session;
   try {
     await api("/status");
     assert.equal(calls.at(-1)?.headers.get("Authorization"), `Bearer ${token}`);
   } finally {
     globalThis.sessionStorage = previous;
-    stored.clear();
+    fragment.stored.clear();
   }
+});
+
+test("a 401 becomes the open instruction, not the bearer header text", async () => {
+  respond = () =>
+    json(401, {
+      error:
+        "This request needs the API token. Send it as Authorization: Bearer <token>, or as the X-Bell-Token header.",
+    });
+  const error = await rejection(api("/status"));
+  assert.ok(error instanceof ApiError);
+  assert.equal(error.status, 401);
+  assert.equal(
+    error.message,
+    "Open bell-pr from this computer by running `bell-pr open`.",
+  );
+  assert.doesNotMatch(error.message, /Bearer|X-Bell-Token/);
 });
