@@ -12,6 +12,7 @@ import { AppError } from "./types.js";
 import { redact } from "./secrets.js";
 import { exitStatusCanHideFailure } from "./exit-status.js";
 import {
+  agentGitWriteDenials,
   agentReadDenials,
   agentSandboxReadPaths,
   enforceAgentSandbox,
@@ -98,6 +99,12 @@ function claudeAccess(access: AgentAccess, web: boolean): string[] {
  * Codex CLI 0.165 it selects the older sandbox, which does not apply
  * `default_permissions`, so the read denials would be ignored.
  * `glob_scan_max_depth` makes a `**` deny apply on Linux.
+ *
+ * Filesystem values are only `read`, `write`, or `deny`, and `deny` blocks
+ * reading as well as writing (Codex permission profiles). A write-only
+ * carve-out for `.git/config` or the checkout's `.git` file cannot be
+ * expressed here without hiding those files from Git. Server-side `git()`
+ * is what refuses a replaced `.git` and ignores hook and filter config.
  */
 export function codexSandboxConfig(access: AgentAccess): string[] {
   const filesystem = [
@@ -165,7 +172,10 @@ export function claudeSettings(options: {
             failIfUnavailable: true,
             autoAllowBashIfSandboxed: true,
             allowUnsandboxedCommands: false,
-            filesystem: agentSandboxReadPaths(options.cwd),
+            filesystem: {
+              ...agentSandboxReadPaths(options.cwd),
+              denyWrite: agentGitWriteDenials(options.cwd),
+            },
             network: { allowedDomains: [], strictAllowlist: true },
           },
         }
