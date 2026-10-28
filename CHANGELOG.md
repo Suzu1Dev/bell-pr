@@ -7,6 +7,14 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- **`bell-pr start` waits for `bell-pr doctor`.** When a required check
+  fails, start exits before it listens and prints the doctor's checklist
+  with the command that fixes each one. `bell-pr start --force` starts
+  anyway and prints a warning, which is how the sample tour opens when no
+  AI provider is signed in. A real agent run is still refused until one is.
+
 ### Added
 
 - **Analysis progress.** While a project analysis or **Generate 5 more**

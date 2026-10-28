@@ -24,6 +24,7 @@ const m: Translation<typeof en> = {
       "  --host <主機>       監聽的位址（BELLPR_HOST，預設 127.0.0.1）",
       "  --data-dir <目錄>   資料目錄（BELLPR_DATA_DIR，預設 ~/.bellpr）",
       "  --no-open           不開啟瀏覽器（BELLPR_NO_OPEN=1）",
+      "  --force             即使 doctor 尚未就緒也啟動",
       "  --env-file <檔案>   先從檔案載入 BELLPR_PORT 等設定",
       "",
       "open 的選項：",
@@ -77,6 +78,8 @@ const m: Translation<typeof en> = {
     listenFailed: ({ address, reason }) =>
       `${name} 無法在 ${address} 監聽：${reason}`,
     failed: ({ reason }) => `${name} 未能啟動：${reason}`,
+    forced: `警告：--force 略過就緒檢查，仍會啟動 ${name}。執行 \`${bin} doctor\` 可查看缺少的項目。範例導覽不需要 AI 服務；真實的 Agent 工作仍然需要。`,
+    notReady: `${name} 沒有啟動。上方清單列出每一項失敗的必要檢查與修正指令。若仍要啟動並走範例導覽，請執行 \`${bin} start --force\`。`,
     uiMissing: ({ path }) =>
       `網頁介面尚未建置：${path} 中沒有 index.html。請在 ${name} 原始碼資料夾執行 \`npm run build\` 後重新啟動；在此之前只有 API 可用。`,
     uiMissingTitle: `${name}：網頁介面尚未建置`,

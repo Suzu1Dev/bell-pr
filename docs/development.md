@@ -65,6 +65,9 @@ npm start
 `npm start` runs the built `bell-pr start --no-open`, so build first:
 without `dist/`, the server warns that the web interface is not built and
 only the API answers. It prints its address as an installed BELL PR does.
+`bell-pr start` exits when `bell-pr doctor` is not ready. To open the
+sample tour from a checkout that has no AI provider signed in, run
+`npm start -- --force`.
 
 In a source checkout, `npx bell-pr` and `bell-pr` run the checkout's own
 `bin/bellpr.mjs`, not the package from npm, and `build/` and `dist/` exist

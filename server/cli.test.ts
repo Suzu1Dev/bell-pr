@@ -222,7 +222,7 @@ test(
       let printed = "";
       try {
         const code = await withLocale("en", () =>
-          main(["start", "--port", String(port), "--data-dir", dataDir], {
+          main(["start", "--force", "--port", String(port), "--data-dir", dataDir], {
             env: { BELLPR_STATIC_DIR: path.join(directory, "ui") },
             stdout: { write: (text: string) => (printed += text), isTTY: true },
             startOptions: { handleExit: false },
@@ -294,7 +294,7 @@ test("bell-pr help lists every command, and mistakes exit 2", async () => {
     assert.equal(result.code, 0);
     for (const command of ["start", "open", "doctor", "version", "help"])
       assert.match(result.stdout, new RegExp(`^  ${command} `, "m"));
-    for (const option of ["--port", "--host", "--data-dir", "--no-open", "--env-file", "--print"])
+    for (const option of ["--port", "--host", "--data-dir", "--no-open", "--force", "--env-file", "--print"])
       assert.ok(result.stdout.includes(option), option);
   }
   let zhText = "";
@@ -480,7 +480,7 @@ test("bell-pr start runs the server with the flags and --env-file settings", asy
     const stdout = output();
     try {
       const code = await withLocale("en", () =>
-        main(["--port", String(port), "--data-dir", dataDir, "--env-file", envFile, "--no-open"], {
+        main(["--force", "--port", String(port), "--data-dir", dataDir, "--env-file", envFile, "--no-open"], {
           stdout: stdout.stream,
           stderr: output().stream,
           startOptions: { handleExit: false },
@@ -514,19 +514,131 @@ test("bell-pr start explains a data directory it cannot create, then frees the p
     const port = await freePort();
     const result = await cli([
       "start",
+      "--force",
       "--port",
       String(port),
       "--data-dir",
       path.join(readOnly, "data"),
     ], { startOptions: { handleExit: false } });
     assert.equal(result.code, 1);
-    assert.match(result.stderr, /^BELL PR did not start: EACCES: permission denied, mkdir/);
+    assert.match(result.stderr, /Warning: --force skips the readiness check/);
+    assert.match(result.stderr, /BELL PR did not start: EACCES: permission denied, mkdir/);
     // A system error needs no stack trace.
     assert.doesNotMatch(result.stderr, /\n\s+at /);
     // The port is released again.
     const probe = createServer().listen(port, "127.0.0.1");
     await once(probe, "listening");
     await new Promise<void>((resolve) => probe.close(() => resolve()));
+  });
+});
+
+const readyCodex = `case "$1" in
+  --version) echo "codex-cli 0.159.0" ;;
+  login) echo "Logged in using ChatGPT" ;;
+  *) exit 1 ;;
+esac`;
+
+test("bell-pr start exits 1 before it listens when doctor is not ready", async () => {
+  await withStandInClis({ git: standInGit }, async (directory) => {
+    const dataDir = path.join(directory, "data");
+    const port = await freePort();
+    const result = await cli(
+      ["start", "--port", String(port), "--data-dir", dataDir, "--no-open"],
+      { startOptions: { handleExit: false } },
+    );
+    assert.equal(result.code, 1, result.stderr);
+    assert.equal(result.stdout, "");
+    assert.match(result.stderr, /✗ AI provider/);
+    assert.match(result.stderr, /Not ready/);
+    for (const command of [
+      "npm install -g @openai/codex",
+      "codex login",
+      "npm install -g @anthropic-ai/claude-code",
+      "claude auth login",
+    ])
+      assert.ok(result.stderr.includes(`\n        ${command}\n`), command);
+    assert.match(result.stderr, /bell-pr start --force/);
+    assert.match(result.stderr, /sample tour/);
+    // Nothing listened, and the data directory was not created.
+    assert.equal(existsSync(dataDir), false);
+    const probe = createServer().listen(port, "127.0.0.1");
+    await once(probe, "listening");
+    await new Promise<void>((resolve) => probe.close(() => resolve()));
+
+    let zh = "";
+    const zhPort = await freePort();
+    const zhCode = await withLocale("zh-TW", () =>
+      main(
+        ["start", "--port", String(zhPort), "--data-dir", path.join(directory, "data-zh"), "--no-open"],
+        {
+          env: { BELLPR_NO_OPEN: "1" },
+          stdout: { write: () => {} },
+          stderr: { write: (text: string) => (zh += text) },
+          startOptions: { handleExit: false },
+        },
+      ),
+    );
+    assert.equal(zhCode, 1);
+    assert.match(zh, /尚未就緒/);
+    assert.match(zh, /bell-pr start --force/);
+    assert.match(zh, /範例導覽/);
+  });
+});
+
+test("bell-pr start --force starts when doctor is not ready, so the sample tour can open", async () => {
+  await withStandInClis({ git: standInGit }, async (directory) => {
+    const dataDir = path.join(directory, "data");
+    const port = await freePort();
+    let running: RunningServer | undefined;
+    const result = await cli(
+      ["start", "--force", "--port", String(port), "--data-dir", dataDir, "--no-open"],
+      {
+        env: {
+          BELLPR_NO_OPEN: "1",
+          BELLPR_STATIC_DIR: path.join(directory, "ui"),
+        },
+        startOptions: { handleExit: false },
+        onStarted: (server) => (running = server),
+      },
+    );
+    try {
+      assert.equal(result.code, undefined, result.stderr);
+      assert.match(result.stderr, /Warning: --force skips the readiness check/);
+      assert.match(result.stderr, /sample tour/);
+      assert.match(result.stdout, new RegExp(`→ http://127\\.0\\.0\\.1:${port}\\n`));
+      assert.equal(running?.url, `http://127.0.0.1:${port}`);
+      assert.equal(existsSync(path.join(dataDir, "bellpr.lock")), true);
+    } finally {
+      await running?.shutdown();
+    }
+  });
+});
+
+test("bell-pr start listens when every required doctor check passed", async () => {
+  await withStandInClis({ git: standInGit, codex: readyCodex }, async (directory) => {
+    const dataDir = path.join(directory, "data");
+    const port = await freePort();
+    let running: RunningServer | undefined;
+    const result = await cli(
+      ["start", "--port", String(port), "--data-dir", dataDir, "--no-open"],
+      {
+        env: {
+          BELLPR_NO_OPEN: "1",
+          BELLPR_STATIC_DIR: path.join(directory, "ui"),
+        },
+        startOptions: { handleExit: false },
+        onStarted: (server) => (running = server),
+      },
+    );
+    try {
+      assert.equal(result.code, undefined, result.stderr);
+      assert.equal(result.stderr, "");
+      assert.doesNotMatch(result.stdout, /Not ready|--force/);
+      assert.match(result.stdout, new RegExp(`→ http://127\\.0\\.0\\.1:${port}\\n`));
+      assert.equal(running?.url, `http://127.0.0.1:${port}`);
+    } finally {
+      await running?.shutdown();
+    }
   });
 });
 
