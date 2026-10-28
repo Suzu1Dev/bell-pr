@@ -549,7 +549,12 @@ test("bell-pr start exits 1 before it listens when doctor is not ready", async (
     assert.equal(result.code, 1, result.stderr);
     assert.equal(result.stdout, "");
     assert.match(result.stderr, /✗ AI provider/);
-    assert.match(result.stderr, /Not ready/);
+    const sample = "No AI provider yet? See the sample tour: bell-pr start --force";
+    const headlineAt = result.stderr.indexOf("Not ready:");
+    const sampleAt = result.stderr.indexOf(sample);
+    const fixAt = result.stderr.indexOf("\n        npm install -g @openai/codex\n");
+    assert.ok(headlineAt >= 0 && sampleAt === headlineAt + result.stderr.slice(headlineAt).indexOf("\n") + 1);
+    assert.ok(sampleAt < fixAt, result.stderr);
     for (const command of [
       "npm install -g @openai/codex",
       "codex login",
@@ -557,8 +562,6 @@ test("bell-pr start exits 1 before it listens when doctor is not ready", async (
       "claude auth login",
     ])
       assert.ok(result.stderr.includes(`\n        ${command}\n`), command);
-    assert.match(result.stderr, /bell-pr start --force/);
-    assert.match(result.stderr, /sample tour/);
     // Nothing listened, and the data directory was not created.
     assert.equal(existsSync(dataDir), false);
     const probe = createServer().listen(port, "127.0.0.1");
@@ -579,9 +582,12 @@ test("bell-pr start exits 1 before it listens when doctor is not ready", async (
       ),
     );
     assert.equal(zhCode, 1);
-    assert.match(zh, /尚未就緒/);
-    assert.match(zh, /bell-pr start --force/);
-    assert.match(zh, /範例導覽/);
+    const zhSample = "還沒有 AI 服務？先看範例導覽：bell-pr start --force";
+    const zhHeadlineAt = zh.indexOf("尚未就緒");
+    const zhSampleAt = zh.indexOf(zhSample);
+    const zhFixAt = zh.indexOf("\n        npm install -g @openai/codex\n");
+    assert.ok(zhHeadlineAt >= 0 && zhSampleAt === zhHeadlineAt + zh.slice(zhHeadlineAt).indexOf("\n") + 1);
+    assert.ok(zhSampleAt < zhFixAt, zh);
   });
 });
 

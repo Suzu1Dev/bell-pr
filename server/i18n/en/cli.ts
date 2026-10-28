@@ -108,6 +108,8 @@ export default {
     forced: `Warning: --force skips the readiness check and starts ${name} anyway. Run \`${bin} doctor\` to see what is missing. The sample tour needs no AI provider; a real agent run still does.`,
     /** A required doctor check failed, so start did not listen. */
     notReady: `${name} did not start. The checklist above names each failed required check and the command that fixes it. To start anyway and take the sample tour, run \`${bin} start --force\`.`,
+    /** Right under the Not ready headline, before the fix commands. */
+    sampleTour: `No AI provider yet? See the sample tour: ${bin} start --force`,
     uiMissing: ({ path }: { path: string }) =>
       `The web interface is not built: ${path} has no index.html. Run \`npm run build\` in the ${name} source folder and start ${name} again; until then only the API answers.`,
     /** Title and text of the page served while the web interface is missing. */

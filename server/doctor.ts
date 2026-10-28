@@ -1085,18 +1085,36 @@ async function loadDoctorReport(
 }
 
 /**
- * Whether `bell-pr start` may listen, and the doctor's checklist when it
- * may not. `text` is `bell-pr doctor`'s own output for this data directory.
+ * `bell-pr start`'s refusal: the doctor's Not ready line, then the sample
+ * tour, then the same checklist (fixes included). `bell-pr doctor` itself
+ * still ends with the Not ready line.
+ */
+export function formatStartRefusal(report: DoctorReport, dataDir?: string): string {
+  const checklist = formatDoctorReport(report, dataDir).replace(/\n$/, "");
+  const split = checklist.lastIndexOf("\n");
+  const headline = checklist.slice(split + 1);
+  const body = checklist.slice(0, split).replace(/\n$/, "");
+  return `${headline}\n${sm().cli.start.sampleTour}\n\n${body}\n`;
+}
+
+/**
+ * Whether `bell-pr start` may listen, and the refusal text when it may not.
  */
 export async function readinessChecklist(options: {
   dataDir: string;
   port?: number;
 }): Promise<{ ready: boolean; text: string }> {
   const saved = new AppSettingsService(options.dataDir);
-  const report = await withAppSettings(saved, () =>
-    loadDoctorReport({ dataDir: options.dataDir, port: options.port }, saved),
-  );
-  return { ready: report.ready, text: formatDoctorReport(report, options.dataDir) };
+  return withAppSettings(saved, async () => {
+    const report = await loadDoctorReport(
+      { dataDir: options.dataDir, port: options.port },
+      saved,
+    );
+    return {
+      ready: report.ready,
+      text: report.ready ? "" : formatStartRefusal(report, options.dataDir),
+    };
+  });
 }
 
 async function doctorCli(
