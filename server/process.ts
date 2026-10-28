@@ -171,7 +171,36 @@ export function agentEnvironment(provider?: AgentProvider): NodeJS.ProcessEnv {
   for (const key of keys) {
     if (process.env[key]) env[key] = process.env[key];
   }
+  // Removed here as well as at spawn. A later edit that adds either name to
+  // the allowlist above still must not hand it to an agent.
+  delete env.GH_TOKEN;
+  delete env.GITHUB_TOKEN;
   return { ...env, NO_COLOR: "1", GIT_TERMINAL_PROMPT: "0" };
+}
+
+/**
+ * Environment for one Claude Code or Codex child. With no explicit env,
+ * this is agentEnvironment. With an explicit env, every variable is kept
+ * except `GH_TOKEN` and `GITHUB_TOKEN`, which are removed here, at spawn,
+ * whether or not the sandbox is on. Does not mutate `explicit`.
+ */
+export function agentChildEnvironment(
+  provider?: AgentProvider,
+  explicit?: NodeJS.ProcessEnv,
+): NodeJS.ProcessEnv {
+  if (!explicit) return agentEnvironment(provider);
+  const child = { ...explicit };
+  delete child.GH_TOKEN;
+  delete child.GITHUB_TOKEN;
+  return child;
+}
+
+/** `claude` or `codex`, including a path and a Windows `.exe` / `.cmd` name. */
+export function agentProviderOf(executable: string): AgentProvider | undefined {
+  const base = executable.split(/[/\\]/).pop()?.toLowerCase().replace(/\.(?:exe|cmd)$/i, "");
+  if (base === "claude") return "claude";
+  if (base === "codex") return "codex";
+  return undefined;
 }
 
 interface CommandOptions {
@@ -213,6 +242,10 @@ const stderrTailLength = 4000;
  * `allowedCodes` carries `details.stderr` (the redacted end of its raw
  * stderr) and `details.exitCode`. Known failures of git, gh, codex and
  * claude get a setup code and fixes (cli-errors.ts).
+ *
+ * git, gh and other tools keep this process's environment when no env is
+ * passed. Claude and Codex do not: they get agentChildEnvironment, so
+ * GH_TOKEN and GITHUB_TOKEN are removed before the process is spawned.
  */
 export async function command(
   executable: string,
@@ -222,14 +255,17 @@ export async function command(
   if (options.signal?.aborted) throw new AppError(cancelled(), 409);
   return await new Promise<{ stdout: string; stderr: string; code: number }>(
     (resolve, reject) => {
+      const provider = agentProviderOf(executable);
       const child = spawn(executable, args, {
         cwd: options.cwd,
-        env: options.env ?? {
-          ...process.env,
-          GIT_TERMINAL_PROMPT: "0",
-          GH_PROMPT_DISABLED: "1",
-          NO_COLOR: "1",
-        },
+        env: provider
+          ? agentChildEnvironment(provider, options.env)
+          : (options.env ?? {
+              ...process.env,
+              GIT_TERMINAL_PROMPT: "0",
+              GH_PROMPT_DISABLED: "1",
+              NO_COLOR: "1",
+            }),
         shell: false,
         detached: process.platform !== "win32",
         stdio: ["pipe", "pipe", "pipe"],

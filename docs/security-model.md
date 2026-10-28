@@ -67,7 +67,11 @@ it supports (a Claude subscription login, `ANTHROPIC_API_KEY` or
 `ANTHROPIC_AUTH_TOKEN`, a gateway, Amazon Bedrock, Google Vertex AI and
 Microsoft Foundry); BELL PR never restricts or reads them. Codex receives
 `CODEX_HOME`, `OPENAI_API_KEY` and `CODEX_API_KEY`. Neither receives the
-other's keys, and no agent receives GitHub tokens.
+other's keys. `GH_TOKEN` and `GITHUB_TOKEN` are removed from the agent
+child's environment when the process is spawned (`agentChildEnvironment`
+in `server/process.ts`), including when the sandbox is off. Other
+variables passed to that child are left in place. BELL PR's own server
+process still has the tokens for its own GitHub calls.
 Usage-data opt-outs that you set also pass through, unchanged: `DO_NOT_TRACK`
 to both CLIs, and `DISABLE_TELEMETRY`, `DISABLE_ERROR_REPORTING`,
 `DISABLE_BUG_COMMAND`, `CLAUDE_CODE_DISABLE_FEEDBACK_SURVEY` and

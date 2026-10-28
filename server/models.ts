@@ -16,7 +16,7 @@ import {
 import { product } from "../shared/product.js";
 import { version } from "./build-info.js";
 import { sm } from "./i18n/index.js";
-import { agentEnvironment, observeChild } from "./process.js";
+import { agentChildEnvironment, observeChild } from "./process.js";
 import { AppError } from "./types.js";
 
 export const modelId = z
@@ -107,7 +107,7 @@ export async function readModelCatalog(
       ["app-server", "--listen", "stdio://", "-c", 'model_provider="openai"'],
       {
         cwd,
-        env: agentEnvironment("codex"),
+        env: agentChildEnvironment("codex"),
         shell: false,
         detached: process.platform !== "win32",
         stdio: ["pipe", "pipe", "pipe"],
