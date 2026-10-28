@@ -22,7 +22,7 @@ import {
 
 test("the release constant is the only Codex switch, and one line turns the fallback on", async () => {
   const source = await readFile(new URL("../shared/codex-switch.ts", import.meta.url), "utf8");
-  assert.match(source, /export let codexEnabled = false/);
+  assert.match(source, /export let codexEnabled = true/);
   assert.doesNotMatch(source, /process\.env|BELLPR_/);
   setCodexEnabledForTests(true);
   assert.equal(activeProvider(undefined), "codex");
