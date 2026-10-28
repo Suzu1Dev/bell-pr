@@ -13,8 +13,8 @@ export default {
   requested: ({ text }: { text: string }) =>
     `Requested agent collaboration: ${text}`,
   notRunning: "No conversation turn is running.",
-  limitationsUpdated:
-    "Updated the PR draft's Limitations from this turn's results.",
+  draftUpdated:
+    "Updated the PR draft's verification results and remaining limitations.",
   stopped: "This conversation turn was stopped",
   failed: "This conversation turn did not finish",
   editsKept: ({ reason }: { reason: string }) =>

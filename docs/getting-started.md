@@ -253,9 +253,15 @@ The conversation lists changed files, commands BELL actually observed, checks
 the agent says it did not run, and any questions or missing setup. A command's
 exit status alone does not establish that a test was meaningful. A changed file
 loses its review mark and gets fresh explanations, and an approved contribution
-returns to review. The agent may rewrite only the Limitations section of your
-draft, with before-and-after text shown in the conversation; review that wording
-yourself. Code changes or observed commands also refresh draft suggestions,
+returns to review. The agent may update existing Validation and Limitations
+sections together: completed checks and their scope go in Validation, while
+Limitations keeps remaining gaps and constraints. Outdated claims are corrected
+in both. Other draft sections stay as written, and before-and-after text is shown
+in the conversation for your review. If the draft has no separate, recognizable
+Validation section, completed results stay in the reply and draft suggestion
+instead of being added to Limitations. Sections with nested headings are also
+left intact to preserve the template. Code changes, observed commands or section
+updates also refresh draft suggestions,
 without replacing your edited draft. Reviewer and Test analyst reports need a
 separate rerun.
 

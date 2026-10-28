@@ -1399,7 +1399,11 @@ test("draft prompt writes the person's fields in the locale's language and keeps
 
 test("draft prompt routes the person's to-dos to the checklist and passes the branch and word budget", () => {
   const prompt = draftPrompt(
-    { title: "Update", prompt: "Update value", reports: {}, branch: "bellpr-abc12345" },
+    {
+      title: "Update", prompt: "Update value", branch: "bellpr-abc12345",
+      reports: { tester: "The cross toolchain was unavailable." },
+      draft: { title: "Update", body: "## Problem\nKeep this wording.\n## Validation\nCross checks passed after setup.\n## Limitations\nNo native arm64 run." },
+    },
     [diff],
     context,
   );
@@ -1409,6 +1413,17 @@ test("draft prompt routes the person's to-dos to the checklist and passes the br
   assert.match(prompt, /requires disclosing AI assistance, add a checklist item/);
   assert.doesNotMatch(prompt, /Developed with AI assistance|Include truthful AI assistance disclosure/);
   assert.match(prompt, /goes ONLY into checklist/);
+  assert.match(prompt, /Put completed verification and its scope in Validation/);
+  assert.match(prompt, /reserve Limitations for remaining gaps, skipped checks and constraints/);
+  assert.match(prompt, /Reconcile later evidence with earlier claims/);
+  assert.match(prompt, /currentDraftChecks is the latest edited validation\/limitations wording, not independent execution evidence/);
+  assert.match(prompt, /flag it in summary and checklist instead of asserting either claim as fact/);
+  const data = JSON.parse(prompt.split("Provided data:\n")[1]);
+  assert.deepEqual(data.currentDraftChecks, {
+    validation: "## Validation\nCross checks passed after setup.",
+    limitations: "## Limitations\nNo native arm64 run.",
+  });
+  assert.equal(data.reports.tester, "The cross toolchain was unavailable.");
   assert.match(prompt, /"headBranch":"bellpr-abc12345"/);
   assert.match(prompt, /"bodyWordBudget":300/);
   assert.match(prompt, /"brevityRule":null/);

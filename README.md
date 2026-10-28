@@ -152,8 +152,9 @@ runs your tests, and its agents cannot edit your files in these runs.
 Before publishing an agent contribution, **Collaborate** lets you ask an agent
 to fix checks, add tests or work through the draft's Limitations. Each turn
 records changed files, observed commands, missing checks and questions. Edits
-invalidate the affected review marks, and Limitations updates show their old
-and new text for you to check. You still approve and publish the contribution;
+invalidate the affected review marks. Completed checks go in Validation;
+Limitations keeps remaining gaps and constraints. Updates to these sections show
+their old and new text for you to check. You still approve and publish the contribution;
 you can stop a turn and keep its edits. Learn by hand does not offer this
 writable conversation.
 

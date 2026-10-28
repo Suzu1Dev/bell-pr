@@ -10,10 +10,17 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { git } from "./process.js";
+import { draftFingerprint } from "./drafts.js";
 import { readDiff } from "./git.js";
 import { Store } from "./store.js";
 import { Workbench } from "./workbench.js";
-import { parseSessionResult, sessionPrompt, sessionReport } from "./session.js";
+import {
+  parseSessionResult,
+  sessionPrompt,
+  sessionReport,
+  sessionJsonSchema,
+  limitationsLimit,
+} from "./session.js";
 import type { TeamAgentRunner } from "./team.js";
 import { AppError, type Run } from "./types.js";
 import { createApp } from "./app.js";
@@ -315,6 +322,7 @@ test("an answer that is not the requested JSON is shown as the reply instead of 
       notRun: [],
       setup: [],
       limitations: "",
+      validation: "",
     },
   );
   assert.equal(
@@ -413,7 +421,10 @@ test("the prompt carries the person's message and earlier turns as data and forb
     boundaries: "Never push, publish, open PRs.",
     contributionContext: "User request:\nUpdate greeting",
     baseBranch: "main",
-    draft: { title: "T", body: "## Limitations\nnpm test was not run." },
+    draft: {
+      title: "T",
+      body: "## Validation\nNo checks yet.\n\n## Limitations\nnpm test was not run.",
+    },
     changedFiles: [
       { path: "hello.ts", status: "modified", additions: 1, deletions: 1 },
     ],
@@ -438,21 +449,35 @@ test("the prompt carries the person's message and earlier turns as data and forb
   );
   assert.match(
     prompt,
-    /the only PR text you change is its Limitations section/,
+    /the only PR text you may change is the body of its existing, separate Validation and Limitations sections/,
   );
 });
 
-test("a turn rewrites only the PR draft's Limitations, withdraws the approval and keeps both versions", async () => {
+test("a turn updates Validation and Limitations together, withdraws approval and preserves Problem and Changes", async () => {
   const f = await sessionFixture(async () =>
     reply({
-      reply: "已跑測試。",
-      limitations:
-        "- `make check` passed under `defconfig`.\n- Not run: the macOS job.",
+      reply: "依前一輪記錄更新驗證狀態；macOS 仍未執行。",
+      validation:
+        "- `make check` exited 0 under `defconfig`; the recorded scope was the local test target.",
+      limitations: "- Not run: the macOS job.",
     }),
   );
   try {
     f.run.draft.body =
-      "## Summary\nUpdates the greeting.\n\n## Limitations\n- `make check` was not run.\n\n## Notes\nNone.";
+      "## Problem\nThe greeting is unclear.\n\n## Changes\nUpdates the greeting.\n\n## Validation\n- `make check` was not run.\n\n## Limitations\n- `make check` was not run.\n- Not run: the macOS job.\n\n## Notes\nNone.";
+    f.run.session = {
+      messages: [
+        {
+          id: "earlier",
+          role: "agent",
+          content: "Ran the local test target under defconfig.",
+          at: "t",
+          checks: [{ command: "make check", outcome: "exit 0" }],
+        },
+      ],
+      revision: 0,
+      updatedAt: "t",
+    };
     await writeFile(
       path.join(f.repository, "hello.ts"),
       'export const hello = "after";\n',
@@ -471,14 +496,15 @@ test("a turn rewrites only the PR draft's Limitations, withdraws the approval an
     assert.equal(f.run.session!.revision, 0);
     assert.equal(
       f.run.draft.body,
-      "## Summary\nUpdates the greeting.\n\n## Limitations\n- `make check` passed under `defconfig`.\n- Not run: the macOS job.\n\n## Notes\nNone.",
+      "## Problem\nThe greeting is unclear.\n\n## Changes\nUpdates the greeting.\n\n## Validation\n- `make check` exited 0 under `defconfig`; the recorded scope was the local test target.\n\n## Limitations\n- Not run: the macOS job.\n\n## Notes\nNone.",
     );
     assert.equal(f.run.status, "review");
     assert.equal(f.run.approvedFingerprint, undefined);
     assert.deepEqual(f.run.session!.messages.at(-1)!.draftUpdate, {
-      before: "## Limitations\n- `make check` was not run.",
+      before:
+        "## Validation\n- `make check` was not run.\n\n## Limitations\n- `make check` was not run.\n- Not run: the macOS job.",
       after:
-        "## Limitations\n- `make check` passed under `defconfig`.\n- Not run: the macOS job.",
+        "## Validation\n- `make check` exited 0 under `defconfig`; the recorded scope was the local test target.\n\n## Limitations\n- Not run: the macOS job.",
     });
   } finally {
     await f.cleanup();
@@ -785,4 +811,213 @@ test("session evidence preserves an unverified exit status instead of claiming a
   ]);
   assert.match(report, /exit 0 \(not verified: pipeline\)/);
   assert.match(report, /no evidence that the command passed/);
+});
+
+test("session output remains compatible with old agents and never truncates draft evidence", () => {
+  assert.ok(sessionJsonSchema.required.includes("validation"));
+  const old = parseSessionResult(reply({ limitations: "Not run: macOS." }));
+  assert.equal(old.validation, "");
+  assert.equal(old.limitations, "Not run: macOS.");
+  for (const field of ["validation", "limitations"] as const) {
+    const result = parseSessionResult(
+      reply({
+        reply: "Evidence remains in this reply.",
+        validation: "Existing check result.",
+        limitations: "Remaining limitation.",
+        [field]: "x".repeat(limitationsLimit + 1),
+      }),
+    );
+    assert.equal(result.reply, "Evidence remains in this reply.");
+    assert.equal(result.validation, "");
+    assert.equal(result.limitations, "");
+  }
+});
+
+test("invalid grouped section edits leave both sections intact and legacy limitations-only output still works", async () => {
+  let update = { validation: "", limitations: "" };
+  const f = await sessionFixture(async () =>
+    reply({ reply: "Results remain available here.", ...update }),
+  );
+  const original =
+    "## Problem\nKeep this.\n\n## Validation\nNot run: local checks.\n\n## Limitations\nLocal checks and macOS are unverified.";
+  try {
+    for (const invalid of [
+      "TODO: fill results",
+      "## Changes\nOverwrite",
+      "x".repeat(limitationsLimit + 1),
+    ]) {
+      f.run.draft.body = original;
+      update = { validation: invalid, limitations: "Not run: macOS." };
+      await f.workbench.startSession(f.run.id, "Update the check sections");
+      await turnEnded(f.run);
+      assert.equal(f.run.draft.body, original);
+      assert.equal(f.run.session!.messages.at(-1)!.draftUpdate, undefined);
+      assert.equal(
+        f.run.session!.messages.at(-1)!.content,
+        "Results remain available here.",
+      );
+    }
+    // No independent Validation section: a supplied edit cannot silently disappear while gaps are removed.
+    f.run.draft.body =
+      "## Problem\nKeep this.\n\n## Limitations\nLocal checks are unverified.";
+    const withoutValidation = f.run.draft.body;
+    update = {
+      validation: "Checks exited 0.",
+      limitations: "No remaining gaps in the requested scope.",
+    };
+    await f.workbench.startSession(f.run.id, "Update the check sections");
+    await turnEnded(f.run);
+    assert.equal(f.run.draft.body, withoutValidation);
+    // A deliberately empty Validation update is the older output contract.
+    update = { validation: "", limitations: "Not run: macOS." };
+    await f.workbench.startSession(f.run.id, "Record the remaining limitation");
+    await turnEnded(f.run);
+    assert.match(f.run.draft.body, /## Limitations\nNot run: macOS\./);
+    assert.doesNotMatch(f.run.draft.body, /## Validation/);
+  } finally {
+    await f.cleanup();
+  }
+});
+
+test("the prompt keeps completed checks out of Limitations and does not turn exit zero into proof", () => {
+  const prompt = sessionPrompt({
+    boundaries: "No publishing.",
+    contributionContext: "Fix a bug",
+    baseBranch: "main",
+    draft: {
+      title: "Fix",
+      body: "## Validation and Limitations\nMixed evidence.",
+    },
+    changedFiles: [],
+    reports: { tester: "All checks passed (an unsupported claim)." },
+    history: [
+      {
+        id: "1",
+        role: "agent",
+        content: "Earlier claim",
+        at: "t",
+        checks: [
+          {
+            command: "npm test | tail",
+            outcome: "exit 0 (not verified: pipeline)",
+          },
+        ],
+      },
+    ],
+    message: "Address unfinished work",
+  });
+  assert.match(prompt, /"currentValidation":null/);
+  assert.match(prompt, /"currentLimitations":null/);
+  assert.match(
+    prompt,
+    /containing only remaining gaps, checks not run and material limits, never a list of successful checks/,
+  );
+  assert.match(prompt, /exit 0 does not mean every subcheck passed/);
+  assert.match(
+    prompt,
+    /never on earlier agent reports or a previous reply alone/,
+  );
+  assert.match(prompt, /keep the successful evidence in reply/);
+  assert.match(prompt, /Combined sections and sections with nested headings are left unchanged/);
+  assert.match(prompt, /within 4000 characters/);
+  assert.match(prompt, /exit 0 \(not verified: pipeline\)/);
+});
+
+test("a draft-only session update refreshes the old ready suggestion without replacing the person's draft", async () => {
+  let draftCalls = 0;
+  const proposal = {
+    title: "Update greeting",
+    body: "## Validation\nNo checks were run.",
+    policy: "linux",
+    summary: "Current evidence.",
+    rules: [],
+    checklist: [],
+    templateSourceId: "",
+  };
+  const f = await sessionFixture(
+    async ({ role }) => {
+      if (role === "draft") {
+        draftCalls++;
+        return JSON.stringify(proposal);
+      }
+      return reply({
+        validation: "No check execution evidence is available.",
+        limitations: "Not run: the local checks.",
+      });
+    },
+    (baseSha) => ({
+      collectDraftContext: async () => ({
+        sources: [],
+        warnings: [],
+        checkedAt: "2026-10-03T00:00:00Z",
+        baseSha,
+      }),
+    }),
+  );
+  try {
+    await writeFile(
+      path.join(f.repository, "hello.ts"),
+      'export const hello = "after";\n',
+    );
+    f.run.draft.body =
+      "## Problem\nKeep.\n\n## Validation\nUnclear.\n\n## Limitations\nUnknown.";
+    f.run.draftPreparation = {
+      status: "ready",
+      fingerprint: draftFingerprint(f.run, await readDiff(f.run)),
+      proposal: { ...proposal, policy: "linux" },
+    };
+    await f.workbench.startSession(
+      f.run.id,
+      "Clarify the missing verification evidence",
+    );
+    await turnEnded(f.run);
+    while (f.run.draftPreparation?.status === "generating")
+      await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(draftCalls, 1);
+    assert.equal(f.run.session!.revision, 0);
+    assert.equal(f.run.session!.messages.at(-1)!.checks, undefined);
+    assert.equal(f.run.draftPreparation?.status, "ready");
+    assert.equal(
+      f.run.draft.body,
+      "## Problem\nKeep.\n\n## Validation\nNo check execution evidence is available.\n\n## Limitations\nNot run: the local checks.",
+    );
+  } finally {
+    await f.cleanup();
+  }
+});
+
+test("the draft report retains scoped agent results as unverified claims while prioritizing observed failures", () => {
+  const report = sessionReport([
+    {
+      id: "latest",
+      role: "agent",
+      at: "latest-turn",
+      content:
+        "rv32emu local interpreter checks completed; JIT checks were skipped. " +
+        "More reported output. ".repeat(300),
+      checks: [
+        { command: "run-failed-check", outcome: "exit 2" },
+        {
+          command: "run-latest-check",
+          outcome: "exit 0 (not verified: pipeline)",
+        },
+      ],
+    },
+  ]);
+  assert.ok(report.length <= 5500);
+  assert.match(
+    report,
+    /Agent-reported summary \(UNVERIFIED; not application-observed evidence; truncated\)/,
+  );
+  assert.match(
+    report,
+    /local interpreter checks completed; JIT checks were skipped/,
+  );
+  assert.match(report, /run-failed-check -> exit 2/);
+  assert.match(report, /run-latest-check -> exit 0 \(not verified: pipeline\)/);
+  const unsupported = sessionReport([
+    { id: "claim", role: "agent", at: "t", content: "All tests passed." },
+  ]);
+  assert.match(unsupported, /UNVERIFIED; not application-observed evidence/);
+  assert.match(unsupported, /Commands BELL saw the agent run .*: none/);
 });

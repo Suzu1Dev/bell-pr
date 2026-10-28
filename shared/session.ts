@@ -23,7 +23,7 @@ export interface SessionMessage {
   /** True for an agent turn that ended in an error or was stopped. */
   failed?: boolean;
   /**
-   * Set when this turn rewrote the PR draft's Limitations section (the person's
+   * Set when this turn rewrote the PR draft's validation/limitations sections (the person's
    * own PR text, so both versions are kept to show and undo by hand).
    */
   draftUpdate?: { before: string; after: string };

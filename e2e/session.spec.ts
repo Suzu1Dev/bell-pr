@@ -20,7 +20,7 @@ test("an existing session handles draft limitations, blocks concurrent edits, an
       agents: [],
       logs: [],
       worktreePath: path.join(dataDir, "worktrees", "e2e-session-run"),
-      draft: { title: "Handle retry failures", body: "## Summary\nHandle retries.\n\n## Limitations\n- Retry tests have not run." },
+      draft: { title: "Handle retry failures", body: "## Summary\nHandle retries.\n\n## Validation\n- Retry tests have not run.\n\n## Limitations\n- Retry tests have not run; browser checks have not run." },
       session: { revision: 1, updatedAt: "2026-10-28T00:00:00Z", messages: [
         { id: "old", role: "agent", content: "Existing collaboration message preserved.", at: "2026-10-28T00:00:00Z" },
       ] },
@@ -35,6 +35,7 @@ test("an existing session handles draft limitations, blocks concurrent edits, an
   const page = await context.newPage();
   let sent = "";
   let diffReads = 0;
+  const completedBody = "## Summary\nHandle retries.\n\n## Validation\n- Retry tests passed.\n\n## Limitations\n- Browser checks have not run.";
   try {
     await page.route("**/api/runs/e2e-session-run", (route) => route.fulfill({ json: { run: current } }));
     await page.route("**/api/runs/e2e-session-run/diff", (route) => {
@@ -50,8 +51,16 @@ test("an existing session handles draft limitations, blocks concurrent edits, an
     await page.route("**/api/runs/e2e-session-run/session/cancel", (route) => {
       current = {
         ...current,
-        draft: { ...current.draft, body: "## Summary\nHandle retries.\n\n## Limitations\n- Retry tests passed." },
-        session: { ...current.session!, running: false, revision: 2 },
+        draft: { ...current.draft, body: completedBody },
+        session: { ...current.session!, running: false, revision: 2, messages: [
+          ...current.session!.messages,
+          { id: "new", role: "agent", at: new Date().toISOString(), content: "Retry tests completed; browser checks remain.",
+            draftUpdate: {
+              before: "## Validation\n- Retry tests have not run.\n\n## Limitations\n- Retry tests have not run; browser checks have not run.",
+              after: "## Validation\n- Retry tests passed.\n\n## Limitations\n- Browser checks have not run.",
+            },
+          },
+        ] },
       };
       return route.fulfill({ json: { run: current } });
     });
@@ -63,6 +72,8 @@ test("an existing session handles draft limitations, blocks concurrent edits, an
     await expect(composer).toHaveValue(/Retry tests have not run/);
     await page.getByRole("button", { name: session.send, exact: true }).click();
     expect(sent).toContain("Retry tests have not run");
+    expect(sent).toContain("Put completed verification in Validation");
+    expect(sent).toContain("keep only remaining gaps and constraints in Limitations");
     await expect(composer).toBeDisabled();
     await page.getByRole("tab", { name: workspace.tabs.draft, exact: true }).click();
     await expect(page.locator("#pr-title")).toBeDisabled();
@@ -75,8 +86,11 @@ test("an existing session handles draft limitations, blocks concurrent edits, an
     await page.getByRole("button", { name: session.stop, exact: true }).click();
     await expect(composer).toBeEnabled();
     await expect.poll(() => diffReads).toBeGreaterThan(before);
+    await expect(page.getByRole("heading", { name: session.draftUpdated })).toBeVisible();
+    await page.getByText(session.compare, { exact: true }).click();
+    await expect(page.locator(".session-draft-update pre").last()).toHaveText("## Validation\n- Retry tests passed.\n\n## Limitations\n- Browser checks have not run.");
     await page.getByRole("tab", { name: workspace.tabs.draft, exact: true }).click();
-    await expect(page.locator("#pr-body")).toHaveValue(/Retry tests passed/);
+    await expect(page.locator("#pr-body")).toHaveValue(completedBody);
   } finally {
     await context.close();
     await server.stop();

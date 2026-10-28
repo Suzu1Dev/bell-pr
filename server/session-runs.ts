@@ -5,10 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { activeFollowUp } from "../shared/followups.js";
 import { findDraftPlaceholders } from "../shared/draft-checks.js";
-import {
-  limitationsSection,
-  replaceLimitationsBody,
-} from "../shared/limitations.js";
+import { replaceDraftCheckSections } from "../shared/limitations.js";
 import {
   sessionContentLimit,
   sessionMessageLimit,
@@ -173,28 +170,33 @@ async function finishSessionTurn(
 }
 
 /**
- * Puts the agent's rewritten Limitations section into the PR text, so what
+ * Puts the agent's validation and limitations updates into the PR text, so what
  * the page and the publish dialog show matches what the turn established.
- * Only that section changes; the person still reads it before publishing,
+ * Only those existing separate sections change; the person still reads it before publishing,
  * and both versions are kept in the conversation. Nothing is written when
  * the draft has no such section, the text is unfinished, or it is the same.
  */
-function applyLimitationsUpdate(ctx: WorkbenchContext, run: Run, text: string) {
-  const next = redact(text).trim();
+function applyDraftCheckUpdates(
+  ctx: WorkbenchContext,
+  run: Run,
+  result: { validation: string; limitations: string },
+) {
+  const updates = {
+    validation: redact(result.validation).trim(),
+    limitations: redact(result.limitations).trim(),
+  };
   if (
-    !next ||
+    (!updates.validation && !updates.limitations) ||
     activeFollowUp(run.followUps) ||
     !["review", "approved"].includes(run.status) ||
-    findDraftPlaceholders(next).length
+    Object.values(updates).some((text) => findDraftPlaceholders(text).length)
   )
     return undefined;
-  const before = limitationsSection(run.draft.body);
-  const body = replaceLimitationsBody(run.draft.body, next);
-  const after = body && limitationsSection(body);
-  if (!before || !body || !after || after === before) return undefined;
-  run.draft = { ...run.draft, body };
-  ctx.log(run, "session", sm().session.limitationsUpdated);
-  return { before, after };
+  const update = replaceDraftCheckSections(run.draft.body, updates);
+  if (!update) return undefined;
+  run.draft = { ...run.draft, body: update.body };
+  ctx.log(run, "session", sm().session.draftUpdated);
+  return { before: update.before, after: update.after };
 }
 
 async function runSessionTurn(
@@ -252,7 +254,7 @@ async function runSessionTurn(
     await ctx.lock(run.id, async () => {
       await restoreAgentHead(run, head);
       // Before the diff is re-read, so an approval of the old text is withdrawn with it.
-      const draftUpdate = applyLimitationsUpdate(ctx, run, result.limitations);
+      const draftUpdate = applyDraftCheckUpdates(ctx, run, result);
       const finished = await finishSessionTurn(ctx, run, before);
       changedFiles = finished.changed;
       addSessionMessage(run, {
@@ -266,7 +268,7 @@ async function runSessionTurn(
         ...(result.setup.length ? { setup: result.setup } : {}),
         ...(draftUpdate ? { draftUpdate } : {}),
       });
-      if (changedFiles.length || checks.length) {
+      if (changedFiles.length || checks.length || draftUpdate) {
         markDraftRefreshing(run, finished.files);
         refreshDraft = true;
       }

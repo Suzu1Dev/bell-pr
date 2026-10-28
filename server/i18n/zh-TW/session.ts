@@ -10,7 +10,7 @@ export default {
   description: "和你協作修改程式碼與檢查",
   requested: ({ text }: { text: string }) => `對 Agent 提出協作要求：${text}`,
   notRunning: "目前沒有進行中的對話。",
-  limitationsUpdated: "已依這輪結果更新 PR 草稿的 Limitations。",
+  draftUpdated: "已更新 PR 草稿的驗證結果與剩餘限制。",
   stopped: "這輪對話已停止",
   failed: "這輪對話未完成",
   editsKept: ({ reason }: { reason: string }) =>
