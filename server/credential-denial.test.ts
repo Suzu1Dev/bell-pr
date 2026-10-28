@@ -364,3 +364,53 @@ console.log(${JSON.stringify(event)});
     await workbench.shutdown();
   }
 });
+
+test("an agent-spawned shell inherits the agent env, not the server process.env", async (t) => {
+  withEnv(t, {
+    GH_TOKEN: "from-parent",
+    GITHUB_TOKEN: "from-parent-gh",
+    ANTHROPIC_API_KEY: "sk-ant-test",
+    OPENAI_API_KEY: "sk-openai-test",
+  });
+  const directory = await mkdtemp(path.join(os.tmpdir(), "bell-agent-shell-"));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const probe = async (name: string) => {
+    const file = path.join(directory, name);
+    await writeFile(
+      file,
+      `#!${process.execPath}
+const { spawnSync } = require('node:child_process');
+// No env option: the shell inherits this process, as git and gh do when the agent starts them.
+const shell = spawnSync('/bin/sh', ['-c', 'env'], { encoding: 'utf8' });
+const names = new Set(shell.stdout.split('\\n').map((line) => line.split('=', 1)[0]));
+process.stdout.write(JSON.stringify({
+  GH_TOKEN: names.has('GH_TOKEN'),
+  GITHUB_TOKEN: names.has('GITHUB_TOKEN'),
+  ANTHROPIC_API_KEY: names.has('ANTHROPIC_API_KEY'),
+  OPENAI_API_KEY: names.has('OPENAI_API_KEY'),
+}));
+`,
+      { mode: 0o755 },
+    );
+    return JSON.parse((await command(file, [])).stdout) as {
+      GH_TOKEN: boolean;
+      GITHUB_TOKEN: boolean;
+      ANTHROPIC_API_KEY: boolean;
+      OPENAI_API_KEY: boolean;
+    };
+  };
+  const claude = await probe("claude");
+  assert.equal(claude.GH_TOKEN, false);
+  assert.equal(claude.GITHUB_TOKEN, false);
+  assert.equal(claude.ANTHROPIC_API_KEY, true);
+  assert.equal(claude.OPENAI_API_KEY, false);
+  const codex = await probe("codex");
+  assert.equal(codex.GH_TOKEN, false);
+  assert.equal(codex.GITHUB_TOKEN, false);
+  assert.equal(codex.OPENAI_API_KEY, true);
+  assert.equal(codex.ANTHROPIC_API_KEY, false);
+  // bell-pr's own gh call is not an agent spawn, so it still sees the tokens.
+  const gh = await probe("gh");
+  assert.equal(gh.GH_TOKEN, true);
+  assert.equal(gh.GITHUB_TOKEN, true);
+});
