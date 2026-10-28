@@ -16,6 +16,7 @@ const staticPaths = [
   "~/.config/gh/**",
   "~/.git-credentials",
   "~/.netrc",
+  "~/.ssh/",
   "~/.ssh/**",
   "~/.aws/**",
   "~/.npmrc",
