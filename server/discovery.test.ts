@@ -1,4 +1,5 @@
 import test from "node:test";
+import { codexAccessMode } from "./agent-cli.js";
 import assert from "node:assert/strict";
 import {
   mkdir,
@@ -386,7 +387,7 @@ test("discovery returns a running job, uses one isolated model-pinned inference,
       assert.equal(executable, "codex");
       assert.equal(args[args.indexOf("--model") + 1], "test-model");
       assert.ok(args.includes('model_reasoning_effort="low"'));
-      assert.equal(args[args.indexOf("--sandbox") + 1], "read-only");
+      assert.equal(codexAccessMode(args), "read-only");
       assert.ok(args.includes("--ignore-user-config"));
       assert.ok(args.includes("--output-schema"));
       cwd = options!.cwd!;

@@ -177,11 +177,15 @@ Agents run the imported project's code, its tests and build scripts, on
 your computer, so import only projects you are willing to run. BELL PR
 limits what they can do: agents that write code run in their CLI's
 operating-system sandbox, which keeps their writes in the run's working
-copy and closes the network; Claude Code agents are also denied your SSH
-keys, the GitHub CLI's sign-in and BELL PR's own data, while Codex's
-sandbox does not limit reading; and the project's own agent instructions
-and settings are never loaded. If you allow unsandboxed Claude Code
-agents, they have your full user rights, and those runs are marked. The
+copy and closes the network. With that sandbox on, both agents are denied
+the GitHub CLI config files, `~/.git-credentials` and credential-store
+files, `~/.netrc`, and `~/.ssh/`. Tokens in your system keyring are not
+covered: the agent can still read your GitHub token via `gh auth token`.
+Your main protection is a fine-grained token with the minimum permissions
+you need. Claude Code is also denied BELL PR's data outside its checkout.
+The project's own agent instructions and
+settings are never loaded. If you allow unsandboxed Claude Code agents,
+they have your full user rights, and those runs are marked. The
 [security model](security-model.md) explains every protection and its
 limits.
 

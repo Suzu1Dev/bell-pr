@@ -185,6 +185,7 @@ test("with unsandboxed agents allowed, a write role runs without the sandbox and
   const settings = JSON.parse(write.args[write.args.indexOf("--settings") + 1]);
   assert.equal(settings.sandbox, undefined);
   assert.ok(settings.permissions.deny.includes("Read(~/.ssh/**)"));
+  assert.ok(settings.permissions.deny.includes("Read(~/.git-credentials)"));
   // With the sandbox available the opt-in changes nothing.
   await stubPath(t, ["bwrap", "socat"]);
   assert.deepEqual(await enforceAgentSandbox("claude", "write"), {
@@ -299,11 +300,12 @@ test("agents are denied credentials and BELL's data outside their own checkout",
   const rules = agentReadDenials(checkout);
   const rule = (target: string) => `Read(/${target})`;
   for (const credential of [
-    "Read(~/.ssh/**)",
     "Read(~/.config/gh/**)",
+    "Read(~/.git-credentials)",
+    "Read(~/.netrc)",
+    "Read(~/.ssh/**)",
     "Read(~/.aws/**)",
     "Read(~/.npmrc)",
-    "Read(~/.netrc)",
     "Read(~/.claude/.credentials.json)",
     "Read(~/.codex/auth.json)",
   ])

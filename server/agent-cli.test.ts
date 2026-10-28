@@ -9,6 +9,8 @@ import {
   agentEventReader,
   agentLoginCheck,
   applyReportedModel,
+  codexAccessMode,
+  codexSandboxConfig,
   retryTransientAuth,
   type AgentEvent,
 } from "./agent-cli.js";
@@ -53,11 +55,12 @@ const settingsOf = (args: string[]) =>
   };
 
 const credentialDenials = [
-  "Read(~/.ssh/**)",
   "Read(~/.config/gh/**)",
+  "Read(~/.git-credentials)",
+  "Read(~/.netrc)",
+  "Read(~/.ssh/**)",
   "Read(~/.aws/**)",
   "Read(~/.npmrc)",
-  "Read(~/.netrc)",
   "Read(~/.claude/.credentials.json)",
   "Read(~/.codex/auth.json)",
 ];
@@ -80,8 +83,7 @@ test("Codex arguments keep the existing sandbox, approval and schema flags", asy
       "--ephemeral",
       "--model",
       "codex-example",
-      "--sandbox",
-      "workspace-write",
+      ...codexSandboxConfig("write"),
       "-c",
       'approval_policy="never"',
       "--json",
@@ -102,10 +104,8 @@ test("Codex arguments keep the existing sandbox, approval and schema flags", asy
     },
   );
   assert.equal(readOnly.executable, "codex");
-  assert.equal(
-    readOnly.args[readOnly.args.indexOf("--sandbox") + 1],
-    "read-only",
-  );
+  assert.equal(codexAccessMode(readOnly.args), "read-only");
+  assert.ok(!readOnly.args.includes("--sandbox"));
   assert.ok(readOnly.args.includes("--skip-git-repo-check"));
   assert.equal(
     readOnly.args[readOnly.args.indexOf("--output-schema") + 1],
@@ -238,7 +238,7 @@ test("teammates combine write access with an output schema on both providers", a
     { source: "cli-default" },
     { cwd: directory, access: "write", outputSchema: schemaPath },
   );
-  assert.equal(value(codex.args, "--sandbox"), "workspace-write");
+  assert.equal(codexAccessMode(codex.args), "workspace-write");
   assert.equal(value(codex.args, "--output-schema"), schemaPath);
   assert.ok(!codex.args.includes("--skip-git-repo-check"));
 

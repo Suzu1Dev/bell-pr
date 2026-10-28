@@ -12,6 +12,7 @@ import { constants, readdirSync, readFileSync, realpathSync } from "node:fs";
 import { access } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { sharedCredentialDenials } from "../shared/credential-denials.js";
 import type { AgentProvider } from "../shared/models.js";
 import { product } from "../shared/product.js";
 import { AppError } from "./types.js";
@@ -313,44 +314,32 @@ function dataDirectoryRules(dataDirectory: string, cwd: string): string[] {
 }
 
 /**
- * Files that hold credentials, by home-relative rule: SSH keys, the GitHub
- * CLI login, cloud credentials, npm and netrc tokens, and the Claude Code
- * and Codex logins.
+ * A Claude Code Read rule for one shared denial. Home-relative entries stay
+ * in `~` form. Absolute paths use `//`, and a path the rule syntax cannot
+ * carry is left out rather than risk the whole settings value being rejected.
  */
-const credentialRules = [
-  "Read(~/.ssh/**)",
-  "Read(~/.config/gh/**)",
-  "Read(~/.aws/**)",
-  "Read(~/.npmrc)",
-  "Read(~/.netrc)",
-  "Read(~/.claude/.credentials.json)",
-  "Read(~/.codex/auth.json)",
-];
+function claudeCredentialRule(entry: string): string | undefined {
+  if (/[()\\\n\r\0"]/.test(entry)) return undefined;
+  if (entry.startsWith("~")) return `Read(${entry})`;
+  if (entry.endsWith("/**")) return absoluteRule(entry.slice(0, -3), "/**");
+  return absoluteRule(entry);
+}
 
 /**
- * Every Read denial for an agent working in `cwd`: the credential files
- * above, the same files where an environment variable moved them, and
- * BELL's data directory outside the agent's own checkout. Deny rules also
- * cover Grep and Glob, and Claude Code applies them to sandboxed commands.
+ * Every Read denial for an agent working in `cwd`: the shared credential
+ * list (GitHub CLI config, git credential files, netrc, SSH, and the files
+ * where an environment variable moved them) and BELL's data directory
+ * outside the agent's own checkout. Deny rules also cover Grep and Glob,
+ * and Claude Code applies them to sandboxed commands. The person can turn
+ * that sandbox off; these rules are still sent, and a shell then runs
+ * with the person's own account.
  */
 export function agentReadDenials(cwd: string): string[] {
   const here = resolved(cwd);
-  const rules = [...credentialRules];
-  const moved: [string | undefined, string][] = [
-    [process.env.CLAUDE_CONFIG_DIR, ".credentials.json"],
-    [process.env.CODEX_HOME, "auth.json"],
-    [process.env.GH_CONFIG_DIR, "**"],
-    [
-      process.env.XDG_CONFIG_HOME &&
-        path.join(process.env.XDG_CONFIG_HOME, "gh"),
-      "**",
-    ],
-  ];
-  for (const [directory, file] of moved)
-    if (directory && path.isAbsolute(directory)) {
-      const rule = absoluteRule(resolved(directory), `/${file}`);
-      if (rule) rules.push(rule);
-    }
+  const rules = sharedCredentialDenials().flatMap((entry) => {
+    const rule = claudeCredentialRule(entry);
+    return rule ? [rule] : [];
+  });
   for (const directory of dataDirectoriesFor(here))
     rules.push(...dataDirectoryRules(directory, here));
   return [...new Set(rules)];

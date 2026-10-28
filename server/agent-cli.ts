@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { setTimeout as delay } from "node:timers/promises";
+import { sharedCredentialDenials } from "../shared/credential-denials.js";
 import {
   providerLabels,
   type AgentProvider,
@@ -90,6 +91,40 @@ function claudeAccess(access: AgentAccess, web: boolean): string[] {
         ]
       : []),
   ];
+}
+
+/**
+ * Codex permission profile for one turn. `--sandbox` is not passed: on
+ * Codex CLI 0.165 it selects the older sandbox, which does not apply
+ * `default_permissions`, so the read denials would be ignored.
+ * `glob_scan_max_depth` makes a `**` deny apply on Linux.
+ */
+export function codexSandboxConfig(access: AgentAccess): string[] {
+  const filesystem = [
+    "glob_scan_max_depth=4",
+    ...sharedCredentialDenials().flatMap((entry) =>
+      /["\\\r\n{}]/.test(entry) ? [] : [`"${entry}"="deny"`],
+    ),
+  ].join(", ");
+  const parent = access === "write" ? ":workspace" : ":read-only";
+  return [
+    "-c",
+    'default_permissions="bell-pr"',
+    "-c",
+    `permissions={bell-pr={extends="${parent}", filesystem={${filesystem}}, network={enabled=false}}}`,
+  ];
+}
+
+/** workspace-write or read-only, from the permission profile BELL passes. */
+export function codexAccessMode(
+  args: readonly string[],
+): "workspace-write" | "read-only" | undefined {
+  if (args.includes("--sandbox")) return undefined;
+  const table = args.find((arg) => arg.startsWith("permissions={bell-pr="));
+  if (!table) return undefined;
+  if (table.includes('extends=":workspace"')) return "workspace-write";
+  if (table.includes('extends=":read-only"')) return "read-only";
+  return undefined;
 }
 
 /**
@@ -207,8 +242,7 @@ export async function agentCommand(
       "project_doc_max_bytes=0",
       "--ephemeral",
       ...modelArguments(execution),
-      "--sandbox",
-      options.access === "write" ? "workspace-write" : "read-only",
+      ...codexSandboxConfig(options.access),
       "-c",
       'approval_policy="never"',
       // Codex 0.159 `exec` has no --search flag; live search is a config override.
