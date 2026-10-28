@@ -7,7 +7,7 @@ import {
 } from "./git.js";
 import { formatters } from "../shared/i18n/locale.js";
 import { currentLocale, sm } from "./i18n/index.js";
-import { command, redact, runCheckoutGitDir } from "./process.js";
+import { command, gitSafetyArgs, redact, runCheckoutGitDir } from "./process.js";
 import { AppError, type Repository, type Run } from "./types.js";
 
 const maximumFiles = 16;
@@ -416,12 +416,7 @@ export async function collectDraftContext(
       "git",
       [
         ...(gitDir ? ["--git-dir", gitDir, "--work-tree", cwd] : []),
-        "-c",
-        "core.hooksPath=/dev/null",
-        "-c",
-        "core.fsmonitor=false",
-        "-c",
-        "core.quotePath=false",
+        ...gitSafetyArgs,
         "--no-pager",
         ...args,
       ],

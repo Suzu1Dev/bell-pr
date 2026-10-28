@@ -36,7 +36,7 @@ import {
 } from "./cli-errors.js";
 import { resolvePort } from "./config.js";
 import { sm } from "./i18n/index.js";
-import { agentEnvironment, command, git, redact } from "./process.js";
+import { agentEnvironment, command, git, gitSafetyArgs, redact } from "./process.js";
 import {
   allowUnsandboxedAgents,
   detectClaudeSandbox,
@@ -417,8 +417,14 @@ async function probeDataDir(directory: string): Promise<Facts["dataDir"]> {
 }
 
 async function probe(exec: DoctorExec, dataDir?: string): Promise<Facts> {
+  const run = (executable: string, args: string[], options?: Parameters<DoctorExec>[2]) =>
+    exec(
+      executable,
+      executable === "git" ? [...gitSafetyArgs, ...args] : args,
+      options,
+    );
   const [git, gh, codex, claude, dataDirFacts] = await Promise.all([
-    probeTool(exec, "git"),
+    probeTool(run, "git"),
     probeTool(exec, "gh"),
     probeTool(exec, "codex", agentEnvironment("codex")),
     probeTool(exec, "claude", agentEnvironment("claude")),
@@ -427,7 +433,7 @@ async function probe(exec: DoctorExec, dataDir?: string): Promise<Facts> {
   const [identity, github, codexAuth, claudeAuth, sandbox] = await Promise.all([
     git.state === "ok"
       ? probeGitIdentity((args, options) =>
-          exec("git", args, { ...options, cwd: os.tmpdir() }),
+          run("git", args, { ...options, cwd: os.tmpdir() }),
         )
       : undefined,
     gh.state === "ok" ? probeGithub(exec) : undefined,

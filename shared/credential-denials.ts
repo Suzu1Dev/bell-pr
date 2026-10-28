@@ -115,7 +115,16 @@ function gitHelpers(args: string[], env: NodeJS.ProcessEnv): string[] {
     const gitEnv: NodeJS.ProcessEnv = { ...env, GIT_TERMINAL_PROMPT: "0" };
     delete gitEnv.GIT_DIR;
     delete gitEnv.GIT_WORK_TREE;
-    const result = spawnSync("git", args, {
+    const result = spawnSync(
+      "git",
+      [
+        "-c",
+        "core.hooksPath=/dev/null",
+        "-c",
+        "core.fsmonitor=false",
+        ...args,
+      ],
+      {
       encoding: "utf8",
       env: gitEnv,
       cwd: os.tmpdir(),

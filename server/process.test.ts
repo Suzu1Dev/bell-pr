@@ -156,7 +156,8 @@ const configOf = (args: string[]) =>
 test("every Git command overrides hooks, monitors, pagers, editors, prompts, SSH and log signature checks from the repository", async (t) => {
   const calls = await recordingGit(t);
   await git(os.tmpdir(), ["status"]);
-  const [call] = await calls();
+  const call = (await calls()).find((item) => item.args.at(-1) === "status");
+  assert.ok(call);
   assert.deepEqual(configOf(call.args), [
     "core.hooksPath=/dev/null",
     "core.fsmonitor=false",
@@ -167,6 +168,10 @@ test("every Git command overrides hooks, monitors, pagers, editors, prompts, SSH
     "core.editor=true",
     "core.askPass=",
     "log.showSignature=false",
+    "credential.helper=",
+    "diff.external=",
+    "uploadpack.packObjectsHook=",
+    "protocol.ext.allow=never",
   ]);
   assert.equal(call.args.at(-1), "status");
 });
@@ -177,7 +182,8 @@ test("network Git commands use gh credentials, HTTPS or SSH only, and never prom
     // A caller's own environment cannot turn prompting back on.
     env: { ...process.env, GIT_TERMINAL_PROMPT: "1" },
   });
-  const [call] = await calls();
+  const call = (await calls()).find((item) => item.args.includes("ls-remote"));
+  assert.ok(call);
   const config = configOf(call.args);
   for (const value of configOf(gitNetworkConfig)) assert.ok(config.includes(value), value);
   assert.ok(config.includes("protocol.allow=never"));
@@ -375,4 +381,44 @@ test("a run checkout whose .git file was replaced does not run its filter or cre
   );
   await assert.rejects(readFile(filterMarker, "utf8"));
   await assert.rejects(readFile(credentialMarker, "utf8"));
+});
+
+test("server git runs neither hooks, fsmonitor, filters, nor credential or ssh commands planted in the clone", async (t) => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "bell-process-planted-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const repo = path.join(root, "repo");
+  const checkout = path.join(root, "worktrees", "run-1");
+  const marker = path.join(root, "ran");
+  await mkdir(repo, { recursive: true });
+  await git(repo, ["init", "-q", "-b", "main"]);
+  await git(repo, ["config", "user.name", "Someone"]);
+  await git(repo, ["config", "user.email", "someone@example.invalid"]);
+  await writeFile(path.join(repo, "file.txt"), "v1\n");
+  await git(repo, ["add", "file.txt"]);
+  await git(repo, ["commit", "-q", "-m", "initial"]);
+  await git(repo, ["worktree", "add", "-q", "--detach", checkout]);
+  const script = `#!/bin/sh\necho "$0" >> ${JSON.stringify(marker)}\n`;
+  const hooks = path.join(repo, ".git", "hooks");
+  await mkdir(hooks, { recursive: true });
+  for (const name of ["pre-commit", "post-commit"])
+    await writeFile(path.join(hooks, name), script, { mode: 0o755 });
+  const monitor = path.join(root, "monitor");
+  const ssh = path.join(root, "ssh-command");
+  await writeFile(monitor, script, { mode: 0o755 });
+  await writeFile(ssh, script, { mode: 0o755 });
+  await git(repo, ["config", "core.fsmonitor", monitor]);
+  await git(repo, ["config", "filter.pwn.clean", monitor]);
+  await git(repo, ["config", "filter.pwn.required", "true"]);
+  await git(repo, ["config", "credential.helper", `!${monitor}`]);
+  await git(repo, ["config", "core.sshCommand", ssh]);
+  await writeFile(path.join(checkout, ".gitattributes"), "* filter=pwn\n");
+  await writeFile(path.join(checkout, "file.txt"), "v2\n");
+  await git(checkout, ["status", "--porcelain"]);
+  await git(checkout, ["add", "file.txt"]);
+  await git(checkout, ["commit", "-q", "-m", "edit"]);
+  await gitNetwork(checkout, ["fetch", "origin"], { timeoutMs: 5_000 }).catch(() => undefined);
+  await gitNetwork(checkout, ["ls-remote", "git@127.0.0.1:none.git"], {
+    timeoutMs: 5_000,
+  }).catch(() => undefined);
+  assert.equal(await readFile(marker, "utf8").catch(() => ""), "");
 });

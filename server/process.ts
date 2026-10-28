@@ -1,4 +1,4 @@
-import { spawn, type ChildProcess } from "node:child_process";
+import { spawn, spawnSync, type ChildProcess } from "node:child_process";
 import { existsSync } from "node:fs";
 import { lstat, readFile, realpath } from "node:fs/promises";
 import path from "node:path";
@@ -482,15 +482,14 @@ export async function command(
 }
 
 /**
- * Settings every Git command runs with, ahead of the repository's own
- * configuration: no hooks, no file monitor, no global attributes file, and
- * no pager, editor, password prompt or SSH command taken from the
- * repository. Logs never verify signatures, which would run the signing
- * program. Filters, diff and merge drivers can only come from
- * configuration, and assertGitConfigSafe refuses a repository that sets
- * them.
+ * `-c` overrides on every server Git command. Command-line config wins over
+ * the repository, the worktree, and includes. `credential.helper=` clears
+ * helpers; `gitNetwork` then installs only `gh auth git-credential`.
+ * `core.attributesFile` and `GIT_ATTR_NOSYSTEM` turn off the global and
+ * system attribute files. In-repo `.gitattributes` still name drivers;
+ * `repoDriverOverrides` blanks those drivers' commands.
  */
-const hardenedGitConfig = [
+export const gitSafetyArgs = [
   "-c",
   "core.hooksPath=/dev/null",
   "-c",
@@ -509,7 +508,80 @@ const hardenedGitConfig = [
   "core.askPass=",
   "-c",
   "log.showSignature=false",
+  "-c",
+  "credential.helper=",
+  "-c",
+  "diff.external=",
+  "-c",
+  "uploadpack.packObjectsHook=",
+  "-c",
+  "protocol.ext.allow=never",
 ];
+
+const hardenedGitConfig = gitSafetyArgs;
+
+/** Commands named by repository config. `git config` does not run them. */
+const driverKey =
+  /^(?:filter\.[^.]+\.(?:clean|smudge|process)|diff\.(?:external|.+\.(?:textconv|command))|merge\.[^.]+\.driver|alias\.[^.]+|gpg\.(?:.+\.)?program)$/i;
+
+/**
+ * `-c` blanks for drivers this repository defines, so a `filter` named by
+ * `.gitattributes` has no command left to run. Shell aliases are blanked
+ * only when the value starts with `!`.
+ */
+function repoDriverOverrides(cwd: string, gitDir?: string): string[] {
+  if (!existsSync(cwd)) return [];
+  let stdout = "";
+  try {
+    const result = spawnSync(
+      "git",
+      [
+        ...(gitDir ? ["--git-dir", gitDir, "--work-tree", cwd] : []),
+        "-c",
+        "core.hooksPath=/dev/null",
+        "-c",
+        "core.fsmonitor=false",
+        "-c",
+        "alias.config=",
+        "config",
+        "--show-scope",
+        "--null",
+        "--get-regexp",
+        "^(filter|diff|merge|alias|gpg)\\.",
+      ],
+      {
+        cwd,
+        encoding: "utf8",
+        timeout: 5_000,
+        shell: false,
+        env: { ...process.env, GIT_TERMINAL_PROMPT: "0", GIT_ATTR_NOSYSTEM: "1" },
+      },
+    );
+    if (result.status !== 0 || !result.stdout) return [];
+    stdout = result.stdout;
+  } catch {
+    return [];
+  }
+  const filters = new Set<string>();
+  const args: string[] = [];
+  const fields = stdout.split("\0");
+  for (let index = 0; index + 1 < fields.length; index += 2) {
+    const scope = fields[index];
+    if (scope !== "local" && scope !== "worktree") continue;
+    const field = fields[index + 1];
+    const split = field.indexOf("\n");
+    if (split <= 0) continue;
+    const key = field.slice(0, split);
+    const value = field.slice(split + 1);
+    if (!driverKey.test(key)) continue;
+    if (/^alias\./i.test(key) && !value.startsWith("!")) continue;
+    args.push("-c", `${key}=`);
+    const filter = /^filter\.([^.]+)\./i.exec(key);
+    if (filter) filters.add(filter[1]);
+  }
+  for (const name of filters) args.push("-c", `filter.${name}.required=false`);
+  return args;
+}
 
 /**
  * A run or teammate checkout (`<data>/worktrees/<run>` or
@@ -566,6 +638,7 @@ function withoutGitDir(env: NodeJS.ProcessEnv | undefined): NodeJS.ProcessEnv {
   };
   delete next.GIT_DIR;
   delete next.GIT_WORK_TREE;
+  next.GIT_ATTR_NOSYSTEM = "1";
   return next;
 }
 
@@ -580,12 +653,13 @@ export async function git(
     [
       ...(gitDir ? ["--git-dir", gitDir, "--work-tree", cwd] : []),
       ...hardenedGitConfig,
+      ...repoDriverOverrides(cwd, gitDir),
       ...args,
     ],
     {
       ...options,
       cwd,
-      ...(gitDir ? { env: withoutGitDir(options.env) } : {}),
+      env: withoutGitDir(options.env),
     },
   );
 }
