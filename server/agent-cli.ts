@@ -100,11 +100,14 @@ function claudeAccess(access: AgentAccess, web: boolean): string[] {
  * `default_permissions`, so the read denials would be ignored.
  * `glob_scan_max_depth` makes a `**` deny apply on Linux.
  *
- * Filesystem values are only `read`, `write`, or `deny`, and `deny` blocks
- * reading as well as writing (Codex permission profiles). A write-only
- * carve-out for `.git/config` or the checkout's `.git` file cannot be
- * expressed here without hiding those files from Git. Server-side `git()`
- * is what refuses a replaced `.git` and ignores hook and filter config.
+ * Filesystem values are only `read`, `write`, or `deny`. `deny` blocks
+ * reads and writes. `read` allows reads and forbids writes. Extending
+ * `:workspace` already keeps the workspace root's `.git` read-only
+ * (https://learn.chatgpt.com/docs/permissions). The clone's `.git` is
+ * outside that root, and this profile does not grant writes there.
+ * Those paths are not added as `deny`, which would hide them from Git.
+ * Server-side `git()` refuses a replaced `.git` and ignores hook and
+ * filter config whether or not this profile is in effect.
  */
 export function codexSandboxConfig(access: AgentAccess): string[] {
   const filesystem = [
