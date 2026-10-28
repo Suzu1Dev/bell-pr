@@ -1,6 +1,6 @@
 import test, { type TestContext } from "node:test";
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rename, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import {
@@ -335,4 +335,44 @@ test("a checkout's own signing program never verifies a signed commit in git log
   await git(directory, ["log", "--no-color", "--format=%H%x00%s"]);
   await git(directory, ["show", "--no-color", "--format=%B", "--no-patch", commit]);
   assert.equal(await readFile(marker, "utf8").catch(() => ""), "");
+});
+
+test("a run checkout whose .git file was replaced does not run its filter or credential helper", async (t) => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "bell-process-forged-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const repo = path.join(root, "repo");
+  const checkout = path.join(root, "worktrees", "run-1");
+  const attack = path.join(root, "attack");
+  const filterMarker = path.join(root, "filter-ran");
+  const credentialMarker = path.join(root, "credential-ran");
+  await mkdir(repo, { recursive: true });
+  await mkdir(attack, { recursive: true });
+  await git(repo, ["init", "-q", "-b", "main"]);
+  await git(repo, ["config", "user.name", "Someone"]);
+  await git(repo, ["config", "user.email", "someone@example.invalid"]);
+  await writeFile(path.join(repo, "file.txt"), "v1\n");
+  await git(repo, ["add", "file.txt"]);
+  await git(repo, ["commit", "-q", "-m", "initial"]);
+  await git(repo, ["worktree", "add", "-q", "--detach", checkout]);
+  await git(checkout, ["status", "--porcelain"]);
+
+  await git(attack, ["init", "-q", "-b", "main"]);
+  await git(attack, ["config", "filter.pwn.clean", `touch ${filterMarker}`]);
+  await git(attack, ["config", "filter.pwn.required", "true"]);
+  await git(attack, ["config", "credential.helper", `!touch ${credentialMarker}`]);
+  await rm(path.join(checkout, ".git"));
+  await rename(path.join(attack, ".git"), path.join(checkout, ".git"));
+  await writeFile(path.join(checkout, ".gitattributes"), "* filter=pwn\n");
+  await writeFile(path.join(checkout, "file.txt"), "v2\n");
+
+  const refused = (error: unknown) =>
+    error instanceof AppError && error.statusCode === 409;
+  await assert.rejects(git(checkout, ["add", "file.txt"]), refused);
+  await assert.rejects(git(checkout, ["status"]), refused);
+  await assert.rejects(
+    gitNetwork(checkout, ["push", "origin", "HEAD"]),
+    refused,
+  );
+  await assert.rejects(readFile(filterMarker, "utf8"));
+  await assert.rejects(readFile(credentialMarker, "utf8"));
 });

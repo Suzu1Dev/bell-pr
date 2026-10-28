@@ -1,5 +1,7 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import { existsSync } from "node:fs";
+import { lstat, readFile, realpath } from "node:fs/promises";
+import path from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import type { AgentProvider } from "../shared/models.js";
 import { log } from "./log.js";
@@ -509,12 +511,83 @@ const hardenedGitConfig = [
   "log.showSignature=false",
 ];
 
+/**
+ * A run or teammate checkout (`<data>/worktrees/<run>` or
+ * `<data>/team-worktrees/<run>/<task>`). Its `.git` is a file. The clone's
+ * `.git` directory is not one of these paths.
+ */
+function runCheckout(cwd: string) {
+  const parts = path.resolve(cwd).split(path.sep);
+  const at = parts.lastIndexOf("worktrees");
+  if (at > 0 && at === parts.length - 2) return true;
+  const team = parts.lastIndexOf("team-worktrees");
+  return team > 0 && team === parts.length - 3;
+}
+
+/**
+ * Git directory of a run checkout, taken from its `gitdir:` file and checked
+ * without running Git. A directory in place of that file is the agent's
+ * repository, so it is refused before any command can read its config.
+ * The resolved directory is passed as `--git-dir`, and `GIT_DIR` is not
+ * taken from the environment.
+ */
+export async function runCheckoutGitDir(cwd: string): Promise<string | undefined> {
+  if (!runCheckout(cwd)) return undefined;
+  const forged = () => new AppError((m) => m.security.worktreeForged, 409);
+  const pointerPath = path.join(cwd, ".git");
+  const metadata = await lstat(pointerPath).catch(() => undefined);
+  if (!metadata?.isFile()) throw forged();
+  const pointer = /^gitdir: ([^\r\n]+)\r?\n?$/.exec(
+    await readFile(pointerPath, "utf8"),
+  )?.[1];
+  if (!pointer) throw forged();
+  const gitDir = path.resolve(cwd, pointer.trim());
+  const marker = `${path.sep}.git${path.sep}worktrees${path.sep}`;
+  if (!gitDir.includes(marker)) throw forged();
+  const back = await readFile(path.join(gitDir, "gitdir"), "utf8").catch(() => "");
+  const [expected, actual, resolved] = await Promise.all([
+    realpath(pointerPath).catch(() => undefined),
+    back.trim()
+      ? realpath(path.resolve(gitDir, back.trim())).catch(() => undefined)
+      : Promise.resolve(undefined),
+    realpath(gitDir).catch(() => undefined),
+  ]);
+  if (!expected || expected !== actual || !resolved) throw forged();
+  return resolved;
+}
+
+/** Drops Git-dir overrides so `--git-dir` is the one that is used. */
+function withoutGitDir(env: NodeJS.ProcessEnv | undefined): NodeJS.ProcessEnv {
+  const next: NodeJS.ProcessEnv = {
+    ...(env ?? process.env),
+    GIT_TERMINAL_PROMPT: env?.GIT_TERMINAL_PROMPT ?? "0",
+    GH_PROMPT_DISABLED: env?.GH_PROMPT_DISABLED ?? "1",
+    NO_COLOR: env?.NO_COLOR ?? "1",
+  };
+  delete next.GIT_DIR;
+  delete next.GIT_WORK_TREE;
+  return next;
+}
+
 export async function git(
   cwd: string,
   args: string[],
   options: Omit<CommandOptions, "cwd"> = {},
 ) {
-  return command("git", [...hardenedGitConfig, ...args], { ...options, cwd });
+  const gitDir = await runCheckoutGitDir(cwd);
+  return command(
+    "git",
+    [
+      ...(gitDir ? ["--git-dir", gitDir, "--work-tree", cwd] : []),
+      ...hardenedGitConfig,
+      ...args,
+    ],
+    {
+      ...options,
+      cwd,
+      ...(gitDir ? { env: withoutGitDir(options.env) } : {}),
+    },
+  );
 }
 
 /**

@@ -7,7 +7,7 @@ import {
 } from "./git.js";
 import { formatters } from "../shared/i18n/locale.js";
 import { currentLocale, sm } from "./i18n/index.js";
-import { command, redact } from "./process.js";
+import { command, redact, runCheckoutGitDir } from "./process.js";
 import { AppError, type Repository, type Run } from "./types.js";
 
 const maximumFiles = 16;
@@ -409,10 +409,13 @@ export async function collectDraftContext(
     total += Buffer.byteLength(content);
     context.sources.push({ ...source, content });
   };
-  const gitRead = (args: string[], maxBytes = 2_000_000) =>
-    execute(
+  const gitRead = async (args: string[], maxBytes = 2_000_000) => {
+    const cwd = run.worktreePath || repo.path;
+    const gitDir = await runCheckoutGitDir(cwd);
+    return execute(
       "git",
       [
+        ...(gitDir ? ["--git-dir", gitDir, "--work-tree", cwd] : []),
         "-c",
         "core.hooksPath=/dev/null",
         "-c",
@@ -423,12 +426,13 @@ export async function collectDraftContext(
         ...args,
       ],
       {
-        cwd: run.worktreePath || repo.path,
+        cwd,
         signal: options.signal,
         timeoutMs: 15_000,
         maxBytes,
       },
     );
+  };
   const github = async (args: string[], maxBytes = 500_000) => {
     active();
     const result = await execute(

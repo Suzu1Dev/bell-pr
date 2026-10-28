@@ -181,7 +181,7 @@ test("a checkout an earlier build worked in keeps its diff when its .git/config 
 test("a teammate checkout whose .git pointer was forged is not used", async (t) => {
   const directory = await mkdtemp(path.join(os.tmpdir(), "bell-security-team-"));
   t.after(() => rm(directory, { recursive: true, force: true }));
-  const runCheckout = path.join(directory, "worktrees", "run");
+  const runCheckout = path.join(directory, "run-repo");
   const baseSha = await repository(runCheckout, { "a.ts": "a\n" });
   const run = baseRun({ worktreePath: runCheckout, baseSha });
   const taskPath = path.join(directory, "team-worktrees", "run", "task-1");
