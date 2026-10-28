@@ -6,6 +6,7 @@ import path from "node:path";
 import {
   agentEnvironment,
   assertGitConfigSafe,
+  command,
   git,
   gitNetwork,
   gitNetworkConfig,
@@ -194,6 +195,67 @@ test("network Git commands use gh credentials, HTTPS or SSH only, and never prom
   assert.ok(config.indexOf("credential.helper=") < config.indexOf("credential.helper=!gh auth git-credential"));
   assert.ok(config.includes("core.hooksPath=/dev/null"));
   assert.equal(call.prompt, "0");
+});
+
+test("git children do not see GH_TOKEN; gitNetwork and gh do", async (t) => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "bell-git-env-"));
+  const record = path.join(directory, "seen.jsonl");
+  const script = `#!${process.execPath}
+require('node:fs').appendFileSync(${JSON.stringify(record)}, JSON.stringify({
+  args: process.argv.slice(2),
+  GH_TOKEN: process.env.GH_TOKEN ?? null,
+  GITHUB_TOKEN: process.env.GITHUB_TOKEN ?? null,
+  BELL_MARKER: process.env.BELL_MARKER ?? null,
+}) + '\\n');
+if (process.argv.includes('config')) process.exit(0);
+`;
+  await writeFile(path.join(directory, "git"), script, { mode: 0o755 });
+  await writeFile(path.join(directory, "gh"), script, { mode: 0o755 });
+  withEnv(t, {
+    PATH: `${directory}${path.delimiter}${process.env.PATH}`,
+    GH_TOKEN: "from-parent",
+    GITHUB_TOKEN: "from-parent-gh",
+    BELL_MARKER: "secret",
+  });
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  await git(os.tmpdir(), ["status"]);
+  await git(os.tmpdir(), ["status"], {
+    env: { ...process.env, GH_TOKEN: "explicit", GITHUB_TOKEN: "explicit-gh" },
+  });
+  await command("git", ["--version"], { env: { ...process.env } });
+  await gitNetwork(os.tmpdir(), ["ls-remote", "https://example.invalid/r.git"]);
+  await command("gh", ["api", "user"]);
+  const seen = (await readFile(record, "utf8"))
+    .trim()
+    .split("\n")
+    .map(
+      (line) =>
+        JSON.parse(line) as {
+          args: string[];
+          GH_TOKEN: string | null;
+          GITHUB_TOKEN: string | null;
+          BELL_MARKER: string | null;
+        },
+    );
+  const local = seen.filter(
+    (call) => !call.args.includes("ls-remote") && !call.args.includes("api"),
+  );
+  assert.ok(local.length >= 3);
+  for (const call of local) {
+    assert.equal(call.GH_TOKEN, null);
+    assert.equal(call.GITHUB_TOKEN, null);
+    assert.equal(call.BELL_MARKER, null);
+  }
+  const remote = seen.find((call) => call.args.includes("ls-remote"));
+  assert.ok(remote);
+  assert.equal(remote.GH_TOKEN, "from-parent");
+  assert.equal(remote.GITHUB_TOKEN, "from-parent-gh");
+  assert.equal(remote.BELL_MARKER, null);
+  const gh = seen.find((call) => call.args.includes("api"));
+  assert.ok(gh);
+  assert.equal(gh.GH_TOKEN, "from-parent");
+  assert.equal(gh.GITHUB_TOKEN, "from-parent-gh");
+  assert.equal(gh.BELL_MARKER, null);
 });
 
 async function repository(t: TestContext) {

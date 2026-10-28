@@ -112,9 +112,19 @@ export function credentialStoreFiles(
 
 function gitHelpers(args: string[], env: NodeJS.ProcessEnv): string[] {
   try {
-    const gitEnv: NodeJS.ProcessEnv = { ...env, GIT_TERMINAL_PROMPT: "0" };
-    delete gitEnv.GIT_DIR;
-    delete gitEnv.GIT_WORK_TREE;
+    // Allowlist: this read must not see GH_TOKEN or the rest of the server env.
+    const gitEnv: NodeJS.ProcessEnv = { GIT_TERMINAL_PROMPT: "0" };
+    for (const key of [
+      "PATH",
+      "HOME",
+      "GIT_EXEC_PATH",
+      "GIT_CONFIG_GLOBAL",
+      "GIT_CONFIG_SYSTEM",
+      "GIT_CONFIG_NOSYSTEM",
+      "XDG_CONFIG_HOME",
+    ]) {
+      if (env[key]) gitEnv[key] = env[key];
+    }
     const result = spawnSync(
       "git",
       [

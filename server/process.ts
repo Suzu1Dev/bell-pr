@@ -215,6 +215,11 @@ interface CommandOptions {
   onLine?: (line: string, stream: "stdout" | "stderr") => void;
   allowedCodes?: number[];
   /**
+   * For `git` only. `gitNetwork` sets this so the child receives
+   * `GH_TOKEN` and `GITHUB_TOKEN`. Every other git child does not.
+   */
+  network?: boolean;
+  /**
    * Off by default; for the person's test command (server/by-hand-tests.ts),
    * whose processes may outlive it. POSIX only. The command settles when
    * its own process exits, at most `settleAfterExitMs` later for the
@@ -245,9 +250,11 @@ const stderrTailLength = 4000;
  * stderr) and `details.exitCode`. Known failures of git, gh, codex and
  * claude get a setup code and fixes (cli-errors.ts).
  *
- * git, gh and other tools keep this process's environment when no env is
- * passed. Claude and Codex do not: they get agentChildEnvironment, so
- * GH_TOKEN and GITHUB_TOKEN are removed before the process is spawned.
+ * Claude and Codex get agentChildEnvironment, so `GH_TOKEN` and
+ * `GITHUB_TOKEN` are removed before the process is spawned. `git` gets
+ * gitChildEnv (those tokens only when `network` is set, which only
+ * gitNetwork does). `gh` gets ghEnvironment, including the tokens. Any
+ * other tool keeps this process's environment when no env is passed.
  */
 export async function command(
   executable: string,
@@ -257,17 +264,9 @@ export async function command(
   if (options.signal?.aborted) throw new AppError(cancelled(), 409);
   return await new Promise<{ stdout: string; stderr: string; code: number }>(
     (resolve, reject) => {
-      const provider = agentProviderOf(executable);
       const child = spawn(executable, args, {
         cwd: options.cwd,
-        env: provider
-          ? agentChildEnvironment(provider, options.env)
-          : (options.env ?? {
-              ...process.env,
-              GIT_TERMINAL_PROMPT: "0",
-              GH_PROMPT_DISABLED: "1",
-              NO_COLOR: "1",
-            }),
+        env: childEnvironment(executable, options),
         shell: false,
         detached: process.platform !== "win32",
         stdio: ["pipe", "pipe", "pipe"],
@@ -554,7 +553,7 @@ function repoDriverOverrides(cwd: string, gitDir?: string): string[] {
         encoding: "utf8",
         timeout: 5_000,
         shell: false,
-        env: { ...process.env, GIT_TERMINAL_PROMPT: "0", GIT_ATTR_NOSYSTEM: "1" },
+        env: gitChildEnv(undefined, false),
       },
     );
     if (result.status !== 0 || !result.stdout) return [];
@@ -628,18 +627,133 @@ export async function runCheckoutGitDir(cwd: string): Promise<string | undefined
   return resolved;
 }
 
-/** Drops Git-dir overrides so `--git-dir` is the one that is used. */
-function withoutGitDir(env: NodeJS.ProcessEnv | undefined): NodeJS.ProcessEnv {
-  const next: NodeJS.ProcessEnv = {
-    ...(env ?? process.env),
-    GIT_TERMINAL_PROMPT: env?.GIT_TERMINAL_PROMPT ?? "0",
-    GH_PROMPT_DISABLED: env?.GH_PROMPT_DISABLED ?? "1",
-    NO_COLOR: env?.NO_COLOR ?? "1",
+const gitEnvKeys = [
+  "PATH",
+  "HOME",
+  "USER",
+  "LOGNAME",
+  "SHELL",
+  "TMPDIR",
+  "TMP",
+  "TEMP",
+  "LANG",
+  "LC_ALL",
+  "LC_CTYPE",
+  "SSH_AUTH_SOCK",
+  "GIT_EXEC_PATH",
+  "GIT_CONFIG_GLOBAL",
+  "GIT_TEMPLATE_DIR",
+  "GNUPGHOME",
+  "XDG_CONFIG_HOME",
+  "XDG_RUNTIME_DIR",
+];
+
+const gitIdentityKeys = [
+  "GIT_AUTHOR_NAME",
+  "GIT_AUTHOR_EMAIL",
+  "GIT_AUTHOR_DATE",
+  "GIT_COMMITTER_NAME",
+  "GIT_COMMITTER_EMAIL",
+  "GIT_COMMITTER_DATE",
+  "EMAIL",
+];
+
+/** Proxy and CA settings a fetch or push needs. Not copied for local git. */
+const gitNetworkEnvKeys = [
+  "http_proxy",
+  "https_proxy",
+  "HTTP_PROXY",
+  "HTTPS_PROXY",
+  "ALL_PROXY",
+  "all_proxy",
+  "NO_PROXY",
+  "no_proxy",
+  "SSL_CERT_FILE",
+  "SSL_CERT_DIR",
+  "GIT_SSL_CAINFO",
+  "GIT_SSL_CAPATH",
+  "CURL_CA_BUNDLE",
+  "GH_CONFIG_DIR",
+  "GH_HOST",
+  "GH_ENTERPRISE_TOKEN",
+];
+
+/**
+ * Environment for a server Git process. Not the server's full environment.
+ * `GH_TOKEN` and `GITHUB_TOKEN` are included only for `gitNetwork`, whose
+ * credential helper is `gh auth git-credential`.
+ */
+export function gitChildEnv(
+  explicit: NodeJS.ProcessEnv | undefined,
+  network: boolean,
+): NodeJS.ProcessEnv {
+  const source = explicit ?? process.env;
+  const env: NodeJS.ProcessEnv = {
+    GIT_ATTR_NOSYSTEM: "1",
+    GIT_CONFIG_NOSYSTEM: "1",
+    GIT_TERMINAL_PROMPT: "0",
+    GH_PROMPT_DISABLED: "1",
+    NO_COLOR: "1",
   };
-  delete next.GIT_DIR;
-  delete next.GIT_WORK_TREE;
-  next.GIT_ATTR_NOSYSTEM = "1";
-  return next;
+  for (const key of [...gitEnvKeys, ...gitIdentityKeys]) {
+    const value = source[key] ?? process.env[key];
+    if (value) env[key] = value;
+  }
+  if (source.GIT_INDEX_FILE) env.GIT_INDEX_FILE = source.GIT_INDEX_FILE;
+  if (network) {
+    env.GCM_INTERACTIVE = "never";
+    for (const key of gitNetworkEnvKeys) {
+      const value = source[key] ?? process.env[key];
+      if (value) env[key] = value;
+    }
+    // The gh credential helper is a child of this git process, so it sees
+    // this environment. Tokens come from the server, not from `explicit`.
+    if (process.env.GH_TOKEN) env.GH_TOKEN = process.env.GH_TOKEN;
+    if (process.env.GITHUB_TOKEN) env.GITHUB_TOKEN = process.env.GITHUB_TOKEN;
+  }
+  return env;
+}
+
+/** Environment for a server `gh` process, including the GitHub tokens. */
+export function ghEnvironment(explicit?: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  return gitChildEnv(explicit, true);
+}
+
+/** Basename of an executable, without a Windows extension. */
+function toolBase(executable: string) {
+  return executable.split(/[/\\]/).pop()?.toLowerCase().replace(/\.(?:exe|cmd)$/i, "");
+}
+
+/**
+ * Environment of one child. Agents lose the GitHub tokens. git and gh get
+ * an allowlist. Anything else keeps an explicit env, or this process's
+ * environment when the caller passed none.
+ */
+function childEnvironment(executable: string, options: CommandOptions): NodeJS.ProcessEnv {
+  const provider = agentProviderOf(executable);
+  if (provider) return agentChildEnvironment(provider, options.env);
+  const base = toolBase(executable);
+  if (base === "git") return gitChildEnv(options.env, options.network === true);
+  if (base === "gh") return ghEnvironment(options.env);
+  return (
+    options.env ?? {
+      ...process.env,
+      GIT_TERMINAL_PROMPT: "0",
+      GH_PROMPT_DISABLED: "1",
+      NO_COLOR: "1",
+    }
+  );
+}
+
+/** Argv for one server git command: pinned git dir, static `-c`, local driver blanks. */
+export async function serverGitArgs(cwd: string, args: string[]): Promise<string[]> {
+  const gitDir = await runCheckoutGitDir(cwd);
+  return [
+    ...(gitDir ? ["--git-dir", gitDir, "--work-tree", cwd] : []),
+    ...hardenedGitConfig,
+    ...repoDriverOverrides(cwd, gitDir),
+    ...args,
+  ];
 }
 
 export async function git(
@@ -647,21 +761,11 @@ export async function git(
   args: string[],
   options: Omit<CommandOptions, "cwd"> = {},
 ) {
-  const gitDir = await runCheckoutGitDir(cwd);
-  return command(
-    "git",
-    [
-      ...(gitDir ? ["--git-dir", gitDir, "--work-tree", cwd] : []),
-      ...hardenedGitConfig,
-      ...repoDriverOverrides(cwd, gitDir),
-      ...args,
-    ],
-    {
-      ...options,
-      cwd,
-      env: withoutGitDir(options.env),
-    },
-  );
+  return command("git", await serverGitArgs(cwd, args), {
+    ...options,
+    cwd,
+    network: options.network === true,
+  });
 }
 
 /**
@@ -692,7 +796,8 @@ export const gitNetworkConfig = [
 /**
  * A Git command that talks to GitHub: the hardened settings of git(), the
  * network options above, and an environment that never prompts for a
- * password, whatever the caller passes.
+ * password. This is the only git path that receives `GH_TOKEN` and
+ * `GITHUB_TOKEN`, because its credential helper is `gh auth git-credential`.
  */
 export async function gitNetwork(
   cwd: string,
@@ -701,13 +806,7 @@ export async function gitNetwork(
 ) {
   return git(cwd, [...gitNetworkConfig, ...args], {
     ...options,
-    env: {
-      ...(options.env ?? process.env),
-      GIT_TERMINAL_PROMPT: "0",
-      GCM_INTERACTIVE: "never",
-      GH_PROMPT_DISABLED: "1",
-      NO_COLOR: "1",
-    },
+    network: true,
   });
 }
 

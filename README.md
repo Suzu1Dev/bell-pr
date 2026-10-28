@@ -327,6 +327,8 @@ Details: [Privacy and your data](docs/privacy-and-data.md).
   instructions (`AGENTS.md`, `CLAUDE.md`, `.claude/`) are treated as data:
   the CLIs never load the project's own settings, hooks or instructions,
   and a repository whose Git configuration could run programs is refused.
+  Git commands BELL PR itself runs also turn those programs off. Only a
+  git command that talks to GitHub receives `GH_TOKEN`.
   Agents still run the project's code, so import only projects you are
   willing to run on this computer.
 - **No sign-in.** BELL PR does not authenticate anyone. It listens on

@@ -146,7 +146,7 @@ BELL PR 會閱讀專案的貢獻指南、AI 政策、PR 範本、Agent 指南與
 ## 安全模型
 
 - **在沙箱中執行的 Agent。** 會寫程式的 Agent 在各自 CLI 的作業系統沙箱中執行：寫入限制在該工作自己的 worktree，網路也會關閉。沙箱開啟時，兩個 Agent 都無法讀取 GitHub CLI 的設定檔、`~/.git-credentials` 與 credential-store 檔案、`~/.netrc` 與 `~/.ssh/`。系統 keyring 裡的 token 不在保護範圍內：agent 仍可透過 `gh auth token` 讀到你的 GitHub token。主要防線是改用權限最小的 fine-grained token。Claude Code 另外無法讀取自己 checkout 以外的 BELL PR 資料。
-- **匯入的專案不受信任。** 專案的程式碼、文件與 Agent 指示（`AGENTS.md`、`CLAUDE.md`、`.claude/`）都只被當成資料：CLI 不會載入專案自己的設定、hooks 或指示；Git 設定可能執行其他程式的 repository 會被拒絕。Agent 仍會執行專案的程式碼，請只匯入你願意在這台電腦上執行的專案。
+- **匯入的專案不受信任。** 專案的程式碼、文件與 Agent 指示（`AGENTS.md`、`CLAUDE.md`、`.claude/`）都只被當成資料：CLI 不會載入專案自己的設定、hooks 或指示；Git 設定可能執行其他程式的 repository 會被拒絕。BELL PR 自己執行的 git 也會關掉這些程式；只有會連到 GitHub 的 git 才會拿到 `GH_TOKEN`。Agent 仍會執行專案的程式碼，請只匯入你願意在這台電腦上執行的專案。
 - **沒有登入。** BELL PR 不會驗證任何人。能連到它位址的人可以使用它能做的一切，包括以你的 Codex 或 Claude Code 帳戶啟動 Agent，以及以你的 `gh` 登入發佈。預設只在 `127.0.0.1` 上監聽，因此只有這台電腦能連到它。其他網站可以連結到它的頁面，但無法呼叫它的 API，也無法以框架嵌入它。
 - **在沙箱外執行必須明確開啟。** 沒有沙箱時（例如使用預設設定的 Docker），會修改檔案的 Claude Code Agent 會被拒絕。你可以在**設定 → Agent 安全**或用 `BELLPR_ALLOW_UNSANDBOXED_AGENTS=1` 允許；這類 Agent 擁有你完整的使用者權限，用過它的每個工作都會顯示「**未使用沙箱執行**」標記。
 - **由你發佈。** 在你逐檔審閱並核准之前，不會有任何內容送到 GitHub，而且 commit 只包含你審閱過的檔案。

@@ -45,7 +45,13 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   credential-store files, `~/.netrc`, and `~/.ssh/`. `GH_TOKEN` and
   `GITHUB_TOKEN` are removed from the agent process environment even when
   the sandbox is off. Tokens in the system keyring are not covered: the
-  agent can still read a GitHub token via `gh auth token`.
+  agent can still read a GitHub token via `gh auth token`. With the
+  sandbox on, Claude Code also cannot write the checkout's `.git` file,
+  the clone's git hooks or config, or a worktree `config.worktree`.
+- **Server git.** Git commands BELL PR runs itself ignore repository hooks,
+  file monitors, and other config that would run a program. A run checkout
+  whose `.git` file was replaced is refused. `GH_TOKEN` is passed to `gh`
+  and to git only when that git command talks to GitHub.
 - **Premise check.** In Code changes it sits in the diff's top bar instead
   of a row of its own, and opens as an overlay that scrolls and can be
   reached with the keyboard, so the code keeps its height.

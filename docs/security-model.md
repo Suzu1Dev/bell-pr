@@ -70,8 +70,10 @@ Microsoft Foundry); BELL PR never restricts or reads them. Codex receives
 other's keys. `GH_TOKEN` and `GITHUB_TOKEN` are removed from the agent
 child's environment when the process is spawned (`agentChildEnvironment`
 in `server/process.ts`), including when the sandbox is off. Other
-variables passed to that child are left in place. BELL PR's own server
-process still has the tokens for its own GitHub calls.
+variables passed to that child are left in place. BELL PR's own `gh`
+calls and git commands that talk to GitHub (`gitNetwork`) still receive
+the tokens. Every other server git command gets an allowlist
+(`gitChildEnv`) and does not.
 Usage-data opt-outs that you set also pass through, unchanged: `DO_NOT_TRACK`
 to both CLIs, and `DISABLE_TELEMETRY`, `DISABLE_ERROR_REPORTING`,
 `DISABLE_BUG_COMMAND`, `CLAUDE_CODE_DISABLE_FEEDBACK_SURVEY` and
@@ -174,12 +176,19 @@ to both CLIs, and `DISABLE_TELEMETRY`, `DISABLE_ERROR_REPORTING`,
   still has a worktree in your repository; until then its runs, new ones
   included, keep working there. Branches those runs already added stay in
   your repository; delete them yourself if you no longer need them.
-- **Hardened Git.** Every Git command runs with hooks, the file-system
-  monitor and the global attributes file switched off, and with BELL PR's
-  own pager, editor, password prompt and SSH command. Logs never verify
-  commit signatures, which would run a signing program. Fetches,
+- **Hardened Git.** Every server Git command runs with hooks, the
+  file-system monitor and the global attributes file switched off, and
+  with BELL PR's own pager, editor, password prompt and SSH command.
+  `credential.helper` is cleared and, for a command that talks to GitHub,
+  set to `gh auth git-credential` only. Local filter, diff, merge and
+  shell-alias drivers are blanked before the command runs. Logs never
+  verify commit signatures, which would run a signing program. Fetches,
   `ls-remote` and pushes take credentials from the GitHub CLI only, allow
   HTTPS and SSH transports only, never follow submodules and never prompt.
+  Those network commands are the only git children that receive
+  `GH_TOKEN` or `GITHUB_TOKEN`. System git config is not read
+  (`GIT_CONFIG_NOSYSTEM`). Your global `~/.gitconfig` still is, or the
+  file named by `GIT_CONFIG_GLOBAL` when that variable is set.
 - **Repository configuration.** Before a diff is read, a teammate's work is
   integrated or a snapshot taken, a checkout is synced, an agent's moved
   HEAD is put back, or anything is published, BELL PR refuses a repository
@@ -192,9 +201,17 @@ to both CLIs, and `DISABLE_TELEMETRY`, `DISABLE_ERROR_REPORTING`,
   settings above always replace them. Your global and system
   configuration are not checked. A `.gitattributes` file in the project
   can name a driver, but only configuration can define one.
-- **Teammate checkouts.** Before Git runs in a teammate's checkout, its
-  `.git` must be a plain file pointing at `<repository>/worktrees/<name>`,
-  and Git's own record of that worktree must point back at it.
+- **Run checkouts.** Before Git runs in a run or teammate checkout
+  (`<data>/worktrees/<run>` or `<data>/team-worktrees/<run>/<task>`), its
+  `.git` must be a plain file pointing at `<repository>/.git/worktrees/<name>`,
+  and Git's own record of that worktree must point back. A directory in
+  place of that file is refused (`worktreeForged`) before Git starts. The
+  resolved directory is passed as `--git-dir`. With Claude Code's sandbox
+  on, writes to that file, to `<clone>/.git/hooks`, to `<clone>/.git/config`
+  and to the worktree's `config.worktree` are denied. Codex's permission
+  profile cannot deny those writes without also denying reads, so it does
+  not; the checkout check and the hardened git command above are what
+  stop a planted hook or filter.
 - **Paths.** Diff paths that are absolute, contain `..` or `.git`, control
   characters, or the segments `__proto__`, `constructor` or `prototype` are
   refused. Conflict files are read and rewritten only when they are regular
