@@ -6,6 +6,7 @@
  */
 import { z } from "zod";
 import { log } from "./log.js";
+import { redact } from "./secrets.js";
 import { AppError, type Run } from "./types.js";
 import type { AgentTeam } from "../shared/team.js";
 
@@ -118,25 +119,58 @@ function answerProblem(error: unknown): string | undefined {
 }
 
 /**
+ * Issue text for the server log. Credential shapes are masked; the rest of
+ * the sentence stays. A parser's own message must not be passed here: it
+ * quotes the answer (see parseAgentOutput).
+ */
+export function describeIssue(text: string): string {
+  const masked = redact(text)
+    .replace(
+      /\b((?:proxy-)?authorization\b["']?\s*[:=]\s*["']?(?:(?:bearer|basic|token|digest|bot)\s+)?)[^\s"',;]{8,}/gi,
+      "$1[REDACTED]",
+    )
+    .replace(/\b(bearer\s+)[A-Za-z0-9._~+/=-]{16,}/gi, "$1[REDACTED]");
+  return masked.replace(
+    /(^|[^A-Za-z0-9_])([A-Za-z_][A-Za-z0-9_]*)(\s*=\s*["']?)([^\s"',;]+)/g,
+    (match, lead: string, key: string, eq: string) =>
+      /token|secret|key|password/i.test(key)
+        ? `${lead}${key}${eq}[REDACTED]`
+        : match,
+  );
+}
+
+/**
  * Parses an agent's structured answer. When the answer does not fit its
  * schema, logs agent.output_retry with the run id and the schema name (the
- * "format incomplete, retry" path the person then has to retry), and a
- * `problem` when the error carries one (see answerProblem), then rethrows.
+ * "format incomplete, retry" path the person then has to retry). A parse
+ * failure logs describeIssue of the kind (and the answer's byte length when
+ * the caller measured one), never the parser message or the answer. Any
+ * other failure logs describeIssue of its message. Then rethrows.
  */
 export function parseAgentOutput<T>(
   run: Pick<Run, "id">,
   schema: string,
   parse: () => T,
+  logged?: { length?: number },
 ): T {
   try {
     return parse();
   } catch (error) {
     const problem = answerProblem(error);
+    const summary =
+      problem === undefined
+        ? errorMessage(error)
+        : logged?.length === undefined
+          ? problem
+          : `${problem} length=${logged.length}`;
     log.warn("agent.output_retry", {
       runId: run.id,
       schema,
-      reason: errorMessage(error),
-      ...(problem ? { problem } : {}),
+      reason: describeIssue(summary),
+      ...(problem ? { problem: describeIssue(problem) } : {}),
+      ...(problem && logged?.length !== undefined
+        ? { length: logged.length }
+        : {}),
     });
     throw error;
   }

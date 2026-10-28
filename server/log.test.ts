@@ -7,7 +7,7 @@ import { setTimeout as delay } from "node:timers/promises";
 import { z } from "zod";
 import { closeLog, initLog, log, recentLogLines } from "./log.js";
 import { command, git } from "./process.js";
-import { agentSpawn, parseAgentOutput } from "./run-events.js";
+import { agentSpawn, describeIssue, parseAgentOutput } from "./run-events.js";
 import { Store } from "./store.js";
 import { AppError, type Run } from "./types.js";
 import { Workbench } from "./workbench.js";
@@ -368,6 +368,99 @@ test("agent.output_retry names the paths and codes that did not fit, never the v
     ],
   );
   assert.ok(!lines.join("\n").includes(marker), "the answer's value must not be logged");
+});
+
+test("describeIssue masks credential shapes and leaves ordinary text", () => {
+  const samples = [
+    [`ghp_${"FAKE".padEnd(20, "a")}`, "[REDACTED]"],
+    [`gho_${"FAKE".padEnd(20, "b")}`, "[REDACTED]"],
+    [`ghu_${"FAKE".padEnd(20, "c")}`, "[REDACTED]"],
+    [`ghs_${"FAKE".padEnd(20, "d")}`, "[REDACTED]"],
+    [`github_pat_${"FAKE".padEnd(20, "e")}`, "[REDACTED]"],
+    [`sk-${"FAKE".padEnd(20, "f")}`, "[REDACTED]"],
+    [`${"AK" + "IA"}${"FAKE".padEnd(16, "F")}`, "[REDACTED]"],
+    [
+      "Authorization: Bearer FAKEBEARERTOKEN1234",
+      "Authorization: Bearer [REDACTED]",
+    ],
+    ["sent Bearer FAKEBEARERTOKEN1234 later", "sent Bearer [REDACTED] later"],
+    [
+      "https://fakeuser:faketoken@example.invalid/repo",
+      "https://[REDACTED]@example.invalid/repo",
+    ],
+    ["GITHUB_TOKEN=fakeplaintextvalue", "GITHUB_TOKEN=[REDACTED]"],
+    ["API_SECRET=fakeplaintextvalue", "API_SECRET=[REDACTED]"],
+    ["SOME_KEY=fakeplaintextvalue", "SOME_KEY=[REDACTED]"],
+    ["DB_PASSWORD=fakeplaintextvalue", "DB_PASSWORD=[REDACTED]"],
+  ] as const;
+  for (const [input, masked] of samples)
+    assert.equal(describeIssue(`see ${input} now`), `see ${masked} now`, input);
+  const ordinary =
+    "The reading path lists three files. Retry after the repository changes. https://example.invalid/docs token bucket json_syntax length=40";
+  assert.equal(describeIssue(ordinary), ordinary);
+});
+
+test("agent.output_retry redacts an issue and does not log a parser snippet", async (t) => {
+  const { directory, cleanup } = await logDirectory();
+  t.after(cleanup);
+  initLog(directory, { stderr: capture(false).stream });
+  const run = { id: "run-redact" } as Run;
+  const secret = `ghp_${"FAKE".padEnd(20, "a")}`;
+  const phrase = "ordinary-phrase-keep-out";
+  const raw = `${secret} ${phrase}`;
+  assert.throws(() =>
+    parseAgentOutput(
+      run,
+      "syntax",
+      () => {
+        throw new AppError("The answer was incomplete.", 422, {
+          cause: new SyntaxError(
+            `Unexpected token 'g', "${secret.slice(0, 12)}"... is not valid JSON`,
+          ),
+        });
+      },
+      { length: Buffer.byteLength(raw) },
+    ),
+  );
+  assert.throws(() =>
+    parseAgentOutput(run, "citation", () => {
+      throw new AppError(
+        "Cited src/GITHUB_TOKEN=fakeplaintextvalue from the tool output.",
+        422,
+      );
+    }),
+  );
+  const lines = await recentLogLines(directory);
+  const text = lines.join("\n");
+  assert.ok(!text.includes(secret));
+  assert.ok(!text.includes("FAKE"));
+  assert.ok(!text.includes(phrase));
+  assert.ok(!text.includes("fakeplaintextvalue"));
+  const retries = lines
+    .map((line) => JSON.parse(line) as Record<string, unknown>)
+    .filter((entry) => entry.msg === "agent.output_retry");
+  assert.deepEqual(
+    retries.map(({ schema, problem, length, reason }) => ({
+      schema,
+      problem,
+      length,
+      reason,
+    })),
+    [
+      {
+        schema: "syntax",
+        problem: "json_syntax",
+        length: Buffer.byteLength(raw),
+        reason: `json_syntax length=${Buffer.byteLength(raw)}`,
+      },
+      {
+        schema: "citation",
+        problem: undefined,
+        length: undefined,
+        reason: "Cited src/GITHUB_TOKEN=[REDACTED] from the tool output.",
+      },
+    ],
+  );
 });
 
 test("after the Workbench shuts down, the process logs to stderr, not into the data directory it left", async (t) => {

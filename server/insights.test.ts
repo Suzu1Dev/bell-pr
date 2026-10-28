@@ -892,6 +892,68 @@ test("a rejected analysis logs which fields did not fit, never their values", as
   }
 });
 
+test("a malformed analysis answer is logged as kind and length, without the answer or a secret", async () => {
+  const f = await fixture();
+  const secret = `ghp_${"FAKE".padEnd(20, "a")}`;
+  const phrase = "ordinary-phrase-keep-out";
+  const raw = `${secret} ${phrase} GITHUB_TOKEN=fakeplaintextvalue`;
+  initLog(f.store.directory, { stderr: { write: () => true } });
+  try {
+    const service = new ProjectInsightsService(f.store, {
+      getModelCatalog: async () => ({ models: [], source: "codex" }),
+      command: async (_executable, args, options = {}) => {
+        if (args[0] === "exec") {
+          options.onLine?.(
+            JSON.stringify({
+              type: "item.completed",
+              item: { type: "agent_message", text: raw },
+            }),
+            "stdout",
+          );
+        }
+        return { stdout: "", stderr: "", code: 0 };
+      },
+    });
+    await assert.rejects(
+      service.generate(f.repo.id),
+      (error: unknown) => error instanceof AppError && error.statusCode === 422,
+    );
+    const lines = await recentLogLines(f.store.directory);
+    const text = lines.join("\n");
+    assert.ok(!text.includes(secret), "the secret must not be logged");
+    assert.ok(!text.includes("FAKE"), "a fragment of the secret must not be logged");
+    assert.ok(!text.includes(phrase), "the raw answer must not be logged");
+    assert.ok(!text.includes("fakeplaintextvalue"));
+    const retry = lines
+      .map((line) => JSON.parse(line) as Record<string, unknown>)
+      .find((entry) => entry.msg === "agent.output_retry");
+    assert.ok(retry);
+    assert.equal(retry.schema, "analysis");
+    assert.equal(retry.problem, "json_syntax");
+    assert.equal(retry.length, Buffer.byteLength(raw));
+    assert.equal(retry.reason, `json_syntax length=${Buffer.byteLength(raw)}`);
+    const cited = `src/SOME_KEY=fakeplaintextvalue`;
+    const serviceWithPath = new ProjectInsightsService(f.store, {
+      getModelCatalog: async () => ({ models: [], source: "codex" }),
+      command: fakeCodex(() => ({
+        ...validAnalysis(),
+        modules: [{ path: cited, purpose: "組合問候文字" }],
+      })).execute,
+    });
+    await assert.rejects(
+      serviceWithPath.generate(f.repo.id),
+      (error: unknown) => error instanceof AppError && error.statusCode === 422,
+    );
+    const after = (await recentLogLines(f.store.directory)).join("\n");
+    assert.ok(!after.includes("fakeplaintextvalue"));
+    assert.match(after, /SOME_KEY=\[REDACTED\]/);
+    assert.match(after, /modules/);
+  } finally {
+    closeLog();
+    await f.cleanup();
+  }
+});
+
 test("recommendations whose quotes do not match are dropped and reported while the rest of the analysis is saved", async () => {
   const f = await fixture();
   try {

@@ -495,8 +495,9 @@ there, then publish again.
   for that analysis (or for **Generate 5 more**) has a `problem` field. It
   lists the fields that did not fit and the kind of problem, such as
   `recommendations: too_big`, or `json_syntax` when the answer was not JSON.
-  It never contains the answer's text. Analyze again; the previous result is
-  kept.
+  `length` is the answer's size in bytes. The line never contains the
+  answer's text; credential-shaped text in it is masked. Analyze again; the
+  previous result is kept.
 
 <!-- generated:product-link key=supportEmail text="Contact support by e-mail" -->
 <!-- /generated:product-link -->
