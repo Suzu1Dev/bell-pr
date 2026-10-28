@@ -202,8 +202,10 @@ placeholders block it, and a local path, a CI change or a public commit
 e-mail address needs your confirmation. AI assistance is mentioned only if
 the project requires it or you choose to, and publishing waits until a
 disclosure the project requires is there. Publishing pushes a branch (to
-your fork when needed) and opens a **Draft** PR through the GitHub CLI;
-nothing is ever force-pushed.
+your fork when you cannot push to the project: an existing fork is reused,
+including one you renamed or one in an organization you belong to, and a
+fork is created only when you have none) and opens a **Draft** PR through
+the GitHub CLI; nothing is ever force-pushed.
 
 ![The PR draft tab: the pull request title and description editor, with what is left to do before you submit beside it](docs/images/en/run-draft-1280.png)
 

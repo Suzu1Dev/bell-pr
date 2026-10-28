@@ -478,8 +478,11 @@ and safety. When the dialog opens, BELL PR reads the GitHub facts once.
   **couldn't check**. An unknown fact is never counted as a pass.
 
 **Submit Draft PR** reads the GitHub facts again, then pushes the branch
-(to a fork under your account when you cannot push to the project) and
-opens a Draft PR. Nothing is ever force-pushed.
+(to a fork of the project when you cannot push to it: an existing fork is
+reused, including one with another name or one in an organization you
+belong to, and a fork is created only when you have none) and opens a
+Draft PR. A repository you already have under the project's name that is
+not a fork of it is left untouched. Nothing is ever force-pushed.
 
 ## 8. After publishing
 

@@ -7,6 +7,25 @@ const list = (items: readonly string[]) =>
 const followUpAgentCommitted =
   "Agent 自行建立了 commit 或切換了分支；已還原到已推送的 PR，修改保留在工作目錄供你審閱。";
 
+function forkLookupDetail(reason: string) {
+  switch (reason) {
+    case "rate-limited":
+      return "GitHub 要求的次數已達上限";
+    case "not-ready":
+      return "新的 fork 尚未就緒";
+    case "unconfirmed":
+      return "無法確認是否已有 fork";
+    case "invalid-response":
+      return "GitHub 回傳了無法讀取的內容";
+    case "timeout":
+      return "GitHub 未在時間內回應";
+    default:
+      return reason.startsWith("HTTP ")
+        ? `GitHub 回傳 ${reason}`
+        : "GitHub 回傳錯誤";
+  }
+}
+
 const m: Translation<typeof en> = {
   unsandboxedNotice:
     "這個 Claude Agent 未在作業系統沙箱中執行，因為已允許不使用沙箱的 Claude Agent（在設定中，或以 BELLPR_ALLOW_UNSANDBOXED_AGENTS=1 啟動）。",
@@ -456,6 +475,8 @@ const m: Translation<typeof en> = {
     priorMessageDiffers:
       "先前發佈的提交已帶有不同的提交訊息，推送後無法更改。請還原提交訊息，或建立新工作。",
     notAFork: "同名 Repository 不是目標專案的 fork，請先處理 GitHub fork。",
+    forkLookupFailed: ({ reason }) =>
+      `無法查詢這個專案的 fork（${forkLookupDetail(reason)}）。沒有推送任何內容。`,
     noPrUrl: "GitHub 未回傳 PR URL，請先到 GitHub 確認，避免重複發佈。",
     prCreated: "已建立 GitHub Draft PR。",
     failed: "發佈失敗。",

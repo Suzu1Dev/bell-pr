@@ -53,6 +53,7 @@ import type {
   GuardOverride,
 } from "../shared/contribution.js";
 import { explainPrCreateFailure, refreshRunFacts } from "./contribution-facts.js";
+import { graphqlArgs } from "./issue-check.js";
 
 const now = () => new Date().toISOString();
 
@@ -628,32 +629,13 @@ export async function publish(
 
       let headRepository = repo.fullName;
       let headOwner = repo.owner;
-      if (
-        !["ADMIN", "MAINTAIN", "WRITE"].includes(metadata.viewerPermission)
-      ) {
-        await command(
-          "gh",
-          ["repo", "fork", repo.fullName, "--clone=false", "--remote=false"],
-          { timeoutMs: 120_000 },
-        );
-        headRepository = `${githubUser}/${repo.name}`;
-        const fork = json<{ parent?: { nameWithOwner: string } }>(
-          (
-            await command("gh", [
-              "repo",
-              "view",
-              headRepository,
-              "--json",
-              "parent",
-            ])
-          ).stdout,
-        );
-        if (
-          fork.parent?.nameWithOwner.toLowerCase() !==
-          repo.fullName.toLowerCase()
-        )
-          throw new AppError((m) => m.run.publish.notAFork, 409);
-        headOwner = githubUser;
+      // No push access: reuse a fork of the parent (any name, including one
+      // an organization this person belongs to owns) or create one. A
+      // same-named repository that is not that fork is never pushed to.
+      if (!["ADMIN", "MAINTAIN", "WRITE"].includes(metadata.viewerPermission)) {
+        const fork = await forkToPublish(repo.fullName, githubUser);
+        headRepository = fork.fullName;
+        headOwner = fork.owner;
       }
       assertGitHubRepository(headRepository);
       run.headRepository = headRepository;
@@ -987,6 +969,293 @@ async function openPrUrl(
       pr.headRefOid === commit &&
       pr.headRepositoryOwner?.login.toLowerCase() === headOwner.toLowerCase(),
   )?.url;
+}
+
+/**
+ * Forks of the parent that the signed-in user owns or that an organization
+ * they belong to owns. One page: a user has a single fork, and an
+ * organization membership is a short list. `nameWithOwner` is not used;
+ * the parent is this repository, and each fork is named by owner and name.
+ */
+const forkQuery = `query BellForks($owner: String!, $name: String!) {
+  repository(owner: $owner, name: $name) {
+    forks(first: 100, ownerAffiliations: [OWNER, ORGANIZATION_MEMBER]) {
+      nodes {
+        name
+        owner { login }
+        viewerPermission
+        parent { name owner { login } }
+      }
+      pageInfo { hasNextPage }
+    }
+  }
+}`;
+
+const forkReadyAttempts = 15;
+const forkReadyDelayMs = 200;
+const pushLevels = new Set(["ADMIN", "MAINTAIN", "WRITE"]);
+
+interface ForkTarget {
+  fullName: string;
+  owner: string;
+}
+
+interface ForkNode {
+  name?: unknown;
+  full_name?: unknown;
+  owner?: { login?: unknown };
+  viewerPermission?: unknown;
+  permissions?: { push?: unknown };
+  parent?: {
+    name?: unknown;
+    full_name?: unknown;
+    owner?: { login?: unknown };
+  } | null;
+}
+
+function forkLookupError(reason: string) {
+  return new AppError((m) => m.run.publish.forkLookupFailed({ reason }), 502);
+}
+
+function parentFullNameOf(node: ForkNode) {
+  const login = node.parent?.owner?.login;
+  const name = node.parent?.name;
+  if (typeof login === "string" && typeof name === "string")
+    return `${login}/${name}`;
+  return typeof node.parent?.full_name === "string"
+    ? node.parent.full_name
+    : undefined;
+}
+
+/** A repository id GitHub would accept, or nothing when the fields are not one. */
+function repositoryId(owner: string, name: string): ForkTarget | undefined {
+  const fullName = `${owner}/${name}`;
+  if (parseGitHubSource(`https://github.com/${fullName}`)?.fullName !== fullName)
+    return undefined;
+  return { fullName, owner };
+}
+
+/**
+ * A fork from the parent's fork list. A listed node with no parent object
+ * still belongs to that list. A node whose parent is a different repository
+ * is ignored. A listed fork this person cannot push to is `blocked`, so a
+ * second fork is not created.
+ */
+function listedFork(
+  node: ForkNode,
+  parentFullName: string,
+): ForkTarget | "blocked" | undefined {
+  if (typeof node.owner?.login !== "string" || typeof node.name !== "string")
+    return undefined;
+  const parent = parentFullNameOf(node);
+  if (parent && parent.toLowerCase() !== parentFullName.toLowerCase())
+    return undefined;
+  const id = repositoryId(node.owner.login, node.name);
+  if (!id) return "blocked";
+  if (!pushLevels.has(String(node.viewerPermission ?? ""))) return "blocked";
+  return id;
+}
+
+interface GitHubApiResult {
+  ok: boolean;
+  status: number;
+  rateLimited: boolean;
+  json: unknown;
+}
+
+/** `gh api` for the fork lookup. Exit 1 is a GitHub HTTP error, not a crash. */
+async function githubApi(args: string[], timeoutMs = 20_000): Promise<GitHubApiResult> {
+  let result: { stdout: string; stderr: string; code: number };
+  try {
+    result = await command("gh", ["api", ...args], {
+      timeoutMs,
+      allowedCodes: [0, 1],
+    });
+  } catch (error) {
+    const stderr = String(
+      error instanceof AppError ? (error.details?.stderr ?? error.message) : "",
+    );
+    if (/rate limit|HTTP 429|RATE_LIMITED/i.test(stderr))
+      throw forkLookupError("rate-limited");
+    if (error instanceof AppError && error.statusCode === 504)
+      throw forkLookupError("timeout");
+    const status = /HTTP (\d+)/.exec(stderr)?.[1];
+    throw forkLookupError(status ? `HTTP ${status}` : "GitHub error");
+  }
+  const text = `${result.stderr}\n${result.stdout}`;
+  if (result.code !== 0) {
+    if (/rate limit|HTTP 429|RATE_LIMITED/i.test(text))
+      return { ok: false, status: 429, rateLimited: true, json: null };
+    const status = Number(/HTTP (\d+)/.exec(text)?.[1] ?? 0);
+    if (status) return { ok: false, status, rateLimited: false, json: null };
+    if (/Not Found/i.test(text))
+      return { ok: false, status: 404, rateLimited: false, json: null };
+    if (/Forbidden/i.test(text))
+      return { ok: false, status: 403, rateLimited: false, json: null };
+    return { ok: false, status: 0, rateLimited: false, json: null };
+  }
+  let json: unknown;
+  try {
+    json = result.stdout.trim() ? JSON.parse(result.stdout) : null;
+  } catch {
+    throw forkLookupError("invalid-response");
+  }
+  const errors = (json as { errors?: { type?: unknown; message?: unknown }[] } | null)
+    ?.errors;
+  if (Array.isArray(errors) && errors.length) {
+    const type = String(errors[0]?.type ?? "");
+    const message = String(errors[0]?.message ?? "");
+    if (type === "RATE_LIMITED" || /rate limit/i.test(message))
+      throw forkLookupError("rate-limited");
+    if (type === "NOT_FOUND") throw forkLookupError("HTTP 404");
+    if (type === "FORBIDDEN") throw forkLookupError("HTTP 403");
+    throw forkLookupError("GitHub error");
+  }
+  return { ok: true, status: 200, rateLimited: false, json };
+}
+
+function githubFailure(result: GitHubApiResult) {
+  if (result.rateLimited) return forkLookupError("rate-limited");
+  if (result.status === 403) return forkLookupError("HTTP 403");
+  if (result.status === 404) return forkLookupError("HTTP 404");
+  return forkLookupError(result.status ? `HTTP ${result.status}` : "GitHub error");
+}
+
+/**
+ * How `GET repos/{user}/{name}` relates to the parent. A missing parent
+ * means the repository is not a fork of it (or the fork is not ready yet,
+ * which the caller tells apart by the request).
+ */
+function readForkRepo(
+  body: unknown,
+  parentFullName: string,
+): ForkTarget | "again" | "conflict" {
+  if (!body || typeof body !== "object") return "again";
+  const repo = body as ForkNode;
+  const owner = typeof repo.owner?.login === "string" ? repo.owner.login : undefined;
+  const named = typeof repo.name === "string" ? repo.name : undefined;
+  const fullName = typeof repo.full_name === "string" ? repo.full_name : undefined;
+  const name = named ?? fullName?.split("/")[1];
+  if (!owner || !name) return "again";
+  const parent = parentFullNameOf(repo);
+  if (!parent) return "again";
+  if (parent.toLowerCase() !== parentFullName.toLowerCase()) return "conflict";
+  const id = repositoryId(owner, name);
+  if (!id || (fullName !== undefined && fullName !== id.fullName)) return "conflict";
+  if (repo.permissions && repo.permissions.push !== true)
+    throw forkLookupError("HTTP 403");
+  return id;
+}
+
+async function lookupSameName(
+  parentFullName: string,
+  user: string,
+  repoName: string,
+): Promise<ForkTarget | "missing" | "conflict"> {
+  const result = await githubApi([
+    "--hostname",
+    "github.com",
+    "--method",
+    "GET",
+    `repos/${user}/${repoName}`,
+  ]);
+  if (!result.ok) {
+    if (result.status === 404) return "missing";
+    throw githubFailure(result);
+  }
+  const read = readForkRepo(result.json, parentFullName);
+  if (read === "again") return "conflict";
+  return read;
+}
+
+/** Creates `{user}/{repoName}` and waits until GitHub serves it as this parent's fork. */
+async function createFork(parentFullName: string, user: string, repoName: string) {
+  const created = await githubApi(
+    ["--hostname", "github.com", "--method", "POST", `repos/${parentFullName}/forks`],
+    120_000,
+  );
+  if (!created.ok) throw githubFailure(created);
+  const fromCreate = readForkRepo(created.json, parentFullName);
+  const target =
+    fromCreate && fromCreate !== "again" && fromCreate !== "conflict"
+      ? fromCreate
+      : repositoryId(user, repoName);
+  if (!target) throw new AppError((m) => m.security.invalidRemote, 409);
+  for (let attempt = 1; attempt <= forkReadyAttempts; attempt++) {
+    const ready = await githubApi([
+      "--hostname",
+      "github.com",
+      "--method",
+      "GET",
+      `repos/${target.owner}/${target.fullName.split("/")[1]}`,
+    ]);
+    if (!ready.ok) {
+      if (ready.status !== 404) throw githubFailure(ready);
+    } else {
+      const read = readForkRepo(ready.json, parentFullName);
+      if (read === "conflict")
+        throw new AppError((m) => m.run.publish.notAFork, 409);
+      if (read !== "again") return read;
+    }
+    if (attempt < forkReadyAttempts)
+      await new Promise((resolve) => setTimeout(resolve, forkReadyDelayMs));
+  }
+  throw forkLookupError("not-ready");
+}
+
+/**
+ * Where to push when `user` cannot push to `parentFullName`. An existing
+ * fork of that parent is reused, including one with another name and one
+ * owned by an organization the user belongs to. A same-named repository
+ * that is not a fork of the parent is a conflict: nothing is created and
+ * nothing is pushed there.
+ */
+async function forkToPublish(parentFullName: string, user: string): Promise<ForkTarget> {
+  const parent = parseGitHubSource(`https://github.com/${parentFullName}`);
+  if (!parent || parent.fullName !== parentFullName)
+    throw new AppError((m) => m.security.invalidRemote, 409);
+  const listed = await githubApi([
+    "--hostname",
+    "github.com",
+    ...graphqlArgs(forkQuery, { owner: parent.owner, name: parent.name }),
+  ]);
+  if (!listed.ok) throw githubFailure(listed);
+  const repository = (
+    listed.json as {
+      data?: {
+        repository?: {
+          forks?: { nodes?: unknown; pageInfo?: { hasNextPage?: unknown } };
+        } | null;
+      };
+    } | null
+  )?.data?.repository;
+  if (!repository) throw forkLookupError("HTTP 404");
+  const nodes = Array.isArray(repository.forks?.nodes) ? repository.forks.nodes : [];
+  const parsed = nodes.map((node) =>
+    node && typeof node === "object"
+      ? listedFork(node as ForkNode, parent.fullName)
+      : undefined,
+  );
+  const forks = parsed.filter(
+    (fork): fork is ForkTarget => !!fork && fork !== "blocked",
+  );
+  const personal = forks.filter(
+    (fork) => fork.owner.toLowerCase() === user.toLowerCase(),
+  );
+  const exact = personal.find(
+    (fork) => fork.fullName.toLowerCase() === `${user}/${parent.name}`.toLowerCase(),
+  );
+  const chosen = exact ?? personal[0] ?? forks[0];
+  if (chosen) return chosen;
+  if (parsed.includes("blocked")) throw forkLookupError("HTTP 403");
+  // ponytail: one page of affiliated forks. If another page exists and none
+  // matched, refuse rather than create a second fork.
+  if (repository.forks?.pageInfo?.hasNextPage === true)
+    throw forkLookupError("unconfirmed");
+  const same = await lookupSameName(parent.fullName, user, parent.name);
+  if (same === "missing") return createFork(parent.fullName, user, parent.name);
+  if (same === "conflict") throw new AppError((m) => m.run.publish.notAFork, 409);
+  return same;
 }
 
 /**

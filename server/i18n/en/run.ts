@@ -10,6 +10,26 @@ const list = (items: readonly string[]) => fmt.list(items, { type: "unit" });
 const followUpAgentCommitted =
   "The agent made its own commit or switched branches; the branch is back on the pushed PR, and the edits stay in the working directory for your review.";
 
+/** Words for a fork-lookup failure code. The code itself is not shown. */
+function forkLookupDetail(reason: string) {
+  switch (reason) {
+    case "rate-limited":
+      return "GitHub rate-limited the request";
+    case "not-ready":
+      return "the new fork was not ready";
+    case "unconfirmed":
+      return "an existing fork could not be ruled out";
+    case "invalid-response":
+      return "GitHub returned an unreadable response";
+    case "timeout":
+      return "GitHub did not answer in time";
+    default:
+      return reason.startsWith("HTTP ")
+        ? `GitHub returned ${reason}`
+        : "GitHub returned an error";
+  }
+}
+
 /** Run pipeline messages: run logs, agent details and run errors. */
 export default {
   /** Logged once on a run whose Claude agent ran without the OS sandbox. */
@@ -740,6 +760,9 @@ export default {
       "The commit of an earlier publish has a different commit message, which cannot change after a push. Restore the commit message or start a new run.",
     notAFork:
       "Your repository with this name is not a fork of the target project; sort out the GitHub fork first.",
+    /** `reason` is a short code from the fork lookup, not GitHub's raw body. */
+    forkLookupFailed: ({ reason }: { reason: string }) =>
+      `Could not look up a fork of this project (${forkLookupDetail(reason)}). Nothing was pushed.`,
     noPrUrl:
       "GitHub returned no PR URL; check on GitHub first so the PR is not published twice.",
     prCreated: "Created the GitHub draft PR.",

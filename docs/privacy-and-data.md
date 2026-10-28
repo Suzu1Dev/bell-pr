@@ -49,8 +49,8 @@ Do not import a project if your AI provider must not see its code.
 clones and fetches the projects you import, reads their issues,
 contribution guides and templates, searches GitHub when you run
 discovery, and reads review comments and check results when you ask for
-maintainer feedback. It writes only after you approve: it creates a fork
-when needed, pushes a branch and opens a Draft PR with the title,
+maintainer feedback. It writes only after you approve: it reuses or creates
+a fork when needed, pushes a branch and opens a Draft PR with the title,
 description and commit you approved. Commits carry the Git name and e-mail
 address you configured and become public; BELL PR asks once before it
 publishes an address that is not a GitHub no-reply address.
