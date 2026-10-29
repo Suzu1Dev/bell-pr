@@ -263,7 +263,14 @@ test(
         while (!existsSync(argvFile) && Date.now() < deadline)
           await new Promise((resolve) => setTimeout(resolve, 25));
         const argv = readFileSync(argvFile, "utf8").trimEnd().split("\n");
-        assert.deepEqual(argv, [signedUrl(dataDir, running.url)]);
+        // Opener argv is only a private file:// redirect; the token stays in that file.
+        assert.equal(argv.length, 1);
+        assert.match(argv[0], /^file:\/\//);
+        assert.equal(argv[0].includes("bell_token"), false);
+        assert.equal(argv.join("\n").includes(signedUrl(dataDir, running.url)), false);
+        const handoff = readFileSync(new URL(argv[0]), "utf8");
+        assert.match(handoff, /location\.replace\(/);
+        assert.ok(handoff.includes(JSON.stringify(signedUrl(dataDir, running.url)).replaceAll("<", "\\u003c")));
         assert.ok(printed.includes(`→ ${running.url}\n`), printed);
         assert.equal(printed.includes("bell_token"), false);
       } finally {
