@@ -231,7 +231,7 @@ The sudo panel and the doctor warning for that file show:
   whose URL contains userinfo is not used as a GitHub source: the project is
   imported as a local one. The message includes
   `git remote set-url origin https://github.com/OWNER/REPO`, and says to use
-  a credential helper for authentication and not to put tokens in
+  a credential helper for authentication and not to put a GitHub token in
   `.git/config`. That message never
   includes the address that was refused. Otherwise the clone keeps no remote and runs
   start from its own branches. A project that an earlier version imported in place
