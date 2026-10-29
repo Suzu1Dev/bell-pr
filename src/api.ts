@@ -103,6 +103,9 @@ function errorFromBody(status: number, body: unknown) {
 
 const plainTextType = /^text\/(?!html\b)/i;
 const apiTokenStorageKey = "bellpr-api-token";
+// Raw paired-device credential; install credentials remain tab-scoped.
+export const deviceTokenStorageKey = "bellpr-device-token";
+export const deviceInfoStorageKey = "bellpr-device-info";
 const apiTokenPattern = /^[0-9a-f]{64}$/i;
 
 function decodePart(value: string) {
@@ -121,16 +124,18 @@ function browserSession(): Storage | undefined {
   }
 }
 
-/** The token the page stored, if `bell-pr open` handed it one. */
+/** Install credentials take precedence over this browser's paired credential. */
 export function currentApiToken(): string | undefined {
   try {
-    return browserSession()?.getItem(apiTokenStorageKey) ?? undefined;
-  } catch {
-    return undefined;
-  }
+    const install = browserSession()?.getItem(apiTokenStorageKey);
+    if (install) return install;
+  } catch { /* Try device storage even if tab storage is blocked. */ }
+  try {
+    return localStorage.getItem(deviceTokenStorageKey) ?? undefined;
+  } catch { return undefined; }
 }
 
-/** Remove the old page-readable credential after exchanging it for a cookie. */
+/** Remove the tab-scoped install credential. */
 export function clearApiToken(): void {
   try {
     browserSession()?.removeItem(apiTokenStorageKey);
@@ -298,7 +303,17 @@ export async function api<T>(
     throw unreachable(response.status, error);
   }
   if (!response.ok) {
-    if (response.status === 401) clearApiToken();
+    const presented = headers.get("Authorization")?.replace(/^Bearer /i, "") ?? headers.get("X-Bell-Token");
+    if (response.status === 401 && token && presented === token) {
+      if (token.startsWith("bpd_")) {
+        try {
+          if (localStorage.getItem(deviceTokenStorageKey) === token)
+            localStorage.removeItem(deviceTokenStorageKey);
+        } catch { /* Storage may be unavailable. */ }
+        if (typeof window !== "undefined" && window.location.pathname !== "/pair")
+          window.location.replace("/pair");
+      } else clearApiToken();
+    }
     throw errorFromBody(response.status, body);
   }
   return body as T;

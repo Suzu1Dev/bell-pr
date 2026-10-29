@@ -496,3 +496,24 @@ test("an explicit CLI login exchanges credentials under the same browser-session
   assert.equal(calls[0].headers.get("Authorization"), `Bearer ${"ab".repeat(32)}`);
   assert.equal(calls[2].headers.get("Authorization"), null);
 });
+
+test("install token wins over device token and 401 removes only the presented credential", async (t) => {
+  const tab = tokenWindow("http://localhost/#bell_token=" + "a".repeat(64));
+  const device = tokenWindow("http://localhost/").session;
+  const oldSession = globalThis.sessionStorage;
+  const oldLocal = globalThis.localStorage;
+  globalThis.sessionStorage = tab.session;
+  globalThis.localStorage = device;
+  t.after(() => { globalThis.sessionStorage = oldSession; globalThis.localStorage = oldLocal; });
+  device.setItem("bellpr-device-token", "bpd_" + "0".repeat(64));
+  adoptApiToken(tab.win);
+  await api("/devices");
+  assert.equal(calls.at(-1)?.headers.get("Authorization"), "Bearer " + "a".repeat(64));
+  respond = () => json(401, { error: "invalid" });
+  await assert.rejects(api("/devices"));
+  assert.equal(tab.session.getItem("bellpr-api-token"), null);
+  assert.ok(device.getItem("bellpr-device-token"));
+  await assert.rejects(api("/devices"));
+  assert.equal(calls.at(-1)?.headers.get("Authorization"), "Bearer bpd_" + "0".repeat(64));
+  assert.equal(device.getItem("bellpr-device-token"), null);
+});
