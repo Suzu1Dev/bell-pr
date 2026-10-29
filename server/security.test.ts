@@ -307,8 +307,9 @@ test("a local import is cloned, so runs never add worktrees or branches to the p
   assert.equal(cloned.url, "https://github.com/test-owner/example");
   assert.equal(cloned.fullName, "test-owner/example");
   assert.equal(workbench.managedClone(cloned), true);
+  // The URL stored on the clone. `remote get-url` applies insteadOf.
   assert.equal(
-    (await git(cloned.path, ["remote", "get-url", "origin"])).stdout.trim(),
+    (await git(cloned.path, ["config", "--local", "--get", "remote.origin.url"])).stdout.trim(),
     "https://github.com/test-owner/example.git",
   );
   assert.deepEqual(await repositoryState(github), githubBefore);
@@ -326,6 +327,37 @@ test("a local import is cloned, so runs never add worktrees or branches to the p
     url: "",
   });
   assert.equal((await workbench.importRepository(legacy)).id, "legacy");
+});
+
+test("a global insteadOf rewrite does not hide a GitHub origin on a local import", async (t) => {
+  const directory = await realpath(await mkdtemp(path.join(os.tmpdir(), "bell-security-insteadof-")));
+  const global = path.join(directory, "global.gitconfig");
+  await writeFile(
+    global,
+    '[url "https://user:password@github.com/"]\n\tinsteadOf = https://github.com/\n',
+  );
+  const previous = process.env.GIT_CONFIG_GLOBAL;
+  process.env.GIT_CONFIG_GLOBAL = global;
+  const store = new Store(path.join(directory, "state"));
+  await store.initialize();
+  const workbench = new Workbench(store);
+  t.after(async () => {
+    if (previous === undefined) delete process.env.GIT_CONFIG_GLOBAL;
+    else process.env.GIT_CONFIG_GLOBAL = previous;
+    await workbench.shutdown();
+    await rm(directory, { recursive: true, force: true });
+  });
+  const checkout = path.join(directory, "checkout");
+  await repository(checkout, { "lib.ts": "lib\n" });
+  await git(checkout, ["remote", "add", "origin", "https://github.com/test-owner/example.git"]);
+  const repo = await workbench.importRepository(checkout);
+  assert.equal(repo.url, "https://github.com/test-owner/example");
+  assert.equal(repo.fullName, "test-owner/example");
+  assert.equal(workbench.managedClone(repo), true);
+  assert.equal(
+    (await git(repo.path, ["config", "--local", "--get", "remote.origin.url"])).stdout.trim(),
+    "https://github.com/test-owner/example.git",
+  );
 });
 
 test("a project an earlier build worked on in place moves to a clone once none of its runs works there", async (t) => {

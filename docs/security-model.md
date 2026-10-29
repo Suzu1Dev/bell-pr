@@ -218,8 +218,9 @@ The sudo panel and the doctor warning for that file show:
   local checkout is cloned there as well (`--no-hardlinks`, no submodules):
   runs never add worktrees or branches to your own repository. If the
   checkout's origin is on GitHub, BELL PR's clone points at GitHub and runs
-  fetch from there; otherwise the clone keeps no remote and runs start from
-  its own branches. A project that an earlier version imported in place
+  fetch from there. That origin is the URL saved in the checkout, so a global
+  `url.*.insteadOf` rewrite does not change which project it is. Otherwise the
+  clone keeps no remote and runs start from its own branches. A project that an earlier version imported in place
   moves to such a clone when its next run starts, once none of its runs
   still has a worktree in your repository; until then its runs, new ones
   included, keep working there. Branches those runs already added stay in

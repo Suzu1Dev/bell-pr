@@ -334,8 +334,12 @@ export async function importRepository(
       if (isBare === "true") throw new AppError((m) => m.run.repos.bare);
       await git(checkout, ["rev-parse", "--verify", "HEAD"]);
       try {
+        // The URL saved in the checkout. `remote get-url` applies
+        // `url.<base>.insteadOf`, so a global rewrite would hide a GitHub origin.
         remote = parseGitHubSource(
-          (await git(checkout, ["remote", "get-url", "origin"])).stdout.trim(),
+          (
+            await git(checkout, ["config", "--local", "--get", "remote.origin.url"])
+          ).stdout.trim(),
         );
       } catch {
         /* A local-only repository may have no origin. */
