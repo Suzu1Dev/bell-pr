@@ -24,15 +24,13 @@ the settings in the app.
 ## Commands
 
 `bell-pr` and `bellpr` are the same command. Started with `npx`, write
-`npx bell-pr` instead of `bell-pr` after a release containing the CLI is
-published. The current npm `0.0.2` is only a placeholder. From the
-[source build](getting-started.md#start-bell-pr), use `node bin/bellpr.mjs` instead.
+`npx bell-pr` instead of `bell-pr`.
 
 | Command | What it does |
 | --- | --- |
-| `bell-pr` or `bell-pr start` | Opens the instance already running with the same data directory, or starts one. A new server exits 1 before listening when a required doctor check fails; `--force` starts anyway. Interactive SSH or headless terminals print an authorized link; service output keeps it private |
+| `bell-pr` or `bell-pr start` | Starts BELL PR and prints its address. Exits 1 before listening when a required doctor check fails; `--force` starts anyway |
 | `bell-pr open` | Prints the address of the running BELL PR without the API token, and opens the browser with the token. `--print` only prints that address. `--print-token` includes the token in the printed address |
-| `bell-pr token rotate` | Replaces `<data dir>/api-token` and immediately invalidates every browser session and old token URL. API clients must use the new token. No restart is needed; the new token is not printed |
+| `bell-pr token rotate` | Replaces `<data dir>/api-token`. A running BELL PR uses the new token on the next request. The new token is not printed |
 | `bell-pr doctor` | Checks Node.js, Git, the GitHub CLI, the agent CLIs, the sandbox and the data directory; `--json` for scripts. The report does not include the API token |
 | `bell-pr version` | Shows the version, its release date, Node.js, the platform and the data directory |
 | `bell-pr help` | Lists the commands and options |
@@ -48,11 +46,8 @@ Options of `bell-pr start`:
 | `--force` | | off. Start even when `bell-pr doctor` reports Not ready |
 | `--env-file <file>` | | none |
 
-An ordinary `bell-pr start` first reopens a live instance for the same data
-directory, before checking doctor readiness. Explicit `--no-open`, CI and
-development starts keep duplicate-instance protection. When a new server
-is needed, `start` runs the same required checks as `bell-pr doctor` and
-exits with status 1 before listening if one fails. The message is the doctor's
+`bell-pr start` runs the same required checks as `bell-pr doctor` and exits
+with status 1 before it listens when one fails. The message is the doctor's
 checklist (each failed check and the command that fixes it) plus how to
 start anyway. `--force` skips that gate and prints a warning. The sample
 tour needs no AI provider, so `bell-pr start --force` is how you open it
@@ -136,8 +131,8 @@ BELL PR serves the web interface and the API on one port, 4311 by default, on
 `127.0.0.1`. Two BELL PR servers on one computer, for example one from `npx`
 and one in Docker, need different ports. Keep the default `127.0.0.1` unless
 you mean to listen elsewhere: `--host` and `BELLPR_HOST` are explicit, and
-BELL PR prints a warning for an address that is not loopback. Browser sessions
-or an API token are still required (see [Self-hosting](self-hosting.md)).
+BELL PR prints a warning for an address that is not loopback. The API token
+is still required (see [Self-hosting](self-hosting.md)).
 
 ## Logs
 
@@ -146,3 +141,7 @@ The server writes one log file per day to `<data dir>/logs/`
 and 50 MB, and redacts secrets. Prompts and page contents are never
 logged. In a terminal it also prints every entry in a readable form; under
 a service manager or in a container it prints warnings and errors only.
+
+Interactive SSH and headless starts print only the instruction
+`bell-pr open --print --print-token`; run it explicitly to obtain a private
+authorized URL. Desktop launches use a temporary private `file://` redirect.

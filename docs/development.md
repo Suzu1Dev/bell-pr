@@ -72,13 +72,10 @@ only the API answers. It prints its address as an installed BELL PR does.
 sample tour from a checkout that has no AI provider signed in, run
 `npm start -- --force`.
 
-To launch the built checkout and open the browser, run `node bin/bellpr.mjs`.
-Running it again reopens the instance for the same data directory; in an
-interactive headless terminal it prints an authorized link. `build/` and
-`dist/` exist only after `npm run build`. Without them the command says that
-BELL PR is not built yet; run `npm ci` and `npm run build` first. The npm
-`0.0.2` placeholder has no CLI and does not install this checkout.
-`node_modules` is
+In a source checkout, `npx bell-pr` and `bell-pr` run the checkout's own
+`bin/bellpr.mjs`, not the package from npm, and `build/` and `dist/` exist
+only after `npm run build`. Without them the command says that BELL PR is
+not built yet; run `npm ci` and `npm run build` first. `node_modules` is
 never committed: it is ignored, also when it is a symbolic link.
 
 Agents need the real CLIs (`codex` or `claude`, and `gh`). For checks that
@@ -259,3 +256,7 @@ product.
   [Code of Conduct](../CODE_OF_CONDUCT.md).
 - `vendor/ponytail/README.md`: the pinned Ponytail rules behind the
   efficiency modes, with their license.
+
+Interactive SSH and headless starts print only the instruction
+`bell-pr open --print --print-token`; run it explicitly to obtain a private
+authorized URL. Desktop launches use a temporary private `file://` redirect.

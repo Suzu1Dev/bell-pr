@@ -637,3 +637,7 @@ finish, it leaves the contribution unchanged.
 
 Next: [Configuration](configuration.md), [Troubleshooting](troubleshooting.md)
 and [FAQ](faq.md).
+
+Interactive SSH and headless starts print only the instruction
+`bell-pr open --print --print-token`; run it explicitly to obtain a private
+authorized URL. Desktop launches use a temporary private `file://` redirect.

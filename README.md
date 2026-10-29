@@ -76,23 +76,16 @@ Supported today: **macOS**, **Linux**. **Windows via WSL2 (untested):** install
 everything above inside your WSL distribution.
 
 When `bell-pr doctor` reports every required check green, continue.
-Starting a new server exits before it listens until then. With no AI provider
+`bell-pr start` exits before it listens until then. With no AI provider
 signed in, `bell-pr start --force` still opens BELL PR so you can take the
 sample tour; agent runs and publishing wait until a provider is ready.
 
 ## Quickstart
 
-**This branch has not been published to npm.** The current npm `bell-pr`
-version, `0.0.2`, is a placeholder without a CLI; installing it does not
-provide the `bell-pr` command. Use the source build below.
-
-1. Clone or download this repository, then run these commands in its root
-   directory with Node.js **22.13 or later**:
+1. Start BELL PR:
 
    ```sh
-   npm ci
-   npm run build
-   node bin/bellpr.mjs
+   npx bell-pr
    ```
 
 2. It prints its address and opens BELL PR in your browser:
@@ -107,20 +100,17 @@ provide the `bell-pr` command. Use the source build below.
 4. Take the sample tour, import a repository, or find a project to
    contribute to.
 
-In this checkout, use `node bin/bellpr.mjs` wherever the documentation says
-`bell-pr`. A new server starts only when `bell-pr doctor` is ready;
-`node bin/bellpr.mjs start --force` opens the sample tour anyway.
+`npx bell-pr` is `bell-pr start`. It listens only when `bell-pr doctor` is
+ready; otherwise it exits and prints the fix for each failed check. `npx
+bell-pr start --force` opens the sample tour anyway.
 
-**To reopen BELL PR, run the same command again.** It opens the instance
-already running with the same data directory. In an interactive SSH or
-headless terminal, it prints an authorized link you can open directly.
-Keep that link private. No separate login or `open` command is needed.
+**Lost the address? Run `bell-pr open`** (or `npx bell-pr open` if you
+started with `npx`). It prints the address again, without the API token,
+and opens it. The browser receives the token.
 
-After a release containing the CLI is published to npm, `npx bell-pr` will
-start it without a permanent install, or `npm install -g bell-pr` will make
-the `bell-pr` command available. Those commands do not install this branch
-today. The [getting started guide](docs/getting-started.md) walks through a
-whole contribution.
+To keep BELL PR installed, run `npm install -g bell-pr`, then start it with
+`bell-pr`. The [getting started guide](docs/getting-started.md) walks
+through a whole contribution.
 
 ## Requirements
 
@@ -146,7 +136,7 @@ problem. See [Before you start](#before-you-start).
 
 **With no AI provider installed or signed in:** `bell-pr doctor` exits
 non-zero and marks the required **AI provider** check failed. `bell-pr
-start` then exits non-zero before starting a new server, and prints that checklist
+start` then exits non-zero before it listens, and prints that checklist
 with the command that fixes each failed check. `bell-pr start --force`
 starts anyway and warns that the check was skipped. Welcome lets you
 continue; you can take the **sample tour** (no AI call). Starting a real
@@ -619,3 +609,7 @@ or sponsored by GitHub, Inc., OpenAI, or Anthropic PBC. GitHub, OpenAI,
 Codex, Anthropic, Claude and Claude Code are trademarks of their
 respective owners; BELL PR names them only to say which tools it works
 with.
+
+Interactive SSH and headless starts print only the instruction
+`bell-pr open --print --print-token`; run it explicitly to obtain a private
+authorized URL. Desktop launches use a temporary private `file://` redirect.

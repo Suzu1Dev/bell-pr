@@ -9,9 +9,8 @@ operating-system sandbox that the agent CLIs run commands in cannot start
 inside a container. See [Agent sandbox in
 Docker](#agent-sandbox-in-docker) for the probe result and the workaround,
 and [Beta status](#beta-status) for what has been verified. Running BELL PR
-directly on your computer with the [source build](getting-started.md#start-bell-pr)
-does not have this limitation. The current npm `0.0.2` package is a placeholder
-without a CLI; npm installation will be available with a CLI release.
+directly on your computer (`npm install -g bell-pr`) does not have this
+limitation.
 
 ## Build the image
 
@@ -46,8 +45,7 @@ docker run -d --name bell-pr \
   until a provider is signed in.
 - `-p 127.0.0.1:4311:4311` publishes BELL PR on this computer only. The
   image listens on `0.0.0.0` inside the container (an explicit setting; BELL
-  PR prints a warning) and still requires an authorized browser session or
-  the API token in `/data/api-token`.
+  PR prints a warning) and still requires the API token in `/data/api-token`.
   Do not publish the port on all interfaces unless you mean to. For access
   from other machines, put an HTTPS reverse proxy in front, as
   [docs/self-hosting.md](self-hosting.md) describes, and keep the token URL

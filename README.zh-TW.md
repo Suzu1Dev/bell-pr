@@ -47,21 +47,16 @@ BELL PR 是本機工作台。請先裝好並登入下列工具，再跑快速開
 目前支援：**macOS**、**Linux**。**Windows 透過 WSL2（尚未測試）：** 請在 WSL
 發行版內安裝以上全部。
 
-`bell-pr doctor` 必要檢查全過後，再繼續。在那之前，啟動新伺服器會在監聽前
+`bell-pr doctor` 必要檢查全過後，再繼續。在那之前 `bell-pr start` 會在監聽前
 結束。尚未安裝／登入 AI 服務時，`bell-pr start --force` 仍會開啟 BELL PR，
 讓你走範例導覽；真實 Agent 工作與發佈會等到有就緒的 AI 服務為止。
 
 ## 快速開始
 
-**這個分支尚未發佈到 npm。** npm 目前的 `bell-pr` `0.0.2` 是不含 CLI 的佔位套件，
-安裝後不會提供 `bell-pr` 指令。請先使用以下原始碼版本。
-
-1. Clone 或下載這個 repository，進入根目錄後，以 **Node.js 22.13 以上**執行：
+1. 啟動 BELL PR：
 
    ```sh
-   npm ci
-   npm run build
-   node bin/bellpr.mjs
+   npx bell-pr
    ```
 
 2. 它會印出位址，並在瀏覽器中開啟 BELL PR：
@@ -73,17 +68,13 @@ BELL PR 是本機工作台。請先裝好並登入下列工具，再跑快速開
 3. 依照歡迎畫面完成設定：選擇**語言**、檢查**工作環境**（缺少的工具都會附上修正指令），再選擇 Agent 使用的 **AI 服務**。
 4. 觀看範例導覽、匯入 Repository，或尋找想貢獻的專案。
 
-在這份原始碼裡，請把文件中的 `bell-pr` 換成 `node bin/bellpr.mjs`。
-啟動新伺服器前，`bell-pr doctor` 必須就緒；`node bin/bellpr.mjs start --force`
+`npx bell-pr` 就是 `bell-pr start`。只有在 `bell-pr doctor` 就緒時才會監聽；
+否則它會結束，並印出每一項失敗檢查的修正指令。`npx bell-pr start --force`
 仍可開啟範例導覽。
 
-**要重新開啟 BELL PR，執行同一個指令即可。** 它會開啟使用同一資料目錄、已經執行中的服務。
-在互動式 SSH 或沒有瀏覽器的終端機裡，會直接印出可開啟的授權連結；請勿分享這個連結。
-不需要另外登入或執行 `open` 指令。
+**位址不見了？執行 `bell-pr open`**（若用 `npx` 啟動，請執行 `npx bell-pr open`）。它會再次印出位址（不含 API 權杖）並在瀏覽器中開啟。瀏覽器會收到權杖。
 
-包含 CLI 的正式套件發佈到 npm 後，可以用 `npx bell-pr` 直接啟動，或用
-`npm install -g bell-pr` 安裝 `bell-pr` 指令；目前這些指令還不會安裝這個分支。
-[入門指南](docs/getting-started.md)（英文）會帶你走完一次完整的貢獻。
+想要保留安裝，請執行 `npm install -g bell-pr`，之後用 `bell-pr` 啟動。[入門指南](docs/getting-started.md)（英文）會帶你走完一次完整的貢獻。
 
 ## 系統需求
 
@@ -98,7 +89,7 @@ BELL PR 是本機工作台。請先裝好並登入下列工具，再跑快速開
 `bell-pr doctor` 會檢查以上所有項目，並為每個問題印出修正指令。請見[開始之前](#開始之前)。
 
 **尚未安裝或登入任何 AI 服務時：** `bell-pr doctor` 會以非零結束代碼結束，並將
-必要的「AI 服務」檢查標為失敗。`bell-pr start` 啟動新伺服器時會在監聽前以非零結束代碼結束，
+必要的「AI 服務」檢查標為失敗。`bell-pr start` 會在監聽前以非零結束代碼結束，
 並印出該清單與每一項失敗檢查的修正指令。`bell-pr start --force` 仍會啟動，
 並警告已略過檢查。歡迎畫面可繼續；你可以先走**範例導覽**（不呼叫 AI）。在
 至少一套 Codex CLI 或 Claude Code 安裝並登入之前，無法開始真實的 Agent 工作；
@@ -211,7 +202,7 @@ BELL PR 會閱讀專案的貢獻指南、AI 政策、PR 範本、Agent 指南與
 
 - **在沙箱中執行的 Agent。** 在預設的「工作目錄」模式下，會寫程式的 Agent 在各自 CLI 的作業系統沙箱中執行：寫入限制在該工作自己的 worktree，網路也會關閉。Claude Code 無法讀取 GitHub CLI 的設定檔、`~/.git-credentials` 與 credential-store 檔案、`~/.netrc` 與 `~/.ssh/`。`GH_TOKEN`/`GITHUB_TOKEN` 會從 agent 的環境變數中移除。系統 keyring 裡的 token 不在保護範圍內：agent 仍可透過 `gh auth token` 讀到你的 GitHub token。主要防線是改用權限最小的 fine-grained token。Claude Code 另外無法讀取自己 checkout 以外的 BELL PR 資料。「完整權限」預設關閉。開啟後會對寫入檔案的角色關掉 OS sandbox 和 credential deny 規則，這些 agent 可以讀 `~/.git-credentials` 和 `~/.ssh`，也能執行 `gh`、`git push`、`curl`；唯讀角色維持原本限制。只剩 `GH_TOKEN`/`GITHUB_TOKEN` 從環境變數移除這一項還有效。「免密碼 sudo」（僅 Linux）預設關閉。開啟後這個使用者帳號底下所有 process（包括 agent）都能不用密碼以 root 執行任何指令，讀得到那台機器上所有檔案，包括 token 和 SSH key。兩者都只在用完即丟的 VM 或 container 裡開。
 - **匯入的專案不受信任。** 專案的程式碼、文件與 Agent 指示（`AGENTS.md`、`CLAUDE.md`、`.claude/`）都只被當成資料：CLI 不會載入專案自己的設定、hooks 或指示；Git 設定可能執行其他程式的 repository 會被拒絕。BELL PR 自己執行的 git 也會關掉這些程式；只有會連到 GitHub 的 git 才會拿到 `GH_TOKEN`。Agent 仍會執行專案的程式碼，請只匯入你願意在這台電腦上執行的專案。
-- **瀏覽器存取與 API 權杖。** 每次安裝都會在資料目錄保存一枚權杖。API 請求必須帶上這枚權杖，或已授權的瀏覽器工作階段。預設只在 `127.0.0.1` 上監聽。其他網站可以連結到它的頁面，但無法呼叫它的 API，也無法以框架嵌入它。
+- **API 權杖。** 每次安裝都會在資料目錄保存一枚權杖，沒有送出權杖的 API 請求會被拒絕。預設只在 `127.0.0.1` 上監聽。其他網站可以連結到它的頁面，但無法呼叫它的 API，也無法以框架嵌入它。
 - **在沙箱外執行必須明確開啟。** 沒有沙箱時（例如使用預設設定的 Docker），會修改檔案的 Claude Code Agent 會被拒絕。你可以在**設定 → Agent 安全**或用 `BELLPR_ALLOW_UNSANDBOXED_AGENTS=1` 允許；這類 Agent 擁有你完整的使用者權限，用過它的每個工作都會顯示「**未使用沙箱執行**」標記。
 - **由你發佈。** 在你逐檔審閱並核准之前，不會有任何內容送到 GitHub，而且 commit 只包含你審閱過的檔案。
 
@@ -337,3 +328,5 @@ BELL PR 是開源軟體，依 [Apache License 2.0](LICENSE) 授權（另見 [NOT
 BELL PR 的名稱與標誌不在 Apache 授權範圍內；你可以如何使用它們，請見 [TRADEMARKS.md](TRADEMARKS.md)。
 
 BELL PR 是獨立專案，與 GitHub, Inc.、OpenAI 及 Anthropic PBC 皆無關聯，也未獲其認可或贊助。GitHub、OpenAI、Codex、Anthropic、Claude 與 Claude Code 均為其各自擁有者的商標；BELL PR 提及這些名稱，僅為說明可搭配使用的工具。
+
+含權杖的網址可能留在瀏覽器歷史紀錄中，請視同密碼保管。SSH 或無桌面啟動只會提示執行 `bell-pr open --print --print-token`；桌面啟動使用暫存的私密 `file://` 轉址檔案。

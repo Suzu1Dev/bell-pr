@@ -18,19 +18,13 @@ For containers, see [docs/docker.md](docker.md).
 
 ## Install and start
 
-The current npm `bell-pr` `0.0.2` is a placeholder without a CLI; this source
-branch has not been published. For now, use the [source build](getting-started.md#start-bell-pr)
-and replace `bell-pr` below with `node bin/bellpr.mjs` from that checkout.
-The following npm installation is for a future release containing the CLI:
-
 ```sh
 npm install -g bell-pr
 bell-pr
 ```
 
-`bell-pr` (also `bellpr`) opens an instance already running with the same
-data directory. When it needs to start a server, it prints a line such as
-the one below after every required `bell-pr doctor` check passes. If one
+`bell-pr` (also `bellpr`) starts the server and prints a line such as
+the one below when every required `bell-pr doctor` check passed. If one
 failed, start exits before it listens and prints each failed check with
 the command that fixes it. `bell-pr start --force` starts anyway and
 prints a warning: use that for the sample tour when no AI provider is
@@ -42,10 +36,7 @@ is signed in.
 BELL PR 1.0.0 → http://127.0.0.1:4311
 ```
 
-BELL PR opens the browser already authorized. In an interactive SSH or
-headless terminal it prints an authorized link directly; keep it private.
-Noninteractive startup output, including service logs, keeps the token out.
-`bell-pr help`
+BELL PR opens that address for you when it runs in a terminal. `bell-pr help`
 lists the commands and options, and
 [Configuration](configuration.md) and [.env.example](../.env.example)
 describe every `BELLPR_*` setting. Load a settings file with
@@ -101,9 +92,7 @@ leftover agents before it marks the interrupted runs.
 ## Run as a service (Linux, systemd)
 
 [`contrib/systemd/bell-pr.service`](../contrib/systemd/bell-pr.service) is a
-user unit. Once a release containing the CLI is installed, use it as shown
-below. For a source build, set its `ExecStart` to your absolute Node.js and
-checkout `bin/bellpr.mjs` paths, followed by `start --no-open`.
+user unit. Install BELL PR, then:
 
 ```sh
 mkdir -p ~/.config/systemd/user
@@ -114,8 +103,8 @@ systemctl --user enable --now bell-pr
 
 The comments in the unit explain the PATH, the optional settings file
 `~/.config/bell-pr/environment` and how to keep the service running after
-you log out. The service never opens a browser; run `bell-pr` in a terminal
-on that machine to open the running app.
+you log out. The service never opens a browser; to get its address, run
+`bell-pr open` in a terminal on that machine.
 Logs: `journalctl --user -u bell-pr`.
 
 ## Reach BELL PR from another machine
@@ -130,8 +119,7 @@ pages, requests and API responses would cross the network unencrypted.
    example `BELLPR_PUBLIC_URL=https://bell.example.com`. BELL PR then accepts
    requests for that address. BELL PR must be served at the root of that
    address, not under a path.
-4. Browser sessions or an API token are still required. Also limit who can
-   reach the proxy,
+4. The API token is still required. Also limit who can reach the proxy,
    such as with single sign-on, a VPN, HTTP basic authentication or an IP
    allowlist, so the token URL is not the only barrier on the network.
 
@@ -170,10 +158,39 @@ and container health checks.
 
 1. Wait until no run is executing, then stop BELL PR (or the service).
 2. Back up the data directory.
-3. For a source build, update the checkout and run `npm ci` and `npm run build`.
-   Once a CLI release exists on npm, installed copies can use
-   `npm install -g bell-pr@latest` instead.
-4. Start BELL PR again. Running `bell-pr` later reopens the app whenever you need it.
+3. `npm install -g bell-pr@latest`
+4. Start BELL PR again. It prints its address, and `bell-pr open` opens that
+   address in your browser whenever you need it.
 
 [Upgrading](upgrading.md) covers backups, data from older versions and
 going back to an older version.
+
+Interactive SSH and headless starts print only the instruction
+`bell-pr open --print --print-token`; run it explicitly to obtain a private
+authorized URL. Desktop launches use a temporary private `file://` redirect.
+
+## Reach another device with Tailscale serve
+
+Keep BELL PR bound to loopback. Tailscale serve plus `BELLPR_PUBLIC_URL` is
+the supported remote path:
+
+```sh
+tailscale serve --bg 4311
+BELLPR_PUBLIC_URL=https://<host>.ts.net bell-pr
+bell-pr open --print --print-token
+```
+
+Replace `<host>` with your own Tailscale host. Save the authorized URL in a
+password manager; it may remain in browser history. Without PUBLIC_URL,
+requests to the ts.net host receive 403. Do not put another proxy that
+rewrites Host in front of this path: those requests receive 403. Do not use
+Tailscale Funnel: public exposure leaves only the API token protecting full
+access to your agents and publishing credentials.
+
+Alternatively, forward loopback over SSH:
+
+```sh
+ssh -L 4311:127.0.0.1:4311 <user>@<host>
+```
+
+Open the explicitly printed authorized URL through the local forwarded port.
