@@ -18,22 +18,26 @@ env:
 
 jobs:
   build-and-test:
-    name: Build and test (${{ matrix.os }}, Node.js ${{ matrix.node }})
+    name: Build and test (${{ matrix.os }}, Node.js 24.22.1)
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest]
-        node: [22, 24]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: ${{ matrix.node }}
+          node-version: 24.22.1
           cache: npm
+      - name: Pin npm 11.21.1
+        run: |
+          npm install -g npm@11.21.1
+          node -e "if (process.versions.node !== '24.22.1') { console.error(process.versions.node); process.exit(1); }"
+          test "$(npm --version)" = "11.21.1"
       - name: Check git (syncing runs needs 2.40 or later)
         run: >-
           node -e "const v = require('node:child_process').execFileSync('git', ['--version'], { encoding: 'utf8' });
@@ -66,9 +70,16 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: 22
+          node-version: 24.22.1
           cache: npm
+      - name: Pin npm 11.21.1
+        run: |
+          npm install -g npm@11.21.1
+          node -e "if (process.versions.node !== '24.22.1') { console.error(process.versions.node); process.exit(1); }"
+          test "$(npm --version)" = "11.21.1"
       - run: npm ci
+      - name: Pack file list matches scripts/pack-expected.txt
+        run: node scripts/pack-expected.mjs --check
       - name: Pack (prepack builds)
         run: npm pack
       - run: node scripts/check-pack.mjs
@@ -112,8 +123,13 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: 22
+          node-version: 24.22.1
           cache: npm
+      - name: Pin npm 11.21.1
+        run: |
+          npm install -g npm@11.21.1
+          node -e "if (process.versions.node !== '24.22.1') { console.error(process.versions.node); process.exit(1); }"
+          test "$(npm --version)" = "11.21.1"
       - run: npm ci
       - run: npx playwright install --with-deps chromium
       - name: Run the end-to-end tests (builds, then starts bell-pr on port 4599)
@@ -127,6 +143,27 @@ jobs:
           name: e2e-traces
           path: e2e/output/
           retention-days: 14
+
+  pack-list:
+    name: Pack expected file list
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24.22.1
+          cache: npm
+      - name: Pin npm 11.21.1
+        run: |
+          npm install -g npm@11.21.1
+          node -e "if (process.versions.node !== '24.22.1') { console.error(process.versions.node); process.exit(1); }"
+          test "$(npm --version)" = "11.21.1"
+      - run: npm ci
+      - name: Compare npm pack --dry-run file list to scripts/pack-expected.txt
+        run: node scripts/pack-expected.mjs --check
 
   docker:
     name: Docker build

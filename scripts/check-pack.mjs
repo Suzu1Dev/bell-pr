@@ -34,6 +34,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { gzipSync } from "node:zlib";
+import { diffExpected, readExpected } from "./pack-expected.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const MB = 1000 * 1000;
@@ -61,6 +62,8 @@ const required = [
   "THIRD_PARTY_NOTICES.md",
   "LICENSE",
   "NOTICE",
+  "README.md",
+  "README.zh-TW.md",
 ];
 const forbidden = [
   { pattern: /(^|\/)\.codex-prompts(\/|$)/, reason: "private prompts" },
@@ -246,6 +249,13 @@ function main() {
 
   if (!files.some((file) => file === "dist" || file.startsWith("dist/")))
     problems.push("dist/ is missing from the package (run `npm run build` first).");
+
+  try {
+    const expected = readExpected();
+    for (const problem of diffExpected([...files].sort(), expected)) problems.push(problem);
+  } catch (error) {
+    problems.push(error instanceof Error ? error.message : String(error));
+  }
 
   const tarball = path.join(root, report.filename);
   try {

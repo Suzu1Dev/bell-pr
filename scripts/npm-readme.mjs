@@ -16,9 +16,9 @@
  * README its file search returns as the package's README, which can be
  * README.zh-TW.md.
  *
- * --pre keeps the originals in the folder .README.md.orig (gitignored, and
- * never packed): a byte copy of README.md, and the other root README.*
- * files, moved there so the package holds README.md alone. It then
+ * --pre keeps the original README.md in .README.md.orig (gitignored, and
+ * never packed) and moves other root README.* files there, except
+ * README.zh-TW.md which `files` ships in the package. It then
  * rewrites every relative image and link in README.md:
  *   - to the absolute `<homepageUrl>/<site path>` when `homepageUrl` in
  *     shared/product.ts is set and the website serves the file. The website
@@ -456,7 +456,9 @@ function pre(root, log) {
     homepageUrl: product.homepageUrl,
     sitePath: siteServing(root),
   });
-  const others = otherReadmes(root);
+  // Ship README.zh-TW.md (listed in package.json files). Set other README.*
+  // aside so npmjs.com keeps English README.md as the package readme.
+  const others = otherReadmes(root).filter((name) => name !== translatedReadme);
   // mkdir without `recursive` fails if the folder appeared since the check.
   fs.mkdirSync(backup);
   fs.writeFileSync(path.join(backup, readmeName), original, { flag: "wx" });
@@ -467,7 +469,7 @@ function pre(root, log) {
       product.homepageUrl.trim()
         ? `${changed.site} to the website, ${changed.images + changed.links - changed.site} as text where site/ does not serve the file`
         : "as text: homepageUrl is empty"
-    })${others.length ? `; ${others.join(", ")} set aside` : ""}. ${backupName} keeps the originals until postpack.`,
+    })${others.length ? `; ${others.join(", ")} set aside` : ""}; ${translatedReadme} kept for the package. ${backupName} keeps the originals until postpack.`,
   );
   return 0;
 }
@@ -802,9 +804,9 @@ function selfTest() {
     assert.deepEqual(otherReadmes(temp), ["README.zh-TW.md", "readme.txt"]);
     assert.equal(pre(temp, quiet), 0);
     assert.deepEqual(fs.readFileSync(at(backupName, "README.md")), original);
-    assert.deepEqual(fs.readFileSync(at(backupName, "README.zh-TW.md")), translated);
-    assert.deepEqual(fs.readdirSync(at(backupName)).sort(), ["README.md", "README.zh-TW.md", "readme.txt"]);
-    assert.equal(fs.existsSync(at("README.zh-TW.md")), false, "the package holds README.md alone");
+    assert.equal(fs.existsSync(at(backupName, "README.zh-TW.md")), false, "zh-TW stays in the package");
+    assert.deepEqual(fs.readdirSync(at(backupName)).sort(), ["README.md", "readme.txt"]);
+    assert.deepEqual(fs.readFileSync(at("README.zh-TW.md")), translated, "the package keeps README.zh-TW.md");
     assert.equal(fs.existsSync(at("readme.txt")), false);
     assert.ok(fs.existsSync(at("README.md~")) && fs.existsSync(at("docs", "README.md")));
     assert.equal(fs.readFileSync(at("README.md"), "utf8"), "# Fixture\r\n\r\n*Screenshot: Shot*\r\nDocs");
@@ -817,14 +819,15 @@ function selfTest() {
     assert.equal(fs.existsSync(at(backupName)), false);
     assert.equal(post(temp, quiet), 0, "--post without a backup does nothing");
     assert.deepEqual(fs.readFileSync(at("README.md")), original);
-    // A translated README that reappeared meanwhile is never overwritten.
+    // A set-aside README that reappeared meanwhile is never overwritten.
     assert.equal(pre(temp, quiet), 0);
-    write("README.zh-TW.md", "new text");
+    write("readme.txt", "new text");
     assert.equal(post(temp, quiet), 1);
-    assert.equal(fs.readFileSync(at("README.zh-TW.md"), "utf8"), "new text");
-    assert.deepEqual(fs.readFileSync(at(backupName, "README.zh-TW.md")), translated);
-    fs.rmSync(at("README.zh-TW.md"));
+    assert.equal(fs.readFileSync(at("readme.txt"), "utf8"), "new text");
+    assert.deepEqual(fs.readFileSync(at(backupName, "readme.txt")), Buffer.from("plain", "utf8"));
+    fs.rmSync(at("readme.txt"));
     assert.equal(post(temp, quiet), 0);
+    assert.equal(fs.readFileSync(at("readme.txt"), "utf8"), "plain");
     assert.deepEqual(fs.readFileSync(at("README.zh-TW.md")), translated);
     // A README that cannot become text stops --pre before anything moves.
     write("README.md", "[x][r]\n\n[r]: docs/a.md\n");

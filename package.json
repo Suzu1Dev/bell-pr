@@ -40,7 +40,9 @@
     "NOTICE",
     "THIRD_PARTY_NOTICES.md",
     "SECURITY.md",
-    "CHANGELOG.md"
+    "CHANGELOG.md",
+    "README.zh-TW.md",
+    "README.md"
   ],
   "scripts": {
     "dev": "concurrently -k -n api,web -c green,cyan \"npm:dev:server\" \"npm:dev:web\"",
@@ -60,7 +62,9 @@
     "check:pack": "node scripts/check-pack.mjs",
     "check:meta": "node scripts/sync-package-meta.mjs --check",
     "check:generated": "tsx scripts/render-generated-regions.ts --check",
-    "release:dry-run": "node scripts/release-dry-run.mjs"
+    "release:dry-run": "node scripts/release-dry-run.mjs",
+    "check:pack-expected": "node scripts/pack-expected.mjs --check",
+    "pack-expected:write": "node scripts/pack-expected.mjs --write"
   },
   "engines": {
     "node": ">=22"
@@ -103,5 +107,6 @@
     "typescript": "^5.8.0",
     "typescript-eslint": "~8.70.1",
     "vite": "^8.3.5"
-  }
+  },
+  "packageManager": "npm@11.21.1"
 }
