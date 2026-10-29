@@ -1,7 +1,9 @@
 import { useRef, useState } from "react";
 import { RotateCcw } from "lucide-react";
+import { currentApiToken } from "../api";
 import { useT } from "../i18n";
 import { LanguageSwitcher } from "../i18n/LanguageSwitcher";
+import { DevicesSection } from "./DevicesSection";
 import { BrowserAccess } from "./BrowserAccess";
 import {
   Feedback,
@@ -65,7 +67,8 @@ export function GeneralSection({
           />
         </div>
       </SettingsGroup>
-      <BrowserAccess reload={reload} />
+      {!currentApiToken() && <BrowserAccess reload={reload} />}
+      <DevicesSection />
       <SettingsGroup title={g.sample.title} text={g.sample.text}>
         <SettingSwitch
           label={g.sample.show}

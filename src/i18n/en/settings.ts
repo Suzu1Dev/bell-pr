@@ -52,6 +52,18 @@ const settings = {
     connected: "Connected",
   },
   general: {
+    devices: {
+      unknown: "Unavailable",
+      title: "Devices",
+      text: "Any paired device can list and revoke any device.",
+      current: "This device",
+      created: "Created",
+      lastUsed: "Last used",
+      never: "Not yet used",
+      revoke: "Revoke device",
+      empty: "No paired devices.",
+      access: "Lost or stolen device? Revoke it from another paired device, or run bell-pr token rotate on the host to invalidate all devices.",
+    },
     language: {
       title: "Language",
       text: "The language of the interface, and of new contributions, analyses and answers to your questions. A contribution that already started keeps working in the language it started in, and existing text is not translated.",
