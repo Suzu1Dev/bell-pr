@@ -243,6 +243,11 @@ Performance** allows (1 to 8, 2 by default); the others wait in the queue.
 
 ## 5. Review every change
 
+The code toolbar's focus button expands the reading area and initially hides
+both side panels. Its file-list and explanation buttons still open or close
+each panel. Leaving focus mode with the button or Escape restores the panel
+layout from before you entered it.
+
 Before publishing an agent contribution, the **Collaborate** tab lets you ask
 an agent to finish missing checks, add tests or fix failures in the run's working
 copy. The draft's Limitations shortcut fills the message box for you to review
@@ -550,7 +555,7 @@ finish, it leaves the contribution unchanged.
 - **Choose which changes to read**: the Changes tab defaults to the current
   feedback round, compared with the previous PR head. Files unchanged in
   that round do not need another review, and reverting an earlier edit or
-  deleting a file added in the PR appears in this round's diff. The selector
+  deleting a file added in the PR appears in this round's diff. The selector in the code toolbar
   also offers the initial submission, each published round and the cumulative
   PR changes. Those views are read-only and do not alter the current round's
   review marks or approval; return to the current round to review and approve.

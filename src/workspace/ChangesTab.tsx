@@ -5,6 +5,7 @@ import {
   useRef,
   useState,
   type Dispatch,
+  type ReactNode,
   type SetStateAction,
 } from "react";
 import {
@@ -69,6 +70,7 @@ const YourTurn = lazy(() => import("../byhand/lazy").then((module) => ({ default
 const GuidePanel = lazy(() => import("../byhand/lazy").then((module) => ({ default: module.GuidePanel })));
 
 interface ChangesTabProps {
+  diffRoundPicker?: ReactNode;
   run: Run;
   files: DiffFile[];
   /** The changed file open in the code view. */
@@ -148,6 +150,7 @@ async function loadBaseLines(run: Run, target: DiffFile) {
 
 /** The code review tab: changed files, the diff and the explanation panel. */
 export function ChangesTab({
+  diffRoundPicker,
   run,
   files,
   file,
@@ -230,8 +233,8 @@ export function ChangesTab({
       setAskWaiting(false);
       return;
     }
-    setShowExplanation(true);
     setFocusMode(false);
+    setShowExplanation(true);
   }, [checking, setShowExplanation, setFocusMode]);
   /**
    * The current-file lines a walkthrough part marks in the diff, with the
@@ -317,7 +320,7 @@ export function ChangesTab({
     {run.byHand?.ready && writing && <p className="by-hand-note" role="status">{workspace.byHand.changed}</p>}
     <div
       ref={reviewGridRef}
-      className={`review-grid ${!showFiles ? "files-hidden" : ""} ${!showExplanation ? "explanation-hidden" : ""}`}
+      className={`review-grid ${!showFiles ? "files-hidden" : ""} ${!showExplanation && !checking ? "explanation-hidden" : ""}`}
     >
       {showFiles && (
         <aside
@@ -470,11 +473,11 @@ export function ChangesTab({
       )}
       <section className="diff-panel">
         <div className="diff-topbar">
-          <span>
+          {diffRoundPicker ?? <span>
             <GitBranch size={14} /> {run.baseBranch}{" "}
             <span className="diff-topbar-arrow">←</span>{" "}
             {run.branch}
-          </span>
+          </span>}
           <PremiseNotice premise={run.team?.premise} compact guide={run.learnByHand} />
           <div
             className="diff-toolbar-actions"

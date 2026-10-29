@@ -819,8 +819,8 @@ export function useRunActions({
     }
   }
   async function ask(question: string) {
-    setShowExplanation(true);
     setFocusMode(false);
+    setShowExplanation(true);
     if (!file || !question.trim() || chatLoading) return;
     const key = `${run.id}:${file.path}`;
     if (pendingChats.current.has(key)) return;

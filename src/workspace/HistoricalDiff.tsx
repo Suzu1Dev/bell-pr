@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { api } from "../api";
 import { useT } from "../i18n";
 import { fileStatusLabel } from "../app/labels";
@@ -12,7 +12,9 @@ interface DiffViewResult {
 }
 
 /** History has its own files and selection, and no callbacks into the current review. */
-export function HistoricalDiff({ runId, round }: { runId: string; round: string }) {
+export function HistoricalDiff({ runId, round, toolbar, showFiles = true }: {
+  runId: string; round: string; toolbar?: ReactNode; showFiles?: boolean;
+}) {
   const t = useT("workspace").diffRounds;
   const filesLabel = useT("workspace").changes.files;
   const status = useT("common").fileStatus;
@@ -34,22 +36,10 @@ export function HistoricalDiff({ runId, round }: { runId: string; round: string 
     return () => { cancelled = true; };
   }, [key, runId, round]);
 
-  if (!shown) return <p className="historical-diff-status" role="status">{t.loading}</p>;
-  if (shown.error) return (
-    <div className="historical-diff-status">
-      <p role="alert">{shown.error}</p>
-      <button type="button" className="button secondary" onClick={() => setRetry((value) => value + 1)}>{t.retry}</button>
-    </div>
-  );
   return (
     <section className="historical-diff" aria-label={t.readOnly}>
-      <p className="historical-diff-status">
-        <code>{shown.value!.baseSha.slice(0, 7)}</code>{" → "}
-        {shown.value!.headSha ? <code>{shown.value!.headSha.slice(0, 7)}</code> : t.workingTree}
-      </p>
-      {files.length ? (
-        <div className="review-grid explanation-hidden">
-          <aside className="file-panel" aria-label={filesLabel}>
+        <div className={`review-grid explanation-hidden${!showFiles || !files.length ? " files-hidden" : ""}`}>
+          {showFiles && files.length > 0 && <aside className="file-panel" aria-label={filesLabel}>
             <div className="file-panel-heading"><strong>{filesLabel} <span>{files.length}</span></strong></div>
             <div className="file-tree">
               {files.map((entry) => (
@@ -63,15 +53,29 @@ export function HistoricalDiff({ runId, round }: { runId: string; round: string 
                 </button>
               ))}
             </div>
-          </aside>
+          </aside>}
           <section className="diff-panel">
-            <div className="rv-file-header"><code>{file!.path}</code></div>
-            {file!.blocked ? <p className="historical-diff-status">{file!.blocked}</p>
-              : file!.patch ? <CommitPatch path={file!.path} patch={file!.patch} />
-                : <p className="historical-diff-status">{t.noText}</p>}
+            <div className="diff-topbar">
+              {toolbar}
+              {shown?.value && <span className="historical-diff-range">
+                <code>{shown.value.baseSha.slice(0, 7)}</code>{" → "}
+                {shown.value.headSha ? <code>{shown.value.headSha.slice(0, 7)}</code> : t.workingTree}
+              </span>}
+            </div>
+            {!shown ? <p className="historical-diff-status" role="status">{t.loading}</p>
+              : shown.error ? <div className="historical-diff-status">
+                  <p role="alert">{shown.error}</p>
+                  <button type="button" className="button secondary" onClick={() => setRetry((value) => value + 1)}>{t.retry}</button>
+                </div>
+              : file ? <>
+                  <div className="rv-file-header"><code>{file.path}</code></div>
+                  {file.blocked ? <p className="historical-diff-status">{file.blocked}</p>
+                    : file.patch ? <CommitPatch path={file.path} patch={file.patch} />
+                      : <p className="historical-diff-status">{t.noText}</p>}
+                </>
+              : <p className="historical-diff-status">{t.empty}</p>}
           </section>
         </div>
-      ) : <p className="historical-diff-status">{t.empty}</p>}
     </section>
   );
 }

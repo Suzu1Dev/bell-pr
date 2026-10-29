@@ -13,6 +13,11 @@ test("review rounds have independent read-only files and return to the current s
   const id = "e2e-diff-rounds";
   const base = "a".repeat(40);
   const parent = "b".repeat(40);
+  const premise = {
+    verdict: "holds" as const,
+    statement: "The retry loop can return before all pending requests finish when a connection is interrupted during the second attempt.",
+    evidence: "current.ts:2 returns from the loop after the first completed request. The remaining requests still need their completion callbacks before the operation can be reported as finished.",
+  };
   const currentFile: DiffFile = {
     ...sample.files[0], path: "current.ts", fingerprint: "c".repeat(64), status: "modified",
     patch: "@@ -2 +2 @@\n-before-current\n+after-current",
@@ -28,6 +33,11 @@ test("review rounds have independent read-only files and return to the current s
       ...sample.run, id, repoId: "e2e-rounds-repo", status: "review", baseSha: base,
       publishCommit: parent, prUrl: "https://github.com/acme/widgets/pull/7",
       agents: [], logs: [],
+      team: {
+        config: { maxTeammates: 2, requirePlanApproval: true, provider: "codex", protocol: "bell-shared-tasks", messageDelivery: "between-turns" },
+        phase: "complete", planSummary: "Wait for every pending request before completing the retry.",
+        tasks: [], messages: [], premise,
+      },
       worktreePath: path.join(dataDir, "worktrees", id),
       reviewedFiles: [currentFile.path], reviewedFingerprints: { [currentFile.path]: "old-cumulative-fingerprint" },
       followUps: [
@@ -64,7 +74,7 @@ test("review rounds have independent read-only files and return to the current s
       if (url.pathname.endsWith("/diff-view")) {
         const round = url.searchParams.get("round");
         if (round === "initial") { delayedInitial = route; return; }
-        if (round === "all" && ++allCalls === 1)
+        if (round === "all" && ++allCalls <= 2)
           return route.fulfill({ status: 409, json: { error: "Cannot read this comparison yet." } });
         return route.fulfill({ json: {
           baseSha: base, ...(round === "prior" ? { headSha: parent } : {}),
@@ -84,6 +94,27 @@ test("review rounds have independent read-only files and return to the current s
     await page.goto(`/#/runs/${id}/changes?locale=en`);
     const selector = page.getByRole("combobox", { name: workspace.diffRounds.label });
     await expect(selector).toHaveValue("current");
+    // Round selection shares the code's existing toolbar, without a separate row.
+    const topbar = page.locator(".diff-panel > .diff-topbar").filter({ has: selector });
+    await expect(topbar).toHaveCount(1);
+    await expect(topbar.getByRole("toolbar", { name: workspace.changes.toolbar })).toBeVisible();
+    const premiseSummary = topbar.locator(".premise-compact summary");
+    await expect(premiseSummary).toBeVisible();
+    await expect.poll(async () => {
+      const boxes = await Promise.all([
+        selector.boundingBox(), premiseSummary.boundingBox(), topbar.locator(".diff-toolbar-actions").boundingBox(),
+      ]);
+      if (boxes.some((box) => !box)) return Infinity;
+      const centers = boxes.map((box) => box!.y + box!.height / 2);
+      return Math.max(...centers) - Math.min(...centers);
+    }, { message: "The round selector, premise and original code toolbar should remain on the same row" }).toBeLessThan(8);
+    await premiseSummary.click();
+    const premiseDetail = topbar.getByRole("region", { name: workspace.premise.detailLabel });
+    await expect(premiseDetail).toBeVisible();
+    await expect(premiseDetail).toContainText(premise.statement);
+    await expect(premiseDetail).toContainText(premise.evidence);
+    await premiseSummary.press("Escape");
+    await expect(premiseDetail).toBeHidden();
     await expect(page.locator(".rv-reviewed input")).not.toBeChecked();
     await expect(page.locator(".review-footer")).toContainText("0 / 1 reviewed");
     await page.getByRole("button", { name: review.diff.gap.wholeFile, exact: true }).click();
@@ -92,6 +123,9 @@ test("review rounds have independent read-only files and return to the current s
 
     await selector.selectOption("initial");
     await expect.poll(() => !!delayedInitial).toBe(true);
+    await expect(page.getByRole("status").filter({ hasText: workspace.diffRounds.loading })).toBeVisible();
+    await expect(topbar).toBeVisible();
+    await expect(selector).toBeEnabled();
     await selector.selectOption("prior");
     await expect(page.getByText("previous-round-only", { exact: true })).toBeVisible();
     await delayedInitial!.fulfill({ json: { baseSha: base, headSha: parent, files: [historyFile("late.ts", "late-initial-answer")] } });
@@ -103,10 +137,32 @@ test("review rounds have independent read-only files and return to the current s
 
     await selector.selectOption("all");
     await expect(page.getByRole("alert").filter({ hasText: "Cannot read this comparison yet." })).toBeVisible();
+    await expect(topbar).toBeVisible();
+    await expect(selector).toBeEnabled();
+    // An unavailable comparison must not trap the person on its error screen.
+    await selector.selectOption("prior");
+    await expect(page.getByText("previous-round-only", { exact: true })).toBeVisible();
+    await selector.selectOption("all");
+    await expect(page.getByRole("alert").filter({ hasText: "Cannot read this comparison yet." })).toBeVisible();
     await page.getByRole("button", { name: workspace.diffRounds.retry, exact: true }).click();
     await expect(page.locator(".historical-diff .file-item")).toHaveCount(2);
+
+    const historyFiles = page.locator(".historical-diff .file-panel");
+    const historyButton = (name: string) => topbar.getByRole("button", { name, exact: true });
+    await expect(historyFiles).toBeVisible();
+    await historyButton(workspace.changes.enterFocus).click();
+    await expect(page.locator(".app-shell")).toHaveClass(/is-focused/);
+    await expect(historyFiles).toBeHidden();
+    await expect(selector).toBeVisible();
+    await historyButton(workspace.changes.showFiles).click();
+    await expect(historyFiles).toBeVisible();
     await page.locator(".historical-diff .file-item").filter({ hasText: "current.ts" }).click();
     await expect(page.getByText("cumulative-current", { exact: true })).toBeVisible();
+    await historyButton(workspace.changes.hideFiles).click();
+    await expect(historyFiles).toBeHidden();
+    await historyButton(workspace.changes.exitFocus).click();
+    await expect(page.locator(".app-shell")).not.toHaveClass(/is-focused/);
+    await expect(historyFiles).toBeVisible();
     expect(writes).toEqual([]);
     expect(contextBases).toEqual([parent]);
 

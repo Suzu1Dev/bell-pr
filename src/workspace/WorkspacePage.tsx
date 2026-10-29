@@ -16,6 +16,9 @@ import {
   Globe2,
   History,
   MessageSquare,
+  Maximize2,
+  Minimize2,
+  PanelLeftClose,
   Plus,
   ShieldCheck,
   Split,
@@ -207,6 +210,33 @@ export function WorkspacePage({
   const historical = tab === "changes" && selectedRound !== "current";
   const published = !demo && run.status === "published";
   const showCurrent = () => setDiffSelection({ key: roundKey, round: "current" });
+  const diffRoundPicker = hasHistory ? (
+    <div className="diff-round-picker">
+      <select id="diff-round" className="text-input" value={selectedRound}
+        aria-label={t.diffRounds.label} title={historical ? t.diffRounds.notice : t.diffRounds.label}
+        aria-describedby={historical ? "diff-round-notice" : undefined}
+        onChange={(event) => setDiffSelection({ key: roundKey, round: event.target.value })}>
+        {roundOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+      </select>
+      {historical && <span hidden id="diff-round-notice">{t.diffRounds.notice}</span>}
+    </div>
+  ) : undefined;
+  const historyToolbar = <>
+    {diffRoundPicker}
+    <small className="diff-round-readonly" title={t.diffRounds.notice}>{t.diffRounds.readOnly}</small>
+    <div className="diff-toolbar-actions">
+      <button type="button" className="icon-button"
+        aria-label={showFiles ? t.changes.hideFiles : t.changes.showFiles}
+        aria-pressed={showFiles} onClick={() => setShowFiles(!showFiles)}>
+        <PanelLeftClose size={16} />
+      </button>
+      <button type="button" className="icon-button"
+        aria-label={focusMode ? t.changes.exitFocus : t.changes.enterFocus}
+        onClick={() => setFocusMode(!focusMode)}>
+        {focusMode ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+      </button>
+    </div>
+  </>;
   // A request to open a current file (from feedback, learning or another tab)
   // must not leave a historical file on screen instead.
   function setTab(value: SetStateAction<Tab>) {
@@ -481,26 +511,20 @@ export function WorkspacePage({
               checkingPremise={premise.checkingPremise}
             />
           )}
-          {tab === "changes" && hasHistory && (
-            <div className="diff-round-picker">
-              <label htmlFor="diff-round">{t.diffRounds.label}</label>
-              <select id="diff-round" className="text-input" value={selectedRound}
-                aria-describedby={historical ? "diff-round-notice" : undefined}
-                onChange={(event) => setDiffSelection({ key: roundKey, round: event.target.value })}>
-                {roundOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-              </select>
-              {historical && <p id="diff-round-notice">{t.diffRounds.notice}</p>}
-            </div>
-          )}
           {historical && (
             <ErrorBoundary resetKey={`${roundKey}:${selectedRound}`}>
-              <Suspense fallback={<p className="historical-diff-status" role="status">{t.diffRounds.loading}</p>}>
-                <HistoricalDiff key={roundKey} runId={run.id} round={selectedRound} />
+              <Suspense fallback={<section className="diff-panel">
+                <div className="diff-topbar">{historyToolbar}</div>
+                <p className="historical-diff-status" role="status">{t.diffRounds.loading}</p>
+              </section>}>
+                <HistoricalDiff key={roundKey} runId={run.id} round={selectedRound}
+                  toolbar={historyToolbar} showFiles={showFiles} />
               </Suspense>
             </ErrorBoundary>
           )}
           {tab === "changes" && !historical && (
             <ChangesTab
+              diffRoundPicker={diffRoundPicker}
               run={run}
               files={files}
               file={file}

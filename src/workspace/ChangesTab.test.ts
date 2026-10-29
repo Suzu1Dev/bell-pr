@@ -300,6 +300,9 @@ test("while the check is open it takes the explanation's place: closed book", ()
     openCheckPanel(run.id);
     const html = renderEn(element({ understanding: understanding() }));
     assert.match(html, /<div class="check-wrap">/);
+    const focused = renderEn(element({ understanding: understanding(), focusMode: true, showFiles: false, showExplanation: false }));
+    assert.match(focused, /<div class="check-wrap">/);
+    assert.doesNotMatch(focused, /review-grid[^"]*explanation-hidden/);
     assert.doesNotMatch(html, /check-link/);
     // The explanation panel is not mounted at all, so no note or reference can show.
     assert.doesNotMatch(html, /explain-panel/);
