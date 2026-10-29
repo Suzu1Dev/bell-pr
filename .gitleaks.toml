@@ -1,0 +1,13 @@
+[extend]
+useDefault = true
+
+[allowlist]
+paths = [
+  '''^server/agent-cli\.test\.ts$''',
+  '''^server/by-hand-tests\.test\.ts$''',
+  '''^server/cli-errors\.test\.ts$''',
+  '''^server/contribution-policy\.test\.ts$''',
+  '''^server/draft-sources\.test\.ts$''',
+  '''^server/secrets\.test\.ts$''',
+  '''^server/team\.test\.ts$''',
+]
