@@ -91,7 +91,8 @@ jobs:
           mkdir -p fake-bin
           for name in codex claude gh; do printf '#!/bin/sh\nexit 1\n' > "fake-bin/$name"; chmod +x "fake-bin/$name"; done
           export PATH="$RUNNER_TEMP/fake-bin:$RUNNER_TEMP/p/bin:$PATH"
-          bell-pr start --port 4598 > server.log 2>&1 &
+          # Fake CLIs fail the readiness gate; --force is the sample-tour path.
+          bell-pr start --force --port 4598 > server.log 2>&1 &
           server=$!
           trap 'kill "$server" 2>/dev/null || true; cat server.log' EXIT
           curl -fsS --retry 30 --retry-connrefused --retry-delay 1 http://127.0.0.1:4598/api/health

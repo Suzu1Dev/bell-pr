@@ -272,6 +272,7 @@ export default {
   },
   /** Reading a run's changes: limits, and why a file is held back from the PR. */
   diff: {
+    viewUnavailable: "This round has no readable published history in this workspace.",
     unparsable: "Could not parse the Git diff.",
     renameFirst:
       "A file name contains unsupported characters; rename the file first.",
@@ -291,8 +292,7 @@ export default {
         "This new file is larger than 512 KB; review it by hand or split it.",
       binary:
         "Binary files need a separate manual review and cannot be published through this workflow.",
-      credentials:
-        "The change looks like it contains credentials, so its content is hidden; remove them and review it again.",
+      credentials: "Blocks common token formats and private keys before publishing.",
     },
     /** Shown in place of a held-back file's patch. */
     heldBack: ({ reason }: { reason: string }) =>
@@ -305,8 +305,7 @@ export default {
     tooLarge:
       "The file is larger than 512 KB, so the code around its changes cannot be shown.",
     binary: "A binary file has no code to show around its changes.",
-    credentials:
-      "The file looks like it contains credentials, so the code around its changes is not shown.",
+    credentials: "Blocks common token formats and private keys before publishing.",
     blocked:
       "This file cannot be reviewed right now, so the code around its changes is not shown either.",
     stale: "The file's changes were updated; refresh the changes.",
@@ -321,7 +320,7 @@ export default {
     sensitive: "A sensitive file or build artifact; its content is not shown.",
     binary: "A binary file; its content is not shown.",
     tooLarge: "The change is larger than 600 KB; its content is not shown.",
-    credentials: "The change looks like it contains credentials; its content is not shown.",
+    credentials: "Blocks common token formats and private keys before publishing.",
   },
   /** Checking the request's assumption again on a finished run. */
   premise: {
@@ -688,6 +687,15 @@ export default {
   },
   /** The human review gate and publishing: draft, file reviews, approval and push. */
   publish: {
+    recoveryStale: "The unfinished publish changed. Reload before recovering it.",
+    recoveryNotAllowed: "Only an unfinished publish with no recorded push target or pull request can be recovered here.",
+    recoveryBusy: "Work is still running for this contribution. Wait for it to finish before recovering the publish.",
+    recoveryCheckout: "The local branch or saved commit does not match this contribution. Recovery stopped without changing the checkout.",
+    recoveryUnknown: "Could not confirm that both GitHub repositories have no matching branch or pull request. Recovery stopped; try again when the repositories can be read.",
+    recoveryRemoteBranch: ({ repository, branch }: { repository: string; branch: string }) => `GitHub branch ${repository}:${branch} already exists. The unfinished publish was kept for inspection.`,
+    recoveryPrExists: ({ branch }: { branch: string }) => `A pull request already uses branch ${branch}, including closed or merged pull requests. The unfinished publish was kept for inspection.`,
+    recovered: ({ commit }: { commit: string }) => `Recovered the unfinished publish. Commit ${commit} is preserved in a local recovery ref; review and approve the current draft again before publishing.`,
+
     commitMessageInvalid: "A commit message may only contain text and line breaks.",
     invalidBranch:
       "A GitHub branch name may only use letters, digits and . _ - /, must not contain .., and must not end with . or .lock.",
@@ -735,9 +743,9 @@ export default {
       "The target branch has new commits. An earlier publish already made a commit that may be on GitHub, so this run can no longer be synced or have a sync undone; start a new run from the latest version.",
     branchChanged: "The run's branch changed, so publishing stopped.",
     priorCommitDiffers:
-      "An earlier publish made a different commit. Start a new run so that a branch that may already be pushed is not overwritten.",
+      "An earlier publish made a different commit. Return to the PR draft tab. If “Recover unfinished publish” is available, recover, review and approve again. Otherwise inspect the earlier branch or start a new run.",
     priorMessageDiffers:
-      "The commit of an earlier publish has a different commit message, which cannot change after a push. Restore the commit message or start a new run.",
+      "The commit of an earlier publish has a different commit message, which cannot change after a push. Return to the PR draft tab. If “Recover unfinished publish” is available, recover, review and approve again. Otherwise restore the message or start a new run.",
     notAFork:
       "Your repository with this name is not a fork of the target project; sort out the GitHub fork first.",
     noPrUrl:

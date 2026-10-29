@@ -56,14 +56,21 @@ In scope, because the design relies on them:
 
 - the local server: the host and origin checks, and the content security policy;
 - the agent sandbox and the environment agents get: the agent CLIs' sandbox
-  settings, the credential files agents are denied, the refusal to start
-  agents that change code without a sandbox, and the masking of secrets in
-  logs and diagnostics;
+  settings, the credential files Claude Code is denied in the default Working
+  directory mode, the refusal to start agents that change code without a
+  sandbox in that mode, and the masking of secrets in logs and diagnostics;
 - how imported repositories are handled: the local git configuration they
   may carry and the agent instruction files they contain are untrusted;
 - the publish path: the checks of the pull request text, the confirmations
   before CI workflow changes, and what leaves your computer when you publish;
 - the Docker image and the files in `contrib/`.
+
+**Known limitation.** Tokens in your system keyring are not covered: the
+agent can still read your GitHub token via `gh auth token`. Your main
+protection is a fine-grained token with the minimum permissions you need.
+This is known and tracked; reports of this same behavior are not eligible as
+new vulnerabilities. A different way around the sandbox is still in scope:
+report it through GitHub private vulnerability reporting.
 
 Out of scope:
 

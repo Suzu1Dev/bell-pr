@@ -181,7 +181,7 @@ test("a checkout an earlier build worked in keeps its diff when its .git/config 
 test("a teammate checkout whose .git pointer was forged is not used", async (t) => {
   const directory = await mkdtemp(path.join(os.tmpdir(), "bell-security-team-"));
   t.after(() => rm(directory, { recursive: true, force: true }));
-  const runCheckout = path.join(directory, "worktrees", "run");
+  const runCheckout = path.join(directory, "run-repo");
   const baseSha = await repository(runCheckout, { "a.ts": "a\n" });
   const run = baseRun({ worktreePath: runCheckout, baseSha });
   const taskPath = path.join(directory, "team-worktrees", "run", "task-1");
@@ -628,7 +628,12 @@ test("a credential in the PR text blocks approval and publishing", async (t) => 
     await assert.rejects(
       withLocale("en", () => f.workbench.approve(f.run.id, { ...f.run.draft })),
       (error: unknown) =>
-        error instanceof AppError && error.statusCode === 422 && /credential/.test(error.message),
+        error instanceof AppError &&
+        error.statusCode === 422 &&
+        error.message.startsWith(
+          "Blocks common token formats and private keys before publishing.",
+        ) &&
+        !/credential/i.test(error.message),
     );
     // Approved before the check existed: still stopped before anything is pushed.
     f.run.status = "approved";
@@ -636,7 +641,12 @@ test("a credential in the PR text blocks approval and publishing", async (t) => 
     await assert.rejects(
       withLocale("en", () => f.workbench.publish(f.run.id, f.run.approvedFingerprint!)),
       (error: unknown) =>
-        error instanceof AppError && error.statusCode === 422 && /credential/.test(error.message),
+        error instanceof AppError &&
+        error.statusCode === 422 &&
+        error.message.startsWith(
+          "Blocks common token formats and private keys before publishing.",
+        ) &&
+        !/credential/i.test(error.message),
     );
     assert.equal(f.run.publishCommit, undefined);
     f.run.status = "review";

@@ -30,6 +30,7 @@ const workspace = {
     `${n} ${title}: ${description}`,
   tabsLabel: "Task content",
   tabs: {
+    session: "Collaborate",
     overview: "Overview & motivation",
     changes: "Code changes",
     activity: "Agent activity",
@@ -111,6 +112,7 @@ const workspace = {
     reviewed: ({ reviewed, total }: { reviewed: number; total: number }) =>
       `${reviewed} / ${total} reviewed`,
     viewPullRequest: "View pull request",
+    publishedChanges: "Published PR changes",
     needsReview: "Mark every file as reviewed first",
     needsReviewAndCheck:
       "Mark every file as reviewed, then explain the change back in your own words",
@@ -180,6 +182,25 @@ const workspace = {
     loadingPanel: "Preparing the reading panel…",
     emptyTitle: "Understanding starts with the changes.",
     emptyText: "Select a changed file to ask about its design and trade-offs.",
+  },
+  diffRounds: {
+    label: "Changes to view",
+    current: "Current PR changes",
+    currentRound: "This review round",
+    currentSync: "Current PR changes after sync",
+    initial: "Initial contribution",
+    published: ({ number }: { number: number }) => `Review round ${number} (pushed)`,
+    sync: ({ number }: { number: number }) => `Round ${number}: target branch sync (pushed)`,
+    adopted: ({ number }: { number: number }) => `Round ${number}: changes taken over from GitHub`,
+    all: "All changes (cumulative)",
+    readOnly: "Read-only changes",
+    notice: "This view is read-only. Return to the current changes to mark files as reviewed, ask questions or approve.",
+    back: "Back to current changes",
+    loading: "Loading the selected changes…",
+    retry: "Try loading again",
+    workingTree: "Working files",
+    empty: "No files changed in this comparison.",
+    noText: "This change has no text patch to display.",
   },
   /**
    * The Explain-it-back check next to the diff (UnderstandingCheck). The
@@ -324,6 +345,9 @@ const workspace = {
     subheading:
       "Polish the draft so maintainers can understand your contribution easily.",
     label: "DRAFT PR",
+    recoverPublish: "Recover unfinished publish",
+    recoveryHelp: "The last publish attempt left a local commit. Recovery checks the remote, keeps your code and draft, and returns this contribution to review.",
+    recoveryNeedsSave: "Save your draft edits before recovering the publish attempt.",
     syncNotice:
       "This sync adds one merge commit to the PR branch and keeps the PR title and description as they are. Review the files the target branch changed in “Code changes” first, then check the commit message below.",
     roundNotice:
@@ -497,7 +521,10 @@ const workspace = {
       author: ({ author }: { author: string }) => `Commit author: ${author}`,
       login: ({ login }: { login: string }) => `Pushing as @${login}`,
     },
-    commitPreview: "This round's commit message",
+    titlePreview: "PR title sent to GitHub",
+    titlePreviewDemo: "PR title",
+    commitPreview: "Commit message sent to GitHub",
+    commitPreviewDemo: "Commit message",
     bodyPreview: "PR description sent to GitHub",
     bodyPreviewWords: ({ count }: { count: number }) =>
       plural(count) === "one"
@@ -580,6 +607,7 @@ const workspace = {
       `Could not get an answer this time: ${message}`,
     roundPushed: "Pushed this round to the PR: the branch has one more commit.",
     prCreated: "GitHub Draft PR created",
+    publishRecovered: "Recovered the unfinished publish. Your code and draft are kept; review the changes again before approving.",
     feedbackRead: ({ count }: { count: number }) =>
       plural(count) === "one"
         ? `Read ${count} maintainer comment.`

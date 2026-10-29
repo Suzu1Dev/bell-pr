@@ -3,7 +3,8 @@
  * /api/status and the setup checklist: Node.js, Git and the identity
  * commits need, the GitHub CLI with its sign-in and permissions, the Codex
  * and Claude Code CLIs with their sign-ins, Claude Code's sandbox, the data
- * directory, the app and the platform.
+ * directory, the app, the platform, saved full access, and passwordless
+ * sudo (BELL PR's rule file, or another rule).
  *
  * The probes run in parallel, each with a 5-second limit. What they find is
  * kept for 10 seconds per data directory and PATH, and callers in that
@@ -11,17 +12,20 @@
  * details and fix labels) is worded in the locale in effect for each call.
  */
 import { constants } from "node:fs";
-import { access, readFile, statfs } from "node:fs/promises";
+import { access, readFile, stat, statfs } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { doctorCheckIds, type DoctorCheck, type DoctorReport } from "../shared/doctor.js";
 import type { Fix } from "../shared/errors.js";
+import { codexEnabled } from "../shared/codex-switch.js";
 import {
   agentProviders,
   providerLabels,
+  type AgentAccessMode,
   type AgentProvider,
 } from "../shared/models.js";
 import { product } from "../shared/product.js";
+import { bellSudoersFile } from "../shared/sudo.js";
 import { agentLoginCheck } from "./agent-cli.js";
 import { defaultActiveRunLimit, defaultAgentProcessLimit } from "./agent-slots.js";
 import { AppSettingsService, withAppSettings } from "./app-settings.js";
@@ -36,7 +40,7 @@ import {
 } from "./cli-errors.js";
 import { resolvePort } from "./config.js";
 import { sm } from "./i18n/index.js";
-import { agentEnvironment, command, git, redact } from "./process.js";
+import { agentEnvironment, command, git, gitInvocationPrefix, redact } from "./process.js";
 import {
   allowUnsandboxedAgents,
   detectClaudeSandbox,
@@ -136,6 +140,22 @@ export interface DoctorOptions {
   app?: DoctorAppInfo;
   /** The platform the fixes are for; this one by default. */
   platform?: NodeJS.Platform;
+  /**
+   * Saved agent access. Read from `dataDir`/model-settings.json when absent.
+   * Only `"full"` warns.
+   */
+  agentAccess?: AgentAccessMode;
+  /**
+   * Sudoers file the passwordless-sudo check stats. It never reads the file.
+   * Default: `/etc/sudoers.d/bell-pr-agent`.
+   */
+  sudoersFile?: string;
+  /**
+   * Exit code of `sudo -n true`, or `"absent"` when sudo is not installed.
+   * Tests replace it. The default runs that command with a short timeout
+   * and does not prompt.
+   */
+  sudoRun?: () => Promise<number | "absent">;
 }
 
 const execOptions = { timeoutMs: probeTimeoutMs, maxBytes: 64_000 };
@@ -416,22 +436,55 @@ async function probeDataDir(directory: string): Promise<Facts["dataDir"]> {
   };
 }
 
+/** Whether a Codex binary is on PATH. Does not run it. */
+async function codexOnPath(): Promise<ToolFacts> {
+  const name = process.platform === "win32" ? "codex.exe" : "codex";
+  for (const dir of (process.env.PATH ?? "").split(path.delimiter)) {
+    if (!dir) continue;
+    try {
+      await access(path.join(dir, name), constants.X_OK);
+      return { state: "ok" };
+    } catch {
+      // The next directory.
+    }
+  }
+  return { state: "missing" };
+}
+
 async function probe(exec: DoctorExec, dataDir?: string): Promise<Facts> {
+  const run = async (
+    executable: string,
+    args: string[],
+    options?: Parameters<DoctorExec>[2],
+  ) =>
+    exec(
+      executable,
+      executable === "git"
+        ? [
+            ...(await gitInvocationPrefix(options?.cwd ?? os.tmpdir(), args)),
+            ...args,
+          ]
+        : args,
+      options,
+    );
   const [git, gh, codex, claude, dataDirFacts] = await Promise.all([
-    probeTool(exec, "git"),
+    probeTool(run, "git"),
     probeTool(exec, "gh"),
-    probeTool(exec, "codex", agentEnvironment("codex")),
+    // The switch off must not start Codex. Presence is a PATH check only.
+    codexEnabled
+      ? probeTool(exec, "codex", agentEnvironment("codex"))
+      : codexOnPath(),
     probeTool(exec, "claude", agentEnvironment("claude")),
     dataDir ? probeDataDir(dataDir).catch(() => undefined) : undefined,
   ]);
   const [identity, github, codexAuth, claudeAuth, sandbox] = await Promise.all([
     git.state === "ok"
       ? probeGitIdentity((args, options) =>
-          exec("git", args, { ...options, cwd: os.tmpdir() }),
+          run("git", args, { ...options, cwd: os.tmpdir() }),
         )
       : undefined,
     gh.state === "ok" ? probeGithub(exec) : undefined,
-    codex.state === "ok" ? probeCodexAuth(exec) : undefined,
+    codexEnabled && codex.state === "ok" ? probeCodexAuth(exec) : undefined,
     claude.state === "ok" ? probeClaudeAuth(exec) : undefined,
     claude.state === "ok"
       ? detectClaudeSandbox().catch(() => undefined)
@@ -450,6 +503,48 @@ async function probe(exec: DoctorExec, dataDir?: string): Promise<Facts> {
     ...(sandbox ? { sandbox } : {}),
     ...(dataDirFacts ? { dataDir: dataDirFacts } : {}),
   };
+}
+
+/**
+ * `sudo -n true`: non-interactive, no prompt, only the exit code matters.
+ * A missing sudo is `"absent"`. Any other failure is not passwordless.
+ */
+async function sudoNonInteractive(exec: DoctorExec): Promise<number | "absent"> {
+  try {
+    const { code } = await exec("sudo", ["-n", "true"], {
+      timeoutMs: probeTimeoutMs,
+      allowedCodes: [0, 1],
+      maxBytes: 4_000,
+    });
+    return code;
+  } catch (error) {
+    if (missing(error)) return "absent";
+    return 1;
+  }
+}
+
+/** Whether the sudoers rule file is present. A missing file is not installed. */
+async function sudoersFileExists(file: string): Promise<boolean> {
+  try {
+    await stat(file);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Saved agent access in model-settings.json, when it is a known mode. */
+async function savedAgentAccess(dataDir: string): Promise<AgentAccessMode | undefined> {
+  try {
+    const value = JSON.parse(
+      await readFile(path.join(dataDir, "model-settings.json"), "utf8"),
+    ) as { agentAccess?: unknown };
+    return value?.agentAccess === "full" || value?.agentAccess === "workspace"
+      ? value.agentAccess
+      : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 /** The provider the model settings in `dataDir` chose, if any. */
@@ -481,7 +576,9 @@ function gitSupportsSync(version?: string) {
 function readyProviders(facts: Facts): AgentProvider[] {
   return agentProviders.filter((provider) =>
     provider === "codex"
-      ? facts.codex.state === "ok" && facts.codexAuth?.signedIn === true
+      ? codexEnabled &&
+        facts.codex.state === "ok" &&
+        facts.codexAuth?.signedIn === true
       : facts.claude.state === "ok" && facts.claudeAuth?.signedIn === true,
   );
 }
@@ -524,9 +621,18 @@ function sandboxFixes(detection: SandboxDetection): Fix[] {
 }
 
 /** Builds the report in the locale in effect. */
+type PasswordlessSudoCheck =
+  | { status: "skip"; reason: "platform" | "missing" }
+  | { status: "ok" }
+  | { status: "warn"; reason: "installed" | "external" };
+
 function buildReport(
   facts: Facts,
-  options: DoctorOptions & { platform: NodeJS.Platform; provider?: AgentProvider },
+  options: DoctorOptions & {
+    platform: NodeJS.Platform;
+    provider?: AgentProvider;
+    passwordlessSudo: PasswordlessSudoCheck;
+  },
 ): DoctorReport {
   const m = sm().setup.doctor;
   const platform = options.platform;
@@ -687,6 +793,24 @@ function buildReport(
   });
 
   for (const provider of agentProviders) {
+    if (provider === "codex" && !codexEnabled) {
+      // Not a required failure: a start gate that looks at `ready` stays open
+      // when Claude Code is ready. The saved provider falls back below.
+      add({
+        id: "codex",
+        required: false,
+        status: "skip",
+        reason: "disabled",
+        detail: m.codexDisabled,
+      });
+      add({
+        id: "codex-auth",
+        required: false,
+        status: "skip",
+        reason: "disabled",
+      });
+      continue;
+    }
     const tool = facts[provider];
     const auth = provider === "codex" ? facts.codexAuth : facts.claudeAuth;
     add({
@@ -746,12 +870,25 @@ function buildReport(
   }
 
   const ready = readyProviders(facts);
-  const chosen = options.provider;
+  // A saved Codex choice falls back to Claude Code while the switch is off,
+  // so this required check does not fail only because Codex was saved.
+  const chosen =
+    !codexEnabled && options.provider === "codex" ? "claude" : options.provider;
+  const claudeOnly =
+    !codexEnabled &&
+    facts.claude.state === "missing" &&
+    facts.codex.state !== "missing";
   add({
     id: "provider-ready",
     required: true,
     ...(!ready.length
-      ? {
+      ? claudeOnly
+        ? {
+            status: "fail" as const,
+            reason: "claude-only",
+            detail: `${m.claudeOnlyRelease}\n${m.installClaudeCode}`,
+          }
+        : {
           status: "fail",
           reason: "none-ready",
           detail: m.noProvider,
@@ -835,6 +972,32 @@ function buildReport(
   });
 
   add({
+    id: "full-access",
+    required: false,
+    ...(options.agentAccess === "full"
+      ? { status: "warn" as const, reason: "full", detail: m.fullAccessDisclosure }
+      : { status: "ok" as const }),
+  });
+
+  const sudo = options.passwordlessSudo;
+  add({
+    id: "passwordless-sudo",
+    required: false,
+    ...(sudo.status === "skip"
+      ? { status: "skip" as const, reason: sudo.reason }
+      : sudo.status === "warn"
+        ? {
+            status: "warn" as const,
+            reason: sudo.reason,
+            detail:
+              sudo.reason === "installed"
+                ? m.passwordlessSudoInstalled
+                : m.passwordlessSudoExternal,
+          }
+        : { status: "ok" as const }),
+  });
+
+  add({
     id: "platform",
     required: false,
     ...(platform === "win32"
@@ -894,13 +1057,39 @@ export async function runDoctor(opts: DoctorOptions = {}): Promise<DoctorReport>
   return reportFrom(await entry.facts, opts);
 }
 
+/** Linux only. Warns when `sudo -n true` succeeds, and names whose rule allows it. */
+async function passwordlessSudoCheck(opts: DoctorOptions, platform: NodeJS.Platform): Promise<PasswordlessSudoCheck> {
+  if (platform !== "linux") return { status: "skip", reason: "platform" };
+  const run = opts.sudoRun ?? (() => sudoNonInteractive(opts.exec ?? command));
+  const [installed, code] = await Promise.all([
+    sudoersFileExists(opts.sudoersFile ?? bellSudoersFile),
+    run(),
+  ]);
+  if (code === "absent") return { status: "skip", reason: "missing" };
+  if (code !== 0) return { status: "ok" };
+  return installed
+    ? { status: "warn", reason: "installed" }
+    : { status: "warn", reason: "external" };
+}
+
 async function reportFrom(facts: Facts, opts: DoctorOptions) {
+  const platform = opts.platform ?? process.platform;
   const provider =
     opts.provider ?? (opts.dataDir ? await savedProvider(opts.dataDir) : undefined);
+  const [agentAccess, passwordlessSudo] = await Promise.all([
+    opts.agentAccess !== undefined
+      ? opts.agentAccess
+      : opts.dataDir
+        ? savedAgentAccess(opts.dataDir)
+        : undefined,
+    passwordlessSudoCheck(opts, platform),
+  ]);
   return buildReport(facts, {
     ...opts,
-    platform: opts.platform ?? process.platform,
+    platform,
     ...(provider ? { provider } : {}),
+    ...(agentAccess ? { agentAccess } : {}),
+    passwordlessSudo,
   });
 }
 
@@ -1001,11 +1190,13 @@ export function formatDoctorReport(report: DoctorReport, dataDir?: string): stri
   const width = Math.max(...report.checks.map((check) => columns(labels[check.id])));
   const lines = [m.cli.title, ""];
   for (const check of report.checks) {
-    const text = [check.version, check.detail].filter(Boolean).join("  ");
+    const [first, ...rest] = (check.detail ?? "").split("\n");
+    const text = [check.version, first].filter(Boolean).join("  ");
     const label = labels[check.id];
     lines.push(
       `  ${symbols[check.status]} ${label}${" ".repeat(width - columns(label))}  ${text}`.trimEnd(),
     );
+    for (const line of rest) lines.push(`    ${line}`);
     // Fixes for what needs attention; a tool that is not used needs none.
     if (check.status === "fail" || check.status === "warn")
       for (const fix of check.fixes ?? [])
@@ -1013,8 +1204,9 @@ export function formatDoctorReport(report: DoctorReport, dataDir?: string): stri
   }
   lines.push("");
   if (dataDir) lines.push(m.cli.dataDir({ path: dataDir }));
-  // Name the ✗ rows, since a failed check that is not required does not
-  // stop the start but does stop a step (such as publishing).
+  // Name the ✗ rows. A failed check that is not required does not stop
+  // `bell-pr start` (it stops a later step, such as publishing). A required
+  // failure does, unless that start passed --force.
   const failed = (required: boolean) =>
     report.checks
       .filter((check) => check.status === "fail" && check.required === required)
@@ -1057,6 +1249,65 @@ function configuredPort(): number | undefined {
   }
 }
 
+/**
+ * The report `bell-pr doctor` prints, for `bell-pr start` as well: the same
+ * probes, the saved language and the limits a start would use.
+ */
+async function loadDoctorReport(
+  deps: DoctorCliDeps,
+  saved?: AppSettingsService,
+): Promise<DoctorReport> {
+  // The limits the server would start with: the environment, the saved
+  // settings, then the defaults.
+  const settings = saved?.get() ?? {};
+  const port = "port" in deps ? deps.port : configuredPort();
+  const maxActiveRuns = settings.maxActiveRuns ?? defaultActiveRunLimit;
+  return runDoctor({
+    force: true,
+    ...(deps.exec ? { exec: deps.exec } : {}),
+    ...(deps.dataDir ? { dataDir: deps.dataDir } : {}),
+    app: {
+      version: appVersion,
+      ...(port !== undefined ? { port } : {}),
+      maxActiveRuns,
+      maxAgentProcesses: settings.maxAgentProcesses ?? defaultAgentProcessLimit,
+    },
+  });
+}
+
+/**
+ * `bell-pr start`'s refusal: the doctor's Not ready line, then the sample
+ * tour, then the same checklist (fixes included). `bell-pr doctor` itself
+ * still ends with the Not ready line.
+ */
+export function formatStartRefusal(report: DoctorReport, dataDir?: string): string {
+  const checklist = formatDoctorReport(report, dataDir).replace(/\n$/, "");
+  const split = checklist.lastIndexOf("\n");
+  const headline = checklist.slice(split + 1);
+  const body = checklist.slice(0, split).replace(/\n$/, "");
+  return `${headline}\n${sm().cli.start.sampleTour}\n\n${body}\n`;
+}
+
+/**
+ * Whether `bell-pr start` may listen, and the refusal text when it may not.
+ */
+export async function readinessChecklist(options: {
+  dataDir: string;
+  port?: number;
+}): Promise<{ ready: boolean; text: string }> {
+  const saved = new AppSettingsService(options.dataDir);
+  return withAppSettings(saved, async () => {
+    const report = await loadDoctorReport(
+      { dataDir: options.dataDir, port: options.port },
+      saved,
+    );
+    return {
+      ready: report.ready,
+      text: report.ready ? "" : formatStartRefusal(report, options.dataDir),
+    };
+  });
+}
+
 async function doctorCli(
   argv: string[],
   deps: DoctorCliDeps,
@@ -1075,22 +1326,7 @@ async function doctorCli(
       return 2;
     }
   }
-  // The limits the server would start with: the environment, the saved
-  // settings, then the defaults.
-  const settings = saved?.get() ?? {};
-  const port = "port" in deps ? deps.port : configuredPort();
-  const maxActiveRuns = settings.maxActiveRuns ?? defaultActiveRunLimit;
-  const report = await runDoctor({
-    force: true,
-    ...(deps.exec ? { exec: deps.exec } : {}),
-    ...(deps.dataDir ? { dataDir: deps.dataDir } : {}),
-    app: {
-      version: appVersion,
-      ...(port !== undefined ? { port } : {}),
-      maxActiveRuns,
-      maxAgentProcesses: settings.maxAgentProcesses ?? defaultAgentProcessLimit,
-    },
-  });
+  const report = await loadDoctorReport(deps, saved);
   out.write(
     json ? `${JSON.stringify(report, null, 2)}\n` : formatDoctorReport(report, deps.dataDir),
   );

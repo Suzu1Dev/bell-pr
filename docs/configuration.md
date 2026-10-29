@@ -28,7 +28,7 @@ the settings in the app.
 
 | Command | What it does |
 | --- | --- |
-| `bell-pr` or `bell-pr start` | Starts BELL PR and prints its address |
+| `bell-pr` or `bell-pr start` | Starts BELL PR and prints its address. Exits 1 before listening when a required doctor check fails; `--force` starts anyway |
 | `bell-pr open` | Prints the address of the running BELL PR, including the API token fragment, and opens it; `--print` only prints it |
 | `bell-pr token rotate` | Replaces `<data dir>/api-token`. A running BELL PR uses the new token on the next request. The new token is not printed |
 | `bell-pr doctor` | Checks Node.js, Git, the GitHub CLI, the agent CLIs, the sandbox and the data directory; `--json` for scripts. The report does not include the API token |
@@ -43,7 +43,16 @@ Options of `bell-pr start`:
 | `--host <host>` | `BELLPR_HOST` | `127.0.0.1` |
 | `--data-dir <dir>` | `BELLPR_DATA_DIR` | `~/.bellpr` |
 | `--no-open` | `BELLPR_NO_OPEN=1` | opens the browser when it can |
+| `--force` | | off. Start even when `bell-pr doctor` reports Not ready |
 | `--env-file <file>` | | none |
+
+`bell-pr start` runs the same required checks as `bell-pr doctor` and exits
+with status 1 before it listens when one fails. The message is the doctor's
+checklist (each failed check and the command that fixes it) plus how to
+start anyway. `--force` skips that gate and prints a warning. The sample
+tour needs no AI provider, so `bell-pr start --force` is how you open it
+when none is signed in. A real agent run is still refused until a provider
+is ready.
 
 `--data-dir` and `--env-file` work with every command, so `open`, `doctor`
 and `version` find the data directory of the BELL PR you mean.
@@ -99,7 +108,7 @@ of them. When a turn times out, its message says how long it waited.
 | **Data & privacy** | The data directory, disk use per run and freeing it, automatic cleanup, deleting all data, and what leaves this computer |
 | **About** | The version, and the About dialog with the data directory, the Apache-2.0 license, the notices and the security policy, help links and **Copy diagnostics** |
 
-The model settings (agent, model, reasoning effort, web access) are shared
+The model settings (agent, model, reasoning effort, web access and agent access) are shared
 by every project and saved in `<data dir>/model-settings.json`. Each new
 run records the settings it started with, so later changes do not affect
 runs that already exist. A project's contribution direction, team size,

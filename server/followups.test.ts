@@ -329,6 +329,7 @@ test("a follow-up round works in the run's locale, whatever the locale of the re
     await f.workbench.startFollowUp(f.run.id, { feedbackUrls: [feedbackItem.url] });
     await settled(f.run);
     assert.match(prompt, /Please say hello to the world\./);
+    assert.match(prompt, /notes\.md/, "the agent still sees the published PR's changed-file context");
     assert.ok(prompt.startsWith(respondIn("en")));
     assert.ok(!prompt.includes(outputLanguage("zh-TW")));
     assert.equal(f.run.followUps![0].status, "review");
@@ -434,6 +435,20 @@ test("a review follow-up round becomes one more commit on the same PR branch aft
     assert.equal(f.run.draft.commitMessage, "Greet the world\n\nAddress the review on hello.ts.");
     // The changed file needs a fresh review; title and body stay as published.
     assert.equal(f.run.reviewedFingerprints["hello.ts"], undefined);
+    const files = await f.workbench.diff(f.run.id);
+    assert.deepEqual(files.map((file) => file.path), ["hello.ts"]);
+    assert.match(files[0].patch, /-export const hello = "after";/);
+    assert.doesNotMatch(files[0].patch, /"before"/);
+    // A file already pushed, and untouched in this round, needs no new tick.
+    assert.equal(f.run.reviewedFingerprints["notes.md"], undefined);
+    assert.deepEqual(
+      (await f.workbench.contextLines(f.run.id, "hello.ts", files[0].fingerprint, firstCommit)).lines,
+      ['export const hello = "after";'],
+    );
+    await assert.rejects(
+      f.workbench.contextLines(f.run.id, "hello.ts", files[0].fingerprint, f.baseSha),
+      (error: AppError) => error.statusCode === 409,
+    );
     await assert.rejects(
       f.workbench.draft(f.run.id, { ...f.run.draft, title: "fix: something else" }),
       /PR 標題與說明維持原樣/,
@@ -454,6 +469,14 @@ test("a review follow-up round becomes one more commit on the same PR branch aft
     assert.equal(
       (await git(f.repository, ["log", "-1", "--format=%B", secondCommit])).stdout.trim(),
       "Greet the world\n\nAddress the review on hello.ts.",
+    );
+    assert.equal(
+      (await git(f.repository, ["show", `${secondCommit}:notes.md`])).stdout,
+      "Greeting notes.\n",
+    );
+    assert.equal(
+      (await git(f.repository, ["diff", "--name-only", firstCommit, secondCommit])).stdout.trim(),
+      "hello.ts",
     );
     const roundCalls = (await f.remoteCalls()).slice(firstCalls);
     assert.ok(roundCalls.some((call) => call.includes("ls-remote")));
@@ -493,6 +516,67 @@ test("a review follow-up round becomes one more commit on the same PR branch aft
     // The pushed head was fully reviewed, so its review marks come back.
     assert.deepEqual(Object.keys(f.run.reviewedFingerprints).sort(), ["hello.ts", "notes.md"]);
     await assert.rejects(f.workbench.discardFollowUp(f.run.id), /沒有可以放棄/);
+  } finally {
+    await f.cleanup();
+  }
+});
+
+test("the same patch in a later round rejects stale review ticks even when its parent is unchanged", async () => {
+  const f = await publishedFixture(async (input) => {
+    await writeFile(path.join(input.cwd, "hello.ts"), 'export const hello = "world";\n');
+    return JSON.stringify({
+      summary: "改了問候語。",
+      addressed: [],
+      notAddressed: [],
+      checks: [],
+      commitMessage: "Greet the world",
+    });
+  });
+  try {
+    const firstCommit = f.run.publishCommit!;
+    await f.workbench.startFollowUp(f.run.id, { feedbackUrls: [feedbackItem.url] });
+    await settled(f.run);
+    const [earlier] = await f.workbench.diff(f.run.id);
+    const earlierRound = f.run.followUps!.at(-1)!;
+    await f.workbench.review(f.run.id, earlier.path, true, earlier.fingerprint);
+    await f.workbench.discardFollowUp(f.run.id);
+
+    await f.workbench.startFollowUp(f.run.id, { feedbackUrls: [feedbackItem.url] });
+    await settled(f.run);
+    const [current] = await f.workbench.diff(f.run.id);
+    const currentRound = f.run.followUps!.at(-1)!;
+    assert.notEqual(currentRound.id, earlierRound.id);
+    assert.equal(currentRound.parentCommit, earlierRound.parentCommit);
+    assert.equal(current.patch, earlier.patch);
+    assert.notEqual(current.fingerprint, earlier.fingerprint);
+    assert.equal(f.run.reviewedFingerprints[current.path], undefined);
+    for (const reviewed of [true, false]) {
+      await assert.rejects(
+        f.workbench.review(f.run.id, current.path, reviewed, earlier.fingerprint),
+        (error: AppError) => error.statusCode === 409,
+      );
+      assert.equal(f.run.reviewedFingerprints[current.path], undefined);
+    }
+    await assert.rejects(
+      f.workbench.approve(f.run.id, { ...f.run.draft }),
+      (error: AppError) => error.statusCode === 409,
+    );
+    await f.workbench.review(f.run.id, current.path, true, current.fingerprint);
+    await assert.rejects(
+      f.workbench.review(f.run.id, current.path, false, earlier.fingerprint),
+      (error: AppError) => error.statusCode === 409,
+    );
+    assert.equal(f.run.reviewedFingerprints[current.path], current.fingerprint);
+    await f.workbench.approve(f.run.id, { ...f.run.draft });
+    await f.workbench.publish(f.run.id, f.run.approvedFingerprint!);
+    assert.equal(
+      (await git(f.repository, ["rev-parse", `${f.run.publishCommit}^`])).stdout.trim(),
+      firstCommit,
+    );
+    assert.equal(
+      (await git(f.repository, ["show", `${f.run.publishCommit}:notes.md`])).stdout,
+      "Greeting notes.\n",
+    );
   } finally {
     await f.cleanup();
   }
@@ -624,7 +708,7 @@ test("stopping or restarting during a follow-up round keeps the PR published and
   }
 });
 
-test("a round that reverts or deletes pushed files cannot be approved, and an agent's own commit is undone for review", async () => {
+test("a round can review and publish reverted or deleted PR files, and an agent's own commit is undone for review", async () => {
   let edit: (cwd: string) => Promise<void> = async () => {};
   const f = await publishedFixture(async (input) => {
     await edit(input.cwd);
@@ -638,22 +722,38 @@ test("a round that reverts or deletes pushed files cannot be approved, and an ag
   });
   try {
     const firstCommit = f.run.publishCommit!;
-    // Deleting a file the PR added drops it out of the review list, so it is refused.
+    // These changes disappear from the cumulative PR diff, but both must be
+    // shown and reviewed against the previous push before this round can go out.
     edit = async (cwd) => {
-      await writeFile(path.join(cwd, "hello.ts"), 'export const hello = "kept";\n');
+      await writeFile(path.join(cwd, "hello.ts"), 'export const hello = "before";\n');
       await rm(path.join(cwd, "notes.md"));
     };
     await f.workbench.startFollowUp(f.run.id, { feedbackUrls: [feedbackItem.url] });
     await settled(f.run);
-    await f.reviewAll();
+    const files = await f.workbench.diff(f.run.id);
+    assert.deepEqual(
+      files.map((file) => [file.path, file.status]),
+      [["hello.ts", "modified"], ["notes.md", "deleted"]],
+    );
+    assert.match(files[0].patch, /-export const hello = "after";/);
+    assert.match(files[0].patch, /\+export const hello = "before";/);
+    assert.match(files[1].patch, /-Greeting notes\./);
+    await f.workbench.review(f.run.id, "hello.ts", true, files[0].fingerprint);
     await assert.rejects(
       f.workbench.approve(f.run.id, { ...f.run.draft }),
-      (error: AppError) => error.statusCode === 409 && /notes\.md/.test(error.message),
+      (error: AppError) => error.statusCode === 409 && /請先審閱/.test(error.message),
     );
-    await f.workbench.discardFollowUp(f.run.id);
+    await f.workbench.review(f.run.id, "notes.md", true, files[1].fingerprint);
+    await f.workbench.approve(f.run.id, { ...f.run.draft });
+    await f.workbench.publish(f.run.id, f.run.approvedFingerprint!);
+    const revertedCommit = f.run.publishCommit!;
     assert.equal(
-      await readFile(path.join(f.repository, "notes.md"), "utf8"),
-      "Greeting notes.\n",
+      (await git(f.repository, ["rev-parse", `${revertedCommit}^`])).stdout.trim(),
+      firstCommit,
+    );
+    assert.equal(
+      (await git(f.repository, ["rev-parse", `${revertedCommit}^{tree}`])).stdout.trim(),
+      (await git(f.repository, ["rev-parse", `${f.baseSha}^{tree}`])).stdout.trim(),
     );
     // An agent that commits despite the prompt: the branch goes back to the PR head,
     // and the edit waits for review as an ordinary change.
@@ -666,7 +766,7 @@ test("a round that reverts or deletes pushed files cannot be approved, and an ag
     const round = f.run.followUps!.at(-1)!;
     assert.equal(round.status, "review");
     assert.match(round.error!, /自行建立了 commit/);
-    assert.equal((await git(f.repository, ["rev-parse", "HEAD"])).stdout.trim(), firstCommit);
+    assert.equal((await git(f.repository, ["rev-parse", "HEAD"])).stdout.trim(), revertedCommit);
     assert.match(
       (await git(f.repository, ["status", "--porcelain"])).stdout,
       /hello\.ts/,
@@ -676,7 +776,7 @@ test("a round that reverts or deletes pushed files cannot be approved, and an ag
     await f.workbench.publish(f.run.id, f.run.approvedFingerprint!);
     assert.equal(
       (await git(f.repository, ["rev-parse", `${f.run.publishCommit}^`])).stdout.trim(),
-      firstCommit,
+      revertedCommit,
     );
   } finally {
     await f.cleanup();

@@ -26,22 +26,61 @@ default; you can turn it off, and the run says so) and approved the pull
 request yourself. Publishing checks that the project welcomes it. There is
 no BELL PR cloud, no telemetry and no account.
 
-This is the open-source edition of BELL PR, licensed under
-[Apache-2.0](LICENSE) and free to use. It is community-maintained.
+BELL PR is free and open-source software under
+[Apache-2.0](LICENSE). There is no paid tier at launch.
 
 ![The Code changes tab: a diff with a plain-language explanation of the change beside it](docs/images/en/run-changes-1280.png)
 
-[Quickstart](#quickstart) · [Requirements](#requirements) ·
+[Try the sample project](#try-the-sample-project) ·
+[Before you start](#before-you-start) · [Quickstart](#quickstart) ·
+[Requirements](#requirements) ·
 [Features](#features) · [Privacy](#privacy) ·
 [Security](#security-model) · [Local API](#local-api) ·
 [Configuration](#configuration) ·
 [Troubleshooting](#troubleshooting) · [Documentation](#documentation) ·
 [Contributing](#contributing) · [License](#license-and-trademarks)
 
-## Quickstart
+## Try the sample project
 
-With the [requirements](#requirements) in place, this takes about 60
-seconds.
+A finished sample contribution — project rules, plan, diffs, explanations,
+understanding check, and PR draft — needs **no setup**, makes **no AI call**,
+and sends nothing to GitHub. Open it from Home (**Try the sample project**) or
+**Sample** in the sidebar once BELL PR is running.
+
+Use it to learn the review flow before you import a real repository. When
+`bell-pr doctor` is not ready, start with `bell-pr start --force` so this
+tour can open. A real agent run still waits for a signed-in AI provider.
+
+## Before you start
+
+BELL PR is a local workbench. Install and sign in to these tools **before**
+the Quickstart; `bell-pr doctor` prints a fix command for each miss.
+
+- **Node.js 22 or later** ([nodejs.org](https://nodejs.org/en)).
+- **Git**, with your name and e-mail set
+  (`git config --global user.name` / `user.email`). Syncing a run onto the
+  latest target branch needs **Git 2.40 or later**.
+- **GitHub CLI** (`gh`), signed in with `gh auth login`
+  ([cli.github.com](https://cli.github.com/)).
+- **One AI coding CLI**, installed and signed in as the same user that runs
+  BELL PR (either is enough). Usage counts against **your own** provider
+  account (a paid plan or API credits, depending on the provider):
+  - Codex CLI: `npm install -g @openai/codex`, then `codex login`
+  - Claude Code: `npm install -g @anthropic-ai/claude-code`, then
+    `claude auth login`
+- **On Linux:** `bubblewrap` and `socat` for the Claude Code file-edit
+  sandbox (`sudo apt-get install bubblewrap socat` on Debian/Ubuntu).
+  macOS uses its built-in sandbox.
+
+Supported today: **macOS**, **Linux**. **Windows via WSL2 (untested):** install
+everything above inside your WSL distribution.
+
+When `bell-pr doctor` reports every required check green, continue.
+`bell-pr start` exits before it listens until then. With no AI provider
+signed in, `bell-pr start --force` still opens BELL PR so you can take the
+sample tour; agent runs and publishing wait until a provider is ready.
+
+## Quickstart
 
 1. Start BELL PR:
 
@@ -60,6 +99,10 @@ seconds.
    it) and pick the AI **provider** your agents use.
 4. Take the sample tour, import a repository, or find a project to
    contribute to.
+
+`npx bell-pr` is `bell-pr start`. It listens only when `bell-pr doctor` is
+ready; otherwise it exits and prints the fix for each failed check. `npx
+bell-pr start --force` opens the sample tour anyway.
 
 **Lost the address? Run `bell-pr open`** (or `npx bell-pr open` if you
 started with `npx`). It prints the address again, including the API token
@@ -89,14 +132,34 @@ through a whole contribution.
   agents edit files in (`sudo apt-get install bubblewrap socat`).
 
 `bell-pr doctor` checks all of this and prints the command that fixes each
-problem.
+problem. See [Before you start](#before-you-start).
+
+**With no AI provider installed or signed in:** `bell-pr doctor` exits
+non-zero and marks the required **AI provider** check failed. `bell-pr
+start` then exits non-zero before it listens, and prints that checklist
+with the command that fixes each failed check. `bell-pr start --force`
+starts anyway and warns that the check was skipped. Welcome lets you
+continue; you can take the **sample tour** (no AI call). Starting a real
+agent run is refused until at least one of Codex CLI or Claude Code is
+installed and signed in; Discovery also needs a signed-in GitHub CLI.
+
+### Cost of a sample run
+
+<!-- TODO(Suzu / Product Tester): fill after one real end-to-end sample
+     contribution (not the offline Sample project). Record provider, model,
+     reported input/output tokens, and the billed cost in the provider’s
+     currency. Do not invent numbers. -->
+Agent usage is billed by **your** Codex / Claude account. BELL PR does not
+set prices. Exact tokens and cost for a typical first contribution are
+**not published yet** — they will be added here after one measured run.
 
 ## Supported platforms
 
 - **macOS**
 - **Linux**
-- **Windows through WSL2**: install and run BELL PR, Git, the GitHub CLI
-  and your AI CLI inside your WSL distribution.
+- **Windows through WSL2 (untested):** install and run BELL PR, Git, the
+  GitHub CLI and your AI CLI inside your WSL distribution. Browser tests and
+  real agent runs for 1.0.0-rc.1 were done on Linux only.
 
 The 1.0.0-rc.1 release candidate's unit tests, build and package check run
 on Linux and macOS with Node.js 22 and 24 (see the CI workflow). The browser
@@ -135,10 +198,13 @@ Failed subtasks can be retried.
 Before it plans, the Lead checks any assumption the request states against
 the code, and every role is told the verdict. The brief shows it, and once
 the run is finished you can check it again, also on a run made before
-these checks. Agents are told never to change your
-machine: no `sudo` and no global installs. When a check needs something
+these checks. With default **Working directory (default)** access, agents are told not to change
+your machine: no `sudo` and no global installs. When a check needs something
 the machine lacks, the overview lists it with a suggested command, for you
-to verify and run yourself.
+to verify and run yourself. Explicit **Full access** in model settings lets
+writable roles install tools outside the checkout and use available sudo
+privileges; read-only roles keep their restrictions. Linux also offers an
+optional passwordless sudo setup. See the [security model](docs/security-model.md#explicit-full-access).
 
 Several contributions can run at the same time, up to the limit in
 **Settings → Performance** or `BELLPR_MAX_ACTIVE_RUNS` (1 to 8; 2 by
@@ -148,9 +214,18 @@ In **Learn by hand** you write the change yourself: a guide plans with you,
 gives hints without code and reviews your change when you are ready. BELL PR
 runs your tests, and its agents cannot edit your files in these runs.
 
+Before publishing an agent contribution, **Collaborate** lets you ask an agent
+to fix checks, add tests or work through the draft's Limitations. Each turn
+records changed files, observed commands, missing checks and questions. Edits
+invalidate the affected review marks. Completed checks go in Validation;
+Limitations keeps remaining gaps and constraints. Updates to these sections show
+their old and new text for you to check. You still approve and publish the contribution;
+you can stop a turn and keep its edits. Learn by hand does not offer this
+writable conversation.
+
 ![Agent activity: the team's plan, progress and reports](docs/images/en/run-activity-1280.png)
 
-### Review that teaches, and checks you learned
+### Review that teaches, and asks you to explain it back
 
 Every changed file comes with a plain-language explanation: a concrete
 example of the behavior before and after, what changed and why, the
@@ -199,13 +274,20 @@ another, the confirm before publishing lists them, and **Split into
 contributions** on the Draft tab can turn each part into its own contribution,
 by file. A part is a group of files, not always one fix, so check the grouping.
 
-It checks the text before anything is sent: credentials and unfinished
-placeholders block it, and a local path, a CI change or a public commit
+It checks the text before anything is sent. Blocks common token formats and private keys before publishing.
+Unfinished placeholders block it, and a local path, a CI change or a public commit
 e-mail address needs your confirmation. AI assistance is mentioned only if
 the project requires it or you choose to, and publishing waits until a
 disclosure the project requires is there. Publishing pushes a branch (to
 your fork when needed) and opens a **Draft** PR through the GitHub CLI;
 nothing is ever force-pushed.
+An existing fork must belong to the target project before BELL PR pushes to it.
+
+If an earlier attempt created a local commit but stopped before pushing,
+**Recover unfinished publish** on the Draft tab checks GitHub and returns
+the contribution to review, keeping your files and draft. Review and approve
+it again before submitting. Recovery stops if a matching branch or PR exists,
+or GitHub cannot be checked.
 
 ![The PR draft tab: the pull request title and description editor, with what is left to do before you submit beside it](docs/images/en/run-draft-1280.png)
 
@@ -252,6 +334,10 @@ compare them with what you predicted, and tag what each comment raised and
 whether you saw it coming. Then let an agent address selected comments in a
 follow-up round, after you restate each one in your own words; you review
 the round and push it as one more commit.
+The code review shows that round's edits against the previous PR version.
+Use the selector in the code toolbar to view the initial submission, a published round,
+or all changes together. Historical and cumulative views are read-only;
+return to the current round to mark files reviewed and approve it.
 **Commit history** lists every commit of the pull request, from the first
 push to review rounds, syncs and commits made on GitHub, each opening to
 its files' diffs.
@@ -297,12 +383,6 @@ Claude Code may then open pages on GitHub's own sites only; the Codex CLI
 uses OpenAI's web search. Project analysis and discovery never get web
 access.
 
-### Try it with the sample project
-
-A finished sample contribution, with the project's rules, the plan, the
-changes, their explanations, the understanding check and the PR draft,
-needs no setup and makes no AI call.
-
 ## Privacy
 
 - BELL PR runs on your computer and keeps everything in one data
@@ -317,15 +397,13 @@ Details: [Privacy and your data](docs/privacy-and-data.md).
 
 ## Security model
 
-- **Sandboxed agents.** Agents that write code run in their CLI's
-  operating-system sandbox: writes stay in the run's own worktree and the
-  network is closed. Claude Code agents are also denied your SSH keys, the
-  GitHub CLI's sign-in and BELL PR's own data; Codex's sandbox does not
-  limit reading.
+- **Sandboxed agents.** In the default Working directory mode, agents that write code run in their CLI's operating-system sandbox: writes stay in the run's own worktree and the network is closed. Claude Code is denied the GitHub CLI config files, `~/.git-credentials` and credential-store files, `~/.netrc`, and `~/.ssh/`. `GH_TOKEN`/`GITHUB_TOKEN` are removed from the agent's environment. Tokens in your system keyring are not covered: the agent can still read your GitHub token via `gh auth token`. Your main protection is a fine-grained token with the minimum permissions you need. Claude Code is also denied BELL PR's own data outside its checkout. "Full access" is off by default. It turns off the OS sandbox and the credential deny rules for roles that write files, so those agents can read `~/.git-credentials` and `~/.ssh` and run `gh`, `git push`, and `curl`. Read-only roles keep their limits. Only the removal of `GH_TOKEN`/`GITHUB_TOKEN` from the environment still applies. "Passwordless sudo" (Linux only) is off by default. It lets every process under your user account, including the agent, run any command as root without a password and read every file on that machine, including tokens and SSH keys. Use either only in a throwaway VM or container.
 - **Imported projects are untrusted.** Their code, documents and agent
   instructions (`AGENTS.md`, `CLAUDE.md`, `.claude/`) are treated as data:
   the CLIs never load the project's own settings, hooks or instructions,
   and a repository whose Git configuration could run programs is refused.
+  Git commands BELL PR itself runs also turn those programs off. Only a
+  git command that talks to GitHub receives `GH_TOKEN`.
   Agents still run the project's code, so import only projects you are
   willing to run on this computer.
 - **API token.** Each install keeps a token in its data directory, and
@@ -384,7 +462,9 @@ The token can remain in browser history; run `bell-pr token rotate` if you share
 
 BELL PR needs no configuration. Every setting below is an environment
 variable read at start; `bell-pr start` also takes `--port`, `--host`,
-`--data-dir`, `--no-open` and `--env-file <file>`. Values set in the app's
+`--data-dir`, `--no-open`, `--force` and `--env-file <file>`. `start` exits
+before it listens when a required `bell-pr doctor` check fails; `--force`
+starts anyway. Values set in the app's
 Settings are used unless a variable sets them.
 
 | Variable | Default | What it sets |
@@ -422,7 +502,11 @@ docker exec bell-pr bell-pr open --print
 ```
 
 The image includes Git, the GitHub CLI and the Codex CLI; you can install
-Claude Code into the container yourself. Docker is **beta**: the agent
+Claude Code into the container yourself. Its command is `bell-pr start`,
+which exits before it listens when `bell-pr doctor` is not ready. To open
+the sample tour before a provider is signed in, run
+`docker run ... bell-pr start --force` (that replaces the image command).
+Docker is **beta**: the agent
 sandbox needs three extra `--security-opt` options. Read
 [Docker](docs/docker.md) before you use it, and
 [Self-hosting](docs/self-hosting.md) for a systemd service or a reverse
@@ -492,15 +576,15 @@ BELL PR from its source.
 
 ## Support
 
-BELL PR is community-maintained. Start with `bell-pr doctor`, then
+Start with `bell-pr doctor`, then
 [Troubleshooting](docs/troubleshooting.md) and the [FAQ](docs/faq.md); the
 rest of the [documentation](docs/README.md) covers each topic. The About
 dialog (**Settings → About → About BELL PR**) can copy a diagnostics report
 with secrets, paths and your GitHub login removed, ready for a support
 request.
 
-To report a security vulnerability, follow [SECURITY.md](SECURITY.md); do
-not open a public issue for it.
+To report a security vulnerability privately, follow
+[SECURITY.md](SECURITY.md). Do not open a public issue.
 
 <!-- generated:product-link key=homepageUrl text="Website" -->
 <!-- /generated:product-link -->

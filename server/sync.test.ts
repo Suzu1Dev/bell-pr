@@ -854,19 +854,27 @@ test("commits pushed to the PR branch on GitHub are taken over before a round; r
     assert.equal(adopted.parentCommit, bellPush);
     await until(() => f.run.status === "review");
     assert.equal(f.run.followUps![1].parentCommit, theirs);
-    // Discarding the round leaves the taken-over file still to be reviewed.
+    // Discard restores the cumulative view without marking adopted files as reviewed.
     await f.workbench.discardFollowUp(f.run.id);
     assert.deepEqual(f.run.reviewedFiles, ["hello.ts"]);
     await f.workbench.startFollowUp(f.run.id, { feedbackUrls: [feedbackUrl] });
     await until(() => f.run.status === "review");
     const round = f.run.followUps![2];
     assert.equal(round.parentCommit, theirs);
-    // The adopted change is reviewed together with the round's own.
-    assert.deepEqual((await readDiff(f.run)).map((file) => file.path), ["hello.ts", "notes.md"]);
+    // The new round reviews only changes after its adopted parent; the
+    // already-pushed GitHub change remains available in read-only history.
+    assert.deepEqual((await readDiff(f.run)).map((file) => file.path), ["hello.ts"]);
+    const adoptedDiff = await f.workbench.commit(f.run.id, theirs);
+    assert.deepEqual(adoptedDiff.files.map((file) => file.path), ["notes.md"]);
+    assert.match(adoptedDiff.files[0].patch, /\+Suggested on GitHub\./);
     await f.reviewAll();
     await f.workbench.approve(f.run.id, { ...f.run.draft });
     await f.workbench.publish(f.run.id, f.run.approvedFingerprint!);
     assert.deepEqual(await parentsOf(f.repo.path, await f.github.head("fix/sync0001")), [theirs]);
+    assert.equal(
+      (await git(f.run.worktreePath, ["show", `${f.run.publishCommit}:notes.md`])).stdout,
+      "Suggested on GitHub.\n",
+    );
 
     // History that no longer contains BELL's push is refused.
     const mainHead = await f.github.head("main");

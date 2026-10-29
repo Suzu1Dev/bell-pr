@@ -14,6 +14,7 @@ export const runDetailFields = [
   "reports",
   "draftPreparation",
   "conversations",
+  "session",
   "prFeedback",
   "followUps",
   "sync",

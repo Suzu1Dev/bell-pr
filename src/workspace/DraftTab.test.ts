@@ -125,7 +125,7 @@ const element = (
         async loadPublishChecks() {},
         ...draft,
       },
-      actions: { feedbackLoading: false, async fetchPrFeedback() {}, openSplit() {} },
+      actions: { feedbackLoading: false, async fetchPrFeedback() {}, openSplit() {}, async recoverPublish() {} },
       rounds: {
         followUpSelection: [],
         setFollowUpSelection() {},
@@ -148,6 +148,40 @@ const render = (
   draft: Partial<Props["draft"]> = {},
   rounds: Partial<Props["rounds"]> = {},
 ) => renderZh(element(props, draft, rounds));
+
+test("only an unfinished local publish offers recovery, with a save-first and busy guard", () => {
+  const interrupted: Run = {
+    ...published, status: "review", publishCommit: "d".repeat(40),
+    prUrl: undefined, publishedBranch: undefined, headRepository: undefined, followUps: undefined,
+  };
+  const available = render({ run: interrupted });
+  assert.match(available, /恢復未完成的發佈/);
+  assert.match(available, /檢查遠端，保留程式碼與草稿/);
+  assert.doesNotMatch(tag(available, /aria-describedby="publish-recovery-help"/), /disabled=""/);
+  const dirty = render({ run: interrupted }, { draftDirty: true });
+  assert.match(dirty, /請先儲存草稿的修改/);
+  assert.match(tag(dirty, /aria-describedby="publish-recovery-help publish-recovery-unsaved"/), /disabled=""/);
+  for (const props of [
+    { busy: true }, { active: true },
+    { run: { ...interrupted, publishing: true } },
+    { run: { ...interrupted, session: { revision: 0, updatedAt: "2026-10-29T00:00:00Z", messages: [], running: true } } },
+  ]) {
+    assert.match(tag(render({ run: interrupted, ...props }), /aria-describedby="publish-recovery-help"/), /disabled=""/);
+  }
+  for (const props of [
+    { demo: true },
+    { run: { ...interrupted, publishCommit: undefined } },
+    { run: { ...interrupted, prUrl } },
+    { run: { ...interrupted, publishedBranch: "fix/run1" } },
+    { run: { ...interrupted, headRepository: "acme/widgets" } },
+    { run: { ...interrupted, followUps: [open] } },
+    { run: { ...interrupted, status: "running" as const } },
+  ]) assert.doesNotMatch(render({ run: interrupted, ...props }), /恢復未完成的發佈/);
+  const english = renderEn(element({ run: interrupted }));
+  assert.match(english, /Recover unfinished publish/);
+  assert.match(english, /checks the remote, keeps your code and draft/);
+  assertNoHan(english);
+});
 
 /** The opening tag of the first element whose attributes match `marker`. */
 const tag = (html: string, marker: RegExp) =>

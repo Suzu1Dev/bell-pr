@@ -16,7 +16,7 @@ import { parseDiff } from "./diff";
 import "./review.css";
 
 /** A commit's patch for one file, read only: no review marks, no selection. */
-function CommitPatch({ path, patch }: { path: string; patch: string }) {
+export function CommitPatch({ path, patch }: { path: string; patch: string }) {
   const t = useT("review");
   return (
     <div

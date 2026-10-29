@@ -13,6 +13,7 @@ export function ModelSummary({
   analysis?: boolean;
 }) {
   const t = useT("models");
+  const permissions = useT("permissions");
   const { reasoningEffortWithId } = useT("common");
   const fmt = useFormat();
   const kind = analysis ? "analysis" : "run";
@@ -81,6 +82,12 @@ export function ModelSummary({
               <div>
                 <dt>{t.network}</dt>
                 <dd>{t.webAccessAllowed}</dd>
+              </div>
+            )}
+            {execution.agentAccess === "full" && (
+              <div>
+                <dt>{permissions.label}</dt>
+                <dd>{permissions.summary}</dd>
               </div>
             )}
           </dl>

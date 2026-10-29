@@ -37,6 +37,8 @@ export default {
       "data-dir": "Data directory",
       app: product.name,
       platform: "Platform",
+      "full-access": "Full access",
+      "passwordless-sudo": "Passwordless sudo",
     } satisfies Record<DoctorCheckId, string>,
     status: {
       ok: "Ready",

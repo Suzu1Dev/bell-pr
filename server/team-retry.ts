@@ -10,6 +10,7 @@ import { sm } from "./i18n/index.js";
 import { queueTeamMessage } from "./run-executor.js";
 import { assertWorkspacePresent } from "./cleanup.js";
 import { logRunQueued } from "./run-events.js";
+import { assertRunAgentAllowed } from "./codex-guard.js";
 import type { WorkbenchContext } from "./workbench.js";
 
 /**
@@ -27,6 +28,7 @@ export async function retryTeam(
 ) {
   return ctx.lock(id, async () => {
     const run = ctx.run(id);
+    assertRunAgentAllowed(run);
     const team = run.team;
     if (!["failed", "cancelled"].includes(run.status) || !team)
       throw new AppError((m) => m.run.team.retryNotAllowed, 409);

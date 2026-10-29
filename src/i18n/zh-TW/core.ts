@@ -15,6 +15,8 @@ import pages from "./pages";
 import repos from "./repos";
 import review from "./review";
 import setup from "./setup";
+import session from "./session";
+import permissions from "./permissions";
 import workspace from "./workspace";
 
 const messages: Translation<typeof en> = {
@@ -28,6 +30,8 @@ const messages: Translation<typeof en> = {
   review,
   draft,
   setup,
+  session,
+  permissions,
   home,
 };
 

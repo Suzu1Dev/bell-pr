@@ -33,6 +33,9 @@ import type { RouteDeps } from "./routes/types.js";
 import { registerUnderstandingRoutes } from "./routes/understanding.js";
 import { registerContributionRoutes } from "./routes/contribution.js";
 import { registerByHandRoutes } from "./routes/by-hand.js";
+import { registerSessionRoutes } from "./routes/session.js";
+import { registerSudoRoutes } from "./routes/sudo.js";
+import type { PasswordlessSudo } from "./sudo.js";
 
 /** Masks secrets in string values, which may quote command output. */
 function redactValues<T extends Record<string, unknown>>(values?: T) {
@@ -66,6 +69,7 @@ function appErrorBody(error: AppError): ApiErrorBody {
  * point and tests set what they need, and later work only fills in values.
  */
 export interface AppOptions {
+  sudo?: PasswordlessSudo;
   /**
    * The built UI: the dist/ folder next to the server code by default, not
    * the working directory.
@@ -90,6 +94,11 @@ export interface AppOptions {
   agentTimeoutScale?: number;
   /** The app version the API reports. */
   version?: string;
+  /**
+   * Operating system for Linux-only routes. This process by default.
+   * Tests pass another value; the server entry does not.
+   */
+  platform?: NodeJS.Platform;
   /** Development mode, with the UI dev server in front. Off by default. */
   dev?: boolean;
   /**
@@ -194,6 +203,8 @@ export function createApp(workbench: Workbench, options: AppOptions = {}) {
   registerUnderstandingRoutes(app, deps);
   registerContributionRoutes(app, deps);
   registerByHandRoutes(app, deps);
+  registerSessionRoutes(app, deps);
+  if ((options.platform ?? process.platform) === "linux") registerSudoRoutes(app, deps);
   app.use("/api", (_req, res) => {
     res.status(404).json({ error: sm().common.notFound });
   });

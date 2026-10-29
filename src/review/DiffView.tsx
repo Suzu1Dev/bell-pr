@@ -50,6 +50,9 @@ const expandStep = 20;
 export interface DiffViewProps {
   file: DiffFile;
   reviewed: boolean;
+  reviewDisabled?: boolean;
+  /** Published comparisons remain readable without asking for new review marks. */
+  showReview?: boolean;
   onReview: () => void;
   onAsk: (question: string) => void;
   view: "unified" | "split";
@@ -98,6 +101,8 @@ const Syntax = memo(function Syntax({ code }: { code: string }) {
 export function DiffView({
   file,
   reviewed,
+  reviewDisabled = false,
+  showReview = true,
   onReview,
   onAsk,
   view,
@@ -558,21 +563,21 @@ export function DiffView({
           )}
           <span className="rv-additions">+{file.additions}</span>
           <span className="rv-deletions">−{file.deletions}</span>
-          {hasNote === false && !reviewed && !file.blocked && (
+          {showReview && hasNote === false && !reviewed && !file.blocked && (
             <span className="rv-note-hint">{t.diff.noteHint}</span>
           )}
-          <label className={`rv-reviewed ${reviewed ? "rv-reviewed-yes" : ""}`}>
+          {showReview && <label className={`rv-reviewed ${reviewed ? "rv-reviewed-yes" : ""}`}>
             <input
               type="checkbox"
               checked={reviewed}
               onChange={onReview}
-              disabled={Boolean(file.blocked)}
+              disabled={reviewDisabled || Boolean(file.blocked)}
             />
             <span className="rv-review-check" aria-hidden="true">
               {reviewed && <Check size={11} strokeWidth={3} />}
             </span>
             {t.diff.reviewed}
-          </label>
+          </label>}
         </div>
       </div>
       {baseError && (

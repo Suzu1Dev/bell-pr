@@ -8,6 +8,7 @@ import { existsSync } from "node:fs";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { codexAccessMode } from "./agent-cli.js";
 import { coachJsonSchema, coachRecords, parseCoachAnswer } from "./coach.js";
 import { withLocale } from "./i18n/index.js";
 import { respondIn } from "./prompt-language.js";
@@ -419,7 +420,8 @@ test("the coach's CLI runs read-only in BELL's empty folder, offline, even when 
   const [call] = calls;
   assert.equal(call.executable, "codex");
   const flag = (name: string) => call.args[call.args.indexOf(name) + 1];
-  assert.equal(flag("--sandbox"), "read-only");
+  assert.equal(codexAccessMode(call.args), "read-only");
+  assert.ok(!call.args.includes("--sandbox"));
   assert.equal(flag("--model"), "gpt-saved");
   assert.ok(call.args.includes("--skip-git-repo-check"));
   assert.ok(!call.args.some((arg) => arg.includes("web_search")));

@@ -21,10 +21,33 @@ Contents:
 
 - [I lost the address](#i-lost-the-address)
 - [Error codes](#error-codes), one section per code
+- [An earlier publish made a different commit](#an-earlier-publish-made-a-different-commit)
 - [Publishing was blocked by a project rule, an issue or pacing](#publishing-was-blocked-by-a-project-rule-an-issue-or-pacing)
 - [BELL PR does not start](#bell-pr-does-not-start)
 - [Runs that wait, stop or cannot be reviewed](#runs-that-wait-stop-or-cannot-be-reviewed)
 - [Collecting details for a support request](#collecting-details-for-a-support-request)
+
+## An earlier publish made a different commit
+
+If a publish failed and you have not changed the code or commit message,
+retry **Submit Draft PR** after resolving the error. BELL PR reuses the saved
+commit; recovery is needed when that commit no longer matches your changes.
+
+A failed publish can leave a local commit. If you later change the files or
+commit message, retrying cannot reuse that commit. On the **Draft** tab, save
+your edits and choose **Recover unfinished publish**. This option appears
+only for attempts that stopped before pushing began.
+
+Recovery checks the project and your signed-in account's fork for matching
+branches, and checks the project for matching PRs in any state. If no branch
+or PR exists, it backs up the old commit locally, keeps your files and draft,
+and returns the contribution to review. Review and approve it again, then
+submit the Draft PR as usual.
+
+If GitHub cannot be checked, fix the connection or sign-in and try recovery
+again. If a branch or PR already exists, recovery leaves everything unchanged;
+check that branch or PR on GitHub. Attempts where pushing may have begun
+cannot use this recovery action.
 
 ## I lost the address
 
@@ -434,6 +457,12 @@ there, then publish again.
 
 ## BELL PR does not start
 
+- **"Not ready: fix the required check…"**: `bell-pr doctor` failed a
+  required check, so `bell-pr start` exited before it listened. The message
+  is the doctor's checklist: each failed check and the command that fixes
+  it, then how to start anyway. `bell-pr start --force` starts and prints a
+  warning. The sample tour needs no AI provider; a real agent run still
+  waits until Codex CLI or Claude Code is installed and signed in.
 - **"BELL PR needs Node.js 22 or later"**: install the current Node.js LTS
   from [nodejs.org](https://nodejs.org/en) (or `nvm install 22`).
 - **"Port 4311 is already in use by another program"**: start on a free
@@ -478,9 +507,9 @@ there, then publish again.
 - **"The changes cover more than 150 files"** or **"… larger than 2 MB"**:
   make the task smaller and run it again.
 - **A file is held back from the pull request**: binary files, symbolic
-  links, new files over 512 KB, sensitive files (such as `.env` files and
-  private keys) and changes that look like credentials need a manual
-  review. Remove them from the changes, or handle them outside BELL PR.
+  links, new files over 512 KB, and sensitive files (such as `.env` files)
+  need a manual review. Blocks common token formats and private keys before publishing.
+  Remove them from the changes, or handle them outside BELL PR.
 - **A run stopped when BELL PR restarted**: a restart stops the agents.
   Interrupted runs show what happened; retry the failed subtasks from the
   task board.
@@ -503,8 +532,9 @@ there, then publish again.
   for that analysis (or for **Generate 5 more**) has a `problem` field. It
   lists the fields that did not fit and the kind of problem, such as
   `recommendations: too_big`, or `json_syntax` when the answer was not JSON.
-  It never contains the answer's text. Analyze again; the previous result is
-  kept.
+  `length` is the answer's size in bytes. The line never contains the
+  answer's text; credential-shaped text in it is masked. Analyze again; the
+  previous result is kept.
 
 <!-- generated:product-link key=supportEmail text="Contact support by e-mail" -->
 <!-- /generated:product-link -->

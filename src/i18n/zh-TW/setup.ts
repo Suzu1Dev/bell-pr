@@ -30,6 +30,8 @@ const m: Translation<typeof en> = {
       "data-dir": "資料目錄",
       app: product.name,
       platform: "平台",
+      "full-access": "完整權限",
+      "passwordless-sudo": "免密碼 sudo",
     },
     status: {
       ok: "已就緒",

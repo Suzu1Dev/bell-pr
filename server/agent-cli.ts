@@ -1,5 +1,9 @@
 import { readFile } from "node:fs/promises";
+import path from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
+import { sharedCredentialDenials } from "../shared/credential-denials.js";
+import { codexEnabled } from "../shared/codex-switch.js";
+export { setCodexEnabledForTests } from "../shared/codex-switch.js";
 import {
   providerLabels,
   type AgentProvider,
@@ -11,6 +15,7 @@ import { AppError } from "./types.js";
 import { redact } from "./secrets.js";
 import { exitStatusCanHideFailure } from "./exit-status.js";
 import {
+  agentGitWriteDenials,
   agentReadDenials,
   agentSandboxReadPaths,
   enforceAgentSandbox,
@@ -30,6 +35,8 @@ export interface AgentCommandOptions {
   skipGitRepoCheck?: boolean;
   /** Web search and page fetching for "read" and "write"; "none" never gets it. */
   web?: boolean;
+  /** Write roles only: explicit permission to remove the sandbox and command deny rules. */
+  full?: boolean;
 }
 
 export const agentLabel = (provider: AgentProvider = "codex") =>
@@ -56,7 +63,7 @@ export const claudeWebFetchDomains = [
  * - `WebFetch(domain:…)` allows one host per rule; WebSearch takes no
  *   argument.
  */
-function claudeAccess(access: AgentAccess, web: boolean): string[] {
+function claudeAccess(access: AgentAccess, web: boolean, full: boolean): string[] {
   if (access === "none") return ["--tools", "", "--permission-mode", "dontAsk"];
   const tools =
     access === "read"
@@ -77,10 +84,10 @@ function claudeAccess(access: AgentAccess, web: boolean): string[] {
         : []),
     ].join(" "),
     "--permission-mode",
-    access === "read" ? "dontAsk" : "acceptEdits",
+    access === "read" ? "dontAsk" : full ? "bypassPermissions" : "acceptEdits",
     // acceptEdits approves file edits inside the working directory only.
     // Deny rules win over allow rules: pushing, GitHub CLI and raw downloads stay with BELL's own flow.
-    ...(access === "write"
+    ...(access === "write" && !full
       ? [
           "--disallowedTools",
           "Bash(git push:*)",
@@ -90,6 +97,50 @@ function claudeAccess(access: AgentAccess, web: boolean): string[] {
         ]
       : []),
   ];
+}
+
+/**
+ * Codex permission profile for one turn. `--sandbox` is not passed: on
+ * Codex CLI 0.165 it selects the older sandbox, which does not apply
+ * `default_permissions`, so the read denials would be ignored.
+ * `glob_scan_max_depth` makes a `**` deny apply on Linux.
+ *
+ * Filesystem values are only `read`, `write`, or `deny`. `deny` blocks
+ * reads and writes. `read` allows reads and forbids writes, including
+ * delete and replace. The checkout's `.git` and `.git/**` are `read`,
+ * so the file cannot be edited or replaced with a directory, and Git
+ * can still read it. Credential paths stay `deny`.
+ */
+export function codexSandboxConfig(access: AgentAccess, cwd: string): string[] {
+  const dotGit = path.join(cwd, ".git");
+  const filesystem = [
+    "glob_scan_max_depth=4",
+    ...sharedCredentialDenials().flatMap((entry) =>
+      /["\\\r\n{}]/.test(entry) ? [] : [`"${entry}"="deny"`],
+    ),
+    ...[dotGit, `${dotGit}/**`].flatMap((entry) =>
+      /["\\\r\n{}]/.test(entry) ? [] : [`"${entry}"="read"`],
+    ),
+  ].join(", ");
+  const parent = access === "write" ? ":workspace" : ":read-only";
+  return [
+    "-c",
+    'default_permissions="bell-pr"',
+    "-c",
+    `permissions={bell-pr={extends="${parent}", filesystem={${filesystem}}, network={enabled=false}}}`,
+  ];
+}
+
+/** workspace-write or read-only, from the permission profile BELL passes. */
+export function codexAccessMode(
+  args: readonly string[],
+): "workspace-write" | "read-only" | undefined {
+  if (args.includes("--sandbox")) return undefined;
+  const table = args.find((arg) => arg.startsWith("permissions={bell-pr="));
+  if (!table) return undefined;
+  if (table.includes('extends=":workspace"')) return "workspace-write";
+  if (table.includes('extends=":read-only"')) return "read-only";
+  return undefined;
 }
 
 /**
@@ -115,7 +166,18 @@ export function claudeSettings(options: {
   cwd: string;
   access: AgentAccess;
   sandbox: boolean;
-}) {
+  full?: boolean;
+}): {
+  permissions: { deny: string[]; blockReadsOutsideWorkingDirectories?: boolean };
+  sandbox?: {
+    enabled: boolean;
+    failIfUnavailable?: boolean;
+    autoAllowBashIfSandboxed?: boolean;
+    allowUnsandboxedCommands?: boolean;
+    filesystem?: ReturnType<typeof agentSandboxReadPaths> & { denyWrite?: string[] };
+    network?: { allowedDomains: string[]; strictAllowlist: boolean };
+  };
+} {
   return {
     permissions: {
       deny: agentReadDenials(options.cwd),
@@ -130,11 +192,16 @@ export function claudeSettings(options: {
             failIfUnavailable: true,
             autoAllowBashIfSandboxed: true,
             allowUnsandboxedCommands: false,
-            filesystem: agentSandboxReadPaths(options.cwd),
+            filesystem: {
+              ...agentSandboxReadPaths(options.cwd),
+              denyWrite: agentGitWriteDenials(options.cwd),
+            },
             network: { allowedDomains: [], strictAllowlist: true },
           },
         }
-      : {}),
+      : options.full
+        ? { sandbox: { enabled: false } }
+        : {}),
   };
 }
 
@@ -160,13 +227,16 @@ export async function agentCommand(
   execution: ModelExecution,
   options: AgentCommandOptions,
 ): Promise<AgentCommand> {
+  // Omitted provider means Codex. While the switch is off, neither starts.
+  if (!codexEnabled && execution.provider !== "claude")
+    throw new AppError((m) => m.setup.doctor.codexDisabled, 422);
+  const full = (options.full ?? execution.agentAccess === "full") && options.access === "write";
   const web = options.web === true && options.access !== "none";
   if (execution.provider === "claude") {
     const value = modelExecutionSchema.parse(execution);
-    const { sandbox, unsandboxed } = await enforceAgentSandbox(
-      "claude",
-      options.access,
-    );
+    const { sandbox, unsandboxed } = full
+      ? { sandbox: false, unsandboxed: true }
+      : await enforceAgentSandbox("claude", options.access);
     return {
       executable: "claude",
       args: [
@@ -182,11 +252,11 @@ export async function agentCommand(
         "user",
         "--settings",
         JSON.stringify(
-          claudeSettings({ cwd: options.cwd, access: options.access, sandbox }),
+          claudeSettings({ cwd: options.cwd, access: options.access, sandbox, full }),
         ),
         ...(value.model ? ["--model", value.model] : []),
         ...(value.reasoningEffort ? ["--effort", value.reasoningEffort] : []),
-        ...claudeAccess(options.access, web),
+        ...claudeAccess(options.access, web, full),
         ...(options.outputSchema
           ? ["--json-schema", await readFile(options.outputSchema, "utf8")]
           : []),
@@ -207,8 +277,9 @@ export async function agentCommand(
       "project_doc_max_bytes=0",
       "--ephemeral",
       ...modelArguments(execution),
-      "--sandbox",
-      options.access === "write" ? "workspace-write" : "read-only",
+      ...(full
+        ? ["--sandbox", "danger-full-access"]
+        : codexSandboxConfig(options.access, options.cwd)),
       "-c",
       'approval_policy="never"',
       // Codex 0.159 `exec` has no --search flag; live search is a config override.

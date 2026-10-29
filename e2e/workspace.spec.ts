@@ -122,6 +122,73 @@ test("at 390 px the file filters sit side by side and the search opens from its 
   await expectNoOverflow(page);
 });
 
+for (const width of [390, 1024, 1440, 1800]) {
+  test(`at ${width} px focus mode can toggle both panes and restore the previous layout`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto("/#/runs/demo-run/changes?locale=en");
+    const files = page.locator(".file-panel");
+    const explanation = page.locator(".explanation-wrap");
+    const toggle = (name: string) => page.getByRole("button", { name, exact: true });
+    await expect(files).toBeVisible();
+    await expect(explanation).toBeVisible();
+    await toggle(workspace.changes.enterFocus).click();
+    await expect(page.locator(".app-shell")).toHaveClass(/is-focused/);
+    await expect(files).toBeHidden();
+    await expect(explanation).toBeHidden();
+
+    await toggle(workspace.changes.showFiles).click();
+    await expect(files).toBeVisible();
+    await expect(explanation).toBeHidden();
+    await toggle(workspace.changes.showExplanation).click();
+    await expect(explanation).toBeVisible();
+    if (width > 760) {
+      await expect(page.locator(".pane-resizer")).toBeVisible();
+      // The opened panes occupy their own grid columns, not rows below a
+      // full-width diff or a hidden column with only its state toggled.
+      const [left, code, right] = await Promise.all([
+        files.boundingBox(), page.locator(".diff-panel").boundingBox(), explanation.boundingBox(),
+      ]);
+      expect(left!.width).toBeGreaterThan(100);
+      expect(right!.width).toBeGreaterThan(200);
+      expect(left!.x + left!.width).toBeLessThanOrEqual(code!.x + 1);
+      expect(code!.x + code!.width).toBeLessThanOrEqual(right!.x + 1);
+    }
+    // Measure the opened panes and their controls. The premise summary
+    // elsewhere in the top bar intentionally folds its text to one line.
+    await expectNoOverflow(page, [".file-panel", ".explanation-wrap", ".rv-diff", ".diff-toolbar-actions"]);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    await toggle(workspace.changes.hideFiles).click();
+    await toggle(workspace.changes.hideExplanation).click();
+    await expect(files).toBeHidden();
+    await expect(explanation).toBeHidden();
+    await toggle(workspace.changes.exitFocus).click();
+    await expect(files).toBeVisible();
+    await expect(explanation).toBeVisible();
+
+    // Escape restores a mixed layout too, regardless of the panes opened
+    // or closed while focused. A second entry takes a new snapshot.
+    await toggle(workspace.changes.hideFiles).click();
+    await toggle(workspace.changes.enterFocus).click();
+    await toggle(workspace.changes.showFiles).click();
+    await toggle(workspace.changes.exitFocus).focus();
+    await page.keyboard.press("Escape");
+    await expect(page.locator(".app-shell")).not.toHaveClass(/is-focused/);
+    await expect(files).toBeHidden();
+    await expect(explanation).toBeVisible();
+  });
+}
+
+test("asking about code from focus mode opens the answer even when the explanation was hidden before", async ({ page }) => {
+  await page.goto("/#/runs/demo-run/changes?locale=en");
+  await page.getByRole("button", { name: workspace.changes.hideExplanation, exact: true }).click();
+  await page.getByRole("button", { name: workspace.changes.enterFocus, exact: true }).click();
+  await page.locator(".rv-code-scroll [role=option]").first().click();
+  await page.getByRole("button", { name: review.diff.askSelection, exact: true }).click();
+  await expect(page.locator(".app-shell")).not.toHaveClass(/is-focused/);
+  await expect(page.locator(".file-panel")).toBeVisible();
+  await expect(page.locator(".explanation-wrap")).toBeVisible();
+});
+
 test("Export saves the learning record as a Markdown file", async ({ browser }) => {
   const server = await launchSeeded();
   const { page, close } = await openOn(browser, server);

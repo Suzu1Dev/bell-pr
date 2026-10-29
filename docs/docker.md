@@ -37,6 +37,12 @@ docker run -d --name bell-pr \
   bell-pr
 ```
 
+- The image's command is `bell-pr start`. If a required doctor check fails
+  (no Codex or Claude Code sign-in yet), the process exits before it
+  listens and prints each failed check with its fix command. Sign in as
+  below, or open the sample tour with `docker run ... bell-pr start --force`
+  (that replaces the image command). A real agent run is still refused
+  until a provider is signed in.
 - `-p 127.0.0.1:4311:4311` publishes BELL PR on this computer only. The
   image listens on `0.0.0.0` inside the container (an explicit setting; BELL
   PR prints a warning) and still requires the API token in `/data/api-token`.
@@ -51,7 +57,8 @@ docker run -d --name bell-pr \
 - `BELLPR_PUBLIC_URL` must be the address your browser uses. BELL PR refuses
   requests for any other address. If you publish another port, for example
   `-p 127.0.0.1:8080:4311`, set `BELLPR_PUBLIC_URL=http://localhost:8080`.
-- `GH_TOKEN` lets `gh` and git push to GitHub. Instead, you can sign in once
+- `GH_TOKEN` lets `gh` and a git push or fetch talk to GitHub. Other git
+  commands BELL PR runs do not receive it. Instead, you can sign in once
   with `docker exec -it bell-pr gh auth login`; the login stays in
   `bellpr-home`.
 - Codex: pass `OPENAI_API_KEY`, or sign in once with

@@ -1,12 +1,15 @@
 import test, { type TestContext } from "node:test";
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { spawnSync } from "node:child_process";
+import { mkdir, mkdtemp, readFile, rename, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import {
   agentEnvironment,
   assertGitConfigSafe,
+  command,
   git,
+  gitChildEnv,
   gitNetwork,
   gitNetworkConfig,
 } from "./process.js";
@@ -156,7 +159,8 @@ const configOf = (args: string[]) =>
 test("every Git command overrides hooks, monitors, pagers, editors, prompts, SSH and log signature checks from the repository", async (t) => {
   const calls = await recordingGit(t);
   await git(os.tmpdir(), ["status"]);
-  const [call] = await calls();
+  const call = (await calls()).find((item) => item.args.at(-1) === "status");
+  assert.ok(call);
   assert.deepEqual(configOf(call.args), [
     "core.hooksPath=/dev/null",
     "core.fsmonitor=false",
@@ -167,8 +171,13 @@ test("every Git command overrides hooks, monitors, pagers, editors, prompts, SSH
     "core.editor=true",
     "core.askPass=",
     "log.showSignature=false",
+    "credential.helper=",
+    "diff.external=",
+    "uploadpack.packObjectsHook=",
+    "protocol.ext.allow=never",
   ]);
   assert.equal(call.args.at(-1), "status");
+  assert.ok(call.args.includes("--no-pager"));
 });
 
 test("network Git commands use gh credentials, HTTPS or SSH only, and never prompt", async (t) => {
@@ -177,7 +186,8 @@ test("network Git commands use gh credentials, HTTPS or SSH only, and never prom
     // A caller's own environment cannot turn prompting back on.
     env: { ...process.env, GIT_TERMINAL_PROMPT: "1" },
   });
-  const [call] = await calls();
+  const call = (await calls()).find((item) => item.args.includes("ls-remote"));
+  assert.ok(call);
   const config = configOf(call.args);
   for (const value of configOf(gitNetworkConfig)) assert.ok(config.includes(value), value);
   assert.ok(config.includes("protocol.allow=never"));
@@ -188,6 +198,67 @@ test("network Git commands use gh credentials, HTTPS or SSH only, and never prom
   assert.ok(config.indexOf("credential.helper=") < config.indexOf("credential.helper=!gh auth git-credential"));
   assert.ok(config.includes("core.hooksPath=/dev/null"));
   assert.equal(call.prompt, "0");
+});
+
+test("git children do not see GH_TOKEN; gitNetwork and gh do", async (t) => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "bell-git-env-"));
+  const record = path.join(directory, "seen.jsonl");
+  const script = `#!${process.execPath}
+require('node:fs').appendFileSync(${JSON.stringify(record)}, JSON.stringify({
+  args: process.argv.slice(2),
+  GH_TOKEN: process.env.GH_TOKEN ?? null,
+  GITHUB_TOKEN: process.env.GITHUB_TOKEN ?? null,
+  BELL_MARKER: process.env.BELL_MARKER ?? null,
+}) + '\\n');
+if (process.argv.includes('config')) process.exit(0);
+`;
+  await writeFile(path.join(directory, "git"), script, { mode: 0o755 });
+  await writeFile(path.join(directory, "gh"), script, { mode: 0o755 });
+  withEnv(t, {
+    PATH: `${directory}${path.delimiter}${process.env.PATH}`,
+    GH_TOKEN: "from-parent",
+    GITHUB_TOKEN: "from-parent-gh",
+    BELL_MARKER: "secret",
+  });
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  await git(os.tmpdir(), ["status"]);
+  await git(os.tmpdir(), ["status"], {
+    env: { ...process.env, GH_TOKEN: "explicit", GITHUB_TOKEN: "explicit-gh" },
+  });
+  await command("git", ["--version"], { env: { ...process.env } });
+  await gitNetwork(os.tmpdir(), ["ls-remote", "https://example.invalid/r.git"]);
+  await command("gh", ["api", "user"]);
+  const seen = (await readFile(record, "utf8"))
+    .trim()
+    .split("\n")
+    .map(
+      (line) =>
+        JSON.parse(line) as {
+          args: string[];
+          GH_TOKEN: string | null;
+          GITHUB_TOKEN: string | null;
+          BELL_MARKER: string | null;
+        },
+    );
+  const local = seen.filter(
+    (call) => !call.args.includes("ls-remote") && !call.args.includes("api"),
+  );
+  assert.ok(local.length >= 3);
+  for (const call of local) {
+    assert.equal(call.GH_TOKEN, null);
+    assert.equal(call.GITHUB_TOKEN, null);
+    assert.equal(call.BELL_MARKER, null);
+  }
+  const remote = seen.find((call) => call.args.includes("ls-remote"));
+  assert.ok(remote);
+  assert.equal(remote.GH_TOKEN, "from-parent");
+  assert.equal(remote.GITHUB_TOKEN, "from-parent-gh");
+  assert.equal(remote.BELL_MARKER, null);
+  const gh = seen.find((call) => call.args.includes("api"));
+  assert.ok(gh);
+  assert.equal(gh.GH_TOKEN, "from-parent");
+  assert.equal(gh.GITHUB_TOKEN, "from-parent-gh");
+  assert.equal(gh.BELL_MARKER, null);
 });
 
 async function repository(t: TestContext) {
@@ -335,4 +406,219 @@ test("a checkout's own signing program never verifies a signed commit in git log
   await git(directory, ["log", "--no-color", "--format=%H%x00%s"]);
   await git(directory, ["show", "--no-color", "--format=%B", "--no-patch", commit]);
   assert.equal(await readFile(marker, "utf8").catch(() => ""), "");
+});
+
+test("a run checkout whose .git file was replaced does not run its filter or credential helper", async (t) => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "bell-process-forged-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const repo = path.join(root, "repo");
+  const checkout = path.join(root, "worktrees", "run-1");
+  const attack = path.join(root, "attack");
+  const filterMarker = path.join(root, "filter-ran");
+  const credentialMarker = path.join(root, "credential-ran");
+  await mkdir(repo, { recursive: true });
+  await mkdir(attack, { recursive: true });
+  await git(repo, ["init", "-q", "-b", "main"]);
+  await git(repo, ["config", "user.name", "Someone"]);
+  await git(repo, ["config", "user.email", "someone@example.invalid"]);
+  await writeFile(path.join(repo, "file.txt"), "v1\n");
+  await git(repo, ["add", "file.txt"]);
+  await git(repo, ["commit", "-q", "-m", "initial"]);
+  await git(repo, ["worktree", "add", "-q", "--detach", checkout]);
+  const gitDir = (await git(checkout, ["rev-parse", "--absolute-git-dir"])).stdout.trim();
+  await git(checkout, ["status", "--porcelain"]);
+
+  await git(attack, ["init", "-q", "-b", "main"]);
+  await git(attack, ["config", "filter.pwn.clean", `touch ${filterMarker}`]);
+  await git(attack, ["config", "filter.pwn.required", "true"]);
+  await git(attack, ["config", "credential.helper", `!touch ${credentialMarker}`]);
+  await rm(path.join(checkout, ".git"));
+  await rename(path.join(attack, ".git"), path.join(checkout, ".git"));
+  await writeFile(path.join(checkout, ".gitattributes"), "* filter=pwn\n");
+  await writeFile(path.join(checkout, "file.txt"), "v2\n");
+
+  assert.equal(
+    (await git(checkout, ["rev-parse", "--absolute-git-dir"])).stdout.trim(),
+    gitDir,
+  );
+  await git(checkout, ["status", "--porcelain"]);
+  await git(checkout, ["add", "file.txt"]);
+  await gitNetwork(checkout, ["push", "origin", "HEAD"]).catch(() => undefined);
+  await assert.rejects(readFile(filterMarker, "utf8"));
+  await assert.rejects(readFile(credentialMarker, "utf8"));
+});
+
+test("server git runs neither hooks, fsmonitor, filters, nor credential or ssh commands planted in the clone", async (t) => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "bell-process-planted-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const repo = path.join(root, "repo");
+  const checkout = path.join(root, "worktrees", "run-1");
+  const marker = path.join(root, "ran");
+  await mkdir(repo, { recursive: true });
+  await git(repo, ["init", "-q", "-b", "main"]);
+  await git(repo, ["config", "user.name", "Someone"]);
+  await git(repo, ["config", "user.email", "someone@example.invalid"]);
+  await writeFile(path.join(repo, "file.txt"), "v1\n");
+  await git(repo, ["add", "file.txt"]);
+  await git(repo, ["commit", "-q", "-m", "initial"]);
+  await git(repo, ["worktree", "add", "-q", "--detach", checkout]);
+  const script = `#!/bin/sh\necho "$0" >> ${JSON.stringify(marker)}\n`;
+  const hooks = path.join(repo, ".git", "hooks");
+  await mkdir(hooks, { recursive: true });
+  for (const name of ["pre-commit", "post-commit"])
+    await writeFile(path.join(hooks, name), script, { mode: 0o755 });
+  const monitor = path.join(root, "monitor");
+  const ssh = path.join(root, "ssh-command");
+  await writeFile(monitor, script, { mode: 0o755 });
+  await writeFile(ssh, script, { mode: 0o755 });
+  await git(repo, ["config", "core.fsmonitor", monitor]);
+  await git(repo, ["config", "filter.pwn.clean", monitor]);
+  await git(repo, ["config", "filter.pwn.required", "true"]);
+  await git(repo, ["config", "credential.helper", `!${monitor}`]);
+  await git(repo, ["config", "core.sshCommand", ssh]);
+  await writeFile(path.join(checkout, ".gitattributes"), "* filter=pwn\n");
+  await writeFile(path.join(checkout, "file.txt"), "v2\n");
+  await git(checkout, ["status", "--porcelain"]);
+  await git(checkout, ["add", "file.txt"]);
+  await git(checkout, ["commit", "-q", "-m", "edit"]);
+  await gitNetwork(checkout, ["fetch", "origin"], { timeoutMs: 5_000 }).catch(() => undefined);
+  await gitNetwork(checkout, ["ls-remote", "git@127.0.0.1:none.git"], {
+    timeoutMs: 5_000,
+  }).catch(() => undefined);
+  assert.equal(await readFile(marker, "utf8").catch(() => ""), "");
+});
+
+test("server git does not pass askpass variables", (t) => {
+  withEnv(t, {
+    GIT_ASKPASS: "/tmp/bell-askpass",
+    SSH_ASKPASS: "/tmp/bell-ssh-askpass",
+    GIT_PAGER: "/tmp/bell-pager",
+    GH_TOKEN: "from-parent",
+  });
+  const env = gitChildEnv({ ...process.env }, false);
+  assert.equal(env.GIT_ASKPASS, undefined);
+  assert.equal(env.SSH_ASKPASS, undefined);
+  assert.equal(env.GIT_PAGER, "cat");
+  assert.equal(env.GH_TOKEN, undefined);
+});
+
+test("a checkout .gitattributes driver from local config, include.path, or includeIf does not run", async (t) => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "bell-process-attrs-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const repo = path.join(root, "repo");
+  const checkout = path.join(root, "worktrees", "run-1");
+  const bare = path.join(root, "bare.git");
+  const marker = path.join(root, "ran");
+  const script = path.join(root, "mark");
+  await mkdir(repo, { recursive: true });
+  await writeFile(
+    script,
+    `#!/bin/sh\necho "$0" >> ${JSON.stringify(marker)}\ncat\n`,
+    { mode: 0o755 },
+  );
+  await git(repo, ["init", "-q", "-b", "main"]);
+  await git(repo, ["config", "user.name", "Someone"]);
+  await git(repo, ["config", "user.email", "someone@example.invalid"]);
+  await writeFile(path.join(repo, "file.txt"), "v1\n");
+  await git(repo, ["add", "file.txt"]);
+  await git(repo, ["commit", "-q", "-m", "initial"]);
+  await git(repo, ["worktree", "add", "-q", "--detach", checkout]);
+  const gitDir = (await git(checkout, ["rev-parse", "--absolute-git-dir"])).stdout.trim();
+  const included = path.join(root, "included.gitconfig");
+  const conditional = path.join(root, "conditional.gitconfig");
+  await writeFile(
+    included,
+    `[filter "inc"]\n\tclean = ${script}\n\tsmudge = ${script}\n\tprocess = ${script}\n\trequired = true\n[diff "inc"]\n\ttextconv = ${script}\n`,
+  );
+  await writeFile(
+    conditional,
+    `[filter "ifi"]\n\tclean = ${script}\n\tsmudge = ${script}\n\tprocess = ${script}\n\trequired = true\n[diff "ifi"]\n\ttextconv = ${script}\n`,
+  );
+  const hooks = path.join(repo, ".git", "hooks");
+  await mkdir(hooks, { recursive: true });
+  await writeFile(path.join(hooks, "pre-commit"), script, { mode: 0o755 });
+  await writeFile(path.join(hooks, "post-commit"), script, { mode: 0o755 });
+  await git(checkout, ["config", "core.hooksPath", hooks]);
+  await git(checkout, ["config", "core.fsmonitor", script]);
+  await git(checkout, ["config", "filter.direct.clean", script]);
+  await git(checkout, ["config", "filter.direct.smudge", script]);
+  await git(checkout, ["config", "filter.direct.process", script]);
+  await git(checkout, ["config", "filter.direct.required", "true"]);
+  await git(checkout, ["config", "diff.direct.textconv", script]);
+  await git(checkout, ["config", "diff.external", script]);
+  await git(checkout, ["config", "include.path", included]);
+  await git(checkout, ["config", `includeIf.gitdir:${gitDir}.path`, conditional]);
+  await git(checkout, ["config", "core.pager", script]);
+  await git(checkout, ["config", "core.askPass", script]);
+  await git(checkout, ["config", "credential.helper", `!${script}`]);
+  await git(checkout, ["config", "core.sshCommand", script]);
+  await writeFile(
+    path.join(checkout, ".gitattributes"),
+    "* filter=direct diff=direct\n",
+  );
+  for (const key of [
+    "filter.direct.clean",
+    "filter.direct.smudge",
+    "filter.direct.process",
+    "filter.inc.clean",
+    "filter.ifi.clean",
+    "diff.direct.textconv",
+    "diff.inc.textconv",
+    "diff.ifi.textconv",
+    "diff.external",
+  ]) {
+    const seen = spawnSync(
+      "git",
+      ["--git-dir", gitDir, "--work-tree", checkout, "config", "--get", key],
+      { encoding: "utf8" },
+    );
+    assert.equal(seen.status, 0, key);
+    assert.equal(seen.stdout.trim(), script, key);
+  }
+  await writeFile(path.join(checkout, "a.txt"), "a\n");
+  await writeFile(path.join(checkout, "b.txt"), "b\n");
+  await writeFile(path.join(checkout, "c.txt"), "c\n");
+  withEnv(t, { GIT_ASKPASS: script, SSH_ASKPASS: script, GIT_PAGER: script });
+  await git(checkout, ["status", "--porcelain"]);
+  await git(checkout, ["add", "a.txt", "b.txt", "c.txt"]);
+  await git(checkout, ["diff", "--cached"]);
+  await git(checkout, ["commit", "-q", "-m", "edit"]);
+  await writeFile(path.join(checkout, "a.txt"), "a2\n");
+  await git(checkout, ["diff"]);
+  await mkdir(bare, { recursive: true });
+  await git(bare, ["init", "--bare", "-q"]);
+  await git(checkout, ["remote", "add", "origin", bare]);
+  await git(checkout, ["push", "origin", "HEAD:refs/heads/main"]);
+  await git(checkout, ["checkout", "--", "a.txt"]);
+  await git(checkout, ["ls-remote", "git@127.0.0.1:none.git"], { timeoutMs: 5_000 }).catch(
+    () => undefined,
+  );
+  await git(
+    checkout,
+    ["credential", "fill"],
+    {
+      input: "protocol=https\nhost=example.invalid\n\n",
+      allowedCodes: [0, 1, 128],
+      timeoutMs: 5_000,
+    },
+  ).catch(() => undefined);
+  const listed = (
+    await git(checkout, ["config", "--list", "--show-origin", "--includes"])
+  ).stdout;
+  assert.match(listed, /included\.gitconfig/);
+  assert.match(listed, /conditional\.gitconfig/);
+  const effective = new Map<string, string>();
+  for (const line of listed.split("\n")) {
+    const tab = line.indexOf("\t");
+    if (tab < 0) continue;
+    const rest = line.slice(tab + 1);
+    const eq = rest.indexOf("=");
+    if (eq < 0) continue;
+    effective.set(rest.slice(0, eq).toLowerCase(), rest.slice(eq + 1));
+  }
+  const driver =
+    /^(?:filter\.[^.]+\.(?:clean|smudge|process)|diff\.external|diff\..+\.textconv)$/;
+  for (const [key, value] of effective)
+    if (driver.test(key)) assert.equal(value, "", key);
+  await assert.rejects(readFile(marker));
 });

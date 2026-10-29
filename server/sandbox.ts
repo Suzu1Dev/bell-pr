@@ -8,10 +8,11 @@
  * roles have no Bash, and Codex brings its own sandbox, so neither needs it.
  */
 import { execFile } from "node:child_process";
-import { constants, readdirSync, readFileSync, realpathSync } from "node:fs";
+import { constants, lstatSync, readdirSync, readFileSync, realpathSync } from "node:fs";
 import { access } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { sharedCredentialDenials } from "../shared/credential-denials.js";
 import type { AgentProvider } from "../shared/models.js";
 import { product } from "../shared/product.js";
 import { AppError } from "./types.js";
@@ -313,44 +314,32 @@ function dataDirectoryRules(dataDirectory: string, cwd: string): string[] {
 }
 
 /**
- * Files that hold credentials, by home-relative rule: SSH keys, the GitHub
- * CLI login, cloud credentials, npm and netrc tokens, and the Claude Code
- * and Codex logins.
+ * A Claude Code Read rule for one shared denial. Home-relative entries stay
+ * in `~` form. Absolute paths use `//`, and a path the rule syntax cannot
+ * carry is left out rather than risk the whole settings value being rejected.
  */
-const credentialRules = [
-  "Read(~/.ssh/**)",
-  "Read(~/.config/gh/**)",
-  "Read(~/.aws/**)",
-  "Read(~/.npmrc)",
-  "Read(~/.netrc)",
-  "Read(~/.claude/.credentials.json)",
-  "Read(~/.codex/auth.json)",
-];
+function claudeCredentialRule(entry: string): string | undefined {
+  if (/[()\\\n\r\0"]/.test(entry)) return undefined;
+  if (entry.startsWith("~")) return `Read(${entry})`;
+  if (entry.endsWith("/**")) return absoluteRule(entry.slice(0, -3), "/**");
+  return absoluteRule(entry);
+}
 
 /**
- * Every Read denial for an agent working in `cwd`: the credential files
- * above, the same files where an environment variable moved them, and
- * BELL's data directory outside the agent's own checkout. Deny rules also
- * cover Grep and Glob, and Claude Code applies them to sandboxed commands.
+ * Every Read denial for an agent working in `cwd`: the shared credential
+ * list (GitHub CLI config, git credential files, netrc, SSH, and the files
+ * where an environment variable moved them) and BELL's data directory
+ * outside the agent's own checkout. Deny rules also cover Grep and Glob,
+ * and Claude Code applies them to sandboxed commands. The person can turn
+ * that sandbox off; these rules are still sent, and a shell then runs
+ * with the person's own account.
  */
 export function agentReadDenials(cwd: string): string[] {
   const here = resolved(cwd);
-  const rules = [...credentialRules];
-  const moved: [string | undefined, string][] = [
-    [process.env.CLAUDE_CONFIG_DIR, ".credentials.json"],
-    [process.env.CODEX_HOME, "auth.json"],
-    [process.env.GH_CONFIG_DIR, "**"],
-    [
-      process.env.XDG_CONFIG_HOME &&
-        path.join(process.env.XDG_CONFIG_HOME, "gh"),
-      "**",
-    ],
-  ];
-  for (const [directory, file] of moved)
-    if (directory && path.isAbsolute(directory)) {
-      const rule = absoluteRule(resolved(directory), `/${file}`);
-      if (rule) rules.push(rule);
-    }
+  const rules = sharedCredentialDenials().flatMap((entry) => {
+    const rule = claudeCredentialRule(entry);
+    return rule ? [rule] : [];
+  });
   for (const directory of dataDirectoriesFor(here))
     rules.push(...dataDirectoryRules(directory, here));
   return [...new Set(rules)];
@@ -398,4 +387,49 @@ export function agentSandboxReadPaths(cwd: string) {
     allowRead.push(...open.map((value) => `/${value}`));
   }
   return { denyRead: [...new Set(denyRead)], allowRead: [...new Set(allowRead)] };
+}
+
+/**
+ * Paths a sandboxed agent must not write. Claude Code's
+ * `sandbox.filesystem.denyWrite` takes absolute paths and does not block
+ * reads. The checkout's `.git` pointer is inside the working directory, so
+ * the default write allow would otherwise cover it. Hooks and config live
+ * in the clone's git directory, which these paths name explicitly.
+ */
+export function agentGitWriteDenials(cwd: string): string[] {
+  const dotGit = path.join(cwd, ".git");
+  let metadata;
+  try {
+    metadata = lstatSync(dotGit);
+  } catch {
+    metadata = undefined;
+  }
+  // The path itself and everything under it: editing the file, or replacing
+  // it with a directory and writing inside that directory.
+  const rules: string[] = [dotGit, `${dotGit}/**`];
+  const deny = (target: string) => {
+    rules.push(target);
+    if (!target.endsWith("/**")) rules.push(`${target}/**`);
+  };
+  if (!metadata) return [...new Set(rules)];
+  if (metadata.isFile()) {
+    const pointer = /^gitdir: ([^\r\n]+)/.exec(readFileSync(dotGit, "utf8"))?.[1];
+    if (!pointer) return [...new Set(rules)];
+    const gitDir = path.resolve(cwd, pointer.trim());
+    const common = path.resolve(gitDir, "..", "..");
+    deny(path.join(common, "hooks"));
+    rules.push(path.join(common, "config"));
+    rules.push(path.join(gitDir, "config.worktree"));
+    return [...new Set(rules)];
+  }
+  if (!metadata.isDirectory()) return [];
+  deny(path.join(dotGit, "hooks"));
+  rules.push(path.join(dotGit, "config"));
+  try {
+    for (const name of readdirSync(path.join(dotGit, "worktrees")))
+      rules.push(path.join(dotGit, "worktrees", name, "config.worktree"));
+  } catch {
+    /* No worktrees recorded. */
+  }
+  return [...new Set(rules)];
 }

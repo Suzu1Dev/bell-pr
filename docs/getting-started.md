@@ -16,6 +16,9 @@ You need:
 - **The GitHub CLI** (`gh`), signed in with `gh auth login`, to import from
   GitHub, publish pull requests and find projects
   ([cli.github.com](https://cli.github.com/)).
+  To check, run `gh auth status`. Tokens in your system keyring are not covered:
+  the agent can still read your GitHub token via `gh auth token`. Your main
+  protection is a fine-grained token with the minimum permissions you need.
 - **An AI coding CLI**, installed and signed in, as the same user that runs
   BELL PR. Either one is enough:
   - the Codex CLI: `npm install -g @openai/codex`, then `codex login`.
@@ -34,7 +37,29 @@ BELL PR runs on macOS and Linux, and on Windows inside WSL2
 install everything above inside your WSL distribution).
 
 `bell-pr doctor` checks all of this and prints the command that fixes each
-problem. You can also skip it: the Welcome screen runs the same check.
+problem.
+
+### With no AI provider
+
+`bell-pr start` does not listen until every required check passes. With
+neither the Codex CLI nor Claude Code installed and signed in, it exits
+and prints **Not ready**, then this line, before the commands that fix
+each check:
+
+```text
+No AI provider yet? See the sample tour: bell-pr start --force
+```
+
+`bell-pr start --force` opens BELL PR so you can take the sample tour. The
+tour makes no AI call and sends nothing to GitHub. A real agent run still
+waits until a provider is ready. Install and sign in to one, as the same
+user that runs BELL PR:
+
+- Codex CLI: `npm install -g @openai/codex`, then `codex login`
+- Claude Code: `npm install -g @anthropic-ai/claude-code`, then
+  `claude auth login`
+
+The Welcome screen runs the same check once BELL PR is open.
 
 ## Start BELL PR
 
@@ -225,12 +250,16 @@ Start the run with **Generate the team plan** (with plan approval) or
   the overall conclusion; the Reviewer opens by saying whether it agrees
   and adds only what the summary lacks, and the Test analyst keeps the one
   list of checks still to run.
-- Agents are told never to change your machine: no `sudo`, no global or
+- With the default **Working directory (default)** access, agents are told not to change
+  your machine: no `sudo`, no global or
   user-level installs. When a check needs something the machine lacks, the
   teammate reports it, and **Overview & motivation** lists it under "Setup
   this machine needs from you" with a suggested command and who reported
   it. Check the command against the project's documentation before you run
-  it; BELL PR never runs it.
+  it; the setup checklist never runs it. Explicit **Full access** in the model
+  settings lets writable agents install required tools and use available sudo
+  privileges outside the checkout. Read the [access settings](security-model.md#explicit-full-access)
+  before enabling it; read-only roles keep their restrictions.
 - **Run details** folds the model and the AI usage: its line names the
   agent, the model, the calls and the input and output tokens, marks
   partial reports and says when usage was not reported, never 0.
@@ -240,6 +269,39 @@ BELL PR runs as many contributions at the same time as **Settings →
 Performance** allows (1 to 8, 2 by default); the others wait in the queue.
 
 ## 5. Review every change
+
+The code toolbar's focus button expands the reading area and initially hides
+both side panels. Its file-list and explanation buttons still open or close
+each panel. Leaving focus mode with the button or Escape restores the panel
+layout from before you entered it.
+
+Before publishing an agent contribution, the **Collaborate** tab lets you ask
+an agent to finish missing checks, add tests or fix failures in the run's working
+copy. The draft's Limitations shortcut fills the message box for you to review
+and send. Each message starts a fresh agent call with recent conversation and
+the existing reports as context; it uses your own CLI account.
+
+The conversation lists changed files, commands BELL actually observed, checks
+the agent says it did not run, and any questions or missing setup. A command's
+exit status alone does not establish that a test was meaningful. A changed file
+loses its review mark and gets fresh explanations, and an approved contribution
+returns to review. The agent may update existing Validation and Limitations
+sections together: completed checks and their scope go in Validation, while
+Limitations keeps remaining gaps and constraints. Outdated claims are corrected
+in both. Other draft sections stay as written, and before-and-after text is shown
+in the conversation for your review. If the draft has no separate, recognizable
+Validation section, completed results stay in the reply and draft suggestion
+instead of being added to Limitations. Sections with nested headings are also
+left intact to preserve the template. Code changes, observed commands or section
+updates also refresh draft suggestions,
+without replacing your edited draft. Reviewer and Test analyst reports need a
+separate rerun.
+
+While a turn runs, editing the draft, marking files reviewed, approval,
+publication and syncing are blocked. **Stop** cancels the turn and preserves
+its edits; a restart interrupts the turn too. The agent cannot commit, push or
+publish for you. Published contributions use their feedback workflow, and
+Learn by hand does not offer a writable agent conversation.
 
 When the team is done, the run waits for your review in **Code changes**:
 
@@ -448,8 +510,8 @@ repository, your own words, reviewability, disclosing AI help and the
 understanding check, each with its source and one sentence on why
 maintainers care.
 
-Before you can approve, BELL PR checks what will be sent: a credential in
-the text, or placeholders such as `TODO:` or an empty `Fixes #`, block it;
+Before you can approve, BELL PR checks what will be sent. Blocks common token formats and private keys before publishing.
+Placeholders such as `TODO:` or an empty `Fixes #` block it;
 a path from your computer, a change to CI workflows and a commit e-mail
 address that is not your GitHub no-reply address need your confirmation.
 The description mentions AI assistance only if the project's rules require
@@ -483,6 +545,16 @@ and safety. When the dialog opens, BELL PR reads the GitHub facts once.
 (to a fork under your account when you cannot push to the project) and
 opens a Draft PR. Nothing is ever force-pushed.
 
+If a failed attempt left a local commit and you then changed the files or
+commit message, save the draft and choose **Recover unfinished publish** on
+the Draft tab. This is available only when that attempt stopped before
+pushing began. BELL PR checks the project and your fork for matching branches
+and PRs, including closed PRs. If those checks succeed and find none, it
+keeps your files and draft, backs up the old commit locally and returns the
+contribution to review. Review and approve again before submitting. Recovery
+does not publish anything; if a branch or PR exists, or the checks cannot
+finish, it leaves the contribution unchanged.
+
 ## 8. After publishing
 
 - **Sync to the latest target branch** when the project moved on: BELL PR
@@ -507,6 +579,16 @@ opens a Draft PR. Nothing is ever force-pushed.
   maintainer's comment only as context, then changes the code. You review
   each file, explain the round back (while the understanding check is on),
   and push the round as one new commit to the same PR.
+- **Choose which changes to read**: the Changes tab defaults to the current
+  feedback round, compared with the previous PR head. Files unchanged in
+  that round do not need another review, and reverting an earlier edit or
+  deleting a file added in the PR appears in this round's diff. The selector in the code toolbar
+  also offers the initial submission, each published round and the cumulative
+  PR changes. Those views are read-only and do not alter the current round's
+  review marks or approval; return to the current round to review and approve.
+  Failed or discarded rounds have no published snapshot to select. A sync
+  with the target branch keeps its existing review against the updated target;
+  published syncs can also be inspected separately.
 - **Commit history**: the tab lists every commit of the pull request,
   oldest first, labelled by where it came from (the first push, a review
   round, a sync with the target branch, a commit taken over from GitHub),

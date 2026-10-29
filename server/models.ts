@@ -1,9 +1,10 @@
-import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
+import type { ChildProcessWithoutNullStreams } from "node:child_process";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { z } from "zod";
 import {
+  agentAccessModes,
   agentProviders,
   reasoningEfforts,
   type AgentProvider,
@@ -16,7 +17,8 @@ import {
 import { product } from "../shared/product.js";
 import { version } from "./build-info.js";
 import { sm } from "./i18n/index.js";
-import { agentEnvironment, observeChild } from "./process.js";
+import { assertCodexProviderAllowed } from "./codex-guard.js";
+import { agentChildEnvironment, observeChild, processSpawn } from "./process.js";
 import { AppError } from "./types.js";
 
 export const modelId = z
@@ -30,12 +32,14 @@ export const modelSettingsSchema = {
   model: modelId.or(z.literal("")).default(""),
   reasoningEffort: effort.or(z.literal("")).default(""),
   webAccess: z.boolean().optional(),
+  agentAccess: z.enum(agentAccessModes).optional(),
 };
 export const modelExecutionSchema = z.object({
   provider: provider.optional(),
   model: modelId.optional(),
   reasoningEffort: effort.optional(),
   webAccess: z.boolean().optional(),
+  agentAccess: z.enum(agentAccessModes).optional(),
   source: z.enum(["selected", "catalog-default", "cli-default"]),
   // Persisted insights and discovery records are parsed with this schema; unknown keys are stripped.
   reported: z
@@ -102,12 +106,12 @@ function catalogError() {
 /** Read model metadata only: this connection never creates a thread or inference turn. */
 export async function readModelCatalog(
   start: (cwd: string) => ChildProcessWithoutNullStreams = (cwd) =>
-    spawn(
+    processSpawn.spawn(
       "codex",
       ["app-server", "--listen", "stdio://", "-c", 'model_provider="openai"'],
       {
         cwd,
-        env: agentEnvironment("codex"),
+        env: agentChildEnvironment("codex"),
         shell: false,
         detached: process.platform !== "win32",
         stdio: ["pipe", "pipe", "pipe"],
@@ -116,6 +120,7 @@ export async function readModelCatalog(
   timeoutMs = 10_000,
 ): Promise<ModelCatalog> {
   // Read once here: the process callbacks below run outside the caller's turn.
+  assertCodexProviderAllowed("codex");
   const error = catalogError();
   let cwd: string | undefined;
   try {
@@ -303,6 +308,7 @@ export function getModelCatalog(
   provider: AgentProvider = "codex",
 ): Promise<ModelCatalog> {
   if (provider === "claude") return Promise.resolve(claudeModelCatalog());
+  assertCodexProviderAllowed(provider);
   if (cached && cached.expires > Date.now())
     return Promise.resolve(localized(cached.value));
   if (pending) return pending.then(localized);
@@ -331,6 +337,7 @@ export function resolveModelExecution(
     ...(catalog.source === "codex" ? {} : { provider: catalog.source }),
     // Off is the default, so only an enabled flag is recorded on the run.
     ...(selected.webAccess ? { webAccess: true } : {}),
+    ...(selected.agentAccess === "full" ? { agentAccess: selected.agentAccess } : {}),
   };
   const model = selected.model
     ? catalog.models.find((item) => item.id === selected.model)

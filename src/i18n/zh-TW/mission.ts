@@ -293,6 +293,7 @@ const m: Translation<typeof en> = {
         missing: "未安裝",
         broken: "無法執行",
         "signed-out": "未登入",
+        disabled: "已關閉",
       },
       model: "執行模型",
       providerDefault: ({ provider, model }) =>
@@ -308,7 +309,7 @@ const m: Translation<typeof en> = {
       effortHelp: `只列出所選模型支援的強度；較高的強度每回合需要更久、用量也較多，${product.name} 會為 Claude Code 以及 xhigh、max 強度延長等待時間。`,
       webAccess: "允許 Agent 上網搜尋與讀取網頁",
       webAccessHelp:
-        "套用到 Lead、Teammates、Reviewer、Test analyst 與追問導師；專案分析與探索貢獻維持離線。網頁內容視為不可信資料；Claude Code 的 curl、wget 仍被拒絕。",
+        "套用到 Lead、Teammates、Reviewer、Test analyst 與追問導師；專案分析與探索貢獻維持離線。網頁內容視為不可信資料；Claude Code 的 curl、wget 仍被拒絕（完整權限的可寫入角色除外）。",
       error: ({ message }) => `${message} 已儲存的選擇會保留。`,
       loadFailed: ({ provider }) => `暫時無法讀取 ${provider} 模型清單。`,
       reload: "重新載入",
