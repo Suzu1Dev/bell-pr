@@ -37,6 +37,25 @@ regexes = [
   '''^rk_live_51H8abcdefghijklmnopqrstuvwxyz$''',
 ]
 
+[[rules.allowlists]]
+description = "Repeating hex fixture for the e2e API token"
+condition = "AND"
+regexTarget = "secret"
+paths = ['''^e2e/api-token\.mjs$''']
+regexes = ['''^0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef$''']
+
+[[rules.allowlists]]
+description = "Synthetic 64-hex redaction fixture"
+condition = "AND"
+regexTarget = "secret"
+paths = [
+  '''^server/redact-samples\.ts$''',
+  '''^server/secrets\.test\.ts$''',
+  '''^server/log\.test\.ts$''',
+  '''^server/insights\.test\.ts$''',
+]
+regexes = ['''^(?:ab){32}$''']
+
 [[rules]]
 id = "github-pat"
 
@@ -66,6 +85,18 @@ condition = "AND"
 regexTarget = "secret"
 paths = ['''^server/team\.test\.ts$''']
 regexes = ['''^ghp_0123456789abcdef0123$''']
+
+[[rules.allowlists]]
+description = "Synthetic Bearer redaction fixture"
+condition = "AND"
+regexTarget = "secret"
+paths = [
+  '''^server/redact-samples\.ts$''',
+  '''^server/secrets\.test\.ts$''',
+  '''^server/log\.test\.ts$''',
+  '''^server/insights\.test\.ts$''',
+]
+regexes = ['''^FAKEBEARERTOKEN1234$''']
 
 [[rules]]
 id = "jwt"
@@ -108,6 +139,18 @@ condition = "AND"
 regexTarget = "secret"
 paths = ['''^server/by-hand-tests\.test\.ts$''']
 regexes = ['''^xoxb-123456789012-1234567890123-AbCdEfGhIjKlMnOpQrStUvWx$''']
+
+[[rules.allowlists]]
+description = "Synthetic xoxb redaction fixture"
+condition = "AND"
+regexTarget = "secret"
+paths = [
+  '''^server/redact-samples\.ts$''',
+  '''^server/secrets\.test\.ts$''',
+  '''^server/log\.test\.ts$''',
+  '''^server/insights\.test\.ts$''',
+]
+regexes = ['''^xoxb-FAKEFAKEFAKE$''']
 
 [[rules]]
 id = "gcp-api-key"

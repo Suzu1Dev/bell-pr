@@ -27,7 +27,7 @@ request yourself. Publishing checks that the project welcomes it. There is
 no BELL PR cloud, no telemetry and no account.
 
 BELL PR is free and open-source software under
-[Apache-2.0](LICENSE). There is no paid tier at launch.
+[Apache-2.0](LICENSE). No paid tier.
 
 ![The Code changes tab: a diff with a plain-language explanation of the change beside it](docs/images/en/run-changes-1280.png)
 
@@ -155,10 +155,6 @@ installed and signed in; Discovery also needs a signed-in GitHub CLI.
 
 ### Cost of a sample run
 
-<!-- TODO(Suzu / Product Tester): fill after one real end-to-end sample
-     contribution (not the offline Sample project). Record provider, model,
-     reported input/output tokens, and the billed cost in the provider’s
-     currency. Do not invent numbers. -->
 Agent usage is billed by **your** Codex / Claude account. BELL PR does not
 set prices. Exact tokens and cost for a typical first contribution are
 **not published yet** — they will be added here after one measured run.
@@ -476,9 +472,12 @@ once, then removed.
 An interactive terminal prints the authorized link when used over SSH or
 in a headless environment. Noninteractive startup output and service logs
 do not include it.
-`bell-pr open` and `bell-pr open --print` remain available for explicitly
-opening or printing the link. Treat it like a password. It is not written
-to the server log or to `bell-pr doctor --json`.
+`bell-pr open` opens the authorized browser but prints an address without
+the token. `bell-pr open --print` only prints that token-free address. Add
+`--print-token` to explicitly include the token in the printed link, or use
+`bell-pr open --print --print-token` to print it without opening a browser.
+Treat authorized links like passwords. They are not written to the server
+log or to `bell-pr doctor --json`.
 
 The token can remain in browser history. Signing out alone does not invalidate
 that link; revoke all access or run `bell-pr token rotate` to invalidate it.
@@ -524,7 +523,7 @@ Variables used only by BELL PR's own tests are in
 docker build -t bell-pr .
 docker run -d --name bell-pr -p 127.0.0.1:4311:4311 \
   -v bellpr-data:/data -v bellpr-home:/home/node bell-pr
-docker exec bell-pr bell-pr open --print
+docker exec bell-pr bell-pr open --print --print-token
 ```
 
 The image includes Git, the GitHub CLI and the Codex CLI; you can install

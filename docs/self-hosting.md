@@ -75,8 +75,10 @@ in front as well (see
 `bell-pr` opens the address browsers use (`BELLPR_PUBLIC_URL` when you set
 it, else the local address) with `#bell_token=` on the end. An interactive
 terminal prints that authorized link when used over SSH or in a headless
-environment. `bell-pr open` and `bell-pr open
---print` remain available for explicitly opening or printing it. The page exchanges
+environment. `bell-pr open` also opens the authorized browser, but prints
+an address without the token. `bell-pr open --print` only prints that
+token-free address. Add `--print-token` to print an authorized link, using
+`bell-pr open --print --print-token` to skip opening a browser. The page exchanges
 the token for an HttpOnly session cookie and removes it from the address bar.
 New tabs at the same address share that cookie. Remembering is on by default:
 the workbench renews access automatically while you use it, so active
@@ -92,7 +94,7 @@ the API token, invalidating all browser sessions, API clients' old tokens,
 and old token URLs. `bell-pr token rotate` has the same effect. After either
 rotation, run `bell-pr` again and update API clients.
 
-Treat authorized links printed in an interactive terminal or by `open --print`
+Treat authorized links printed in an interactive terminal or by `open --print-token`
 like passwords. They are not in service logs or in `bell-pr doctor --json`.
 
 ## One instance per data directory

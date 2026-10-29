@@ -31,7 +31,7 @@ published. The current npm `0.0.2` is only a placeholder. From the
 | Command | What it does |
 | --- | --- |
 | `bell-pr` or `bell-pr start` | Opens the instance already running with the same data directory, or starts one. A new server exits 1 before listening when a required doctor check fails; `--force` starts anyway. Interactive SSH or headless terminals print an authorized link; service output keeps it private |
-| `bell-pr open` | Prints the address of the running BELL PR, including the API token fragment, and opens it; `--print` only prints it |
+| `bell-pr open` | Prints the address of the running BELL PR without the API token, and opens the browser with the token. `--print` only prints that address. `--print-token` includes the token in the printed address |
 | `bell-pr token rotate` | Replaces `<data dir>/api-token` and immediately invalidates every browser session and old token URL. API clients must use the new token. No restart is needed; the new token is not printed |
 | `bell-pr doctor` | Checks Node.js, Git, the GitHub CLI, the agent CLIs, the sandbox and the data directory; `--json` for scripts. The report does not include the API token |
 | `bell-pr version` | Shows the version, its release date, Node.js, the platform and the data directory |

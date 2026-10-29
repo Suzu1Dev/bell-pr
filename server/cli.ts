@@ -352,6 +352,7 @@ async function open(args: string[], ctx: Context): Promise<number> {
   const { values } = parse(args, {
     ...commonOptions,
     print: { type: "boolean" },
+    "print-token": { type: "boolean" },
     "no-open": { type: "boolean" },
   });
   loadEnvFile(values["env-file"]);
@@ -362,10 +363,12 @@ async function open(args: string[], ctx: Context): Promise<number> {
     ctx.stderr.write(`${m.notRunning({ dataDir })}\n`);
     return 1;
   }
-  const url = withApiToken(lockUrl(instance.lock), instance.token);
-  ctx.stdout.write(`${url}\n`);
+  const base = lockUrl(instance.lock);
+  const signed = withApiToken(base, instance.token);
+  // The token stays off stdout unless --print-token. The browser still gets it.
+  ctx.stdout.write(`${values["print-token"] ? signed : base}\n`);
   if (!values.print && !values["no-open"] && canOpenBrowser(ctx.env, ctx.stdout, ctx.platform))
-    ctx.openUrl(url);
+    ctx.openUrl(signed);
   return 0;
 }
 

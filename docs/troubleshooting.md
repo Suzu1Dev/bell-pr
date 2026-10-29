@@ -65,10 +65,12 @@ bell-pr
 - **No browser on that machine** (a server, SSH): the interactive command
   prints an authorized link directly. Open it in a browser that reaches
   BELL PR, and keep it private. Noninteractive service output omits it;
-  `bell-pr open --print` remains available to explicitly print the link.
+  `bell-pr open --print --print-token` explicitly prints the authorized
+  link. Without `--print-token`, `open` and `open --print` print an address
+  without the token.
 - **Another data directory:** `bell-pr --data-dir <dir>`, with the
   directory you started BELL PR with.
-- **Docker:** `docker exec <container> bell-pr open --print`.
+- **Docker:** `docker exec <container> bell-pr open --print --print-token`.
 - **systemd service:** run `bell-pr` in a terminal on that machine.
 
 The command reopens the existing instance before checking doctor readiness.

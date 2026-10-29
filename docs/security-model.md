@@ -337,7 +337,7 @@ files that hold secrets with `0600`.
 - Publish the port on loopback only, for example
   `-p 127.0.0.1:4311:4311`; inside the container BELL PR listens on all
   interfaces so the port mapping can reach it.
-- Get the address again with `docker exec <container> bell-pr open --print`.
+- Get the address again with `docker exec <container> bell-pr open --print --print-token`.
 - Both agent sandboxes need bubblewrap to create namespaces, which Docker's
   default security options forbid: every command a Codex agent runs fails,
   and a writable Claude role stops with `claude_sandbox_unavailable` (BELL PR
@@ -394,10 +394,11 @@ Release candidate 1.0.0-rc.1, run on Linux with `--real --decoy-home` from
 a shell started with `env -i` (so no token variable of the shell reached the
 agents). Each row is one model call.
 
-The fourth probe of this run, `open-link`, read BELL PR's one-time sign-in
-link (`<dataDir>/run/open-link.json`). BELL PR has no sign-in any more, and
-the canary reads `<dataDir>/state.json` instead (probe `data-dir`). The
-record below is unchanged and has not been run again.
+The fourth probe of this run, `open-link`, read BELL PR's old one-time sign-in
+link (`<dataDir>/run/open-link.json`). That mechanism has been removed; current
+browser sessions use the installation's API token. The canary now reads
+`<dataDir>/state.json` instead (probe `data-dir`). The record below is unchanged
+and has not been run again.
 
 | | |
 | --- | --- |

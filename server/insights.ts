@@ -33,7 +33,8 @@ import {
   secretInPatch,
   sensitivePath,
 } from "./git.js";
-import { agentEnvironment, command, git, redact } from "./process.js";
+import { agentEnvironment, command, git } from "./process.js";
+import { redact } from "./secrets.js";
 import { Store } from "./store.js";
 import { writeDurable } from "./fs-atomic.js";
 import { log } from "./log.js";
