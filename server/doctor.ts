@@ -1204,8 +1204,9 @@ export function formatDoctorReport(report: DoctorReport, dataDir?: string): stri
   }
   lines.push("");
   if (dataDir) lines.push(m.cli.dataDir({ path: dataDir }));
-  // Name the ✗ rows, since a failed check that is not required does not
-  // stop the start but does stop a step (such as publishing).
+  // Name the ✗ rows. A failed check that is not required does not stop
+  // `bell-pr start` (it stops a later step, such as publishing). A required
+  // failure does, unless that start passed --force.
   const failed = (required: boolean) =>
     report.checks
       .filter((check) => check.status === "fail" && check.required === required)
@@ -1248,6 +1249,65 @@ function configuredPort(): number | undefined {
   }
 }
 
+/**
+ * The report `bell-pr doctor` prints, for `bell-pr start` as well: the same
+ * probes, the saved language and the limits a start would use.
+ */
+async function loadDoctorReport(
+  deps: DoctorCliDeps,
+  saved?: AppSettingsService,
+): Promise<DoctorReport> {
+  // The limits the server would start with: the environment, the saved
+  // settings, then the defaults.
+  const settings = saved?.get() ?? {};
+  const port = "port" in deps ? deps.port : configuredPort();
+  const maxActiveRuns = settings.maxActiveRuns ?? defaultActiveRunLimit;
+  return runDoctor({
+    force: true,
+    ...(deps.exec ? { exec: deps.exec } : {}),
+    ...(deps.dataDir ? { dataDir: deps.dataDir } : {}),
+    app: {
+      version: appVersion,
+      ...(port !== undefined ? { port } : {}),
+      maxActiveRuns,
+      maxAgentProcesses: settings.maxAgentProcesses ?? defaultAgentProcessLimit,
+    },
+  });
+}
+
+/**
+ * `bell-pr start`'s refusal: the doctor's Not ready line, then the sample
+ * tour, then the same checklist (fixes included). `bell-pr doctor` itself
+ * still ends with the Not ready line.
+ */
+export function formatStartRefusal(report: DoctorReport, dataDir?: string): string {
+  const checklist = formatDoctorReport(report, dataDir).replace(/\n$/, "");
+  const split = checklist.lastIndexOf("\n");
+  const headline = checklist.slice(split + 1);
+  const body = checklist.slice(0, split).replace(/\n$/, "");
+  return `${headline}\n${sm().cli.start.sampleTour}\n\n${body}\n`;
+}
+
+/**
+ * Whether `bell-pr start` may listen, and the refusal text when it may not.
+ */
+export async function readinessChecklist(options: {
+  dataDir: string;
+  port?: number;
+}): Promise<{ ready: boolean; text: string }> {
+  const saved = new AppSettingsService(options.dataDir);
+  return withAppSettings(saved, async () => {
+    const report = await loadDoctorReport(
+      { dataDir: options.dataDir, port: options.port },
+      saved,
+    );
+    return {
+      ready: report.ready,
+      text: report.ready ? "" : formatStartRefusal(report, options.dataDir),
+    };
+  });
+}
+
 async function doctorCli(
   argv: string[],
   deps: DoctorCliDeps,
@@ -1266,22 +1326,7 @@ async function doctorCli(
       return 2;
     }
   }
-  // The limits the server would start with: the environment, the saved
-  // settings, then the defaults.
-  const settings = saved?.get() ?? {};
-  const port = "port" in deps ? deps.port : configuredPort();
-  const maxActiveRuns = settings.maxActiveRuns ?? defaultActiveRunLimit;
-  const report = await runDoctor({
-    force: true,
-    ...(deps.exec ? { exec: deps.exec } : {}),
-    ...(deps.dataDir ? { dataDir: deps.dataDir } : {}),
-    app: {
-      version: appVersion,
-      ...(port !== undefined ? { port } : {}),
-      maxActiveRuns,
-      maxAgentProcesses: settings.maxAgentProcesses ?? defaultAgentProcessLimit,
-    },
-  });
+  const report = await loadDoctorReport(deps, saved);
   out.write(
     json ? `${JSON.stringify(report, null, 2)}\n` : formatDoctorReport(report, deps.dataDir),
   );

@@ -722,7 +722,7 @@ test("a symlinked bin entry starts the server", async () => {
   // npm links bin names to the entry file; the entry guard must follow the link.
   const link = path.join(box.directory, "bin", "bell-pr");
   symlinkSync(cliEntry, link);
-  const server = launch(link, ["start", "--port", String(port), "--data-dir", box.data], box.env);
+  const server = launch(link, ["start", "--force", "--port", String(port), "--data-dir", box.data], box.env);
   try {
     await started(server);
     assert.ok(
@@ -743,7 +743,7 @@ test("a second instance on the same data dir exits 1 and leaves state.json byte-
   const box = await sandbox();
   const first = launch(
     cliEntry,
-    ["start", "--port", String(await freePort()), "--data-dir", box.data],
+    ["start", "--force", "--port", String(await freePort()), "--data-dir", box.data],
     box.env,
   );
   try {
@@ -758,7 +758,7 @@ test("a second instance on the same data dir exits 1 and leaves state.json byte-
 
     const second = launch(
       cliEntry,
-      ["start", "--port", String(await freePort()), "--data-dir", box.data],
+      ["start", "--force", "--port", String(await freePort()), "--data-dir", box.data],
       box.env,
     );
     const { code } = await second.exited;
@@ -780,14 +780,14 @@ test("a second instance on the same data dir exits 1 and leaves state.json byte-
 test("an occupied port exits non-zero and points to bell-pr open", async () => {
   const box = await sandbox();
   const port = await freePort();
-  const first = launch(cliEntry, ["start", "--port", String(port), "--data-dir", box.data], box.env);
+  const first = launch(cliEntry, ["start", "--force", "--port", String(port), "--data-dir", box.data], box.env);
   const other = createServer();
   try {
     await started(first);
     const otherData = path.join(box.directory, "other-data");
     const second = launch(
       cliEntry,
-      ["start", "--port", String(port), "--data-dir", otherData],
+      ["start", "--force", "--port", String(port), "--data-dir", otherData],
       box.env,
     );
     const { code } = await second.exited;
@@ -803,7 +803,7 @@ test("an occupied port exits non-zero and points to bell-pr open", async () => {
     const busy = (other.address() as AddressInfo).port;
     const third = launch(
       cliEntry,
-      ["start", "--port", String(busy), "--data-dir", otherData],
+      ["start", "--force", "--port", String(busy), "--data-dir", otherData],
       box.env,
     );
     assert.notEqual((await third.exited).code, 0);
@@ -822,7 +822,7 @@ test("SIGHUP and SIGTERM shut down cleanly and remove the lock file", async () =
     for (const signal of ["SIGHUP", "SIGTERM"] as const) {
       const server = launch(
         cliEntry,
-        ["start", "--port", String(await freePort()), "--data-dir", box.data],
+        ["start", "--force", "--port", String(await freePort()), "--data-dir", box.data],
         box.env,
       );
       await started(server);
@@ -843,7 +843,7 @@ test("server/index.ts started directly behaves like bell-pr start", async () => 
   const port = await freePort();
   const server = launch(
     path.join(repoRoot, "server", "index.ts"),
-    ["--port", String(port), "--data-dir", box.data],
+    ["--force", "--port", String(port), "--data-dir", box.data],
     box.env,
   );
   try {

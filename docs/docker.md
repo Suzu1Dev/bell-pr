@@ -37,6 +37,12 @@ docker run -d --name bell-pr \
   bell-pr
 ```
 
+- The image's command is `bell-pr start`. If a required doctor check fails
+  (no Codex or Claude Code sign-in yet), the process exits before it
+  listens and prints each failed check with its fix command. Sign in as
+  below, or open the sample tour with `docker run ... bell-pr start --force`
+  (that replaces the image command). A real agent run is still refused
+  until a provider is signed in.
 - `-p 127.0.0.1:4311:4311` publishes BELL PR on this computer only. Do not
   publish it on all interfaces: BELL PR has no sign-in, so anything that
   reaches the port can use it. For access from other machines, put an HTTPS
