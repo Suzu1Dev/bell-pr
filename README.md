@@ -27,7 +27,7 @@ request yourself. Publishing checks that the project welcomes it. There is
 no BELL PR cloud, no telemetry and no account.
 
 BELL PR is free and open-source software under
-[Apache-2.0](LICENSE). There is no paid tier at launch.
+[Apache-2.0](LICENSE). No paid tier.
 
 ![The Code changes tab: a diff with a plain-language explanation of the change beside it](docs/images/en/run-changes-1280.png)
 
@@ -105,8 +105,8 @@ ready; otherwise it exits and prints the fix for each failed check. `npx
 bell-pr start --force` opens the sample tour anyway.
 
 **Lost the address? Run `bell-pr open`** (or `npx bell-pr open` if you
-started with `npx`). It prints the address again, including the API token
-the page needs, and opens it.
+started with `npx`). It prints the address again, without the API token,
+and opens it. The browser receives the token.
 
 To keep BELL PR installed, run `npm install -g bell-pr`, then start it with
 `bell-pr`. The [getting started guide](docs/getting-started.md) walks
@@ -145,10 +145,6 @@ installed and signed in; Discovery also needs a signed-in GitHub CLI.
 
 ### Cost of a sample run
 
-<!-- TODO(Suzu / Product Tester): fill after one real end-to-end sample
-     contribution (not the offline Sample project). Record provider, model,
-     reported input/output tokens, and the billed cost in the provider’s
-     currency. Do not invent numbers. -->
 Agent usage is billed by **your** Codex / Claude account. BELL PR does not
 set prices. Exact tokens and cost for a typical first contribution are
 **not published yet** — they will be added here after one measured run.
@@ -451,10 +447,11 @@ Requests that change data must use `application/json`.
 `bell-pr` opens the browser at an address whose fragment is
 `#bell_token=<token>`. The page stores the token and removes it from the
 address. The line printed at start does not include the token, so a service
-log does not either. To open the app yourself, use `bell-pr open` or
-`bell-pr open --print`: both print the address with the token. Treat that
-address like a password. It is not written to the server log or to
-`bell-pr doctor --json`.
+log does not either. `bell-pr open` prints that address without the token
+and gives the token to the browser. `bell-pr open --print` only prints it,
+still without the token. `bell-pr open --print-token` prints the address
+with the token (add `--print` to skip the browser). Treat that address like
+a password. It is not written to the server log or to `bell-pr doctor --json`.
 
 The token can remain in browser history; run `bell-pr token rotate` if you share this browser profile.
 
@@ -498,7 +495,7 @@ Variables used only by BELL PR's own tests are in
 docker build -t bell-pr .
 docker run -d --name bell-pr -p 127.0.0.1:4311:4311 \
   -v bellpr-data:/data -v bellpr-home:/home/node bell-pr
-docker exec bell-pr bell-pr open --print
+docker exec bell-pr bell-pr open --print --print-token
 ```
 
 The image includes Git, the GitHub CLI and the Codex CLI; you can install

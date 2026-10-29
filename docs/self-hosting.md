@@ -61,11 +61,13 @@ the port; they still need the token. Put a proxy that limits who can connect
 in front as well (see
 [Reach BELL PR from another machine](#reach-bell-pr-from-another-machine)).
 
-`bell-pr open` and `bell-pr open --print` print the address browsers use
-(`BELLPR_PUBLIC_URL` when you set it, else the local address) with
-`#bell_token=` on the end, and `open` opens that address. The page stores
-the token and removes it from the address bar. The line printed at start
-does not include the token. Treat the `open --print` address like a
+`bell-pr open` prints the address browsers use (`BELLPR_PUBLIC_URL` when
+you set it, else the local address) without the API token, and opens that
+address with `#bell_token=` on the end. `--print` only prints the address,
+still without the token. `--print-token` prints `#bell_token=` as well
+(`bell-pr open --print --print-token` when there is no browser). The page
+stores the token and removes it from the address bar. The line printed at
+start does not include the token. Treat the `--print-token` address like a
 password: it is not in the server log or in `bell-pr doctor --json`.
 
 ## One instance per data directory

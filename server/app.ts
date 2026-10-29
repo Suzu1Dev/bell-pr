@@ -5,7 +5,7 @@ import { z } from "zod";
 import { ProjectInsightsService } from "./insights.js";
 import type { Workbench } from "./workbench.js";
 import { AppError } from "./types.js";
-import { redact } from "./process.js";
+import { redact } from "./secrets.js";
 import { DiscoveryService } from "./discovery.js";
 import type { AgentSlots } from "./agent-slots.js";
 import { localhostGuard, parseAllowedOrigins } from "./http-guard.js";

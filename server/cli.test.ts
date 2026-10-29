@@ -23,7 +23,7 @@ async function freePort() {
   return port;
 }
 
-/** The address `bell-pr open` prints: the base URL plus the token fragment. */
+/** The address the browser opens: the base URL plus the token fragment. */
 function signedUrl(dataDir: string, url: string) {
   const token = readFileSync(path.join(dataDir, "api-token"), "utf8").trim();
   return `${url}#bell_token=${token}`;
@@ -139,18 +139,35 @@ test("bell-pr open prints the address of the running server and opens it where a
     try {
       const printed = await cli(["open", "--data-dir", dataDir, "--print"]);
       const signedIn = signedUrl(dataDir, server.url);
+      const token = signedIn.split("bell_token=")[1];
       assert.equal(printed.code, 0, printed.stderr);
-      assert.equal(printed.stdout, `${signedIn}\n`);
+      assert.equal(printed.stdout, `${server.url}\n`);
+      assert.equal(printed.stdout.includes(token), false);
+      assert.equal(printed.stdout.includes("bell_token"), false);
       assert.equal(printed.stderr, "");
       assert.deepEqual(printed.opened, []);
-      assert.equal(readFileSync(path.join(dataDir, "bellpr.lock"), "utf8").includes(signedIn.split("bell_token=")[1]), false);
+      assert.equal(readFileSync(path.join(dataDir, "bellpr.lock"), "utf8").includes(token), false);
 
-      // A terminal that allows it gets the browser.
+      const withToken = await cli(["open", "--data-dir", dataDir, "--print", "--print-token"]);
+      assert.equal(withToken.code, 0, withToken.stderr);
+      assert.equal(withToken.stdout, `${signedIn}\n`);
+      assert.deepEqual(withToken.opened, []);
+
+      // A terminal that allows it gets the browser. Stdout stays token-free.
+      let terminal = "";
       const second = await cli(["open", "--data-dir", dataDir], {
         env: {},
-        stdout: { write: () => true, isTTY: true },
+        stdout: {
+          write: (text: string) => {
+            terminal += text;
+            return true;
+          },
+          isTTY: true,
+        },
       });
       assert.equal(second.code, 0);
+      assert.equal(terminal, `${server.url}\n`);
+      assert.equal(terminal.includes(token), false);
       if (!existsSync("/.dockerenv")) assert.deepEqual(second.opened, [signedIn]);
     } finally {
       await server.shutdown();
@@ -171,7 +188,8 @@ test("bell-pr open prints the address browsers use: the public URL when BELL PR 
       try {
         const result = await cli(["open", "--data-dir", dataDir, "--print"]);
         assert.equal(result.code, 0, result.stderr);
-        assert.equal(result.stdout, `${signedUrl(dataDir, expected ?? server.url)}\n`);
+        assert.equal(result.stdout, `${expected ?? server.url}\n`);
+        assert.equal(result.stdout.includes("bell_token"), false);
         assert.equal(JSON.parse(readFileSync(path.join(dataDir, "bellpr.lock"), "utf8")).url, server.url);
       } finally {
         await server.shutdown();
@@ -193,7 +211,8 @@ test("bell-pr open falls back to the local address for a lock without a usable w
         writeFileSync(lockFile, JSON.stringify({ ...lock, url }));
         const result = await cli(["open", "--data-dir", dataDir, "--print"]);
         assert.equal(result.code, 0, result.stderr);
-        assert.equal(result.stdout, `${signedUrl(dataDir, `http://127.0.0.1:${lock.port}`)}\n`, String(url));
+        assert.equal(result.stdout, `http://127.0.0.1:${lock.port}\n`, String(url));
+        assert.equal(result.stdout.includes("bell_token"), false);
       }
     } finally {
       await server.shutdown();
@@ -272,7 +291,8 @@ test("bell-pr open reaches a server that listens on ::1 only", async (t) => {
       assert.match(server.url, /^http:\/\/\[::1\]:\d+$/);
       const result = await cli(["open", "--data-dir", dataDir, "--print"]);
       assert.equal(result.code, 0, result.stderr);
-      assert.equal(result.stdout, `${signedUrl(dataDir, server.url)}\n`);
+      assert.equal(result.stdout, `${server.url}\n`);
+      assert.equal(result.stdout.includes("bell_token"), false);
     } finally {
       await server.shutdown();
     }
@@ -303,7 +323,7 @@ test("bell-pr help lists every command, and mistakes exit 2", async () => {
     assert.equal(result.code, 0);
     for (const command of ["start", "open", "doctor", "token", "version", "help"])
       assert.match(result.stdout, new RegExp(`^  ${command} `, "m"));
-    for (const option of ["--port", "--host", "--data-dir", "--no-open", "--force", "--env-file", "--print"])
+    for (const option of ["--port", "--host", "--data-dir", "--no-open", "--force", "--env-file", "--print", "--print-token"])
       assert.ok(result.stdout.includes(option), option);
   }
   let zhText = "";
