@@ -1,7 +1,9 @@
 import test, { type TestContext } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { once } from "node:events";
 import { mkdir, mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
+import { request } from "node:http";
 import os from "node:os";
 import path from "node:path";
 import { agentCommand, claudeSettings } from "./agent-cli.js";
@@ -15,10 +17,12 @@ import {
   setAllowUnsandboxedAgentsSource,
 } from "./sandbox.js";
 import { runAgent } from "./run-executor.js";
+import { createApp } from "./app.js";
+import { resolveModelExecution } from "./models.js";
 import { Store } from "./store.js";
 import { AppError, type Run } from "./types.js";
 import { Workbench, type WorkbenchContext } from "./workbench.js";
-import { withLocale } from "./i18n/index.js";
+import { sm, withLocale } from "./i18n/index.js";
 
 const linux = process.platform === "linux";
 
@@ -272,6 +276,99 @@ test("a run whose Claude agent ran unsandboxed is marked once, with one notice",
     await store.save();
     await rm(directory, { recursive: true, force: true });
   }
+});
+
+test("full access saved through the API, or written into the settings file, is named in the run log", async (t) => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "bell-full-access-log-"));
+  await stubPath(t, [], true);
+  const store = new Store(path.join(directory, "state"));
+  await store.initialize();
+  const workbench = new Workbench(store);
+  const app = createApp(workbench, { staticDirectory: path.join(directory, "missing") });
+  const server = app.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  t.after(async () => {
+    await new Promise<void>((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
+    await app.locals.insights.shutdown();
+    await app.locals.discovery.shutdown();
+    await workbench.shutdown();
+    await rm(directory, { recursive: true, force: true });
+  });
+  const address = server.address();
+  assert.ok(address && typeof address !== "string");
+  const put = (body: unknown) =>
+    new Promise<void>((resolve, reject) => {
+      const payload = JSON.stringify(body);
+      const req = request(
+        `http://127.0.0.1:${address.port}/api/model-settings`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            "Content-Length": Buffer.byteLength(payload),
+            Host: "127.0.0.1:4311",
+          },
+        },
+        (res) => {
+          res.resume();
+          res.on("end", () => {
+            if ((res.statusCode ?? 0) >= 400) reject(new Error(`settings ${res.statusCode}`));
+            else resolve();
+          });
+        },
+      );
+      req.on("error", reject);
+      req.end(payload);
+    });
+  const saved = { provider: "claude", model: "", reasoningEffort: "", agentAccess: "full" };
+  await put(saved);
+  const ctx = (workbench as unknown as { context: WorkbenchContext }).context;
+  const notice = withLocale("en", () => sm().sudo.fullAccessNotice);
+  async function turn(name: string, execution: Run["modelExecution"]) {
+    const worktreePath = path.join(store.directory, "worktrees", name);
+    await mkdir(worktreePath, { recursive: true });
+    const run: Run = {
+      id: name,
+      repoId: "repo",
+      title: "Edit",
+      prompt: "Edit",
+      status: "running",
+      branch: "fix/fullacce",
+      baseBranch: "main",
+      baseSha: "0".repeat(40),
+      worktreePath,
+      createdAt: new Date().toISOString(),
+      agents: [],
+      logs: [],
+      draft: { title: "", body: "" },
+      reviewedFiles: [],
+      reviewedFingerprints: {},
+      modelExecution: execution,
+      locale: "en",
+    };
+    store.data.runs.push(run);
+    await withLocale("en", () =>
+      runAgent(ctx, run, "member", "Edit the file.", new AbortController().signal, false),
+    );
+    assert.equal(
+      run.logs.filter((entry) => entry.kind === "notice" && entry.message === notice).length,
+      1,
+    );
+  }
+  const fromApi = await app.locals.insights.getModelSettings();
+  assert.equal(fromApi.agentAccess, "full");
+  await turn("from-api", resolveModelExecution(fromApi, await workbench.models("claude")));
+  await writeFile(
+    path.join(store.directory, "model-settings.json"),
+    JSON.stringify({ provider: "claude", model: "", reasoningEffort: "", agentAccess: "workspace" }),
+  );
+  await writeFile(
+    path.join(store.directory, "model-settings.json"),
+    JSON.stringify(saved),
+  );
+  const fromFile = await app.locals.insights.getModelSettings();
+  assert.equal(fromFile.agentAccess, "full");
+  await turn("from-file", resolveModelExecution(fromFile, await workbench.models("claude")));
 });
 
 test("agents are denied credentials and BELL's data outside their own checkout", async (t) => {

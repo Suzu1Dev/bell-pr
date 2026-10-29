@@ -233,11 +233,20 @@ export async function runAgent(
         skipGitRepoCheck: context.isolated,
         web,
       });
+      // Full access is a saved setting. The confirm dialog is only in the
+      // UI, so a run created from the API or from the settings file still
+      // says so, once, on its first writable turn.
+      if (!readonly && modelExecution.agentAccess === "full") {
+        const notice = sm().sudo.fullAccessNotice;
+        if (!run.logs.some((entry) => entry.kind === "notice" && entry.message === notice))
+          ctx.log(run, role, notice, { kind: "notice" });
+      }
       // Marks the run once when an agent runs without the OS sandbox
       // because the person allowed it in Settings (agentCommand decides).
       if (cli.unsandboxed && !run.unsandboxed) {
         run.unsandboxed = true;
-        ctx.log(run, role, modelExecution.agentAccess === "full" ? sm().sudo.fullAccessNotice : sm().run.unsandboxedNotice, { kind: "notice" });
+        if (modelExecution.agentAccess !== "full")
+          ctx.log(run, role, sm().run.unsandboxedNotice, { kind: "notice" });
       }
       const read = agentEventReader(modelExecution.provider);
       const spawned = agentSpawn(run, role, cli.executable, timeoutMs);
