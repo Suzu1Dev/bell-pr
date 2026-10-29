@@ -319,8 +319,8 @@ Details: [Privacy and your data](docs/privacy-and-data.md).
   operating-system sandbox: writes stay in the run's own worktree and the
   network is closed. With the sandbox on, both agents are denied the GitHub
   CLI config files, `~/.git-credentials` and credential-store files,
-  `~/.netrc`, and `~/.ssh/`, but an agent can still read your GitHub token.
-  Tokens in your system keyring are not covered. Your main
+  `~/.netrc`, and `~/.ssh/`. Tokens in your system keyring are not covered: the
+  agent can still read your GitHub token via `gh auth token`. Your main
   protection is a fine-grained token with the minimum permissions you need.
   Claude Code is also denied BELL PR's own data outside its checkout.
 - **Imported projects are untrusted.** Their code, documents and agent

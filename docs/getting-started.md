@@ -16,6 +16,8 @@ You need:
 - **The GitHub CLI** (`gh`), signed in with `gh auth login`, to import from
   GitHub, publish pull requests and find projects
   ([cli.github.com](https://cli.github.com/)).
+  To check, run `gh auth status`. If it shows your token is stored in the
+  keyring, switch to a fine-grained token with the minimum permissions you need.
 - **An AI coding CLI**, installed and signed in, as the same user that runs
   BELL PR. Either one is enough:
   - the Codex CLI: `npm install -g @openai/codex`, then `codex login`.

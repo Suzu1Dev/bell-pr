@@ -65,7 +65,8 @@ In scope, because the design relies on them:
   before CI workflow changes, and what leaves your computer when you publish;
 - the Docker image and the files in `contrib/`.
 
-**Known limitation.** Tokens in your system keyring are not covered. Your main
+**Known limitation.** Tokens in your system keyring are not covered: the
+agent can still read your GitHub token via `gh auth token`. Your main
 protection is a fine-grained token with the minimum permissions you need.
 This is known and tracked; reports of this same behavior are not eligible as
 new vulnerabilities. A different way around the sandbox is still in scope:
