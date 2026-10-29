@@ -645,7 +645,7 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   Files that earlier builds saved load as before, and saved files are read
   as leniently as before.
 
-## [1.0.0-rc.1] - 2026-10-20
+## [1.0.0] - 【暫定】
 
 The first public release candidate of BELL PR, open source under the
 Apache License 2.0. BELL PR is a self-hosted, local-first workbench for

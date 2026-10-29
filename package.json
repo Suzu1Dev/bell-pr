@@ -1,6 +1,6 @@
 {
   "name": "bell-pr",
-  "version": "1.0.0-rc.1",
+  "version": "1.0.0",
   "description": "From vibe coding to knowing why. A local workbench for AI-assisted open-source contributions: an agent team builds the change in isolated git worktrees, you learn every change, explain it back and send one Draft PR that follows the project's rules.",
   "keywords": [
     "open-source",
