@@ -1,3 +1,4 @@
+import { safeLink, WebLink } from "../review/MarkdownContent";
 import { useEffect, useState } from "react";
 import { ClipboardCopy, Copy, ExternalLink, TriangleAlert } from "lucide-react";
 import { productEmail, productLink } from "../../shared/product";
@@ -196,10 +197,10 @@ export function AboutDialog({
           <ul className="about-links">
             {links.map((item) => (
               <li key={item.id}>
-                <a href={item.href} target="_blank" rel="noreferrer">
+                <WebLink href={item.href.startsWith("mailto:") ? item.href : safeLink(item.href) || undefined} target="_blank" rel="noreferrer">
                   {t.links[item.id]}
                   <ExternalLink size={13} aria-hidden="true" />
-                </a>
+                </WebLink>
               </li>
             ))}
           </ul>

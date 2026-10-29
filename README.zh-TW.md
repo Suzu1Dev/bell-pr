@@ -330,3 +330,54 @@ BELL PR 的名稱與標誌不在 Apache 授權範圍內；你可以如何使用�
 BELL PR 是獨立專案，與 GitHub, Inc.、OpenAI 及 Anthropic PBC 皆無關聯，也未獲其認可或贊助。GitHub、OpenAI、Codex、Anthropic、Claude 與 Claude Code 均為其各自擁有者的商標；BELL PR 提及這些名稱，僅為說明可搭配使用的工具。
 
 含權杖的網址可能留在瀏覽器歷史紀錄中，請視同密碼保管。SSH 或無桌面啟動只會提示執行 `bell-pr open --print --print-token`；桌面啟動使用暫存的私密 `file://` 轉址檔案。
+
+## 準備主機與配對裝置
+
+執行 `npm install -g bell-pr` 前，請先安裝並登入所選 AI 供應商的 CLI、
+安裝 Git，並設定 Git 身分（`git config --global user.name` 與
+`git config --global user.email`）。執行 `bell-pr doctor` 檢查環境；
+缺少必要條件會阻擋 `bell-pr start`。請依 doctor 顯示的修復指令操作、
+登入供應商或補上 Git 身分，再次檢查後啟動。
+
+在主機執行 `bell-pr pair`，於另一台裝置開啟配對頁，輸入配對碼
+（或掃描 QR code），可選填裝置名稱後配對。建議優先使用配對：
+權杖網址會留在瀏覽器歷史紀錄。裝置權杖存於瀏覽器 localStorage；
+啟動連結的安裝權杖存於 sessionStorage，且優先使用。API 請求透過
+Authorization 標頭驗證，瀏覽器必須允許儲存資料。
+
+使用 `bell-pr devices list` 查看裝置，或 `bell-pr devices revoke <id>`
+撤銷裝置。也可到「設定 → 一般 → 裝置」操作。安裝權杖與裝置權杖都可列出並撤銷任何裝置。`bell-pr token rotate` 會使所有已配對裝置失效，
+之後需重新配對。
+
+## 配對遭鎖定時該怎麼辦
+
+若配對回傳 HTTP **423**，或 CLI 顯示配對已鎖定，表示太多錯誤嘗試暫時
+阻擋了配對。這能防止透過 Tailscale serve 或 `ssh -L` 猜測配對碼，因為
+這些連線在伺服器看來都可能來自 `127.0.0.1`。
+
+請在執行 BELL PR 的**本機主機**上，使用安裝權杖執行：
+
+```bash
+bell-pr pair --unlock
+bell-pr pair [--name "device name"]
+```
+
+- 未加 `--unlock` 的 `bell-pr pair` 不會在鎖定期間清除鎖定或失敗計數。
+- 裝置權杖不能解鎖；只有主機上的安裝權杖可以。
+- 鎖定或計數檔案遺失、損毀時，伺服器會保持鎖定，並提示執行 `bell-pr pair --unlock`。
+- 成功配對，或連續 24 小時沒有失敗後，計數會自動重設。
+
+## 裝置遺失或遭竊
+
+任何已配對裝置都可列出並撤銷任何裝置（包括其他裝置）。裝置權杖仍不能
+建立配對碼、輪替安裝權杖或解除配對鎖定。
+
+請從另一台已配對裝置的「設定 → 一般 → 裝置」撤銷遺失的裝置，或在主機
+使用安裝權杖執行 `bell-pr devices revoke <id>`。若自己的裝置已被撤銷，
+或不再信任任何裝置權杖，請在**主機**執行：
+
+```bash
+bell-pr token rotate
+```
+
+此指令會輪替安裝權杖並使所有裝置權杖失效。之後以 `bell-pr pair` 重新配對。

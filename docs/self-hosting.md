@@ -55,11 +55,15 @@ request except `GET /api/health` must send the token (`Authorization: Bearer`
 or `X-Bell-Token`). A missing or wrong token is HTTP 401 and changes nothing.
 
 BELL PR listens on 127.0.0.1 unless you set `--host` or `BELLPR_HOST`. Any
-other address prints a warning at start. `--host 0.0.0.0` outside Docker,
-and publishing the Docker port beyond `127.0.0.1`, let other machines reach
-the port; they still need the token. Put a proxy that limits who can connect
-in front as well (see
-[Reach BELL PR from another machine](#reach-bell-pr-from-another-machine)).
+other address prints a warning at start. Binding `BELLPR_HOST` to `0.0.0.0` or
+`::` without `BELLPR_PUBLIC_URL` still opens the port on every interface, but
+the request guard only accepts this computer's addresses: **every remote
+connection receives HTTP 403** until you set `BELLPR_PUBLIC_URL` to the HTTPS
+origin browsers use. Startup prints one stderr line in that case. `--host
+0.0.0.0` outside Docker, and publishing the Docker port beyond `127.0.0.1`,
+let other machines reach the port once `BELLPR_PUBLIC_URL` is set; they still
+need authorization. Put a proxy that limits who can connect in front as well
+(see [Reach BELL PR from another machine](#reach-bell-pr-from-another-machine)).
 
 `bell-pr open` prints the address browsers use (`BELLPR_PUBLIC_URL` when
 you set it, else the local address) without the API token, and opens that
@@ -169,28 +173,58 @@ Interactive SSH and headless starts print only the instruction
 `bell-pr open --print --print-token`; run it explicitly to obtain a private
 authorized URL. Desktop launches use a temporary private `file://` redirect.
 
-## Reach another device with Tailscale serve
+## Pairing devices on your tailnet
 
-Keep BELL PR bound to loopback. Tailscale serve plus `BELLPR_PUBLIC_URL` is
-the supported remote path:
+Tailscale serve is the supported remote path. Set
+`BELLPR_PUBLIC_URL=https://<hostname>.ts.net` before starting BELL PR, then use
+`tailscale serve --bg 4311` for the default server port. Open that public URL's
+`/pair` page and run `bell-pr pair` on the host. Enter `XXXX-XXXX` or scan the
+QR code. A paired credential has the form `bpd_<device-token>` and is stored in
+browser localStorage. Prefer pairing: token URLs stay in browser history.
 
-```sh
-tailscale serve --bg 4311
-BELLPR_PUBLIC_URL=https://<host>.ts.net bell-pr
-bell-pr open --print --print-token
+Using a `*.ts.net` URL without `BELLPR_PUBLIC_URL` causes 403 responses. The same
+applies when `BELLPR_HOST` is `0.0.0.0` or `::` without `BELLPR_PUBLIC_URL`: remote
+clients are refused until that origin is set. Do not place a Host-rewriting
+reverse proxy in front: changing Host causes 403 responses. Never use Tailscale
+Funnel; keep the service on your private tailnet.
+
+As an alternative, forward the default port with
+`ssh -L 4311:127.0.0.1:4311 <user>@<hostname>` and open
+`http://127.0.0.1:4311/pair`. Run the pairing command on the host.
+
+Manage access with `bell-pr devices list`, `bell-pr devices revoke <id>`, or
+Settings → General → Devices. `bell-pr token rotate` invalidates every device.
+The pairing page removes its code hash fragment immediately and the server sends
+`Referrer-Policy: no-referrer`. Scripts must come from the same origin under CSP;
+`style-src` retains `'unsafe-inline'` for the current React inline styles.
+
+## What to do if pairing is locked
+
+If pairing fails with HTTP **423** (or the CLI says pairing is locked), too many failed redeem attempts temporarily blocked pairing. This protects against code guessing on Tailscale serve / `ssh -L` paths where every client appears as `127.0.0.1`.
+
+**On the host** (where `bell-pr` runs), with the install token:
+
+```bash
+bell-pr pair --unlock
+bell-pr pair [--name "device name"]
 ```
 
-Replace `<host>` with your own Tailscale host. Save the authorized URL in a
-password manager; it may remain in browser history. Without PUBLIC_URL,
-requests to the ts.net host receive 403. Do not put another proxy that
-rewrites Host in front of this path: those requests receive 403. Do not use
-Tailscale Funnel: public exposure leaves only the API token protecting full
-access to your agents and publishing credentials.
+Notes:
 
-Alternatively, forward loopback over SSH:
+- `bell-pr pair` without `--unlock` does **not** clear the lock or failure counter while locked.
+- A **device token cannot unlock** — only the install token on the host can.
+- If the lock/counter file is missing or corrupt, the server **fails closed** (treats pairing as locked) and hints `bell-pr pair --unlock`.
+- After a successful pair, or after 24 hours with no failures, the counter resets automatically.
 
-```sh
-ssh -L 4311:127.0.0.1:4311 <user>@<host>
+## Stolen or lost device
+
+Permissions (spec v0.6+): any paired device may **list** devices and **revoke any** device (including others). Device tokens still cannot create pairing codes, rotate the install token, or unlock the failure lock.
+
+1. **Revoke the lost device from another paired device** (Settings → Devices, or `bell-pr devices revoke <id>` on the host with the install token).
+2. **If your own device was revoked** (or you no longer trust any device token), on the **host** run:
+
+```bash
+bell-pr token rotate
 ```
 
-Open the explicitly printed authorized URL through the local forwarded port.
+That rotates the install token and invalidates **all** device tokens. Then pair devices again with `bell-pr pair`.

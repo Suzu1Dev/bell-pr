@@ -3836,3 +3836,18 @@ button {
     text-align: left;
   }
 }
+
+.pair-page form {
+  display: grid;
+  gap: 12px;
+  width: min(100%, 350px);
+  text-align: left;
+}
+.pair-page input {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-surface);
+  color: var(--color-text);
+}

@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { RotateCcw } from "lucide-react";
 import { useT } from "../i18n";
 import { LanguageSwitcher } from "../i18n/LanguageSwitcher";
+import { DevicesSection } from "./DevicesSection";
 import {
   Feedback,
   SettingSwitch,
@@ -65,6 +66,7 @@ export function GeneralSection({
           />
         </div>
       </SettingsGroup>
+      <DevicesSection />
       <SettingsGroup title={g.sample.title} text={g.sample.text}>
         <SettingSwitch
           label={g.sample.show}

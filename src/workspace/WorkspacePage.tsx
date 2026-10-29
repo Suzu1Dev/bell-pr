@@ -1,3 +1,4 @@
+import { safeLink, WebLink } from "../review/MarkdownContent";
 import { lazy, Suspense, useState, type Dispatch, type SetStateAction } from "react";
 import {
   Activity,
@@ -640,16 +641,16 @@ export function WorkspacePage({
             </span>}
             {/* The sample PR exists nowhere: its button just stays off. */}
             {published ? run.prUrl && (
-              <a
+              <WebLink
                 className="button primary"
-                href={run.prUrl}
+                href={safeLink(run.prUrl) || undefined}
                 target="_blank"
                 rel="noreferrer"
               >
                 <GitPullRequest size={16} />
                 {t.footer.viewPullRequest}
                 <ExternalLink size={14} />
-              </a>
+              </WebLink>
             ) : byHand.writing || reviewing ? (
               // Learn by hand: the person says when the change is ready (DESIGN v1.2 F5).
               <button className="button primary" disabled={busy || reviewing || !files.length} title={files.length ? undefined : t.byHand.writeFirst}

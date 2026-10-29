@@ -1,3 +1,4 @@
+import { safeLink, WebLink } from "../review/MarkdownContent";
 import type { Dispatch, SetStateAction } from "react";
 import {
   ChevronRight,
@@ -160,9 +161,9 @@ export function Topbar({
           </a>
         )}
         {repoLink && (
-          <a
+          <WebLink
             className="topbar-repo-link"
-            href={repoLink}
+            href={safeLink(repoLink) || undefined}
             target="_blank"
             rel="noreferrer"
             aria-label={t.topbar.openOnGitHub}
@@ -170,7 +171,7 @@ export function Topbar({
           >
             <ExternalLink size={14} aria-hidden="true" />
             <span className="topbar-repo-text">{t.topbar.openOnGitHub}</span>
-          </a>
+          </WebLink>
         )}
         <button
           className="top-avatar"

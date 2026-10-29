@@ -99,6 +99,8 @@ const m: Translation<typeof en> = {
       `${name} 的網頁介面尚未建置。請在 ${name} 原始碼資料夾執行 npm run build，再重新啟動 ${name}。`,
     exposedHost: ({ host }) =>
       `${name} 正在 ${host} 上監聽，而非只在 127.0.0.1。這是 --host 或 BELLPR_HOST 明確指定的位址。API 權杖仍然必要。`,
+    wildcardHostNeedsPublicUrl: ({ host }) =>
+      `${name} 正在 ${host} 上監聽，但尚未設定 BELLPR_PUBLIC_URL。遠端連線會收到 HTTP 403；請把 BELLPR_PUBLIC_URL 設為瀏覽器使用的 HTTPS 來源（例如 https://bell.example.com）。`,
   },
   open: {
     notRunning: ({ dataDir }) =>

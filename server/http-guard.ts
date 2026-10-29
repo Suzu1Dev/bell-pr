@@ -70,7 +70,7 @@ export interface GuardOptions {
 
 /** No scripts or styles from elsewhere, no framing, no form posts to other sites. */
 export const contentSecurityPolicy =
-  "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'";
+  "default-src 'self'; script-src 'self'; object-src 'none'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'";
 
 export function localhostGuard(opts: GuardOptions): RequestHandler {
   const localHosts = new Set(

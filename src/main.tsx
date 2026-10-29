@@ -1,6 +1,7 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
+import { PairPage, takePairCode } from "./PairPage";
 import { adoptApiToken } from "./api";
 import { parsePresentationFlags } from "./app/presentation";
 import {
@@ -18,6 +19,8 @@ import "./workspace-v2.css";
 // The address from `bell-pr open` carries the API token in the fragment.
 // Store it and drop it from the address before the router reads the hash.
 adoptApiToken(window);
+const isPairPage = window.location.pathname === "/pair";
+const pairCode = isPairPage ? takePairCode(window) : "";
 
 const root = ReactDOM.createRoot(document.getElementById("root")!);
 
@@ -25,7 +28,7 @@ function render(locale: Locale) {
   root.render(
     <React.StrictMode>
       <LocaleProvider locale={locale}>
-        <App />
+        {isPairPage ? <PairPage initialCode={pairCode} /> : <App />}
       </LocaleProvider>
     </React.StrictMode>,
   );
@@ -33,7 +36,7 @@ function render(locale: Locale) {
 
 // An address an upstream BELL build wrote (?run=…&tab=…, ?project=…,
 // ?page=…) opens the same place through the hash route.
-adoptViewSearch(window);
+if (!isPairPage) adoptViewSearch(window);
 
 // The sample project's text in a locale loads with its dictionary.
 addLocaleResource(loadDemo);
@@ -45,9 +48,9 @@ addLocaleResource(loadDemo);
 const locale =
   parsePresentationFlags(window.location.hash).locale ?? initialLocale();
 void loadLocale(locale).then(
-  () => render(locale),
+  () => locale,
   (error: unknown) => {
     console.error("[BELL-PR] Could not load the dictionary for", locale, error);
-    render(defaultLocale);
+    return defaultLocale;
   },
-);
+).then(render);

@@ -13,6 +13,10 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   keeping the API token out of opener arguments. Interactive headless starts
   show only `bell-pr open --print --print-token` as an explicit next step.
 
+- Pairing QR codes prefill from a hash fragment, which is cleared before confirmation; query codes are ignored. Paired devices can list and revoke any device.
+
+- Tighten CSP with explicit same-origin scripts and disabled objects; retain inline styles.
+
 - **Reopen with the normal launch command.** `bell-pr` and `bell-pr start`
   reopen an instance already running with the same data directory, before
   checking doctor readiness. Interactive SSH and headless terminals print
@@ -26,6 +30,8 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   AI provider is signed in. A real agent run is still refused until one is.
 
 ### Added
+
+- Pathname `/pair` page with QR-code prefill, header-only device credentials, and Devices settings for revocation.
 
 - **Collaborate before publishing.** A conversation with a writable agent can
   finish checks, fix failures and update the draft's Limitations section.

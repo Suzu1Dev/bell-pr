@@ -1,3 +1,4 @@
+import { safeLink, WebLink } from "../review/MarkdownContent";
 import { lazy, Suspense, useEffect, useId, useState } from "react";
 import {
   Bug,
@@ -588,9 +589,9 @@ export function DirectionSettings({
             </select>
             <p id={`${id}-ponytail-help`} className="mission-field-note">
               {t.ponytail.help}{" "}
-              <a href={ponytailSource} target="_blank" rel="noreferrer">
+              <WebLink href={safeLink(ponytailSource) || undefined} target="_blank" rel="noreferrer">
                 {t.ponytail.link}
-              </a>
+              </WebLink>
             </p>
           </div>
 

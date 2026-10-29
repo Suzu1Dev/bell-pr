@@ -613,3 +613,55 @@ with.
 Interactive SSH and headless starts print only the instruction
 `bell-pr open --print --print-token`; run it explicitly to obtain a private
 authorized URL. Desktop launches use a temporary private `file://` redirect.
+
+## Prepare the host and pair devices
+
+Before installing with `npm install -g bell-pr`, install and sign in to your AI
+provider's CLI, install Git, and configure your Git identity (`git config --global
+user.name` and `git config --global user.email`). Run `bell-pr doctor` to check
+readiness. Missing prerequisites block `bell-pr start`; follow the doctor's fix
+commands, sign in to the selected provider, or configure the missing Git identity,
+then run doctor again before starting.
+
+Run `bell-pr pair` on the host and open the pairing page on the other device.
+Enter the code (or scan the QR code), optionally name the device, and pair it.
+Prefer pairing over token URLs: a token URL stays in browser history. Paired-device
+credentials stay in that browser's localStorage; install tokens from launch links
+stay in sessionStorage and take precedence. API requests use the Authorization
+header. Browser storage must be enabled.
+
+Use `bell-pr devices list` to inspect devices and `bell-pr devices revoke <id>`
+to remove one. Settings → General → Devices also supports revocation. Both install
+tokens and paired-device credentials can list and revoke any device.
+`bell-pr token rotate` invalidates all paired devices; pair them again afterward.
+
+## What to do if pairing is locked
+
+If pairing fails with HTTP **423** (or the CLI says pairing is locked), too many failed redeem attempts temporarily blocked pairing. This protects against code guessing on Tailscale serve / `ssh -L` paths where every client appears as `127.0.0.1`.
+
+**On the host** (where `bell-pr` runs), with the install token:
+
+```bash
+bell-pr pair --unlock
+bell-pr pair [--name "device name"]
+```
+
+Notes:
+
+- `bell-pr pair` without `--unlock` does **not** clear the lock or failure counter while locked.
+- A **device token cannot unlock** — only the install token on the host can.
+- If the lock/counter file is missing or corrupt, the server **fails closed** (treats pairing as locked) and hints `bell-pr pair --unlock`.
+- After a successful pair, or after 24 hours with no failures, the counter resets automatically.
+
+## Stolen or lost device
+
+Permissions (spec v0.6+): any paired device may **list** devices and **revoke any** device (including others). Device tokens still cannot create pairing codes, rotate the install token, or unlock the failure lock.
+
+1. **Revoke the lost device from another paired device** (Settings → Devices, or `bell-pr devices revoke <id>` on the host with the install token).
+2. **If your own device was revoked** (or you no longer trust any device token), on the **host** run:
+
+```bash
+bell-pr token rotate
+```
+
+That rotates the install token and invalidates **all** device tokens. Then pair devices again with `bell-pr pair`.

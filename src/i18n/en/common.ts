@@ -9,6 +9,21 @@ import type { TeamTaskStatus } from "../../../shared/team";
 import type { RunStatus } from "../../../shared/types";
 
 const common = {
+  pair: {
+    title: "Pair this device",
+    explainer: "Run bell-pr pair on the host computer, then enter the code here.",
+    code: "Pairing code",
+    name: "Device name (optional)",
+    submit: "Pair device",
+    pairing: "Pairing…",
+    invalid: "This code is invalid or expired. Run bell-pr pair for a new code.",
+    locked: "Pairing is temporarily locked.",
+    remaining: ({ seconds }: { seconds: number }) => `Try again in ${seconds} seconds.`,
+    rateLimited: "Too many attempts. Please try again later.",
+    failed: "Could not pair or save this device. Check browser storage and try again.",
+    open: "Pair this device",
+  },
+
   runStatus: {
     queued: "Queued",
     awaiting_plan: "Awaiting plan approval",

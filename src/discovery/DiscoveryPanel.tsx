@@ -1,3 +1,4 @@
+import { safeLink, WebLink } from "../review/MarkdownContent";
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import {
   ArrowUpRight,
@@ -57,12 +58,7 @@ const angles = ["rules", "activity", "needs", "barrier"] as const;
 
 /** An http(s) link, or undefined for anything else (a sample's empty URL). */
 function webLink(value?: string) {
-  try {
-    const url = new URL(value ?? "");
-    return ["https:", "http:"].includes(url.protocol) ? url.href : undefined;
-  } catch {
-    return undefined;
-  }
+  return safeLink(value) || undefined;
 }
 
 export default function DiscoveryPanel({
@@ -686,16 +682,16 @@ export default function DiscoveryPanel({
                   </span>
                   <div>
                     {candidate.url ? (
-                      <a
+                      <WebLink
                         className="discovery-repo-link"
-                        href={candidate.url}
+                        href={safeLink(candidate.url) || undefined}
                         target="_blank"
                         rel="noreferrer"
                       >
                         <FolderGit2 size={16} />
                         {candidate.fullName}
                         <ExternalLink size={12} />
-                      </a>
+                      </WebLink>
                     ) : (
                       // Sample repositories are fictional: no link.
                       <span className="discovery-repo-link">
@@ -826,14 +822,14 @@ export default function DiscoveryPanel({
                         source && (
                           <div key={i}>
                             {source.url ? (
-                              <a
-                                href={source.url}
+                              <WebLink
+                                href={safeLink(source.url) || undefined}
                                 target="_blank"
                                 rel="noreferrer"
                               >
                                 {source.title}
                                 <ArrowUpRight size={14} />
-                              </a>
+                              </WebLink>
                             ) : (
                               <span className="discovery-source-title">
                                 {source.title}

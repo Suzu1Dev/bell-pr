@@ -1,3 +1,4 @@
+import { safeLink, WebLink } from "../review/MarkdownContent";
 import { useRef } from "react";
 import { Gauge, ArrowUpRight, Info } from "lucide-react";
 import {
@@ -132,10 +133,10 @@ export function EfficiencySummary({
             {/* Focusable, so selecting its text does not close it. */}
             <div className="efficiency-credit" role="note" tabIndex={-1}>
               <p>{credit}</p>
-              <a href={ponytailSource} target="_blank" rel="noreferrer">
+              <WebLink href={safeLink(ponytailSource) || undefined} target="_blank" rel="noreferrer">
                 {t.credit.link}
                 <ArrowUpRight size={13} aria-hidden="true" />
-              </a>
+              </WebLink>
             </div>
           </details>
         )}

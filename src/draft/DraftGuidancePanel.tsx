@@ -1,3 +1,4 @@
+import { safeLink, WebLink } from "../review/MarkdownContent";
 import { useEffect, useId, useState, type ReactNode } from "react";
 import {
   ArrowDownToLine,
@@ -154,12 +155,7 @@ function countWhySeen() {
 }
 
 function webLink(value?: string) {
-  try {
-    const url = new URL(value ?? "");
-    return ["https:", "http:"].includes(url.protocol) ? url.href : undefined;
-  } catch {
-    return undefined;
-  }
+  return safeLink(value) || undefined;
 }
 
 export function DraftGuidancePanel({
@@ -502,9 +498,9 @@ export function DraftGuidancePanel({
                         <div>
                           <p>{rule.text}</p>
                           {source ? (
-                            <a
+                            <WebLink
                               className="draft-guidance-source-link"
-                              href={url ?? `#${sourceAnchor(sourceIndex)}`}
+                              href={safeLink(url) || `#${sourceAnchor(sourceIndex)}`}
                               {...(url
                                 ? {
                                     target: "_blank",
@@ -515,7 +511,7 @@ export function DraftGuidancePanel({
                               <FileText size={12} />
                               {source.label}
                               {url && <ArrowUpRight size={12} />}
-                            </a>
+                            </WebLink>
                           ) : (
                             <span className="draft-guidance-source-missing">
                               {t.rules.noSource}
@@ -622,10 +618,10 @@ export function DraftGuidancePanel({
                     const source = sources[sourceIndex];
                     const url = webLink(source?.url);
                     return source ? (
-                      <a
+                      <WebLink
                         key={id}
                         className="draft-guidance-source-link"
-                        href={url ?? `#${sourceAnchor(sourceIndex)}`}
+                        href={safeLink(url) || `#${sourceAnchor(sourceIndex)}`}
                         {...(url
                           ? { target: "_blank", rel: "noopener noreferrer" }
                           : {})}
@@ -633,7 +629,7 @@ export function DraftGuidancePanel({
                         <FileText size={12} />
                         {source.label}
                         {url && <ArrowUpRight size={12} />}
-                      </a>
+                      </WebLink>
                     ) : (
                       <span key={id} className="draft-guidance-source-missing">
                         {t.rules.noSource}
@@ -747,9 +743,9 @@ export function DraftGuidancePanel({
                   </summary>
                   <div className="draft-guidance-source-content">
                     {url && (
-                      <a href={url} target="_blank" rel="noopener noreferrer">
+                      <WebLink href={safeLink(url) || undefined} target="_blank" rel="noopener noreferrer">
                         {t.sources.open} <ArrowUpRight size={13} />
-                      </a>
+                      </WebLink>
                     )}
                     <pre
                       tabIndex={0}
@@ -818,9 +814,9 @@ export function DraftGuidancePanel({
                     </p>
                   )}
                   {row.id === "issue" && issueLink && (
-                    <a href={issueLink} target="_blank" rel="noopener noreferrer">
+                    <WebLink href={safeLink(issueLink) || undefined} target="_blank" rel="noopener noreferrer">
                       {t.checklist.openIssue} <ArrowUpRight size={12} aria-hidden="true" />
-                    </a>
+                    </WebLink>
                   )}
                   {(whySeen[row.id] ?? 0) >= whyShownTimes ? (
                     <details className="draft-checklist-why">
@@ -841,13 +837,13 @@ export function DraftGuidancePanel({
         <p className="draft-guidance-linux">
           {rich(t.linux.note, {
             guide: (
-              <a
-                href={linuxContributionUrl}
+              <WebLink
+                href={safeLink(linuxContributionUrl) || undefined}
                 target="_blank"
                 rel="noopener noreferrer"
               >
                 {t.linux.guide} <ArrowUpRight size={12} />
-              </a>
+              </WebLink>
             ),
           })}
         </p>

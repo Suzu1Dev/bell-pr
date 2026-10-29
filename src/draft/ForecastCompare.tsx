@@ -1,3 +1,4 @@
+import { safeLink, WebLink } from "../review/MarkdownContent";
 import { useId, useState } from "react";
 import { ArrowUpRight, Telescope } from "lucide-react";
 import type { PrFeedback, PrFeedbackItem } from "../../shared/pr-feedback";
@@ -69,12 +70,7 @@ export function feedbackOutcome(feedback: PrFeedback): Outcome {
 }
 
 function webLink(value: string) {
-  try {
-    const url = new URL(value);
-    return ["https:", "http:"].includes(url.protocol) ? url.href : undefined;
-  } catch {
-    return undefined;
-  }
+  return safeLink(value) || undefined;
 }
 
 type ForecastMessages = Messages["draft"]["forecast"];
@@ -112,9 +108,9 @@ function ItemTags({
         <span>{item.authorAssociation}</span>
         {item.path && <code>{t.line({ path: item.path, line: item.line })}</code>}
         {link && (
-          <a href={link} target="_blank" rel="noopener noreferrer">
+          <WebLink href={safeLink(link) || undefined} target="_blank" rel="noopener noreferrer">
             {t.open} <ArrowUpRight size={12} aria-hidden="true" />
-          </a>
+          </WebLink>
         )}
       </div>
       {item.body.trim() && <p className="forecast-item-body">{item.body}</p>}

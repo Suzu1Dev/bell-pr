@@ -227,6 +227,67 @@ test("an invalid BELLPR_ALLOWED_ORIGINS is reported in the CLI's language", () =
   );
 });
 
+test("a wildcard host without BELLPR_PUBLIC_URL warns once that remotes get 403", async () => {
+  const box = await sandbox();
+  try {
+    const warnings: string[] = [];
+    const printed: string[] = [];
+    await withLocale("en", async () => {
+    for (const host of ["0.0.0.0", "::"] as const) {
+      warnings.length = 0;
+      printed.length = 0;
+      const running = await startServer({
+        config: resolveConfig(
+          { host, port: String(await freePort()), dataDir: box.data },
+          box.env,
+        ),
+        handleExit: false,
+        print: (line) => printed.push(line),
+        warn: (line) => warnings.push(line),
+      });
+      try {
+        assert.equal(warnings.length, 1, host);
+        assert.match(warnings[0]!, /BELLPR_PUBLIC_URL/);
+        assert.match(warnings[0]!, /403/);
+        assert.equal(
+          printed.some((line) => /API token is still required/.test(line)),
+          false,
+          host,
+        );
+      } finally {
+        await running.shutdown();
+      }
+    }
+    });
+    // With PUBLIC_URL set, keep the generic exposed-host line instead.
+    warnings.length = 0;
+    printed.length = 0;
+    await withLocale("en", async () => {
+      const withUrl = await startServer({
+        config: resolveConfig(
+          { host: "0.0.0.0", port: String(await freePort()), dataDir: box.data },
+          { ...box.env, BELLPR_PUBLIC_URL: "https://bell.example.com" },
+        ),
+        handleExit: false,
+        print: (line) => printed.push(line),
+        warn: (line) => warnings.push(line),
+      });
+      try {
+        assert.equal(warnings.length, 0);
+        assert.equal(
+          printed.some((line) => /listening on 0\.0\.0\.0/.test(line) && /API token/.test(line)),
+          true,
+          printed.join("\n"),
+        );
+      } finally {
+        await withUrl.shutdown();
+      }
+    });
+  } finally {
+    await box.cleanup();
+  }
+});
+
 test("an out-of-range limit is reported in the CLI's language", () => {
   withLocale("zh-TW", () => {
     for (const [env, expected] of [
