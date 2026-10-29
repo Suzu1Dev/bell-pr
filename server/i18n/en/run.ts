@@ -657,7 +657,7 @@ export default {
      * userinfo. The words never include that address.
      */
     originUserinfo:
-      "This checkout's origin URL contains embedded credentials or userinfo, so it was not used as a GitHub source. The project is treated as a local project. Set a plain https://github.com/owner/repo origin, then remove the project here and import it again.",
+      "This checkout's origin URL contains embedded credentials or userinfo, so it was not used as a GitHub source. The project is treated as a local project. Run git remote set-url origin https://github.com/OWNER/REPO, then remove the project here and import it again. Sign in for push with a git credential helper or gh auth login instead of putting credentials in the remote URL. Credentials stored in .git/config are readable by anything that can read the repository.",
     /** A local path that names no folder; `path` is absolute, with ~/ expanded. */
     pathMissing: ({ path }: { path: string }) =>
       `There is no folder at ${path} on the computer ${product.name} runs on. Check the path; ~/ is the home directory of the user ${product.name} runs as.`,

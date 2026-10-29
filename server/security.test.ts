@@ -387,12 +387,17 @@ test("an origin with userinfo is imported as local, and the message leaves that 
   assert.equal(repo.owner, "local");
   assert.equal(repo.originUserinfoIgnored, true);
   assert.equal(workbench.managedClone(repo), false);
+  const command = "git remote set-url origin https://github.com/OWNER/REPO";
   assert.match(message, /embedded credentials or userinfo/);
   assert.match(message, /not used as a GitHub source/);
   assert.match(message, /treated as a local project/);
-  assert.match(message, /https:\/\/github\.com\/owner\/repo/);
+  assert.ok(message.includes(command));
+  assert.match(message, /git credential helper or gh auth login/);
+  assert.match(message, /Credentials stored in \.git\/config are readable/);
   assert.match(zh, /使用者資訊/);
-  assert.match(zh, /https:\/\/github\.com\/owner\/repo/);
+  assert.ok(zh.includes(command));
+  assert.match(zh, /gh auth login/);
+  assert.match(zh, /\.git\/config/);
   const logs = (await recentLogLines(store.directory)).join("\n");
   assert.match(logs, /repo\.origin_userinfo/);
   const returned = JSON.stringify({

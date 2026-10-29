@@ -221,9 +221,12 @@ The sudo panel and the doctor warning for that file show:
   fetch from there. That origin is the URL saved in the checkout, so a global
   `url.*.insteadOf` rewrite does not change which project it is. An origin
   whose URL contains userinfo is not used as a GitHub source: the project is
-  imported as a local one, and the message tells the person to set a plain
-  `https://github.com/owner/repo` origin. That message never includes the
-  address that was refused. Otherwise the clone keeps no remote and runs
+  imported as a local one. The message includes
+  `git remote set-url origin https://github.com/OWNER/REPO`, says to sign in
+  with a git credential helper or `gh auth login` rather than putting
+  credentials in the remote URL, and notes that credentials in `.git/config`
+  can be read by anything that can read the repository. That message never
+  includes the address that was refused. Otherwise the clone keeps no remote and runs
   start from its own branches. A project that an earlier version imported in place
   moves to such a clone when its next run starts, once none of its runs
   still has a worktree in your repository; until then its runs, new ones
