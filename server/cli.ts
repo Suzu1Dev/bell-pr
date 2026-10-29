@@ -1,8 +1,8 @@
 import { openBrowserFile, type BrowserOpener } from "./browser-open.js";
 /**
  * The `bell-pr` / `bellpr` command: start (the default), open, doctor,
- * version and help. bin/bellpr.mjs loads the bundle of this file
- * (build/cli.mjs) and calls `run`.
+ * token, pair, devices, version and help. bin/bellpr.mjs loads the bundle
+ * of this file (build/cli.mjs) and calls `run`.
  */
 import { spawn } from "node:child_process";
 import { randomBytes } from "node:crypto";
@@ -22,7 +22,7 @@ import {
   resolvePort,
 } from "./config.js";
 import { readinessChecklist, runDoctorCli } from "./doctor.js";
-import { sm } from "./i18n/index.js";
+import { currentLocale, sm } from "./i18n/index.js";
 import {
   isEntryPoint,
   lockHolderRunning,
@@ -35,6 +35,10 @@ import {
   type StartServerOptions,
 } from "./index.js";
 import { redact } from "./process.js";
+import { clearPairing } from "./pairing.js";
+import { printPairQr } from "./pair-qr.js";
+import { formatters } from "../shared/i18n/locale.js";
+import type { DeviceSummary, PairCodeResponse, PairLockedResponse } from "../shared/pairing.js";
 
 interface Output {
   write(text: string): unknown;
@@ -55,6 +59,8 @@ export interface CliDeps {
   startServer?: typeof startServer;
   /** Called with the running server after `start`. */
   onStarted?: (server: RunningServer) => void;
+  /** Draws the pairing QR code; tests spy on it. */
+  printPairQr?: typeof printPairQr;
 }
 
 /** A command-line mistake: the message, then exit code 2. */
@@ -379,17 +385,166 @@ async function open(args: string[], ctx: Context): Promise<number> {
   return 0;
 }
 
-/** `bell-pr token rotate` replaces the token file. The new token is not printed. */
+/**
+ * `bell-pr token rotate` replaces the token file and signs out every paired
+ * device. The new token is not printed.
+ */
 async function rotateToken(args: string[], ctx: Context): Promise<number> {
   const [sub, ...rest] = args;
   if (sub !== "rotate")
     throw new UsageError(sm().cli.token.usage);
   const { values } = parse(rest, commonOptions);
   loadEnvFile(values["env-file"]);
-  const file = dataPaths(resolveDataDir({ dataDir: values["data-dir"] }, ctx.env)).apiToken;
+  const dataDir = resolveDataDir({ dataDir: values["data-dir"] }, ctx.env);
+  const file = dataPaths(dataDir).apiToken;
   await rotateApiToken(file);
-  ctx.stdout.write(`${sm().cli.token.rotated({ path: file })}\n`);
+  await clearPairing(dataDir);
+  ctx.stdout.write(`${sm().cli.token.rotated({ path: file })}\n${sm().cli.token.devicesCleared}\n`);
   return 0;
+}
+
+/** One JSON request to the proven instance, with the install token. */
+function callInstance(
+  { lock, token }: { lock: LockInfo; token: string },
+  method: string,
+  urlPath: string,
+  body: object,
+): Promise<{ status: number; body: unknown }> {
+  const text = JSON.stringify(body);
+  return new Promise((resolve, reject) => {
+    const request = http.request(
+      `http://${browserHost(lock.host ?? "127.0.0.1")}:${lock.port}${urlPath}`,
+      {
+        method,
+        headers: {
+          host: `127.0.0.1:${lock.port}`,
+          authorization: `Bearer ${token}`,
+          "content-type": "application/json",
+          "content-length": String(Buffer.byteLength(text)),
+        },
+        timeout: 10_000,
+      },
+      (response) => {
+        let data = "";
+        response.setEncoding("utf8");
+        response.on("data", (chunk: string) => (data += chunk));
+        response.on("error", reject);
+        response.on("end", () => {
+          let parsed: unknown;
+          try {
+            parsed = data ? JSON.parse(data) : undefined;
+          } catch {
+            parsed = undefined;
+          }
+          resolve({ status: response.statusCode ?? 0, body: parsed });
+        });
+      },
+    );
+    request.on("timeout", () => request.destroy(new Error("timeout")));
+    request.on("error", reject);
+    request.end(text);
+  });
+}
+
+/** A refused request: the status and the server's message, never a token. */
+function requestFailed(ctx: Context, response: { status: number; body: unknown }) {
+  const error = (response.body as { error?: unknown } | undefined)?.error;
+  ctx.stderr.write(
+    `${sm().cli.requestFailed({ status: response.status, error: redact(typeof error === "string" ? error : "") })}\n`,
+  );
+  return 1;
+}
+
+/** The running instance for `dataDir`, or undefined after saying it is not running. */
+async function runningInstance(values: { "data-dir"?: string }, ctx: Context) {
+  const dataDir = resolveDataDir({ dataDir: values["data-dir"] }, ctx.env);
+  const instance = await provenInstance(dataDir);
+  if (!instance) ctx.stderr.write(`${sm().cli.open.notRunning({ dataDir })}\n`);
+  return instance;
+}
+
+/**
+ * `bell-pr pair`: a one-time code for the /pair page, printed with its
+ * address. `--unlock` clears the failure lock instead.
+ */
+async function pair(args: string[], ctx: Context): Promise<number> {
+  const { values } = parse(args, {
+    ...commonOptions,
+    name: { type: "string" },
+    "no-qr": { type: "boolean" },
+    unlock: { type: "boolean" },
+  });
+  loadEnvFile(values["env-file"]);
+  const m = sm().cli.pair;
+  const instance = await runningInstance(values, ctx);
+  if (!instance) return 1;
+  if (values.unlock) {
+    const response = await callInstance(instance, "POST", "/api/pair/unlock", {});
+    if (response.status !== 204) return requestFailed(ctx, response);
+    ctx.stdout.write(`${m.unlocked}\n`);
+    return 0;
+  }
+  const response = await callInstance(instance, "POST", "/api/pair/codes", values.name ? { name: values.name } : {});
+  const format = formatters(currentLocale());
+  if (response.status === 423) {
+    const { lockedUntil } = response.body as PairLockedResponse;
+    ctx.stderr.write(
+      `${lockedUntil ? m.locked({ lockedUntil: format.dateTime(lockedUntil) }) : m.lockedDamaged}\n${m.unlockHint}\n`,
+    );
+    return 1;
+  }
+  if (response.status !== 201) return requestFailed(ctx, response);
+  const { code, expiresAt, pairUrl } = response.body as PairCodeResponse;
+  ctx.stdout.write(`${m.created({ pairUrl, code, expiresAt: format.time(expiresAt) })}\n`);
+  if (!values["no-qr"]) (ctx.deps.printPairQr ?? printPairQr)(`${pairUrl}#code=${code}`, ctx.stdout);
+  return 0;
+}
+
+/** `bell-pr devices list` and `bell-pr devices revoke <id>`. */
+async function devices(args: string[], ctx: Context): Promise<number> {
+  const [sub, ...rest] = args;
+  const m = sm().cli.devices;
+  if (sub === "list") {
+    const { values } = parse(rest, commonOptions);
+    loadEnvFile(values["env-file"]);
+    const instance = await runningInstance(values, ctx);
+    if (!instance) return 1;
+    const response = await callInstance(instance, "GET", "/api/devices", {});
+    if (response.status !== 200) return requestFailed(ctx, response);
+    const list = response.body as DeviceSummary[];
+    const format = formatters(currentLocale());
+    ctx.stdout.write(
+      list.length
+        ? list
+            .map((device) =>
+              m.line({
+                id: device.id,
+                name: device.name,
+                createdAt: format.dateTime(device.createdAt),
+                lastUsedAt: device.lastUsedAt ? format.dateTime(device.lastUsedAt) : m.neverUsed,
+              }),
+            )
+            .join("\n") + "\n"
+        : `${m.none}\n`,
+    );
+    return 0;
+  }
+  if (sub === "revoke" && rest[0] && !rest[0].startsWith("-")) {
+    const [id, ...options] = rest;
+    const { values } = parse(options, commonOptions);
+    loadEnvFile(values["env-file"]);
+    const instance = await runningInstance(values, ctx);
+    if (!instance) return 1;
+    const response = await callInstance(instance, "DELETE", `/api/devices/${encodeURIComponent(id)}`, {});
+    if (response.status === 404) {
+      ctx.stderr.write(`${m.notFound({ id })}\n`);
+      return 1;
+    }
+    if (response.status !== 204) return requestFailed(ctx, response);
+    ctx.stdout.write(`${m.revoked({ id })}\n`);
+    return 0;
+  }
+  throw new UsageError(m.usage);
 }
 
 function printVersion(args: string[], ctx: Context): number {
@@ -468,7 +623,7 @@ export async function main(
   try {
     // `bell-pr start --help` and the like show the help instead of failing.
     if (
-      ["start", "open", "token", "version", "--version", "-v"].includes(first) ||
+      ["start", "open", "token", "pair", "devices", "version", "--version", "-v"].includes(first) ||
       first?.startsWith("-")
     )
       if (wantsHelp(argv)) return help();
@@ -481,6 +636,10 @@ export async function main(
         return await open(rest, ctx);
       case "token":
         return await rotateToken(rest, ctx);
+      case "pair":
+        return await pair(rest, ctx);
+      case "devices":
+        return await devices(rest, ctx);
       case "doctor":
         return await doctor(rest, ctx);
       case "version":
