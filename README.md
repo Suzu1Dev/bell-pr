@@ -216,6 +216,7 @@ the project requires it or you choose to, and publishing waits until a
 disclosure the project requires is there. Publishing pushes a branch (to
 your fork when needed) and opens a **Draft** PR through the GitHub CLI;
 nothing is ever force-pushed.
+An existing fork must belong to the target project before BELL PR pushes to it.
 
 If an earlier attempt created a local commit but stopped before pushing,
 **Recover unfinished publish** on the Draft tab checks GitHub and returns

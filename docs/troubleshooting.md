@@ -29,6 +29,10 @@ Contents:
 
 ## An earlier publish made a different commit
 
+If a publish failed and you have not changed the code or commit message,
+retry **Submit Draft PR** after resolving the error. BELL PR reuses the saved
+commit; recovery is needed when that commit no longer matches your changes.
+
 A failed publish can leave a local commit. If you later change the files or
 commit message, retrying cannot reuse that commit. On the **Draft** tab, save
 your edits and choose **Recover unfinished publish**. This option appears

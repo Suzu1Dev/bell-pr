@@ -853,7 +853,9 @@ export async function publish(
           { timeoutMs: 120_000 },
         );
         headRepository = `${githubUser}/${repo.name}`;
-        const fork = json<{ parent?: { nameWithOwner: string } }>(
+        const fork = json<{
+          parent?: { name?: unknown; owner?: { login?: unknown } | null } | null;
+        } | null>(
           (
             await command("gh", [
               "repo",
@@ -864,9 +866,13 @@ export async function publish(
             ])
           ).stdout,
         );
+        // `gh repo view --json parent` returns the owner's login and repository name separately.
+        const parentOwner = fork?.parent?.owner?.login;
+        const parentName = fork?.parent?.name;
         if (
-          fork.parent?.nameWithOwner.toLowerCase() !==
-          repo.fullName.toLowerCase()
+          typeof parentOwner !== "string" ||
+          typeof parentName !== "string" ||
+          `${parentOwner}/${parentName}`.toLowerCase() !== repo.fullName.toLowerCase()
         )
           throw new AppError((m) => m.run.publish.notAFork, 409);
         headOwner = githubUser;
