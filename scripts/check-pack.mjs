@@ -60,6 +60,10 @@ const required = [
   "NOTICE",
 ];
 const forbidden = [
+  { pattern: /(^|\/)\.codex-prompts(\/|$)/, reason: "private prompts" },
+  { pattern: /\.map$/, reason: "source map" },
+  { pattern: /(^|\/)\.git(\/|$)/, reason: "Git metadata" },
+  { pattern: /(^|\/)(tests?|e2e)(\/|$)/, reason: "tests" },
   { pattern: /\.test\.tsx?$/, reason: "test file" },
   { pattern: /^deploy\//, reason: "deployment files" },
   { pattern: /^\.agents\//, reason: "agent instructions" },
@@ -70,7 +74,7 @@ const forbidden = [
   { pattern: /(^|\/)fixtures\//, reason: "test fixtures" },
   { pattern: /^node_modules\//, reason: "dependencies" },
   { pattern: /\.(pem|key)$/, reason: "key or certificate" },
-  { pattern: /(^|\/)\.env(\.|$)/, reason: "environment file" },
+  { pattern: /(^|\/)\.env[^/]*(\/|$)/, reason: "environment file" },
 ];
 
 class SetupError extends Error {}
