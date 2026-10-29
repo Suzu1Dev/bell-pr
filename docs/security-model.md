@@ -40,9 +40,18 @@ what BELL PR trusts, what it does not, and the limits of each protection.
   your Codex or Claude Code account and publish with your `gh` login.
 - **Browser access.** The token link opened by `bell-pr` or `bell-pr open`
   is exchanged for an HttpOnly cookie and removed from the address bar.
-  Tabs at the same address share access. By default the cookie is a browser
-  session cookie and the server limits its validity to 12 hours. **Settings
-  → General → Browser access** can remember the browser for 30 days instead.
+  Tabs at the same address share access. New browser sessions are remembered
+  by default. The visible workbench renews remembered access on page load
+  and at most hourly afterward, including when it becomes visible again,
+  for another 30 days.
+  Ordinary API requests do not renew cookies. The browser's Web Locks API
+  coordinates renewal with sign-out and changes to the remember setting
+  across tabs, so a pending renewal cannot undo those actions. Browsers
+  without Web Locks skip background renewal; reopening through the CLI
+  still renews access. Access expires after about 30 days without renewal. Under
+  **Settings → General → Browser access**, turning off **Remember this browser**
+  gives it a nonpersistent cookie limited to 12 hours. Reopening the app
+  preserves a valid session's remember choice.
   Signing out clears that browser's cookie; it does not invalidate a copied
   token URL. A copied session cookie remains valid after sign-out until it
   expires or all access is revoked. Revoking all access also rotates the API

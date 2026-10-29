@@ -1,7 +1,7 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
-import { adoptApiToken, establishBrowserSession } from "./api";
+import { adoptApiToken, currentApiToken, establishBrowserSession, renewBrowserSession } from "./api";
 import { parsePresentationFlags } from "./app/presentation";
 import {
   addLocaleResource,
@@ -19,9 +19,11 @@ import "./workspace-v2.css";
 // Drop it from the address, then exchange it for a browser session before
 // mounting the app. Older tabs' stored tokens are upgraded the same way.
 const pageToken = adoptApiToken(window);
-const browserSession = establishBrowserSession(pageToken).catch(() => {
-  // The app's first API requests show the existing connection/sign-in message.
-});
+const hasLaunchToken = Boolean(pageToken ?? currentApiToken());
+const browserSession = establishBrowserSession(pageToken).then(
+  () => hasLaunchToken,
+  () => false, // The app's first API requests show connection/access errors.
+);
 
 const root = ReactDOM.createRoot(document.getElementById("root")!);
 
@@ -57,4 +59,18 @@ void Promise.all([
     },
   ),
   browserSession,
-]).then(([readyLocale]) => render(readyLocale));
+]).then(([readyLocale, renewedAtLaunch]) => {
+  render(readyLocale);
+  const hour = 60 * 60 * 1000;
+  let lastRenewal = renewedAtLaunch ? Date.now() : 0;
+  const renewWhenVisible = () => {
+    if (document.visibilityState !== "visible" || Date.now() - lastRenewal < hour) return;
+    lastRenewal = Date.now();
+    // Session changes share a browser lock so renewal cannot undo sign-out.
+    // The regular app requests already handle offline or expired access.
+    void renewBrowserSession().catch(() => {});
+  };
+  renewWhenVisible();
+  window.setInterval(renewWhenVisible, hour);
+  document.addEventListener("visibilitychange", renewWhenVisible);
+});

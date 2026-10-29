@@ -8,19 +8,24 @@ Nothing is migrated or moved behind your back.
 
 ## Update
 
+This source branch is not yet published to npm. The current `0.0.2` package
+is a placeholder without a CLI; use the source-build path below until a
+release containing the CLI is available.
+
 1. Wait until no run is executing, then stop BELL PR (Ctrl+C in its
    terminal, or stop the service or container). Agents that are still
    running when BELL PR stops are stopped too; their runs show what
    happened, and failed subtasks can be retried.
 2. Back up the data directory (see below).
 3. Install the new version:
-   - installed with npm: `npm install -g bell-pr@latest`;
-   - with `npx`: run `npx bell-pr@latest`, which fetches the newest
+   - source build: update the checkout, then run `npm ci` and `npm run build`;
+   - after a CLI release is published, installed with npm: `npm install -g bell-pr@latest`;
+   - after a CLI release is published, with `npx`: run `npx bell-pr@latest`, which fetches the newest
      version;
    - Docker: build or pull the new image and replace the container with
      the same volumes, as [Docker](docker.md#update) describes.
-4. Start BELL PR again. It prints its address, and `bell-pr open` opens it
-   again whenever you need it.
+4. Start BELL PR again. Run `bell-pr` (or `node bin/bellpr.mjs` from the
+   checkout) whenever you want to reopen the running app.
 
 `bell-pr version` shows the version you run and its release date.
 

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import test, { afterEach, beforeEach } from "node:test";
+import test, { afterEach, beforeEach, type TestContext } from "node:test";
 import { product } from "../shared/product";
 import {
   adoptApiToken,
@@ -7,7 +7,10 @@ import {
   api,
   apiUrl,
   establishBrowserSession,
+  endBrowserSession,
+  renewBrowserSession,
   send,
+  updateBrowserSession,
 } from "./api";
 import { setLocale } from "./i18n";
 
@@ -312,7 +315,7 @@ test("a 401 becomes the open instruction, not the bearer header text", async () 
   assert.equal(error.status, 401);
   assert.equal(
     error.message,
-    "Open bell-pr from this computer by running `bell-pr open`.",
+    "Run `bell-pr` on the computer hosting BELL PR to reopen your workspace.",
   );
   assert.doesNotMatch(error.message, /Bearer|X-Bell-Token/);
 });
@@ -371,4 +374,125 @@ test("a revoked legacy token is removed so it cannot override a valid cookie", a
   respond = () => json(200, { ready: true });
   await api("/status");
   assert.equal(calls.at(-1)?.headers.get("Authorization"), null);
+});
+
+/** FIFO exclusive locks, with the same queue shared by every simulated tab. */
+function installSessionLocks(t: TestContext, supported = true) {
+  const previous = Object.getOwnPropertyDescriptor(globalThis, "navigator");
+  const names: string[] = [];
+  let queue: Promise<unknown> = Promise.resolve();
+  const locks = {
+    request<T>(name: string, change: () => Promise<T>) {
+      names.push(name);
+      const result = queue.then(change);
+      queue = result.catch(() => {});
+      return result;
+    },
+  };
+  Object.defineProperty(globalThis, "navigator", {
+    configurable: true, value: supported ? { locks } : {},
+  });
+  t.after(() => {
+    if (previous) Object.defineProperty(globalThis, "navigator", previous);
+    else Reflect.deleteProperty(globalThis, "navigator");
+  });
+  return names;
+}
+
+function deferred() {
+  let resolve!: () => void;
+  const promise = new Promise<void>((done) => { resolve = done; });
+  return { promise, resolve };
+}
+
+test("without Web Locks background renewal is skipped while explicit browser changes still work", async (t) => {
+  installSessionLocks(t, false);
+  await renewBrowserSession();
+  assert.equal(calls.length, 0);
+  respond = (call) => call.method === "DELETE"
+    ? new Response(null, { status: 204 }) : json(200, { remembered: false });
+  assert.deepEqual(await updateBrowserSession(false), { remembered: false });
+  await endBrowserSession();
+  assert.deepEqual(calls.map((call) => call.method), ["POST", "DELETE"]);
+});
+
+test("renewal rechecks the saved choice and never uses a bearer even when legacy token removal fails", async (t) => {
+  installSessionLocks(t);
+  const tab = tokenWindow(`http://127.0.0.1:4311/#bell_token=${"ab".repeat(32)}`);
+  adoptApiToken(tab.win);
+  tab.session.removeItem = () => { throw new Error("Storage blocked"); };
+  const previous = globalThis.sessionStorage;
+  globalThis.sessionStorage = tab.session;
+  t.after(() => { globalThis.sessionStorage = previous; });
+  respond = () => json(200, { remembered: false });
+  await renewBrowserSession();
+  assert.deepEqual(calls.map((call) => call.method), ["GET"]);
+
+  respond = () => json(200, { remembered: true });
+  await renewBrowserSession();
+  assert.deepEqual(calls.map((call) => call.method), ["GET", "GET", "POST"]);
+  assert.equal(calls.at(-1)?.body, '{"remember":true}');
+  assert.ok(calls.every((call) => call.headers.get("Authorization") === null));
+  assert.ok(calls.every((call) => call.headers.get("X-Bell-Token") === null));
+});
+
+for (const action of ["sign-out", "revoke", "opt-out"] as const) {
+  test(`a paused renewal finishes before ${action}, and queued renewal rechecks the resulting cookie`, async (t) => {
+    const locks = installSessionLocks(t);
+    const renewalStarted = deferred();
+    const finishRenewal = deferred();
+    let cookie: { remembered: boolean } | undefined = { remembered: true };
+    respond = async (call) => {
+      if (!cookie) return json(401, { error: "Signed out" });
+      if (call.method === "GET") return json(200, cookie);
+      if (call.method === "DELETE" || call.url.endsWith("/revoke")) {
+        cookie = undefined;
+        return new Response(null, { status: 204 });
+      }
+      const { remember } = JSON.parse(call.body!);
+      if (remember) {
+        renewalStarted.resolve();
+        await finishRenewal.promise;
+      }
+      cookie = { remembered: remember };
+      return json(200, cookie);
+    };
+
+    const renewal = renewBrowserSession();
+    await renewalStarted.promise;
+    const change = action === "opt-out" ? updateBrowserSession(false) : endBrowserSession(action === "revoke");
+    const afterChange = renewBrowserSession().then(() => undefined, (error: unknown) => error);
+    await Promise.resolve();
+    assert.deepEqual(calls.map((call) => call.method), ["GET", "POST"]);
+
+    finishRenewal.resolve();
+    await renewal;
+    await change;
+    const outcome = await afterChange;
+    assert.equal(calls.length, 4);
+    assert.equal(calls[3].method, "GET");
+    if (action === "opt-out") {
+      assert.deepEqual(cookie, { remembered: false });
+      assert.equal(calls[2].body, '{"remember":false}');
+      assert.equal(outcome, undefined);
+    } else {
+      assert.equal(cookie, undefined);
+      assert.ok(outcome instanceof ApiError && outcome.status === 401);
+      assert.equal(calls[2].method, action === "revoke" ? "POST" : "DELETE");
+    }
+    assert.equal(new Set(locks).size, 1);
+    assert.equal(locks.length, 3);
+    assert.ok(calls.every((call) => call.headers.get("Authorization") === null));
+  });
+}
+
+test("an explicit CLI login exchanges credentials under the same browser-session lock", async (t) => {
+  const locks = installSessionLocks(t);
+  respond = () => json(200, { remembered: true });
+  await establishBrowserSession("ab".repeat(32));
+  await updateBrowserSession(false);
+  assert.equal(locks.length, 2);
+  assert.equal(new Set(locks).size, 1);
+  assert.equal(calls[0].headers.get("Authorization"), `Bearer ${"ab".repeat(32)}`);
+  assert.equal(calls[2].headers.get("Authorization"), null);
 });

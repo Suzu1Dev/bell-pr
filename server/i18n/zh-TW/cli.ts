@@ -13,7 +13,7 @@ const m: Translation<typeof en> = {
       `用法：${bin} [指令] [選項]`,
       "",
       "指令：",
-      `  start      啟動 ${name}（預設指令）`,
+      `  start      啟動 ${name}，或開啟執行中的工作區（預設指令）`,
       "  open       印出執行中伺服器的位址，並在瀏覽器開啟",
       "  doctor     檢查 git、gh 與 Agent CLI（加 --json 輸出機器可讀格式）",
       "  token      更換 API 權杖（`token rotate`）",
@@ -68,6 +68,8 @@ const m: Translation<typeof en> = {
   },
   start: {
     startup: ({ version, url }) => `${name} ${version} → ${url}`,
+    reusing: ({ url }) => `${name} 執行中 → ${url}`,
+    openLink: ({ url }) => `在瀏覽器開啟工作區：${url}`,
     legacyDataDir: ({ dataDir }) =>
       `在 ./.bellpr 找到 ${name} 資料。${name} 現在使用 ${dataDir}，沒有搬移任何資料。若要繼續使用舊資料夾，請以此方式啟動：${bin} start --data-dir ./.bellpr`,
     alreadyRunning: ({ url }) =>

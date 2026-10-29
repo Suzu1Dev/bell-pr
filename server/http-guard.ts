@@ -1,4 +1,4 @@
-import type { Request, RequestHandler } from "express";
+import type { CookieOptions, Request, RequestHandler } from "express";
 import { tokensMatch } from "./api-token.js";
 import { apiSessionCookie, readApiSession } from "./api-session.js";
 import { sm } from "./i18n/index.js";
@@ -145,10 +145,13 @@ export function localhostGuard(opts: GuardOptions): RequestHandler {
 /** Explicit token headers take precedence, including malformed or empty values. */
 export function apiRequestAuthenticated(req: Request, expected: string | undefined): boolean {
   if (!expected) return false;
-  const hasTokenHeader = req.get("authorization") !== undefined || req.get("x-bell-token") !== undefined;
-  return hasTokenHeader
+  return hasTokenHeader(req)
     ? tokensMatch(expected, presentedToken(req))
     : readApiSession(req.get("cookie"), expected, apiSessionCookieScope(req).name) !== undefined;
+}
+
+function hasTokenHeader(req: Request) {
+  return req.get("authorization") !== undefined || req.get("x-bell-token") !== undefined;
 }
 
 /** Cookies span ports, so each validated endpoint gets its own cookie name. */
@@ -160,6 +163,16 @@ export function apiSessionCookieScope(req: Request) {
   const endpoint = new URL(`${secure ? "https" : "http"}://${req.headers.host}`);
   const port = endpoint.port || (secure ? "443" : "80");
   return { name: `${apiSessionCookie}-${port}`, secure };
+}
+
+/** Session cookie attributes after Host validation. */
+export function apiSessionCookieOptions(req: Request): CookieOptions {
+  return {
+    httpOnly: true,
+    sameSite: "strict",
+    path: "/",
+    secure: apiSessionCookieScope(req).secure,
+  };
 }
 
 function enforced(opts: GuardOptions) {

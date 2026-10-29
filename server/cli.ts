@@ -4,9 +4,12 @@
  * (build/cli.mjs) and calls `run`.
  */
 import { spawn } from "node:child_process";
+import { randomBytes } from "node:crypto";
 import { existsSync } from "node:fs";
+import http from "node:http";
 import { parseArgs, type ParseArgsConfig } from "node:util";
-import { readApiToken, rotateApiToken, withApiToken } from "./api-token.js";
+import { apiListenerProof, readApiToken, rotateApiToken, tokensMatch, withApiToken } from "./api-token.js";
+import { product } from "../shared/product.js";
 import { buildDate, version } from "./build-info.js";
 import {
   browserHost,
@@ -47,6 +50,8 @@ export interface CliDeps {
   openUrl?: (url: string) => void;
   /** Passed to startServer by `start`. */
   startOptions?: Partial<StartServerOptions>;
+  /** Starts the listener; tests can arrange a competing start at this boundary. */
+  startServer?: typeof startServer;
   /** Called with the running server after `start`. */
   onStarted?: (server: RunningServer) => void;
 }
@@ -161,13 +166,16 @@ function loadEnvFile(file: string | undefined) {
 
 /**
  * Whether opening a browser makes sense here: not when BELLPR_NO_OPEN or CI
- * is set, output is not a terminal, or in a container.
+ * is set, output is not a terminal, in a container or over SSH. Linux
+ * also needs a graphical session; a TTY alone cannot open a browser.
  */
-export function canOpenBrowser(env: NodeJS.ProcessEnv, stdout: Output) {
+export function canOpenBrowser(env: NodeJS.ProcessEnv, stdout: Output, platform = process.platform) {
   return (
     !envFlag(env.BELLPR_NO_OPEN) &&
     !envFlag(env.CI) &&
     Boolean(stdout.isTTY) &&
+    !env.SSH_CONNECTION && !env.SSH_CLIENT && !env.SSH_TTY &&
+    (platform !== "linux" || Boolean(env.DISPLAY?.trim() || env.WAYLAND_DISPLAY?.trim())) &&
     !existsSync("/.dockerenv") &&
     !existsSync("/run/.containerenv")
   );
@@ -204,6 +212,56 @@ interface Context {
   deps: CliDeps;
 }
 
+/** A desktop opens the URL; an interactive headless terminal gets its usable link. */
+function startBrowserAction(ctx: Context): ((url: string) => void) | undefined {
+  if (!ctx.stdout.isTTY || envFlag(ctx.env.BELLPR_NO_OPEN) || envFlag(ctx.env.CI)) return undefined;
+  if (canOpenBrowser(ctx.env, ctx.stdout, ctx.platform)) return ctx.openUrl;
+  return (url) => ctx.stdout.write(`${sm().cli.start.openLink({ url })}\n`);
+}
+
+/** Only a listener proving possession of this directory's token may receive a login link. */
+async function provenInstance(dataDir: string): Promise<{ lock: LockInfo; token: string } | undefined> {
+  const lock = readLock(dataDir);
+  if (!lock || !lockHolderRunning(dataDir, lock)) return undefined;
+  const tokenFile = dataPaths(dataDir).apiToken;
+  const token = readApiToken(tokenFile);
+  if (!token) return undefined;
+  const nonce = randomBytes(32).toString("hex");
+  const verified = await new Promise<boolean>((resolve) => {
+    try {
+      const probe = http.get(
+        `http://${browserHost(lock.host ?? "127.0.0.1")}:${lock.port}/api/health?challenge=${nonce}`,
+        { headers: { host: `127.0.0.1:${lock.port}` }, timeout: 2000 },
+        (response) => {
+          const expected = apiListenerProof(token, nonce, response.socket.remoteAddress ?? "", response.socket.remotePort ?? 0);
+          let body = "";
+          response.setEncoding("utf8");
+          response.on("data", (chunk: string) => {
+            body += chunk;
+            if (body.length > 10_000) {
+              resolve(false);
+              probe.destroy();
+            }
+          });
+          response.on("error", () => resolve(false));
+          response.on("end", () => {
+            try {
+              const value = JSON.parse(body);
+              resolve(response.statusCode === 200 && value?.name === product.npmPackage &&
+                typeof value.proof === "string" && Boolean(expected && tokensMatch(expected, value.proof)));
+            } catch { resolve(false); }
+          });
+        },
+      );
+      probe.on("timeout", () => probe.destroy());
+      probe.on("error", () => resolve(false));
+    } catch { resolve(false); }
+  });
+  if (!verified || JSON.stringify(readLock(dataDir)) !== JSON.stringify(lock) || readApiToken(tokenFile) !== token)
+    return undefined;
+  return { lock, token };
+}
+
 async function start(args: string[], ctx: Context): Promise<number | undefined> {
   const { values } = parse(args, {
     ...commonOptions,
@@ -224,6 +282,24 @@ async function start(args: string[], ctx: Context): Promise<number | undefined> 
     },
     ctx.env,
   );
+  const browserAction = startBrowserAction(ctx);
+  const reuseRunning = async () => {
+    // --no-open, CI and development starts still mean "run a server".
+    // A service must not silently succeed while another process owns it.
+    if (!config.open) return false;
+    const instance = await provenInstance(config.dataDir);
+    if (!instance) return false;
+    const { lock, token } = instance;
+    if ((values.port !== undefined || ctx.env.BELLPR_PORT?.trim()) && lock.port !== config.port)
+      return false;
+    if ((values.host !== undefined || ctx.env.BELLPR_HOST?.trim()) && (lock.host ?? "127.0.0.1") !== config.host)
+      return false;
+    const url = lockUrl(lock);
+    ctx.stdout.write(`${sm().cli.start.reusing({ url })}\n`);
+    browserAction?.(withApiToken(url, token));
+    return true;
+  };
+  if (await reuseRunning()) return 0;
   // Before anything listens: the same required checks as `bell-pr doctor`.
   // --force is how the sample tour still opens when no AI provider is ready.
   if (values.force) {
@@ -234,17 +310,24 @@ async function start(args: string[], ctx: Context): Promise<number | undefined> 
       port: config.port,
     });
     if (!readiness.ready) {
+      if (await reuseRunning()) return 0;
       ctx.stderr.write(readiness.text);
       ctx.stderr.write(`${sm().cli.start.notReady}\n`);
       return 1;
     }
   }
-  const running = await startServer({
-    config,
-    print: (line) => ctx.stdout.write(`${line}\n`),
-    ...(canOpenBrowser(ctx.env, ctx.stdout) ? { openBrowser: ctx.openUrl } : {}),
-    ...ctx.deps.startOptions,
-  });
+  let running: RunningServer;
+  try {
+    running = await (ctx.deps.startServer ?? startServer)({
+      config,
+      print: (line) => ctx.stdout.write(`${line}\n`),
+      ...(browserAction ? { openBrowser: browserAction } : {}),
+      ...ctx.deps.startOptions,
+    });
+  } catch (error) {
+    if (error instanceof StartupError && await reuseRunning()) return 0;
+    throw error;
+  }
   ctx.deps.onStarted?.(running);
   // The server keeps the process alive; there is no exit code yet.
   return undefined;
@@ -274,18 +357,14 @@ async function open(args: string[], ctx: Context): Promise<number> {
   loadEnvFile(values["env-file"]);
   const m = sm().cli.open;
   const dataDir = resolveDataDir({ dataDir: values["data-dir"] }, ctx.env);
-  const lock = readLock(dataDir);
-  if (
-    !lock ||
-    !lockHolderRunning(dataDir, lock) ||
-    !(await probeHealth(lock.host ?? "127.0.0.1", lock.port))
-  ) {
+  const instance = await provenInstance(dataDir);
+  if (!instance) {
     ctx.stderr.write(`${m.notRunning({ dataDir })}\n`);
     return 1;
   }
-  const url = withApiToken(lockUrl(lock), readApiToken(dataPaths(dataDir).apiToken));
+  const url = withApiToken(lockUrl(instance.lock), instance.token);
   ctx.stdout.write(`${url}\n`);
-  if (!values.print && !values["no-open"] && canOpenBrowser(ctx.env, ctx.stdout))
+  if (!values.print && !values["no-open"] && canOpenBrowser(ctx.env, ctx.stdout, ctx.platform))
     ctx.openUrl(url);
   return 0;
 }
@@ -368,7 +447,7 @@ export async function main(
     stdout: deps.stdout ?? process.stdout,
     stderr: deps.stderr ?? process.stderr,
     platform: deps.platform ?? process.platform,
-    openUrl: deps.openUrl ?? ((url) => openInBrowser(url)),
+    openUrl: deps.openUrl ?? ((url) => openInBrowser(url, deps.platform ?? process.platform)),
     deps,
   };
   const [first, ...rest] = argv;

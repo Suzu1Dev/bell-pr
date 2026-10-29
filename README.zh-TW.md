@@ -47,16 +47,21 @@ BELL PR 是本機工作台。請先裝好並登入下列工具，再跑快速開
 目前支援：**macOS**、**Linux**。**Windows 透過 WSL2（尚未測試）：** 請在 WSL
 發行版內安裝以上全部。
 
-`bell-pr doctor` 必要檢查全過後，再繼續。在那之前 `bell-pr start` 會在監聽前
+`bell-pr doctor` 必要檢查全過後，再繼續。在那之前，啟動新伺服器會在監聽前
 結束。尚未安裝／登入 AI 服務時，`bell-pr start --force` 仍會開啟 BELL PR，
 讓你走範例導覽；真實 Agent 工作與發佈會等到有就緒的 AI 服務為止。
 
 ## 快速開始
 
-1. 啟動 BELL PR：
+**這個分支尚未發佈到 npm。** npm 目前的 `bell-pr` `0.0.2` 是不含 CLI 的佔位套件，
+安裝後不會提供 `bell-pr` 指令。請先使用以下原始碼版本。
+
+1. Clone 或下載這個 repository，進入根目錄後，以 **Node.js 22.13 以上**執行：
 
    ```sh
-   npx bell-pr
+   npm ci
+   npm run build
+   node bin/bellpr.mjs
    ```
 
 2. 它會印出位址，並在瀏覽器中開啟 BELL PR：
@@ -68,13 +73,17 @@ BELL PR 是本機工作台。請先裝好並登入下列工具，再跑快速開
 3. 依照歡迎畫面完成設定：選擇**語言**、檢查**工作環境**（缺少的工具都會附上修正指令），再選擇 Agent 使用的 **AI 服務**。
 4. 觀看範例導覽、匯入 Repository，或尋找想貢獻的專案。
 
-`npx bell-pr` 就是 `bell-pr start`。只有在 `bell-pr doctor` 就緒時才會監聽；
-否則它會結束，並印出每一項失敗檢查的修正指令。`npx bell-pr start --force`
+在這份原始碼裡，請把文件中的 `bell-pr` 換成 `node bin/bellpr.mjs`。
+啟動新伺服器前，`bell-pr doctor` 必須就緒；`node bin/bellpr.mjs start --force`
 仍可開啟範例導覽。
 
-**位址不見了？執行 `bell-pr open`**（若用 `npx` 啟動，請執行 `npx bell-pr open`）。它會再次印出位址（含頁面需要的 API 權杖）並在瀏覽器中開啟。
+**要重新開啟 BELL PR，執行同一個指令即可。** 它會開啟使用同一資料目錄、已經執行中的服務。
+在互動式 SSH 或沒有瀏覽器的終端機裡，會直接印出可開啟的授權連結；請勿分享這個連結。
+不需要另外登入或執行 `open` 指令。
 
-想要保留安裝，請執行 `npm install -g bell-pr`，之後用 `bell-pr` 啟動。[入門指南](docs/getting-started.md)（英文）會帶你走完一次完整的貢獻。
+包含 CLI 的正式套件發佈到 npm 後，可以用 `npx bell-pr` 直接啟動，或用
+`npm install -g bell-pr` 安裝 `bell-pr` 指令；目前這些指令還不會安裝這個分支。
+[入門指南](docs/getting-started.md)（英文）會帶你走完一次完整的貢獻。
 
 ## 系統需求
 
@@ -89,7 +98,7 @@ BELL PR 是本機工作台。請先裝好並登入下列工具，再跑快速開
 `bell-pr doctor` 會檢查以上所有項目，並為每個問題印出修正指令。請見[開始之前](#開始之前)。
 
 **尚未安裝或登入任何 AI 服務時：** `bell-pr doctor` 會以非零結束代碼結束，並將
-必要的「AI 服務」檢查標為失敗。`bell-pr start` 會在監聽前以非零結束代碼結束，
+必要的「AI 服務」檢查標為失敗。`bell-pr start` 啟動新伺服器時會在監聽前以非零結束代碼結束，
 並印出該清單與每一項失敗檢查的修正指令。`bell-pr start --force` 仍會啟動，
 並警告已略過檢查。歡迎畫面可繼續；你可以先走**範例導覽**（不呼叫 AI）。在
 至少一套 Codex CLI 或 Claude Code 安裝並登入之前，無法開始真實的 Agent 工作；
@@ -214,7 +223,7 @@ BELL PR 會閱讀專案的貢獻指南、AI 政策、PR 範本、Agent 指南與
 
 BELL PR 在 `127.0.0.1` 的埠 4311 提供網頁介面與 API，除非你設定 `--host` 或 `BELLPR_HOST`。它不會在 `0.0.0.0` 上監聽，除非你明確要求。其他位址都是明確設定，啟動時會印出警告。API 請求仍然需要授權。
 
-第一次啟動會把隨機權杖寫入 `<資料目錄>/api-token`（32 位元組，權限 `0600`，只有你的使用者能讀）。之後的啟動會沿用這個檔案。檔案遺失或內容損壞時會重新建立。`bell-pr token rotate` 會更換它，立即使所有瀏覽器工作階段與舊權杖連結失效，不需要重新啟動。API 用戶端必須改用新權杖；請再執行 `bell-pr open`，重新授權瀏覽器。
+第一次啟動會把隨機權杖寫入 `<資料目錄>/api-token`（32 位元組，權限 `0600`，只有你的使用者能讀）。之後的啟動會沿用這個檔案。檔案遺失或內容損壞時會重新建立。`bell-pr token rotate` 會更換它，立即使所有瀏覽器工作階段與舊權杖連結失效，不需要重新啟動。API 用戶端必須改用新權杖；請再執行 `bell-pr`，重新授權瀏覽器。
 
 瀏覽器請求使用 HttpOnly 工作階段 cookie。API 用戶端除了 `GET /api/health`，每個請求都必須送出權杖：
 
@@ -224,15 +233,15 @@ Authorization: Bearer <token>
 
 `X-Bell-Token: <token>` 效果相同。缺少或無效的授權會得到 HTTP 401。請求的 Host 必須是受信任的位址（`localhost`、`127.0.0.1` 或 `[::1]` 加上 BELL PR 的埠，或你用 `BELLPR_PUBLIC_URL`、`BELLPR_ALLOWED_ORIGINS` 指定的主機）。瀏覽器的 `Origin` 若不是這個應用程式自己的來源，也不在允許清單上，就會被拒絕。沒有萬用字元 CORS。會變更資料的請求必須使用 `application/json`。
 
-`bell-pr` 開啟瀏覽器時，位址的片段是 `#bell_token=<權杖>`。頁面會用它換取 HttpOnly 工作階段 cookie，再從位址列移除。同一位址的新分頁會共用存取權；預設工作階段最長 12 小時，cookie 不會持久保存。你可以在**設定 → 一般 → 瀏覽器存取**記住這個瀏覽器 30 天。登出會清除這個瀏覽器的 cookie；撤銷所有存取權則會同時更換 API 權杖，使所有瀏覽器工作階段與舊權杖連結失效。舊版本留在 session storage 的權杖會交換一次，再移除。
+`bell-pr` 開啟瀏覽器時，位址的片段是 `#bell_token=<權杖>`。頁面會用它換取 HttpOnly 工作階段 cookie，再從位址列移除。同一位址的新分頁會共用存取權。預設會記住這個瀏覽器，使用 BELL PR 時會自動延長期限，約 30 天未使用後才會到期。共用裝置可在**設定 → 一般 → 瀏覽器存取**關閉「**記住這個瀏覽器**」，改用不持久保存、最長 12 小時的工作階段；工作階段有效時，重新開啟應用程式會保留這個選擇。登出會清除這個瀏覽器的 cookie；撤銷所有存取權則會同時更換 API 權杖，使所有瀏覽器工作階段與舊權杖連結失效。舊版本留在 session storage 的權杖會交換一次，再移除。
 
-啟動時印出的那一行不含權杖，因此服務記錄裡也不會有。若要自己開啟，請用 `bell-pr open` 或 `bell-pr open --print`：兩者都會印出帶權杖的位址。請把那個位址當成密碼。它不會寫進伺服器記錄，也不會出現在 `bell-pr doctor --json`。
+透過 SSH 或在沒有桌面瀏覽器的環境中使用互動式終端機時，終端機會印出授權連結；非互動式啟動輸出與服務記錄不會包含它。`bell-pr open` 和 `bell-pr open --print` 仍可用於明確開啟或印出連結。請把這個連結當成密碼。它不會寫進伺服器記錄，也不會出現在 `bell-pr doctor --json`。
 
 權杖可能留在瀏覽器歷史紀錄裡。只登出不會使這個連結失效；請撤銷所有存取權或執行 `bell-pr token rotate`，讓舊連結失效。
 
 ## 設定
 
-BELL PR 不需要任何設定就能啟動。下列設定都是啟動時讀取的環境變數；`bell-pr start` 另外接受 `--port`、`--host`、`--data-dir`、`--no-open`、`--force` 與 `--env-file <file>`。必要的 `bell-pr doctor` 檢查失敗時，`start` 會在監聽前結束；`--force` 仍會啟動。在應用程式「設定」中調整的值，除非被環境變數指定，否則都會生效。
+BELL PR 不需要任何設定就能啟動。下列設定都是啟動時讀取的環境變數；`bell-pr start` 另外接受 `--port`、`--host`、`--data-dir`、`--no-open`、`--force` 與 `--env-file <file>`。一般啟動會開啟同一資料目錄的既有服務。若需要啟動新伺服器，必要的 `bell-pr doctor` 檢查失敗時，`start` 會在監聽前結束；`--force` 仍會啟動。在應用程式「設定」中調整的值，除非被環境變數指定，否則都會生效。
 
 | 變數 | 預設值 | 用途 |
 | --- | --- | --- |

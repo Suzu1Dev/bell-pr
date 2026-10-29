@@ -37,17 +37,17 @@ function props(element: FakeElement) {
 
 const click = (element: FakeElement) => act(async () => props(element).onClick());
 
-test("browser access starts with remembering off, and has both localized access actions", () => {
+test("browser access waits for the saved preference and has both localized access actions", () => {
   const html = renderEn(createElement(BrowserAccess));
   assertNoHan(html);
-  assert.match(html, /Remember this browser for 30 days/);
+  assert.match(html, /Remember this browser/);
   assert.match(html, /type="checkbox" disabled=""/);
   assert.doesNotMatch(html, /checked=""/);
   assert.match(html, /Sign out this browser/);
   assert.match(html, /Revoke all access…/);
   assert.doesNotMatch(html, /role="dialog"/);
   const zh = renderZh(createElement(BrowserAccess));
-  assert.match(zh, /記住這個瀏覽器 30 天/);
+  assert.match(zh, /記住這個瀏覽器/);
   assert.match(zh, /登出這個瀏覽器/);
   assert.match(zh, /撤銷所有存取權限…/);
 });
@@ -88,7 +88,7 @@ test("revoking requires confirmation, cancelling restores focus, and only succes
     await click(revoke);
     assert.match(view.text(), /Every browser, including this one, will be signed out/);
     assert.match(view.text(), /All existing login links and API tokens will stop working/);
-    assert.match(view.text(), /Run bell-pr open on the host/);
+    assert.match(view.text(), /Run bell-pr on the host/);
     assert.match(view.text(), /does not stop running tasks/);
     const actions = view.container.querySelectorAll((element) => element.nodeName === "BUTTON");
     assert.ok(actions.indexOf(button("Cancel")) < actions.indexOf(button("Revoke all access and sign out")));

@@ -76,16 +76,23 @@ Supported today: **macOS**, **Linux**. **Windows via WSL2 (untested):** install
 everything above inside your WSL distribution.
 
 When `bell-pr doctor` reports every required check green, continue.
-`bell-pr start` exits before it listens until then. With no AI provider
+Starting a new server exits before it listens until then. With no AI provider
 signed in, `bell-pr start --force` still opens BELL PR so you can take the
 sample tour; agent runs and publishing wait until a provider is ready.
 
 ## Quickstart
 
-1. Start BELL PR:
+**This branch has not been published to npm.** The current npm `bell-pr`
+version, `0.0.2`, is a placeholder without a CLI; installing it does not
+provide the `bell-pr` command. Use the source build below.
+
+1. Clone or download this repository, then run these commands in its root
+   directory with Node.js **22.13 or later**:
 
    ```sh
-   npx bell-pr
+   npm ci
+   npm run build
+   node bin/bellpr.mjs
    ```
 
 2. It prints its address and opens BELL PR in your browser:
@@ -100,17 +107,20 @@ sample tour; agent runs and publishing wait until a provider is ready.
 4. Take the sample tour, import a repository, or find a project to
    contribute to.
 
-`npx bell-pr` is `bell-pr start`. It listens only when `bell-pr doctor` is
-ready; otherwise it exits and prints the fix for each failed check. `npx
-bell-pr start --force` opens the sample tour anyway.
+In this checkout, use `node bin/bellpr.mjs` wherever the documentation says
+`bell-pr`. A new server starts only when `bell-pr doctor` is ready;
+`node bin/bellpr.mjs start --force` opens the sample tour anyway.
 
-**Lost the address? Run `bell-pr open`** (or `npx bell-pr open` if you
-started with `npx`). It prints the address again, including the API token
-the page needs, and opens it.
+**To reopen BELL PR, run the same command again.** It opens the instance
+already running with the same data directory. In an interactive SSH or
+headless terminal, it prints an authorized link you can open directly.
+Keep that link private. No separate login or `open` command is needed.
 
-To keep BELL PR installed, run `npm install -g bell-pr`, then start it with
-`bell-pr`. The [getting started guide](docs/getting-started.md) walks
-through a whole contribution.
+After a release containing the CLI is published to npm, `npx bell-pr` will
+start it without a permanent install, or `npm install -g bell-pr` will make
+the `bell-pr` command available. Those commands do not install this branch
+today. The [getting started guide](docs/getting-started.md) walks through a
+whole contribution.
 
 ## Requirements
 
@@ -136,7 +146,7 @@ problem. See [Before you start](#before-you-start).
 
 **With no AI provider installed or signed in:** `bell-pr doctor` exits
 non-zero and marks the required **AI provider** check failed. `bell-pr
-start` then exits non-zero before it listens, and prints that checklist
+start` then exits non-zero before starting a new server, and prints that checklist
 with the command that fixes each failed check. `bell-pr start --force`
 starts anyway and warns that the check was skipped. Welcome lets you
 continue; you can take the **sample tour** (no AI call). Starting a real
@@ -433,7 +443,7 @@ The first start writes a random token to `<data dir>/api-token` (32 bytes,
 mode `0600`, your user only). A later start reuses that file. A missing or
 damaged file is created again. `bell-pr token rotate` replaces it and
 immediately invalidates every browser session and old token URL, without a
-restart. API clients must use the new token. Run `bell-pr open` afterwards
+restart. API clients must use the new token. Run `bell-pr` afterwards
 to authorize your browser again.
 
 Browser requests use an HttpOnly session cookie. API clients must send the
@@ -452,19 +462,23 @@ Requests that change data must use `application/json`.
 
 `bell-pr` opens the browser at an address whose fragment is
 `#bell_token=<token>`. The page exchanges it for an HttpOnly session cookie
-and removes it from the address. New tabs at the same address share access;
-the default session lasts at most 12 hours and is not a persistent cookie.
-Under **Settings → General → Browser access**, you can remember this browser
-for 30 days. Signing out clears this browser's cookie; revoking all access
+and removes it from the address. New tabs at the same address share access.
+The browser is remembered by default, and using BELL PR renews access
+automatically; it expires after about 30 days without use. Under **Settings
+→ General → Browser access**, turn off **Remember this browser** on a shared
+device to use a nonpersistent session lasting at most 12 hours. Reopening
+the app preserves that choice while the session is valid. Signing out clears
+this browser's cookie; revoking all access
 also replaces the API token and invalidates every browser session and old
 token URL. A token left in session storage by an older version is exchanged
 once, then removed.
 
-The line printed at start does not include the token, so a service
-log does not either. To open the app yourself, use `bell-pr open` or
-`bell-pr open --print`: both print the address with the token. Treat that
-address like a password. It is not written to the server log or to
-`bell-pr doctor --json`.
+An interactive terminal prints the authorized link when used over SSH or
+in a headless environment. Noninteractive startup output and service logs
+do not include it.
+`bell-pr open` and `bell-pr open --print` remain available for explicitly
+opening or printing the link. Treat it like a password. It is not written
+to the server log or to `bell-pr doctor --json`.
 
 The token can remain in browser history. Signing out alone does not invalidate
 that link; revoke all access or run `bell-pr token rotate` to invalidate it.
@@ -473,9 +487,10 @@ that link; revoke all access or run `bell-pr token rotate` to invalidate it.
 
 BELL PR needs no configuration. Every setting below is an environment
 variable read at start; `bell-pr start` also takes `--port`, `--host`,
-`--data-dir`, `--no-open`, `--force` and `--env-file <file>`. `start` exits
-before it listens when a required `bell-pr doctor` check fails; `--force`
-starts anyway. Values set in the app's
+`--data-dir`, `--no-open`, `--force` and `--env-file <file>`. A normal launch
+opens an existing instance for that data directory. When starting a new
+server, `start` exits before it listens if a required `bell-pr doctor` check
+fails; `--force` starts anyway. Values set in the app's
 Settings are used unless a variable sets them.
 
 | Variable | Default | What it sets |

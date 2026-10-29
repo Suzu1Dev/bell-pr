@@ -110,7 +110,7 @@ test("a bearer token bootstraps an HttpOnly session usable without the token", a
   assert.equal((await send("GET")).status, 401);
   assert.equal((await send("POST", "/api/session", {}, { remember: false })).status, 401);
   assert.equal((await send("GET", "/api/health")).status, 200);
-  assert.deepEqual(JSON.parse((await send("GET", "/api/session", bearer)).body), { remembered: false });
+  assert.deepEqual(JSON.parse((await send("GET", "/api/session", bearer)).body), { remembered: true });
   const loggedIn = await login();
   assert.match(loggedIn.setCookie, /; HttpOnly/);
   assert.match(loggedIn.setCookie, /; SameSite=Strict/);
@@ -126,7 +126,7 @@ test("a bearer token bootstraps an HttpOnly session usable without the token", a
 });
 
 test("remembering a browser persists for 30 days and a later session choice removes persistence", async (t) => {
-  const { login, send } = await fixture(t);
+  const { login, send, bearer } = await fixture(t);
   const remembered = await login(true);
   assert.match(remembered.setCookie, /; Max-Age=2592000/);
   assert.match(remembered.setCookie, /; Expires=/);
@@ -134,6 +134,28 @@ test("remembering a browser persists for 30 days and a later session choice remo
   const temporary = await login(false, { cookie: remembered.cookie });
   assert.doesNotMatch(temporary.setCookie, /(?:Max-Age|Expires)=/);
   assert.deepEqual(JSON.parse(temporary.body), { remembered: false });
+  // A fresh CLI link preserves an explicit opt-out in a still-valid cookie.
+  const reopen = await send("GET", "/api/session", { ...bearer, cookie: temporary.cookie });
+  assert.equal(reopen.status, 200);
+  assert.deepEqual(JSON.parse(reopen.body), { remembered: false });
+  // A new browser, or one whose cookie is invalid, is remembered by default.
+  for (const cookie of [undefined, `${localCookieName}=invalid`]) {
+    const fresh = await send("GET", "/api/session", { ...bearer, ...(cookie ? { cookie } : {}) });
+    assert.equal(fresh.status, 200);
+    assert.deepEqual(JSON.parse(fresh.body), { remembered: true });
+  }
+});
+
+test("normal API requests do not rewrite cookies, so a delayed response cannot undo logout", async (t) => {
+  const { token, send } = await fixture(t);
+  const old = `${localCookieName}=${createApiSession(token, true, Date.now() - 29 * 24 * 60 * 60 * 1000)}`;
+  const response = await send("GET", "/api/app-settings", { cookie: old });
+  assert.equal(response.status, 200);
+  assert.equal(response.headers["set-cookie"], undefined);
+  const expired = `${localCookieName}=${createApiSession(token, true, Date.now() - rememberedApiSessionLifetime * 1000)}`;
+  const denied = await send("GET", "/api/app-settings", { cookie: expired });
+  assert.equal(denied.status, 401);
+  assert.equal(denied.headers["set-cookie"], undefined);
 });
 
 test("public hosts receive Secure cookies even through an HTTP proxy, while logout clears the cookie", async (t) => {
@@ -311,7 +333,7 @@ test("rotation while a JSON body is arriving prevents renewal or revocation with
           "content-length": String(Buffer.byteLength(body)),
           ...(credential === "bearer"
             ? { authorization: `Bearer ${token}` }
-            : { cookie: `${localCookieName}=${createApiSession(token, true)}` }),
+            : { cookie: `${localCookieName}=${createApiSession(token, true, Date.now() - 24 * 60 * 60 * 1000)}` }),
         },
       });
       const response = once(req, "response");

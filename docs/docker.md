@@ -9,8 +9,9 @@ operating-system sandbox that the agent CLIs run commands in cannot start
 inside a container. See [Agent sandbox in
 Docker](#agent-sandbox-in-docker) for the probe result and the workaround,
 and [Beta status](#beta-status) for what has been verified. Running BELL PR
-directly on your computer (`npm install -g bell-pr`) does not have this
-limitation.
+directly on your computer with the [source build](getting-started.md#start-bell-pr)
+does not have this limitation. The current npm `0.0.2` package is a placeholder
+without a CLI; npm installation will be available with a CLI release.
 
 ## Build the image
 

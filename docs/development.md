@@ -40,7 +40,8 @@ This starts the API on port 4311 and the Vite dev server on port 4310,
 both on `127.0.0.1`; open `http://127.0.0.1:4310`. The API requires the
 token in `<data dir>/api-token`. `bell-pr open --print` prints
 `#bell_token=` for the API origin; for the dev server, open
-`http://127.0.0.1:4310/#bell_token=<that value>` once per tab. Development mode
+`http://127.0.0.1:4310/#bell_token=<that value>` to authorize the browser;
+new tabs share its cookie. Development mode
 (`BELLPR_DEV=1`, set by the script) lets the API trust the dev server's port;
 that trust exists only in development mode, and development mode only listens
 on `127.0.0.1`. `BELLPR_FRONTEND_PORT`
@@ -72,10 +73,13 @@ only the API answers. It prints its address as an installed BELL PR does.
 sample tour from a checkout that has no AI provider signed in, run
 `npm start -- --force`.
 
-In a source checkout, `npx bell-pr` and `bell-pr` run the checkout's own
-`bin/bellpr.mjs`, not the package from npm, and `build/` and `dist/` exist
-only after `npm run build`. Without them the command says that BELL PR is
-not built yet; run `npm ci` and `npm run build` first. `node_modules` is
+To launch the built checkout and open the browser, run `node bin/bellpr.mjs`.
+Running it again reopens the instance for the same data directory; in an
+interactive headless terminal it prints an authorized link. `build/` and
+`dist/` exist only after `npm run build`. Without them the command says that
+BELL PR is not built yet; run `npm ci` and `npm run build` first. The npm
+`0.0.2` placeholder has no CLI and does not install this checkout.
+`node_modules` is
 never committed: it is ignored, also when it is a symbolic link.
 
 Agents need the real CLIs (`codex` or `claude`, and `gh`). For checks that

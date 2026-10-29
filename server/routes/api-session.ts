@@ -1,4 +1,4 @@
-import type { CookieOptions, Express, Request } from "express";
+import type { Express } from "express";
 import { z } from "zod";
 import {
   createApiSession,
@@ -6,24 +6,15 @@ import {
   rememberedApiSessionLifetime,
 } from "../api-session.js";
 import { readApiToken, rotateApiToken } from "../api-token.js";
-import { apiRequestAuthenticated, apiSessionCookieScope } from "../http-guard.js";
+import { apiRequestAuthenticated, apiSessionCookieOptions, apiSessionCookieScope } from "../http-guard.js";
 import { sm } from "../i18n/index.js";
-
-function cookieOptions(req: Request): CookieOptions {
-  return {
-    httpOnly: true,
-    sameSite: "strict",
-    path: "/",
-    secure: apiSessionCookieScope(req).secure,
-  };
-}
 
 /** Registered only with the same token file the request guard reads. */
 export function registerApiSessionRoutes(app: Express, tokenFile: string) {
   app.get("/api/session", (req, res) => {
     const token = readApiToken(tokenFile);
     const session = token ? readApiSession(req.get("cookie"), token, apiSessionCookieScope(req).name) : undefined;
-    res.json({ remembered: session?.remembered ?? false });
+    res.json({ remembered: session?.remembered ?? true });
   });
   app.post("/api/session", (req, res) => {
     const { remember } = z.object({ remember: z.boolean() }).strict().parse(req.body);
@@ -36,14 +27,14 @@ export function registerApiSessionRoutes(app: Express, tokenFile: string) {
       return;
     }
     res.cookie(apiSessionCookieScope(req).name, createApiSession(token, remember), {
-      ...cookieOptions(req),
+      ...apiSessionCookieOptions(req),
       ...(remember ? { maxAge: rememberedApiSessionLifetime * 1000 } : {}),
     });
     res.json({ remembered: remember });
   });
   app.delete("/api/session", (req, res) => {
     z.object({}).strict().parse(req.body);
-    res.clearCookie(apiSessionCookieScope(req).name, cookieOptions(req));
+    res.clearCookie(apiSessionCookieScope(req).name, apiSessionCookieOptions(req));
     res.status(204).end();
   });
   app.post("/api/session/revoke", async (req, res) => {
@@ -53,7 +44,7 @@ export function registerApiSessionRoutes(app: Express, tokenFile: string) {
       return;
     }
     await rotateApiToken(tokenFile);
-    res.clearCookie(apiSessionCookieScope(req).name, cookieOptions(req));
+    res.clearCookie(apiSessionCookieScope(req).name, apiSessionCookieOptions(req));
     res.status(204).end();
   });
 }

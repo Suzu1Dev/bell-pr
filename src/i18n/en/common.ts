@@ -71,7 +71,7 @@ const common = {
     serverUnreachable: `Cannot reach the local ${product.name} service. Is it still running?`,
     generic: "Something went wrong. Please try again.",
     /** Shown when the page has no API token, or the API answers 401. */
-    apiTokenRequired: `Open ${product.binNames[0]} from this computer by running \`${product.binNames[0]} open\`.`,
+    apiTokenRequired: `Run \`${product.binNames[0]}\` on the computer hosting ${product.name} to reopen your workspace.`,
   },
   /**
    * A long error, usually the raw tail of an agent CLI's output, folded

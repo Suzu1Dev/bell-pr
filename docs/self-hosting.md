@@ -18,13 +18,19 @@ For containers, see [docs/docker.md](docker.md).
 
 ## Install and start
 
+The current npm `bell-pr` `0.0.2` is a placeholder without a CLI; this source
+branch has not been published. For now, use the [source build](getting-started.md#start-bell-pr)
+and replace `bell-pr` below with `node bin/bellpr.mjs` from that checkout.
+The following npm installation is for a future release containing the CLI:
+
 ```sh
 npm install -g bell-pr
 bell-pr
 ```
 
-`bell-pr` (also `bellpr`) starts the server and prints a line such as
-the one below when every required `bell-pr doctor` check passed. If one
+`bell-pr` (also `bellpr`) opens an instance already running with the same
+data directory. When it needs to start a server, it prints a line such as
+the one below after every required `bell-pr doctor` check passes. If one
 failed, start exits before it listens and prints each failed check with
 the command that fixes it. `bell-pr start --force` starts anyway and
 prints a warning: use that for the sample tour when no AI provider is
@@ -36,7 +42,10 @@ is signed in.
 BELL PR 1.0.0 → http://127.0.0.1:4311
 ```
 
-BELL PR opens that address for you when it runs in a terminal. `bell-pr help`
+BELL PR opens the browser already authorized. In an interactive SSH or
+headless terminal it prints an authorized link directly; keep it private.
+Noninteractive startup output, including service logs, keeps the token out.
+`bell-pr help`
 lists the commands and options, and
 [Configuration](configuration.md) and [.env.example](../.env.example)
 describe every `BELLPR_*` setting. Load a settings file with
@@ -63,31 +72,37 @@ the port; they still need authorization. Put a proxy that limits who can connect
 in front as well (see
 [Reach BELL PR from another machine](#reach-bell-pr-from-another-machine)).
 
-`bell-pr open` and `bell-pr open --print` print the address browsers use
-(`BELLPR_PUBLIC_URL` when you set it, else the local address) with
-`#bell_token=` on the end, and `open` opens that address. The page exchanges
+`bell-pr` opens the address browsers use (`BELLPR_PUBLIC_URL` when you set
+it, else the local address) with `#bell_token=` on the end. An interactive
+terminal prints that authorized link when used over SSH or in a headless
+environment. `bell-pr open` and `bell-pr open
+--print` remain available for explicitly opening or printing it. The page exchanges
 the token for an HttpOnly session cookie and removes it from the address bar.
-New tabs at the same address share that cookie. The default session lasts at
-most 12 hours and the cookie has no persistent expiry. In **Settings → General
-→ Browser access**, remember this browser to keep access for 30 days, including
-after restarting the browser. Local and public addresses have separate cookies.
+New tabs at the same address share that cookie. Remembering is on by default:
+the workbench renews access automatically while you use it, so active
+browsers stay connected. After about 30 days without use, authorize again.
+On a shared device, turn off **Settings → General → Browser access → Remember
+this browser** for a nonpersistent session lasting at most 12 hours. A valid
+session's choice is preserved when reopening the app. Local and public
+addresses have separate cookies.
 A token left in session storage by an older build is exchanged once and removed.
 
 Signing out clears this browser's cookie. Revoking all access also rotates
 the API token, invalidating all browser sessions, API clients' old tokens,
 and old token URLs. `bell-pr token rotate` has the same effect. After either
-rotation, use `bell-pr open` again and update API clients.
+rotation, run `bell-pr` again and update API clients.
 
-The line printed at start does not include the token. Treat the `open --print` address like a
-password: it is not in the server log or in `bell-pr doctor --json`.
+Treat authorized links printed in an interactive terminal or by `open --print`
+like passwords. They are not in service logs or in `bell-pr doctor --json`.
 
 ## One instance per data directory
 
-BELL PR keeps a lock file, `<data dir>/bellpr.lock`, while it runs. A second
-start with the same data directory exits with a message instead of touching
-the data, and a start on a port that BELL PR already uses says so and
-points to `bell-pr open`. A lock left behind by a crash is detected and
-replaced at the next start.
+BELL PR keeps a lock file, `<data dir>/bellpr.lock`, while it runs. A normal
+launch reopens the live instance for the same data directory before checking
+doctor readiness. Explicit `--no-open`, CI and development starts keep the
+duplicate-instance protection: they exit instead of starting a second
+server. A different data directory cannot reuse an occupied port. A lock
+left behind by a crash is detected and replaced at the next start.
 
 Containers and machines that share a data directory cannot see each other's
 processes. On Linux, the lock names the host and PID namespace it was
@@ -103,7 +118,9 @@ leftover agents before it marks the interrupted runs.
 ## Run as a service (Linux, systemd)
 
 [`contrib/systemd/bell-pr.service`](../contrib/systemd/bell-pr.service) is a
-user unit. Install BELL PR, then:
+user unit. Once a release containing the CLI is installed, use it as shown
+below. For a source build, set its `ExecStart` to your absolute Node.js and
+checkout `bin/bellpr.mjs` paths, followed by `start --no-open`.
 
 ```sh
 mkdir -p ~/.config/systemd/user
@@ -114,8 +131,8 @@ systemctl --user enable --now bell-pr
 
 The comments in the unit explain the PATH, the optional settings file
 `~/.config/bell-pr/environment` and how to keep the service running after
-you log out. The service never opens a browser; to get its address, run
-`bell-pr open` in a terminal on that machine.
+you log out. The service never opens a browser; run `bell-pr` in a terminal
+on that machine to open the running app.
 Logs: `journalctl --user -u bell-pr`.
 
 ## Reach BELL PR from another machine
@@ -170,9 +187,10 @@ and container health checks.
 
 1. Wait until no run is executing, then stop BELL PR (or the service).
 2. Back up the data directory.
-3. `npm install -g bell-pr@latest`
-4. Start BELL PR again. It prints its address, and `bell-pr open` opens that
-   address in your browser whenever you need it.
+3. For a source build, update the checkout and run `npm ci` and `npm run build`.
+   Once a CLI release exists on npm, installed copies can use
+   `npm install -g bell-pr@latest` instead.
+4. Start BELL PR again. Running `bell-pr` later reopens the app whenever you need it.
 
 [Upgrading](upgrading.md) covers backups, data from older versions and
 going back to an older version.

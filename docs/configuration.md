@@ -24,11 +24,13 @@ the settings in the app.
 ## Commands
 
 `bell-pr` and `bellpr` are the same command. Started with `npx`, write
-`npx bell-pr` instead of `bell-pr`.
+`npx bell-pr` instead of `bell-pr` after a release containing the CLI is
+published. The current npm `0.0.2` is only a placeholder. From the
+[source build](getting-started.md#start-bell-pr), use `node bin/bellpr.mjs` instead.
 
 | Command | What it does |
 | --- | --- |
-| `bell-pr` or `bell-pr start` | Starts BELL PR and prints its address. Exits 1 before listening when a required doctor check fails; `--force` starts anyway |
+| `bell-pr` or `bell-pr start` | Opens the instance already running with the same data directory, or starts one. A new server exits 1 before listening when a required doctor check fails; `--force` starts anyway. Interactive SSH or headless terminals print an authorized link; service output keeps it private |
 | `bell-pr open` | Prints the address of the running BELL PR, including the API token fragment, and opens it; `--print` only prints it |
 | `bell-pr token rotate` | Replaces `<data dir>/api-token` and immediately invalidates every browser session and old token URL. API clients must use the new token. No restart is needed; the new token is not printed |
 | `bell-pr doctor` | Checks Node.js, Git, the GitHub CLI, the agent CLIs, the sandbox and the data directory; `--json` for scripts. The report does not include the API token |
@@ -46,8 +48,11 @@ Options of `bell-pr start`:
 | `--force` | | off. Start even when `bell-pr doctor` reports Not ready |
 | `--env-file <file>` | | none |
 
-`bell-pr start` runs the same required checks as `bell-pr doctor` and exits
-with status 1 before it listens when one fails. The message is the doctor's
+An ordinary `bell-pr start` first reopens a live instance for the same data
+directory, before checking doctor readiness. Explicit `--no-open`, CI and
+development starts keep duplicate-instance protection. When a new server
+is needed, `start` runs the same required checks as `bell-pr doctor` and
+exits with status 1 before listening if one fails. The message is the doctor's
 checklist (each failed check and the command that fixes it) plus how to
 start anyway. `--force` skips that gate and prints a warning. The sample
 tour needs no AI provider, so `bell-pr start --force` is how you open it
@@ -99,7 +104,7 @@ of them. When a turn times out, its message says how long it waited.
 
 | Section | What you set there |
 | --- | --- |
-| **General** | The language of the interface and of new work; browser access (remember this browser for 30 days, sign out, or revoke all access); the sample project, and resetting it |
+| **General** | The language of the interface and of new work; browser access (remember this browser, sign out, or revoke all access); the sample project, and resetting it |
 | **AI provider** | Which agent CLI is ready, with its setup commands, and the agent, model, reasoning effort and web access (off until you turn it on) every project shares |
 | **Agent safety** | The Claude Code sandbox status, allowing unsandboxed Claude Code agents, and the AI-assistance note on pull requests |
 | **Learning** | The understanding check (you explain each change back before you approve it; on by default, and turning it off asks you to confirm and marks the runs you approve without it), the try-first prompts during review, and counts from this computer: runs approved without the check and the median time of your recent checks |
@@ -116,10 +121,13 @@ plan approval and efficiency mode (Lean, Full or Off) are saved per
 project, in the contribution settings of that project.
 
 Browser access is stored in an HttpOnly cookie, shared by tabs at the same
-address. The default session lasts at most 12 hours; remembering a browser
-keeps access for 30 days. Signing out clears this browser's cookie. Revoking
+address. New browser sessions are remembered by default. The workbench renews
+remembered access automatically while you use it; access expires after about
+30 days without use. Turn off **Remember this browser** on a shared
+device for a nonpersistent session lasting at most 12 hours. Signing out
+clears this browser's cookie. Revoking
 all access rotates the API token as well, invalidating every browser session
-and old token URL; API clients must also update their token. Use `bell-pr open`
+and old token URL; API clients must also update their token. Run `bell-pr`
 to authorize the browser again.
 
 ## Language

@@ -137,9 +137,11 @@ and the sample project's review progress, check answers and drafts. None of
 this reaches the server's data directory.
 
 The browser also stores an HttpOnly access cookie, shared by tabs at the
-same address. Its default session lasts at most 12 hours; choosing to
-remember this browser keeps it for 30 days. **Settings → General → Browser
-access** lets you sign out of this browser or revoke all access. An API token
+same address. New sessions remember the browser by default. The workbench
+renews that access automatically while you use it; it expires after about
+30 days without use. **Settings → General →
+Browser access** lets you turn off remembering for a nonpersistent session
+lasting at most 12 hours, sign out of this browser, or revoke all access. An API token
 left in session storage by an older build is exchanged for the cookie once,
 then removed.
 

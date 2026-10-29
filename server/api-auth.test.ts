@@ -11,6 +11,7 @@ import path from "node:path";
 import type { AddressInfo } from "node:net";
 import { createServer } from "node:net";
 import {
+  apiListenerProof,
   generateApiToken,
   loadOrCreateApiToken,
   readApiToken,
@@ -152,6 +153,19 @@ test("API routes require the token, and a bad host, origin or body changes nothi
     const health = await send("GET", "/api/health", local);
     assert.equal(health.status, 200);
     assert.equal(health.allowOrigin, undefined);
+    assert.deepEqual(Object.keys(JSON.parse(health.body)).sort(), ["name", "version"]);
+    const nonce = generateApiToken();
+    const proof = await send("GET", `/api/health?challenge=${nonce}`, local);
+    const expectedProof = apiListenerProof(token, nonce, "127.0.0.1", address.port);
+    assert.equal(proof.status, 200);
+    assert.equal(JSON.parse(proof.body).proof, expectedProof);
+    assert.equal(proof.body.includes(token), false);
+    assert.notEqual(expectedProof, apiListenerProof(token, nonce, "127.0.0.1", address.port === 65535 ? 65534 : address.port + 1));
+    for (const query of ["arbitrary-payload", `${nonce}&challenge=${nonce}`, `${nonce}00`]) {
+      const invalid = await send("GET", `/api/health?challenge=${query}`, local);
+      assert.equal(invalid.status, 200);
+      assert.equal(JSON.parse(invalid.body).proof, undefined);
+    }
 
     const missing = await send("GET", "/api/app-settings", {
       ...local,
@@ -211,6 +225,9 @@ test("API routes require the token, and a bad host, origin or body changes nothi
     assert.match((await snapshot(directory))["app-settings.json"] ?? "", /zh-TW/);
 
     const rotated = await rotateApiToken(file);
+    const rotatedProof = await send("GET", `/api/health?challenge=${nonce}`, local);
+    assert.equal(JSON.parse(rotatedProof.body).proof, apiListenerProof(rotated, nonce, "127.0.0.1", address.port));
+    assert.notEqual(JSON.parse(rotatedProof.body).proof, expectedProof);
     const stale = await send("GET", "/api/app-settings", bearer);
     assert.equal(stale.status, 401);
     const fresh = await send("GET", "/api/app-settings", {

@@ -9,8 +9,14 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
-- **`bell-pr start` waits for `bell-pr doctor`.** When a required check
-  fails, start exits before it listens and prints the doctor's checklist
+- **Reopen with the normal launch command.** `bell-pr` and `bell-pr start`
+  reopen an instance already running with the same data directory, before
+  checking doctor readiness. Interactive SSH and headless terminals print
+  an authorized link directly. Noninteractive service output keeps the
+  token private. Explicit `--no-open`, CI and development starts retain
+  duplicate-instance protection.
+- **`bell-pr start` waits for `bell-pr doctor` before starting a new server.**
+  When a required check fails, start exits before it listens and prints the doctor's checklist
   with the command that fixes each one. `bell-pr start --force` starts
   anyway and prints a warning, which is how the sample tour opens when no
   AI provider is signed in. A real agent run is still refused until one is.
@@ -35,14 +41,19 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `bell-pr open --print` put the token in the page address so the app can
   establish a browser session. `bell-pr token rotate` replaces the file
   and immediately invalidates all browser sessions and old token URLs. The
-  token is not in the startup line, the server log, or `bell-pr doctor --json`.
+  token is not in noninteractive startup output, service logs, or
+  `bell-pr doctor --json`.
   Listening somewhere other than a loopback address is still an explicit
   `--host` or `BELLPR_HOST`, and BELL PR prints a warning when you do.
 - **Browser access.** Opening the app through the CLI exchanges the token
   link for an HttpOnly cookie shared by tabs at the same address. The
-  default session lasts at most 12 hours. **Settings → General → Browser
-  access** can remember this browser for 30 days, sign out of this browser,
-  or revoke all access. Revoking all access also rotates the API token,
+  browser is remembered by default. The workbench renews access automatically
+  while you use it. Active browsers stay connected, and access expires
+  after about 30 days without use. **Settings → General → Browser access**
+  can turn off remembering for a nonpersistent session lasting at most 12
+  hours, sign out of this browser, or revoke all access. Reopening the app
+  preserves a valid session's remember choice. Revoking all access also
+  rotates the API token,
   invalidating every browser session, API clients' old tokens, and old
   token URLs. Tokens left in session storage by older builds are exchanged
   once and removed.

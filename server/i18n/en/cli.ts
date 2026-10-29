@@ -13,7 +13,7 @@ export default {
       `Usage: ${bin} [command] [options]`,
       "",
       "Commands:",
-      `  start      Start ${name} (the default command)`,
+      `  start      Start ${name}, or open its running workspace (the default command)`,
       "  open       Print the address of the running server and open it in the browser",
       "  doctor     Check git, gh and the agent CLIs (--json for machine output)",
       "  token      Replace the API token (`token rotate`)",
@@ -92,6 +92,8 @@ export default {
     /** The startup line with the address. */
     startup: ({ version, url }: { version: string; url: string }) =>
       `${name} ${version} → ${url}`,
+    reusing: ({ url }: { url: string }) => `${name} is running → ${url}`,
+    openLink: ({ url }: { url: string }) => `Open the workspace in your browser: ${url}`,
     /** Data left by an older version in the current folder; nothing moves. */
     legacyDataDir: ({ dataDir }: { dataDir: string }) =>
       `Found ${name} data in ./.bellpr. ${name} now uses ${dataDir} and moved nothing. To keep using the old folder, start it with: ${bin} start --data-dir ./.bellpr`,

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { ShieldCheck } from "lucide-react";
-import { api, clearApiToken, send } from "../api";
+import { api, endBrowserSession, updateBrowserSession } from "../api";
 import { useT } from "../i18n";
 import { Modal } from "../modals/Modal";
 import { Feedback, SettingSwitch, SettingsGroup, messageOf, reloadPage } from "./controls";
@@ -38,7 +38,7 @@ export function BrowserAccess({ reload = reloadPage }: { reload?: () => void }) 
     setSaved(false);
     setError("");
     try {
-      const value = await api<BrowserSession>("/session", send("POST", { remember: checked }));
+      const value = await updateBrowserSession(checked);
       setSession(value);
       setSaved(true);
     } catch (failure) {
@@ -55,8 +55,7 @@ export function BrowserAccess({ reload = reloadPage }: { reload?: () => void }) 
     setError("");
     setConfirming(false);
     try {
-      await api(all ? "/session/revoke" : "/session", send(all ? "POST" : "DELETE"));
-      clearApiToken();
+      await endBrowserSession(all);
       reload();
     } catch (failure) {
       setError(messageOf(failure));
