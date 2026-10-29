@@ -15,6 +15,7 @@ import {
   GitPullRequest,
   Globe2,
   History,
+  MessageSquare,
   Plus,
   ShieldCheck,
   Split,
@@ -40,6 +41,15 @@ import { DraftTab } from "./DraftTab";
 import { OverviewTab } from "./OverviewTab";
 import { RunNotices, showsCheckOff, UnderstandingOffBadge, UnsandboxedBadge } from "./RunNotices";
 import "./workspace.css";
+import { limitationsRequest } from "../session/limitations";
+import { sessionAwaitsAnswer, showSessionTab } from "../session/state";
+import "../session/session.css";
+
+const SessionPanel = lazy(() =>
+  withMessages(import("../session/SessionPanel")).then((module) => ({
+    default: module.SessionPanel,
+  })),
+);
 
 // The activity tab carries the team board, which most reviews never open;
 // it loads with its first visit.
@@ -58,6 +68,9 @@ const CommitHistory = lazy(() =>
 );
 
 interface WorkspacePageProps {
+  sessionDraft?: string;
+  onSessionDraftChange?: (text: string) => void;
+  onSessionRun?: (run: Run) => void;
   run: Run;
   files: DiffFile[];
   /** The changed file open in the code view. */
@@ -127,6 +140,9 @@ interface WorkspacePageProps {
  * four tabs and the review footer with the approve button.
  */
 export function WorkspacePage({
+  sessionDraft = "",
+  onSessionDraftChange,
+  onSessionRun,
   run,
   files,
   file,
@@ -176,6 +192,10 @@ export function WorkspacePage({
   updatingRepo,
 }: WorkspacePageProps) {
   const t = useT("workspace");
+  const sessionMessages = useT("session");
+  const sessionRunning = !!run.session?.running;
+  const sessionVisible = showSessionTab(run, demo);
+  const sessionNeedsAttention = sessionRunning || sessionAwaitsAnswer(run.session);
   const statusLabels = useT("common").runStatus;
   const { draftDirty, draftUnfinished, followUp, commitMessageUnfinished } =
     draft;
@@ -361,6 +381,14 @@ export function WorkspacePage({
               {t.tabs.activity}{" "}
               {active && <span className="activity-pulse" />}
             </button>
+            {sessionVisible && (
+              <button role="tab" id="workspace-tab-session" aria-controls="workspace-panel"
+                tabIndex={tab === "session" ? 0 : -1} aria-selected={tab === "session"}
+                className={tab === "session" ? "selected" : ""} onClick={() => setTab("session")}>
+                <MessageSquare size={16} />{sessionMessages.tab}
+                {sessionNeedsAttention && <><span className="session-tab-dot" aria-hidden="true" /><span className="session-sr-only">{sessionMessages.attention}</span></>}
+              </button>
+            )}
             <button
               role="tab"
               id="workspace-tab-draft"
@@ -395,11 +423,22 @@ export function WorkspacePage({
             <span>{demo ? t.sampleReview : t.humanReview}</span>
           </div>
         </div>
+        {sessionRunning && <p className="session-busy-note" role="status">{sessionMessages.busy}</p>}
         <div
           role="tabpanel"
           id="workspace-panel"
           aria-labelledby={`workspace-tab-${tab}`}
         >
+          {tab === "session" && sessionVisible && onSessionDraftChange && onSessionRun && (
+            <ErrorBoundary resetKey={run.id}>
+              <Suspense fallback={<p>{sessionMessages.loading}</p>}>
+                <SessionPanel key={run.id} run={run} draft={sessionDraft}
+                  onDraftChange={onSessionDraftChange} onRun={onSessionRun}
+                  onOpenFile={(path) => { setSelectedPath(path); setTab("changes"); }}
+                  />
+              </Suspense>
+            </ErrorBoundary>
+          )}
           {tab === "overview" && currentRepo && (
             <OverviewTab
               currentRepo={currentRepo}
@@ -504,6 +543,10 @@ export function WorkspacePage({
               currentRepo={currentRepo}
               understanding={understanding}
               records={records}
+              onAddressLimitations={sessionVisible && onSessionDraftChange ? (section) => {
+                onSessionDraftChange(limitationsRequest(section, sessionMessages.limitationsIntro));
+                setTab("session");
+              } : undefined}
             />
           )}
         </div>
@@ -549,7 +592,7 @@ export function WorkspacePage({
               <button
                 className="button primary"
                 disabled={
-                  !footer.explainFirst && (!allReviewed ||
+                  sessionRunning || (!footer.explainFirst && (!allReviewed ||
                   active ||
                   busy ||
                   !!run.publishing ||
@@ -557,7 +600,7 @@ export function WorkspacePage({
                   prTextMissing ||
                   (!demo &&
                     (followUp ? commitMessageUnfinished : !!draftUnfinished)) ||
-                  !["review", "approved"].includes(run.status))
+                  !["review", "approved"].includes(run.status)))
                 }
                 title={
                   !allReviewed

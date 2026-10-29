@@ -225,12 +225,16 @@ Start the run with **Generate the team plan** (with plan approval) or
   the overall conclusion; the Reviewer opens by saying whether it agrees
   and adds only what the summary lacks, and the Test analyst keeps the one
   list of checks still to run.
-- Agents are told never to change your machine: no `sudo`, no global or
+- With the default **Workspace** access, agents are told not to change
+  your machine: no `sudo`, no global or
   user-level installs. When a check needs something the machine lacks, the
   teammate reports it, and **Overview & motivation** lists it under "Setup
   this machine needs from you" with a suggested command and who reported
   it. Check the command against the project's documentation before you run
-  it; BELL PR never runs it.
+  it; the setup checklist never runs it. Explicit **Full access** in the model
+  settings lets writable agents install required tools and use available sudo
+  privileges outside the checkout. Read the [access settings](security-model.md#explicit-full-access)
+  before enabling it; read-only roles keep their restrictions.
 - **Run details** folds the model and the AI usage: its line names the
   agent, the model, the calls and the input and output tokens, marks
   partial reports and says when usage was not reported, never 0.
@@ -240,6 +244,34 @@ BELL PR runs as many contributions at the same time as **Settings →
 Performance** allows (1 to 8, 2 by default); the others wait in the queue.
 
 ## 5. Review every change
+
+Before publishing an agent contribution, the **Collaborate** tab lets you ask
+an agent to finish missing checks, add tests or fix failures in the run's working
+copy. The draft's Limitations shortcut fills the message box for you to review
+and send. Each message starts a fresh agent call with recent conversation and
+the existing reports as context; it uses your own CLI account.
+
+The conversation lists changed files, commands BELL actually observed, checks
+the agent says it did not run, and any questions or missing setup. A command's
+exit status alone does not establish that a test was meaningful. A changed file
+loses its review mark and gets fresh explanations, and an approved contribution
+returns to review. The agent may update existing Validation and Limitations
+sections together: completed checks and their scope go in Validation, while
+Limitations keeps remaining gaps and constraints. Outdated claims are corrected
+in both. Other draft sections stay as written, and before-and-after text is shown
+in the conversation for your review. If the draft has no separate, recognizable
+Validation section, completed results stay in the reply and draft suggestion
+instead of being added to Limitations. Sections with nested headings are also
+left intact to preserve the template. Code changes, observed commands or section
+updates also refresh draft suggestions,
+without replacing your edited draft. Reviewer and Test analyst reports need a
+separate rerun.
+
+While a turn runs, editing the draft, marking files reviewed, approval,
+publication and syncing are blocked. **Stop** cancels the turn and preserves
+its edits; a restart interrupts the turn too. The agent cannot commit, push or
+publish for you. Published contributions use their feedback workflow, and
+Learn by hand does not offer a writable agent conversation.
 
 When the team is done, the run waits for your review in **Code changes**:
 

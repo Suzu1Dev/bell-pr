@@ -453,6 +453,7 @@ async function runConflictResolution(
         task: { title: run.title, prompt: run.prompt },
         baseBranch: run.baseBranch,
         conflicts: files,
+        agentAccess: run.modelExecution?.agentAccess,
       }),
       controller.signal,
       false,

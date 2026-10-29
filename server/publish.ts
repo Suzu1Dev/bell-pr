@@ -1,3 +1,4 @@
+import { assertSessionIdle } from "./session.js";
 /**
  * The human review gate and publishing: the PR draft, per-file review,
  * approval, and publishing exactly the reviewed files as one commit in a
@@ -209,6 +210,7 @@ async function assertWorkflowScope(files: DiffFile[]) {
 
 /** The draft, file reviews and approval change only in review or approved, never while publishing. */
 export function editable(run: Run) {
+  assertSessionIdle(run);
   if (!["review", "approved"].includes(run.status) || run.publishing)
     throw new AppError((m) => m.run.publish.notEditable, 409);
 }
@@ -411,6 +413,7 @@ export async function publish(
     )
       throw new AppError((m) => m.run.publish.approvalStale, 409);
     if (run.status === "published") return run;
+    assertSessionIdle(run);
     const repo = ctx.repo(run.repoId);
     if (run.status !== "approved" || !run.approvedFingerprint)
       throw new AppError((m) => m.run.publish.approveFirst, 409);

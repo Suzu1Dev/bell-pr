@@ -92,6 +92,9 @@ to both CLIs, and `DISABLE_TELEMETRY`, `DISABLE_ERROR_REPORTING`,
 
 ### Claude Code
 
+The following restrictions describe the default **Workspace** access. Explicit
+Full access changes writable roles as described [below](#explicit-full-access).
+
 - **Writable roles** (teammates, follow-up rounds, syncing) run every Bash
   command inside Claude Code's sandbox: bubblewrap with socat on Linux,
   `sandbox-exec` on macOS. Writes are limited to the run's checkout, network
@@ -143,17 +146,46 @@ to both CLIs, and `DISABLE_TELEMETRY`, `DISABLE_ERROR_REPORTING`,
 
 - Writable roles run with a permission profile that extends `:workspace`:
   writes are limited to the checkout and command network access is off.
-  Read-only roles extend `:read-only`. BELL PR does not pass `--sandbox`.
-  On Codex CLI 0.165, `--sandbox` selects the older sandbox and ignores
-  `default_permissions`, which would drop the read denials below.
+  Read-only roles extend `:read-only`. BELL PR does not pass `--sandbox`
+  for that profile. On Codex CLI 0.165, `--sandbox` selects the older
+  sandbox and ignores `default_permissions`, which would drop the read
+  denials below. Explicit full access, described below, is the case that
+  passes `--sandbox danger-full-access`.
 - The profile names the same path list as Claude Code
   (`shared/credential-denials.ts`): GitHub CLI config files,
   `~/.git-credentials` and `credential.helper store --file` paths,
   `~/.netrc`, `~/.ssh`, and the other files in that list. Those denials
-  are part of the sandbox profile. The person can turn Claude Code's
-  sandbox off; Codex is started with this profile on each turn. Reads of
-  other files your user can read are still allowed. The profile does not
-  name the system keyring (Secret Service, D-Bus, or Keychain).
+  are part of the sandbox profile. The checkout's `.git` path and `.git/**`
+  are `read`, so that path cannot be edited or replaced and Git can still
+  read it. The person can turn Claude Code's sandbox off; Codex is started
+  with this profile on each turn unless full access is on. Reads of other
+  files your user can read are still allowed. The profile does not name
+  the system keyring (Secret Service, D-Bus, or Keychain).
+
+### Explicit full access
+
+Model settings offer **Full access** for roles that write files: implementation,
+collaborative sessions, follow-up fixes and conflict resolution. It is off by
+default and is recorded with the run's model settings. These roles use Codex's
+`--sandbox danger-full-access` or Claude Code's `bypassPermissions` mode without
+its Bash sandbox. Claude turns using it are marked as unsandboxed. Lead,
+reviewer, test analyst, project analysis and other read-only roles keep their
+restrictions. Learn by hand never gains a writable agent from this setting.
+
+Full access lets an agent install required tools, change files outside its
+checkout and use existing sudo privileges. Imported code, issues and reviews
+are untrusted input: an induced command can affect anything the service account
+can access. Permission deny lists are not an operating-system boundary for an
+unsandboxed shell.
+
+On Linux, the optional sudo control accepts a password to install a validated
+`/etc/sudoers.d/bell-pr-agent` rule granting the service account `NOPASSWD: ALL`.
+The password is passed to sudo over standard input, never saved or logged, and
+cleared from the input after submission. This grants that account passwordless
+root commands, including to processes outside BELL PR. Three failed password
+attempts block this control for 15 minutes in process memory; restarting clears
+the counter. Removing BELL's rule does not remove privileges from other sudo
+rules. Enabling Full access alone does not install the sudo rule.
 
 ### Limits that apply to every agent
 

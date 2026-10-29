@@ -470,5 +470,5 @@ test("Claude's sandbox denies writes to git hooks, config, and the checkout .git
   ])
     assert.ok(denials.includes(target), target);
   const settings = claudeSettings({ cwd: checkout, access: "write", sandbox: true });
-  assert.deepEqual(settings.sandbox?.filesystem.denyWrite, denials);
+  assert.deepEqual(settings.sandbox?.filesystem?.denyWrite, denials);
 });

@@ -1144,3 +1144,27 @@ test("agent CLI notices, outcomes and failures follow the locale in effect", asy
     "Claude Code is refreshing its sign-in while another process holds the refresh lock; next try in 15 seconds (attempt 2 of 3).",
   ]);
 });
+
+test("explicit full access affects write turns only and retains isolation from repository settings", async () => {
+  const execution: ModelExecution = { provider: "claude", source: "cli-default", agentAccess: "full" };
+  const write = await agentCommand(execution, { cwd: "/work/tree", access: "write" });
+  assert.equal(write.args[write.args.indexOf("--permission-mode") + 1], "bypassPermissions");
+  assert.equal(write.unsandboxed, true);
+  assert.equal(settingsOf(write.args).sandbox?.enabled, false);
+  assert.ok(settingsOf(write.args).permissions.deny.includes("Read(~/.ssh/**)"));
+  assert.ok(write.args.includes("--strict-mcp-config"));
+  assert.equal(write.args[write.args.indexOf("--setting-sources") + 1], "user");
+  assert.ok(!write.args.includes("--disallowedTools"));
+  for (const access of ["read", "none"] as const) {
+    const read = await agentCommand(execution, { cwd: "/work/tree", access, full: true });
+    assert.equal(read.args[read.args.indexOf("--permission-mode") + 1], "dontAsk");
+    assert.equal(settingsOf(read.args).permissions.blockReadsOutsideWorkingDirectories, true);
+    assert.equal(read.unsandboxed, undefined);
+    const codex = await agentCommand({ ...execution, provider: "codex" }, { cwd: "/work/tree", access });
+    assert.equal(codexAccessMode(codex.args), "read-only");
+    assert.ok(!codex.args.includes("--sandbox"));
+  }
+  const codex = await agentCommand({ ...execution, provider: "codex" }, { cwd: "/work/tree", access: "write" });
+  assert.equal(codex.args[codex.args.indexOf("--sandbox") + 1], "danger-full-access");
+  assert.ok(codex.args.includes("--ignore-rules"));
+});

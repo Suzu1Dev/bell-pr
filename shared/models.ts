@@ -16,12 +16,17 @@ export const providerLabels: Record<AgentProvider, string> = {
   codex: "Codex",
   claude: "Claude Code",
 };
+export const agentAccessModes = ["workspace", "full"] as const;
+/** Full access applies only to roles that write; workspace is the default. */
+export type AgentAccessMode = (typeof agentAccessModes)[number];
 export interface ModelSettings {
   provider?: AgentProvider;
   model?: string;
   reasoningEffort?: ReasoningEffort | "";
   /** Lets run roles search the web and fetch pages; off when absent. Analysis and discovery never get it. */
   webAccess?: boolean;
+  /** Explicit permission to run write roles without the sandbox; read roles stay restricted. */
+  agentAccess?: AgentAccessMode;
 }
 export interface ModelOption {
   id: string;
@@ -43,6 +48,8 @@ export interface ModelExecution {
   reasoningEffort?: ReasoningEffort;
   /** Recorded only when the run was created with web access on. */
   webAccess?: boolean;
+  /** Explicit permission to run write roles without the sandbox; read roles stay restricted. */
+  agentAccess?: AgentAccessMode;
   source: "selected" | "catalog-default" | "cli-default";
   /** What the CLI itself reported (Claude Code only so far); absent for Codex and older records. */
   reported?: {

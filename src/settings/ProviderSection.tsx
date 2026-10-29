@@ -201,8 +201,8 @@ function ModelSettingsForm({
           <fieldset className="direction-settings-container" disabled={saving}>
             <DirectionSettings
               value={{ ...defaultContributionSettings, ...settings }}
-              onChange={({ provider, model, reasoningEffort, webAccess }) => {
-                setSettings({ provider, model, reasoningEffort, webAccess });
+              onChange={({ provider, model, reasoningEffort, webAccess, agentAccess }) => {
+                setSettings({ provider, model, reasoningEffort, webAccess, agentAccess });
                 setMessage("");
                 setError("");
               }}

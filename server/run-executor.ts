@@ -235,7 +235,7 @@ export async function runAgent(
       // because the person allowed it in Settings (agentCommand decides).
       if (cli.unsandboxed && !run.unsandboxed) {
         run.unsandboxed = true;
-        ctx.log(run, role, sm().run.unsandboxedNotice, { kind: "notice" });
+        ctx.log(run, role, modelExecution.agentAccess === "full" ? sm().sudo.fullAccessNotice : sm().run.unsandboxedNotice, { kind: "notice" });
       }
       const read = agentEventReader(modelExecution.provider);
       const spawned = agentSpawn(run, role, cli.executable, timeoutMs);

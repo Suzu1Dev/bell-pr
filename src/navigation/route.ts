@@ -26,6 +26,7 @@ export const runTabs = [
   "overview",
   "changes",
   "activity",
+  "session",
   "draft",
   "commits",
 ] as const;
