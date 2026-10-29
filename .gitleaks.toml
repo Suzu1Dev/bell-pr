@@ -1,13 +1,130 @@
+# Default rules stay in force. A finding is ignored only when a rule
+# allowlist matches both the exact test path and that file's fixture
+# shape. Gitleaks 8.21.2 honors condition = "AND" on [[rules.allowlists]]
+# only; a global [allowlist] path skips the whole file.
 [extend]
 useDefault = true
 
-[allowlist]
+[[rules]]
+id = "generic-api-key"
+
+[[rules.allowlists]]
+description = "Sequential fixture in agent-cli tests"
+condition = "AND"
+regexTarget = "secret"
+paths = ['''^server/agent-cli\.test\.ts$''']
+regexes = ['''^ghp_0123456789abcdef0123$''']
+
+[[rules.allowlists]]
+description = "Letter-then-digit placeholder"
+condition = "AND"
+regexTarget = "secret"
 paths = [
-  '''^server/agent-cli\.test\.ts$''',
   '''^server/by-hand-tests\.test\.ts$''',
-  '''^server/cli-errors\.test\.ts$''',
+  '''^server/secrets\.test\.ts$''',
+]
+regexes = ['''^abcdefgh12345678$''']
+
+# generic-api-key also matches these two fixtures. The specific rule
+# normally takes precedence; once that hit is ignored, this one remains.
+[[rules.allowlists]]
+description = "npm and stripe fixtures also matched here"
+condition = "AND"
+regexTarget = "secret"
+paths = ['''^server/by-hand-tests\.test\.ts$''']
+regexes = [
+  '''^npm_aBcDeFgHiJkLmNoPqRsTuVwXyZ0123456789$''',
+  '''^rk_live_51H8abcdefghijklmnopqrstuvwxyz$''',
+]
+
+[[rules]]
+id = "github-pat"
+
+[[rules.allowlists]]
+description = "Sequential fixture in cli-errors tests"
+condition = "AND"
+regexTarget = "secret"
+paths = ['''^server/cli-errors\.test\.ts$''']
+regexes = ['''^ghp_0123456789abcdefghij0123456789abcdef$''']
+
+[[rules.allowlists]]
+description = "Alphabet-then-digit fixture"
+condition = "AND"
+regexTarget = "secret"
+paths = [
   '''^server/contribution-policy\.test\.ts$''',
   '''^server/draft-sources\.test\.ts$''',
-  '''^server/secrets\.test\.ts$''',
-  '''^server/team\.test\.ts$''',
 ]
+regexes = ['''^ghp_abcdefghijklmnopqrstuvwxyz0123456789$''']
+
+[[rules]]
+id = "curl-auth-header"
+
+[[rules.allowlists]]
+description = "Sequential fixture in team tests"
+condition = "AND"
+regexTarget = "secret"
+paths = ['''^server/team\.test\.ts$''']
+regexes = ['''^ghp_0123456789abcdef0123$''']
+
+[[rules]]
+id = "jwt"
+
+# The signature has no recognizable marker, so it is not listed.
+# This matches the demo header {"alg":"HS256"} and payload {"sub":"1234567890"}.
+[[rules.allowlists]]
+description = "Demo JWT header and payload"
+condition = "AND"
+regexTarget = "secret"
+paths = ['''^server/by-hand-tests\.test\.ts$''']
+regexes = ['''^eyJhbGciOiJIUzI1NiJ9\.eyJzdWIiOiIxMjM0NTY3ODkwIn0\.''']
+
+[[rules]]
+id = "npm-access-token"
+
+[[rules.allowlists]]
+description = "Alternating-case alphabet fixture"
+condition = "AND"
+regexTarget = "secret"
+paths = ['''^server/by-hand-tests\.test\.ts$''']
+regexes = ['''^npm_aBcDeFgHiJkLmNoPqRsTuVwXyZ0123456789$''']
+
+[[rules]]
+id = "stripe-access-token"
+
+[[rules.allowlists]]
+description = "Alphabet-suffix fixture"
+condition = "AND"
+regexTarget = "secret"
+paths = ['''^server/by-hand-tests\.test\.ts$''']
+regexes = ['''^rk_live_51H8abcdefghijklmnopqrstuvwxyz$''']
+
+[[rules]]
+id = "slack-bot-token"
+
+[[rules.allowlists]]
+description = "Sequential id and alternating-case fixture"
+condition = "AND"
+regexTarget = "secret"
+paths = ['''^server/by-hand-tests\.test\.ts$''']
+regexes = ['''^xoxb-123456789012-1234567890123-AbCdEfGhIjKlMnOpQrStUvWx$''']
+
+[[rules]]
+id = "gcp-api-key"
+
+[[rules.allowlists]]
+description = "Published example-prefix fixture"
+condition = "AND"
+regexTarget = "secret"
+paths = ['''^server/by-hand-tests\.test\.ts$''']
+regexes = ['''^AIzaSyA-abcdefghijklmnopqrstuvwxyz12345$''']
+
+[[rules]]
+id = "gitlab-pat"
+
+[[rules.allowlists]]
+description = "Alphabet-then-digit fixture"
+condition = "AND"
+regexTarget = "secret"
+paths = ['''^server/by-hand-tests\.test\.ts$''']
+regexes = ['''^glpat-abcdefghij0123456789$''']
