@@ -215,7 +215,7 @@ test("an agent spawn does not inherit GH_TOKEN or GITHUB_TOKEN from process.env"
   const claude = await envProbe(t, "claude");
   const codex = await envProbe(t, "codex");
   const git = await envProbe(t, "git");
-  // No env argument: agents get the allowlist, not process.env. git still inherits.
+  // No env argument: agents and git get an allowlist, not process.env.
   const claudeDefault = await claude();
   assert.equal(claudeDefault.GH_TOKEN, null);
   assert.equal(claudeDefault.GITHUB_TOKEN, null);
@@ -228,9 +228,9 @@ test("an agent spawn does not inherit GH_TOKEN or GITHUB_TOKEN from process.env"
   assert.equal(codexDefault.OPENAI_API_KEY, "sk-openai-test");
   assert.equal(codexDefault.ANTHROPIC_API_KEY, null);
   const inherited = await git();
-  assert.equal(inherited.GH_TOKEN, "from-parent");
-  assert.equal(inherited.GITHUB_TOKEN, "from-parent-gh");
-  assert.equal(inherited.BELL_MARKER, "kept");
+  assert.equal(inherited.GH_TOKEN, null);
+  assert.equal(inherited.GITHUB_TOKEN, null);
+  assert.equal(inherited.BELL_MARKER, null);
   // An explicit copy of process.env still loses only the two token variables.
   const passed = await claude({ ...process.env });
   assert.equal(passed.GH_TOKEN, null);

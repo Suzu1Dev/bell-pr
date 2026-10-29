@@ -6,6 +6,7 @@ import os from "node:os";
 import path from "node:path";
 import { agentCommand, claudeSettings } from "./agent-cli.js";
 import {
+  agentGitWriteDenials,
   agentReadDenials,
   allowUnsandboxedAgents,
   detectClaudeSandbox,
@@ -446,4 +447,28 @@ test("the sandbox canary's fake mode checks the harness without a model call", (
   assert.equal(run(["--fake", "--web"]).status, 2);
   assert.equal(report.web, false);
   assert.equal(report.home, "real");
+});
+
+test("Claude's sandbox denies writes to git hooks, config, and the checkout .git file", async (t) => {
+  const base = await mkdtemp(path.join(os.tmpdir(), "bell-sandbox-git-write-"));
+  t.after(() => rm(base, { recursive: true, force: true }));
+  const checkout = path.join(base, "worktrees", "run-1");
+  const gitDir = path.join(base, "repositories", "proj", ".git", "worktrees", "run-1");
+  await mkdir(gitDir, { recursive: true });
+  await mkdir(checkout, { recursive: true });
+  const pointer = path.join(checkout, ".git");
+  await writeFile(pointer, `gitdir: ${gitDir}\n`);
+  const common = path.join(base, "repositories", "proj", ".git");
+  const denials = agentGitWriteDenials(checkout);
+  for (const target of [
+    pointer,
+    `${pointer}/**`,
+    path.join(common, "config"),
+    path.join(common, "hooks"),
+    path.join(common, "hooks", "**"),
+    path.join(gitDir, "config.worktree"),
+  ])
+    assert.ok(denials.includes(target), target);
+  const settings = claudeSettings({ cwd: checkout, access: "write", sandbox: true });
+  assert.deepEqual(settings.sandbox?.filesystem?.denyWrite, denials);
 });

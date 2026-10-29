@@ -1,6 +1,8 @@
 node_modules
 dist/
 .bellpr/
+# Local deployment backups, archives and operational notes
+/.local/
 .env
 .env.*
 !.env.example

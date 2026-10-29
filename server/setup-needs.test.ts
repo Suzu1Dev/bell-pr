@@ -62,3 +62,16 @@ test("the checklist lists a command once, with every agent that reported it", ()
     2,
   );
 });
+
+test("full access permits necessary installs only when explicitly selected and keeps password and publishing boundaries", () => {
+  for (const provider of ["codex", "claude"] as const) {
+    const full = commandEnvironment(provider, true);
+    assert.match(full, /there is no sandbox/);
+    assert.match(full, /Install or configure only what the task needs/);
+    assert.match(full, /Use sudo only when it needs no password/);
+    assert.match(full, /must not push, publish, contact anyone or access credentials/);
+    assert.doesNotMatch(commandEnvironment(provider), /explicitly allowed full access/);
+  }
+  assert.match(setupInstruction("en", true), /still lacks/);
+  assert.match(setupInstruction("zh-TW", true), /Traditional Chinese \(Taiwan usage\)/);
+});

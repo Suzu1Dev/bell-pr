@@ -22,7 +22,7 @@ import { assertWorkspacePresent } from "./cleanup.js";
 import { assertRefName, readDiff } from "./git.js";
 import { shuttingDown, sm } from "./i18n/index.js";
 import { log } from "./log.js";
-import { git } from "./process.js";
+import { git, recordedGitDir } from "./process.js";
 import { editable } from "./publish.js";
 import { discardCheckout } from "./repositories.js";
 import { assertConflictsResolved } from "./sync-runs.js";
@@ -85,6 +85,8 @@ async function createContribution(
   await git(repo.path, ["branch", "--no-track", branch, source.baseSha]);
   try {
     await git(repo.path, ["worktree", "add", worktreePath, branch], { timeoutMs: 60_000 });
+    const gitDir = recordedGitDir(worktreePath);
+    if (!gitDir) throw new AppError((m) => m.security.worktreeForged, 409);
     const chosen = paths.map((filePath) => files.get(filePath)!);
     const patch = chosen.map((file) => file.patch).join("\n");
     await git(worktreePath, ["apply", "--check", "--whitespace=nowarn", "-"], { input: patch });
@@ -101,7 +103,13 @@ async function createContribution(
           copied.find((other) => other.path === file.path)?.fingerprint === file.fingerprint,
       );
     if (!same) throw new AppError((m) => m.run.split.notReproduced, 500);
-    return contributionRun(ctx, source, { id, title, branch, worktreePath }, new Set(paths), files);
+    return contributionRun(
+      ctx,
+      source,
+      { id, title, branch, worktreePath, gitDir },
+      new Set(paths),
+      files,
+    );
   } catch (error) {
     // Whatever fails once the checkout exists, it does not stay behind.
     await discardCheckout(repo, branch, worktreePath);
@@ -117,11 +125,11 @@ async function createContribution(
 function contributionRun(
   ctx: WorkbenchContext,
   source: Run,
-  made: { id: string; title: string; branch: string; worktreePath: string },
+  made: { id: string; title: string; branch: string; worktreePath: string; gitDir: string },
   own: ReadonlySet<string>,
   files: ReadonlyMap<string, DiffFile>,
 ): Run {
-  const { id, title, branch, worktreePath } = made;
+  const { id, title, branch, worktreePath, gitDir } = made;
   const changed = [...files.keys()];
   const tasks = (source.team?.tasks ?? [])
     .filter((task) => planTaskPaths(changed, task).some((filePath) => own.has(filePath)))
@@ -170,6 +178,7 @@ function contributionRun(
     baseBranch: source.baseBranch,
     baseSha: source.baseSha,
     worktreePath,
+    gitDir,
     createdAt: created,
     ...(source.locale ? { locale: source.locale } : {}),
     // The lead planned and the teammates built these files; the reviewer and the

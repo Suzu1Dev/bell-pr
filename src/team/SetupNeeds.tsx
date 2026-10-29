@@ -32,8 +32,7 @@ export function runSetupNeeds(
 }
 
 /**
- * What agents could not run because this machine lacks something. Agents
- * are asked not to change the machine, so the person installs it; each
+ * What agents could not run with their available permissions and setup; each
  * command is an agent's suggestion, shown to be checked and copied, never
  * run by BELL. The copy control is the environment checklist's.
  */

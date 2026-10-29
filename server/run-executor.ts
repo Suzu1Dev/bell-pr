@@ -10,7 +10,7 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { assertRunAgentAllowed } from "./codex-guard.js";
-import { command, git, agentEnvironment, redact } from "./process.js";
+import { command, git, agentEnvironment, recordedGitDir, redact } from "./process.js";
 import { readDiff } from "./git.js";
 import {
   claimReadyTasks,
@@ -237,7 +237,7 @@ export async function runAgent(
       // because the person allowed it in Settings (agentCommand decides).
       if (cli.unsandboxed && !run.unsandboxed) {
         run.unsandboxed = true;
-        ctx.log(run, role, sm().run.unsandboxedNotice, { kind: "notice" });
+        ctx.log(run, role, modelExecution.agentAccess === "full" ? sm().sudo.fullAccessNotice : sm().run.unsandboxedNotice, { kind: "notice" });
       }
       const read = agentEventReader(modelExecution.provider);
       const spawned = agentSpawn(run, role, cli.executable, timeoutMs);
@@ -540,6 +540,9 @@ async function executeTeamTask(
           { signal },
         ),
       );
+      const gitDir = recordedGitDir(task.worktreePath!);
+      if (!gitDir) throw new AppError((m) => m.security.worktreeForged, 409);
+      task.gitDir = gitDir;
     });
     ctx.log(run, task.owner, sm().run.team.taskClaimed({ title: task.title }));
     await ctx.store.save();

@@ -57,16 +57,18 @@ async function fakes(t: TestContext, scripts: Record<string, string>) {
   };
 }
 
-const git = (version = "2.45.1", identity = "ok") => `case "$1" in
-  --version) echo "git version ${version}" ;;
-  var) ${
-    identity === "missing"
-      ? `printf 'Author identity unknown\\n\\n*** Please tell me who you are.\\n\\nfatal: unable to auto-detect email address (got "me@host.(none)")\\n' >&2; exit 128`
-      : `echo "Test User <${identity === "ok" ? "test@example.com" : "me@host.example"}> 1760000000 +0000"`
-  } ;;
-  config) ${identity === "ok" ? 'echo "test@example.com"' : "exit 1"} ;;
-  *) exit 1 ;;
-esac`;
+const git = (version = "2.45.1", identity = "ok") => `for arg in "$@"; do
+  case "$arg" in
+    --version) echo "git version ${version}"; exit 0 ;;
+    var) ${
+      identity === "missing"
+        ? `printf 'Author identity unknown\\n\\n*** Please tell me who you are.\\n\\nfatal: unable to auto-detect email address (got "me@host.(none)")\\n' >&2; exit 128`
+        : `echo "Test User <${identity === "ok" ? "test@example.com" : "me@host.example"}> 1760000000 +0000"; exit 0`
+    } ;;
+    config) ${identity === "ok" ? 'echo "test@example.com"; exit 0' : "exit 1"} ;;
+  esac
+done
+exit 1`;
 
 const githubUser = (scopes: string | null) =>
   `printf 'HTTP/2.0 200 OK\\r\\nContent-Type: application/json\\r\\n${
@@ -378,7 +380,7 @@ test("a CLI that fails tells its error, offers a reinstall and is told apart fro
       force: true,
       platform: "linux",
       exec: async (executable, args, options) => {
-        if (executable === "git" && args[0] === "--version")
+        if (executable === "git" && args.includes("--version"))
           throw new AppError("git timed out", 504);
         return command(executable, args, options);
       },

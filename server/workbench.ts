@@ -45,6 +45,7 @@ import { RunQueue } from "./run-queue.js";
 import * as publishing from "./publish.js";
 import * as learning from "./learning.js";
 import * as drafting from "./draft-jobs.js";
+import * as sessions from "./session-runs.js";
 import * as syncing from "./sync-runs.js";
 import * as followUps from "./followup-runs.js";
 import * as walkthroughs from "./walkthrough-runs.js";
@@ -80,6 +81,7 @@ export class Workbench {
   private explanationJobs = new Map<string, Promise<void>>();
   private walkthroughJobs = new Map<string, Promise<void>>();
   private draftJobs = new Map<string, Promise<void>>();
+  private sessionJobs = new Map<string, Promise<void>>();
   /** Learner-requested reviewer/tester reruns; one per run, aborted through controllers[run.id]. */
   private reviewJobs = new Map<string, Promise<void>>();
   private followUpJobs = new Map<string, Promise<void>>();
@@ -166,6 +168,7 @@ export class Workbench {
       explanationJobs: this.explanationJobs,
       walkthroughJobs: this.walkthroughJobs,
       draftJobs: this.draftJobs,
+      sessionJobs: this.sessionJobs,
       reviewJobs: this.reviewJobs,
       followUpJobs: this.followUpJobs,
       conflictJobs: this.conflictJobs,
@@ -422,8 +425,17 @@ export class Workbench {
     return retryTeam(this.context, id, message);
   }
 
+  async startSession(id: string, content: string) {
+    return sessions.startSession(this.context, id, content);
+  }
+
+  async cancelSession(id: string) {
+    return sessions.cancelSession(this.context, id);
+  }
+
   async cancel(id: string) {
     const run = this.run(id);
+    if (this.sessionJobs.has(id)) return this.cancelSession(id);
     // Stopping a re-review only aborts the reviewers; the run keeps its status.
     // A conflict resolution or a follow-up round keeps the edits made so far
     // for review, and a published PR stays published.

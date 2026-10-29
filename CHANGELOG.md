@@ -9,6 +9,15 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **Collaborate before publishing.** A conversation with a writable agent can
+  finish checks, fix failures and update the draft's Limitations section.
+  Each turn records changed files and observed commands, invalidates reviews
+  of changed files, and leaves approval and publication to you. Learn by hand
+  remains read-only for agents.
+- **Explicit full agent access.** Model settings can give writable roles full
+  machine access, with an optional Linux sudo setup. Workspace access remains
+  the default, and read-only roles keep their existing restrictions.
+
 - **Analysis progress.** While a project analysis or **Generate 5 more**
   runs, the overview lists its steps and shows how long the agent has worked
   against the longest it will wait, with the CLI's notices such as a retry or
@@ -45,7 +54,17 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   credential-store files, `~/.netrc`, and `~/.ssh/`. `GH_TOKEN` and
   `GITHUB_TOKEN` are removed from the agent process environment even when
   the sandbox is off. Tokens in the system keyring are not covered: the
-  agent can still read a GitHub token via `gh auth token`.
+  agent can still read a GitHub token via `gh auth token`. With the
+  sandbox on, Claude Code also cannot write the checkout's `.git` file,
+  the clone's git hooks or config, or a worktree `config.worktree`.
+- **Server git.** Git commands BELL PR runs itself ignore repository hooks,
+  file monitors, and other config that would run a program. Each checkout's
+  git directory is recorded when its worktree is created and passed to git
+  as `--git-dir` and `--work-tree`. With the sandbox on, Claude Code
+  cannot write the checkout's `.git` path or anything under it.
+  `GIT_ASKPASS` and `SSH_ASKPASS` are not passed to server git.
+  `GH_TOKEN` is passed to `gh` and to git only when that git command
+  talks to GitHub.
 - **Premise check.** In Code changes it sits in the diff's top bar instead
   of a row of its own, and opens as an overlay that scrolls and can be
   reached with the keyboard, so the code keeps its height.

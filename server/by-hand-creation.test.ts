@@ -222,6 +222,11 @@ test("with Claude Code and no usable sandbox, a Learn-by-hand run is created and
   assert.equal(run.learnByHand, true);
   assert.equal(run.modelExecution?.provider, "claude");
   assert.equal(f.store.data.runs.length, 1);
+  // Explicit full access permits only a writable agent run to bypass this check.
+  const full = await f.workbench.createRun(f.repo.id, prompt, undefined, { ...settings, agentAccess: "full" });
+  assert.equal(full.modelExecution?.agentAccess, "full");
+  assert.equal(full.learnByHand, undefined);
+  assert.equal(f.store.data.runs.length, 2);
 });
 
 test("no route but POST /api/runs takes the mode, and none takes a help lock", async () => {

@@ -1,3 +1,4 @@
+import { sessionMovedFiles } from "../session/state";
 import {
   lazy,
   Suspense,
@@ -72,7 +73,7 @@ export type Page =
   | "team"
   | "learning"
   | "settings";
-export type Tab = "overview" | "changes" | "activity" | "draft" | "commits";
+export type Tab = "overview" | "changes" | "activity" | "session" | "draft" | "commits";
 export type ModalName =
   | "import"
   | "task"
@@ -396,6 +397,7 @@ function AppShell({
     if (typeof value !== "function") openRunId.current = value.id;
     setRunState(value);
   }, []);
+  const [sessionComposer, setSessionComposer] = useState({ runId: "", text: "" });
   const [files, setFiles] = useState<DiffFile[]>(() => sample.files);
   // The workspace's tab and file while another page is shown, and the
   // repository the overview page shows next.
@@ -527,7 +529,8 @@ function AppShell({
   const additions = files.reduce((sum, f) => sum + f.additions, 0);
   const deletions = files.reduce((sum, f) => sum + f.deletions, 0);
   const active = ["running", "queued", "awaiting_plan"].includes(run.status);
-  const editable = !demo && ["review", "approved"].includes(run.status);
+  const sessionRunning = Boolean(run.session?.running);
+  const editable = !demo && !sessionRunning && ["review", "approved"].includes(run.status);
   // A learner-requested re-review keeps the run in review/approved; only the
   // two reviewer agents report running, so poll and offer to stop on that signal.
   const reviewRerunning =
@@ -728,6 +731,21 @@ function AppShell({
     setup,
   });
   const { chooseRun, importRepo, startTask, publish } = actions;
+  function adoptSessionRun(updated: Run) {
+    if (runIdRef.current !== updated.id) return;
+    const moved = sessionMovedFiles(run.session, updated.session);
+    setRun(updated);
+    setRuns((previous) => previous.map((item) =>
+      item.id === updated.id ? summarizeRun(updated) : item));
+    if (moved) void api<{ files: DiffFile[] }>(`/runs/${updated.id}/diff`)
+      .then(({ files: changed }) => {
+        if (runIdRef.current === updated.id) setFiles(changed);
+      })
+      .catch((error: Error) => {
+        if (runIdRef.current === updated.id) setApiError(error.message);
+      });
+  }
+
 
   // The workspace and the overview page come back as they were left.
   useEffect(() => {
@@ -1067,6 +1085,9 @@ function AppShell({
           </div>
         ) : page === "workspace" ? (
           <WorkspacePage
+            sessionDraft={sessionComposer.runId === run.id ? sessionComposer.text : ""}
+            onSessionDraftChange={(text) => setSessionComposer({ runId: run.id, text })}
+            onSessionRun={adoptSessionRun}
             run={run}
             files={files}
             file={file}
@@ -1076,7 +1097,7 @@ function AppShell({
             demo={demo}
             reading={reading}
             active={active}
-            busy={busy}
+            busy={busy || sessionRunning}
             editable={editable}
             reviewRerunning={reviewRerunning}
             preparingDraft={preparingDraft}
@@ -1259,7 +1280,7 @@ function AppShell({
               currentRepo={currentRepo}
               additions={additions}
               deletions={deletions}
-              busy={busy}
+              busy={busy || sessionRunning}
               formError={formError}
               draft={draft}
               publish={publish}

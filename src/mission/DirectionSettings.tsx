@@ -38,6 +38,7 @@ import { ReadinessMessage } from "../setup/ReadinessNotice";
 import { useDoctor, type DoctorState } from "../setup/useDoctor";
 import { providerReadiness, withProvider } from "./readiness";
 import type { StartCheck } from "./StartConfirm";
+import { SudoAccess } from "./SudoAccess";
 import "./mission.css";
 
 // The task dialog's facts: their own chunk, with the respect rules.
@@ -113,6 +114,7 @@ export function DirectionSettings({
   byHand = false,
 }: DirectionSettingsProps) {
   const { directions, settings: t } = useT("mission");
+  const permissions = useT("permissions");
   const byHandText = useT("discovery").byHand;
   const { reasoningEffort: efforts, reasoningEffortWithId } = useT("common");
   const id = useId();
@@ -469,6 +471,22 @@ export function DirectionSettings({
             <small id={`${id}-web-help`}>{t.model.webAccessHelp}</small>
           </span>
         </label>
+        <div className="mission-form-field">
+          <label htmlFor={`${id}-agent-access`}>{permissions.label}</label>
+          <select
+            id={`${id}-agent-access`}
+            value={value.agentAccess === "full" ? "full" : "workspace"}
+            aria-describedby={`${id}-agent-access-help`}
+            onChange={(event) => update("agentAccess", event.target.value === "full" ? "full" : "workspace")}
+          >
+            <option value="workspace">{permissions.workspace}</option>
+            <option value="full">{permissions.full}</option>
+          </select>
+          <p id={`${id}-agent-access-help`} className="mission-field-note">
+            {value.agentAccess === "full" ? permissions.fullHelp : permissions.workspaceHelp}
+          </p>
+        </div>
+        {value.agentAccess === "full" && <SudoAccess id={id} />}
         {modelError && (
           <div className="mission-model-error" role="status">
             <span>{t.model.error({ message: modelError })}</span>

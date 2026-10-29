@@ -37,7 +37,7 @@ import {
 } from "./cli-errors.js";
 import { resolvePort } from "./config.js";
 import { sm } from "./i18n/index.js";
-import { agentEnvironment, command, git, redact } from "./process.js";
+import { agentEnvironment, command, git, gitInvocationPrefix, redact } from "./process.js";
 import {
   allowUnsandboxedAgents,
   detectClaudeSandbox,
@@ -433,8 +433,23 @@ async function codexOnPath(): Promise<ToolFacts> {
 }
 
 async function probe(exec: DoctorExec, dataDir?: string): Promise<Facts> {
+  const run = async (
+    executable: string,
+    args: string[],
+    options?: Parameters<DoctorExec>[2],
+  ) =>
+    exec(
+      executable,
+      executable === "git"
+        ? [
+            ...(await gitInvocationPrefix(options?.cwd ?? os.tmpdir(), args)),
+            ...args,
+          ]
+        : args,
+      options,
+    );
   const [git, gh, codex, claude, dataDirFacts] = await Promise.all([
-    probeTool(exec, "git"),
+    probeTool(run, "git"),
     probeTool(exec, "gh"),
     // The switch off must not start Codex. Presence is a PATH check only.
     codexEnabled
@@ -446,7 +461,7 @@ async function probe(exec: DoctorExec, dataDir?: string): Promise<Facts> {
   const [identity, github, codexAuth, claudeAuth, sandbox] = await Promise.all([
     git.state === "ok"
       ? probeGitIdentity((args, options) =>
-          exec("git", args, { ...options, cwd: os.tmpdir() }),
+          run("git", args, { ...options, cwd: os.tmpdir() }),
         )
       : undefined,
     gh.state === "ok" ? probeGithub(exec) : undefined,

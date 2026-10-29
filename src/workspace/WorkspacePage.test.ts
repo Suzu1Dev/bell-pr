@@ -370,3 +370,16 @@ test("a split original says it was split and lists the contributions it became",
   assert.match(renderZh(element({ run: intoRun, tab: "overview" })), /已拆成 2 份貢獻/);
   assert.doesNotMatch(renderEn(element({ tab: "overview" })), /Split into \d/);
 });
+
+test("collaboration is offered for an agent-built run, but never a Learn-by-hand run", () => {
+  assert.match(renderEn(element()), /id="workspace-tab-session"/);
+  assert.doesNotMatch(renderEn(element({ run: { ...realRun, learnByHand: true } })), /id="workspace-tab-session"/);
+});
+
+test("a running collaboration turn blocks approval even when the explanation check is next", () => {
+  const run = { ...realRun, session: { running: true, revision: 0, messages: [], updatedAt: "2026-10-28T00:00:00Z" } };
+  const html = renderEn(element({ run }));
+  assert.match(html, /The agent is editing code/);
+  assert.match(html, /<button class="button primary" disabled=""/);
+  assert.match(html, /session-tab-dot/);
+});

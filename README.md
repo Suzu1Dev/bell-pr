@@ -133,10 +133,13 @@ Failed subtasks can be retried.
 Before it plans, the Lead checks any assumption the request states against
 the code, and every role is told the verdict. The brief shows it, and once
 the run is finished you can check it again, also on a run made before
-these checks. Agents are told never to change your
-machine: no `sudo` and no global installs. When a check needs something
+these checks. With default **Workspace** access, agents are told not to change
+your machine: no `sudo` and no global installs. When a check needs something
 the machine lacks, the overview lists it with a suggested command, for you
-to verify and run yourself.
+to verify and run yourself. Explicit **Full access** in model settings lets
+writable roles install tools outside the checkout and use available sudo
+privileges; read-only roles keep their restrictions. Linux also offers an
+optional passwordless sudo setup. See the [security model](docs/security-model.md#explicit-full-access).
 
 Several contributions can run at the same time, up to the limit in
 **Settings → Performance** or `BELLPR_MAX_ACTIVE_RUNS` (1 to 8; 2 by
@@ -145,6 +148,15 @@ default). The others wait in the queue.
 In **Learn by hand** you write the change yourself: a guide plans with you,
 gives hints without code and reviews your change when you are ready. BELL PR
 runs your tests, and its agents cannot edit your files in these runs.
+
+Before publishing an agent contribution, **Collaborate** lets you ask an agent
+to fix checks, add tests or work through the draft's Limitations. Each turn
+records changed files, observed commands, missing checks and questions. Edits
+invalidate the affected review marks. Completed checks go in Validation;
+Limitations keeps remaining gaps and constraints. Updates to these sections show
+their old and new text for you to check. You still approve and publish the contribution;
+you can stop a turn and keep its edits. Learn by hand does not offer this
+writable conversation.
 
 ![Agent activity: the team's plan, progress and reports](docs/images/en/run-activity-1280.png)
 
@@ -319,14 +331,16 @@ Details: [Privacy and your data](docs/privacy-and-data.md).
   operating-system sandbox: writes stay in the run's own worktree and the
   network is closed. With the sandbox on, both agents are denied the GitHub
   CLI config files, `~/.git-credentials` and credential-store files,
-  `~/.netrc`, and `~/.ssh/`. Tokens in your system keyring are not covered:
-  the agent can still read your GitHub token via `gh auth token`. Your main
+  `~/.netrc`, and `~/.ssh/`. Tokens in your system keyring are not covered: the
+  agent can still read your GitHub token via `gh auth token`. Your main
   protection is a fine-grained token with the minimum permissions you need.
   Claude Code is also denied BELL PR's own data outside its checkout.
 - **Imported projects are untrusted.** Their code, documents and agent
   instructions (`AGENTS.md`, `CLAUDE.md`, `.claude/`) are treated as data:
   the CLIs never load the project's own settings, hooks or instructions,
   and a repository whose Git configuration could run programs is refused.
+  Git commands BELL PR itself runs also turn those programs off. Only a
+  git command that talks to GitHub receives `GH_TOKEN`.
   Agents still run the project's code, so import only projects you are
   willing to run on this computer.
 - **No sign-in.** BELL PR does not authenticate anyone. It listens on
