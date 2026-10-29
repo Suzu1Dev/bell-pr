@@ -415,6 +415,15 @@ const m: Translation<typeof en> = {
     wasSplit: ({ count }) => `已拆成 ${count} 個貢獻。`,
   },
   publish: {
+    recoveryStale: "未完成的發佈記錄已變更；請重新載入後再恢復。",
+    recoveryNotAllowed: "只能恢復尚未記錄推送目標或 PR 的未完成發佈。",
+    recoveryBusy: "這個工作仍有作業進行中；請等完成後再恢復發佈。",
+    recoveryCheckout: "本機分支或已儲存的提交與這個工作不符；已停止恢復，工作目錄沒有變更。",
+    recoveryUnknown: "無法確認兩個 GitHub Repository 都沒有對應分支或 PR；已停止恢復，請待 Repository 可以讀取後重試。",
+    recoveryRemoteBranch: ({ repository, branch }) => `GitHub 分支 ${repository}:${branch} 已存在；未完成的發佈記錄已保留，請先檢查。`,
+    recoveryPrExists: ({ branch }) => `分支 ${branch} 已有 PR，包括已關閉或合併的 PR；未完成的發佈記錄已保留，請先檢查。`,
+    recovered: ({ commit }) => `已恢復未完成的發佈；提交 ${commit} 已保留在本機恢復參照，請重新審閱與核准目前草稿後再發佈。`,
+
     commitMessageInvalid: "提交訊息只能包含文字與換行。",
     invalidBranch:
       "GitHub 分支名稱只能用英數字與 . _ - /，不能有 ..，也不能以 . 或 .lock 結尾。",
@@ -452,9 +461,9 @@ const m: Translation<typeof en> = {
       "目標分支已有新提交；先前的發佈已建立提交，可能已推送到 GitHub，因此不能再同步或復原同步；請從最新版本建立新工作。",
     branchChanged: "工作分支已改變，已停止發佈。",
     priorCommitDiffers:
-      "先前發佈已建立不同的提交。請建立新工作，以避免覆寫可能已推送的分支。",
+      "先前發佈已建立不同的提交。請返回 PR 草稿頁；若顯示「恢復未完成的發佈」，請先恢復再重新審閱與核准。若無此選項，請檢查先前分支或建立新工作。",
     priorMessageDiffers:
-      "先前發佈的提交已帶有不同的提交訊息，推送後無法更改。請還原提交訊息，或建立新工作。",
+      "先前發佈的提交已帶有不同的提交訊息，推送後無法更改。請返回 PR 草稿頁；若顯示「恢復未完成的發佈」，請先恢復再重新審閱與核准。若無此選項，請還原提交訊息或建立新工作。",
     notAFork: "同名 Repository 不是目標專案的 fork，請先處理 GitHub fork。",
     noPrUrl: "GitHub 未回傳 PR URL，請先到 GitHub 確認，避免重複發佈。",
     prCreated: "已建立 GitHub Draft PR。",

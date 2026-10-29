@@ -396,6 +396,10 @@ async function mountActions(
   const runIdRef = options.runIdRef ?? { current: run.id };
   const shown: Run[] = [];
   const notices: string[] = [];
+  const errors: string[] = [];
+  const busy: boolean[] = [];
+  const confirmations: unknown[] = [];
+  let closed = 0;
   let latest: RunActions | undefined;
   const ignore = () => {};
   const draft = {
@@ -406,8 +410,9 @@ async function mountActions(
     draftCommitMessage: "",
     draftPublishBranch: "",
     acknowledged: [],
-    setAcknowledged: ignore,
+    setAcknowledged: (value: unknown) => confirmations.push(value),
     overrides: [],
+    setOverrides: (value: unknown) => confirmations.push(value),
     loadPublishChecks: async () => {},
     followUp: undefined,
     draftMutationEpoch: { current: 0 },
@@ -438,11 +443,11 @@ async function mountActions(
       setSelectedPath: ignore,
       demo: false,
       reviewRerunning: false,
-      setBusy: ignore,
-      setFormError: ignore,
+      setBusy: (value) => { if (typeof value === "boolean") busy.push(value); },
+      setFormError: (value) => { if (typeof value === "string") errors.push(value); },
       notify: (message) => notices.push(message),
       openModal: ignore,
-      closeModal: ignore,
+      closeModal: () => { closed++; },
       navigate: ignore,
       setTab: ignore,
       setShowExplanation: ignore,
@@ -462,6 +467,10 @@ async function mountActions(
     actions: () => latest!,
     shown,
     notices,
+    errors,
+    busy,
+    confirmations,
+    closed: () => closed,
     unmount: () => mounted.unmount(),
   };
 }
@@ -489,6 +498,100 @@ test("a PR created after the person opened another run leaves that run on screen
     assert.deepEqual(shell.notices, [en.workspace.notices.prCreated]);
   } finally {
     await shell.unmount();
+  }
+});
+
+test("recovering an unfinished publish returns to review and clears old confirmations without publishing", async (t) => {
+  const realFetch = globalThis.fetch;
+  t.after(() => { globalThis.fetch = realFetch; });
+  const interrupted: Run = { ...base, status: "approved", publishCommit: "a".repeat(40), approvedFingerprint: "old" };
+  const recovered: Run = { ...interrupted, status: "review" };
+  delete recovered.publishCommit;
+  delete recovered.approvedFingerprint;
+  const asked: string[] = [];
+  globalThis.fetch = (async (url, init) => {
+    asked.push(`${init?.method} ${String(url)}`);
+    assert.deepEqual(JSON.parse(String(init?.body)), { commit: interrupted.publishCommit });
+    return respond({ run: recovered });
+  }) as typeof fetch;
+  const shell = await mountActions(interrupted);
+  try {
+    await act(() => shell.actions().recoverPublish());
+    assert.deepEqual(asked, ["POST /api/runs/r/publish/recover"]);
+    assert.deepEqual(shell.shown, [recovered]);
+    assert.deepEqual(shell.confirmations, [[], []]);
+    assert.equal(shell.closed(), 1);
+    assert.deepEqual(shell.notices, [en.workspace.notices.publishRecovered]);
+    assert.deepEqual(shell.busy, [true, false]);
+  } finally { await shell.unmount(); }
+});
+
+test("recovery preserves state on refusal and cannot discard an unsaved draft", async (t) => {
+  const realFetch = globalThis.fetch;
+  t.after(() => { globalThis.fetch = realFetch; });
+  const interrupted: Run = { ...base, status: "review", publishCommit: "a".repeat(40) };
+  let calls = 0;
+  globalThis.fetch = (async () => {
+    calls++;
+    return new Response(JSON.stringify({ error: "The remote branch already exists." }), {
+      status: 409, headers: { "Content-Type": "application/json" },
+    });
+  }) as typeof fetch;
+  for (const draftDirty of [true, false]) {
+    const shell = await mountActions(interrupted, { draftDirty });
+    try {
+      await act(() => shell.actions().recoverPublish());
+      assert.deepEqual(shell.shown, []);
+      assert.deepEqual(shell.confirmations, []);
+      assert.equal(shell.closed(), 0);
+      assert.equal(calls, draftDirty ? 0 : 1);
+      assert.deepEqual(shell.notices, draftDirty ? [] : ["The remote branch already exists."]);
+    } finally { await shell.unmount(); }
+  }
+});
+
+test("a recovery response for a run left open earlier does not change the current run or dialog", async (t) => {
+  const realFetch = globalThis.fetch;
+  t.after(() => { globalThis.fetch = realFetch; });
+  const interrupted: Run = { ...base, status: "review", publishCommit: "a".repeat(40) };
+  const runIdRef = { current: interrupted.id };
+  globalThis.fetch = (async () => {
+    runIdRef.current = "another-run";
+    return respond({ run: { ...interrupted, publishCommit: undefined } });
+  }) as typeof fetch;
+  const shell = await mountActions(interrupted, { runIdRef });
+  try {
+    await act(() => shell.actions().recoverPublish());
+    assert.deepEqual(shell.shown, []);
+    assert.deepEqual(shell.confirmations, []);
+    assert.deepEqual(shell.notices, []);
+    assert.equal(shell.closed(), 0);
+  } finally { await shell.unmount(); }
+});
+
+test("a failed first publish reloads its local commit, while a late reload cannot replace another run", async (t) => {
+  const realFetch = globalThis.fetch;
+  t.after(() => { globalThis.fetch = realFetch; });
+  const approved: Run = { ...base, status: "approved", approvedFingerprint: "f" };
+  const interrupted: Run = { ...approved, publishCommit: "a".repeat(40) };
+  for (const switched of [false, true]) {
+    const runIdRef = { current: approved.id };
+    const asked: string[] = [];
+    globalThis.fetch = (async (url, init) => {
+      asked.push(`${init?.method ?? "GET"} ${String(url)}`);
+      if (init?.method === "POST") return new Response(JSON.stringify({ error: "Publish stopped." }), {
+        status: 409, headers: { "Content-Type": "application/json" },
+      });
+      if (switched) runIdRef.current = "another-run";
+      return respond({ run: interrupted });
+    }) as typeof fetch;
+    const shell = await mountActions(approved, { runIdRef });
+    try {
+      await act(() => shell.actions().publish());
+      assert.deepEqual(asked, ["POST /api/runs/r/publish", "GET /api/runs/r"]);
+      assert.deepEqual(shell.shown, switched ? [] : [interrupted]);
+      assert.deepEqual(shell.errors, ["", "Publish stopped."]);
+    } finally { await shell.unmount(); }
   }
 });
 
@@ -528,4 +631,3 @@ test("starting a task on a project asks before discarding the open run's unsaved
     await shell.unmount();
   }
 });
-

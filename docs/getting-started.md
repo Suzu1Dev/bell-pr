@@ -513,6 +513,16 @@ and safety. When the dialog opens, BELL PR reads the GitHub facts once.
 (to a fork under your account when you cannot push to the project) and
 opens a Draft PR. Nothing is ever force-pushed.
 
+If a failed attempt left a local commit and you then changed the files or
+commit message, save the draft and choose **Recover unfinished publish** on
+the Draft tab. This is available only when that attempt stopped before
+pushing began. BELL PR checks the project and your fork for matching branches
+and PRs, including closed PRs. If those checks succeed and find none, it
+keeps your files and draft, backs up the old commit locally and returns the
+contribution to review. Review and approve again before submitting. Recovery
+does not publish anything; if a branch or PR exists, or the checks cannot
+finish, it leaves the contribution unchanged.
+
 ## 8. After publishing
 
 - **Sync to the latest target branch** when the project moved on: BELL PR

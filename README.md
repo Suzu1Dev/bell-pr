@@ -217,6 +217,12 @@ disclosure the project requires is there. Publishing pushes a branch (to
 your fork when needed) and opens a **Draft** PR through the GitHub CLI;
 nothing is ever force-pushed.
 
+If an earlier attempt created a local commit but stopped before pushing,
+**Recover unfinished publish** on the Draft tab checks GitHub and returns
+the contribution to review, keeping your files and draft. Review and approve
+it again before submitting. Recovery stops if a matching branch or PR exists,
+or GitHub cannot be checked.
+
 ![The PR draft tab: the pull request title and description editor, with what is left to do before you submit beside it](docs/images/en/run-draft-1280.png)
 
 ### Respect the maintainer's time

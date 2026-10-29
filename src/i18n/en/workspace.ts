@@ -325,6 +325,9 @@ const workspace = {
     subheading:
       "Polish the draft so maintainers can understand your contribution easily.",
     label: "DRAFT PR",
+    recoverPublish: "Recover unfinished publish",
+    recoveryHelp: "The last publish attempt left a local commit. Recovery checks the remote, keeps your code and draft, and returns this contribution to review.",
+    recoveryNeedsSave: "Save your draft edits before recovering the publish attempt.",
     syncNotice:
       "This sync adds one merge commit to the PR branch and keeps the PR title and description as they are. Review the files the target branch changed in “Code changes” first, then check the commit message below.",
     roundNotice:
@@ -581,6 +584,7 @@ const workspace = {
       `Could not get an answer this time: ${message}`,
     roundPushed: "Pushed this round to the PR: the branch has one more commit.",
     prCreated: "GitHub Draft PR created",
+    publishRecovered: "Recovered the unfinished publish. Your code and draft are kept; review the changes again before approving.",
     feedbackRead: ({ count }: { count: number }) =>
       plural(count) === "one"
         ? `Read ${count} maintainer comment.`

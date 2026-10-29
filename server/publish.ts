@@ -38,13 +38,13 @@ import {
   type Run,
 } from "./types.js";
 import { assertRemoteHead, prHasCommit, remoteBranchHead } from "./pr-branch.js";
-import { assertConflictsResolved } from "./sync-runs.js";
+import { assertConflictsResolved, runBusy } from "./sync-runs.js";
 import { applyAiDisclosure } from "./drafts.js";
 import { assertReady } from "./by-hand.js";
 import { assertGitIdentity, githubTokenScopes } from "./doctor.js";
 import { setupError } from "./cli-errors.js";
 import type { WorkbenchContext } from "./workbench.js";
-import { currentLocale, sm } from "./i18n/index.js";
+import { currentLocale, shuttingDown, sm } from "./i18n/index.js";
 import { secretInPatch } from "./secrets.js";
 import { assertUnderstood, understandingRequired } from "./understanding.js";
 import { reviewabilitySnapshot } from "../shared/reviewability.js";
@@ -386,6 +386,219 @@ export async function approve(
     if (understood.passed) delete run.understandingCheckOff;
     else if (!understood.required) run.understandingCheckOff = true;
     await ctx.store.save();
+    return run;
+  });
+}
+
+/**
+ * Releases an unpublished commit left by a failed publish, preserving the
+ * checkout and the old commit. A recorded push target is never guessed or
+ * discarded; only successful empty remote reads permit this local recovery.
+ */
+export async function recoverPublish(
+  ctx: WorkbenchContext,
+  id: string,
+  expectedCommit: string,
+) {
+  if (ctx.stopping()) throw new AppError(shuttingDown(), 503);
+  return ctx.lock(id, async () => {
+    const run = ctx.run(id);
+    const assertRecoverable = () => {
+      if (ctx.stopping()) throw new AppError(shuttingDown(), 503);
+      if (
+        !/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(expectedCommit) ||
+        run.publishCommit !== expectedCommit
+      )
+        throw new AppError((m) => m.run.publish.recoveryStale, 409);
+      if (
+        !["review", "approved"].includes(run.status) ||
+        run.publishing ||
+        run.prUrl ||
+        run.headRepository ||
+        run.publishedBranch ||
+        activeFollowUp(run.followUps)
+      )
+        throw new AppError((m) => m.run.publish.recoveryNotAllowed, 409);
+      if (
+        run.session?.running ||
+        ctx.sessionJobs.has(id) ||
+        ctx.draftJobs.has(id) ||
+        runBusy(ctx, id, { walkthroughs: false })
+      )
+        throw new AppError((m) => m.run.publish.recoveryBusy, 409);
+    };
+    assertRecoverable();
+    await assertGitConfigSafe(run.worktreePath);
+    const repo = ctx.repo(run.repoId);
+    const source = parseGitHubSource(repo.url);
+    if (
+      !source ||
+      source.fullName.toLowerCase() !== repo.fullName.toLowerCase()
+    )
+      throw new AppError((m) => m.run.publish.noGithubOrigin, 422);
+    assertGitHubRepository(source.fullName);
+    const branches = [
+      ...new Set(
+        [run.branch, run.draft.publishBranch].filter(
+          (branch): branch is string => !!branch,
+        ),
+      ),
+    ];
+    for (const branch of branches) assertRefName(branch);
+    const archiveRef = `refs/bellpr/publish-recovery/${run.id}/${expectedCommit}`;
+    await git(run.worktreePath, ["check-ref-format", archiveRef]);
+    // None of these reads changes HEAD, the index or files, even if the old commit is now detached from the branch.
+    const branchRef = `refs/heads/${run.branch}`;
+    await git(run.worktreePath, ["show-ref", "--verify", branchRef]);
+    const checkedOut = (
+      await git(run.worktreePath, ["symbolic-ref", "--quiet", "HEAD"])
+    ).stdout.trim();
+    const objectType = (
+      await git(run.worktreePath, ["cat-file", "-t", expectedCommit])
+    ).stdout.trim();
+    if (checkedOut !== branchRef || objectType !== "commit")
+      throw new AppError((m) => m.run.publish.recoveryCheckout, 409);
+
+    let login: unknown;
+    try {
+      const user: unknown = JSON.parse(
+        (await command("gh", ["api", "user"], { timeoutMs: 30_000 })).stdout,
+      );
+      login =
+        user && typeof user === "object" && "login" in user
+          ? user.login
+          : undefined;
+      if (
+        typeof login !== "string" ||
+        !/^[A-Za-z0-9][A-Za-z0-9-]{0,38}$/.test(login)
+      )
+        throw new Error("Invalid GitHub login");
+    } catch (cause) {
+      throw new AppError((m) => m.run.publish.recoveryUnknown, 502, { cause });
+    }
+    const repositories = [
+      ...new Set([source.fullName, `${login}/${source.name}`]),
+    ];
+    for (const repository of repositories) {
+      assertGitHubRepository(repository);
+      for (const branch of branches) {
+        let output: string;
+        try {
+          output = (
+            await gitNetwork(
+              run.worktreePath,
+              [
+                "ls-remote",
+                "--",
+                `https://github.com/${repository}.git`,
+                `refs/heads/${branch}`,
+              ],
+              { timeoutMs: 60_000 },
+            )
+          ).stdout.trim();
+        } catch (cause) {
+          throw new AppError((m) => m.run.publish.recoveryUnknown, 502, {
+            cause,
+          });
+        }
+        // A nonempty malformed reply is unknown, never evidence that the branch is absent.
+        if (output) {
+          const parts = output.split(/\s+/);
+          if (
+            parts.length !== 2 ||
+            !/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(parts[0]) ||
+            parts[1] !== `refs/heads/${branch}`
+          )
+            throw new AppError((m) => m.run.publish.recoveryUnknown, 502);
+          throw new AppError(
+            (m) => m.run.publish.recoveryRemoteBranch({ repository, branch }),
+            409,
+          );
+        }
+      }
+    }
+    for (const branch of branches) {
+      let prs: unknown;
+      try {
+        prs = JSON.parse(
+          (
+            await command(
+              "gh",
+              [
+                "pr",
+                "list",
+                "--repo",
+                source.fullName,
+                "--head",
+                branch,
+                "--state",
+                "all",
+                "--limit",
+                "1",
+                "--json",
+                "number",
+              ],
+              { timeoutMs: 30_000 },
+            )
+          ).stdout,
+        );
+      } catch (cause) {
+        throw new AppError((m) => m.run.publish.recoveryUnknown, 502, {
+          cause,
+        });
+      }
+      if (!Array.isArray(prs))
+        throw new AppError((m) => m.run.publish.recoveryUnknown, 502);
+      // A closed/merged PR, a changed SHA, or a PR from another owner still means this branch was used.
+      if (prs.length)
+        throw new AppError(
+          (m) => m.run.publish.recoveryPrExists({ branch }),
+          409,
+        );
+    }
+    // Review and premise jobs reserve controllers before taking this lock; check again after network I/O.
+    assertRecoverable();
+    const archived = await git(
+      run.worktreePath,
+      ["rev-parse", "--verify", "--quiet", archiveRef],
+      { allowedCodes: [0, 1] },
+    );
+    if (archived.code === 0 && archived.stdout.trim() !== expectedCommit)
+      throw new AppError((m) => m.run.publish.recoveryCheckout, 409);
+    await git(run.worktreePath, [
+      "update-ref",
+      archiveRef,
+      expectedCommit,
+      archived.code === 0 ? expectedCommit : "0".repeat(expectedCommit.length),
+    ]);
+    assertRecoverable();
+    const previous = {
+      status: run.status,
+      error: run.error,
+      approval: run.approvedFingerprint,
+      logs: [...run.logs],
+    };
+    delete run.publishCommit;
+    delete run.error;
+    delete run.approvedFingerprint;
+    run.status = "review";
+    ctx.log(
+      run,
+      "system",
+      sm().run.publish.recovered({ commit: expectedCommit }),
+    );
+    try {
+      await ctx.store.save();
+    } catch (error) {
+      run.publishCommit = expectedCommit;
+      run.status = previous.status;
+      if (previous.error === undefined) delete run.error;
+      else run.error = previous.error;
+      if (previous.approval === undefined) delete run.approvedFingerprint;
+      else run.approvedFingerprint = previous.approval;
+      run.logs = previous.logs;
+      throw error;
+    }
     return run;
   });
 }

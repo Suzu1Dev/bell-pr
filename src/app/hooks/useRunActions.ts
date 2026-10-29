@@ -42,6 +42,13 @@ import type { TaskSetup } from "./useTaskSetup";
  */
 export const runPath = (id: string) => `/runs/${encodeURIComponent(id)}`;
 
+/** Recovery is available only before a publish attempt records a push target. */
+export function recoverablePublish(run: Run) {
+  return !!run.publishCommit && !run.prUrl && !run.headRepository &&
+    !run.publishedBranch && !activeFollowUp(run.followUps) &&
+    ["review", "approved"].includes(run.status);
+}
+
 /**
  * The run's changed files. A run whose working files were cleaned up
  * (410 `workspace_removed`) has none to show, but its reports, notes and
@@ -311,6 +318,7 @@ export function useRunActions({
     acknowledged,
     setAcknowledged,
     overrides,
+    setOverrides,
     loadPublishChecks,
     followUp,
   } = draft;
@@ -335,6 +343,7 @@ export function useRunActions({
   const [messages, setMessages] = useState<Record<string, ChatMessage[]>>({});
   const [loadingChats, setLoadingChats] = useState<Set<string>>(new Set());
   const pendingChats = useRef(new Set<string>());
+  const recoveringPublish = useRef(false);
   const [chatRequests, setChatRequests] = useState<Record<string, number>>({});
   const rerunPending = useRef(new Set<string>());
   const [rerunRequests, setRerunRequests] = useState<Set<string>>(new Set());
@@ -1003,16 +1012,45 @@ export function useRunActions({
       closeModal();
       notify(pushingRound ? t.roundPushed : t.prCreated);
     } catch (error) {
-      if (error instanceof ApiError && error.code === "understanding_check_required") checkFirst();
-      else setFormError((error as Error).message);
-      // A refused push may have saved the round's state; show it next to the error.
-      if (pushingRound)
-        void api<{ run: Run }>(`/runs/${run.id}`)
-          .then(({ run: latest }) => {
-            if (runIdRef.current === latest.id) setRun(latest);
-          })
-          .catch(() => undefined);
+      if (runIdRef.current === run.id) {
+        if (error instanceof ApiError && error.code === "understanding_check_required") checkFirst();
+        else setFormError((error as Error).message);
+      }
+      // Even a first publish can have committed locally before failing.
+      // Show that saved state so the person can recover the unfinished attempt.
+      await api<{ run: Run }>(runPath(run.id))
+        .then(({ run: latest }) => {
+          if (latest.id === run.id && runIdRef.current === latest.id) setRun(latest);
+        })
+        .catch(() => undefined);
     } finally {
+      setBusy(false);
+    }
+  }
+  async function recoverPublish() {
+    if (demo || draftDirty || recoveringPublish.current || run.publishing ||
+      run.session?.running || !recoverablePublish(run)) return;
+    const id = run.id;
+    const selection = selectionSequence.current;
+    const stillOpen = () => runIdRef.current === id && selectionSequence.current === selection;
+    recoveringPublish.current = true;
+    setBusy(true);
+    setFormError("");
+    try {
+      const { run: updated } = await api<{ run: Run }>(
+        `${runPath(id)}/publish/recover`,
+        send("POST", { commit: run.publishCommit }),
+      );
+      if (!stillOpen() || updated.id !== id) return;
+      setRun(updated);
+      setAcknowledged([]);
+      setOverrides([]);
+      closeModal();
+      notify(t.publishRecovered);
+    } catch (error) {
+      if (stillOpen()) notify((error as Error).message, "error");
+    } finally {
+      recoveringPublish.current = false;
       setBusy(false);
     }
   }
@@ -1127,6 +1165,7 @@ export function useRunActions({
     ask,
     approve,
     publish,
+    recoverPublish,
     fetchPrFeedback,
     cancel,
   };

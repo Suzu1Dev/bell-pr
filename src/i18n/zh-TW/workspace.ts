@@ -263,6 +263,9 @@ const m: Translation<typeof en> = {
     heading: "讓好的改動，也有好的說明。",
     subheading: "調整草稿，讓維護者輕鬆理解你的貢獻。",
     label: "DRAFT PR",
+    recoverPublish: "恢復未完成的發佈",
+    recoveryHelp: "上次發佈留下了本機 commit。恢復時會檢查遠端，保留程式碼與草稿，並讓這份貢獻回到審閱。",
+    recoveryNeedsSave: "請先儲存草稿的修改，再恢復未完成的發佈。",
     syncNotice:
       "這次同步會在 PR 分支加上一個合併 commit，PR 標題與說明維持原樣。請先在「程式碼變更」審閱目標分支改到的檔案，再確認下方的提交訊息。",
     roundNotice:
@@ -448,6 +451,7 @@ const m: Translation<typeof en> = {
     chatFailed: ({ message }) => `這次未能取得回答：${message}`,
     roundPushed: "已把這輪修正推送到 PR，分支上多了一個 commit。",
     prCreated: "GitHub Draft PR 已建立",
+    publishRecovered: "已恢復未完成的發佈，程式碼與草稿已保留；請重新審閱變更後再核准。",
     feedbackRead: ({ count }) => `已讀取 ${count} 則維護者回饋。`,
     branchInvalid:
       "分支名稱只能用英數字與 . _ - /，不能有 ..，也不能以 . 或 .lock 結尾。",

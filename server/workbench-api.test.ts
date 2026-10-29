@@ -66,6 +66,7 @@ const methods = [
   "startFollowUp",
   "discardFollowUp",
   "publish",
+  "recoverPublish",
   "removeWorkspace",
   "removeRun",
   "removeRepository",

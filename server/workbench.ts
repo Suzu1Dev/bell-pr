@@ -649,6 +649,11 @@ export class Workbench {
     );
   }
 
+  /** Preserves a failed pre-push commit and returns its contribution to review. */
+  async recoverPublish(id: string, commit: string) {
+    return publishing.recoverPublish(this.context, id, commit);
+  }
+
   /** Frees a finished run's working files; the run and its notes stay. */
   async removeWorkspace(id: string) {
     return cleanup.archiveRunWorkspace(this.context, this.run(id));
