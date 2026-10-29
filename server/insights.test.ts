@@ -32,9 +32,10 @@ import { lenientRead } from "./persisted-schema.js";
 import { closeLog, initLog, recentLogLines } from "./log.js";
 import { assertNoHan } from "../src/test-utils/render.js";
 import { command, git } from "./process.js";
+import { assertSecretsHidden, redactSamples } from "./redact-samples.js";
 import { AppError } from "./types.js";
 import { Store } from "./store.js";
-import { withLocale } from "./i18n/index.js";
+import { sm, withLocale } from "./i18n/index.js";
 import { respondIn } from "./prompt-language.js";
 
 /** The JSON data object sent after the prompt sentences and before the Ponytail guidance. */
@@ -946,9 +947,10 @@ test("a malformed analysis answer is logged as kind and length, without the answ
       (error: unknown) => error instanceof AppError && error.statusCode === 422,
     );
     const after = (await recentLogLines(f.store.directory)).join("\n");
+    // The assignment is rejected as sensitive content, so the path is not logged.
     assert.ok(!after.includes("fakeplaintextvalue"));
-    assert.match(after, /SOME_KEY=\[REDACTED\]/);
-    assert.match(after, /modules/);
+    assert.ok(!after.includes("SOME_KEY="));
+    assert.match(after, new RegExp(sm().analysis.insights.sensitiveAnswer.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   } finally {
     closeLog();
     await f.cleanup();
@@ -2123,6 +2125,54 @@ test("a running analysis reports its step, try, wait against the limit and the C
     assert.equal(started?.notice, undefined);
     assert.match(noticed?.notice ?? "", /rate_limit/);
     assert.equal(service.analysisProgress(f.repo.id), undefined);
+  } finally {
+    await service.shutdown();
+    await f.cleanup();
+  }
+});
+
+test("analysis notices and errors hide the shared secret samples", async () => {
+  const f = await fixture();
+  const notices: string[] = [];
+  const service: ProjectInsightsService = new ProjectInsightsService(f.store, {
+    command: async (executable, args, options = {}) => {
+      if (executable === "claude" && args[0] === "-p") {
+        const emit = (event: unknown) => options.onLine?.(JSON.stringify(event), "stdout");
+        for (const sample of redactSamples) {
+          emit({
+            type: "system",
+            subtype: "api_retry",
+            attempt: 1,
+            max_retries: 2,
+            error: sample.text,
+          });
+          notices.push(service.analysisProgress(f.repo.id)?.notice ?? "");
+        }
+        emit({
+          type: "result",
+          subtype: "success",
+          is_error: true,
+          result: redactSamples.map((sample) => sample.text).join("\n"),
+        });
+        throw new AppError("claude failed before redaction", 422);
+      }
+      return { stdout: "", stderr: "", code: 0 };
+    },
+  });
+  try {
+    await service.setSettings(f.repo.id, {
+      ...defaultContributionSettings,
+      provider: "claude",
+    });
+    const error = await service.generate(f.repo.id).then(
+      () => assert.fail("the analysis should fail"),
+      (caught: unknown) => caught,
+    );
+    assert.ok(error instanceof Error);
+    assertSecretsHidden(notices.join("\n"));
+    assertSecretsHidden(error.message);
+    assert.match(notices.join("\n"), /\[REDACTED\]/);
+    assert.match(error.message, /\[REDACTED\]/);
   } finally {
     await service.shutdown();
     await f.cleanup();

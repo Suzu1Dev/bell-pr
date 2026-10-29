@@ -88,13 +88,14 @@ or ask the running server for its address again, with your container's name
 in place of `bell-pr`:
 
 ```sh
-docker exec <container> bell-pr open --print
+docker exec <container> bell-pr open --print --print-token
 ```
 
 The browser never opens by itself from a container, so `--print` is the way to
-go: the printed address ends with `#bell_token=` and signs the page in. The
-startup line in `docker logs` does not include the token. Treat the printed
-address like a password. The health check (`GET /api/health`) does not need
+go. Add `--print-token`: the printed address then ends with `#bell_token=`
+and signs the page in. Without `--print-token` the printed address has no
+token. The startup line in `docker logs` does not include the token. Treat
+the `--print-token` address like a password. The health check (`GET /api/health`) does not need
 the token and is built into the image, so `docker ps` shows when BELL PR is
 ready.
 
@@ -197,7 +198,7 @@ volumes:
 ```sh
 docker rm -f bell-pr
 docker run -d --name bell-pr ... bell-pr
-docker exec bell-pr bell-pr open --print
+docker exec bell-pr bell-pr open --print --print-token
 ```
 
 Agents that were still running when the old container stopped are gone;

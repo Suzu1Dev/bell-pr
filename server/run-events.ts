@@ -119,24 +119,12 @@ function answerProblem(error: unknown): string | undefined {
 }
 
 /**
- * Issue text for the server log. Credential shapes are masked; the rest of
- * the sentence stays. A parser's own message must not be passed here: it
- * quotes the answer (see parseAgentOutput).
+ * Issue text for the server log: `redact()`, so a credential in the
+ * sentence is masked and the rest stays. A parser's own message must not
+ * be passed here: it quotes the answer (see parseAgentOutput).
  */
 export function describeIssue(text: string): string {
-  const masked = redact(text)
-    .replace(
-      /\b((?:proxy-)?authorization\b["']?\s*[:=]\s*["']?(?:(?:bearer|basic|token|digest|bot)\s+)?)[^\s"',;]{8,}/gi,
-      "$1[REDACTED]",
-    )
-    .replace(/\b(bearer\s+)[A-Za-z0-9._~+/=-]{16,}/gi, "$1[REDACTED]");
-  return masked.replace(
-    /(^|[^A-Za-z0-9_])([A-Za-z_][A-Za-z0-9_]*)(\s*=\s*["']?)([^\s"',;]+)/g,
-    (match, lead: string, key: string, eq: string) =>
-      /token|secret|key|password/i.test(key)
-        ? `${lead}${key}${eq}[REDACTED]`
-        : match,
-  );
+  return redact(text);
 }
 
 /**
@@ -198,7 +186,7 @@ export async function logged<T>(
       ...fields,
       durationMs: Date.now() - started,
       ...(refused ? { status: error.statusCode } : {}),
-      error: errorMessage(error),
+      error: redact(errorMessage(error)),
     });
     throw error;
   }

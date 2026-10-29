@@ -23,6 +23,12 @@ export const secretPatterns: readonly SecretPattern[] = [
     blocks: true,
   },
   {
+    // Slack bot, app, user, and session tokens. Ten characters after the hyphen keeps short placeholders.
+    pattern: /\bxox[abposr]-[A-Za-z0-9-]{10,}\b/g,
+    replacement: "[REDACTED]",
+    blocks: true,
+  },
+  {
     // PEM private keys; a block cut off before its END marker is masked to the end of the text.
     pattern:
       /-----BEGIN (?:[A-Z]+ )?PRIVATE KEY-----[\s\S]*?(?:-----END (?:[A-Z]+ )?PRIVATE KEY-----|$)/g,
@@ -41,13 +47,71 @@ export const secretPatterns: readonly SecretPattern[] = [
     replacement: "$1[REDACTED]",
     blocks: false,
   },
+  {
+    // Authorization and a bare Bearer token. Moved here from describeIssue.
+    pattern:
+      /\b((?:proxy-)?authorization\b["']?\s*[:=]\s*["']?(?:(?:bearer|basic|token|digest|bot)\s+)?)[^\s"',;]{8,}/gi,
+    replacement: "$1[REDACTED]",
+    blocks: false,
+  },
+  {
+    pattern: /\b(bearer\s+)[A-Za-z0-9._~+/=-]{16,}/gi,
+    replacement: "$1[REDACTED]",
+    blocks: false,
+  },
+  {
+    // #bell_token= or ?bell_token= in a URL. The hex is the secret.
+    pattern: /(?:#|\?)bell_token=[0-9a-fA-F]+/g,
+    replacement: "[REDACTED]",
+    blocks: false,
+  },
+  {
+    pattern: /(X-Bell-Token\s*[:=]\s*)\S+/gi,
+    replacement: "$1[REDACTED]",
+    blocks: false,
+  },
+  {
+    // api-token.ts writes 32 random bytes as lowercase hex.
+    pattern: /\b[0-9a-f]{64}\b/g,
+    replacement: "[REDACTED]",
+    blocks: false,
+  },
 ];
 
+/**
+ * An assignment whose key has token, secret, key, or password as a whole
+ * word (`GITHUB_TOKEN`, `bell-token-id`, `apiKey`). A letter sequence inside
+ * another word (`monkey`) is not one. Hyphens belong to the key. The value
+ * still needs eight characters, the same floor as the named assignment
+ * above, so `password = "example"` stays.
+ */
+const assignmentKey =
+  /(^|[^A-Za-z0-9_-])([A-Za-z_][A-Za-z0-9_-]*)(\s*=\s*["']?)([^\s"',;]{8,})/g;
+const secretKeyWords = new Set(["token", "secret", "key", "password"]);
+
+function assignmentKeyIsSecret(key: string): boolean {
+  const words = key
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter(Boolean);
+  return words.some((word) => secretKeyWords.has(word));
+}
+
+function maskAssignments(text: string): string {
+  return text.replace(
+    assignmentKey,
+    (match, lead: string, key: string, eq: string) =>
+      assignmentKeyIsSecret(key) ? `${lead}${key}${eq}[REDACTED]` : match,
+  );
+}
+
 export function redact(text: string): string {
-  return secretPatterns.reduce(
-    (result, { pattern, replacement }) =>
-      result.replace(pattern, replacement),
-    text,
+  return maskAssignments(
+    secretPatterns.reduce(
+      (result, { pattern, replacement }) => result.replace(pattern, replacement),
+      text,
+    ),
   );
 }
 

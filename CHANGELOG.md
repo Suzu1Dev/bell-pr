@@ -31,8 +31,10 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **Local API token.** The first start writes a random token to
   `<data dir>/api-token` (mode 0600) and later starts reuse it. API requests
   other than `GET /api/health` send `Authorization: Bearer` or
-  `X-Bell-Token`. `bell-pr open` and `bell-pr open --print` put the token in
-  the page address so the app can send it. `bell-pr token rotate` replaces
+  `X-Bell-Token`. `bell-pr open` gives the token to the browser in the page
+  address and prints that address without the token. `bell-pr open --print-token`
+  prints the address with the token; add `--print` to only print it.
+  `bell-pr token rotate` replaces
   the file; a running BELL PR uses the new token on the next request. The
   token is not in the startup line, the server log, or `bell-pr doctor --json`.
   Listening somewhere other than a loopback address is still an explicit

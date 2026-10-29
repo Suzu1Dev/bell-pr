@@ -60,13 +60,14 @@ bell-pr open
 ```
 
 - **Started with `npx`:** run `npx bell-pr open`.
-- **No browser on that machine** (a server, SSH): `bell-pr open --print`
+- **No browser on that machine** (a server, SSH): `bell-pr open --print --print-token`
   only prints the address; open it in a browser that reaches BELL PR. The
   address includes `#bell_token=`, which the page needs. The line printed
-  at start does not. Do not share the `open --print` address.
+  at start does not, and neither does `bell-pr open` without `--print-token`.
+  Do not share the `--print-token` address.
 - **Another data directory:** `bell-pr open --data-dir <dir>`, with the
   directory you started BELL PR with.
-- **Docker:** `docker exec <container> bell-pr open --print`.
+- **Docker:** `docker exec <container> bell-pr open --print --print-token`.
 - **systemd service:** run `bell-pr open` in a terminal on that machine.
 
 If `bell-pr open` says that no BELL PR is running with that data directory,

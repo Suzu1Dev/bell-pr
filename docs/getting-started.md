@@ -88,7 +88,8 @@ working immediately. By default
 only this computer can reach it; see [Security model](security-model.md).
 
 > **Lost the address?** Run `bell-pr open` (or `npx bell-pr open`) on the same
-> computer. It prints the address again and opens it. More in
+> computer. It prints the address again, without the API token, and opens it.
+> More in
 > [Troubleshooting](troubleshooting.md#i-lost-the-address).
 
 BELL PR listens on `127.0.0.1:4311`, so only this computer can reach it.

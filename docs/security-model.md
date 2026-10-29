@@ -315,7 +315,7 @@ files that hold secrets with `0600`.
 - Publish the port on loopback only, for example
   `-p 127.0.0.1:4311:4311`; inside the container BELL PR listens on all
   interfaces so the port mapping can reach it.
-- Get the address again with `docker exec <container> bell-pr open --print`.
+- Get the address again with `docker exec <container> bell-pr open --print --print-token`.
 - Both agent sandboxes need bubblewrap to create namespaces, which Docker's
   default security options forbid: every command a Codex agent runs fails,
   and a writable Claude role stops with `claude_sandbox_unavailable` (BELL PR

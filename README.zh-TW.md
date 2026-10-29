@@ -10,7 +10,7 @@ BELL PR 是自架、以本機為主的開源貢獻工作台。它在你的電腦
 
 **邊貢獻邊學習，絕不是自動產生 PR。** 在你逐一審閱每個檔案、用自己的話把改動講一遍（預設開啟；你可以關閉，而工作會標示出來），並親自核准 Pull Request 之前，不會發佈任何內容。發佈時會確認專案歡迎這個 PR。沒有 BELL PR 雲端服務、沒有遙測，也不需要帳號。
 
-BELL PR 是以 [Apache-2.0](LICENSE) 授權的免費開源軟體。公開時沒有付費方案。
+BELL PR 是以 [Apache-2.0](LICENSE) 授權的免費開源軟體。沒有付費版。
 
 ![「程式碼變更」頁籤：diff 旁邊是這次變更的白話解說](docs/images/zh-TW/run-changes-1280.png)
 
@@ -72,7 +72,7 @@ BELL PR 是本機工作台。請先裝好並登入下列工具，再跑快速開
 否則它會結束，並印出每一項失敗檢查的修正指令。`npx bell-pr start --force`
 仍可開啟範例導覽。
 
-**位址不見了？執行 `bell-pr open`**（若用 `npx` 啟動，請執行 `npx bell-pr open`）。它會再次印出位址（含頁面需要的 API 權杖）並在瀏覽器中開啟。
+**位址不見了？執行 `bell-pr open`**（若用 `npx` 啟動，請執行 `npx bell-pr open`）。它會再次印出位址（不含 API 權杖）並在瀏覽器中開啟。瀏覽器會收到權杖。
 
 想要保留安裝，請執行 `npm install -g bell-pr`，之後用 `bell-pr` 啟動。[入門指南](docs/getting-started.md)（英文）會帶你走完一次完整的貢獻。
 
@@ -97,8 +97,6 @@ BELL PR 是本機工作台。請先裝好並登入下列工具，再跑快速開
 
 ### 一次範例執行的費用
 
-<!-- TODO(Suzu / Product Tester)：完成一次真實端到端貢獻後填入（不是離線範例專案）。
-     記錄服務商、模型、回報的 input/output tokens，以及服務商帳單上的費用。勿捏造。 -->
 Agent 用量由**你自己的** Codex／Claude 帳戶計費。BELL PR 不定價。典型第一次
 貢獻的精確 token 與費用**尚未公布**——待實際量測後補上。
 
@@ -224,7 +222,7 @@ Authorization: Bearer <token>
 
 `X-Bell-Token: <token>` 效果相同。缺少或錯誤的權杖會得到 HTTP 401。請求的 Host 必須是受信任的位址（`localhost`、`127.0.0.1` 或 `[::1]` 加上 BELL PR 的埠，或你用 `BELLPR_PUBLIC_URL`、`BELLPR_ALLOWED_ORIGINS` 指定的主機）。瀏覽器的 `Origin` 若不是這個應用程式自己的來源，也不在允許清單上，就會被拒絕。沒有萬用字元 CORS。會變更資料的請求必須使用 `application/json`。
 
-`bell-pr` 開啟瀏覽器時，位址的片段是 `#bell_token=<權杖>`。頁面會存下權杖，再從位址列移除。啟動時印出的那一行不含權杖，因此服務記錄裡也不會有。若要自己開啟，請用 `bell-pr open` 或 `bell-pr open --print`：兩者都會印出帶權杖的位址。請把那個位址當成密碼。它不會寫進伺服器記錄，也不會出現在 `bell-pr doctor --json`。
+`bell-pr` 開啟瀏覽器時，位址的片段是 `#bell_token=<權杖>`。頁面會存下權杖，再從位址列移除。啟動時印出的那一行不含權杖，因此服務記錄裡也不會有。`bell-pr open` 印出的位址不含權杖，權杖只交給瀏覽器。`bell-pr open --print` 只印出位址，同樣不含權杖。`bell-pr open --print-token` 會印出帶權杖的位址（加上 `--print` 則不開瀏覽器）。請把那個位址當成密碼。它不會寫進伺服器記錄，也不會出現在 `bell-pr doctor --json`。
 
 token 可能留在瀏覽器歷史紀錄裡，如果這個瀏覽器設定檔有跟別人共用，請執行 `bell-pr token rotate`。
 
@@ -260,7 +258,7 @@ BELL PR 不需要任何設定就能啟動。下列設定都是啟動時讀取的
 docker build -t bell-pr .
 docker run -d --name bell-pr -p 127.0.0.1:4311:4311 \
   -v bellpr-data:/data -v bellpr-home:/home/node bell-pr
-docker exec bell-pr bell-pr open --print
+docker exec bell-pr bell-pr open --print --print-token
 ```
 
 映像檔包含 Git、GitHub CLI 與 Codex CLI；Claude Code 可以由你自行安裝到容器中。映像檔的指令是 `bell-pr start`，在 `bell-pr doctor` 尚未就緒時會在監聽前結束。若要在登入 AI 服務之前開啟範例導覽，請執行 `docker run ... bell-pr start --force`（這會取代映像檔的指令）。Docker 目前為 **beta**：Agent 的沙箱需要另外三個 `--security-opt` 選項。使用前請先閱讀 [Docker 說明](docs/docker.md)（英文）；若要以 systemd 服務執行或放在反向代理之後，請見[自架說明](docs/self-hosting.md)（英文）。

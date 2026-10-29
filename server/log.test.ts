@@ -7,7 +7,8 @@ import { setTimeout as delay } from "node:timers/promises";
 import { z } from "zod";
 import { closeLog, initLog, log, recentLogLines } from "./log.js";
 import { command, git } from "./process.js";
-import { agentSpawn, describeIssue, parseAgentOutput } from "./run-events.js";
+import { assertSecretsHidden, redactSamples } from "./redact-samples.js";
+import { agentSpawn, describeIssue, logged, parseAgentOutput } from "./run-events.js";
 import { Store } from "./store.js";
 import { AppError, type Run } from "./types.js";
 import { Workbench } from "./workbench.js";
@@ -395,9 +396,30 @@ test("describeIssue masks credential shapes and leaves ordinary text", () => {
   ] as const;
   for (const [input, masked] of samples)
     assert.equal(describeIssue(`see ${input} now`), `see ${masked} now`, input);
+  for (const sample of redactSamples) {
+    const masked = describeIssue(`see ${sample.text} now`);
+    assertSecretsHidden(masked);
+    assert.match(masked, /\[REDACTED\]/, sample.name);
+  }
   const ordinary =
     "The reading path lists three files. Retry after the repository changes. https://example.invalid/docs token bucket json_syntax length=40";
   assert.equal(describeIssue(ordinary), ordinary);
+});
+
+test("log fields and logged() failures hide the shared secret samples", async (t) => {
+  const { directory, cleanup } = await logDirectory();
+  t.after(cleanup);
+  initLog(directory, { stderr: capture(false).stream });
+  for (const sample of redactSamples)
+    log.error("sample.field", { detail: sample.text, error: sample.text });
+  await assert.rejects(() =>
+    logged("sample.run", { runId: "sample" }, async () => {
+      throw new Error(redactSamples.map((sample) => sample.text).join(" "));
+    }),
+  );
+  const text = (await recentLogLines(directory)).join("\n");
+  assertSecretsHidden(text);
+  assert.match(text, /\[REDACTED\]/);
 });
 
 test("agent.output_retry redacts an issue and does not log a parser snippet", async (t) => {
