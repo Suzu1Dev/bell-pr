@@ -13,6 +13,11 @@ export type { Agent, RunLogEntry, RunStatus } from "../shared/types";
 export interface Repo extends Repository {
   /** Whether BELL owns the clone and may update it; computed by the API, not stored. */
   updatable?: boolean;
+  /**
+   * Why a saved origin was not used as a GitHub source. Computed by the
+   * API in the request's language. It never includes that address.
+   */
+  originNotice?: string;
 }
 
 /** The client run; the demo run has no baseSha, worktreePath or reviewedFingerprints. */

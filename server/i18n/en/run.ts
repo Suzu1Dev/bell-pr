@@ -652,6 +652,12 @@ export default {
     importSource:
       "Enter a GitHub HTTPS URL or the absolute path of a local repository.",
     bare: "Choose a repository that has a working directory.",
+    /**
+     * A saved origin was not used as a GitHub source because it had
+     * userinfo. The words never include that address.
+     */
+    originUserinfo:
+      "This checkout's origin URL contains embedded credentials or userinfo, so it was not used as a GitHub source. The project is treated as a local project. Set a plain https://github.com/owner/repo origin, then remove the project here and import it again.",
     /** A local path that names no folder; `path` is absolute, with ~/ expanded. */
     pathMissing: ({ path }: { path: string }) =>
       `There is no folder at ${path} on the computer ${product.name} runs on. Check the path; ~/ is the home directory of the user ${product.name} runs as.`,

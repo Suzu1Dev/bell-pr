@@ -126,6 +126,11 @@ export function ReposPage({
                   <span>{maskPath(repo.path)}</span>
                 </p>
               )}
+              {repo.originNotice && (
+                <p className="callout" role="alert">
+                  {repo.originNotice}
+                </p>
+              )}
               <div className="repository-meta">
                 <span>
                   <span className="language-dot" />

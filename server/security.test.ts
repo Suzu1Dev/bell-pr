@@ -25,6 +25,8 @@ import path from "node:path";
 import { fakeGitHub } from "../test/fake-github.js";
 import { createApp } from "./index.js";
 import { git } from "./process.js";
+import { recentLogLines } from "./log.js";
+import { sm } from "./i18n/index.js";
 import { readDiff, reviewFingerprint } from "./git.js";
 import { adoptLegacyCheckout, createRunWorktree } from "./repositories.js";
 import { publishChecks } from "./publish.js";
@@ -358,6 +360,51 @@ test("a global insteadOf rewrite does not hide a GitHub origin on a local import
     (await git(repo.path, ["config", "--local", "--get", "remote.origin.url"])).stdout.trim(),
     "https://github.com/test-owner/example.git",
   );
+});
+
+test("an origin with userinfo is imported as local, and the message leaves that userinfo out", async (t) => {
+  const marker = "synthetic-userinfo-marker";
+  const directory = await realpath(await mkdtemp(path.join(os.tmpdir(), "bell-security-userinfo-")));
+  const store = new Store(path.join(directory, "state"));
+  await store.initialize();
+  const workbench = new Workbench(store);
+  t.after(async () => {
+    await workbench.shutdown();
+    await rm(directory, { recursive: true, force: true });
+  });
+  const checkout = path.join(directory, "checkout");
+  await repository(checkout, { "lib.ts": "lib\n" });
+  await git(checkout, [
+    "remote",
+    "add",
+    "origin",
+    `https://${marker}@github.com/test-owner/example.git`,
+  ]);
+  const repo = await withLocale("en", () => workbench.importRepository(checkout));
+  const message = withLocale("en", () => sm().run.repos.originUserinfo);
+  const zh = withLocale("zh-TW", () => sm().run.repos.originUserinfo);
+  assert.equal(repo.url, "");
+  assert.equal(repo.owner, "local");
+  assert.equal(repo.originUserinfoIgnored, true);
+  assert.equal(workbench.managedClone(repo), false);
+  assert.match(message, /embedded credentials or userinfo/);
+  assert.match(message, /not used as a GitHub source/);
+  assert.match(message, /treated as a local project/);
+  assert.match(message, /https:\/\/github\.com\/owner\/repo/);
+  assert.match(zh, /使用者資訊/);
+  assert.match(zh, /https:\/\/github\.com\/owner\/repo/);
+  const logs = (await recentLogLines(store.directory)).join("\n");
+  assert.match(logs, /repo\.origin_userinfo/);
+  const returned = JSON.stringify({
+    repo,
+    message,
+    zh,
+    originNotice: message,
+    saved: await readFile(path.join(store.directory, "state.json"), "utf8"),
+    cloneConfig: await readFile(path.join(repo.path, ".git", "config"), "utf8"),
+    logs,
+  });
+  assert.equal(returned.includes(marker), false);
 });
 
 test("a project an earlier build worked on in place moves to a clone once none of its runs works there", async (t) => {

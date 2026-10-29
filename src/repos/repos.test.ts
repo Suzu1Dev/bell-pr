@@ -16,6 +16,34 @@ const repo: Repo = {
   url: "https://github.com/octo/widgets",
 };
 
+test("a local import whose origin was not used shows that notice without the address", () => {
+  const marker = "synthetic-userinfo-marker";
+  const notice =
+    "This checkout's origin URL contains embedded credentials or userinfo, so it was not used as a GitHub source. The project is treated as a local project. Set a plain https://github.com/owner/repo origin, then remove the project here and import it again.";
+  const element = createElement(ReposPage, {
+    repos: [
+      {
+        ...repo,
+        url: `https://${marker}@github.com/test-owner/example`,
+        owner: "local",
+        fullName: "local/widgets",
+        originUserinfoIgnored: true,
+        originNotice: notice,
+      },
+    ],
+    openModal() {},
+    navigate() {},
+    async chooseRun() {
+      return true;
+    },
+    setExploreRepoId() {},
+  });
+  const html = renderEn(element);
+  assert.match(html, /role="alert"/);
+  assert.match(html, /not used as a GitHub source/);
+  assert.equal(html.includes(marker), false);
+});
+
 test("the repository list reads in English with no Chinese left", () => {
   const element = createElement(ReposPage, {
     repos: [repo],

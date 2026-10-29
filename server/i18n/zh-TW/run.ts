@@ -391,6 +391,8 @@ const m: Translation<typeof en> = {
     notFound: "找不到 Repository。",
     importSource: "請輸入 GitHub HTTPS URL 或本機 Repository 的絕對路徑。",
     bare: "請選擇有工作目錄的 Repository。",
+    originUserinfo:
+      "這個工作目錄的 origin URL 含有內嵌的憑證或使用者資訊，所以沒有當作 GitHub 來源。這個專案會當作本機專案。請改成單純的 https://github.com/owner/repo origin，然後在這裡移除專案並重新匯入。",
     pathMissing: ({ path }) =>
       `${product.name} 執行的電腦上沒有 ${path} 這個資料夾。請檢查路徑；~/ 代表執行 ${product.name} 的使用者的家目錄。`,
     notGitRepository: ({ path }) =>
