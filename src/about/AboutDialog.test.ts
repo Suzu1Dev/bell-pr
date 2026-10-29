@@ -5,7 +5,7 @@ import { maskPath } from "../app/presentation";
 import { product } from "../../shared/product";
 import { assertNoHan, renderEn, renderZh } from "../test-utils/render";
 import { appVersion } from "../version";
-import { AboutDialog, aboutLinks } from "./AboutDialog";
+import { AboutDialog, aboutLinks, aboutSafeHref } from "./AboutDialog";
 
 type Props = Parameters<typeof AboutDialog>[0];
 
@@ -119,4 +119,73 @@ test("presenting masks the data directory, with nothing to copy", () => {
   );
   assert.match(html, /<code>…\/\.bellpr<\/code>/);
   assert.doesNotMatch(html, /real-person|\/home\/|about-copy/);
+});
+
+test("with securityEmail set, About shows a clickable mailto with the address", () => {
+  const html = renderEn(
+    element({
+      link: () => undefined,
+      email: (key) => (key === "securityEmail" ? "security@example.test" : undefined),
+    }),
+  );
+  assert.ok(
+    html.includes('href="mailto:security@example.test"'),
+    html,
+  );
+  assert.ok(html.includes("security@example.test"), html);
+  assert.match(html, /Report a security issue/);
+  assert.doesNotMatch(html, /<span>[^<]*security@example\.test/);
+});
+
+test("without publicRepoUrl, the Issue support mailto shows the address", () => {
+  const html = renderEn(
+    element({
+      link: () => undefined,
+      email: (key) => (key === "supportEmail" ? "help@example.test" : undefined),
+    }),
+  );
+  assert.deepEqual(aboutLinks(() => undefined, (key) => (key === "supportEmail" ? "help@example.test" : undefined)), [
+    { id: "issue", href: "mailto:help@example.test" },
+  ]);
+  assert.ok(html.includes('href="mailto:help@example.test"'), html);
+  assert.ok(html.includes("help@example.test"), html);
+  assert.match(html, /Report an issue/);
+});
+
+test("aboutSafeHref allows only exact mailto:local@domain values", () => {
+  assert.equal(aboutSafeHref("mailto:security@example.test"), "mailto:security@example.test");
+  assert.equal(aboutSafeHref("mailto:help@example.test"), "mailto:help@example.test");
+  for (const value of [
+    "mailto:not-an-email",
+    "mailto:spaces @example.test",
+    "mailto:user@exam ple.test",
+    "mailto:user@",
+    "mailto:@example.test",
+    "MAILTO:security@example.test",
+    " mailto:security@example.test",
+    "javascript:alert(1)",
+    "https://example.com",
+  ]) {
+    if (value === "https://example.com") {
+      assert.equal(aboutSafeHref(value), "https://example.com/");
+      continue;
+    }
+    assert.equal(aboutSafeHref(value), "", value);
+  }
+});
+
+test("a malformed mailto from product config is not linked in About", () => {
+  const html = renderEn(
+    element({
+      link: () => undefined,
+      email: (key) => (key === "securityEmail" ? "not an address" : undefined),
+    }),
+  );
+  // aboutLinks still builds mailto:not an address; aboutSafeHref rejects it.
+  assert.deepEqual(
+    aboutLinks(() => undefined, (key) => (key === "securityEmail" ? "not an address" : undefined)),
+    [{ id: "security", href: "mailto:not an address" }],
+  );
+  assert.doesNotMatch(html, /href="mailto:/);
+  assert.match(html, /Report a security issue/);
 });
