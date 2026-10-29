@@ -30,35 +30,13 @@ what BELL PR trusts, what it does not, and the limits of each protection.
 
 ## The local server
 
-- **API token and browser sessions.** The first start writes a random token to
+- **API token.** The first start writes a random token to
   `<data dir>/api-token` (mode 0600) and later starts reuse it.
-  `bell-pr token rotate` replaces it and immediately invalidates all browser
-  sessions and old token URLs. Every API request except `GET /api/health`
-  must carry an authorized session cookie, `Authorization: Bearer <token>`,
-  or `X-Bell-Token`. Missing or invalid authorization is rejected and changes nothing.
+  `bell-pr token rotate` replaces it. Every API request except
+  `GET /api/health` must send `Authorization: Bearer <token>` or
+  `X-Bell-Token`. A missing or wrong token is rejected and changes nothing.
   Whoever has the token can use everything BELL PR can do: start agents with
   your Codex or Claude Code account and publish with your `gh` login.
-- **Browser access.** The token link opened by `bell-pr` or `bell-pr open`
-  is exchanged for an HttpOnly cookie and removed from the address bar.
-  Tabs at the same address share access. New browser sessions are remembered
-  by default. The visible workbench renews remembered access on page load
-  and at most hourly afterward, including when it becomes visible again,
-  for another 30 days.
-  Ordinary API requests do not renew cookies. The browser's Web Locks API
-  coordinates renewal with sign-out and changes to the remember setting
-  across tabs, so a pending renewal cannot undo those actions. Browsers
-  without Web Locks skip background renewal; reopening through the CLI
-  still renews access. Access expires after about 30 days without renewal. Under
-  **Settings → General → Browser access**, turning off **Remember this browser**
-  gives it a nonpersistent cookie limited to 12 hours. Reopening the app
-  preserves a valid session's remember choice.
-  Signing out clears that browser's cookie; it does not invalidate a copied
-  token URL. A copied session cookie remains valid after sign-out until it
-  expires or all access is revoked. Revoking all access also rotates the API
-  token, so every browser session and old token URL stops working. An older
-  build's token in session storage is exchanged once and removed. HttpOnly
-  keeps page scripts from reading the cookie; it does not stop scripts running
-  in this app's origin from making authorized requests.
 - **Loopback by default.** BELL PR listens on `127.0.0.1`. `--host` and
   `BELLPR_HOST` are how you listen elsewhere, and BELL PR prints a warning
   when the address is not a loopback address. Requests must name a trusted

@@ -51,44 +51,33 @@ cannot use this recovery action.
 
 ## I lost the address
 
-Run the normal launch command again on the computer where BELL PR runs,
-as the same user and with the same data directory:
+`bell-pr open` prints the address of the BELL PR that runs with the data
+directory and opens it in your browser. Run it on the computer where BELL PR
+runs, as the same user:
 
 ```sh
-bell-pr
+bell-pr open
 ```
 
-- **Source build:** run `node bin/bellpr.mjs` from the checkout.
-- **Published CLI installed with `npx`:** run `npx bell-pr` again. The current
-  npm `0.0.2` placeholder has no CLI; use the [source build](getting-started.md#start-bell-pr)
-  until a release containing the CLI is published.
-- **No browser on that machine** (a server, SSH): the interactive command
-  prints an authorized link directly. Open it in a browser that reaches
-  BELL PR, and keep it private. Noninteractive service output omits it;
-  `bell-pr open --print --print-token` explicitly prints the authorized
-  link. Without `--print-token`, `open` and `open --print` print an address
-  without the token.
-- **Another data directory:** `bell-pr --data-dir <dir>`, with the
+- **Started with `npx`:** run `npx bell-pr open`.
+- **No browser on that machine** (a server, SSH): `bell-pr open --print --print-token`
+  only prints the address; open it in a browser that reaches BELL PR. The
+  address includes `#bell_token=`, which the page needs. The line printed
+  at start does not, and neither does `bell-pr open` without `--print-token`.
+  Do not share the `--print-token` address.
+- **Another data directory:** `bell-pr open --data-dir <dir>`, with the
   directory you started BELL PR with.
 - **Docker:** `docker exec <container> bell-pr open --print --print-token`.
-- **systemd service:** run `bell-pr` in a terminal on that machine.
+- **systemd service:** run `bell-pr open` in a terminal on that machine.
 
-The command reopens the existing instance before checking doctor readiness.
-If no instance is running, it starts one after the required checks pass.
+If `bell-pr open` says that no BELL PR is running with that data directory,
+start BELL PR (`bell-pr`) and use the address it prints.
 
-If the page asks you to authorize this browser, run `bell-pr` on that
-computer (same user, same `--data-dir`). Its link creates a browser session
-shared by tabs at the same address. Bookmarks work while that session is
-valid. By default access renews while you use the app and expires after
-about 30 days without use. If you turn off **Remember this browser** under
-**Settings → General → Browser access**, the session lasts at most 12 hours.
-Local and public addresses
-have separate cookies. Signing out clears this browser's cookie.
-
-The token file is `<data dir>/api-token`. A restart reuses it. Revoking all
-access in settings, or running `bell-pr token rotate`, replaces it and
-invalidates every browser session and old token URL; then run `bell-pr`
-again. API clients must also use the new token.
+The page says the request needs the API token when it was opened from the
+startup line, or from a bookmark, instead of from `bell-pr open`. Run
+`bell-pr open` on that computer (same user, same `--data-dir`). The token
+file is `<data dir>/api-token`. A restart reuses it. `bell-pr token rotate`
+replaces it; then run `bell-pr open` again.
 
 ## Error codes
 

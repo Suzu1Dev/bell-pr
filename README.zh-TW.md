@@ -219,27 +219,25 @@ BELL PR 會閱讀專案的貢獻指南、AI 政策、PR 範本、Agent 指南與
 
 ## 本機 API
 
-BELL PR 在 `127.0.0.1` 的埠 4311 提供網頁介面與 API，除非你設定 `--host` 或 `BELLPR_HOST`。它不會在 `0.0.0.0` 上監聽，除非你明確要求。其他位址都是明確設定，啟動時會印出警告。API 請求仍然需要授權。
+BELL PR 在 `127.0.0.1` 的埠 4311 提供網頁介面與 API，除非你設定 `--host` 或 `BELLPR_HOST`。它不會在 `0.0.0.0` 上監聽，除非你明確要求。其他位址都是明確設定，啟動時會印出警告。API 權杖仍然必要。
 
-第一次啟動會把隨機權杖寫入 `<資料目錄>/api-token`（32 位元組，權限 `0600`，只有你的使用者能讀）。之後的啟動會沿用這個檔案。檔案遺失或內容損壞時會重新建立。`bell-pr token rotate` 會更換它，立即使所有瀏覽器工作階段與舊權杖連結失效，不需要重新啟動。API 用戶端必須改用新權杖；請再執行 `bell-pr`，重新授權瀏覽器。
+第一次啟動會把隨機權杖寫入 `<資料目錄>/api-token`（32 位元組，權限 `0600`，只有你的使用者能讀）。之後的啟動會沿用這個檔案。檔案遺失或內容損壞時會重新建立。`bell-pr token rotate` 會更換它；執行中的 BELL PR 在下一個請求就使用新權杖。更換後請再執行 `bell-pr open`，瀏覽器才會帶上新權杖。
 
-瀏覽器請求使用 HttpOnly 工作階段 cookie。API 用戶端除了 `GET /api/health`，每個請求都必須送出權杖：
+除了 `GET /api/health`，每個 API 請求都必須送出權杖：
 
 ```http
 Authorization: Bearer <token>
 ```
 
-`X-Bell-Token: <token>` 效果相同。缺少或無效的授權會得到 HTTP 401。請求的 Host 必須是受信任的位址（`localhost`、`127.0.0.1` 或 `[::1]` 加上 BELL PR 的埠，或你用 `BELLPR_PUBLIC_URL`、`BELLPR_ALLOWED_ORIGINS` 指定的主機）。瀏覽器的 `Origin` 若不是這個應用程式自己的來源，也不在允許清單上，就會被拒絕。沒有萬用字元 CORS。會變更資料的請求必須使用 `application/json`。
+`X-Bell-Token: <token>` 效果相同。缺少或錯誤的權杖會得到 HTTP 401。請求的 Host 必須是受信任的位址（`localhost`、`127.0.0.1` 或 `[::1]` 加上 BELL PR 的埠，或你用 `BELLPR_PUBLIC_URL`、`BELLPR_ALLOWED_ORIGINS` 指定的主機）。瀏覽器的 `Origin` 若不是這個應用程式自己的來源，也不在允許清單上，就會被拒絕。沒有萬用字元 CORS。會變更資料的請求必須使用 `application/json`。
 
-`bell-pr` 開啟瀏覽器時，位址的片段是 `#bell_token=<權杖>`。頁面會用它換取 HttpOnly 工作階段 cookie，再從位址列移除。同一位址的新分頁會共用存取權。預設會記住這個瀏覽器，使用 BELL PR 時會自動延長期限，約 30 天未使用後才會到期。共用裝置可在**設定 → 一般 → 瀏覽器存取**關閉「**記住這個瀏覽器**」，改用不持久保存、最長 12 小時的工作階段；工作階段有效時，重新開啟應用程式會保留這個選擇。登出會清除這個瀏覽器的 cookie；撤銷所有存取權則會同時更換 API 權杖，使所有瀏覽器工作階段與舊權杖連結失效。舊版本留在 session storage 的權杖會交換一次，再移除。
+`bell-pr` 開啟瀏覽器時，位址的片段是 `#bell_token=<權杖>`。頁面會存下權杖，再從位址列移除。啟動時印出的那一行不含權杖，因此服務記錄裡也不會有。`bell-pr open` 印出的位址不含權杖，權杖只交給瀏覽器。`bell-pr open --print` 只印出位址，同樣不含權杖。`bell-pr open --print-token` 會印出帶權杖的位址（加上 `--print` 則不開瀏覽器）。請把那個位址當成密碼。它不會寫進伺服器記錄，也不會出現在 `bell-pr doctor --json`。
 
-透過 SSH 或在沒有桌面瀏覽器的環境中使用互動式終端機時，終端機會印出授權連結；非互動式啟動輸出與服務記錄不會包含它。`bell-pr open` 會開啟已授權的瀏覽器，但印出的位址不含權杖；`bell-pr open --print` 只印出不含權杖的位址。加上 `--print-token` 才會把權杖放進印出的連結；若只要印出授權連結、不開啟瀏覽器，請執行 `bell-pr open --print --print-token`。請把授權連結當成密碼。它不會寫進伺服器記錄，也不會出現在 `bell-pr doctor --json`。
-
-權杖可能留在瀏覽器歷史紀錄裡。只登出不會使這個連結失效；請撤銷所有存取權或執行 `bell-pr token rotate`，讓舊連結失效。
+token 可能留在瀏覽器歷史紀錄裡，如果這個瀏覽器設定檔有跟別人共用，請執行 `bell-pr token rotate`。
 
 ## 設定
 
-BELL PR 不需要任何設定就能啟動。下列設定都是啟動時讀取的環境變數；`bell-pr start` 另外接受 `--port`、`--host`、`--data-dir`、`--no-open`、`--force` 與 `--env-file <file>`。一般啟動會開啟同一資料目錄的既有服務。若需要啟動新伺服器，必要的 `bell-pr doctor` 檢查失敗時，`start` 會在監聽前結束；`--force` 仍會啟動。在應用程式「設定」中調整的值，除非被環境變數指定，否則都會生效。
+BELL PR 不需要任何設定就能啟動。下列設定都是啟動時讀取的環境變數；`bell-pr start` 另外接受 `--port`、`--host`、`--data-dir`、`--no-open`、`--force` 與 `--env-file <file>`。必要的 `bell-pr doctor` 檢查失敗時，`start` 會在監聽前結束；`--force` 仍會啟動。在應用程式「設定」中調整的值，除非被環境變數指定，否則都會生效。
 
 | 變數 | 預設值 | 用途 |
 | --- | --- | --- |

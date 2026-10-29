@@ -1,7 +1,7 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
-import { adoptApiToken, currentApiToken, establishBrowserSession, renewBrowserSession } from "./api";
+import { adoptApiToken } from "./api";
 import { parsePresentationFlags } from "./app/presentation";
 import {
   addLocaleResource,
@@ -16,14 +16,8 @@ import "./styles.css";
 import "./workspace-v2.css";
 
 // The address from `bell-pr open` carries the API token in the fragment.
-// Drop it from the address, then exchange it for a browser session before
-// mounting the app. Older tabs' stored tokens are upgraded the same way.
-const pageToken = adoptApiToken(window);
-const hasLaunchToken = Boolean(pageToken ?? currentApiToken());
-const browserSession = establishBrowserSession(pageToken).then(
-  () => hasLaunchToken,
-  () => false, // The app's first API requests show connection/access errors.
-);
+// Store it and drop it from the address before the router reads the hash.
+adoptApiToken(window);
 
 const root = ReactDOM.createRoot(document.getElementById("root")!);
 
@@ -50,27 +44,10 @@ addLocaleResource(loadDemo);
 // saved choice and the browser language, and is never saved.
 const locale =
   parsePresentationFlags(window.location.hash).locale ?? initialLocale();
-void Promise.all([
-  loadLocale(locale).then(
-    () => locale,
-    (error: unknown) => {
-      console.error("[BELL-PR] Could not load the dictionary for", locale, error);
-      return defaultLocale;
-    },
-  ),
-  browserSession,
-]).then(([readyLocale, renewedAtLaunch]) => {
-  render(readyLocale);
-  const hour = 60 * 60 * 1000;
-  let lastRenewal = renewedAtLaunch ? Date.now() : 0;
-  const renewWhenVisible = () => {
-    if (document.visibilityState !== "visible" || Date.now() - lastRenewal < hour) return;
-    lastRenewal = Date.now();
-    // Session changes share a browser lock so renewal cannot undo sign-out.
-    // The regular app requests already handle offline or expired access.
-    void renewBrowserSession().catch(() => {});
-  };
-  renewWhenVisible();
-  window.setInterval(renewWhenVisible, hour);
-  document.addEventListener("visibilitychange", renewWhenVisible);
-});
+void loadLocale(locale).then(
+  () => render(locale),
+  (error: unknown) => {
+    console.error("[BELL-PR] Could not load the dictionary for", locale, error);
+    render(defaultLocale);
+  },
+);

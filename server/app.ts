@@ -34,10 +34,8 @@ import { registerUnderstandingRoutes } from "./routes/understanding.js";
 import { registerContributionRoutes } from "./routes/contribution.js";
 import { registerByHandRoutes } from "./routes/by-hand.js";
 import { registerSessionRoutes } from "./routes/session.js";
-import { registerApiSessionRoutes } from "./routes/api-session.js";
 import { registerSudoRoutes } from "./routes/sudo.js";
 import type { PasswordlessSudo } from "./sudo.js";
-import { readApiToken } from "./api-token.js";
 
 /** Masks secrets in string values, which may quote command output. */
 function redactValues<T extends Record<string, unknown>>(values?: T) {
@@ -115,8 +113,6 @@ export interface AppOptions {
    */
   apiToken?: string;
   readApiToken?: () => string | undefined;
-  /** Authoritative token file; also enables browser sessions and their revocation. */
-  apiTokenFile?: string;
 }
 
 export function createApp(workbench: Workbench, options: AppOptions = {}) {
@@ -162,10 +158,6 @@ export function createApp(workbench: Workbench, options: AppOptions = {}) {
     typeof allowedOrigins === "string"
       ? parseAllowedOrigins(allowedOrigins)
       : allowedOrigins;
-  const tokenFile = options.apiTokenFile;
-  const tokenReader = tokenFile
-    ? () => readApiToken(tokenFile)
-    : options.readApiToken;
   app.use(
     localhostGuard({
       // The Vite dev server's port is trusted in development only.
@@ -179,7 +171,7 @@ export function createApp(workbench: Workbench, options: AppOptions = {}) {
         ),
       ],
       ...(options.apiToken !== undefined ? { apiToken: options.apiToken } : {}),
-      ...(tokenReader ? { readApiToken: tokenReader } : {}),
+      ...(options.readApiToken ? { readApiToken: options.readApiToken } : {}),
     }),
   );
   app.use(express.json({ limit: "160kb", strict: true }));
@@ -212,7 +204,6 @@ export function createApp(workbench: Workbench, options: AppOptions = {}) {
   registerContributionRoutes(app, deps);
   registerByHandRoutes(app, deps);
   registerSessionRoutes(app, deps);
-  if (options.apiTokenFile) registerApiSessionRoutes(app, options.apiTokenFile);
   if ((options.platform ?? process.platform) === "linux") registerSudoRoutes(app, deps);
   app.use("/api", (_req, res) => {
     res.status(404).json({ error: sm().common.notFound });

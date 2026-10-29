@@ -136,15 +136,6 @@ layout preferences such as the code font size and the collapsed sidebar,
 and the sample project's review progress, check answers and drafts. None of
 this reaches the server's data directory.
 
-The browser also stores an HttpOnly access cookie, shared by tabs at the
-same address. New sessions remember the browser by default. The workbench
-renews that access automatically while you use it; it expires after about
-30 days without use. **Settings → General →
-Browser access** lets you turn off remembering for a nonpersistent session
-lasting at most 12 hours, sign out of this browser, or revoke all access. An API token
-left in session storage by an older build is exchanged for the cookie once,
-then removed.
-
 ## How long it is kept
 
 - Runs, notes and analyses stay until you delete them.

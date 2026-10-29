@@ -36,28 +36,15 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   control is offered only on Linux.
 - **Local API token.** The first start writes a random token to
   `<data dir>/api-token` (mode 0600) and later starts reuse it. API requests
-  other than `GET /api/health` need an authorized browser session,
-  `Authorization: Bearer` or `X-Bell-Token`. `bell-pr open` passes the token
-  to the browser but prints an address without it. `bell-pr open --print`
-  only prints that token-free address; add `--print-token` to explicitly
-  print an authorized link. `bell-pr token rotate` replaces the file
-  and immediately invalidates all browser sessions and old token URLs. The
-  token is not in noninteractive startup output, service logs, or
-  `bell-pr doctor --json`.
+  other than `GET /api/health` send `Authorization: Bearer` or
+  `X-Bell-Token`. `bell-pr open` gives the token to the browser in the page
+  address and prints that address without the token. `bell-pr open --print-token`
+  prints the address with the token; add `--print` to only print it.
+  `bell-pr token rotate` replaces
+  the file; a running BELL PR uses the new token on the next request. The
+  token is not in the startup line, the server log, or `bell-pr doctor --json`.
   Listening somewhere other than a loopback address is still an explicit
   `--host` or `BELLPR_HOST`, and BELL PR prints a warning when you do.
-- **Browser access.** Opening the app through the CLI exchanges the token
-  link for an HttpOnly cookie shared by tabs at the same address. The
-  browser is remembered by default. The workbench renews access automatically
-  while you use it. Active browsers stay connected, and access expires
-  after about 30 days without use. **Settings → General → Browser access**
-  can turn off remembering for a nonpersistent session lasting at most 12
-  hours, sign out of this browser, or revoke all access. Reopening the app
-  preserves a valid session's remember choice. Revoking all access also
-  rotates the API token,
-  invalidating every browser session, API clients' old tokens, and old
-  token URLs. Tokens left in session storage by older builds are exchanged
-  once and removed.
 
 - **Analysis progress.** While a project analysis or **Generate 5 more**
   runs, the overview lists its steps and shows how long the agent has worked
@@ -81,10 +68,9 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Removed
 
-- **Legacy session sign-in.** The old in-memory session secret, one-time
-  sign-in links, `/auth` page and `auth_required` error code stay removed.
-  Browser sessions now use cookies signed by the installation's local
-  API token, as described above.
+- **Session sign-in.** The session cookie, the one-time sign-in links, the
+  `/auth` page and the `auth_required` error code stay removed. The local
+  API token above is what a request must send instead.
 
 ### Changed
 

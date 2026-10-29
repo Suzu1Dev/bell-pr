@@ -412,9 +412,9 @@ Details: [Privacy and your data](docs/privacy-and-data.md).
   git command that talks to GitHub receives `GH_TOKEN`.
   Agents still run the project's code, so import only projects you are
   willing to run on this computer.
-- **Browser access and API token.** Each install keeps a token in its data
-  directory. The API requires that token or an authorized browser session.
-  BELL PR listens on `127.0.0.1` by default. Other sites may link to its page, but cannot
+- **API token.** Each install keeps a token in its data directory, and
+  the API refuses a request that does not send it. BELL PR listens on
+  `127.0.0.1` by default. Other sites may link to its page, but cannot
   call its API or frame it.
 - **Unsandboxed agents are an explicit opt-in.** Without the sandbox (for
   example in Docker with default settings), a Claude Code agent that edits
@@ -433,23 +433,21 @@ vulnerability, see [SECURITY.md](SECURITY.md).
 BELL PR serves the web interface and the API on `127.0.0.1`, port 4311,
 unless you set `--host` or `BELLPR_HOST`. It does not listen on `0.0.0.0`
 unless you ask it to. Any other address is an explicit setting, and BELL PR
-prints a warning at start. API requests still need authorization.
+prints a warning at start. The API token is still required.
 
 The first start writes a random token to `<data dir>/api-token` (32 bytes,
 mode `0600`, your user only). A later start reuses that file. A missing or
-damaged file is created again. `bell-pr token rotate` replaces it and
-immediately invalidates every browser session and old token URL, without a
-restart. API clients must use the new token. Run `bell-pr` afterwards
-to authorize your browser again.
+damaged file is created again. `bell-pr token rotate` replaces it; a running
+BELL PR uses the new token on the next request. Run `bell-pr open` afterwards
+so the browser has the new one.
 
-Browser requests use an HttpOnly session cookie. API clients must send the
-token on every request except `GET /api/health`:
+Every API request except `GET /api/health` must send the token:
 
 ```http
 Authorization: Bearer <token>
 ```
 
-`X-Bell-Token: <token>` is the same. Missing or invalid authorization is HTTP 401.
+`X-Bell-Token: <token>` is the same. A missing or wrong token is HTTP 401.
 Requests must name a trusted host (`localhost`, `127.0.0.1` or `[::1]` with
 BELL PR's port, or a host you named with `BELLPR_PUBLIC_URL` or
 `BELLPR_ALLOWED_ORIGINS`). A browser `Origin` that is not this app's own
@@ -457,39 +455,23 @@ origin, and not on that list, is rejected. There is no wildcard CORS.
 Requests that change data must use `application/json`.
 
 `bell-pr` opens the browser at an address whose fragment is
-`#bell_token=<token>`. The page exchanges it for an HttpOnly session cookie
-and removes it from the address. New tabs at the same address share access.
-The browser is remembered by default, and using BELL PR renews access
-automatically; it expires after about 30 days without use. Under **Settings
-→ General → Browser access**, turn off **Remember this browser** on a shared
-device to use a nonpersistent session lasting at most 12 hours. Reopening
-the app preserves that choice while the session is valid. Signing out clears
-this browser's cookie; revoking all access
-also replaces the API token and invalidates every browser session and old
-token URL. A token left in session storage by an older version is exchanged
-once, then removed.
+`#bell_token=<token>`. The page stores the token and removes it from the
+address. The line printed at start does not include the token, so a service
+log does not either. `bell-pr open` prints that address without the token
+and gives the token to the browser. `bell-pr open --print` only prints it,
+still without the token. `bell-pr open --print-token` prints the address
+with the token (add `--print` to skip the browser). Treat that address like
+a password. It is not written to the server log or to `bell-pr doctor --json`.
 
-An interactive terminal prints the authorized link when used over SSH or
-in a headless environment. Noninteractive startup output and service logs
-do not include it.
-`bell-pr open` opens the authorized browser but prints an address without
-the token. `bell-pr open --print` only prints that token-free address. Add
-`--print-token` to explicitly include the token in the printed link, or use
-`bell-pr open --print --print-token` to print it without opening a browser.
-Treat authorized links like passwords. They are not written to the server
-log or to `bell-pr doctor --json`.
-
-The token can remain in browser history. Signing out alone does not invalidate
-that link; revoke all access or run `bell-pr token rotate` to invalidate it.
+The token can remain in browser history; run `bell-pr token rotate` if you share this browser profile.
 
 ## Configuration
 
 BELL PR needs no configuration. Every setting below is an environment
 variable read at start; `bell-pr start` also takes `--port`, `--host`,
-`--data-dir`, `--no-open`, `--force` and `--env-file <file>`. A normal launch
-opens an existing instance for that data directory. When starting a new
-server, `start` exits before it listens if a required `bell-pr doctor` check
-fails; `--force` starts anyway. Values set in the app's
+`--data-dir`, `--no-open`, `--force` and `--env-file <file>`. `start` exits
+before it listens when a required `bell-pr doctor` check fails; `--force`
+starts anyway. Values set in the app's
 Settings are used unless a variable sets them.
 
 | Variable | Default | What it sets |

@@ -130,90 +130,6 @@ export function currentApiToken(): string | undefined {
   }
 }
 
-/** Remove the old page-readable credential after exchanging it for a cookie. */
-export function clearApiToken(): void {
-  try {
-    browserSession()?.removeItem(apiTokenStorageKey);
-  } catch {
-    // The cookie still works when browser storage is unavailable.
-  }
-}
-
-const browserSessionLockName = "bellpr-browser-session";
-
-function browserSessionLocks(): LockManager | undefined {
-  try {
-    return typeof navigator === "undefined" ? undefined : navigator.locks;
-  } catch {
-    return undefined;
-  }
-}
-
-/** Web Locks serialize cookie changes across tabs of this origin. */
-async function withBrowserSessionLock<T>(change: () => Promise<T>): Promise<T> {
-  const locks = browserSessionLocks();
-  return await (locks ? locks.request(browserSessionLockName, change) : change());
-}
-
-/** Save an explicit browser preference, after any pending renewal finishes. */
-export function updateBrowserSession(remember: boolean): Promise<{ remembered: boolean }> {
-  return withBrowserSessionLock(async () => {
-    clearApiToken();
-    return api<{ remembered: boolean }>("/session", {
-      ...send("POST", { remember }), browserSessionOnly: true,
-    });
-  });
-}
-
-/** Clear this browser, or revoke every browser and old login link, in order. */
-export function endBrowserSession(revokeAll = false): Promise<void> {
-  return withBrowserSessionLock(async () => {
-    clearApiToken();
-    await api(revokeAll ? "/session/revoke" : "/session", {
-      ...send(revokeAll ? "POST" : "DELETE"), browserSessionOnly: true,
-    });
-  });
-}
-
-/**
- * Renew only a still-remembered cookie. Call at most hourly while visible.
- * Without cross-tab locks, skip background renewal so a delayed response
- * cannot restore a session after another tab signs out or opts out.
- */
-export async function renewBrowserSession(): Promise<void> {
-  const locks = browserSessionLocks();
-  if (!locks) return;
-  await locks.request(browserSessionLockName, async () => {
-    clearApiToken();
-    const session = await api<{ remembered: boolean }>("/session", { browserSessionOnly: true });
-    if (session.remembered)
-      await api("/session", { ...send("POST", { remember: true }), browserSessionOnly: true });
-  });
-}
-
-/**
- * Upgrade a CLI link or an older tab to a browser session before rendering.
- * Opening another CLI link preserves this browser's existing remember choice.
- */
-export async function establishBrowserSession(token = currentApiToken()): Promise<void> {
-  if (!token) return;
-  await withBrowserSessionLock(async () => {
-    const headers = { Authorization: `Bearer ${token}` };
-    try {
-      const session = await api<{ remembered: boolean }>("/session", { headers });
-      await api("/session", {
-        ...send("POST", { remember: session.remembered === true }),
-        headers,
-      });
-      clearApiToken();
-    } catch (error) {
-      // A revoked legacy token must not override a valid browser cookie.
-      if (error instanceof ApiError && error.status === 401) clearApiToken();
-      throw error;
-    }
-  });
-}
-
 /**
  * Reads `#bell_token=` from the fragment into session storage and removes
  * that fragment. A `?bell_token=` query is ignored.
@@ -227,7 +143,7 @@ export interface ApiTokenWindow {
   sessionStorage: { setItem(key: string, value: string): void };
 }
 
-export function adoptApiToken(win: ApiTokenWindow): string | undefined {
+export function adoptApiToken(win: ApiTokenWindow): void {
   const hash = win.location.hash.startsWith("#")
     ? win.location.hash.slice(1)
     : win.location.hash;
@@ -244,8 +160,6 @@ export function adoptApiToken(win: ApiTokenWindow): string | undefined {
     "",
     `${win.location.pathname}${win.location.search}`,
   );
-  // Keep the exchange possible even when sessionStorage is blocked.
-  return token.toLowerCase();
 }
 
 /**
@@ -260,27 +174,19 @@ export function adoptApiToken(win: ApiTokenWindow): string | undefined {
  *   page while the service is down), gives code `server_unreachable`.
  * Aborting through `options.signal` rejects with the abort error unchanged.
  */
-export async function api<T>(
-  path: string,
-  options?: RequestInit & { browserSessionOnly?: boolean },
-): Promise<T> {
-  const { browserSessionOnly, ...requestOptions } = options ?? {};
-  const headers = new Headers(requestOptions.headers);
+export async function api<T>(path: string, options?: RequestInit): Promise<T> {
+  const headers = new Headers(options?.headers);
   if (!headers.has("Content-Type"))
     headers.set("Content-Type", "application/json");
   if (!headers.has("X-Bell-Locale"))
     headers.set("X-Bell-Locale", getCurrentLocale());
-  const token = browserSessionOnly ? undefined : currentApiToken();
-  if (browserSessionOnly) {
-    headers.delete("Authorization");
-    headers.delete("X-Bell-Token");
-  }
+  const token = currentApiToken();
   if (token && !headers.has("Authorization") && !headers.has("X-Bell-Token"))
     headers.set("Authorization", `Bearer ${token}`);
   let response: Response;
   let text: string;
   try {
-    response = await fetch(`/api${path}`, { ...requestOptions, headers });
+    response = await fetch(`/api${path}`, { ...options, headers });
     text = await response.text();
   } catch (error) {
     if (isAbort(error, options?.signal)) throw error;
@@ -297,10 +203,7 @@ export async function api<T>(
   } catch (error) {
     throw unreachable(response.status, error);
   }
-  if (!response.ok) {
-    if (response.status === 401) clearApiToken();
-    throw errorFromBody(response.status, body);
-  }
+  if (!response.ok) throw errorFromBody(response.status, body);
   return body as T;
 }
 

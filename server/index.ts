@@ -578,7 +578,6 @@ export async function startServer(
       version,
       agentSlots,
       readApiToken: () => readApiToken(paths.apiToken),
-      apiTokenFile: paths.apiToken,
     });
     handler = app;
 

@@ -63,49 +63,33 @@ The Welcome screen runs the same check once BELL PR is open.
 
 ## Start BELL PR
 
-This branch has not been published to npm. The currently published `bell-pr`
-`0.0.2` is a placeholder without a CLI. Clone or download this repository,
-then use Node.js 22.13 or later in its root directory:
-
 ```sh
-npm ci
-npm run build
-node bin/bellpr.mjs
+npx bell-pr
 ```
 
-In a source checkout, replace `bell-pr` in the commands below with
-`node bin/bellpr.mjs`. After a release containing the CLI is published,
-`npx bell-pr` will start that release, or you can install it once:
+or install it once and start it by name:
 
 ```sh
 npm install -g bell-pr
 bell-pr
 ```
 
-BELL PR starts on your computer and opens your browser already authorized.
-Running the same command again opens the instance for that data directory;
-it does not launch a second server. An interactive terminal without a local
-browser, including SSH, prints an authorized link you can open directly.
-Keep that link private. Service and other noninteractive startup output
-show only the plain address:
+BELL PR starts on your computer, prints its address and opens BELL PR in your
+browser:
 
 ```text
 BELL PR 1.0.0-rc.1 → http://127.0.0.1:4311
 ```
 
-Keep the terminal open: BELL PR runs until you stop it with Ctrl+C. The
-browser exchanges its authorization link for a cookie, so new tabs at the
-same address share access. Remembering the browser is on by default. Access
-renews as you use BELL PR and expires after about 30 days without use. On a
-shared device, turn off **Settings → General → Browser access → Remember
-this browser** for a session lasting at most 12 hours. You can also sign out
-or revoke all access. Revoking all access, like `bell-pr token rotate`,
-invalidates every browser session and old authorization link. Run `bell-pr` to authorize
-the browser again. By default only this computer can reach it; see
-[Security model](security-model.md).
+Keep the terminal open: BELL PR runs until you stop it with Ctrl+C. The API
+needs a token. It lives at `<data dir>/api-token`. `bell-pr open` passes it
+to the browser. `bell-pr token rotate` replaces it, and the old one stops
+working immediately. By default
+only this computer can reach it; see [Security model](security-model.md).
 
-> **Lost the address?** Run `bell-pr` again with the same data directory.
-> It reopens the running app without a separate login command. More in
+> **Lost the address?** Run `bell-pr open` (or `npx bell-pr open`) on the same
+> computer. It prints the address again, without the API token, and opens it.
+> More in
 > [Troubleshooting](troubleshooting.md#i-lost-the-address).
 
 BELL PR listens on `127.0.0.1:4311`, so only this computer can reach it.
