@@ -169,7 +169,7 @@ test("bell-pr open prints the address of the running server and opens it where a
       assert.equal(second.code, 0);
       assert.equal(terminal, `${server.url}\n`);
       assert.equal(terminal.includes(token), false);
-      if (!existsSync("/.dockerenv") && !existsSync("/run/.containerenv")) assert.deepEqual(second.opened, [signedIn]);
+      if (!existsSync("/.dockerenv") && !existsSync("/run/.containerenv")) assert.match(second.opened[0], /^file:\/\//);
     } finally {
       await server.shutdown();
     }
@@ -729,7 +729,7 @@ test("normal desktop launch opens the authorized running workspace without print
         env: { DISPLAY: ":99" }, stdout: stdout.stream,
       });
       assert.equal(result.code, 0, result.stderr);
-      assert.deepEqual(result.opened, [signedUrl(dataDir, server.url)]);
+      assert.match(result.opened[0], /^file:\/\//);
       assert.equal(stdout.text(), `BELL PR is running → ${server.url}\n`);
       assert.equal(result.stderr, "");
     } finally { await server.shutdown(); }
@@ -748,8 +748,8 @@ test("headless interactive launch prints its usable link directly, while nonTTY 
         });
         assert.equal(result.code, 0, result.stderr);
         assert.deepEqual(result.opened, []);
-        assert.equal(stdout.text().includes(signedUrl(dataDir, server.url)), isTTY);
-        assert.equal(stdout.text().includes("Open the workspace in your browser:"), isTTY);
+        assert.equal(stdout.text().includes("#bell_token="), false);
+        assert.equal(stdout.text().includes("open --print --print-token"), isTTY);
         assert.equal(result.stderr, "");
       }
     } finally { await server.shutdown(); }
@@ -770,7 +770,8 @@ test("headless first start provides the authorized link without a second open co
       assert.equal(result.code, undefined, result.stderr);
       assert.ok(running);
       assert.deepEqual(result.opened, []);
-      assert.ok(stdout.text().includes(`Open the workspace in your browser: ${signedUrl(dataDir, running.url)}\n`));
+      assert.ok(stdout.text().includes("open --print --print-token"));
+      assert.equal(stdout.text().includes("#bell_token="), false);
     } finally { await running?.shutdown(); }
   });
 });

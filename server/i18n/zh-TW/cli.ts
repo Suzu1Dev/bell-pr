@@ -6,6 +6,7 @@ const name = product.name;
 const bin = product.binNames[0];
 
 const m: Translation<typeof en> = {
+  browserOpenHint: `無法開啟瀏覽器。請執行 \`${bin} open --print --print-token\` 取得位址。`,
   help: ({ version }) =>
     [
       `${name} ${version}：在本機參與開源貢獻的工作台。`,
@@ -70,7 +71,6 @@ const m: Translation<typeof en> = {
   start: {
     startup: ({ version, url }) => `${name} ${version} → ${url}`,
     reusing: ({ url }) => `${name} 執行中 → ${url}`,
-    openLink: ({ url }) => `在瀏覽器開啟工作區：${url}`,
     legacyDataDir: ({ dataDir }) =>
       `在 ./.bellpr 找到 ${name} 資料。${name} 現在使用 ${dataDir}，沒有搬移任何資料。若要繼續使用舊資料夾，請以此方式啟動：${bin} start --data-dir ./.bellpr`,
     alreadyRunning: ({ url }) =>

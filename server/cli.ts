@@ -1,3 +1,4 @@
+import { openBrowserFile, type BrowserOpener } from "./browser-open.js";
 /**
  * The `bell-pr` / `bellpr` command: start (the default), open, doctor,
  * version and help. bin/bellpr.mjs loads the bundle of this file
@@ -47,7 +48,7 @@ export interface CliDeps {
   stderr?: Output;
   platform?: NodeJS.Platform;
   /** Opens a URL in the default browser. */
-  openUrl?: (url: string) => void;
+  openUrl?: BrowserOpener;
   /** Passed to startServer by `start`. */
   startOptions?: Partial<StartServerOptions>;
   /** Starts the listener; tests can arrange a competing start at this boundary. */
@@ -189,18 +190,20 @@ export function openInBrowser(url: string, platform = process.platform) {
       : platform === "win32"
         ? ["cmd", ["/c", "start", '""', url]]
         : ["xdg-open", [url]];
-  try {
-    const child = spawn(command, args, {
-      detached: true,
-      stdio: "ignore",
-      windowsHide: true,
-    });
-    // ENOENT: no opener installed. The link is printed anyway.
-    child.on("error", () => {});
-    child.unref();
-  } catch {
-    // Same: the person can open the printed link.
-  }
+  return new Promise<boolean>((resolve) => {
+    try {
+      const child = spawn(command, args, {
+        detached: true,
+        stdio: "ignore",
+        windowsHide: true,
+      });
+      child.once("error", () => resolve(false));
+      child.once("exit", (code) => resolve(code === 0));
+
+    } catch {
+      resolve(false);
+    }
+  });
 }
 
 interface Context {
@@ -208,15 +211,18 @@ interface Context {
   stdout: Output;
   stderr: Output;
   platform: NodeJS.Platform;
-  openUrl: (url: string) => void;
+  openUrl: BrowserOpener;
   deps: CliDeps;
 }
 
-/** A desktop opens the URL; an interactive headless terminal gets its usable link. */
-function startBrowserAction(ctx: Context): ((url: string) => void) | undefined {
+/** Keep automatic launches token-free in argv and headless output. */
+function startBrowserAction(ctx: Context, dataDir: string): ((url: string) => Promise<void>) | undefined {
   if (!ctx.stdout.isTTY || envFlag(ctx.env.BELLPR_NO_OPEN) || envFlag(ctx.env.CI)) return undefined;
-  if (canOpenBrowser(ctx.env, ctx.stdout, ctx.platform)) return ctx.openUrl;
-  return (url) => ctx.stdout.write(`${sm().cli.start.openLink({ url })}\n`);
+  return async (url) => {
+    await openBrowserFile(dataDir, url,
+      canOpenBrowser(ctx.env, ctx.stdout, ctx.platform) ? ctx.openUrl : undefined,
+      () => ctx.stdout.write(`${sm().cli.browserOpenHint}\n`));
+  };
 }
 
 /** Only a listener proving possession of this directory's token may receive a login link. */
@@ -282,7 +288,7 @@ async function start(args: string[], ctx: Context): Promise<number | undefined> 
     },
     ctx.env,
   );
-  const browserAction = startBrowserAction(ctx);
+  const browserAction = startBrowserAction(ctx, config.dataDir);
   const reuseRunning = async () => {
     // --no-open, CI and development starts still mean "run a server".
     // A service must not silently succeed while another process owns it.
@@ -296,7 +302,7 @@ async function start(args: string[], ctx: Context): Promise<number | undefined> 
       return false;
     const url = lockUrl(lock);
     ctx.stdout.write(`${sm().cli.start.reusing({ url })}\n`);
-    browserAction?.(withApiToken(url, token));
+    await browserAction?.(withApiToken(url, token));
     return true;
   };
   if (await reuseRunning()) return 0;
@@ -368,7 +374,8 @@ async function open(args: string[], ctx: Context): Promise<number> {
   // The token stays off stdout unless --print-token. The browser still gets it.
   ctx.stdout.write(`${values["print-token"] ? signed : base}\n`);
   if (!values.print && !values["no-open"] && canOpenBrowser(ctx.env, ctx.stdout, ctx.platform))
-    ctx.openUrl(signed);
+    await openBrowserFile(dataDir, signed, ctx.openUrl,
+      () => ctx.stderr.write(`${sm().cli.browserOpenHint}\n`));
   return 0;
 }
 

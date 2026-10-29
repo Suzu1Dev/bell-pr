@@ -418,3 +418,15 @@ and has not been run again.
 - **Pending (maintainers):** the macOS canary (`sandbox-exec`), and the canary on
   each newer Claude Code or Codex release before the supported range is
   widened.
+
+### Desktop browser handoff
+
+The opener receives only a `file://` URL to a random private redirect file
+in `<data dir>/browser-open` (directory 0700, file 0600). The HTML only calls
+`location.replace` with the authorized URL; it makes no API requests. Files
+are removed after 60 seconds, on process exit and termination signals, or
+immediately if the opener fails. Stale files are swept at the next launch.
+Same-user programs can still read them. Snap or Flatpak browsers may not be
+able to read data-directory files: this fails closed. Run
+`bell-pr open --print --print-token` explicitly in that case and keep the
+result private. Token URLs may remain in browser history.

@@ -764,3 +764,7 @@ are not under the Apache license; see `TRADEMARKS.md`.
   options, see `docs/docker.md`.
 - Several real-agent checks used small JavaScript projects; larger and
   multi-language projects are not yet covered.
+
+- Desktop launches pass a private temporary file URL to the browser opener,
+  keeping the API token out of opener arguments. Interactive headless starts
+  show only `bell-pr open --print --print-token` as an explicit next step.

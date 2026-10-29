@@ -5,6 +5,7 @@ const name = product.name;
 const bin = product.binNames[0];
 
 export default {
+  browserOpenHint: `Could not open the browser. Run \`${bin} open --print --print-token\` to get the address.`,
   /** `bell-pr help`. */
   help: ({ version }: { version: string }) =>
     [
@@ -94,7 +95,6 @@ export default {
     startup: ({ version, url }: { version: string; url: string }) =>
       `${name} ${version} → ${url}`,
     reusing: ({ url }: { url: string }) => `${name} is running → ${url}`,
-    openLink: ({ url }: { url: string }) => `Open the workspace in your browser: ${url}`,
     /** Data left by an older version in the current folder; nothing moves. */
     legacyDataDir: ({ dataDir }: { dataDir: string }) =>
       `Found ${name} data in ./.bellpr. ${name} now uses ${dataDir} and moved nothing. To keep using the old folder, start it with: ${bin} start --data-dir ./.bellpr`,

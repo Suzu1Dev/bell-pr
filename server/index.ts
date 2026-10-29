@@ -75,7 +75,7 @@ export interface StartServerOptions {
   /** Where the startup line and hints go; console.log by default. */
   print?: (line: string) => void;
   /** Opens the app's URL when the configuration says to open a browser. */
-  openBrowser?: (url: string) => void;
+  openBrowser?: (url: string) => unknown;
   /**
    * Shut down and exit the process on SIGINT, SIGTERM, SIGHUP and fatal
    * errors (true by default). In-process callers such as tests pass false
@@ -588,7 +588,7 @@ export async function startServer(
       log.warn(warning);
     }
     if (config.open && options.openBrowser)
-      options.openBrowser(withApiToken(url, readApiToken(paths.apiToken)));
+      await options.openBrowser(withApiToken(url, readApiToken(paths.apiToken)));
     return { server, app, url, shutdown };
   } catch (error) {
     if (workbench) await shutdown();

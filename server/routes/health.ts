@@ -6,16 +6,14 @@
 import type { Express } from "express";
 import { product } from "../../shared/product.js";
 import { version } from "../build-info.js";
-import { apiListenerProof, readApiToken } from "../api-token.js";
+import { apiListenerProof } from "../api-token.js";
 import type { RouteDeps } from "./types.js";
 
 export function registerHealthRoutes(app: Express, { options }: RouteDeps) {
   app.get("/api/health", (req, res) => {
     let proof: string | undefined;
     if (typeof req.query.challenge === "string") {
-      const token = options.apiTokenFile
-        ? readApiToken(options.apiTokenFile)
-        : options.readApiToken ? options.readApiToken() : options.apiToken;
+      const token = options.readApiToken?.() ?? options.apiToken;
       if (token && req.socket.localAddress && req.socket.localPort)
         proof = apiListenerProof(token, req.query.challenge, req.socket.localAddress, req.socket.localPort);
     }
