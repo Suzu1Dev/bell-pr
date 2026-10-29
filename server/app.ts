@@ -253,7 +253,7 @@ export function createApp(workbench: Workbench, options: AppOptions = {}) {
     );
     app.get("/{*splat}", (_req, res) => {
       res.setHeader("Cache-Control", "no-cache");
-      res.sendFile(indexFile, { cacheControl: false });
+      res.sendFile("index.html", { root: staticDirectory, cacheControl: false });
     });
   } else {
     // Started from source without `npm run build`: say so instead of a 404.

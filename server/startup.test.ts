@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { spawn, type ChildProcess } from "node:child_process";
 import { once } from "node:events";
 import {
+  cpSync,
   existsSync,
   mkdirSync,
   readFileSync,
@@ -777,6 +778,70 @@ test("createApp revalidates the page, caches hashed assets for good and explains
     }
     await workbench.shutdown();
     await box.cleanup();
+  }
+});
+
+async function serveFromDotPath() {
+  const box = await sandbox();
+  const store = new Store(box.data);
+  await store.initialize();
+  const workbench = new Workbench(store);
+  // npm i -g under nvm, ~/.local or ~/.npm-global puts the UI below a dot directory.
+  const staticDirectory = path.join(box.directory, ".nvm", "versions", "lib", "bell-pr", "dist");
+  mkdirSync(path.dirname(staticDirectory), { recursive: true });
+  cpSync(box.env.BELLPR_STATIC_DIR!, staticDirectory, { recursive: true });
+  writeFileSync(path.join(staticDirectory, ".env"), "SYNTHETIC_SECRET=dotfile-must-not-leak\n");
+  const app = createApp(workbench, { staticDirectory });
+  const server = app.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  const port = (server.address() as AddressInfo).port;
+  const fetchPage = (route: string) =>
+    get(`http://127.0.0.1:${port}${route}`, { host: "127.0.0.1:4311" });
+  const close = async () => {
+    server.closeAllConnections();
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+    await app.locals.insights.shutdown();
+    await app.locals.discovery.shutdown();
+    await workbench.shutdown();
+    await box.cleanup();
+  };
+  return { fetchPage, close };
+}
+
+test("an install below a dot-prefixed directory serves the page on every route", async () => {
+  const { fetchPage, close } = await serveFromDotPath();
+  try {
+    for (const route of ["/", "/pair", "/some/deep/link"]) {
+      const page = await fetchPage(route);
+      assert.equal(page.status, 200, route);
+      assert.match(page.body, /<title>ui<\/title>/, route);
+    }
+  } finally {
+    await close();
+  }
+});
+
+test("dotfiles inside the UI directory are never served", async () => {
+  const { fetchPage, close } = await serveFromDotPath();
+  try {
+    for (const route of ["/.env", "/pair/../.env", "/%2eenv"]) {
+      const page = await fetchPage(route);
+      assert.doesNotMatch(page.body, /dotfile-must-not-leak/, route);
+    }
+  } finally {
+    await close();
+  }
+});
+
+test("the page served from a dot-prefixed install is still revalidated", async () => {
+  const { fetchPage, close } = await serveFromDotPath();
+  try {
+    for (const route of ["/", "/pair", "/some/deep/link"]) {
+      const page = await fetchPage(route);
+      assert.equal(page.headers["cache-control"], "no-cache", route);
+    }
+  } finally {
+    await close();
   }
 });
 
