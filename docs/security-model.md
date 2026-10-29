@@ -174,8 +174,8 @@ restrictions. Learn by hand never gains a writable agent from this setting.
 
 Full access lets an agent install required tools, change files outside its
 checkout and use existing sudo privileges. Imported code, issues and reviews
-are untrusted input: an induced command can affect anything the service account
-can access. Permission deny lists are not an operating-system boundary for an
+are untrusted input: an induced command can affect anything the user account that
+runs BELL PR can access. Permission deny lists are not an operating-system boundary for an
 unsandboxed shell.
 
 Choosing Full access asks for confirmation. Switching back to Working directory (default) does
@@ -189,7 +189,8 @@ The Full access confirmation and its help show:
 > "Full access" is off by default. It turns off the OS sandbox and the credential deny rules for roles that write files, so those agents can read `~/.git-credentials` and `~/.ssh` and run `gh`, `git push`, and `curl`. Read-only roles keep their limits. Only the removal of `GH_TOKEN`/`GITHUB_TOKEN` from the environment still applies. Use it only in a throwaway VM or container.
 
 On Linux, the optional sudo control accepts a password to install a validated
-`/etc/sudoers.d/bell-pr-agent` rule granting the service account `NOPASSWD: ALL`.
+`/etc/sudoers.d/bell-pr-agent` rule granting the user
+account that runs BELL PR `NOPASSWD: ALL`.
 The password is passed to sudo over standard input, never saved or logged, and
 cleared from the input after submission. This grants that account passwordless
 root commands, including to processes outside BELL PR. Three failed password
