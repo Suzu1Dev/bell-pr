@@ -66,11 +66,15 @@ except `GET /api/health` must send the token (`Authorization: Bearer` or
 `X-Bell-Token`). Missing or invalid authorization is HTTP 401 and changes nothing.
 
 BELL PR listens on 127.0.0.1 unless you set `--host` or `BELLPR_HOST`. Any
-other address prints a warning at start. `--host 0.0.0.0` outside Docker,
-and publishing the Docker port beyond `127.0.0.1`, let other machines reach
-the port; they still need authorization. Put a proxy that limits who can connect
-in front as well (see
-[Reach BELL PR from another machine](#reach-bell-pr-from-another-machine)).
+other address prints a warning at start. Binding `BELLPR_HOST` to `0.0.0.0` or
+`::` without `BELLPR_PUBLIC_URL` still opens the port on every interface, but
+the request guard only accepts this computer's addresses: **every remote
+connection receives HTTP 403** until you set `BELLPR_PUBLIC_URL` to the HTTPS
+origin browsers use. Startup prints one stderr line in that case. `--host
+0.0.0.0` outside Docker, and publishing the Docker port beyond `127.0.0.1`,
+let other machines reach the port once `BELLPR_PUBLIC_URL` is set; they still
+need authorization. Put a proxy that limits who can connect in front as well
+(see [Reach BELL PR from another machine](#reach-bell-pr-from-another-machine)).
 
 `bell-pr` opens the address browsers use (`BELLPR_PUBLIC_URL` when you set
 it, else the local address) with `#bell_token=` on the end. An interactive
@@ -206,9 +210,11 @@ Tailscale serve is the supported remote path. Set
 QR code. A paired credential has the form `bpd_<device-token>` and is stored in
 browser localStorage. Prefer pairing: token URLs stay in browser history.
 
-Using a `*.ts.net` URL without `BELLPR_PUBLIC_URL` causes 403 responses. Do not
-place a Host-rewriting reverse proxy in front: changing Host causes 403 responses.
-Never use Tailscale Funnel; keep the service on your private tailnet.
+Using a `*.ts.net` URL without `BELLPR_PUBLIC_URL` causes 403 responses. The same
+applies when `BELLPR_HOST` is `0.0.0.0` or `::` without `BELLPR_PUBLIC_URL`: remote
+clients are refused until that origin is set. Do not place a Host-rewriting
+reverse proxy in front: changing Host causes 403 responses. Never use Tailscale
+Funnel; keep the service on your private tailnet.
 
 As an alternative, forward the default port with
 `ssh -L 4311:127.0.0.1:4311 <user>@<hostname>` and open

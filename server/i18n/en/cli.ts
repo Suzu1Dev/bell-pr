@@ -123,6 +123,9 @@ export default {
     /** --host or BELLPR_HOST is not 127.0.0.1 (and not another loopback address). */
     exposedHost: ({ host }: { host: string }) =>
       `${name} is listening on ${host}, not only on 127.0.0.1. That address is an explicit setting (--host or BELLPR_HOST). The API token is still required.`,
+    /** 0.0.0.0 / :: without BELLPR_PUBLIC_URL: remote clients are refused by the Host guard. */
+    wildcardHostNeedsPublicUrl: ({ host }: { host: string }) =>
+      `${name} is listening on ${host} without BELLPR_PUBLIC_URL. Remote connections receive HTTP 403 until you set BELLPR_PUBLIC_URL to the HTTPS origin browsers use (for example https://bell.example.com).`,
   },
   /** `bell-pr open`. */
   open: {

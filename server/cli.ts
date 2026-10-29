@@ -321,6 +321,7 @@ async function start(args: string[], ctx: Context): Promise<number | undefined> 
     running = await (ctx.deps.startServer ?? startServer)({
       config,
       print: (line) => ctx.stdout.write(`${line}\n`),
+      warn: (line) => ctx.stderr.write(`${line}\n`),
       ...(browserAction ? { openBrowser: browserAction } : {}),
       ...ctx.deps.startOptions,
     });
