@@ -327,14 +327,7 @@ Details: [Privacy and your data](docs/privacy-and-data.md).
 
 ## Security model
 
-- **Sandboxed agents.** Agents that write code run in their CLI's
-  operating-system sandbox: writes stay in the run's own worktree and the
-  network is closed. With the sandbox on, both agents are denied the GitHub
-  CLI config files, `~/.git-credentials` and credential-store files,
-  `~/.netrc`, and `~/.ssh/`. Tokens in your system keyring are not covered: the
-  agent can still read your GitHub token via `gh auth token`. Your main
-  protection is a fine-grained token with the minimum permissions you need.
-  Claude Code is also denied BELL PR's own data outside its checkout.
+- **Sandboxed agents.** In the default Working directory mode, agents that write code run in their CLI's operating-system sandbox: writes stay in the run's own worktree and the network is closed. Claude Code is denied the GitHub CLI config files, `~/.git-credentials` and credential-store files, `~/.netrc`, and `~/.ssh/`. `GH_TOKEN`/`GITHUB_TOKEN` are removed from the agent's environment. Tokens in your system keyring are not covered: the agent can still read your GitHub token via `gh auth token`. Your main protection is a fine-grained token with the minimum permissions you need. Claude Code is also denied BELL PR's own data outside its checkout. "Full access" is off by default. It turns off the OS sandbox and the credential deny rules for roles that write files, so those agents can read `~/.git-credentials` and `~/.ssh` and run `gh`, `git push`, and `curl`. Read-only roles keep their limits. Only the removal of `GH_TOKEN`/`GITHUB_TOKEN` from the environment still applies. "Passwordless sudo" (Linux only) is off by default. It lets every process under your user account, including the agent, run any command as root without a password and read every file on that machine, including tokens and SSH keys. Use either only in a throwaway VM or container.
 - **Imported projects are untrusted.** Their code, documents and agent
   instructions (`AGENTS.md`, `CLAUDE.md`, `.claude/`) are treated as data:
   the CLIs never load the project's own settings, hooks or instructions,

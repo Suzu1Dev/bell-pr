@@ -658,7 +658,7 @@ esac`,
   assert.equal(check(full, "passwordless-sudo").status, "ok");
   assert.match(
     withLocale("en", () => formatDoctorReport(full)),
-    /Full access +TODO\(B38 disclosure\): Full access notice is not final\./,
+    /Full access +"Full access" is off by default\./,
   );
 
   const installed = path.join(f.directory, "bell-pr-agent");
@@ -669,7 +669,7 @@ esac`,
   assert.equal(check(sudo, "passwordless-sudo").status, "warn");
   assert.equal(check(sudo, "passwordless-sudo").reason, "installed");
   assert.match(check(sudo, "passwordless-sudo").detail ?? "", /BELL PR's passwordless sudo rule is installed/);
-  assert.match(check(sudo, "passwordless-sudo").detail ?? "", /TODO\(B38 disclosure\)/);
+  assert.match(check(sudo, "passwordless-sudo").detail ?? "", /throwaway VM or container/);
   assert.equal(check(sudo, "full-access").status, "ok");
   assert.equal(JSON.stringify(sudo).includes("DO-NOT-READ-THIS-FILE"), false);
   assert.deepEqual(
@@ -694,7 +694,7 @@ esac`,
   );
   assert.equal(check(zh, "full-access").detail, fullAccessDisclosureZh);
   assert.match(check(zh, "passwordless-sudo").detail ?? "", /已安裝 BELL PR 的免密碼 sudo 規則/);
-  assert.match(check(zh, "passwordless-sudo").detail ?? "", /TODO\(B38 disclosure\)/);
+  assert.match(check(zh, "passwordless-sudo").detail ?? "", /用完即丟的 VM 或 container/);
   assert.match(withLocale("zh-TW", () => formatDoctorReport(zh)), /完整權限/);
   assert.equal(bellSudoersFile, "/etc/sudoers.d/bell-pr-agent");
   const securityModel = await readFile(new URL("../docs/security-model.md", import.meta.url), "utf8");
@@ -723,7 +723,7 @@ test("passwordless sudo warns for BELL's rule and for another rule, and skips wh
   assert.equal(check(external, "passwordless-sudo").status, "warn");
   assert.equal(check(external, "passwordless-sudo").reason, "external");
   assert.match(check(external, "passwordless-sudo").detail ?? "", /another rule/);
-  assert.match(check(external, "passwordless-sudo").detail ?? "", /TODO\(B38 disclosure\)/);
+  assert.match(check(external, "passwordless-sudo").detail ?? "", /throwaway VM or container/);
 
   const password = await withLocale("en", () =>
     runDoctor({ ...base, sudoersFile: installed, sudoRun: async () => 1 }),

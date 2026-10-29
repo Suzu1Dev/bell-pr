@@ -186,7 +186,7 @@ It does not run that command on other platforms, or when sudo is not installed.
 
 The Full access confirmation and its help show:
 
-> TODO(B38 disclosure): Full access notice is not final.
+> "Full access" is off by default. It turns off the OS sandbox and the credential deny rules for roles that write files, so those agents can read `~/.git-credentials` and `~/.ssh` and run `gh`, `git push`, and `curl`. Read-only roles keep their limits. Only the removal of `GH_TOKEN`/`GITHUB_TOKEN` from the environment still applies. Use it only in a throwaway VM or container.
 
 On Linux, the optional sudo control accepts a password to install a validated
 `/etc/sudoers.d/bell-pr-agent` rule granting the service account `NOPASSWD: ALL`.
@@ -200,7 +200,7 @@ is not shown on other platforms, and its API is not registered there.
 
 The sudo panel and the doctor warning for that file show:
 
-> TODO(B38 disclosure): Passwordless sudo notice is not final.
+> "Passwordless sudo" (Linux only) is off by default. It lets every process under your user account, including the agent, run any command as root without a password and read every file on that machine, including tokens and SSH keys. Use it only in a throwaway VM or container.
 
 ### Limits that apply to every agent
 

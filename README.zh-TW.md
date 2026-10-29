@@ -71,7 +71,7 @@ Agent 以唯讀方式閱讀專案，說明它的用途、使用者、各部分�
 
 你描述這次貢獻：誰會受益、對他們有什麼改變、哪些行為不能改變、怎樣才算完成。**Lead** 把工作拆成檔案範圍明確的任務，你可以確認計畫或退回並補充意見。**Teammates**（2、3 或 4 位，由你選擇）各自在自己的 Git worktree 中平行工作，透過團隊收件匣分享發現；它們被要求只改自己範圍內的檔案、不做純格式的修改，也絕不削弱、略過或刪除測試。整合之後，**Reviewer** 與 **Test analyst** 會檢查結果，各自只補充 Lead 摘要沒說到的部分。失敗的子任務可以重試。
 
-規劃之前，Lead 會對照程式碼查核需求裡寫下的假設，並把結論告訴每個角色；任務簡介會顯示結論；工作完成後可以重新查核，在有這項查核之前建立的工作也能補做。預設的「工作目錄（預設）」權限要求 Agent 不用 `sudo`，也不做全域安裝。檢查需要這台電腦缺少的環境時，全貌頁會列出它與建議的安裝指令，由你確認後自行執行。模型設定可明確選擇「完整權限」，讓會寫入檔案的角色安裝與設定所需環境；這會移除它們的沙箱限制，唯讀角色仍維持原本限制。Linux 上也可選擇設定服務帳號的免密碼 sudo，詳見[安全模型](docs/security-model.md#explicit-full-access)。
+規劃之前，Lead 會對照程式碼查核需求裡寫下的假設，並把結論告訴每個角色；任務簡介會顯示結論；工作完成後可以重新查核，在有這項查核之前建立的工作也能補做。預設的「工作目錄（預設）」權限要求 Agent 不用 `sudo`，也不做全域安裝。檢查需要這台電腦缺少的環境時，全貌頁會列出它與建議的安裝指令，由你確認後自行執行。模型設定可明確選擇「完整權限」，讓會寫入檔案的角色安裝與設定所需環境；這會移除它們的沙箱限制，唯讀角色仍維持原本限制。Linux 上也可選擇為執行 BELL PR 的使用者帳號設定免密碼 sudo，詳見[安全模型](docs/security-model.md#explicit-full-access)。
 
 多項貢獻可以同時進行，上限由**設定 → 效能**或 `BELLPR_MAX_ACTIVE_RUNS` 決定（1 到 8；預設 2），其餘的依序排隊。
 
@@ -147,7 +147,7 @@ BELL PR 會閱讀專案的貢獻指南、AI 政策、PR 範本、Agent 指南與
 
 ## 安全模型
 
-- **在沙箱中執行的 Agent。** 會寫程式的 Agent 在各自 CLI 的作業系統沙箱中執行：寫入限制在該工作自己的 worktree，網路也會關閉。沙箱開啟時，兩個 Agent 都無法讀取 GitHub CLI 的設定檔、`~/.git-credentials` 與 credential-store 檔案、`~/.netrc` 與 `~/.ssh/`。系統 keyring 裡的 token 不在保護範圍內：agent 仍可透過 `gh auth token` 讀到你的 GitHub token。主要防線是改用權限最小的 fine-grained token。Claude Code 另外無法讀取自己 checkout 以外的 BELL PR 資料。
+- **在沙箱中執行的 Agent。** 在預設的「工作目錄」模式下，會寫程式的 Agent 在各自 CLI 的作業系統沙箱中執行：寫入限制在該工作自己的 worktree，網路也會關閉。Claude Code 無法讀取 GitHub CLI 的設定檔、`~/.git-credentials` 與 credential-store 檔案、`~/.netrc` 與 `~/.ssh/`。`GH_TOKEN`/`GITHUB_TOKEN` 會從 agent 的環境變數中移除。系統 keyring 裡的 token 不在保護範圍內：agent 仍可透過 `gh auth token` 讀到你的 GitHub token。主要防線是改用權限最小的 fine-grained token。Claude Code 另外無法讀取自己 checkout 以外的 BELL PR 資料。「完整權限」預設關閉。開啟後會對寫入檔案的角色關掉 OS sandbox 和 credential deny 規則，這些 agent 可以讀 `~/.git-credentials` 和 `~/.ssh`，也能執行 `gh`、`git push`、`curl`；唯讀角色維持原本限制。只剩 `GH_TOKEN`/`GITHUB_TOKEN` 從環境變數移除這一項還有效。「免密碼 sudo」（僅 Linux）預設關閉。開啟後這個使用者帳號底下所有 process（包括 agent）都能不用密碼以 root 執行任何指令，讀得到那台機器上所有檔案，包括 token 和 SSH key。兩者都只在用完即丟的 VM 或 container 裡開。
 - **匯入的專案不受信任。** 專案的程式碼、文件與 Agent 指示（`AGENTS.md`、`CLAUDE.md`、`.claude/`）都只被當成資料：CLI 不會載入專案自己的設定、hooks 或指示；Git 設定可能執行其他程式的 repository 會被拒絕。BELL PR 自己執行的 git 也會關掉這些程式；只有會連到 GitHub 的 git 才會拿到 `GH_TOKEN`。Agent 仍會執行專案的程式碼，請只匯入你願意在這台電腦上執行的專案。
 - **沒有登入。** BELL PR 不會驗證任何人。能連到它位址的人可以使用它能做的一切，包括以你的 Codex 或 Claude Code 帳戶啟動 Agent，以及以你的 `gh` 登入發佈。預設只在 `127.0.0.1` 上監聽，因此只有這台電腦能連到它。其他網站可以連結到它的頁面，但無法呼叫它的 API，也無法以框架嵌入它。
 - **在沙箱外執行必須明確開啟。** 沒有沙箱時（例如使用預設設定的 Docker），會修改檔案的 Claude Code Agent 會被拒絕。你可以在**設定 → Agent 安全**或用 `BELLPR_ALLOW_UNSANDBOXED_AGENTS=1` 允許；這類 Agent 擁有你完整的使用者權限，用過它的每個工作都會顯示「**未使用沙箱執行**」標記。

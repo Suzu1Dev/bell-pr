@@ -56,9 +56,9 @@ In scope, because the design relies on them:
 
 - the local server: the host and origin checks, and the content security policy;
 - the agent sandbox and the environment agents get: the agent CLIs' sandbox
-  settings, the credential files agents are denied, the refusal to start
-  agents that change code without a sandbox, and the masking of secrets in
-  logs and diagnostics;
+  settings, the credential files Claude Code is denied in the default Working
+  directory mode, the refusal to start agents that change code without a
+  sandbox in that mode, and the masking of secrets in logs and diagnostics;
 - how imported repositories are handled: the local git configuration they
   may carry and the agent instruction files they contain are untrusted;
 - the publish path: the checks of the pull request text, the confirmations

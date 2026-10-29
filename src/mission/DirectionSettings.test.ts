@@ -417,8 +417,8 @@ test("agent access defaults to workspace and exposes the sudo controls only for 
   );
   assert.match(full, /value="full" selected=""/);
   assert.match(full, /Passwordless sudo/);
-  assert.match(full, /TODO\(B38 disclosure\): Full access notice is not final/);
-  assert.match(full, /TODO\(B38 disclosure\): Passwordless sudo notice is not final/);
+  assert.match(full, /&quot;Full access&quot; is off by default/);
+  assert.match(full, /&quot;Passwordless sudo&quot; \(Linux only\) is off by default/);
   assert.doesNotMatch(full, /role="dialog"/);
   assertNoHan(full);
   const other = renderEn(
@@ -426,7 +426,7 @@ test("agent access defaults to workspace and exposes the sudo controls only for 
   );
   assert.match(other, /value="full" selected=""/);
   assert.doesNotMatch(other, /Passwordless sudo/);
-  assert.match(other, /TODO\(B38 disclosure\): Full access notice is not final/);
+  assert.match(other, /&quot;Full access&quot; is off by default/);
 });
 
 test("switching to full access requires confirmation and switching back does not", () => {
@@ -438,7 +438,7 @@ test("switching to full access requires confirmation and switching back does not
     createElement(FullAccessConfirmDialog, { onCancel() {}, onConfirm() {} }),
   );
   assert.match(dialog, /role="dialog"/);
-  assert.match(dialog, /TODO\(B38 disclosure\): Full access notice is not final/);
+  assert.match(dialog, /&quot;Full access&quot; is off by default/);
   const actions = dialog.slice(dialog.indexOf("modal-actions"));
   assert.match(
     actions,
@@ -447,6 +447,6 @@ test("switching to full access requires confirmation and switching back does not
   assert.doesNotMatch(renderEn(props({}, { modelsOnly: true, demo: true })), /role="dialog"/);
   const zh = renderZh(createElement(FullAccessConfirmDialog, { onCancel() {}, onConfirm() {} }));
   assert.match(zh, /要改用完整權限嗎？/);
-  assert.match(zh, /TODO\(B38 disclosure\): 完整權限說明尚未定稿。/);
+  assert.match(zh, /「完整權限」預設關閉/);
   assert.match(zh, /維持工作目錄（預設）/);
 });
