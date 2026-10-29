@@ -305,7 +305,7 @@ test("a 401 becomes the open instruction, not the bearer header text", async () 
   assert.equal(error.status, 401);
   assert.equal(
     error.message,
-    "Open bell-pr from this computer by running `bell-pr open`.",
+    "Run `bell-pr` on the computer hosting BELL PR to reopen your workspace.",
   );
   assert.doesNotMatch(error.message, /Bearer|X-Bell-Token/);
 });

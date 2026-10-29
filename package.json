@@ -30,6 +30,7 @@
   "files": [
     "bin/",
     "build/",
+    "!build/**/*.map",
     "dist/",
     "!dist/.vite/",
     "vendor/ponytail/rules.md",

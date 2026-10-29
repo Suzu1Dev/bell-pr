@@ -9,10 +9,14 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- Desktop launches pass a private temporary file URL to the browser opener,
+  keeping the API token out of opener arguments. Interactive headless starts
+  show only `bell-pr open --print --print-token` as an explicit next step.
+
 - **Reopen with the normal launch command.** `bell-pr` and `bell-pr start`
   reopen an instance already running with the same data directory, before
   checking doctor readiness. Interactive SSH and headless terminals print
-  an authorized link directly. Noninteractive service output keeps the
+  only `bell-pr open --print --print-token` as a hint. Noninteractive service output keeps the
   token private. Explicit `--no-open`, CI and development starts retain
   duplicate-instance protection.
 - **`bell-pr start` waits for `bell-pr doctor` before starting a new server.**
@@ -764,7 +768,3 @@ are not under the Apache license; see `TRADEMARKS.md`.
   options, see `docs/docker.md`.
 - Several real-agent checks used small JavaScript projects; larger and
   multi-language projects are not yet covered.
-
-- Desktop launches pass a private temporary file URL to the browser opener,
-  keeping the API token out of opener arguments. Interactive headless starts
-  show only `bell-pr open --print --print-token` as an explicit next step.
