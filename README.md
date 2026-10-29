@@ -57,6 +57,7 @@ BELL PR is a local workbench. Install and sign in to these tools **before**
 the Quickstart; `bell-pr doctor` prints a fix command for each miss.
 
 - **Node.js 22 or later** ([nodejs.org](https://nodejs.org/en)).
+- `engines` states the minimum supported Node.js; CI pins Node.js 24.22.1 (and npm 11.21.1).
 - **Git**, with your name and e-mail set
   (`git config --global user.name` / `user.email`). Syncing a run onto the
   latest target branch needs **Git 2.40 or later**.

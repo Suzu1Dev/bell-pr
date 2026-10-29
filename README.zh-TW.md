@@ -32,6 +32,7 @@ BELL PR 是本機工作台。請先裝好並登入下列工具，再跑快速開
 會為每一項缺失印出修正指令。
 
 - **Node.js 22 以上**（[nodejs.org](https://nodejs.org/en)）。
+- `engines` 記載支援的最低 Node.js 版本；CI 釘選 Node.js 24.22.1（以及 npm 11.21.1）。
 - **Git**，並設定名字與電子郵件（`git config --global user.name` /
   `user.email`）。同步到最新目標分支需要 **Git 2.40 以上**。
 - **GitHub CLI**（`gh`），並以 `gh auth login` 登入

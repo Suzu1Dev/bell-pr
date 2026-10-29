@@ -3,8 +3,12 @@ import { useT } from "../i18n";
 import { Markdown } from "./markdown/render";
 
 export function safeLink(value: string | null | undefined) {
+  const trimmed = (value ?? "").trim();
+  // Reject anything that does not clearly begin with http(s): before URL parses
+  // (blocks javascript:, data:, protocol-relative //, and whitespace tricks).
+  if (!/^https?:\/\//i.test(trimmed)) return "";
   try {
-    const url = new URL(value ?? "");
+    const url = new URL(trimmed);
     return url.protocol === "https:" || url.protocol === "http:"
       ? url.href
       : "";
@@ -15,8 +19,15 @@ export function safeLink(value: string | null | undefined) {
 
 /** Keep rejected external URLs readable without creating a link. */
 export function WebLink({ href, children, className, ...props }: ComponentProps<"a">) {
-  return href
-    ? <a className={className} href={href} {...props}>{children}</a>
+  // In-page hash targets are not external; everything else must pass safeLink.
+  const safe =
+    typeof href === "string" && href.startsWith("#")
+      ? href
+      : typeof href === "string"
+        ? safeLink(href)
+        : "";
+  return safe
+    ? <a className={className} href={safe} {...props}>{children}</a>
     : <span className={className} title={props.title}>{children}</span>;
 }
 

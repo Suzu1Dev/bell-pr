@@ -197,7 +197,7 @@ export function AboutDialog({
           <ul className="about-links">
             {links.map((item) => (
               <li key={item.id}>
-                <WebLink href={item.href.startsWith("mailto:") ? item.href : safeLink(item.href) || undefined} target="_blank" rel="noreferrer">
+                <WebLink href={safeLink(item.href) || undefined} target="_blank" rel="noreferrer">
                   {t.links[item.id]}
                   <ExternalLink size={13} aria-hidden="true" />
                 </WebLink>

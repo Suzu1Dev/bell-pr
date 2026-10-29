@@ -330,3 +330,46 @@ test("pairing modules never read the source address or forwarded headers", () =>
     assert.doesNotMatch(source, /req\.ip\b|\.ips\b|x-forwarded|forwarded|remoteAddress|\.socket\b/i, file);
   }
 });
+
+test("POST /api/pair?code= ignores the query: no redeem and no prefill from query", async (t) => {
+  const f = await fixture(t);
+  const code = await f.newCode();
+  // Query carries a valid code; body has none / a different code — query must not redeem.
+  const noBodyCode = await f.send("POST", `/api/pair?code=${code}`, {}, { name: "FromQuery" });
+  assert.equal(noBodyCode.status, 400);
+  assert.equal((await f.send("GET", "/api/devices", f.install)).json.length, 0);
+
+  const other = code.startsWith("0") ? "1111-1111" : "0000-0000";
+  const wrongBody = await f.send("POST", `/api/pair?code=${code}`, {}, { code: other });
+  assert.equal(wrongBody.status, 401);
+  assert.deepEqual(wrongBody.json, { error: "invalid_code" });
+  assert.equal((await f.send("GET", "/api/devices", f.install)).json.length, 0);
+
+  // Body code still works when query is absent or present with noise.
+  const ok = await f.send("POST", `/api/pair?code=${other}`, {}, { code, name: "BodyWins" });
+  assert.equal(ok.status, 201);
+  assert.equal(ok.json.name, "BodyWins");
+});
+
+test("pairing lock returns only 423 pairing_locked, never 429", async (t) => {
+  const f = await fixture(t);
+  const code = await f.newCode();
+  const wrong = code.startsWith("0") ? "1111-1111" : "0000-0000";
+  const statuses: number[] = [];
+  for (let i = 0; i < 40; i++) {
+    const response = await f.send("POST", "/api/pair", {}, { code: wrong });
+    statuses.push(response.status);
+    if (response.status === 423) {
+      assert.equal(response.json.error, "pairing_locked");
+      break;
+    }
+  }
+  assert.equal(statuses.includes(429), false);
+  assert.equal(statuses.at(-1), 423);
+  // Creating codes while locked also stays off 429.
+  const refused = await f.send("POST", "/api/pair/codes", f.install, {});
+  assert.equal(refused.status, 423);
+  assert.equal(refused.json.error, "pairing_locked");
+  const unlocked = await f.send("POST", "/api/pair/unlock", f.install, {});
+  assert.equal(unlocked.status, 204);
+});
