@@ -1,3 +1,4 @@
+import { safeLink, WebLink } from "../../review/MarkdownContent";
 import type { HelpChannel } from "../../../shared/contribution";
 
 /**
@@ -11,9 +12,9 @@ export function Channels({ channels = [] }: { channels?: HelpChannel[] }) {
     <ul>
       {links.map((channel) => (
         <li key={channel.url}>
-          <a href={channel.url} target="_blank" rel="noreferrer">
+          <WebLink href={safeLink(channel.url) || undefined} target="_blank" rel="noreferrer">
             {channel.label}
-          </a>{" "}
+          </WebLink>{" "}
           {channel.path && <code>{`${channel.path}:${channel.line ?? 1}`}</code>}
         </li>
       ))}

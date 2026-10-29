@@ -1,3 +1,4 @@
+import { safeLink, WebLink } from "./MarkdownContent";
 import { ArrowUpRight, MessageCircle } from "lucide-react";
 import type { PrFeedbackItem } from "../../shared/pr-feedback";
 import { useT } from "../i18n";
@@ -29,10 +30,10 @@ export function MaintainerFeedback({ items }: { items: PrFeedbackItem[] }) {
                 <span>{t.feedback.line({ line: item.line })}</span>
               )}
               {item.isResolved && <span>{t.feedback.resolved}</span>}
-              <a href={item.url} target="_blank" rel="noopener noreferrer">
+              <WebLink href={safeLink(item.url) || undefined} target="_blank" rel="noopener noreferrer">
                 {t.feedback.open}
                 <ArrowUpRight size={12} />
-              </a>
+              </WebLink>
             </div>
             <p>{item.body}</p>
           </li>

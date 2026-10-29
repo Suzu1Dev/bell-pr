@@ -1,15 +1,23 @@
+import type { ComponentProps } from "react";
 import { useT } from "../i18n";
 import { Markdown } from "./markdown/render";
 
-function safeLink(value: string) {
+export function safeLink(value: string | null | undefined) {
   try {
-    const url = new URL(value);
+    const url = new URL(value ?? "");
     return url.protocol === "https:" || url.protocol === "http:"
       ? url.href
       : "";
   } catch {
     return "";
   }
+}
+
+/** Keep rejected external URLs readable without creating a link. */
+export function WebLink({ href, children, className, ...props }: ComponentProps<"a">) {
+  return href
+    ? <a className={className} href={href} {...props}>{children}</a>
+    : <span className={className} title={props.title}>{children}</span>;
 }
 
 /**

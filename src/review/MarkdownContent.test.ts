@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { createElement } from "react";
 import { assertNoHan, renderEn, renderZh } from "../test-utils/render";
-import { MarkdownContent } from "./MarkdownContent";
+import { MarkdownContent, safeLink, WebLink } from "./MarkdownContent";
 
 const render = (children: string) =>
   renderZh(createElement(MarkdownContent, { children }));
@@ -67,4 +67,15 @@ test("a diff block marks its added and removed lines and keeps the text as it wa
     /<pre><code class="language-ts">\+1\n<\/code><\/pre>/,
   );
   assertNoHan(html);
+});
+
+test("safeLink allows only absolute HTTP and HTTPS links", () => {
+  for (const value of ["javascript:alert(1)", "data:text/html,x", "vbscript:msgbox(1)", "/relative", "//evil.example"])
+    assert.equal(safeLink(value), "");
+  for (const value of ["https://example.com/path", "http://example.com/path"])
+    assert.equal(safeLink(value), value);
+});
+
+test("rejected external links render their text without an anchor", () => {
+  assert.equal(renderEn(createElement(WebLink, { href: safeLink("javascript:alert(1)") || undefined }, "Source")), "<span>Source</span>");
 });

@@ -1,3 +1,4 @@
+import { safeLink, WebLink } from "./MarkdownContent";
 import { useEffect, useState } from "react";
 import {
   ChevronDown,
@@ -100,10 +101,10 @@ export function CommitList({
             {commit.body && <p className="commit-body">{commit.body}</p>}
             <div className="commit-meta">
               {prUrl ? (
-                <a href={`${prUrl}/commits/${commit.sha}`} target="_blank" rel="noreferrer">
+                <WebLink href={safeLink(`${prUrl}/commits/${commit.sha}`) || undefined} target="_blank" rel="noreferrer">
                   <code>{commit.sha.slice(0, 7)}</code>
                   <ExternalLink size={11} aria-hidden="true" />
-                </a>
+                </WebLink>
               ) : (
                 <code>{commit.sha.slice(0, 7)}</code>
               )}

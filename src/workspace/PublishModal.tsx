@@ -1,3 +1,4 @@
+import { safeLink, WebLink } from "../review/MarkdownContent";
 import {
   useCallback,
   useEffect,
@@ -737,9 +738,9 @@ export function LoopRuns({
     return own ? (
       open(own)
     ) : (
-      <a key={url} className="run-notice-link" href={url} target="_blank" rel="noreferrer">
+      <WebLink key={url} className="run-notice-link" href={safeLink(url) || undefined} target="_blank" rel="noreferrer">
         {t.waitingPr({ number: pullNumber(url) })}
-      </a>
+      </WebLink>
     );
   });
 }

@@ -1,3 +1,4 @@
+import { safeLink, WebLink } from "../review/MarkdownContent";
 import { limitationsSection } from "../../shared/limitations";
 import { sessionTurnBlock } from "../session/state";
 import {
@@ -688,16 +689,16 @@ export function DraftTab({
             <div className="pr-feedback-actions">
               {/* The sample PR exists nowhere to link to. */}
               {!demo && (
-                <a
+                <WebLink
                   className="button secondary"
-                  href={run.prUrl}
+                  href={safeLink(run.prUrl) || undefined}
                   target="_blank"
                   rel="noreferrer"
                 >
                   <GitPullRequest size={15} />
                   {t.feedback.viewPullRequest}
                   <ExternalLink size={13} />
-                </a>
+                </WebLink>
               )}
               <button className="button primary" disabled={feedbackLoading} onClick={fetchPrFeedback}>
                 {feedbackLoading ? <Loader2 className="spin" size={15} /> : <RefreshCw size={15} />}
@@ -755,13 +756,13 @@ export function DraftTab({
                         <span>{check.name}</span>
                         <b>{check.state}</b>
                         {check.url && (
-                          <a
-                            href={check.url}
+                          <WebLink
+                            href={safeLink(check.url) || undefined}
                             target="_blank"
                             rel="noreferrer"
                           >
                             {t.feedback.details}
-                          </a>
+                          </WebLink>
                         )}
                       </li>
                     ))}
@@ -849,13 +850,13 @@ export function DraftTab({
                             )}
                             {/* Sample feedback links to nothing on GitHub. */}
                             {!demo && (
-                              <a
-                                href={item.url}
+                              <WebLink
+                                href={safeLink(item.url) || undefined}
                                 target="_blank"
                                 rel="noreferrer"
                               >
                                 {t.feedback.openOnGitHub}
-                              </a>
+                              </WebLink>
                             )}
                           </div>
                           <p
@@ -931,9 +932,9 @@ export function DraftTab({
           {/* The sample's PR exists nowhere to close. */}
           {!demo && (
             <p className="pr-feedback-cant">
-              <a href={run.prUrl} target="_blank" rel="noreferrer">
+              <WebLink href={safeLink(run.prUrl) || undefined} target="_blank" rel="noreferrer">
                 {t.feedback.cantContinue}
-              </a>
+              </WebLink>
             </p>
           )}
         </section>
