@@ -8,6 +8,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Browser, type Page } from "@playwright/test";
+import { e2eApiHeaders } from "./api-token.mjs";
 import draft from "../src/i18n/en/draft";
 import modals from "../src/i18n/en/modals";
 import workspace from "../src/i18n/en/workspace";
@@ -123,6 +124,7 @@ test.afterAll(async () => {
 
 async function open(browser: Browser, width = 1440) {
   const context = await browser.newContext({
+    extraHTTPHeaders: e2eApiHeaders,
     baseURL: server.baseURL,
     locale: "en-US",
     viewport: { width, height: 900 },

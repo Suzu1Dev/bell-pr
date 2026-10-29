@@ -6,10 +6,12 @@
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import { parseArgs, type ParseArgsConfig } from "node:util";
+import { readApiToken, rotateApiToken, withApiToken } from "./api-token.js";
 import { buildDate, version } from "./build-info.js";
 import {
   browserHost,
   ConfigError,
+  dataPaths,
   envFlag,
   resolveConfig,
   resolveDataDir,
@@ -281,10 +283,23 @@ async function open(args: string[], ctx: Context): Promise<number> {
     ctx.stderr.write(`${m.notRunning({ dataDir })}\n`);
     return 1;
   }
-  const url = lockUrl(lock);
+  const url = withApiToken(lockUrl(lock), readApiToken(dataPaths(dataDir).apiToken));
   ctx.stdout.write(`${url}\n`);
   if (!values.print && !values["no-open"] && canOpenBrowser(ctx.env, ctx.stdout))
     ctx.openUrl(url);
+  return 0;
+}
+
+/** `bell-pr token rotate` replaces the token file. The new token is not printed. */
+async function rotateToken(args: string[], ctx: Context): Promise<number> {
+  const [sub, ...rest] = args;
+  if (sub !== "rotate")
+    throw new UsageError(sm().cli.token.usage);
+  const { values } = parse(rest, commonOptions);
+  loadEnvFile(values["env-file"]);
+  const file = dataPaths(resolveDataDir({ dataDir: values["data-dir"] }, ctx.env)).apiToken;
+  await rotateApiToken(file);
+  ctx.stdout.write(`${sm().cli.token.rotated({ path: file })}\n`);
   return 0;
 }
 
@@ -364,7 +379,7 @@ export async function main(
   try {
     // `bell-pr start --help` and the like show the help instead of failing.
     if (
-      ["start", "open", "version", "--version", "-v"].includes(first) ||
+      ["start", "open", "token", "version", "--version", "-v"].includes(first) ||
       first?.startsWith("-")
     )
       if (wantsHelp(argv)) return help();
@@ -375,6 +390,8 @@ export async function main(
         return await start(rest, ctx);
       case "open":
         return await open(rest, ctx);
+      case "token":
+        return await rotateToken(rest, ctx);
       case "doctor":
         return await doctor(rest, ctx);
       case "version":

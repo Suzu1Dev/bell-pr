@@ -504,7 +504,7 @@ async function appServer(options: { port?: number; publicUrl?: string } = {}) {
 const cspHeader =
   "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'";
 
-test("BELL PR has no sign-in: the API and the pages answer without credentials, set no cookie and carry the security headers", async () => {
+test("an app with no API token configured answers without credentials, sets no cookie and carries the security headers", async () => {
   const server = await appServer();
   try {
     // An origin-less POST, as a local script would send it.

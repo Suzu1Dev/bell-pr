@@ -29,8 +29,9 @@ the settings in the app.
 | Command | What it does |
 | --- | --- |
 | `bell-pr` or `bell-pr start` | Starts BELL PR and prints its address. Exits 1 before listening when a required doctor check fails; `--force` starts anyway |
-| `bell-pr open` | Prints the address of the running BELL PR and opens it; `--print` only prints it |
-| `bell-pr doctor` | Checks Node.js, Git, the GitHub CLI, the agent CLIs, the sandbox and the data directory; `--json` for scripts |
+| `bell-pr open` | Prints the address of the running BELL PR, including the API token fragment, and opens it; `--print` only prints it |
+| `bell-pr token rotate` | Replaces `<data dir>/api-token`. A running BELL PR uses the new token on the next request. The new token is not printed |
+| `bell-pr doctor` | Checks Node.js, Git, the GitHub CLI, the agent CLIs, the sandbox and the data directory; `--json` for scripts. The report does not include the API token |
 | `bell-pr version` | Shows the version, its release date, Node.js, the platform and the data directory |
 | `bell-pr help` | Lists the commands and options |
 
@@ -128,9 +129,10 @@ command-line messages before a language is chosen.
 
 BELL PR serves the web interface and the API on one port, 4311 by default, on
 `127.0.0.1`. Two BELL PR servers on one computer, for example one from `npx`
-and one in Docker, need different ports. BELL PR does not authenticate anyone,
-so keep the default `127.0.0.1` unless a proxy that authenticates sits in front
-(see [Self-hosting](self-hosting.md)).
+and one in Docker, need different ports. Keep the default `127.0.0.1` unless
+you mean to listen elsewhere: `--host` and `BELLPR_HOST` are explicit, and
+BELL PR prints a warning for an address that is not loopback. The API token
+is still required (see [Self-hosting](self-hosting.md)).
 
 ## Logs
 

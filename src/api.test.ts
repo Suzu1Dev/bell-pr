@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test, { afterEach, beforeEach } from "node:test";
 import { product } from "../shared/product";
-import { ApiError, api, apiUrl, send } from "./api";
+import { adoptApiToken, ApiError, api, apiUrl, send } from "./api";
 import { setLocale } from "./i18n";
 
 interface Call {
@@ -70,8 +70,10 @@ test("every request carries the UI locale in X-Bell-Locale", async () => {
       ["DELETE", "/api/repos", "zh-TW"],
     ],
   );
-  for (const call of calls)
+  for (const call of calls) {
     assert.equal(call.headers.get("Content-Type"), "application/json");
+    assert.equal(call.headers.get("Authorization"), null);
+  }
   assert.equal(calls[1].body, '{"title":"Fix"}');
   assert.equal(calls[2].headers.get("X-Custom"), "1");
   assert.equal(calls[3].headers.get("Accept"), "text/markdown");
@@ -222,4 +224,88 @@ test("apiUrl adds the UI locale for plain links", async () => {
 test("send builds a JSON request body", () => {
   assert.deepEqual(send("POST", { a: 1 }), { method: "POST", body: '{"a":1}' });
   assert.deepEqual(send("DELETE"), { method: "DELETE", body: "{}" });
+});
+
+function tokenWindow(initial: string) {
+  const stored = new Map<string, string>();
+  const session = {
+    getItem: (key: string) => stored.get(key) ?? null,
+    setItem: (key: string, value: string) => void stored.set(key, value),
+    removeItem: (key: string) => void stored.delete(key),
+    clear: () => stored.clear(),
+    key: () => null,
+    get length() {
+      return stored.size;
+    },
+  } satisfies Storage;
+  let href = initial;
+  const win = {
+    location: {
+      get hash() {
+        return new URL(href).hash;
+      },
+      get search() {
+        return new URL(href).search;
+      },
+      get pathname() {
+        return new URL(href).pathname;
+      },
+    },
+    history: {
+      state: null,
+      replaceState: (_state: unknown, _title: string, url?: string | URL | null) => {
+        href = String(url);
+      },
+    },
+    sessionStorage: session,
+  };
+  return {
+    win,
+    session,
+    stored,
+    href: () => href,
+  };
+}
+
+test("?bell_token= is ignored and #bell_token= is stored then removed", async () => {
+  const token = "ab".repeat(32);
+  const query = tokenWindow(`http://127.0.0.1:4311/?bell_token=${token}`);
+  adoptApiToken(query.win);
+  assert.equal(query.stored.get("bellpr-api-token"), undefined);
+  assert.equal(query.href(), `http://127.0.0.1:4311/?bell_token=${token}`);
+
+  const hashed = tokenWindow(`http://127.0.0.1:4311/#/runs/abc?bell_token=${token}`);
+  adoptApiToken(hashed.win);
+  assert.equal(hashed.stored.get("bellpr-api-token"), undefined);
+  assert.equal(hashed.href(), `http://127.0.0.1:4311/#/runs/abc?bell_token=${token}`);
+
+  const fragment = tokenWindow(`http://127.0.0.1:4311/#bell_token=${token}`);
+  adoptApiToken(fragment.win);
+  assert.equal(fragment.stored.get("bellpr-api-token"), token);
+  assert.equal(fragment.href(), "/");
+  const previous = globalThis.sessionStorage;
+  globalThis.sessionStorage = fragment.session;
+  try {
+    await api("/status");
+    assert.equal(calls.at(-1)?.headers.get("Authorization"), `Bearer ${token}`);
+  } finally {
+    globalThis.sessionStorage = previous;
+    fragment.stored.clear();
+  }
+});
+
+test("a 401 becomes the open instruction, not the bearer header text", async () => {
+  respond = () =>
+    json(401, {
+      error:
+        "This request needs the API token. Send it as Authorization: Bearer <token>, or as the X-Bell-Token header.",
+    });
+  const error = await rejection(api("/status"));
+  assert.ok(error instanceof ApiError);
+  assert.equal(error.status, 401);
+  assert.equal(
+    error.message,
+    "Open bell-pr from this computer by running `bell-pr open`.",
+  );
+  assert.doesNotMatch(error.message, /Bearer|X-Bell-Token/);
 });

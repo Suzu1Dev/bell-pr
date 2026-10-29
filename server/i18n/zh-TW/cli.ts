@@ -16,6 +16,7 @@ const m: Translation<typeof en> = {
       `  start      啟動 ${name}（預設指令）`,
       "  open       印出執行中伺服器的位址，並在瀏覽器開啟",
       "  doctor     檢查 git、gh 與 Agent CLI（加 --json 輸出機器可讀格式）",
+      "  token      更換 API 權杖（`token rotate`）",
       "  version    顯示版本、Node.js、平台與資料目錄",
       "  help       顯示這份說明",
       "",
@@ -86,10 +87,17 @@ const m: Translation<typeof en> = {
     uiMissingTitle: `${name}：網頁介面尚未建置`,
     uiMissingPage:
       `${name} 的網頁介面尚未建置。請在 ${name} 原始碼資料夾執行 npm run build，再重新啟動 ${name}。`,
+    exposedHost: ({ host }) =>
+      `${name} 正在 ${host} 上監聽，而非只在 127.0.0.1。這是 --host 或 BELLPR_HOST 明確指定的位址。API 權杖仍然必要。`,
   },
   open: {
     notRunning: ({ dataDir }) =>
       `沒有使用資料目錄 ${dataDir} 的 ${name} 在執行。請用 \`${bin}\` 啟動；若 ${name} 用其他資料目錄啟動，請執行 \`${bin} open --data-dir <dir>\`。`,
+  },
+  token: {
+    rotated: ({ path }) =>
+      `已更換 ${path} 的 API 權杖。執行中的 ${name} 會在下一個請求使用新權杖。執行 \`${bin} open\` 即可用它開啟。`,
+    usage: `執行 \`${bin} token rotate\` 以更換 API 權杖。`,
   },
 };
 export default m;

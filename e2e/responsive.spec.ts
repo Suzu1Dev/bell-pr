@@ -20,6 +20,7 @@
 //
 //   BELLPR_E2E_PORT=<port> npx playwright test e2e/responsive.spec.ts
 import { expect, test, type Browser, type Page } from "@playwright/test";
+import { e2eApiHeaders } from "./api-token.mjs";
 import { htmlLang, locales, type Locale } from "../shared/i18n/locale";
 import { findOverflow } from "./helpers/overflow";
 import { startReadyServer } from "./helpers/ready-server";
@@ -229,6 +230,7 @@ async function expectFits(
   } = {},
 ) {
   const context = await browser.newContext({
+    extraHTTPHeaders: e2eApiHeaders,
     baseURL: server.baseURL,
     locale: "en-US",
     timezoneId: "UTC",
@@ -297,6 +299,7 @@ test.describe("every page", () => {
     test(`the run's tabs keep clear of the totals in ${locale}`, async ({ browser }) => {
       for (const width of [900, 1024, 1100, 1181, 1280, 1440]) {
         const context = await browser.newContext({
+          extraHTTPHeaders: e2eApiHeaders,
           baseURL: server!.baseURL,
           viewport: { width, height: 800 },
         });

@@ -4,6 +4,7 @@
 import { writeFile } from "node:fs/promises";
 import path from "node:path";
 import { expect, test } from "@playwright/test";
+import { e2eApiHeaders } from "./api-token.mjs";
 import mission from "../src/i18n/en/mission";
 import modals from "../src/i18n/en/modals";
 import repos from "../src/i18n/en/repos";
@@ -39,6 +40,7 @@ test.afterAll(async () => {
 
 test("a link typed the moment the saved settings unlock the form is kept when they arrive", async ({ browser }) => {
   const context = await browser.newContext({
+    extraHTTPHeaders: e2eApiHeaders,
     baseURL: server.baseURL,
     viewport: { width: 1440, height: 900 },
     locale: "en-US",
@@ -87,6 +89,7 @@ test("a link typed the moment the saved settings unlock the form is kept when th
 
 test("the team size is a plain choice of two, three or four teammates", async ({ browser }) => {
   const context = await browser.newContext({
+    extraHTTPHeaders: e2eApiHeaders,
     baseURL: server.baseURL,
     viewport: { width: 1440, height: 900 },
     locale: "en-US",

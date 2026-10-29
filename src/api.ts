@@ -85,9 +85,11 @@ function errorFromBody(status: number, body: unknown) {
     ...details
   } = raw;
   const message =
-    typeof text === "string" && text.trim()
-      ? text
-      : getCurrentMessages().common.errors.generic;
+    status === 401
+      ? getCurrentMessages().common.errors.apiTokenRequired
+      : typeof text === "string" && text.trim()
+        ? text
+        : getCurrentMessages().common.errors.generic;
   const code = isErrorCode(rawCode) ? rawCode : undefined;
   const init: ApiErrorInit = {
     status,
@@ -100,6 +102,65 @@ function errorFromBody(status: number, body: unknown) {
 }
 
 const plainTextType = /^text\/(?!html\b)/i;
+const apiTokenStorageKey = "bellpr-api-token";
+const apiTokenPattern = /^[0-9a-f]{64}$/i;
+
+function decodePart(value: string) {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
+
+function browserSession(): Storage | undefined {
+  try {
+    return typeof sessionStorage === "undefined" ? undefined : sessionStorage;
+  } catch {
+    return undefined;
+  }
+}
+
+/** The token the page stored, if `bell-pr open` handed it one. */
+export function currentApiToken(): string | undefined {
+  try {
+    return browserSession()?.getItem(apiTokenStorageKey) ?? undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Reads `#bell_token=` from the fragment into session storage and removes
+ * that fragment. A `?bell_token=` query is ignored.
+ */
+export interface ApiTokenWindow {
+  location: { hash: string; search: string; pathname: string };
+  history: {
+    state: unknown;
+    replaceState(state: unknown, title: string, url?: string | URL | null): void;
+  };
+  sessionStorage: { setItem(key: string, value: string): void };
+}
+
+export function adoptApiToken(win: ApiTokenWindow): void {
+  const hash = win.location.hash.startsWith("#")
+    ? win.location.hash.slice(1)
+    : win.location.hash;
+  if (!hash.startsWith("bell_token=")) return;
+  const token = decodePart(hash.slice("bell_token=".length));
+  if (!apiTokenPattern.test(token)) return;
+  try {
+    win.sessionStorage.setItem(apiTokenStorageKey, token.toLowerCase());
+  } catch {
+    // Storage can refuse the write. The fragment is still removed below.
+  }
+  win.history.replaceState(
+    win.history.state,
+    "",
+    `${win.location.pathname}${win.location.search}`,
+  );
+}
 
 /**
  * Calls the BELL PR API at `/api${path}` with the UI locale in the
@@ -119,6 +180,9 @@ export async function api<T>(path: string, options?: RequestInit): Promise<T> {
     headers.set("Content-Type", "application/json");
   if (!headers.has("X-Bell-Locale"))
     headers.set("X-Bell-Locale", getCurrentLocale());
+  const token = currentApiToken();
+  if (token && !headers.has("Authorization") && !headers.has("X-Bell-Token"))
+    headers.set("Authorization", `Bearer ${token}`);
   let response: Response;
   let text: string;
   try {

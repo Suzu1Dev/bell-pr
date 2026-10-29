@@ -16,6 +16,7 @@ export default {
       `  start      Start ${name} (the default command)`,
       "  open       Print the address of the running server and open it in the browser",
       "  doctor     Check git, gh and the agent CLIs (--json for machine output)",
+      "  token      Replace the API token (`token rotate`)",
       "  version    Show the version, Node.js, platform and data directory",
       "  help       Show this help",
       "",
@@ -116,10 +117,19 @@ export default {
     uiMissingTitle: `${name}: web interface not built`,
     uiMissingPage:
       `The ${name} web interface is not built. Run npm run build in the ${name} source folder, then start ${name} again.`,
+    /** --host or BELLPR_HOST is not 127.0.0.1 (and not another loopback address). */
+    exposedHost: ({ host }: { host: string }) =>
+      `${name} is listening on ${host}, not only on 127.0.0.1. That address is an explicit setting (--host or BELLPR_HOST). The API token is still required.`,
   },
   /** `bell-pr open`. */
   open: {
     notRunning: ({ dataDir }: { dataDir: string }) =>
       `No ${name} is running with the data directory ${dataDir}. Start it with \`${bin}\`, or, for a ${name} started with another data directory, run \`${bin} open --data-dir <dir>\`.`,
+  },
+  /** `bell-pr token rotate`. The new token is not included. */
+  token: {
+    rotated: ({ path }: { path: string }) =>
+      `Replaced the API token in ${path}. A running ${name} uses the new token on the next request. Run \`${bin} open\` to open the app with it.`,
+    usage: `Run \`${bin} token rotate\` to replace the API token.`,
   },
 };

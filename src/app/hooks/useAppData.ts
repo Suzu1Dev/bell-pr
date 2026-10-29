@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { AppSettings, AppSettingsView } from "../../../shared/app-settings";
-import { api } from "../../api";
+import { api, ApiError } from "../../api";
 import type { Repo, RunSummary } from "../../types";
 
 /** What /api/status reports about the local CLIs and the run limits. */
@@ -84,6 +84,8 @@ export function useAppData() {
   const [appSettings, setAppSettings] = useState<AppSettings | null>(null);
   const [loaded, setLoaded] = useState(pending);
   const [apiError, setApiError] = useState("");
+  /** A 401 on the first load: the page was opened without the API token. */
+  const [apiTokenRequired, setApiTokenRequired] = useState(false);
   useEffect(() => {
     let cancelled = false;
     const settle = (source: AppDataSource, state: LoadState) =>
@@ -112,6 +114,10 @@ export function useAppData() {
       failed(source, error) {
         if (cancelled) return;
         settle(source, "failed");
+        if (error instanceof ApiError && error.status === 401) {
+          setApiTokenRequired(true);
+          return;
+        }
         // The settings only decide the welcome flow and the agreement
         // prompt; the other requests report a broken connection.
         if (source !== "appSettings")
@@ -155,6 +161,7 @@ export function useAppData() {
     loaded,
     apiError,
     setApiError,
+    apiTokenRequired,
   };
 }
 

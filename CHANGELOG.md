@@ -28,6 +28,15 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   Choosing Full access asks for confirmation. Doctor warns when Full access
   is saved and when the passwordless sudo rule file is installed. The sudo
   control is offered only on Linux.
+- **Local API token.** The first start writes a random token to
+  `<data dir>/api-token` (mode 0600) and later starts reuse it. API requests
+  other than `GET /api/health` send `Authorization: Bearer` or
+  `X-Bell-Token`. `bell-pr open` and `bell-pr open --print` put the token in
+  the page address so the app can send it. `bell-pr token rotate` replaces
+  the file; a running BELL PR uses the new token on the next request. The
+  token is not in the startup line, the server log, or `bell-pr doctor --json`.
+  Listening somewhere other than a loopback address is still an explicit
+  `--host` or `BELLPR_HOST`, and BELL PR prints a warning when you do.
 
 - **Analysis progress.** While a project analysis or **Generate 5 more**
   runs, the overview lists its steps and shows how long the agent has worked
@@ -51,12 +60,9 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Removed
 
-- **Sign-in.** BELL PR no longer signs anyone in: the session cookie, the
-  one-time sign-in links, the `/auth` page and the `auth_required` error code
-  are gone. The start line prints the plain address (`http://127.0.0.1:4311`),
-  and `bell-pr open` prints that address and opens it (`--print` only prints
-  it). BELL PR does not authenticate anyone, so put an authenticating proxy in
-  front of it before you reach it from another machine.
+- **Session sign-in.** The session cookie, the one-time sign-in links, the
+  `/auth` page and the `auth_required` error code stay removed. The local
+  API token above is what a request must send instead.
 
 ### Changed
 

@@ -13,6 +13,7 @@ import { appendFile, mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Browser, type Page, type Route } from "@playwright/test";
+import { e2eApiHeaders } from "./api-token.mjs";
 import { changeFingerprint } from "../shared/change-fingerprint";
 import type { DiscoveryJob } from "../shared/discovery";
 import type { Locale } from "../shared/i18n/locale";
@@ -233,6 +234,7 @@ test.afterAll(async () => {
 
 async function open(browser: Browser, hash: string, { locale = "en", width = 1440 }: { locale?: Locale; width?: number } = {}) {
   const context = await browser.newContext({
+    extraHTTPHeaders: e2eApiHeaders,
     baseURL: server.baseURL,
     viewport: { width, height: width < 760 ? 844 : 900 },
     locale: locale === "en" ? "en-US" : locale,
