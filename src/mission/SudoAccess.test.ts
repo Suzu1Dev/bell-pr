@@ -27,6 +27,7 @@ test("when sudo needs a password, the panel asks for it once and the enable butt
   assert.match(empty, /<button[^>]*disabled[^>]*>啟用免密碼 sudo<\/button>/);
   assert.doesNotMatch(empty, /移除 BELL PR 的 sudo 規則/);
   assert.match(empty, /不會被儲存或寫入記錄/);
+  assert.match(empty, /TODO\(B38 disclosure\): 免密碼 sudo 說明尚未定稿。/);
 
   const typed = render({ password: "typed" });
   assert.doesNotMatch(typed, /<button[^>]*disabled[^>]*>啟用免密碼 sudo<\/button>/);

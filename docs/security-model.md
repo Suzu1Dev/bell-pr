@@ -178,6 +178,15 @@ are untrusted input: an induced command can affect anything the service account
 can access. Permission deny lists are not an operating-system boundary for an
 unsandboxed shell.
 
+Choosing Full access asks for confirmation. Switching back to Workspace does
+not. `bell-pr doctor` warns, and does not fail, when Full access is saved and
+when `/etc/sudoers.d/bell-pr-agent` is installed. Those checks read the saved
+model settings and whether that file exists. They do not run sudo.
+
+The Full access confirmation and its help show:
+
+> TODO(B38 disclosure): Full access notice is not final.
+
 On Linux, the optional sudo control accepts a password to install a validated
 `/etc/sudoers.d/bell-pr-agent` rule granting the service account `NOPASSWD: ALL`.
 The password is passed to sudo over standard input, never saved or logged, and
@@ -185,7 +194,12 @@ cleared from the input after submission. This grants that account passwordless
 root commands, including to processes outside BELL PR. Three failed password
 attempts block this control for 15 minutes in process memory; restarting clears
 the counter. Removing BELL's rule does not remove privileges from other sudo
-rules. Enabling Full access alone does not install the sudo rule.
+rules. Enabling Full access alone does not install the sudo rule. The control
+is not shown on other platforms, and its API is not registered there.
+
+The sudo panel and the doctor warning for that file show:
+
+> TODO(B38 disclosure): Passwordless sudo notice is not final.
 
 ### Limits that apply to every agent
 

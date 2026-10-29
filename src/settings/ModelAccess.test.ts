@@ -29,7 +29,7 @@ function stubApi() {
 }
 
 type Handler = (event: { preventDefault(): void; target: { value: string } }) => unknown;
-async function invoke(element: FakeElement, name: "onChange" | "onSubmit", value = "") {
+async function invoke(element: FakeElement, name: "onChange" | "onSubmit" | "onClick", value = "") {
   const props = Object.entries(element).find(([key]) => key.startsWith("__reactProps$"))?.[1] as Record<string, Handler>;
   await act(async () => { await props[name]({ preventDefault() {}, target: { value } }); });
 }
@@ -44,6 +44,9 @@ test("the Provider settings page saves explicit full access and can return it to
       return element;
     };
     await invoke(find((node) => node.getAttribute("id")?.endsWith("-agent-access") === true), "onChange", "full");
+    await invoke(find((node) => node.nodeName === "FORM"), "onSubmit");
+    assert.equal(writes.at(-1)?.agentAccess, undefined);
+    await invoke(find((node) => node.nodeName === "BUTTON" && node.textContent === "Use Full access"), "onClick");
     await invoke(find((node) => node.nodeName === "FORM"), "onSubmit");
     assert.equal(writes.at(-1)?.agentAccess, "full");
     assert.equal(writes.at(-1)?.webAccess, true);
@@ -75,6 +78,11 @@ test("the model settings dialog forwards the chosen access mode to its save hand
     await invoke(access, "onChange", "full");
     const form = view.container.querySelectorAll((node) => node.nodeName === "FORM")[0];
     assert.ok(form);
+    await invoke(form, "onSubmit");
+    assert.equal(saved?.agentAccess, undefined);
+    const confirm = view.container.querySelectorAll((node) => node.nodeName === "BUTTON" && node.textContent === "Use Full access")[0];
+    assert.ok(confirm);
+    await invoke(confirm, "onClick");
     await invoke(form, "onSubmit");
     assert.equal(saved?.agentAccess, "full");
     assert.equal(saved?.webAccess, true);

@@ -3,7 +3,8 @@
  * /api/status and the setup checklist: Node.js, Git and the identity
  * commits need, the GitHub CLI with its sign-in and permissions, the Codex
  * and Claude Code CLIs with their sign-ins, Claude Code's sandbox, the data
- * directory, the app and the platform.
+ * directory, the app, the platform, saved full access and an installed
+ * passwordless-sudo rule file.
  *
  * The probes run in parallel, each with a 5-second limit. What they find is
  * kept for 10 seconds per data directory and PATH, and callers in that
@@ -11,7 +12,7 @@
  * details and fix labels) is worded in the locale in effect for each call.
  */
 import { constants } from "node:fs";
-import { access, readFile, statfs } from "node:fs/promises";
+import { access, readFile, stat, statfs } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { doctorCheckIds, type DoctorCheck, type DoctorReport } from "../shared/doctor.js";
@@ -20,9 +21,11 @@ import { codexEnabled } from "../shared/codex-switch.js";
 import {
   agentProviders,
   providerLabels,
+  type AgentAccessMode,
   type AgentProvider,
 } from "../shared/models.js";
 import { product } from "../shared/product.js";
+import { bellSudoersFile } from "../shared/sudo.js";
 import { agentLoginCheck } from "./agent-cli.js";
 import { defaultActiveRunLimit, defaultAgentProcessLimit } from "./agent-slots.js";
 import { AppSettingsService, withAppSettings } from "./app-settings.js";
@@ -137,6 +140,16 @@ export interface DoctorOptions {
   app?: DoctorAppInfo;
   /** The platform the fixes are for; this one by default. */
   platform?: NodeJS.Platform;
+  /**
+   * Saved agent access. Read from `dataDir`/model-settings.json when absent.
+   * Only `"full"` warns.
+   */
+  agentAccess?: AgentAccessMode;
+  /**
+   * Sudoers file the passwordless-sudo check stats. It never reads the file
+   * and never runs sudo. Default: `/etc/sudoers.d/bell-pr-agent`.
+   */
+  sudoersFile?: string;
 }
 
 const execOptions = { timeoutMs: probeTimeoutMs, maxBytes: 64_000 };
@@ -486,6 +499,30 @@ async function probe(exec: DoctorExec, dataDir?: string): Promise<Facts> {
   };
 }
 
+/** Whether the sudoers rule file is present. A missing file is not installed. */
+async function sudoersFileExists(file: string): Promise<boolean> {
+  try {
+    await stat(file);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Saved agent access in model-settings.json, when it is a known mode. */
+async function savedAgentAccess(dataDir: string): Promise<AgentAccessMode | undefined> {
+  try {
+    const value = JSON.parse(
+      await readFile(path.join(dataDir, "model-settings.json"), "utf8"),
+    ) as { agentAccess?: unknown };
+    return value?.agentAccess === "full" || value?.agentAccess === "workspace"
+      ? value.agentAccess
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 /** The provider the model settings in `dataDir` chose, if any. */
 async function savedProvider(dataDir: string): Promise<AgentProvider | undefined> {
   try {
@@ -562,7 +599,11 @@ function sandboxFixes(detection: SandboxDetection): Fix[] {
 /** Builds the report in the locale in effect. */
 function buildReport(
   facts: Facts,
-  options: DoctorOptions & { platform: NodeJS.Platform; provider?: AgentProvider },
+  options: DoctorOptions & {
+    platform: NodeJS.Platform;
+    provider?: AgentProvider;
+    sudoersInstalled: boolean;
+  },
 ): DoctorReport {
   const m = sm().setup.doctor;
   const platform = options.platform;
@@ -902,6 +943,22 @@ function buildReport(
   });
 
   add({
+    id: "full-access",
+    required: false,
+    ...(options.agentAccess === "full"
+      ? { status: "warn" as const, reason: "full", detail: m.fullAccessDisclosure }
+      : { status: "ok" as const }),
+  });
+
+  add({
+    id: "passwordless-sudo",
+    required: false,
+    ...(options.sudoersInstalled
+      ? { status: "warn" as const, reason: "installed", detail: m.sudoDisclosure }
+      : { status: "ok" as const }),
+  });
+
+  add({
     id: "platform",
     required: false,
     ...(platform === "win32"
@@ -964,10 +1021,20 @@ export async function runDoctor(opts: DoctorOptions = {}): Promise<DoctorReport>
 async function reportFrom(facts: Facts, opts: DoctorOptions) {
   const provider =
     opts.provider ?? (opts.dataDir ? await savedProvider(opts.dataDir) : undefined);
+  const [agentAccess, sudoersInstalled] = await Promise.all([
+    opts.agentAccess !== undefined
+      ? opts.agentAccess
+      : opts.dataDir
+        ? savedAgentAccess(opts.dataDir)
+        : undefined,
+    sudoersFileExists(opts.sudoersFile ?? bellSudoersFile),
+  ]);
   return buildReport(facts, {
     ...opts,
     platform: opts.platform ?? process.platform,
     ...(provider ? { provider } : {}),
+    ...(agentAccess ? { agentAccess } : {}),
+    sudoersInstalled,
   });
 }
 

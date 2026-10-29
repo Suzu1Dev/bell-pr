@@ -39,6 +39,7 @@ export function SudoAccessView({
   return (
     <div className="mission-form-field sudo-access">
       <strong>{t.sudoTitle}</strong>
+      <p className="mission-field-note">{t.sudoDisclosure}</p>
       {loadError ? (
         <p className="mission-field-note" role="status">
           {t.loadFailed({ message: loadError })}

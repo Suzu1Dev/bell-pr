@@ -5,6 +5,15 @@ import os from "node:os";
 import path from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { setCodexEnabledForTests } from "../shared/codex-switch.js";
+import {
+  fullAccessDisclosure,
+  sudoDisclosure,
+} from "../shared/i18n/disclosures.en.js";
+import {
+  fullAccessDisclosure as fullAccessDisclosureZh,
+  sudoDisclosure as sudoDisclosureZh,
+} from "../shared/i18n/disclosures.zh-TW.js";
+import { bellSudoersFile } from "../shared/sudo.js";
 import type { DoctorCheck, DoctorReport } from "../shared/doctor.js";
 import {
   claudeAuthDetail,
@@ -128,6 +137,7 @@ test("nothing installed: Git and a provider are required, with install fixes", a
     [
       "node", "git", "git-identity", "gh", "gh-auth", "gh-scopes", "codex", "codex-auth",
       "claude", "claude-auth", "claude-sandbox", "provider-ready", "data-dir", "app", "platform",
+      "full-access", "passwordless-sudo",
     ],
   );
   assert.deepEqual(statuses(report), {
@@ -146,6 +156,8 @@ test("nothing installed: Git and a provider are required, with install fixes", a
     "data-dir": "skip",
     app: "ok",
     platform: "ok",
+    "full-access": "ok",
+    "passwordless-sudo": "ok",
   });
   assert.equal(check(report, "git").reason, "missing");
   assert.deepEqual(check(report, "git").fixes, [
@@ -605,6 +617,69 @@ test("the GitHub user answer and the Claude auth JSON are read defensively", () 
     withLocale("zh-TW", () => formatDoctorReport(identity)),
     /\n已就緒：所有必要的檢查都通過了。有些步驟要先修正標示 ✗ 的檢查（Git 身分）才能進行。\n$/,
   );
+});
+
+test("doctor warns for full access and an installed sudoers file, and stays quiet by default", async (t) => {
+  const f = await fakes(t, { git: git(), sudo: "echo should-not-run >&2; exit 1" });
+  const missing = path.join(f.directory, "no-sudoers");
+  const quiet = await withLocale("en", () =>
+    runDoctor({ force: true, platform: "linux", sudoersFile: missing, agentAccess: "workspace" }),
+  );
+  assert.equal(check(quiet, "full-access").status, "ok");
+  assert.equal(check(quiet, "full-access").required, false);
+  assert.equal(check(quiet, "passwordless-sudo").status, "ok");
+  assert.equal(check(quiet, "passwordless-sudo").required, false);
+  assert.doesNotMatch(
+    withLocale("en", () => formatDoctorReport(quiet)),
+    /TODO\(B38 disclosure\)/,
+  );
+
+  const full = await withLocale("en", () =>
+    runDoctor({ force: true, platform: "linux", sudoersFile: missing, agentAccess: "full" }),
+  );
+  assert.equal(check(full, "full-access").status, "warn");
+  assert.equal(check(full, "full-access").reason, "full");
+  assert.equal(check(full, "full-access").detail, fullAccessDisclosure);
+  assert.equal(check(full, "passwordless-sudo").status, "ok");
+  assert.match(
+    withLocale("en", () => formatDoctorReport(full)),
+    /Full access +TODO\(B38 disclosure\): Full access notice is not final\./,
+  );
+
+  const installed = path.join(f.directory, "bell-pr-agent");
+  await writeFile(installed, "# fixture only\nDO-NOT-READ-THIS-FILE\n");
+  const sudo = await withLocale("en", () =>
+    runDoctor({ force: true, platform: "linux", sudoersFile: installed, agentAccess: "workspace" }),
+  );
+  assert.equal(check(sudo, "passwordless-sudo").status, "warn");
+  assert.equal(check(sudo, "passwordless-sudo").reason, "installed");
+  assert.equal(check(sudo, "passwordless-sudo").detail, sudoDisclosure);
+  assert.equal(check(sudo, "full-access").status, "ok");
+  assert.equal(JSON.stringify(sudo).includes("DO-NOT-READ-THIS-FILE"), false);
+  assert.ok(!(await f.calls()).some((line) => /^sudo /.test(line)));
+
+  const dataDir = path.join(f.directory, "data");
+  await mkdir(dataDir);
+  await writeFile(
+    path.join(dataDir, "model-settings.json"),
+    JSON.stringify({ agentAccess: "full", model: "" }),
+  );
+  const fromDisk = await withLocale("en", () =>
+    runDoctor({ force: true, platform: "linux", dataDir, sudoersFile: missing }),
+  );
+  assert.equal(check(fromDisk, "full-access").status, "warn");
+  assert.equal(check(fromDisk, "full-access").detail, fullAccessDisclosure);
+
+  const zh = await withLocale("zh-TW", () =>
+    runDoctor({ force: true, platform: "linux", sudoersFile: installed, agentAccess: "full" }),
+  );
+  assert.equal(check(zh, "full-access").detail, fullAccessDisclosureZh);
+  assert.equal(check(zh, "passwordless-sudo").detail, sudoDisclosureZh);
+  assert.match(withLocale("zh-TW", () => formatDoctorReport(zh)), /完整權限/);
+  assert.equal(bellSudoersFile, "/etc/sudoers.d/bell-pr-agent");
+  const securityModel = await readFile(new URL("../docs/security-model.md", import.meta.url), "utf8");
+  assert.ok(securityModel.includes(fullAccessDisclosure));
+  assert.ok(securityModel.includes(sudoDisclosure));
 });
 
 test("Codex turned off is disabled, not a required failure, and a saved Codex choice falls back", async (t) => {

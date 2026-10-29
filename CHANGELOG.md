@@ -17,6 +17,9 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **Explicit full agent access.** Model settings can give writable roles full
   machine access, with an optional Linux sudo setup. Workspace access remains
   the default, and read-only roles keep their existing restrictions.
+  Choosing Full access asks for confirmation. Doctor warns when Full access
+  is saved and when the passwordless sudo rule file is installed. The sudo
+  control is offered only on Linux.
 
 - **Analysis progress.** While a project analysis or **Generate 5 more**
   runs, the overview lists its steps and shows how long the agent has worked

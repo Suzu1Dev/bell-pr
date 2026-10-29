@@ -1,3 +1,6 @@
+/** The one rule file BELL writes. Doctor only checks that it exists. */
+export const bellSudoersFile = "/etc/sudoers.d/bell-pr-agent";
+
 /** What the settings page shows about passwordless sudo for the account BELL runs as. */
 export interface SudoStatus {
   user: string;

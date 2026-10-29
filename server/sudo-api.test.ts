@@ -41,6 +41,7 @@ test("sudo API reports status, enables once with the password, removes the rule,
   };
   const app = createApp(workbench, {
     staticDirectory: path.join(directory, "missing"),
+    platform: "linux",
     sudo: new PasswordlessSudo({ run, user: "bellsvc", file: path.join(directory, "bell-pr-agent") }),
   });
   const server = app.listen(0, "127.0.0.1");
@@ -114,4 +115,56 @@ test("sudo API reports status, enables once with the password, removes the rule,
   assert.match(locked.text, /Try again in 15 minutes/);
   assert.equal((await api("POST", { password: correct })).status, 429);
   assert.equal(passwordless, false);
+});
+
+test("sudo routes are not registered off Linux", async (t) => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "bell-sudo-platform-"));
+  const store = new Store(directory);
+  await store.initialize();
+  const workbench = new Workbench(store);
+  let calls = 0;
+  const run: SudoRunner = async () => {
+    calls += 1;
+    return ok;
+  };
+  const app = createApp(workbench, {
+    staticDirectory: path.join(directory, "missing"),
+    platform: "darwin",
+    sudo: new PasswordlessSudo({ run, user: "bellsvc", file: path.join(directory, "bell-pr-agent") }),
+  });
+  const server = app.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  t.after(async () => {
+    await new Promise<void>((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
+    await app.locals.insights.shutdown();
+    await app.locals.discovery.shutdown();
+    await workbench.shutdown();
+    await rm(directory, { recursive: true, force: true });
+  });
+  const address = server.address();
+  assert.ok(address && typeof address !== "string");
+  for (const method of ["GET", "POST", "DELETE"]) {
+    const status = await new Promise<number>((resolve, reject) => {
+      const payload = method === "GET" ? undefined : "{}";
+      const req = request(
+        `http://127.0.0.1:${address.port}/api/system/sudo`,
+        {
+          method,
+          headers: {
+            "Content-Type": "application/json",
+            Host: "127.0.0.1:4311",
+            ...(payload === undefined ? {} : { "Content-Length": Buffer.byteLength(payload) }),
+          },
+        },
+        (res) => {
+          res.resume();
+          res.on("end", () => resolve(res.statusCode ?? 0));
+        },
+      );
+      req.on("error", reject);
+      req.end(payload);
+    });
+    assert.equal(status, 404, method);
+  }
+  assert.equal(calls, 0);
 });

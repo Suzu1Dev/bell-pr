@@ -20,6 +20,8 @@ export const doctorCheckIds = [
   "data-dir",
   "app",
   "platform",
+  "full-access",
+  "passwordless-sudo",
 ] as const;
 export type DoctorCheckId = (typeof doctorCheckIds)[number];
 

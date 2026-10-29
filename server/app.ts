@@ -94,6 +94,11 @@ export interface AppOptions {
   agentTimeoutScale?: number;
   /** The app version the API reports. */
   version?: string;
+  /**
+   * Operating system for Linux-only routes. This process by default.
+   * Tests pass another value; the server entry does not.
+   */
+  platform?: NodeJS.Platform;
   /** Development mode, with the UI dev server in front. Off by default. */
   dev?: boolean;
   /**
@@ -190,7 +195,7 @@ export function createApp(workbench: Workbench, options: AppOptions = {}) {
   registerContributionRoutes(app, deps);
   registerByHandRoutes(app, deps);
   registerSessionRoutes(app, deps);
-  registerSudoRoutes(app, deps);
+  if ((options.platform ?? process.platform) === "linux") registerSudoRoutes(app, deps);
   app.use("/api", (_req, res) => {
     res.status(404).json({ error: sm().common.notFound });
   });
