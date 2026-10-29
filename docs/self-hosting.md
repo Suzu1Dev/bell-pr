@@ -196,7 +196,7 @@ Tailscale serve is the supported remote path. Set
 `BELLPR_PUBLIC_URL=https://<your-url>` before starting BELL PR, then use
 `tailscale serve --bg 4311` for the default server port. On the host run
 `bell-pr pair`. On the other device open `<your-url>/pair` and enter the
-one-time code. The device stores
+one-time code (or scan the QR if the terminal shows one). The QR may not scan on a light-background terminal — use a dark background, or just open the printed URL. If the URL is too long, only the URL is printed, no QR. The device stores
 a credential in that browser's local storage. Prefer pairing: token URLs
 stay in browser history.
 

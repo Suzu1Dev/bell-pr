@@ -631,7 +631,7 @@ commands, sign in to the selected provider, or configure the missing Git identit
 then run doctor again before starting.
 
 Run `bell-pr pair` on the host and open the pairing page on the other device.
-Enter the code (or scan the QR code), optionally name the device, and pair it.
+Enter the code (or scan the QR code), optionally name the device, and pair it. The QR may not scan on a light-background terminal — use a dark background, or just open the printed URL. If the URL is too long, only the URL is printed, no QR.
 Prefer pairing over token URLs: a token URL stays in browser history. Paired-device
 credentials stay in that browser's localStorage; install tokens from launch links
 stay in sessionStorage and take precedence. API requests use the Authorization
