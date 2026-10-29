@@ -72,6 +72,11 @@ export const redactSamples: readonly RedactSample[] = [
     text: `https://bell.example/pair?code=${piece("FAKE", "C0DE")}`,
     secretParts: [piece("FAKE", "C0DE")],
   },
+  {
+    name: "pairing fragment code",
+    text: `https://bell.example/pair#code=${piece("FAKE", "C0DE")}`,
+    secretParts: [piece("FAKE", "C0DE")],
+  },
 ];
 
 /** Fails when any sample's secret material is still in `text`. The message names the sample, not the value. */

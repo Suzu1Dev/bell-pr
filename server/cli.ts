@@ -489,7 +489,7 @@ async function pair(args: string[], ctx: Context): Promise<number> {
   if (response.status !== 201) return requestFailed(ctx, response);
   const { code, expiresAt, pairUrl } = response.body as PairCodeResponse;
   ctx.stdout.write(`${m.created({ pairUrl, code, expiresAt: format.time(expiresAt) })}\n`);
-  if (!values["no-qr"]) (ctx.deps.printPairQr ?? printPairQr)(`${pairUrl}?code=${code}`, ctx.stdout);
+  if (!values["no-qr"]) (ctx.deps.printPairQr ?? printPairQr)(`${pairUrl}#code=${code}`, ctx.stdout);
   return 0;
 }
 

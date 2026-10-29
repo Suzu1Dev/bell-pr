@@ -13,7 +13,7 @@ export interface PairCodeResponse {
   code: string;
   /** ISO 8601. */
   expiresAt: string;
-  /** The /pair page address, without query or token. */
+  /** The /pair page address, without query, fragment, or token. */
   pairUrl: string;
 }
 

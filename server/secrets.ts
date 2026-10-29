@@ -83,8 +83,8 @@ export const secretPatterns: readonly SecretPattern[] = [
     blocks: true,
   },
   {
-    // A pairing code in a /pair?code= link (pair-qr.ts).
-    pattern: /([?&]code=)[^&#\s"']+/gi,
+    // A pairing code in a /pair?code= or /pair#code= link (pair-qr.ts).
+    pattern: /([?#&]code=)[^&#\s"']+/gi,
     replacement: "$1[REDACTED]",
     blocks: false,
   },

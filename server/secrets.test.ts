@@ -272,6 +272,7 @@ test("secrets: device tokens and pairing codes are masked; ids that only look al
   assert.equal(redact("code FAKE-C0DE, then 0000-ZZZZ."), "code [REDACTED], then [REDACTED].");
   assert.equal(redact("GET /pair?code=FAKEC0DE&x=1"), "GET /pair?code=[REDACTED]&x=1");
   assert.equal(redact("https://bell.example/pair?code=FAKE-C0DE#top"), "https://bell.example/pair?code=[REDACTED]#top");
+  assert.equal(redact("https://bell.example/pair#code=FAKE-C0DE"), "https://bell.example/pair#code=[REDACTED]");
   assert.equal(secretInPatch("code FAKE-C0DE"), false);
   // UUID runs, lowercase words and longer ids are not pairing codes.
   for (const text of ["abababab-7777-4777-8777-777777777777", "ABABABAB-7777-4777-8777-777777777777", "test-1234", "ABCD-EFGH-JK", "bpd_short"])

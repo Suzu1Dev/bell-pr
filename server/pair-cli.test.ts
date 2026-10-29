@@ -103,7 +103,7 @@ test("bell-pr pair prints the address and the code, never a token, and hands the
     assert.match(result.stdout, new RegExp(`open ${server.url}/pair\\n`));
     assert.equal(result.stdout.includes(installToken), false);
     assert.doesNotMatch(result.stdout, /bpd_|bell_token/);
-    assert.deepEqual(result.qr, [`${server.url}/pair?code=${code}`]);
+    assert.deepEqual(result.qr, [`${server.url}/pair#code=${code}`]);
 
     const noQr = await cli(["pair", "--data-dir", dataDir, "--no-qr"]);
     assert.equal(noQr.code, 0, noQr.stderr);
