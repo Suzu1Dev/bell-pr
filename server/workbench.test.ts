@@ -1251,6 +1251,172 @@ else if (args[0] === 'pr' && args[1] === 'create') {
   }
 });
 
+test("publish validates the real gh fork parent shape and reuses the commit after a rejected fork", async () => {
+  const f = await fixture();
+  const previousPath = process.env.PATH;
+  try {
+    const realGit = (await command("which", ["git"])).stdout.trim();
+    const bin = path.join(f.directory, "bin");
+    const callsFile = path.join(f.directory, "fork-calls.jsonl");
+    const forkFile = path.join(f.directory, "fork.json");
+    await mkdir(bin);
+    await writeFile(callsFile, "");
+    // Every remote operation is intercepted; these tests never publish to GitHub.
+    await writeFile(
+      path.join(bin, "git"),
+      `#!/usr/bin/env node
+const fs = require('node:fs');
+const { spawnSync } = require('node:child_process');
+const args = process.argv.slice(2);
+fs.appendFileSync(${JSON.stringify(callsFile)}, JSON.stringify(['git', ...args]) + '\\n');
+if (args.includes('push')) process.exit(0);
+if (args.includes('fetch') || args.includes('clone') || args.includes('ls-remote')) process.exit(98);
+const result = spawnSync(${JSON.stringify(realGit)}, args, { stdio: 'inherit', env: process.env });
+process.exit(result.status ?? 1);
+`,
+      { mode: 0o700 },
+    );
+    await writeFile(
+      path.join(bin, "gh"),
+      `#!/usr/bin/env node
+const fs = require('node:fs');
+const args = process.argv.slice(2);
+fs.appendFileSync(${JSON.stringify(callsFile)}, JSON.stringify(['gh', ...args]) + '\\n');
+if (args[0] === 'api' && args[1] === 'user') console.log('test-owner');
+else if (args[0] === 'api' && args[1] === 'repos/test-upstream/example/git/ref/heads/main') console.log(${JSON.stringify(f.baseSha)});
+else if (args[0] === 'repo' && args[1] === 'fork') process.exit(0);
+else if (args[0] === 'repo' && args[1] === 'view' && args[2] === 'test-owner/example') process.stdout.write(fs.readFileSync(${JSON.stringify(forkFile)}, 'utf8'));
+else if (args[0] === 'repo' && args[1] === 'view' && args[2] === 'test-upstream/example') console.log(JSON.stringify({viewerPermission:'READ',defaultBranchRef:{name:'main'}}));
+else if (args[0] === 'pr' && args[1] === 'list') console.log('[]');
+else if (args[0] === 'pr' && args[1] === 'create') console.log('https://github.com/test-upstream/example/pull/1');
+else process.exit(97);
+`,
+      { mode: 0o700 },
+    );
+    Object.assign(f.workbench.repo(f.run.repoId), {
+      url: "https://github.com/test-upstream/example",
+      fullName: "test-upstream/example",
+      owner: "test-upstream",
+      name: "example",
+    });
+    await git(f.repository, ["checkout", "-b", "fix/fork-parent"]);
+    f.run.branch = "fix/fork-parent";
+    await writeFile(
+      path.join(f.repository, "hello.ts"),
+      'export const hello = "after";\n',
+    );
+    await f.workbench.review(
+      f.run.id,
+      "hello.ts",
+      true,
+      (await readDiff(f.run))[0].fingerprint,
+    );
+    const commitMessage =
+      "fix: update the greeting\n\nKeep the reviewed message exactly.";
+    await f.workbench.draft(f.run.id, { ...f.run.draft, commitMessage });
+    await f.workbench.approve(f.run.id, { ...f.run.draft });
+    process.env.PATH = `${bin}${path.delimiter}${previousPath}`;
+    const calls = async () =>
+      (await readFile(callsFile, "utf8"))
+        .trim()
+        .split("\n")
+        .filter(Boolean)
+        .map((line) => JSON.parse(line) as string[]);
+    let firstCommit: string | undefined;
+    for (const fork of [
+      null,
+      {},
+      { parent: null },
+      { parent: {} },
+      { parent: { name: "example" } },
+      { parent: { name: "example", owner: {} } },
+      { parent: { name: "example", owner: null } },
+      { parent: { name: "example", owner: { login: 123 } } },
+      { parent: { name: 123, owner: { login: "test-upstream" } } },
+      { parent: { name: "other-project", owner: { login: "test-upstream" } } },
+      { parent: { name: "example", owner: { login: "unrelated-owner" } } },
+    ]) {
+      await writeFile(forkFile, JSON.stringify(fork));
+      await assert.rejects(
+        f.workbench.publish(f.run.id, f.run.approvedFingerprint!, [
+          "facts-unknown",
+        ]),
+        (error: unknown) =>
+          error instanceof AppError && error.statusCode === 409,
+      );
+      firstCommit ??= f.run.publishCommit;
+      assert.ok(firstCommit);
+      assert.equal(f.run.publishCommit, firstCommit);
+      assert.equal(f.run.status, "approved");
+      assert.equal(f.run.publishing, false);
+      assert.equal(f.run.headRepository, undefined);
+      assert.equal(f.run.publishedBranch, undefined);
+      assert.equal(f.run.prUrl, undefined);
+      assert.ok(
+        !(await calls()).some(
+          (args) => args.includes("push") || args.includes("create"),
+        ),
+      );
+    }
+    // gh repo view --json parent returns owner.login + name, not parent.nameWithOwner.
+    await writeFile(
+      forkFile,
+      JSON.stringify({
+        nameWithOwner: "test-owner/example",
+        isFork: true,
+        parent: {
+          id: "parent-id",
+          name: "EXAMPLE",
+          owner: { id: "owner-id", login: "Test-Upstream" },
+        },
+      }),
+    );
+    const published = await f.workbench.publish(
+      f.run.id,
+      f.run.approvedFingerprint!,
+      ["facts-unknown"],
+    );
+    assert.equal(published.status, "published");
+    assert.equal(published.publishCommit, firstCommit);
+    assert.equal(published.headRepository, "test-owner/example");
+    assert.equal(published.publishedBranch, "fix/fork-parent");
+    assert.equal(
+      published.prUrl,
+      "https://github.com/test-upstream/example/pull/1",
+    );
+    assert.equal(
+      (
+        await git(f.repository, ["log", "-1", "--format=%B", firstCommit!])
+      ).stdout.trim(),
+      commitMessage,
+    );
+    assert.equal(
+      (await git(f.repository, ["rev-parse", "HEAD^"])).stdout.trim(),
+      f.baseSha,
+    );
+    const operations = await calls();
+    assert.equal(
+      operations.filter((args) => args.includes("commit-tree")).length,
+      1,
+    );
+    const pushes = operations.filter((args) => args.includes("push"));
+    assert.equal(pushes.length, 1);
+    assert.ok(pushes[0].includes("https://github.com/test-owner/example.git"));
+    assert.ok(pushes[0].includes(`${firstCommit}:refs/heads/fix/fork-parent`));
+    const create = operations.find(
+      (args) => args[0] === "gh" && args.includes("create"),
+    )!;
+    assert.equal(
+      create[create.indexOf("--head") + 1],
+      "test-owner:fix/fork-parent",
+    );
+  } finally {
+    process.env.PATH = previousPath;
+    await f.workbench.shutdown();
+    await f.cleanup();
+  }
+});
+
 test("PR feedback is read on request from a published run, stored redacted, and handed to the mentor as untrusted data", async () => {
   const f = await fixture();
   const previousPath = process.env.PATH;

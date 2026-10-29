@@ -7,8 +7,8 @@ name or logo (Apache License 2.0, section 6). This page says what you may do
 with them.
 
 "BELL PR", "bell-pr", "bellpr" and the BELL PR logo and brand files are
-names and marks of the project's maintainer, Suzu1Dev. BELL PR is free,
-non-commercial software. The marks are described in
+names and marks of the project's maintainer, Suzu1Dev. BELL PR is free
+software. The marks are described in
 [docs/brand.md](docs/brand.md).
 
 ## You may, without asking

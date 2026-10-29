@@ -29,7 +29,7 @@ import {
 import type { Tab } from "../app/AppShell";
 import { ErrorBoundary } from "../app/ErrorBoundary";
 import type { DraftEditor } from "../app/hooks/useDraftEditor";
-import type { RunActions } from "../app/hooks/useRunActions";
+import { recoverablePublish, type RunActions } from "../app/hooks/useRunActions";
 import type { RunRecords } from "../app/hooks/useRunRecords";
 import type { RunRounds } from "../app/hooks/useRunRounds";
 import type { Understanding } from "../app/hooks/useUnderstanding";
@@ -93,7 +93,7 @@ interface DraftTabProps {
     | "serverChecksRead"
     | "loadPublishChecks"
   >;
-  actions: Pick<RunActions, "feedbackLoading" | "fetchPrFeedback" | "openSplit">;
+  actions: Pick<RunActions, "feedbackLoading" | "fetchPrFeedback" | "openSplit" | "recoverPublish">;
   rounds: RunRounds;
   currentRepo?: Repo;
   /** The Explain-it-back check and the person's other records (useUnderstanding, useRunRecords). */
@@ -278,6 +278,24 @@ export function DraftTab({
             </div>
             <span className="draft-label">{t.draft.label}</span>
           </div>
+          {!demo && !followUp && recoverablePublish(run) && (
+            <div className="draft-origin-notice">
+              <AlertCircle size={16} aria-hidden="true" />
+              <div>
+                <p id="publish-recovery-help">{t.draft.recoveryHelp}</p>
+                {draftDirty && <p id="publish-recovery-unsaved">{t.draft.recoveryNeedsSave}</p>}
+                <button
+                  type="button"
+                  className="button secondary"
+                  aria-describedby={`publish-recovery-help${draftDirty ? " publish-recovery-unsaved" : ""}`}
+                  disabled={busy || active || sessionRunning || !!run.publishing || draftDirty}
+                  onClick={() => void actions.recoverPublish()}
+                >
+                  {t.draft.recoverPublish}
+                </button>
+              </div>
+            </div>
+          )}
           {followUp && (
             <div className="draft-origin-notice" role="status">
               <AlertCircle size={16} />

@@ -37,6 +37,13 @@ export function registerReviewRoutes(app: Express, { workbench }: RouteDeps) {
     );
     res.json({ files });
   });
+  app.get("/api/runs/:id/diff-view", async (req, res) => {
+    const { round } = z
+      .object({ round: z.string().min(1).max(100) })
+      .strict()
+      .parse(req.query);
+    res.json(await workbench.diffView(req.params.id, round));
+  });
   app.post("/api/runs/:id/chat", async (req, res) => {
     const { filePath, question } = z
       .object({
@@ -149,6 +156,13 @@ export function registerReviewRoutes(app: Express, { workbench }: RouteDeps) {
   // feedback is separate from the AI follow-up rounds on it (follow-ups.ts).
   app.post("/api/runs/:id/pr/feedback", async (req, res) => {
     res.json({ run: await workbench.fetchPrFeedback(req.params.id) });
+  });
+  app.post("/api/runs/:id/publish/recover", async (req, res) => {
+    const { commit } = z
+      .object({ commit: z.string().regex(/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/) })
+      .strict()
+      .parse(req.body);
+    res.json({ run: await workbench.recoverPublish(req.params.id, commit) });
   });
   app.post("/api/runs/:id/publish", async (req, res) => {
     const { fingerprint, acknowledged, overrides, rulesDigest } = z

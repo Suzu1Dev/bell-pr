@@ -359,3 +359,47 @@
   text-decoration: underline;
   text-align: left;
 }
+.diff-round-picker {
+  display: flex;
+  align-items: center;
+  flex: 0 1 auto;
+  min-width: 5rem;
+}
+.diff-round-picker .text-input {
+  width: auto;
+  max-width: min(12rem, 100%);
+  min-height: 30px;
+  height: 30px;
+  padding: 3px 6px;
+  font-size: var(--text-xs);
+}
+.diff-topbar:has(.diff-round-picker) > .premise-notice.premise-compact {
+  flex: 1 1 0;
+  margin: 0;
+}
+.diff-round-readonly {
+  white-space: nowrap;
+  color: var(--color-text-muted);
+}
+.historical-diff {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+.historical-diff-range {
+  order: 1;
+}
+.historical-diff .diff-toolbar-actions {
+  order: 2;
+}
+.historical-diff-status {
+  padding: var(--space-3) var(--space-4);
+}
+.historical-diff .rv-file-header {
+  padding: var(--space-3) var(--space-4);
+  overflow-wrap: anywhere;
+}
+.historical-diff .file-name {
+  overflow-wrap: anywhere;
+}
