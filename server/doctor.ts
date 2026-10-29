@@ -3,8 +3,8 @@
  * /api/status and the setup checklist: Node.js, Git and the identity
  * commits need, the GitHub CLI with its sign-in and permissions, the Codex
  * and Claude Code CLIs with their sign-ins, Claude Code's sandbox, the data
- * directory, the app, the platform, saved full access and an installed
- * passwordless-sudo rule file.
+ * directory, the app, the platform, saved full access, and passwordless
+ * sudo (BELL PR's rule file, or another rule).
  *
  * The probes run in parallel, each with a 5-second limit. What they find is
  * kept for 10 seconds per data directory and PATH, and callers in that
@@ -146,10 +146,16 @@ export interface DoctorOptions {
    */
   agentAccess?: AgentAccessMode;
   /**
-   * Sudoers file the passwordless-sudo check stats. It never reads the file
-   * and never runs sudo. Default: `/etc/sudoers.d/bell-pr-agent`.
+   * Sudoers file the passwordless-sudo check stats. It never reads the file.
+   * Default: `/etc/sudoers.d/bell-pr-agent`.
    */
   sudoersFile?: string;
+  /**
+   * Exit code of `sudo -n true`, or `"absent"` when sudo is not installed.
+   * Tests replace it. The default runs that command with a short timeout
+   * and does not prompt.
+   */
+  sudoRun?: () => Promise<number | "absent">;
 }
 
 const execOptions = { timeoutMs: probeTimeoutMs, maxBytes: 64_000 };
@@ -499,6 +505,24 @@ async function probe(exec: DoctorExec, dataDir?: string): Promise<Facts> {
   };
 }
 
+/**
+ * `sudo -n true`: non-interactive, no prompt, only the exit code matters.
+ * A missing sudo is `"absent"`. Any other failure is not passwordless.
+ */
+async function sudoNonInteractive(exec: DoctorExec): Promise<number | "absent"> {
+  try {
+    const { code } = await exec("sudo", ["-n", "true"], {
+      timeoutMs: probeTimeoutMs,
+      allowedCodes: [0, 1],
+      maxBytes: 4_000,
+    });
+    return code;
+  } catch (error) {
+    if (missing(error)) return "absent";
+    return 1;
+  }
+}
+
 /** Whether the sudoers rule file is present. A missing file is not installed. */
 async function sudoersFileExists(file: string): Promise<boolean> {
   try {
@@ -597,12 +621,17 @@ function sandboxFixes(detection: SandboxDetection): Fix[] {
 }
 
 /** Builds the report in the locale in effect. */
+type PasswordlessSudoCheck =
+  | { status: "skip"; reason: "platform" | "missing" }
+  | { status: "ok" }
+  | { status: "warn"; reason: "installed" | "external" };
+
 function buildReport(
   facts: Facts,
   options: DoctorOptions & {
     platform: NodeJS.Platform;
     provider?: AgentProvider;
-    sudoersInstalled: boolean;
+    passwordlessSudo: PasswordlessSudoCheck;
   },
 ): DoctorReport {
   const m = sm().setup.doctor;
@@ -950,12 +979,22 @@ function buildReport(
       : { status: "ok" as const }),
   });
 
+  const sudo = options.passwordlessSudo;
   add({
     id: "passwordless-sudo",
     required: false,
-    ...(options.sudoersInstalled
-      ? { status: "warn" as const, reason: "installed", detail: m.sudoDisclosure }
-      : { status: "ok" as const }),
+    ...(sudo.status === "skip"
+      ? { status: "skip" as const, reason: sudo.reason }
+      : sudo.status === "warn"
+        ? {
+            status: "warn" as const,
+            reason: sudo.reason,
+            detail:
+              sudo.reason === "installed"
+                ? m.passwordlessSudoInstalled
+                : m.passwordlessSudoExternal,
+          }
+        : { status: "ok" as const }),
   });
 
   add({
@@ -1018,23 +1057,39 @@ export async function runDoctor(opts: DoctorOptions = {}): Promise<DoctorReport>
   return reportFrom(await entry.facts, opts);
 }
 
+/** Linux only. Warns when `sudo -n true` succeeds, and names whose rule allows it. */
+async function passwordlessSudoCheck(opts: DoctorOptions, platform: NodeJS.Platform): Promise<PasswordlessSudoCheck> {
+  if (platform !== "linux") return { status: "skip", reason: "platform" };
+  const run = opts.sudoRun ?? (() => sudoNonInteractive(opts.exec ?? command));
+  const [installed, code] = await Promise.all([
+    sudoersFileExists(opts.sudoersFile ?? bellSudoersFile),
+    run(),
+  ]);
+  if (code === "absent") return { status: "skip", reason: "missing" };
+  if (code !== 0) return { status: "ok" };
+  return installed
+    ? { status: "warn", reason: "installed" }
+    : { status: "warn", reason: "external" };
+}
+
 async function reportFrom(facts: Facts, opts: DoctorOptions) {
+  const platform = opts.platform ?? process.platform;
   const provider =
     opts.provider ?? (opts.dataDir ? await savedProvider(opts.dataDir) : undefined);
-  const [agentAccess, sudoersInstalled] = await Promise.all([
+  const [agentAccess, passwordlessSudo] = await Promise.all([
     opts.agentAccess !== undefined
       ? opts.agentAccess
       : opts.dataDir
         ? savedAgentAccess(opts.dataDir)
         : undefined,
-    sudoersFileExists(opts.sudoersFile ?? bellSudoersFile),
+    passwordlessSudoCheck(opts, platform),
   ]);
   return buildReport(facts, {
     ...opts,
-    platform: opts.platform ?? process.platform,
+    platform,
     ...(provider ? { provider } : {}),
     ...(agentAccess ? { agentAccess } : {}),
-    sudoersInstalled,
+    passwordlessSudo,
   });
 }
 

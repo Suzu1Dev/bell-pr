@@ -135,6 +135,8 @@ const m: Translation<typeof en> = {
       "無法使用。你已允許 Claude Code Agent 不用沙箱修改檔案；這類工作會有標示。",
     fullAccessDisclosure,
     sudoDisclosure,
+    passwordlessSudoInstalled: `已安裝 BELL PR 的免密碼 sudo 規則。${sudoDisclosure}`,
+    passwordlessSudoExternal: `免密碼 sudo 來自其他規則。${sudoDisclosure}`,
     providersReady: ({ providers }) => `已就緒：${fmt.list(providers)}。`,
     noProvider: `請安裝並登入 Codex CLI 或 Claude Code：${product.name} 至少需要其中一個。`,
     savedProviderNotReady: ({ provider }) =>

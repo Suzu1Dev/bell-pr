@@ -149,6 +149,8 @@ export default {
       "Not available. Claude Code agents may edit files without it because you allowed that; such runs are marked.",
     fullAccessDisclosure,
     sudoDisclosure,
+    passwordlessSudoInstalled: `BELL PR's passwordless sudo rule is installed. ${sudoDisclosure}`,
+    passwordlessSudoExternal: `Passwordless sudo is available through another rule. ${sudoDisclosure}`,
     providersReady: ({ providers }: { providers: string[] }) =>
       `Ready: ${fmt.list(providers)}.`,
     noProvider:
