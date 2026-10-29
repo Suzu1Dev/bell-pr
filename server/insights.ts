@@ -450,7 +450,7 @@ function validateAnalysis<
   try {
     value = schema.parse(JSON.parse(raw)) as z.infer<S>;
   } catch (error) {
-    // The person reads one sentence; parseAgentOutput logs which part did not fit.
+    // The person reads one sentence. The log records the kind and length, not this answer.
     throw new AppError((m) => m.analysis.insights.incompleteAnswer, 422, {
       cause: error,
     });
@@ -1464,6 +1464,7 @@ export class ProjectInsightsService {
           more
             ? validateAnalysis(answer, context.files, safePaths, recommendationsSchema, locale)
             : validateAnalysis(answer, context.files, safePaths, analysisSchema, locale),
+        { length: Buffer.byteLength(answer) },
       );
       if (
         (await this.version(repo, signal)).fingerprint !== version.fingerprint
