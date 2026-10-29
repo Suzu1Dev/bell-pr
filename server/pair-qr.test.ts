@@ -8,7 +8,7 @@ const url = "https://box.example.test:4310/pair#code=ABCD-EFGH";
 function capture(isTTY?: boolean) {
   const writes: string[] = [];
   const out = { isTTY, write: (s: string) => void writes.push(s) };
-  return { writes, out: out as unknown as NodeJS.WritableStream };
+  return { writes, out };
 }
 
 test("the pair QR fits an 80-column terminal inside a light quiet zone", () => {

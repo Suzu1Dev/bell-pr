@@ -46,7 +46,7 @@ export function shouldPrintQr(opts: { stdoutIsTTY: boolean; noQr?: boolean }): b
  * ever written, so NO_COLOR needs nothing more. A URL too long to encode
  * also gets the URL line alone.
  */
-export function printPairQr(pairUrlWithCode: string, out: NodeJS.WritableStream): void {
+export function printPairQr(pairUrlWithCode: string, out: { write(text: string): unknown; isTTY?: boolean }): void {
   const stdoutIsTTY = (out as { isTTY?: boolean }).isTTY === true;
   if (shouldPrintQr({ stdoutIsTTY })) {
     try {
