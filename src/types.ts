@@ -16,7 +16,10 @@ export interface Repo extends Repository {
 }
 
 /** The client run; the demo run has no baseSha, worktreePath or reviewedFingerprints. */
-export interface Run extends RunCore {}
+export interface Run extends RunCore {
+  /** Returned for real runs; a review tick is valid only for this exact diff. */
+  reviewedFingerprints?: Record<string, string>;
+}
 
 /** What GET /api/runs returns for each run (see shared/runs.ts). */
 export type RunSummary = Omit<Run, RunDetailField>;

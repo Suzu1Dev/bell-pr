@@ -51,6 +51,7 @@ import * as followUps from "./followup-runs.js";
 import * as walkthroughs from "./walkthrough-runs.js";
 import * as premises from "./premise-runs.js";
 import { commitDetail, listCommits } from "./commits.js";
+import { readDiffView } from "./diff-views.js";
 import { splitRun } from "./split-run.js";
 import { synchronizeWalkthroughs } from "./walkthroughs.js";
 import {
@@ -492,6 +493,15 @@ export class Workbench {
     await syncing.refreshConflicts(run);
     await this.store.save();
     return files;
+  }
+
+  /** A recorded round or cumulative comparison, without updating review state. */
+  async diffView(id: string, round: string) {
+    return this.lock(id, async () => {
+      const run = this.run(id);
+      cleanup.assertWorkspacePresent(run);
+      return readDiffView(run, round);
+    });
   }
 
   async explanations(

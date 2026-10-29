@@ -7,6 +7,7 @@ import { AppError, type DiffFile, type Run } from "./types.js";
 import { sm, withLocale } from "./i18n/index.js";
 import { parseLocale, type Locale } from "../shared/i18n/locale.js";
 import { ciConfigPath } from "../shared/draft-checks.js";
+import { activeFollowUp, reviewBaseSha } from "../shared/followups.js";
 
 export { ciConfigPath, secretInPatch };
 
@@ -274,10 +275,19 @@ export async function checkoutLineCount(
   return lines.at(-1) === "" ? lines.length - 1 : lines.length;
 }
 
+/** Review changes in the checkout, or compare two commits without reading untracked files. */
 export async function readDiff(
-  run: Pick<Run, "worktreePath" | "baseSha" | "locale">,
+  run: Pick<Run, "worktreePath" | "baseSha" | "locale" | "followUps">,
+  targetSha?: string,
 ): Promise<DiffFile[]> {
-  if (!run.baseSha || !run.worktreePath) return [];
+  const baseSha = reviewBaseSha(run);
+  if (!baseSha || !run.worktreePath) return [];
+  const comparison = targetSha ? [baseSha, targetSha] : [baseSha];
+  const round = activeFollowUp(run.followUps);
+  // Each ordinary review round needs its own review, even when its patch
+  // matches an earlier one. First-publish and sync fingerprints stay compatible.
+  const roundFingerprint =
+    round && round.kind !== "sync" ? `${round.id}\0${baseSha}\0` : "";
   // Diffing runs the checkout's filters; refuse a configuration that sets any.
   await assertGitConfigSafe(run.worktreePath);
   // A held-back file's reason is part of its fingerprint and of the draft
@@ -298,21 +308,23 @@ export async function readDiff(
         ...common,
         "--numstat",
         "-z",
-        run.baseSha,
+        ...comparison,
         "--",
       ])
     ).stdout,
   );
-  const untracked = (
-    await git(run.worktreePath, [
-      "ls-files",
-      "--others",
-      "--exclude-standard",
-      "-z",
-    ])
-  ).stdout
-    .split("\0")
-    .filter(Boolean);
+  const untracked = targetSha
+    ? []
+    : (
+        await git(run.worktreePath, [
+          "ls-files",
+          "--others",
+          "--exclude-standard",
+          "-z",
+        ])
+      ).stdout
+        .split("\0")
+        .filter(Boolean);
   const files: DiffFile[] = [];
   let total = 0;
   if (stats.length + untracked.length > 150)
@@ -367,7 +379,7 @@ export async function readDiff(
             "--literal-pathspecs",
             "diff",
             ...common,
-            run.baseSha,
+            ...comparison,
             "--",
             stat.path,
           ],
@@ -388,7 +400,7 @@ export async function readDiff(
       blocked = held.binary;
     if (secretInPatch(patch)) blocked = held.credentials;
     const fingerprint = digest(
-      stat.path + "\0" + (patch || fileMode + blocked),
+      roundFingerprint + stat.path + "\0" + (patch || fileMode + blocked),
     );
     if (blocked) patch = messages.heldBack({ reason: blocked });
     total += Buffer.byteLength(patch);

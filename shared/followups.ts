@@ -84,3 +84,9 @@ export function activeFollowUp(rounds: FollowUpRound[] | undefined) {
     ? round
     : undefined;
 }
+
+/** Review feedback against the previous PR head; syncs keep their target-based merge review. */
+export function reviewBaseSha(run: { baseSha?: string; followUps?: FollowUpRound[] }) {
+  const round = activeFollowUp(run.followUps);
+  return round && round.kind !== "sync" ? round.parentCommit : run.baseSha;
+}

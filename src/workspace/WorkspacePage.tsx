@@ -1,4 +1,4 @@
-import { lazy, Suspense, type Dispatch, type SetStateAction } from "react";
+import { lazy, Suspense, useState, type Dispatch, type SetStateAction } from "react";
 import {
   Activity,
   ArrowDownToLine,
@@ -36,6 +36,8 @@ import { premiseCheckable, usePremiseCheck } from "../app/hooks/usePremiseCheck"
 import { openCheckPanel, useUnderstanding } from "../app/hooks/useUnderstanding";
 import { ErrorBoundary } from "../app/ErrorBoundary";
 import { ChangesTab } from "./ChangesTab";
+import { isFileReviewed } from "../review/reviewed";
+import { diffRoundKey, diffRoundOptions } from "./diffRounds";
 import { checkFooter } from "./checkFooter";
 import { DraftTab } from "./DraftTab";
 import { OverviewTab } from "./OverviewTab";
@@ -65,6 +67,9 @@ const CommitHistory = lazy(() =>
   import("../review/CommitHistory").then((module) => ({
     default: module.CommitHistory,
   })),
+);
+const HistoricalDiff = lazy(() =>
+  import("./HistoricalDiff").then((module) => ({ default: module.HistoricalDiff })),
 );
 
 interface WorkspacePageProps {
@@ -158,7 +163,7 @@ export function WorkspacePage({
   additions,
   deletions,
   tab,
-  setTab,
+  setTab: setWorkspaceTab,
   focusMode,
   setFocusMode,
   showFiles,
@@ -192,6 +197,23 @@ export function WorkspacePage({
   updatingRepo,
 }: WorkspacePageProps) {
   const t = useT("workspace");
+  const roundKey = diffRoundKey(run);
+  const [diffSelection, setDiffSelection] = useState({ key: roundKey, round: "current" });
+  const hasHistory = !demo && !!run.prUrl && !!run.publishCommit;
+  const roundOptions = diffRoundOptions(run, t.diffRounds);
+  const selectedRound = hasHistory && diffSelection.key === roundKey &&
+    roundOptions.some((option) => option.value === diffSelection.round)
+    ? diffSelection.round : "current";
+  const historical = tab === "changes" && selectedRound !== "current";
+  const published = !demo && run.status === "published";
+  const showCurrent = () => setDiffSelection({ key: roundKey, round: "current" });
+  // A request to open a current file (from feedback, learning or another tab)
+  // must not leave a historical file on screen instead.
+  function setTab(value: SetStateAction<Tab>) {
+    const next = typeof value === "function" ? value(tab) : value;
+    if (next === "changes") showCurrent();
+    setWorkspaceTab(next);
+  }
   const sessionMessages = useT("session");
   const sessionRunning = !!run.session?.running;
   const sessionVisible = showSessionTab(run, demo);
@@ -225,7 +247,7 @@ export function WorkspacePage({
     </button>
   );
   const reviewedCount = files.filter((f) =>
-    run.reviewedFiles.includes(f.path),
+    isFileReviewed(run, f, demo),
   ).length;
   const allReviewed = files.length > 0 && reviewedCount === files.length;
   const footer = checkFooter(run, allReviewed, understanding);
@@ -416,11 +438,13 @@ export function WorkspacePage({
             </button>
           </div>
           <div className="review-totals">
+            {historical ? <span>{t.diffRounds.readOnly}</span> : <>
             <span className="additions">+{additions}</span>
             <span className="deletions">−{deletions}</span>
             <span className="totals-divider" />
             <ShieldCheck size={15} />
             <span>{demo ? t.sampleReview : t.humanReview}</span>
+            </>}
           </div>
         </div>
         {sessionRunning && <p className="session-busy-note" role="status">{sessionMessages.busy}</p>}
@@ -457,7 +481,25 @@ export function WorkspacePage({
               checkingPremise={premise.checkingPremise}
             />
           )}
-          {tab === "changes" && (
+          {tab === "changes" && hasHistory && (
+            <div className="diff-round-picker">
+              <label htmlFor="diff-round">{t.diffRounds.label}</label>
+              <select id="diff-round" className="text-input" value={selectedRound}
+                aria-describedby={historical ? "diff-round-notice" : undefined}
+                onChange={(event) => setDiffSelection({ key: roundKey, round: event.target.value })}>
+                {roundOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+              </select>
+              {historical && <p id="diff-round-notice">{t.diffRounds.notice}</p>}
+            </div>
+          )}
+          {historical && (
+            <ErrorBoundary resetKey={`${roundKey}:${selectedRound}`}>
+              <Suspense fallback={<p className="historical-diff-status" role="status">{t.diffRounds.loading}</p>}>
+                <HistoricalDiff key={roundKey} runId={run.id} round={selectedRound} />
+              </Suspense>
+            </ErrorBoundary>
+          )}
+          {tab === "changes" && !historical && (
             <ChangesTab
               run={run}
               files={files}
@@ -551,25 +593,29 @@ export function WorkspacePage({
           )}
         </div>
         <footer className="review-footer">
+          {historical ? <>
+            <span>{t.diffRounds.readOnly}</span>
+            <button type="button" className="button primary" onClick={showCurrent}>{t.diffRounds.back}</button>
+          </> : <>
           <div>
             <span className="footer-spark">
               <Sparkles size={15} />
             </span>
-            <span>{t.footer[footer.status]}</span>
+            <span>{published ? t.footer.publishedChanges : t.footer[footer.status]}</span>
             {prTextMissing && !byHand.writing && !reviewing && run.status !== "published" ? (
               <button type="button" className="mission-text-button" onClick={() => setTab("draft")}>{t.byHand.writePr}</button>
             ) : <span className="footer-hint">{run.learnByHand ? t.footer.hintByHand : t.footer.hint}</span>}
           </div>
           <div>
-            <span className="footer-reviewed">
+            {!published && <span className="footer-reviewed">
               <CheckCheck size={15} />
               {t.footer.reviewed({
                 reviewed: reviewedCount,
                 total: files.length,
               })}
-            </span>
+            </span>}
             {/* The sample PR exists nowhere: its button just stays off. */}
-            {run.status === "published" && run.prUrl && !demo ? (
+            {published ? run.prUrl && (
               <a
                 className="button primary"
                 href={run.prUrl}
@@ -629,6 +675,7 @@ export function WorkspacePage({
               </button>
             )}
           </div>
+          </>}
         </footer>
       </section>
       {byHand.readyOpen && (

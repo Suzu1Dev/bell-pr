@@ -37,6 +37,13 @@ export function registerReviewRoutes(app: Express, { workbench }: RouteDeps) {
     );
     res.json({ files });
   });
+  app.get("/api/runs/:id/diff-view", async (req, res) => {
+    const { round } = z
+      .object({ round: z.string().min(1).max(100) })
+      .strict()
+      .parse(req.query);
+    res.json(await workbench.diffView(req.params.id, round));
+  });
   app.post("/api/runs/:id/chat", async (req, res) => {
     const { filePath, question } = z
       .object({

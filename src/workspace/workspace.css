@@ -359,3 +359,30 @@
   text-decoration: underline;
   text-align: left;
 }
+.diff-round-picker {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+.diff-round-picker .text-input {
+  width: auto;
+  max-width: 100%;
+}
+.diff-round-picker p {
+  flex-basis: 100%;
+  margin: 0;
+  color: var(--color-text-muted);
+}
+.historical-diff-status {
+  padding: var(--space-3) var(--space-4);
+}
+.historical-diff .rv-file-header {
+  padding: var(--space-3) var(--space-4);
+  overflow-wrap: anywhere;
+}
+.historical-diff .file-name {
+  overflow-wrap: anywhere;
+}

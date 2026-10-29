@@ -112,6 +112,7 @@ const workspace = {
     reviewed: ({ reviewed, total }: { reviewed: number; total: number }) =>
       `${reviewed} / ${total} reviewed`,
     viewPullRequest: "View pull request",
+    publishedChanges: "Published PR changes",
     needsReview: "Mark every file as reviewed first",
     needsReviewAndCheck:
       "Mark every file as reviewed, then explain the change back in your own words",
@@ -181,6 +182,25 @@ const workspace = {
     loadingPanel: "Preparing the reading panel…",
     emptyTitle: "Understanding starts with the changes.",
     emptyText: "Select a changed file to ask about its design and trade-offs.",
+  },
+  diffRounds: {
+    label: "Changes to view",
+    current: "Current PR changes",
+    currentRound: "This review round",
+    currentSync: "Current PR changes after sync",
+    initial: "Initial contribution",
+    published: ({ number }: { number: number }) => `Review round ${number} (pushed)`,
+    sync: ({ number }: { number: number }) => `Round ${number}: target branch sync (pushed)`,
+    adopted: ({ number }: { number: number }) => `Round ${number}: changes taken over from GitHub`,
+    all: "All changes (cumulative)",
+    readOnly: "Read-only changes",
+    notice: "This view is read-only. Return to the current changes to mark files as reviewed, ask questions or approve.",
+    back: "Back to current changes",
+    loading: "Loading the selected changes…",
+    retry: "Try loading again",
+    workingTree: "Working files",
+    empty: "No files changed in this comparison.",
+    noText: "This change has no text patch to display.",
   },
   /**
    * The Explain-it-back check next to the diff (UnderstandingCheck). The

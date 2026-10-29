@@ -547,6 +547,16 @@ finish, it leaves the contribution unchanged.
   maintainer's comment only as context, then changes the code. You review
   each file, explain the round back (while the understanding check is on),
   and push the round as one new commit to the same PR.
+- **Choose which changes to read**: the Changes tab defaults to the current
+  feedback round, compared with the previous PR head. Files unchanged in
+  that round do not need another review, and reverting an earlier edit or
+  deleting a file added in the PR appears in this round's diff. The selector
+  also offers the initial submission, each published round and the cumulative
+  PR changes. Those views are read-only and do not alter the current round's
+  review marks or approval; return to the current round to review and approve.
+  Failed or discarded rounds have no published snapshot to select. A sync
+  with the target branch keeps its existing review against the updated target;
+  published syncs can also be inspected separately.
 - **Commit history**: the tab lists every commit of the pull request,
   oldest first, labelled by where it came from (the first push, a review
   round, a sync with the target branch, a commit taken over from GitHub),

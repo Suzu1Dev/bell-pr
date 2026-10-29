@@ -30,7 +30,7 @@ import {
   type DraftCheck,
 } from "../shared/draft-checks.js";
 import type { Locale } from "../shared/i18n/locale.js";
-import { activeFollowUp, type FollowUpRound } from "../shared/followups.js";
+import { activeFollowUp, reviewBaseSha, type FollowUpRound } from "../shared/followups.js";
 import {
   AppError,
   type DiffFile,
@@ -944,9 +944,8 @@ export async function publish(
 }
 
 /**
- * Paths whose pushed content a round changed but the review list cannot
- * show: a file put back to its base version or deleted drops out of the
- * diff against the base, yet it would change the pushed commit.
+ * Paths a round would change outside its reviewed diff. Review rounds use
+ * the previous PR head; sync rounds use the target branch being merged.
  */
 async function unreviewableRoundPaths(
   run: Run,
@@ -1247,7 +1246,8 @@ async function stageReviewedTree(
   files: DiffFile[],
   indexEnv: NodeJS.ProcessEnv,
 ) {
-  await git(run.worktreePath, ["read-tree", run.baseSha], {
+  const base = reviewBaseSha(run)!;
+  await git(run.worktreePath, ["read-tree", base], {
     env: indexEnv,
   });
   await git(
@@ -1271,7 +1271,7 @@ async function stageReviewedTree(
         "--no-renames",
         "--name-only",
         "-z",
-        run.baseSha,
+        base,
         "--",
       ],
       { env: indexEnv },
@@ -1296,7 +1296,7 @@ async function stageReviewedTree(
           "--no-ext-diff",
           "--no-textconv",
           "--no-renames",
-          run.baseSha,
+          base,
           "--",
           file.path,
         ],

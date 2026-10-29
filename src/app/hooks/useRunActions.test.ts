@@ -21,7 +21,7 @@ import {
 import type { DraftEditor } from "./useDraftEditor";
 import type { TaskSetup } from "./useTaskSetup";
 import { getDemo } from "../../demo";
-import type { Run } from "../../types";
+import type { DiffFile, Run } from "../../types";
 
 const zh = zhTW.workspace.notices;
 
@@ -391,10 +391,11 @@ const respond = (body: unknown, status = 200) =>
  */
 async function mountActions(
   run: Run,
-  options: { draftDirty?: boolean; runIdRef?: { current: string } } = {},
+  options: { draftDirty?: boolean; runIdRef?: { current: string }; file?: DiffFile } = {},
 ) {
   const runIdRef = options.runIdRef ?? { current: run.id };
   const shown: Run[] = [];
+  const shownFiles: DiffFile[][] = [];
   const notices: string[] = [];
   const errors: string[] = [];
   const busy: boolean[] = [];
@@ -438,8 +439,8 @@ async function mountActions(
         if (typeof value !== "function") shown.push(value);
       },
       runIdRef,
-      file: undefined,
-      setFiles: ignore,
+      file: options.file,
+      setFiles: (value) => { if (typeof value !== "function") shownFiles.push(value); },
       setSelectedPath: ignore,
       demo: false,
       reviewRerunning: false,
@@ -466,6 +467,7 @@ async function mountActions(
   return {
     actions: () => latest!,
     shown,
+    shownFiles,
     notices,
     errors,
     busy,
@@ -498,6 +500,32 @@ test("a PR created after the person opened another run leaves that run on screen
     assert.deepEqual(shell.notices, [en.workspace.notices.prCreated]);
   } finally {
     await shell.unmount();
+  }
+});
+
+test("publishing refreshes the canonical diff and drops a response after switching runs", async (t) => {
+  const realFetch = globalThis.fetch;
+  t.after(() => { globalThis.fetch = realFetch; });
+  const approved: Run = { ...base, status: "approved", approvedFingerprint: "f" };
+  const published: Run = { ...approved, status: "published", prUrl: "https://example.test/pull/7" };
+  const files = getDemo("en").files;
+  for (const switched of [false, true]) {
+    const runIdRef = { current: approved.id };
+    const asked: string[] = [];
+    globalThis.fetch = (async (url, init) => {
+      asked.push(`${init?.method ?? "GET"} ${String(url)}`);
+      if (init?.method === "POST") return respond({ run: published });
+      if (switched) runIdRef.current = "other-run";
+      return respond({ files });
+    }) as typeof fetch;
+    const shell = await mountActions(approved, { runIdRef });
+    try {
+      await act(() => shell.actions().publish());
+      assert.deepEqual(asked, ["POST /api/runs/r/publish", "GET /api/runs/r/diff"]);
+      assert.deepEqual(shell.shown, [published]);
+      assert.deepEqual(shell.shownFiles, switched ? [] : [files]);
+      assert.deepEqual(shell.errors, [""]);
+    } finally { await shell.unmount(); }
   }
 });
 
@@ -591,6 +619,26 @@ test("a failed first publish reloads its local commit, while a late reload canno
       assert.deepEqual(asked, ["POST /api/runs/r/publish", "GET /api/runs/r"]);
       assert.deepEqual(shell.shown, switched ? [] : [interrupted]);
       assert.deepEqual(shell.errors, ["", "Publish stopped."]);
+    } finally { await shell.unmount(); }
+  }
+});
+
+test("review toggles the current fingerprint rather than an old round's path mark", async (t) => {
+  const realFetch = globalThis.fetch;
+  t.after(() => { globalThis.fetch = realFetch; });
+  const file = { ...getDemo("en").files[0], fingerprint: "new-round" };
+  for (const fingerprint of ["old-round", "new-round"]) {
+    const reviewing = { ...base, status: "review" as const, reviewedFiles: [file.path], reviewedFingerprints: { [file.path]: fingerprint } };
+    const calls: unknown[] = [];
+    globalThis.fetch = (async (url, init) => {
+      assert.equal(url, "/api/runs/r/review");
+      calls.push(JSON.parse(String(init?.body)));
+      return respond({ run: reviewing });
+    }) as typeof fetch;
+    const shell = await mountActions(reviewing, { file });
+    try {
+      await act(() => shell.actions().reviewFile());
+      assert.deepEqual(calls, [{ filePath: file.path, fingerprint: "new-round", reviewed: fingerprint !== "new-round" }]);
     } finally { await shell.unmount(); }
   }
 });

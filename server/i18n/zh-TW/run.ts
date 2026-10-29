@@ -155,6 +155,7 @@ const m: Translation<typeof en> = {
     failed: ({ executable, output }) => `${executable} 執行失敗：${output}`,
   },
   diff: {
+    viewUnavailable: "此輪次在這個工作目錄中沒有可讀取的已發佈歷史。",
     unparsable: "無法解析 Git 差異。",
     renameFirst: "檔案名稱包含不支援的字元，請先重新命名。",
     unsupportedName: "檔案名稱包含不支援的字元。",

@@ -191,6 +191,10 @@ test("a published sample keeps its approve button off and links to no PR", () =>
   );
   assert.match(real, /href="https:\/\/github\.com\/acme\/widgets\/pull\/3"/);
   assert.match(real, /View pull request/);
+  assert.match(real, /Published PR changes/);
+  assert.doesNotMatch(real, /footer-reviewed|Not just a review: a lesson in code, too\./);
+  assert.match(renderZh(element({ run: { ...realRun, status: "published" } })), /已推送的 PR 變更/);
+  assert.match(html, /footer-reviewed/);
 });
 
 /** The footer's primary button, from its opening tag to its end. */
@@ -199,7 +203,7 @@ const primary = (html: string) =>
 
 test("once every file is ticked, the footer asks to explain the change back first", () => {
   const files = demo.files.map((file) => ({ ...file, fingerprint: file.path }));
-  const ticked = { ...realRun, reviewedFiles: files.map((file) => file.path) };
+  const ticked = { ...realRun, reviewedFiles: files.map((file) => file.path), reviewedFingerprints: Object.fromEntries(files.map((file) => [file.path, file.fingerprint])) };
   const html = renderEn(element({ run: ticked, files }));
   const button = primary(html);
   assert.match(button, /Explain it back/);
@@ -216,9 +220,28 @@ test("once every file is ticked, the footer asks to explain the change back firs
   assert.match(renderZh(element({ run: ticked, files })), /<span>每一個檔案都已審閱。<\/span>/);
 });
 
+test("a path reviewed in an older round does not count toward approving the current diff", () => {
+  const file = { ...demo.files[0], fingerprint: "this-round" };
+  const stale = { ...realRun, reviewedFiles: [file.path], reviewedFingerprints: { [file.path]: "earlier-round" } };
+  const html = renderEn(element({ run: stale, files: [file] }));
+  assert.match(html, /0 \/ 1 reviewed/);
+  assert.match(primary(html), /disabled=""/);
+});
+
+test("published runs offer a round selector with the current review selected, and samples do not", () => {
+  const round = { id: "now", requestedAt: realRun.createdAt, feedbackUrls: [], status: "review" as const, parentCommit: "b".repeat(40) };
+  const run = { ...realRun, prUrl: "https://github.com/acme/widgets/pull/3", publishCommit: round.parentCommit, followUps: [round] };
+  const html = renderEn(element({ run, tab: "changes" }));
+  assert.match(html, /<option value="current" selected="">This review round/);
+  assert.match(html, /Initial contribution/);
+  assert.match(html, /All changes \(cumulative\)/);
+  assert.match(renderZh(element({ run, tab: "changes" })), /本輪修正/);
+  assert.doesNotMatch(renderEn(element({ run, tab: "changes", demo: true })), /id="diff-round"/);
+});
+
 test("with the check turned off, approval needs the ticks only, and the run says so", () => {
   const files = demo.files.map((file) => ({ ...file, fingerprint: file.path }));
-  const ticked = { ...realRun, reviewedFiles: files.map((file) => file.path) };
+  const ticked = { ...realRun, reviewedFiles: files.map((file) => file.path), reviewedFingerprints: Object.fromEntries(files.map((file) => [file.path, file.fingerprint])) };
   try {
     setCheckSettingsForTests({ settings: { skipUnderstandingCheck: true }, lockedBy: {} });
     const html = renderEn(element({ run: ticked, files }));
@@ -301,6 +324,7 @@ test("a learn-by-hand run's approval waits for the person's PR title and descrip
     agents: realRun.agents.filter((agent) => agent.id === "lead"),
     team: realRun.team && { ...realRun.team, tasks: [] },
     reviewedFiles: ["src/a.ts"],
+    reviewedFingerprints: { "src/a.ts": "f1" },
     draft: { title: "", body: "" },
     byHand: { ready: { at: realRun.createdAt, changeFingerprint: changeFingerprint(changed), review: false } },
   };

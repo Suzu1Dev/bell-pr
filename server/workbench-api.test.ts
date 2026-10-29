@@ -45,6 +45,7 @@ const methods = [
   "cancelSession",
   "rerunReview",
   "diff",
+  "diffView",
   "explanations",
   "prepareDraft",
   "editable",

@@ -51,6 +51,16 @@ const run: Run = {
   },
 };
 
+test("the file list and checkbox reject a review mark for another round's fingerprint", () => {
+  const stale = { ...run, reviewedFiles: [files[0].path], reviewedFingerprints: { [files[0].path]: "old-round" } };
+  const html = renderEn(element({ run: stale }));
+  assert.doesNotMatch(html, /class="file-reviewed"/);
+  assert.doesNotMatch(html, /type="checkbox"[^>]*checked=""/);
+  const current = renderEn(element({ run: { ...stale, reviewedFingerprints: { [files[0].path]: files[0].fingerprint! } } }));
+  assert.match(current, /class="[^"]*file-reviewed/);
+  assert.match(current, /type="checkbox"[^>]*checked=""/);
+});
+
 const element = (props: Partial<Props> = {}) =>
   createElement(ChangesTab, {
     run,
@@ -114,6 +124,23 @@ test("the two file filters share one row and say whether they are on", () => {
   assert.match(filters, /aria-pressed="false"[^>]*>.*?Suggested order/);
   // The decorative search mark is hidden from screen readers.
   assert.match(html, /<kbd aria-hidden="true">/);
+  assertNoHan(html);
+});
+
+test("published files ignore the old unreviewed filter and keep explanations without review controls", () => {
+  const published: Run = {
+    ...run, status: "published", reviewedFiles: [files[0].path],
+    reviewedFingerprints: { [files[0].path]: files[0].fingerprint! },
+  };
+  const html = renderEn(element({ run: published, onlyUnreviewed: true, editable: false }));
+  assert.equal((html.match(/class="file-item /g) ?? []).length, files.length);
+  assert.doesNotMatch(html, /Only unreviewed|review-progress|rv-reviewed|file-reviewed/);
+  assert.match(html, /Suggested order/);
+  assert.match(html, /explanation-wrap/);
+  assert.match(html, /Click any line and the agent will explain it/);
+  const sample = renderEn(element({ run: published, demo: true, onlyUnreviewed: true }));
+  assert.match(sample, /Only unreviewed|review-progress|rv-reviewed/);
+  assert.equal((sample.match(/class="file-item /g) ?? []).length, 1);
   assertNoHan(html);
 });
 
@@ -250,8 +277,8 @@ test("every file ticked: the hint points at the check, unless it is off or passe
   assert.match(ticked({}), /Every file reviewed\. Next: explain it back\./);
   assert.match(ticked({ required: false, off: true }), /<small>Every file reviewed\.<\/small>/);
   assert.match(ticked({ passed: true }), /<small>Every file reviewed\.<\/small>/);
-  // A published run takes no check any more, so nothing comes next.
-  assert.match(
+  // A published run asks for neither a new check nor new review marks.
+  assert.doesNotMatch(
     renderEn(
       element({
         run: { ...run, status: "published" },
@@ -260,7 +287,7 @@ test("every file ticked: the hint points at the check, unless it is off or passe
         understanding: understanding(),
       }),
     ),
-    /<small>Every file reviewed\.<\/small>/,
+    /review-progress|Every file reviewed/,
   );
   assert.match(
     renderEn(element()),

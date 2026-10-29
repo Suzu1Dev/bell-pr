@@ -21,6 +21,7 @@ import type { Locale } from "../../../shared/i18n/locale";
 import type { ContributionSettings } from "../../../shared/insights";
 import { summarizeRun } from "../../../shared/runs";
 import { activeFollowUp } from "../../../shared/followups";
+import { isFileReviewed } from "../../review/reviewed";
 import type { SplitRequest } from "../../../shared/split";
 import type { ModalName, Notify, Page, Tab } from "../AppShell";
 import { usePresentation, type PresentationFlags } from "../presentation";
@@ -761,7 +762,7 @@ export function useRunActions({
   }
   async function reviewFile() {
     if (!file) return;
-    const reviewed = !run.reviewedFiles.includes(file.path);
+    const reviewed = !isFileReviewed(run, file, demo);
     if (demo) {
       // As on the server, only a run in review takes review marks: the
       // sample PR, once opened (or on its way), stays as it was approved.
@@ -997,6 +998,7 @@ export function useRunActions({
     setBusy(true);
     setFormError("");
     const pushingRound = !!followUp;
+    const selection = selectionSequence.current;
     try {
       const result = await api<{ run: Run; url?: string }>(
         `/runs/${run.id}/publish`,
@@ -1008,9 +1010,23 @@ export function useRunActions({
         }),
       );
       // The person may have opened another run while the PR was created.
-      if (runIdRef.current === result.run.id) setRun(result.run);
+      if (runIdRef.current === result.run.id && selectionSequence.current === selection)
+        setRun(result.run);
       closeModal();
       notify(pushingRound ? t.roundPushed : t.prCreated);
+      // A published round no longer uses its parent as the review base.
+      // Refresh the canonical files for that new comparison.
+      if (runIdRef.current === result.run.id && selectionSequence.current === selection) {
+        try {
+          const files = await readRunFiles(result.run.id);
+          if (runIdRef.current === result.run.id && selectionSequence.current === selection)
+            setFiles(files);
+        } catch (error) {
+          // The PR was already published; a failed read must not look like a failed push.
+          if (runIdRef.current === result.run.id && selectionSequence.current === selection)
+            notify((error as Error).message, "error");
+        }
+      }
     } catch (error) {
       if (runIdRef.current === run.id) {
         if (error instanceof ApiError && error.code === "understanding_check_required") checkFirst();

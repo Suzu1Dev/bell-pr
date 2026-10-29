@@ -224,7 +224,12 @@ async function runFollowUp(
   const started = Date.now();
   log.info("round.started", { runId: run.id, round: round.id });
   try {
-    const files = await readDiff(run);
+    // The agent needs the whole PR as background before it makes this round's edits.
+    const files = await readDiff({
+      worktreePath: run.worktreePath,
+      baseSha: run.baseSha,
+      locale: run.locale,
+    });
     temporary = await mkdtemp(path.join(os.tmpdir(), "bell-followup-"));
     const outputSchema = path.join(temporary, "followup-schema.json");
     await writeFile(outputSchema, JSON.stringify(followUpJsonSchema), {

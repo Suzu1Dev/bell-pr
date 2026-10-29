@@ -272,6 +272,7 @@ export default {
   },
   /** Reading a run's changes: limits, and why a file is held back from the PR. */
   diff: {
+    viewUnavailable: "This round has no readable published history in this workspace.",
     unparsable: "Could not parse the Git diff.",
     renameFirst:
       "A file name contains unsupported characters; rename the file first.",

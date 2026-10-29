@@ -269,6 +269,10 @@ compare them with what you predicted, and tag what each comment raised and
 whether you saw it coming. Then let an agent address selected comments in a
 follow-up round, after you restate each one in your own words; you review
 the round and push it as one more commit.
+The code review shows that round's edits against the previous PR version.
+Use the diff selector to view the initial submission, a published round,
+or all changes together. Historical and cumulative views are read-only;
+return to the current round to mark files reviewed and approve it.
 **Commit history** lists every commit of the pull request, from the first
 push to review rounds, syncs and commits made on GitHub, each opening to
 its files' diffs.

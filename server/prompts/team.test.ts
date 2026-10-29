@@ -494,6 +494,23 @@ test("the prompt builders return exactly the recorded prompts", async () => {
   assert.deepEqual(builderPrompts(), await fixture("team-prompts.json"));
 });
 
+test("reviewer and tester context names the current round base without changing initial or sync context", () => {
+  const run = { prompt: "Address review", baseSha: "a".repeat(40) };
+  const round: NonNullable<Run["followUps"]>[number] = {
+    id: "round", status: "review", parentCommit: "b".repeat(40),
+    requestedAt: "", feedbackUrls: [],
+  };
+  const initial = independentReviewContext(run, [], undefined);
+  const followUp = independentReviewContext({ ...run, followUps: [round] }, [], undefined);
+  assert.equal(followUp, initial.replace(run.baseSha, round.parentCommit));
+  for (const prompt of [reviewerPrompt(followUp, "en"), testerPrompt(followUp, undefined, "en")]) {
+    assert.ok(prompt.includes(`Base commit: ${round.parentCommit}.`));
+    assert.ok(!prompt.includes(`Base commit: ${run.baseSha}.`));
+  }
+  assert.equal(independentReviewContext({ ...run, followUps: [{ ...round, kind: "sync" }] }, [], undefined), initial);
+  assert.equal(independentReviewContext({ ...run, followUps: [{ ...round, status: "published" }] }, [], undefined), initial);
+});
+
 test("every team prompt builder answers in the locale it is given", () => {
   // Builders that open with the shared team boundaries, which name the language.
   const roles = [
