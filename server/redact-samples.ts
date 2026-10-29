@@ -14,6 +14,10 @@ export const fakeAssignment = piece("fake", "plain", "text", "value");
 export const fakeHex = piece("ab").repeat(32);
 /** Obviously fake Slack bot token (`xoxb-` plus 12 letters). */
 export const fakeSlack = piece("xox", "b-", "FAKE", "FAKE", "FAKE");
+/** A device token's shape: `bpd_` plus 64 hex. Not a real token. */
+export const fakeDeviceToken = piece("bpd", "_", fakeHex);
+/** A pairing code's shape (Crockford base32, XXXX-XXXX). Not a real code. */
+export const fakePairCode = piece("FAKE", "-", "C0DE");
 
 export interface RedactSample {
   name: string;
@@ -52,6 +56,21 @@ export const redactSamples: readonly RedactSample[] = [
     name: "Slack bot token",
     text: fakeSlack,
     secretParts: [fakeSlack, piece("xox", "b-")],
+  },
+  {
+    name: "device token",
+    text: `device ${fakeDeviceToken} paired`,
+    secretParts: [fakeDeviceToken, fakeHex],
+  },
+  {
+    name: "pairing code",
+    text: `pairing code ${fakePairCode}`,
+    secretParts: [fakePairCode],
+  },
+  {
+    name: "pairing link code",
+    text: `https://bell.example/pair?code=${piece("FAKE", "C0DE")}`,
+    secretParts: [piece("FAKE", "C0DE")],
   },
 ];
 

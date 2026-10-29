@@ -1,4 +1,4 @@
-import type { CookieOptions, Request, RequestHandler } from "express";
+import type { CookieOptions, Request, RequestHandler, Response } from "express";
 import { tokensMatch } from "./api-token.js";
 import { apiSessionCookie, readApiSession } from "./api-session.js";
 import { sm } from "./i18n/index.js";
@@ -131,9 +131,9 @@ export function localhostGuard(opts: GuardOptions): RequestHandler {
       res.status(415).json({ error: sm().common.jsonRequired });
       return;
     }
-    if (api && enforced(opts) && !publicHealth(req)) {
+    if (api && enforced(opts) && !publicHealth(req) && !publicPairing(req)) {
       const expected = opts.readApiToken ? opts.readApiToken() : opts.apiToken;
-      if (!apiRequestAuthenticated(req, expected)) {
+      if (!apiRequestAuthenticated(req, expected) && !deviceAuthenticated(req, res, opts, expected)) {
         res.status(401).json({ error: sm().common.apiTokenRequired });
         return;
       }
@@ -185,6 +185,27 @@ function publicHealth(req: Request) {
     (req.method === "GET" || req.method === "HEAD") &&
     /^\/api\/health$/i.test(req.path)
   );
+}
+
+/** Redeeming a pairing code: the device has no token yet. */
+function publicPairing(req: Request) {
+  return req.method === "POST" && /^\/api\/pair$/i.test(req.path);
+}
+
+export interface GuardOptions {
+  /**
+   * A paired device's token, checked against the install token: the device
+   * id, or undefined. The guard puts the id in `res.locals.deviceId`.
+   */
+  deviceToken?: (presented: string, installToken: string) => string | undefined;
+}
+
+/** A device token in the token headers; never a cookie. */
+function deviceAuthenticated(req: Request, res: Response, opts: GuardOptions, expected: string | undefined) {
+  if (!expected || !opts.deviceToken || !hasTokenHeader(req)) return false;
+  const id = opts.deviceToken(presentedToken(req), expected);
+  if (id !== undefined) res.locals.deviceId = id;
+  return id !== undefined;
 }
 
 /** Authorization: Bearer, or X-Bell-Token when Authorization is absent. */
