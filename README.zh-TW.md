@@ -223,9 +223,9 @@ Authorization: Bearer <token>
 
 `X-Bell-Token: <token>` 效果相同。缺少或錯誤的權杖會得到 HTTP 401。請求的 Host 必須是受信任的位址（`localhost`、`127.0.0.1` 或 `[::1]` 加上 BELL PR 的埠，或你用 `BELLPR_PUBLIC_URL`、`BELLPR_ALLOWED_ORIGINS` 指定的主機）。瀏覽器的 `Origin` 若不是這個應用程式自己的來源，也不在允許清單上，就會被拒絕。沒有萬用字元 CORS。會變更資料的請求必須使用 `application/json`。
 
-`bell-pr` 開啟瀏覽器時，位址的片段是 `#bell_token=<權杖>`。頁面會存下權杖，再從位址列移除。啟動時印出的那一行不含權杖，因此服務記錄裡也不會有。`bell-pr open` 印出的位址不含權杖，權杖只交給瀏覽器。`bell-pr open --print` 只印出位址，同樣不含權杖。`bell-pr open --print-token` 會印出帶權杖的位址（加上 `--print` 則不開瀏覽器）。請把那個位址當成密碼。它不會寫進伺服器記錄，也不會出現在 `bell-pr doctor --json`。
+`bell-pr` 開啟瀏覽器時，位址的片段是 `#bell_token=<權杖>`。頁面會存下權杖，再從位址列移除。啟動時印出的那一行不含權杖，因此服務記錄裡也不會有。`bell-pr open` 印出的位址不含權杖，權杖只交給瀏覽器。`bell-pr open --print` 只印出位址，同樣不含權杖。手機與其他裝置請優先用 `bell-pr pair`。在 SSH 或無桌面、無法走配對時，可用 `bell-pr open --print --print-token` 作為備援（加上 `--print` 則不開瀏覽器）。請把那個位址當成密碼。它不會寫進伺服器記錄，也不會出現在 `bell-pr doctor --json`。
 
-token 可能留在瀏覽器歷史紀錄裡，如果這個瀏覽器設定檔有跟別人共用，請執行 `bell-pr token rotate`。
+若把安裝用 API 權杖印進網址，它可能留在瀏覽器歷史紀錄裡；請優先配對。若權杖可能外流，在主機執行 `bell-pr token rotate`（也會讓所有已配對裝置失效）。
 
 ## 設定
 
@@ -234,8 +234,8 @@ BELL PR 不需要任何設定就能啟動。下列設定都是啟動時讀取的
 | 變數 | 預設值 | 用途 |
 | --- | --- | --- |
 | `BELLPR_PORT` | `4311` | 網頁介面與 API 的埠（1024 到 65535） |
-| `BELLPR_HOST` | `127.0.0.1` | 監聽的位址；若要從其他電腦連線，請保留預設值，改用 HTTPS 反向代理並設定 `BELLPR_PUBLIC_URL` |
-| `BELLPR_PUBLIC_URL` | 無 | 在反向代理或其他對外埠之後時，瀏覽器使用的網址 |
+| `BELLPR_HOST` | `127.0.0.1` | 監聽位址；請維持本機回環，遠端請用 Tailscale serve（或其他私人 HTTPS 前端）加上 `BELLPR_PUBLIC_URL`，不要用 Funnel，也不要暴露到公網 |
+| `BELLPR_PUBLIC_URL` | 無 | 瀏覽器使用的 HTTPS 來源（不含路徑）；Tailscale serve／遠端連線必填，未設則遠端 Host 會得到 403 |
 | `BELLPR_ALLOWED_ORIGINS` | 無 | 額外接受的精確 origin，以逗號分隔 |
 | `BELLPR_DATA_DIR` | `~/.bellpr` | 資料目錄 |
 | `BELLPR_NO_OPEN` | 未設定 | `1` 表示絕不開啟瀏覽器 |
@@ -330,7 +330,9 @@ BELL PR 的名稱與標誌不在 Apache 授權範圍內；你可以如何使用�
 
 BELL PR 是獨立專案，與 GitHub, Inc.、OpenAI 及 Anthropic PBC 皆無關聯，也未獲其認可或贊助。GitHub、OpenAI、Codex、Anthropic、Claude 與 Claude Code 均為其各自擁有者的商標；BELL PR 提及這些名稱，僅為說明可搭配使用的工具。
 
-含權杖的網址可能留在瀏覽器歷史紀錄中，請視同密碼保管。SSH 或無桌面啟動只會提示執行 `bell-pr open --print --print-token`；桌面啟動使用暫存的私密 `file://` 轉址檔案。
+含權杖的網址請視同密碼。SSH 或無桌面、無法配對時，可備援執行
+`bell-pr open --print --print-token`；能開 `/pair` 時請優先 `bell-pr pair`。
+桌面啟動使用暫存的私密 `file://` 轉址檔案。
 
 ## 準備主機與配對裝置
 
@@ -346,9 +348,10 @@ BELL PR 是獨立專案，與 GitHub, Inc.、OpenAI 及 Anthropic PBC 皆無關�
 啟動連結的安裝權杖存於 sessionStorage，且優先使用。API 請求透過
 Authorization 標頭驗證，瀏覽器必須允許儲存資料。
 
-使用 `bell-pr devices list` 查看裝置，或 `bell-pr devices revoke <id>`
-撤銷裝置。也可到「設定 → 一般 → 裝置」操作。安裝權杖與裝置權杖都可列出並撤銷任何裝置。`bell-pr token rotate` 會使所有已配對裝置失效，
-之後需重新配對。
+請在設定頁的裝置清單管理裝置。在主機（含無桌面環境）使用
+`bell-pr devices list` 與 `bell-pr devices revoke <id>`。安裝權杖與已配對
+裝置憑證都可列出並撤銷任何裝置。`bell-pr token rotate` 會換掉安裝用 API
+權杖並使所有已配對裝置失效，之後需重新配對。
 
 ## 配對遭鎖定時該怎麼辦
 
@@ -366,19 +369,20 @@ bell-pr pair [--name "device name"]
 - 未加 `--unlock` 的 `bell-pr pair` 不會在鎖定期間清除鎖定或失敗計數。
 - 裝置權杖不能解鎖；只有主機上的安裝權杖可以。
 - 鎖定或計數檔案遺失、損毀時，伺服器會保持鎖定，並提示執行 `bell-pr pair --unlock`。
-- 成功配對，或連續 24 小時沒有失敗後，計數會自動重設。
+- 成功配對後，計數會自動重設。
 
 ## 裝置遺失或遭竊
 
-任何已配對裝置都可列出並撤銷任何裝置（包括其他裝置）。裝置權杖仍不能
+任何已配對裝置都可列出並撤銷任何裝置（包括其他裝置）。裝置憑證仍不能
 建立配對碼、輪替安裝權杖或解除配對鎖定。
 
-請從另一台已配對裝置的「設定 → 一般 → 裝置」撤銷遺失的裝置，或在主機
-使用安裝權杖執行 `bell-pr devices revoke <id>`。若自己的裝置已被撤銷，
-或不再信任任何裝置權杖，請在**主機**執行：
+請從另一台已配對裝置的設定頁裝置清單撤銷；在主機（含無桌面）使用安裝
+權杖執行 `bell-pr devices revoke <id>`。若自己的裝置已被撤銷，或不再信任
+任何裝置憑證，請在**主機**執行：
 
 ```bash
 bell-pr token rotate
 ```
 
-此指令會輪替安裝權杖並使所有裝置權杖失效。之後以 `bell-pr pair` 重新配對。
+此指令會換掉安裝用 API 權杖並使所有已配對裝置失效。之後以 `bell-pr pair`
+重新配對。

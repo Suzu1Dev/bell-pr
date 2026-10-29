@@ -60,11 +60,18 @@ bell-pr open
 ```
 
 - **Started with `npx`:** run `npx bell-pr open`.
-- **No browser on that machine** (a server, SSH): `bell-pr open --print --print-token`
-  only prints the address; open it in a browser that reaches BELL PR. The
-  address includes `#bell_token=`, which the page needs. The line printed
-  at start does not, and neither does `bell-pr open` without `--print-token`.
-  Do not share the `--print-token` address.
+- **No browser on that machine** (a server, SSH): prefer pairing from a
+  device that can open `/pair`. As a fallback,
+  `bell-pr open --print --print-token` only prints the address; open it in
+  a browser that reaches BELL PR. The address includes `#bell_token=`.
+  The line printed at start does not, and neither does `bell-pr open`
+  without `--print-token`. Do not share the `--print-token` address.
+- **Pairing locked (HTTP 423)**: on the host run `bell-pr pair --unlock`,
+  then `bell-pr pair`. A paired device cannot unlock.
+- **Lost or stolen device**: revoke it from the device list in Settings on
+  another paired device, or on the host with
+  `bell-pr devices revoke <id>`. If your own device was revoked, run
+  `bell-pr token rotate` on the host and pair again.
 - **Another data directory:** `bell-pr open --data-dir <dir>`, with the
   directory you started BELL PR with.
 - **Docker:** `docker exec <container> bell-pr open --print --print-token`.
@@ -476,8 +483,9 @@ there, then publish again.
   user, or choose your own directory with `--data-dir`.
 - **"To listen on …, set BELLPR_PUBLIC_URL …"** or **"BELLPR_PUBLIC_URL
   must be the address browsers use …"**: BELL PR listens on 127.0.0.1 by
-  default. To reach it from other machines, put an HTTPS reverse proxy in
-  front and set `BELLPR_PUBLIC_URL`, as [Self-hosting](self-hosting.md)
+  default. For another machine or phone, use Tailscale serve (not Funnel)
+  with `BELLPR_PUBLIC_URL`, then pair with `bell-pr pair`, as
+  [Self-hosting](self-hosting.md#reach-bell-pr-from-another-machine)
   describes.
 - **"Could not load the settings file …"**: check the path given to
   `--env-file`.
