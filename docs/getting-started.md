@@ -37,7 +37,29 @@ BELL PR runs on macOS and Linux, and on Windows inside WSL2
 install everything above inside your WSL distribution).
 
 `bell-pr doctor` checks all of this and prints the command that fixes each
-problem. You can also skip it: the Welcome screen runs the same check.
+problem.
+
+### With no AI provider
+
+`bell-pr start` does not listen until every required check passes. With
+neither the Codex CLI nor Claude Code installed and signed in, it exits
+and prints **Not ready**, then this line, before the commands that fix
+each check:
+
+```text
+No AI provider yet? See the sample tour: bell-pr start --force
+```
+
+`bell-pr start --force` opens BELL PR so you can take the sample tour. The
+tour makes no AI call and sends nothing to GitHub. A real agent run still
+waits until a provider is ready. Install and sign in to one, as the same
+user that runs BELL PR:
+
+- Codex CLI: `npm install -g @openai/codex`, then `codex login`
+- Claude Code: `npm install -g @anthropic-ai/claude-code`, then
+  `claude auth login`
+
+The Welcome screen runs the same check once BELL PR is open.
 
 ## Start BELL PR
 

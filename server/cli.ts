@@ -15,7 +15,7 @@ import {
   resolveDataDir,
   resolvePort,
 } from "./config.js";
-import { runDoctorCli } from "./doctor.js";
+import { readinessChecklist, runDoctorCli } from "./doctor.js";
 import { sm } from "./i18n/index.js";
 import {
   isEntryPoint,
@@ -209,6 +209,7 @@ async function start(args: string[], ctx: Context): Promise<number | undefined> 
     host: { type: "string" },
     "no-open": { type: "boolean" },
     dev: { type: "boolean" },
+    force: { type: "boolean" },
   });
   loadEnvFile(values["env-file"]);
   const config = resolveConfig(
@@ -221,6 +222,21 @@ async function start(args: string[], ctx: Context): Promise<number | undefined> 
     },
     ctx.env,
   );
+  // Before anything listens: the same required checks as `bell-pr doctor`.
+  // --force is how the sample tour still opens when no AI provider is ready.
+  if (values.force) {
+    ctx.stderr.write(`${sm().cli.start.forced}\n`);
+  } else {
+    const readiness = await readinessChecklist({
+      dataDir: config.dataDir,
+      port: config.port,
+    });
+    if (!readiness.ready) {
+      ctx.stderr.write(readiness.text);
+      ctx.stderr.write(`${sm().cli.start.notReady}\n`);
+      return 1;
+    }
+  }
   const running = await startServer({
     config,
     print: (line) => ctx.stdout.write(`${line}\n`),

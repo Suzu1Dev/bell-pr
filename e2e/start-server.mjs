@@ -164,7 +164,9 @@ export async function launchServer(options = {}) {
     await seed?.(dataDir);
     child = spawn(
       process.execPath,
-      [bin, "start", "--no-open", "--port", String(port)],
+      // Fake CLIs fail the readiness gate. --force is what keeps these
+      // servers, including the sample tour, able to start.
+      [bin, "start", "--force", "--no-open", "--port", String(port)],
       {
         cwd: root,
         env: serverEnvironment({ home, dataDir, fakeBin, env }),

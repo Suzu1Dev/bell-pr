@@ -26,21 +26,60 @@ default; you can turn it off, and the run says so) and approved the pull
 request yourself. Publishing checks that the project welcomes it. There is
 no BELL PR cloud, no telemetry and no account.
 
-This is the open-source edition of BELL PR, licensed under
-[Apache-2.0](LICENSE) and free to use. It is community-maintained.
+BELL PR is free and open-source software under
+[Apache-2.0](LICENSE). There is no paid tier at launch.
 
 ![The Code changes tab: a diff with a plain-language explanation of the change beside it](docs/images/en/run-changes-1280.png)
 
-[Quickstart](#quickstart) · [Requirements](#requirements) ·
+[Try the sample project](#try-the-sample-project) ·
+[Before you start](#before-you-start) · [Quickstart](#quickstart) ·
+[Requirements](#requirements) ·
 [Features](#features) · [Privacy](#privacy) ·
 [Security](#security-model) · [Configuration](#configuration) ·
 [Troubleshooting](#troubleshooting) · [Documentation](#documentation) ·
 [Contributing](#contributing) · [License](#license-and-trademarks)
 
-## Quickstart
+## Try the sample project
 
-With the [requirements](#requirements) in place, this takes about 60
-seconds.
+A finished sample contribution — project rules, plan, diffs, explanations,
+understanding check, and PR draft — needs **no setup**, makes **no AI call**,
+and sends nothing to GitHub. Open it from Home (**Try the sample project**) or
+**Sample** in the sidebar once BELL PR is running.
+
+Use it to learn the review flow before you import a real repository. When
+`bell-pr doctor` is not ready, start with `bell-pr start --force` so this
+tour can open. A real agent run still waits for a signed-in AI provider.
+
+## Before you start
+
+BELL PR is a local workbench. Install and sign in to these tools **before**
+the Quickstart; `bell-pr doctor` prints a fix command for each miss.
+
+- **Node.js 22 or later** ([nodejs.org](https://nodejs.org/en)).
+- **Git**, with your name and e-mail set
+  (`git config --global user.name` / `user.email`). Syncing a run onto the
+  latest target branch needs **Git 2.40 or later**.
+- **GitHub CLI** (`gh`), signed in with `gh auth login`
+  ([cli.github.com](https://cli.github.com/)).
+- **One AI coding CLI**, installed and signed in as the same user that runs
+  BELL PR (either is enough). Usage counts against **your own** provider
+  account (a paid plan or API credits, depending on the provider):
+  - Codex CLI: `npm install -g @openai/codex`, then `codex login`
+  - Claude Code: `npm install -g @anthropic-ai/claude-code`, then
+    `claude auth login`
+- **On Linux:** `bubblewrap` and `socat` for the Claude Code file-edit
+  sandbox (`sudo apt-get install bubblewrap socat` on Debian/Ubuntu).
+  macOS uses its built-in sandbox.
+
+Supported today: **macOS**, **Linux**. **Windows via WSL2 (untested):** install
+everything above inside your WSL distribution.
+
+When `bell-pr doctor` reports every required check green, continue.
+`bell-pr start` exits before it listens until then. With no AI provider
+signed in, `bell-pr start --force` still opens BELL PR so you can take the
+sample tour; agent runs and publishing wait until a provider is ready.
+
+## Quickstart
 
 1. Start BELL PR:
 
@@ -59,6 +98,10 @@ seconds.
    it) and pick the AI **provider** your agents use.
 4. Take the sample tour, import a repository, or find a project to
    contribute to.
+
+`npx bell-pr` is `bell-pr start`. It listens only when `bell-pr doctor` is
+ready; otherwise it exits and prints the fix for each failed check. `npx
+bell-pr start --force` opens the sample tour anyway.
 
 **Lost the address? Run `bell-pr open`** (or `npx bell-pr open` if you
 started with `npx`). It prints the address again and opens it.
@@ -87,14 +130,34 @@ through a whole contribution.
   agents edit files in (`sudo apt-get install bubblewrap socat`).
 
 `bell-pr doctor` checks all of this and prints the command that fixes each
-problem.
+problem. See [Before you start](#before-you-start).
+
+**With no AI provider installed or signed in:** `bell-pr doctor` exits
+non-zero and marks the required **AI provider** check failed. `bell-pr
+start` then exits non-zero before it listens, and prints that checklist
+with the command that fixes each failed check. `bell-pr start --force`
+starts anyway and warns that the check was skipped. Welcome lets you
+continue; you can take the **sample tour** (no AI call). Starting a real
+agent run is refused until at least one of Codex CLI or Claude Code is
+installed and signed in; Discovery also needs a signed-in GitHub CLI.
+
+### Cost of a sample run
+
+<!-- TODO(Suzu / Product Tester): fill after one real end-to-end sample
+     contribution (not the offline Sample project). Record provider, model,
+     reported input/output tokens, and the billed cost in the provider’s
+     currency. Do not invent numbers. -->
+Agent usage is billed by **your** Codex / Claude account. BELL PR does not
+set prices. Exact tokens and cost for a typical first contribution are
+**not published yet** — they will be added here after one measured run.
 
 ## Supported platforms
 
 - **macOS**
 - **Linux**
-- **Windows through WSL2**: install and run BELL PR, Git, the GitHub CLI
-  and your AI CLI inside your WSL distribution.
+- **Windows through WSL2 (untested):** install and run BELL PR, Git, the
+  GitHub CLI and your AI CLI inside your WSL distribution. Browser tests and
+  real agent runs for 1.0.0-rc.1 were done on Linux only.
 
 The 1.0.0-rc.1 release candidate's unit tests, build and package check run
 on Linux and macOS with Node.js 22 and 24 (see the CI workflow). The browser
@@ -160,7 +223,7 @@ writable conversation.
 
 ![Agent activity: the team's plan, progress and reports](docs/images/en/run-activity-1280.png)
 
-### Review that teaches, and checks you learned
+### Review that teaches, and asks you to explain it back
 
 Every changed file comes with a plain-language explanation: a concrete
 example of the behavior before and after, what changed and why, the
@@ -318,12 +381,6 @@ Claude Code may then open pages on GitHub's own sites only; the Codex CLI
 uses OpenAI's web search. Project analysis and discovery never get web
 access.
 
-### Try it with the sample project
-
-A finished sample contribution, with the project's rules, the plan, the
-changes, their explanations, the understanding check and the PR draft,
-needs no setup and makes no AI call.
-
 ## Privacy
 
 - BELL PR runs on your computer and keeps everything in one data
@@ -349,8 +406,10 @@ Details: [Privacy and your data](docs/privacy-and-data.md).
   willing to run on this computer.
 - **No sign-in.** BELL PR does not authenticate anyone. It listens on
   `127.0.0.1` by default, so only this computer can reach it. Anyone who can
-  reach its address can use everything it can do. Other sites may link to
-  its page, but cannot call its API or frame it.
+  reach its address can use everything it can do, including starting agents
+  with your Codex or Claude Code account and publishing with your `gh`
+  sign-in. Other sites may link to its page, but cannot call its API or
+  frame it.
 - **Unsandboxed agents are an explicit opt-in.** Without the sandbox (for
   example in Docker with default settings), a Claude Code agent that edits
   files is refused. You can allow it under **Settings → Agent safety** or
@@ -367,7 +426,9 @@ vulnerability, see [SECURITY.md](SECURITY.md).
 
 BELL PR needs no configuration. Every setting below is an environment
 variable read at start; `bell-pr start` also takes `--port`, `--host`,
-`--data-dir`, `--no-open` and `--env-file <file>`. Values set in the app's
+`--data-dir`, `--no-open`, `--force` and `--env-file <file>`. `start` exits
+before it listens when a required `bell-pr doctor` check fails; `--force`
+starts anyway. Values set in the app's
 Settings are used unless a variable sets them.
 
 | Variable | Default | What it sets |
@@ -405,7 +466,11 @@ docker exec bell-pr bell-pr open --print
 ```
 
 The image includes Git, the GitHub CLI and the Codex CLI; you can install
-Claude Code into the container yourself. Docker is **beta**: the agent
+Claude Code into the container yourself. Its command is `bell-pr start`,
+which exits before it listens when `bell-pr doctor` is not ready. To open
+the sample tour before a provider is signed in, run
+`docker run ... bell-pr start --force` (that replaces the image command).
+Docker is **beta**: the agent
 sandbox needs three extra `--security-opt` options. Read
 [Docker](docs/docker.md) before you use it, and
 [Self-hosting](docs/self-hosting.md) for a systemd service or a reverse
@@ -475,15 +540,15 @@ BELL PR from its source.
 
 ## Support
 
-BELL PR is community-maintained. Start with `bell-pr doctor`, then
+Start with `bell-pr doctor`, then
 [Troubleshooting](docs/troubleshooting.md) and the [FAQ](docs/faq.md); the
 rest of the [documentation](docs/README.md) covers each topic. The About
 dialog (**Settings → About → About BELL PR**) can copy a diagnostics report
 with secrets, paths and your GitHub login removed, ready for a support
 request.
 
-To report a security vulnerability, follow [SECURITY.md](SECURITY.md); do
-not open a public issue for it.
+To report a security vulnerability privately, follow
+[SECURITY.md](SECURITY.md). Do not open a public issue.
 
 <!-- generated:product-link key=homepageUrl text="Website" -->
 <!-- /generated:product-link -->

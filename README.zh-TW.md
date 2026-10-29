@@ -10,15 +10,48 @@ BELL PR 是自架、以本機為主的開源貢獻工作台。它在你的電腦
 
 **邊貢獻邊學習，絕不是自動產生 PR。** 在你逐一審閱每個檔案、用自己的話把改動講一遍（預設開啟；你可以關閉，而工作會標示出來），並親自核准 Pull Request 之前，不會發佈任何內容。發佈時會確認專案歡迎這個 PR。沒有 BELL PR 雲端服務、沒有遙測，也不需要帳號。
 
-這是 BELL PR 的開源版本，以 [Apache-2.0](LICENSE) 授權，可免費使用，由社群維護。
+BELL PR 是以 [Apache-2.0](LICENSE) 授權的免費開源軟體。公開時沒有付費方案。
 
 ![「程式碼變更」頁籤：diff 旁邊是這次變更的白話解說](docs/images/zh-TW/run-changes-1280.png)
 
-[快速開始](#快速開始) · [系統需求](#系統需求) · [功能](#功能) · [隱私](#隱私) · [安全模型](#安全模型) · [設定](#設定) · [疑難排解](#疑難排解) · [文件](#文件) · [參與貢獻](#參與貢獻) · [授權條款](#授權條款與商標)
+[用範例專案試試看](#用範例專案試試看) · [開始之前](#開始之前) · [快速開始](#快速開始) · [系統需求](#系統需求) · [功能](#功能) · [隱私](#隱私) · [安全模型](#安全模型) · [設定](#設定) · [疑難排解](#疑難排解) · [文件](#文件) · [參與貢獻](#參與貢獻) · [授權條款](#授權條款與商標)
+
+## 用範例專案試試看
+
+這是一次已完成的範例貢獻（專案規範、計畫、diff、解說、理解檢查、PR 草稿），
+**不需設定**、**不呼叫 AI**、也不會送到 GitHub。BELL PR 啟動後，從首頁的
+「試用範例專案」或側欄「範例」開啟。
+
+請先走完範例審閱流程，再匯入真實專案。`bell-pr doctor` 尚未就緒時，請用
+`bell-pr start --force` 啟動，範例導覽才能開啟。真實的 Agent 工作仍要等到
+有已登入的 AI 服務。
+
+## 開始之前
+
+BELL PR 是本機工作台。請先裝好並登入下列工具，再跑快速開始；`bell-pr doctor`
+會為每一項缺失印出修正指令。
+
+- **Node.js 22 以上**（[nodejs.org](https://nodejs.org/en)）。
+- **Git**，並設定名字與電子郵件（`git config --global user.name` /
+  `user.email`）。同步到最新目標分支需要 **Git 2.40 以上**。
+- **GitHub CLI**（`gh`），並以 `gh auth login` 登入
+  （[cli.github.com](https://cli.github.com/)）。
+- **一套 AI 程式設計 CLI**（擇一），以執行 BELL PR 的同一使用者安裝並登入。
+  用量計入**你自己的**服務商帳戶（付費方案或 API 額度，視服務商而定）：
+  - Codex CLI：`npm install -g @openai/codex`，再 `codex login`
+  - Claude Code：`npm install -g @anthropic-ai/claude-code`，再
+    `claude auth login`
+- **Linux** 另需 `bubblewrap` 與 `socat`（Claude Code 改檔沙箱；Debian/Ubuntu：
+  `sudo apt-get install bubblewrap socat`）。macOS 使用內建沙箱。
+
+目前支援：**macOS**、**Linux**。**Windows 透過 WSL2（尚未測試）：** 請在 WSL
+發行版內安裝以上全部。
+
+`bell-pr doctor` 必要檢查全過後，再繼續。在那之前 `bell-pr start` 會在監聽前
+結束。尚未安裝／登入 AI 服務時，`bell-pr start --force` 仍會開啟 BELL PR，
+讓你走範例導覽；真實 Agent 工作與發佈會等到有就緒的 AI 服務為止。
 
 ## 快速開始
-
-[系統需求](#系統需求)都準備好之後，大約 60 秒就能開始。
 
 1. 啟動 BELL PR：
 
@@ -35,6 +68,10 @@ BELL PR 是自架、以本機為主的開源貢獻工作台。它在你的電腦
 3. 依照歡迎畫面完成設定：選擇**語言**、檢查**工作環境**（缺少的工具都會附上修正指令），再選擇 Agent 使用的 **AI 服務**。
 4. 觀看範例導覽、匯入 Repository，或尋找想貢獻的專案。
 
+`npx bell-pr` 就是 `bell-pr start`。只有在 `bell-pr doctor` 就緒時才會監聽；
+否則它會結束，並印出每一項失敗檢查的修正指令。`npx bell-pr start --force`
+仍可開啟範例導覽。
+
 **位址不見了？執行 `bell-pr open`**（若用 `npx` 啟動，請執行 `npx bell-pr open`）。它會再次印出位址並在瀏覽器中開啟。
 
 想要保留安裝，請執行 `npm install -g bell-pr`，之後用 `bell-pr` 啟動。[入門指南](docs/getting-started.md)（英文）會帶你走完一次完整的貢獻。
@@ -49,13 +86,29 @@ BELL PR 是自架、以本機為主的開源貢獻工作台。它在你的電腦
   - Claude Code：`npm install -g @anthropic-ai/claude-code`，再執行 `claude auth login`。使用你已安裝並登入的 Claude Code CLI（Claude 方案或 Anthropic API 金鑰），用量計入你自己的帳戶。
 - **Linux 需要 bubblewrap 與 socat**，Claude Code Agent 才能在沙箱中修改檔案（`sudo apt-get install bubblewrap socat`）。
 
-`bell-pr doctor` 會檢查以上所有項目，並為每個問題印出修正指令。
+`bell-pr doctor` 會檢查以上所有項目，並為每個問題印出修正指令。請見[開始之前](#開始之前)。
+
+**尚未安裝或登入任何 AI 服務時：** `bell-pr doctor` 會以非零結束代碼結束，並將
+必要的「AI 服務」檢查標為失敗。`bell-pr start` 會在監聽前以非零結束代碼結束，
+並印出該清單與每一項失敗檢查的修正指令。`bell-pr start --force` 仍會啟動，
+並警告已略過檢查。歡迎畫面可繼續；你可以先走**範例導覽**（不呼叫 AI）。在
+至少一套 Codex CLI 或 Claude Code 安裝並登入之前，無法開始真實的 Agent 工作；
+探索功能另需已登入的 GitHub CLI。
+
+### 一次範例執行的費用
+
+<!-- TODO(Suzu / Product Tester)：完成一次真實端到端貢獻後填入（不是離線範例專案）。
+     記錄服務商、模型、回報的 input/output tokens，以及服務商帳單上的費用。勿捏造。 -->
+Agent 用量由**你自己的** Codex／Claude 帳戶計費。BELL PR 不定價。典型第一次
+貢獻的精確 token 與費用**尚未公布**——待實際量測後補上。
 
 ## 支援平台
 
 - **macOS**
 - **Linux**
-- **Windows（透過 WSL2）**：請在 WSL 發行版中安裝並執行 BELL PR、Git、GitHub CLI 與你的 AI CLI。
+- **Windows（透過 WSL2，尚未測試）：** 請在 WSL 發行版中安裝並執行 BELL PR、
+  Git、GitHub CLI 與你的 AI CLI。1.0.0-rc.1 的瀏覽器測試與真實 agent 執行只在
+  Linux 上做過。
 
 1.0.0-rc.1 候選版本的單元測試、建置與套件檢查，在 Linux 與 macOS 上以 Node.js 22 與 24 執行（請見 CI 工作流程）。瀏覽器測試與真實 agent 執行只在 Linux 上做過，WSL2 尚未測試（請見[變更紀錄](CHANGELOG.md)）。另有 Docker 映像檔，目前為 beta。
 
@@ -81,7 +134,7 @@ Agent 以唯讀方式閱讀專案，說明它的用途、使用者、各部分�
 
 ![Agent 動態：團隊的計畫、進度與報告](docs/images/zh-TW/run-activity-1280.png)
 
-### 會教你、也確認你學會的審閱
+### 會教你、並請你用自己的話講一遍的審閱
 
 每個變更的檔案都附有白話解說：修改前後行為的具體例子、改了什麼與為什麼、相關觀念、審閱時要注意什麼、另一種可行做法，以及一題考考自己。**先試著答**：在答案出現之前，你先回答這題並選擇有多確定，再自己評分；在另一種做法出現之前，你也可以先猜猜還能怎麼改，再選擇在這個專案裡你會採用哪一種、為什麼。點選任一行就能請 Agent 解說，可依建議順序閱讀、寫下自己的筆記，逐檔標記為已審閱，然後在核准前用自己的話把改動講一遍。你也可以自己修改程式碼，再重新整理差異。
 
@@ -138,10 +191,6 @@ BELL PR 會閱讀專案的貢獻指南、AI 政策、PR 範本、Agent 指南與
 
 **Agent 的網路存取**是一項設定，在你開啟之前都是關閉的。開啟後，Claude Code 只能開啟 GitHub 自家網站的頁面；Codex CLI 使用 OpenAI 的網路搜尋。專案分析與探索永遠不會有網路存取。
 
-### 用範例專案試試看
-
-範例專案是一次已完成的貢獻，包含專案的規範、計畫、變更、解說、理解檢查與 PR 草稿，不需任何設定，也不會呼叫 AI。
-
 ## 隱私
 
 - BELL PR 在你的電腦上執行，所有資料都放在同一個資料目錄。沒有 BELL PR 雲端、帳號、遙測或分析。
@@ -163,7 +212,7 @@ BELL PR 會閱讀專案的貢獻指南、AI 政策、PR 範本、Agent 指南與
 
 ## 設定
 
-BELL PR 不需要任何設定就能啟動。下列設定都是啟動時讀取的環境變數；`bell-pr start` 另外接受 `--port`、`--host`、`--data-dir`、`--no-open` 與 `--env-file <file>`。在應用程式「設定」中調整的值，除非被環境變數指定，否則都會生效。
+BELL PR 不需要任何設定就能啟動。下列設定都是啟動時讀取的環境變數；`bell-pr start` 另外接受 `--port`、`--host`、`--data-dir`、`--no-open`、`--force` 與 `--env-file <file>`。必要的 `bell-pr doctor` 檢查失敗時，`start` 會在監聽前結束；`--force` 仍會啟動。在應用程式「設定」中調整的值，除非被環境變數指定，否則都會生效。
 
 | 變數 | 預設值 | 用途 |
 | --- | --- | --- |
@@ -196,7 +245,7 @@ docker run -d --name bell-pr -p 127.0.0.1:4311:4311 \
 docker exec bell-pr bell-pr open --print
 ```
 
-映像檔包含 Git、GitHub CLI 與 Codex CLI；Claude Code 可以由你自行安裝到容器中。Docker 目前為 **beta**：Agent 的沙箱需要另外三個 `--security-opt` 選項。使用前請先閱讀 [Docker 說明](docs/docker.md)（英文）；若要以 systemd 服務執行或放在反向代理之後，請見[自架說明](docs/self-hosting.md)（英文）。
+映像檔包含 Git、GitHub CLI 與 Codex CLI；Claude Code 可以由你自行安裝到容器中。映像檔的指令是 `bell-pr start`，在 `bell-pr doctor` 尚未就緒時會在監聽前結束。若要在登入 AI 服務之前開啟範例導覽，請執行 `docker run ... bell-pr start --force`（這會取代映像檔的指令）。Docker 目前為 **beta**：Agent 的沙箱需要另外三個 `--security-opt` 選項。使用前請先閱讀 [Docker 說明](docs/docker.md)（英文）；若要以 systemd 服務執行或放在反向代理之後，請見[自架說明](docs/self-hosting.md)（英文）。
 
 ## 疑難排解
 
@@ -242,9 +291,9 @@ BELL PR 把所有資料放在 `~/.bellpr`（或 `--data-dir`／`BELLPR_DATA_DIR`
 
 ## 支援
 
-BELL PR 由社群維護。請先執行 `bell-pr doctor`，再查看[疑難排解](docs/troubleshooting.md)與[常見問題](docs/faq.md)；其餘主題請見[文件](docs/README.md)（皆為英文）。「關於」對話框（**設定 → 關於 → 關於 BELL PR**）可以複製一份診斷資訊，其中的密鑰、路徑與你的 GitHub 帳號都已移除，可以直接貼到支援請求中。
+請先執行 `bell-pr doctor`，再查看[疑難排解](docs/troubleshooting.md)與[常見問題](docs/faq.md)；其餘主題請見[文件](docs/README.md)（皆為英文）。「關於」對話框（**設定 → 關於 → 關於 BELL PR**）可以複製一份診斷資訊，其中的密鑰、路徑與你的 GitHub 帳號都已移除，可以直接貼到支援請求中。
 
-回報安全性漏洞請依照 [SECURITY.md](SECURITY.md) 的說明；請勿為此公開建立 issue。
+私下回報安全性漏洞請見 [SECURITY.md](SECURITY.md)。請勿公開開 issue。
 
 <!-- generated:product-link key=homepageUrl text="網站" -->
 <!-- /generated:product-link -->

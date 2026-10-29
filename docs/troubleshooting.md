@@ -449,6 +449,12 @@ there, then publish again.
 
 ## BELL PR does not start
 
+- **"Not ready: fix the required check…"**: `bell-pr doctor` failed a
+  required check, so `bell-pr start` exited before it listened. The message
+  is the doctor's checklist: each failed check and the command that fixes
+  it, then how to start anyway. `bell-pr start --force` starts and prints a
+  warning. The sample tour needs no AI provider; a real agent run still
+  waits until Codex CLI or Claude Code is installed and signed in.
 - **"BELL PR needs Node.js 22 or later"**: install the current Node.js LTS
   from [nodejs.org](https://nodejs.org/en) (or `nvm install 22`).
 - **"Port 4311 is already in use by another program"**: start on a free
@@ -518,8 +524,9 @@ there, then publish again.
   for that analysis (or for **Generate 5 more**) has a `problem` field. It
   lists the fields that did not fit and the kind of problem, such as
   `recommendations: too_big`, or `json_syntax` when the answer was not JSON.
-  It never contains the answer's text. Analyze again; the previous result is
-  kept.
+  `length` is the answer's size in bytes. The line never contains the
+  answer's text; credential-shaped text in it is masked. Analyze again; the
+  previous result is kept.
 
 <!-- generated:product-link key=supportEmail text="Contact support by e-mail" -->
 <!-- /generated:product-link -->
