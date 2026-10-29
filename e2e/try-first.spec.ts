@@ -12,6 +12,7 @@
 // codex writes, a graded unit answer counts as the file's question in
 // Explain it back.
 import { expect, test, type Browser, type Page } from "@playwright/test";
+import { e2eApiHeaders } from "./api-token.mjs";
 import { getDemo } from "../src/demo/all";
 import en from "../src/i18n/en";
 import zhTW from "../src/i18n/zh-TW";
@@ -319,6 +320,7 @@ test.describe("the walkthrough's Check yourself on a real agent run", () => {
 
   async function open(browser: Browser) {
     const context = await browser.newContext({
+      extraHTTPHeaders: e2eApiHeaders,
       baseURL: project.baseURL,
       viewport: { width: 1440, height: 900 },
       locale: "en-US",
@@ -355,6 +357,7 @@ test("a tab still open on the question can't change the answer another tab saved
   test.setTimeout(120_000);
   const project = await startRealProject();
   const context = await browser.newContext({
+    extraHTTPHeaders: e2eApiHeaders,
     baseURL: project.baseURL,
     viewport: { width: 1440, height: 900 },
     locale: "en-US",

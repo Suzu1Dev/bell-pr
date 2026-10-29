@@ -6,6 +6,7 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { expect, test, type Browser, type Page, type Route } from "@playwright/test";
+import { e2eApiHeaders } from "./api-token.mjs";
 import { locales } from "../shared/i18n/locale";
 import { product } from "../shared/product";
 import { getDemo } from "../src/demo/all";
@@ -34,6 +35,7 @@ const sidebarButton = (page: Page, name: string) =>
 /** A page on a spec-local server; closed with the server. */
 async function openOn(browser: Browser, server: LaunchedServer) {
   const context = await browser.newContext({
+    extraHTTPHeaders: e2eApiHeaders,
     baseURL: server.baseURL,
     locale: "en-US",
   });
@@ -429,6 +431,7 @@ test("the import dialog suggests ~/projects/repository, which imports, and adds 
 
     // A browser on Windows, where BELL PR may run inside WSL2.
     const context = await browser.newContext({
+      extraHTTPHeaders: e2eApiHeaders,
       baseURL: server.baseURL,
       locale: "en-US",
     });

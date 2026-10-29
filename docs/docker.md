@@ -43,11 +43,13 @@ docker run -d --name bell-pr \
   below, or open the sample tour with `docker run ... bell-pr start --force`
   (that replaces the image command). A real agent run is still refused
   until a provider is signed in.
-- `-p 127.0.0.1:4311:4311` publishes BELL PR on this computer only. Do not
-  publish it on all interfaces: BELL PR has no sign-in, so anything that
-  reaches the port can use it. For access from other machines, put an HTTPS
-  reverse proxy that authenticates in front, as
-  [docs/self-hosting.md](self-hosting.md) describes.
+- `-p 127.0.0.1:4311:4311` publishes BELL PR on this computer only. The
+  image listens on `0.0.0.0` inside the container (an explicit setting; BELL
+  PR prints a warning) and still requires the API token in `/data/api-token`.
+  Do not publish the port on all interfaces unless you mean to. For access
+  from other machines, put an HTTPS reverse proxy in front, as
+  [docs/self-hosting.md](self-hosting.md) describes, and keep the token URL
+  private.
 - `bellpr-data` holds repositories, worktrees and run records (`/data`,
   `BELLPR_DATA_DIR`). `bellpr-home` keeps the container user's home:
   CLI sign-ins, the git configuration and anything you install with
@@ -90,9 +92,11 @@ docker exec <container> bell-pr open --print
 ```
 
 The browser never opens by itself from a container, so `--print` is the way to
-go: open the printed address in your browser. The health check
-(`GET /api/health`) is built into the image, so `docker ps` shows when BELL PR
-is ready.
+go: the printed address ends with `#bell_token=` and signs the page in. The
+startup line in `docker logs` does not include the token. Treat the printed
+address like a password. The health check (`GET /api/health`) does not need
+the token and is built into the image, so `docker ps` shows when BELL PR is
+ready.
 
 To check the tools inside the container, run
 `docker exec bell-pr bell-pr doctor`.

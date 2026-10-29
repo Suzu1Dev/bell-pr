@@ -7,6 +7,7 @@
 // BELLPR_E2E_SKIP_BUILD=1 skips `npm run build`; PLAYWRIGHT_CHROMIUM_EXECUTABLE
 // points at an installed Chromium build instead of Playwright's download.
 import { defineConfig, devices } from "@playwright/test";
+import { e2eApiHeaders } from "./e2e/api-token.mjs";
 
 const port = Number(process.env.BELLPR_E2E_PORT || 4599);
 const executablePath = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE;
@@ -31,6 +32,7 @@ export default defineConfig({
       use: {
         ...devices["Desktop Chrome"],
         baseURL: `http://127.0.0.1:${port}`,
+        extraHTTPHeaders: e2eApiHeaders,
         viewport: { width: 1440, height: 900 },
         locale: "en-US",
         timezoneId: "UTC",

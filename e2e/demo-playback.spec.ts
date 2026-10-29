@@ -6,6 +6,7 @@ import { mkdtemp, rm, symlink } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { expect, test, type Page } from "@playwright/test";
+import { e2eApiHeaders } from "./api-token.mjs";
 import { getDemo } from "../src/demo/all";
 import common from "../src/i18n/en/common";
 import review from "../src/i18n/en/review";
@@ -74,6 +75,7 @@ test.afterAll(async () => {
 test("demo=play plays the sample from queued to a published sample PR, with no tool and no write request", async ({ browser }) => {
   test.setTimeout(90_000);
   const context = await browser.newContext({
+    extraHTTPHeaders: e2eApiHeaders,
     baseURL: server.baseURL,
     viewport: { width: 1440, height: 900 },
     locale: "en-US",
@@ -212,6 +214,7 @@ test("demo=play plays the sample from queued to a published sample PR, with no t
 test("while capturing, a played answer starts on the same tick every time and the chat jumps to it", async ({ browser }) => {
   test.setTimeout(90_000);
   const context = await browser.newContext({
+    extraHTTPHeaders: e2eApiHeaders,
     baseURL: server.baseURL,
     viewport: { width: 1440, height: 900 },
     locale: "en-US",
@@ -264,6 +267,7 @@ test("while capturing, a played answer starts on the same tick every time and th
 test("the chat scrolls smoothly unless the person prefers reduced motion", async ({ browser }) => {
   for (const reducedMotion of ["no-preference", "reduce"] as const) {
     const context = await browser.newContext({
+      extraHTTPHeaders: e2eApiHeaders,
       baseURL: server.baseURL,
       viewport: { width: 1440, height: 900 },
       locale: "en-US",
@@ -301,6 +305,7 @@ test("the chat scrolls smoothly unless the person prefers reduced motion", async
 
 test("stopping the sample's team sends nothing and leaves it stopped", async ({ browser }) => {
   const context = await browser.newContext({
+    extraHTTPHeaders: e2eApiHeaders,
     baseURL: server.baseURL,
     viewport: { width: 1440, height: 900 },
     locale: "en-US",

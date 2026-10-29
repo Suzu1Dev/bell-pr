@@ -4,6 +4,7 @@ import { writeFile } from "node:fs/promises";
 import path from "node:path";
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Browser, type Page, type Request } from "@playwright/test";
+import { e2eApiHeaders } from "./api-token.mjs";
 import { splitConceptHeading } from "../shared/explanations";
 import { getDemo } from "../src/demo/all";
 import app from "../src/i18n/en/app";
@@ -118,6 +119,7 @@ test("seeded notes load from /api/learning, 20 contributions at a time", async (
       ),
   });
   const context = await browser.newContext({
+    extraHTTPHeaders: e2eApiHeaders,
     baseURL: server.baseURL,
     locale: "en-US",
   });
@@ -193,6 +195,7 @@ async function onServer(
 ) {
   const server = await launchServer(options);
   const context = await browser.newContext({
+    extraHTTPHeaders: e2eApiHeaders,
     baseURL: server.baseURL,
     locale: "en-US",
   });

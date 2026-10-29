@@ -11,6 +11,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Browser, type Page } from "@playwright/test";
+import { e2eApiHeaders } from "./api-token.mjs";
 import { changeFingerprint } from "../shared/change-fingerprint";
 import { readDiff } from "../server/git";
 import byHandText from "../src/byhand/write/i18n/en";
@@ -184,6 +185,7 @@ async function expectAccessible(page: Page, selector: string) {
 
 async function open(browser: Browser, hash: string) {
   const context = await browser.newContext({
+    extraHTTPHeaders: e2eApiHeaders,
     baseURL: server.baseURL,
     viewport: { width: 1440, height: 900 },
     locale: "en-US",

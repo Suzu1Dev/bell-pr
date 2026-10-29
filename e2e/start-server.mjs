@@ -21,6 +21,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { request } from "@playwright/test";
+import { e2eApiHeaders, e2eApiToken } from "./api-token.mjs";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
 const bin = path.join(root, "bin", "bellpr.mjs");
@@ -162,6 +163,9 @@ export async function launchServer(options = {}) {
     await mkdir(dataDir, { recursive: true });
     await writeFakeClis(fakeBin);
     await seed?.(dataDir);
+    await writeFile(path.join(dataDir, "api-token"), `${e2eApiToken}\n`, {
+      mode: 0o600,
+    });
     child = spawn(
       process.execPath,
       // Fake CLIs fail the readiness gate. --force is what keeps these
@@ -189,7 +193,10 @@ export async function launchServer(options = {}) {
     if (address.origin !== baseURL)
       throw new Error(`BELL PR printed ${address.origin}, not ${baseURL}.`);
     if (settingsPut) {
-      const context = await request.newContext({ baseURL });
+      const context = await request.newContext({
+        baseURL,
+        extraHTTPHeaders: e2eApiHeaders,
+      });
       try {
         await completeOnboarding(context);
       } finally {

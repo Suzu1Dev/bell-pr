@@ -12,6 +12,7 @@
 // publishes a fitted run with the real quoted-confirm decision.
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Browser, type Page } from "@playwright/test";
+import { e2eApiHeaders } from "./api-token.mjs";
 import type { DraftCheck } from "../shared/draft-checks";
 import { changeFingerprint } from "../shared/change-fingerprint";
 import { aiDisclosureLine } from "../shared/drafts";
@@ -60,6 +61,7 @@ function byHandRun(extra: Record<string, unknown> = {}, byHand: Record<string, u
 
 async function open(browser: Browser, project: RealProject) {
   const context = await browser.newContext({
+    extraHTTPHeaders: e2eApiHeaders,
     baseURL: project.baseURL,
     viewport: { width: 1440, height: 900 },
     locale: "en-US",
@@ -481,6 +483,7 @@ test("against the real server: no AI draft or AI line, a PR title of the person'
     run: { learnByHand: true, agents: [agent("lead", "Guide")], draft: { title: "", body: "" }, byHand: { events: [] } },
   });
   const context = await browser.newContext({
+    extraHTTPHeaders: e2eApiHeaders,
     baseURL: project.baseURL,
     viewport: { width: 1440, height: 900 },
     locale: "en-US",
@@ -572,6 +575,7 @@ test("against the real server: a run fitted to a QEMU-shaped project's carve-out
     },
   });
   const context = await browser.newContext({
+    extraHTTPHeaders: e2eApiHeaders,
     baseURL: project.baseURL,
     viewport: { width: 1440, height: 900 },
     locale: "en-US",
