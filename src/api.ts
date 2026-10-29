@@ -130,6 +130,36 @@ export function currentApiToken(): string | undefined {
   }
 }
 
+/** Remove the old page-readable credential after exchanging it for a cookie. */
+export function clearApiToken(): void {
+  try {
+    browserSession()?.removeItem(apiTokenStorageKey);
+  } catch {
+    // The cookie still works when browser storage is unavailable.
+  }
+}
+
+/**
+ * Upgrade a CLI link or an older tab to a browser session before rendering.
+ * Opening another CLI link preserves this browser's existing remember choice.
+ */
+export async function establishBrowserSession(token = currentApiToken()): Promise<void> {
+  if (!token) return;
+  const headers = { Authorization: `Bearer ${token}` };
+  try {
+    const session = await api<{ remembered: boolean }>("/session", { headers });
+    await api("/session", {
+      ...send("POST", { remember: session.remembered === true }),
+      headers,
+    });
+    clearApiToken();
+  } catch (error) {
+    // A revoked legacy token must not override a valid browser cookie.
+    if (error instanceof ApiError && error.status === 401) clearApiToken();
+    throw error;
+  }
+}
+
 /**
  * Reads `#bell_token=` from the fragment into session storage and removes
  * that fragment. A `?bell_token=` query is ignored.
@@ -143,7 +173,7 @@ export interface ApiTokenWindow {
   sessionStorage: { setItem(key: string, value: string): void };
 }
 
-export function adoptApiToken(win: ApiTokenWindow): void {
+export function adoptApiToken(win: ApiTokenWindow): string | undefined {
   const hash = win.location.hash.startsWith("#")
     ? win.location.hash.slice(1)
     : win.location.hash;
@@ -160,6 +190,8 @@ export function adoptApiToken(win: ApiTokenWindow): void {
     "",
     `${win.location.pathname}${win.location.search}`,
   );
+  // Keep the exchange possible even when sessionStorage is blocked.
+  return token.toLowerCase();
 }
 
 /**
@@ -203,7 +235,10 @@ export async function api<T>(path: string, options?: RequestInit): Promise<T> {
   } catch (error) {
     throw unreachable(response.status, error);
   }
-  if (!response.ok) throw errorFromBody(response.status, body);
+  if (!response.ok) {
+    if (response.status === 401) clearApiToken();
+    throw errorFromBody(response.status, body);
+  }
   return body as T;
 }
 

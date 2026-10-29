@@ -50,22 +50,35 @@ left data in `./.bellpr`, it prints how to keep using that folder.
 
 The first start writes a random token to `<data dir>/api-token` (mode 0600)
 and later starts reuse it. A missing or damaged file is created again.
-`bell-pr token rotate` replaces it; restart is not required. Every API
-request except `GET /api/health` must send the token (`Authorization: Bearer`
-or `X-Bell-Token`). A missing or wrong token is HTTP 401 and changes nothing.
+`bell-pr token rotate` replaces it and immediately invalidates all browser
+sessions and old token URLs; restart is not required. API clients must use
+the new token. Browser requests use a session cookie; other API requests
+except `GET /api/health` must send the token (`Authorization: Bearer` or
+`X-Bell-Token`). Missing or invalid authorization is HTTP 401 and changes nothing.
 
 BELL PR listens on 127.0.0.1 unless you set `--host` or `BELLPR_HOST`. Any
 other address prints a warning at start. `--host 0.0.0.0` outside Docker,
 and publishing the Docker port beyond `127.0.0.1`, let other machines reach
-the port; they still need the token. Put a proxy that limits who can connect
+the port; they still need authorization. Put a proxy that limits who can connect
 in front as well (see
 [Reach BELL PR from another machine](#reach-bell-pr-from-another-machine)).
 
 `bell-pr open` and `bell-pr open --print` print the address browsers use
 (`BELLPR_PUBLIC_URL` when you set it, else the local address) with
-`#bell_token=` on the end, and `open` opens that address. The page stores
-the token and removes it from the address bar. The line printed at start
-does not include the token. Treat the `open --print` address like a
+`#bell_token=` on the end, and `open` opens that address. The page exchanges
+the token for an HttpOnly session cookie and removes it from the address bar.
+New tabs at the same address share that cookie. The default session lasts at
+most 12 hours and the cookie has no persistent expiry. In **Settings → General
+→ Browser access**, remember this browser to keep access for 30 days, including
+after restarting the browser. Local and public addresses have separate cookies.
+A token left in session storage by an older build is exchanged once and removed.
+
+Signing out clears this browser's cookie. Revoking all access also rotates
+the API token, invalidating all browser sessions, API clients' old tokens,
+and old token URLs. `bell-pr token rotate` has the same effect. After either
+rotation, use `bell-pr open` again and update API clients.
+
+The line printed at start does not include the token. Treat the `open --print` address like a
 password: it is not in the server log or in `bell-pr doctor --json`.
 
 ## One instance per data directory
@@ -117,7 +130,8 @@ pages, requests and API responses would cross the network unencrypted.
    example `BELLPR_PUBLIC_URL=https://bell.example.com`. BELL PR then accepts
    requests for that address. BELL PR must be served at the root of that
    address, not under a path.
-4. The API token is still required. Also limit who can reach the proxy,
+4. Browser sessions or an API token are still required. Also limit who can
+   reach the proxy,
    such as with single sign-on, a VPN, HTTP basic authentication or an IP
    allowlist, so the token URL is not the only barrier on the network.
 

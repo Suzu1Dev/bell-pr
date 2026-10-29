@@ -45,7 +45,8 @@ docker run -d --name bell-pr \
   until a provider is signed in.
 - `-p 127.0.0.1:4311:4311` publishes BELL PR on this computer only. The
   image listens on `0.0.0.0` inside the container (an explicit setting; BELL
-  PR prints a warning) and still requires the API token in `/data/api-token`.
+  PR prints a warning) and still requires an authorized browser session or
+  the API token in `/data/api-token`.
   Do not publish the port on all interfaces unless you mean to. For access
   from other machines, put an HTTPS reverse proxy in front, as
   [docs/self-hosting.md](self-hosting.md) describes, and keep the token URL

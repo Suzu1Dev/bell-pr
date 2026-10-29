@@ -72,11 +72,17 @@ bell-pr open
 If `bell-pr open` says that no BELL PR is running with that data directory,
 start BELL PR (`bell-pr`) and use the address it prints.
 
-The page says the request needs the API token when it was opened from the
-startup line, or from a bookmark, instead of from `bell-pr open`. Run
-`bell-pr open` on that computer (same user, same `--data-dir`). The token
-file is `<data dir>/api-token`. A restart reuses it. `bell-pr token rotate`
-replaces it; then run `bell-pr open` again.
+If the page asks you to authorize this browser, run `bell-pr open` on that
+computer (same user, same `--data-dir`). Its link creates a browser session
+shared by tabs at the same address. Bookmarks work while that session is
+valid: at most 12 hours by default, or 30 days when you remember this browser
+under **Settings → General → Browser access**. Local and public addresses
+have separate cookies. Signing out clears this browser's cookie.
+
+The token file is `<data dir>/api-token`. A restart reuses it. Revoking all
+access in settings, or running `bell-pr token rotate`, replaces it and
+invalidates every browser session and old token URL; then run `bell-pr open`
+again. API clients must also use the new token.
 
 ## Error codes
 

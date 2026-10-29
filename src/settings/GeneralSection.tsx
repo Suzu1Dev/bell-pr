@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { RotateCcw } from "lucide-react";
 import { useT } from "../i18n";
 import { LanguageSwitcher } from "../i18n/LanguageSwitcher";
+import { BrowserAccess } from "./BrowserAccess";
 import {
   Feedback,
   SettingSwitch,
@@ -14,15 +15,14 @@ import { clearSampleProgress } from "./sampleProject";
 import type { AppSettingsState } from "./useAppSettings";
 
 /**
- * General: the language (saved in the app settings by the switcher), and
- * the sample project: whether it stays in the sidebar, and starting it over.
+ * General: language, this browser's access, and the sample project.
  */
 export function GeneralSection({
   settings,
   reload = reloadPage,
 }: {
   settings: AppSettingsState;
-  /** Reloads the page after the sample project was reset. */
+  /** Reloads after signing out or resetting the sample project. */
   reload?: () => void;
 }) {
   const t = useT("settings");
@@ -65,6 +65,7 @@ export function GeneralSection({
           />
         </div>
       </SettingsGroup>
+      <BrowserAccess reload={reload} />
       <SettingsGroup title={g.sample.title} text={g.sample.text}>
         <SettingSwitch
           label={g.sample.show}

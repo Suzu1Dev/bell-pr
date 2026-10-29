@@ -30,7 +30,7 @@ the settings in the app.
 | --- | --- |
 | `bell-pr` or `bell-pr start` | Starts BELL PR and prints its address. Exits 1 before listening when a required doctor check fails; `--force` starts anyway |
 | `bell-pr open` | Prints the address of the running BELL PR, including the API token fragment, and opens it; `--print` only prints it |
-| `bell-pr token rotate` | Replaces `<data dir>/api-token`. A running BELL PR uses the new token on the next request. The new token is not printed |
+| `bell-pr token rotate` | Replaces `<data dir>/api-token` and immediately invalidates every browser session and old token URL. API clients must use the new token. No restart is needed; the new token is not printed |
 | `bell-pr doctor` | Checks Node.js, Git, the GitHub CLI, the agent CLIs, the sandbox and the data directory; `--json` for scripts. The report does not include the API token |
 | `bell-pr version` | Shows the version, its release date, Node.js, the platform and the data directory |
 | `bell-pr help` | Lists the commands and options |
@@ -99,7 +99,7 @@ of them. When a turn times out, its message says how long it waited.
 
 | Section | What you set there |
 | --- | --- |
-| **General** | The language of the interface and of new work; the sample project, and resetting it |
+| **General** | The language of the interface and of new work; browser access (remember this browser for 30 days, sign out, or revoke all access); the sample project, and resetting it |
 | **AI provider** | Which agent CLI is ready, with its setup commands, and the agent, model, reasoning effort and web access (off until you turn it on) every project shares |
 | **Agent safety** | The Claude Code sandbox status, allowing unsandboxed Claude Code agents, and the AI-assistance note on pull requests |
 | **Learning** | The understanding check (you explain each change back before you approve it; on by default, and turning it off asks you to confirm and marks the runs you approve without it), the try-first prompts during review, and counts from this computer: runs approved without the check and the median time of your recent checks |
@@ -114,6 +114,13 @@ run records the settings it started with, so later changes do not affect
 runs that already exist. A project's contribution direction, team size,
 plan approval and efficiency mode (Lean, Full or Off) are saved per
 project, in the contribution settings of that project.
+
+Browser access is stored in an HttpOnly cookie, shared by tabs at the same
+address. The default session lasts at most 12 hours; remembering a browser
+keeps access for 30 days. Signing out clears this browser's cookie. Revoking
+all access rotates the API token as well, invalidating every browser session
+and old token URL; API clients must also update their token. Use `bell-pr open`
+to authorize the browser again.
 
 ## Language
 
@@ -131,8 +138,8 @@ BELL PR serves the web interface and the API on one port, 4311 by default, on
 `127.0.0.1`. Two BELL PR servers on one computer, for example one from `npx`
 and one in Docker, need different ports. Keep the default `127.0.0.1` unless
 you mean to listen elsewhere: `--host` and `BELLPR_HOST` are explicit, and
-BELL PR prints a warning for an address that is not loopback. The API token
-is still required (see [Self-hosting](self-hosting.md)).
+BELL PR prints a warning for an address that is not loopback. Browser sessions
+or an API token are still required (see [Self-hosting](self-hosting.md)).
 
 ## Logs
 

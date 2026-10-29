@@ -1,5 +1,6 @@
 import type { Request, RequestHandler } from "express";
 import { tokensMatch } from "./api-token.js";
+import { apiSessionCookie, readApiSession } from "./api-session.js";
 import { sm } from "./i18n/index.js";
 
 const invalidOrigins = () => sm().security.invalidOrigins;
@@ -55,7 +56,8 @@ export interface GuardOptions {
   allowedOrigins: string[];
   /**
    * When `apiToken` or `readApiToken` is set, every `/api` request except
-   * GET and HEAD `/api/health` must send this token. `readApiToken` is
+   * GET and HEAD `/api/health` must send this token or a signed browser
+   * session. `readApiToken` is
    * called per request so `bell-pr token rotate` applies immediately.
    */
   apiToken?: string;
@@ -130,14 +132,34 @@ export function localhostGuard(opts: GuardOptions): RequestHandler {
       return;
     }
     if (api && enforced(opts) && !publicHealth(req)) {
-      const expected = opts.readApiToken?.() ?? opts.apiToken;
-      if (!expected || !tokensMatch(expected, presentedToken(req))) {
+      const expected = opts.readApiToken ? opts.readApiToken() : opts.apiToken;
+      if (!apiRequestAuthenticated(req, expected)) {
         res.status(401).json({ error: sm().common.apiTokenRequired });
         return;
       }
     }
     next();
   };
+}
+
+/** Explicit token headers take precedence, including malformed or empty values. */
+export function apiRequestAuthenticated(req: Request, expected: string | undefined): boolean {
+  if (!expected) return false;
+  const hasTokenHeader = req.get("authorization") !== undefined || req.get("x-bell-token") !== undefined;
+  return hasTokenHeader
+    ? tokensMatch(expected, presentedToken(req))
+    : readApiSession(req.get("cookie"), expected, apiSessionCookieScope(req).name) !== undefined;
+}
+
+/** Cookies span ports, so each validated endpoint gets its own cookie name. */
+export function apiSessionCookieScope(req: Request) {
+  // Host was checked by the guard. X-Forwarded-Host cannot change the
+  // cookie name or remove Secure from an HTTPS-facing public endpoint.
+  const hostname = new URL(`http://${req.headers.host}`).hostname;
+  const secure = req.secure || !loopbackHost(hostname);
+  const endpoint = new URL(`${secure ? "https" : "http"}://${req.headers.host}`);
+  const port = endpoint.port || (secure ? "443" : "80");
+  return { name: `${apiSessionCookie}-${port}`, secure };
 }
 
 function enforced(opts: GuardOptions) {

@@ -268,6 +268,14 @@ test("the server listens on 127.0.0.1 unless --host says otherwise, and warns th
     assert.match(token ?? "", tokenPattern);
     assert.equal(lines.some((line) => token !== undefined && line.includes(token)), false);
     assert.equal((await stat(dataPaths(directory).apiToken)).mode & 0o777, 0o600);
+    const session = await fetch(`http://127.0.0.1:${port}/api/session`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+      body: JSON.stringify({ remember: false }),
+    });
+    assert.equal(session.status, 200);
+    assert.deepEqual(await session.json(), { remembered: false });
+    assert.match(session.headers.get("set-cookie") ?? "", new RegExp(`bellpr-session-${port}=.*; HttpOnly`));
   } finally {
     await running.shutdown();
   }

@@ -81,11 +81,15 @@ browser:
 BELL PR 1.0.0-rc.1 → http://127.0.0.1:4311
 ```
 
-Keep the terminal open: BELL PR runs until you stop it with Ctrl+C. The API
-needs a token. It lives at `<data dir>/api-token`. `bell-pr open` passes it
-to the browser. `bell-pr token rotate` replaces it, and the old one stops
-working immediately. By default
-only this computer can reach it; see [Security model](security-model.md).
+Keep the terminal open: BELL PR runs until you stop it with Ctrl+C. The
+browser opens with an authorization link and exchanges it for a session
+cookie, so new tabs at the same address share access. The default session
+lasts at most 12 hours. In **Settings → General → Browser access**, you can
+remember this browser for 30 days, sign out of this browser, or revoke all
+access. Revoking all access, like `bell-pr token rotate`, invalidates every
+browser session and old authorization link. Use `bell-pr open` to authorize
+the browser again. By default only this computer can reach it; see
+[Security model](security-model.md).
 
 > **Lost the address?** Run `bell-pr open` (or `npx bell-pr open`) on the same
 > computer. It prints the address again and opens it. More in

@@ -30,13 +30,26 @@ what BELL PR trusts, what it does not, and the limits of each protection.
 
 ## The local server
 
-- **API token.** The first start writes a random token to
+- **API token and browser sessions.** The first start writes a random token to
   `<data dir>/api-token` (mode 0600) and later starts reuse it.
-  `bell-pr token rotate` replaces it. Every API request except
-  `GET /api/health` must send `Authorization: Bearer <token>` or
-  `X-Bell-Token`. A missing or wrong token is rejected and changes nothing.
+  `bell-pr token rotate` replaces it and immediately invalidates all browser
+  sessions and old token URLs. Every API request except `GET /api/health`
+  must carry an authorized session cookie, `Authorization: Bearer <token>`,
+  or `X-Bell-Token`. Missing or invalid authorization is rejected and changes nothing.
   Whoever has the token can use everything BELL PR can do: start agents with
   your Codex or Claude Code account and publish with your `gh` login.
+- **Browser access.** The token link opened by `bell-pr` or `bell-pr open`
+  is exchanged for an HttpOnly cookie and removed from the address bar.
+  Tabs at the same address share access. By default the cookie is a browser
+  session cookie and the server limits its validity to 12 hours. **Settings
+  → General → Browser access** can remember the browser for 30 days instead.
+  Signing out clears that browser's cookie; it does not invalidate a copied
+  token URL. A copied session cookie remains valid after sign-out until it
+  expires or all access is revoked. Revoking all access also rotates the API
+  token, so every browser session and old token URL stops working. An older
+  build's token in session storage is exchanged once and removed. HttpOnly
+  keeps page scripts from reading the cookie; it does not stop scripts running
+  in this app's origin from making authorized requests.
 - **Loopback by default.** BELL PR listens on `127.0.0.1`. `--host` and
   `BELLPR_HOST` are how you listen elsewhere, and BELL PR prints a warning
   when the address is not a loopback address. Requests must name a trusted
@@ -49,11 +62,11 @@ what BELL PR trusts, what it does not, and the limits of each protection.
   JSON, which a plain HTML form cannot.
 - **Proxies.** `BELLPR_ALLOWED_ORIGINS` accepts plain HTTP only for loopback
   addresses; any other origin must be HTTPS, so requests and responses never
-  cross a network in clear text. The API token is still required behind a
-  proxy. Keep the token URL private.
+  cross a network in clear text. A browser session or API token is still
+  required behind a proxy. Keep the token URL private.
 - **Other computers.** `--host 0.0.0.0` outside Docker, and publishing the
   Docker port beyond `127.0.0.1`, let other machines reach the port. They
-  still need the API token. Put a proxy that limits who can connect in
+  still need authorization. Put a proxy that limits who can connect in
   front as well (see
   [Self-hosting](self-hosting.md#reach-bell-pr-from-another-machine)).
 - **Same-user programs.** Any program running as your OS user can read the

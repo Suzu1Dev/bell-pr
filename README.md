@@ -406,9 +406,9 @@ Details: [Privacy and your data](docs/privacy-and-data.md).
   git command that talks to GitHub receives `GH_TOKEN`.
   Agents still run the project's code, so import only projects you are
   willing to run on this computer.
-- **API token.** Each install keeps a token in its data directory, and
-  the API refuses a request that does not send it. BELL PR listens on
-  `127.0.0.1` by default. Other sites may link to its page, but cannot
+- **Browser access and API token.** Each install keeps a token in its data
+  directory. The API requires that token or an authorized browser session.
+  BELL PR listens on `127.0.0.1` by default. Other sites may link to its page, but cannot
   call its API or frame it.
 - **Unsandboxed agents are an explicit opt-in.** Without the sandbox (for
   example in Docker with default settings), a Claude Code agent that edits
@@ -427,21 +427,23 @@ vulnerability, see [SECURITY.md](SECURITY.md).
 BELL PR serves the web interface and the API on `127.0.0.1`, port 4311,
 unless you set `--host` or `BELLPR_HOST`. It does not listen on `0.0.0.0`
 unless you ask it to. Any other address is an explicit setting, and BELL PR
-prints a warning at start. The API token is still required.
+prints a warning at start. API requests still need authorization.
 
 The first start writes a random token to `<data dir>/api-token` (32 bytes,
 mode `0600`, your user only). A later start reuses that file. A missing or
-damaged file is created again. `bell-pr token rotate` replaces it; a running
-BELL PR uses the new token on the next request. Run `bell-pr open` afterwards
-so the browser has the new one.
+damaged file is created again. `bell-pr token rotate` replaces it and
+immediately invalidates every browser session and old token URL, without a
+restart. API clients must use the new token. Run `bell-pr open` afterwards
+to authorize your browser again.
 
-Every API request except `GET /api/health` must send the token:
+Browser requests use an HttpOnly session cookie. API clients must send the
+token on every request except `GET /api/health`:
 
 ```http
 Authorization: Bearer <token>
 ```
 
-`X-Bell-Token: <token>` is the same. A missing or wrong token is HTTP 401.
+`X-Bell-Token: <token>` is the same. Missing or invalid authorization is HTTP 401.
 Requests must name a trusted host (`localhost`, `127.0.0.1` or `[::1]` with
 BELL PR's port, or a host you named with `BELLPR_PUBLIC_URL` or
 `BELLPR_ALLOWED_ORIGINS`). A browser `Origin` that is not this app's own
@@ -449,14 +451,23 @@ origin, and not on that list, is rejected. There is no wildcard CORS.
 Requests that change data must use `application/json`.
 
 `bell-pr` opens the browser at an address whose fragment is
-`#bell_token=<token>`. The page stores the token and removes it from the
-address. The line printed at start does not include the token, so a service
+`#bell_token=<token>`. The page exchanges it for an HttpOnly session cookie
+and removes it from the address. New tabs at the same address share access;
+the default session lasts at most 12 hours and is not a persistent cookie.
+Under **Settings → General → Browser access**, you can remember this browser
+for 30 days. Signing out clears this browser's cookie; revoking all access
+also replaces the API token and invalidates every browser session and old
+token URL. A token left in session storage by an older version is exchanged
+once, then removed.
+
+The line printed at start does not include the token, so a service
 log does not either. To open the app yourself, use `bell-pr open` or
 `bell-pr open --print`: both print the address with the token. Treat that
 address like a password. It is not written to the server log or to
 `bell-pr doctor --json`.
 
-The token can remain in browser history; run `bell-pr token rotate` if you share this browser profile.
+The token can remain in browser history. Signing out alone does not invalidate
+that link; revoke all access or run `bell-pr token rotate` to invalidate it.
 
 ## Configuration
 

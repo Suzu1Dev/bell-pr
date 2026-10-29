@@ -204,7 +204,7 @@ BELL PR 會閱讀專案的貢獻指南、AI 政策、PR 範本、Agent 指南與
 
 - **在沙箱中執行的 Agent。** 在預設的「工作目錄」模式下，會寫程式的 Agent 在各自 CLI 的作業系統沙箱中執行：寫入限制在該工作自己的 worktree，網路也會關閉。Claude Code 無法讀取 GitHub CLI 的設定檔、`~/.git-credentials` 與 credential-store 檔案、`~/.netrc` 與 `~/.ssh/`。`GH_TOKEN`/`GITHUB_TOKEN` 會從 agent 的環境變數中移除。系統 keyring 裡的 token 不在保護範圍內：agent 仍可透過 `gh auth token` 讀到你的 GitHub token。主要防線是改用權限最小的 fine-grained token。Claude Code 另外無法讀取自己 checkout 以外的 BELL PR 資料。「完整權限」預設關閉。開啟後會對寫入檔案的角色關掉 OS sandbox 和 credential deny 規則，這些 agent 可以讀 `~/.git-credentials` 和 `~/.ssh`，也能執行 `gh`、`git push`、`curl`；唯讀角色維持原本限制。只剩 `GH_TOKEN`/`GITHUB_TOKEN` 從環境變數移除這一項還有效。「免密碼 sudo」（僅 Linux）預設關閉。開啟後這個使用者帳號底下所有 process（包括 agent）都能不用密碼以 root 執行任何指令，讀得到那台機器上所有檔案，包括 token 和 SSH key。兩者都只在用完即丟的 VM 或 container 裡開。
 - **匯入的專案不受信任。** 專案的程式碼、文件與 Agent 指示（`AGENTS.md`、`CLAUDE.md`、`.claude/`）都只被當成資料：CLI 不會載入專案自己的設定、hooks 或指示；Git 設定可能執行其他程式的 repository 會被拒絕。BELL PR 自己執行的 git 也會關掉這些程式；只有會連到 GitHub 的 git 才會拿到 `GH_TOKEN`。Agent 仍會執行專案的程式碼，請只匯入你願意在這台電腦上執行的專案。
-- **API 權杖。** 每次安裝都會在資料目錄保存一枚權杖，沒有送出權杖的 API 請求會被拒絕。預設只在 `127.0.0.1` 上監聽。其他網站可以連結到它的頁面，但無法呼叫它的 API，也無法以框架嵌入它。
+- **瀏覽器存取與 API 權杖。** 每次安裝都會在資料目錄保存一枚權杖。API 請求必須帶上這枚權杖，或已授權的瀏覽器工作階段。預設只在 `127.0.0.1` 上監聽。其他網站可以連結到它的頁面，但無法呼叫它的 API，也無法以框架嵌入它。
 - **在沙箱外執行必須明確開啟。** 沒有沙箱時（例如使用預設設定的 Docker），會修改檔案的 Claude Code Agent 會被拒絕。你可以在**設定 → Agent 安全**或用 `BELLPR_ALLOW_UNSANDBOXED_AGENTS=1` 允許；這類 Agent 擁有你完整的使用者權限，用過它的每個工作都會顯示「**未使用沙箱執行**」標記。
 - **由你發佈。** 在你逐檔審閱並核准之前，不會有任何內容送到 GitHub，而且 commit 只包含你審閱過的檔案。
 
@@ -212,21 +212,23 @@ BELL PR 會閱讀專案的貢獻指南、AI 政策、PR 範本、Agent 指南與
 
 ## 本機 API
 
-BELL PR 在 `127.0.0.1` 的埠 4311 提供網頁介面與 API，除非你設定 `--host` 或 `BELLPR_HOST`。它不會在 `0.0.0.0` 上監聽，除非你明確要求。其他位址都是明確設定，啟動時會印出警告。API 權杖仍然必要。
+BELL PR 在 `127.0.0.1` 的埠 4311 提供網頁介面與 API，除非你設定 `--host` 或 `BELLPR_HOST`。它不會在 `0.0.0.0` 上監聽，除非你明確要求。其他位址都是明確設定，啟動時會印出警告。API 請求仍然需要授權。
 
-第一次啟動會把隨機權杖寫入 `<資料目錄>/api-token`（32 位元組，權限 `0600`，只有你的使用者能讀）。之後的啟動會沿用這個檔案。檔案遺失或內容損壞時會重新建立。`bell-pr token rotate` 會更換它；執行中的 BELL PR 在下一個請求就使用新權杖。更換後請再執行 `bell-pr open`，瀏覽器才會帶上新權杖。
+第一次啟動會把隨機權杖寫入 `<資料目錄>/api-token`（32 位元組，權限 `0600`，只有你的使用者能讀）。之後的啟動會沿用這個檔案。檔案遺失或內容損壞時會重新建立。`bell-pr token rotate` 會更換它，立即使所有瀏覽器工作階段與舊權杖連結失效，不需要重新啟動。API 用戶端必須改用新權杖；請再執行 `bell-pr open`，重新授權瀏覽器。
 
-除了 `GET /api/health`，每個 API 請求都必須送出權杖：
+瀏覽器請求使用 HttpOnly 工作階段 cookie。API 用戶端除了 `GET /api/health`，每個請求都必須送出權杖：
 
 ```http
 Authorization: Bearer <token>
 ```
 
-`X-Bell-Token: <token>` 效果相同。缺少或錯誤的權杖會得到 HTTP 401。請求的 Host 必須是受信任的位址（`localhost`、`127.0.0.1` 或 `[::1]` 加上 BELL PR 的埠，或你用 `BELLPR_PUBLIC_URL`、`BELLPR_ALLOWED_ORIGINS` 指定的主機）。瀏覽器的 `Origin` 若不是這個應用程式自己的來源，也不在允許清單上，就會被拒絕。沒有萬用字元 CORS。會變更資料的請求必須使用 `application/json`。
+`X-Bell-Token: <token>` 效果相同。缺少或無效的授權會得到 HTTP 401。請求的 Host 必須是受信任的位址（`localhost`、`127.0.0.1` 或 `[::1]` 加上 BELL PR 的埠，或你用 `BELLPR_PUBLIC_URL`、`BELLPR_ALLOWED_ORIGINS` 指定的主機）。瀏覽器的 `Origin` 若不是這個應用程式自己的來源，也不在允許清單上，就會被拒絕。沒有萬用字元 CORS。會變更資料的請求必須使用 `application/json`。
 
-`bell-pr` 開啟瀏覽器時，位址的片段是 `#bell_token=<權杖>`。頁面會存下權杖，再從位址列移除。啟動時印出的那一行不含權杖，因此服務記錄裡也不會有。若要自己開啟，請用 `bell-pr open` 或 `bell-pr open --print`：兩者都會印出帶權杖的位址。請把那個位址當成密碼。它不會寫進伺服器記錄，也不會出現在 `bell-pr doctor --json`。
+`bell-pr` 開啟瀏覽器時，位址的片段是 `#bell_token=<權杖>`。頁面會用它換取 HttpOnly 工作階段 cookie，再從位址列移除。同一位址的新分頁會共用存取權；預設工作階段最長 12 小時，cookie 不會持久保存。你可以在**設定 → 一般 → 瀏覽器存取**記住這個瀏覽器 30 天。登出會清除這個瀏覽器的 cookie；撤銷所有存取權則會同時更換 API 權杖，使所有瀏覽器工作階段與舊權杖連結失效。舊版本留在 session storage 的權杖會交換一次，再移除。
 
-token 可能留在瀏覽器歷史紀錄裡，如果這個瀏覽器設定檔有跟別人共用，請執行 `bell-pr token rotate`。
+啟動時印出的那一行不含權杖，因此服務記錄裡也不會有。若要自己開啟，請用 `bell-pr open` 或 `bell-pr open --print`：兩者都會印出帶權杖的位址。請把那個位址當成密碼。它不會寫進伺服器記錄，也不會出現在 `bell-pr doctor --json`。
+
+權杖可能留在瀏覽器歷史紀錄裡。只登出不會使這個連結失效；請撤銷所有存取權或執行 `bell-pr token rotate`，讓舊連結失效。
 
 ## 設定
 

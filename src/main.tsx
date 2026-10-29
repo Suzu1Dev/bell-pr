@@ -1,7 +1,7 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
-import { adoptApiToken } from "./api";
+import { adoptApiToken, establishBrowserSession } from "./api";
 import { parsePresentationFlags } from "./app/presentation";
 import {
   addLocaleResource,
@@ -16,8 +16,12 @@ import "./styles.css";
 import "./workspace-v2.css";
 
 // The address from `bell-pr open` carries the API token in the fragment.
-// Store it and drop it from the address before the router reads the hash.
-adoptApiToken(window);
+// Drop it from the address, then exchange it for a browser session before
+// mounting the app. Older tabs' stored tokens are upgraded the same way.
+const pageToken = adoptApiToken(window);
+const browserSession = establishBrowserSession(pageToken).catch(() => {
+  // The app's first API requests show the existing connection/sign-in message.
+});
 
 const root = ReactDOM.createRoot(document.getElementById("root")!);
 
@@ -44,10 +48,13 @@ addLocaleResource(loadDemo);
 // saved choice and the browser language, and is never saved.
 const locale =
   parsePresentationFlags(window.location.hash).locale ?? initialLocale();
-void loadLocale(locale).then(
-  () => render(locale),
-  (error: unknown) => {
-    console.error("[BELL-PR] Could not load the dictionary for", locale, error);
-    render(defaultLocale);
-  },
-);
+void Promise.all([
+  loadLocale(locale).then(
+    () => locale,
+    (error: unknown) => {
+      console.error("[BELL-PR] Could not load the dictionary for", locale, error);
+      return defaultLocale;
+    },
+  ),
+  browserSession,
+]).then(([readyLocale]) => render(readyLocale));

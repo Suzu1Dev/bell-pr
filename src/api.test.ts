@@ -1,7 +1,14 @@
 import assert from "node:assert/strict";
 import test, { afterEach, beforeEach } from "node:test";
 import { product } from "../shared/product";
-import { adoptApiToken, ApiError, api, apiUrl, send } from "./api";
+import {
+  adoptApiToken,
+  ApiError,
+  api,
+  apiUrl,
+  establishBrowserSession,
+  send,
+} from "./api";
 import { setLocale } from "./i18n";
 
 interface Call {
@@ -308,4 +315,60 @@ test("a 401 becomes the open instruction, not the bearer header text", async () 
     "Open bell-pr from this computer by running `bell-pr open`.",
   );
   assert.doesNotMatch(error.message, /Bearer|X-Bell-Token/);
+});
+
+test("a legacy tab exchanges its token once and later requests use the browser cookie", async (t) => {
+  const token = "ab".repeat(32);
+  const tab = tokenWindow(`http://127.0.0.1:4311/#bell_token=${token}`);
+  adoptApiToken(tab.win);
+  const previous = globalThis.sessionStorage;
+  globalThis.sessionStorage = tab.session;
+  t.after(() => { globalThis.sessionStorage = previous; });
+  respond = () => json(200, { remembered: false });
+
+  await establishBrowserSession();
+  assert.equal(tab.stored.has("bellpr-api-token"), false);
+  assert.deepEqual(calls.map(({ url, method, body }) => ({ url, method, body })), [
+    { url: "/api/session", method: "GET", body: undefined },
+    { url: "/api/session", method: "POST", body: '{"remember":false}' },
+  ]);
+  assert.ok(calls.every((call) => call.headers.get("Authorization") === `Bearer ${token}`));
+  await api("/status");
+  assert.equal(calls.at(-1)?.headers.get("Authorization"), null);
+  const count = calls.length;
+  await establishBrowserSession();
+  assert.equal(calls.length, count);
+});
+
+test("opening another CLI link preserves the browser's remembered session", async () => {
+  respond = () => json(200, { remembered: true });
+  await establishBrowserSession("ab".repeat(32));
+  assert.equal(calls[1].body, '{"remember":true}');
+});
+
+test("a CLI fragment can establish a session when browser storage is blocked", async () => {
+  const token = "ab".repeat(32);
+  const tab = tokenWindow(`http://127.0.0.1:4311/#bell_token=${token}`);
+  tab.win.sessionStorage.setItem = () => { throw new Error("Storage blocked"); };
+  const adopted = adoptApiToken(tab.win);
+  assert.equal(adopted, token);
+  assert.equal(tab.href(), "/");
+  respond = () => json(200, { remembered: false });
+  await establishBrowserSession(adopted);
+  assert.equal(calls[1].headers.get("Authorization"), `Bearer ${token}`);
+});
+
+test("a revoked legacy token is removed so it cannot override a valid cookie", async (t) => {
+  const token = "ab".repeat(32);
+  const tab = tokenWindow(`http://127.0.0.1:4311/#bell_token=${token}`);
+  adoptApiToken(tab.win);
+  const previous = globalThis.sessionStorage;
+  globalThis.sessionStorage = tab.session;
+  t.after(() => { globalThis.sessionStorage = previous; });
+  respond = () => json(401, { error: "Revoked" });
+  await assert.rejects(establishBrowserSession(), (error: unknown) => error instanceof ApiError && error.status === 401);
+  assert.equal(tab.stored.has("bellpr-api-token"), false);
+  respond = () => json(200, { ready: true });
+  await api("/status");
+  assert.equal(calls.at(-1)?.headers.get("Authorization"), null);
 });

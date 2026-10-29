@@ -126,6 +126,7 @@ with mode 0600.
 | `discovery.json` | Discovery preferences and results. |
 | `model-settings.json` | The agent, model, reasoning effort and web-access choice. |
 | `app-settings.json` | Language, limits, onboarding progress, safety settings and the retention period. |
+| `api-token` | The installation's API token, also used to authorize browser sessions. Rotating it invalidates every existing session and old token URL. |
 | `author-emails.json` | SHA-256 digests of the commit e-mail addresses you confirmed when publishing, never the addresses themselves. |
 | `logs/` | Daily log files, at most 7 files and 50 MB, with secrets redacted. Prompts and page contents are never logged. |
 | `children.json`, `bellpr.lock` | The agent processes that are running (so a crash leaves none behind), and the running instance's process id and port, with the computer's uptime (on Linux also its host name, PID namespace and boot id). |
@@ -134,6 +135,13 @@ Your browser keeps, for this local site only: the language you chose,
 layout preferences such as the code font size and the collapsed sidebar,
 and the sample project's review progress, check answers and drafts. None of
 this reaches the server's data directory.
+
+The browser also stores an HttpOnly access cookie, shared by tabs at the
+same address. Its default session lasts at most 12 hours; choosing to
+remember this browser keeps it for 30 days. **Settings → General → Browser
+access** lets you sign out of this browser or revoke all access. An API token
+left in session storage by an older build is exchanged for the cookie once,
+then removed.
 
 ## How long it is kept
 
