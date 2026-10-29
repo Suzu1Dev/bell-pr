@@ -189,7 +189,7 @@ they have your full user rights, and those runs are marked. The
 [security model](security-model.md) explains every protection and its
 limits.
 
-With the default Workspace access, agents are also told not to change the machine: no `sudo` and no
+With the default Working directory (default) access, agents are also told not to change the machine: no `sudo` and no
 global or user-level installs. When a check needs a tool the machine
 lacks, the run's overview lists it with a suggested command, for you to
 check against the project's documentation and run yourself; BELL PR never

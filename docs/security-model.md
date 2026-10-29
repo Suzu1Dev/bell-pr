@@ -92,7 +92,7 @@ to both CLIs, and `DISABLE_TELEMETRY`, `DISABLE_ERROR_REPORTING`,
 
 ### Claude Code
 
-The following restrictions describe the default **Workspace** access. Explicit
+The following restrictions describe the default **Working directory (default)** access. Explicit
 Full access changes writable roles as described [below](#explicit-full-access).
 
 - **Writable roles** (teammates, follow-up rounds, syncing) run every Bash
@@ -178,10 +178,11 @@ are untrusted input: an induced command can affect anything the service account
 can access. Permission deny lists are not an operating-system boundary for an
 unsandboxed shell.
 
-Choosing Full access asks for confirmation. Switching back to Workspace does
+Choosing Full access asks for confirmation. Switching back to Working directory (default) does
 not. `bell-pr doctor` warns, and does not fail, when Full access is saved and
-when `/etc/sudoers.d/bell-pr-agent` is installed. Those checks read the saved
-model settings and whether that file exists. They do not run sudo.
+when passwordless sudo is available. It tells BELL PR's rule file apart from
+another rule. On Linux it runs `sudo -n true` and uses only the exit code.
+It does not run that command on other platforms, or when sudo is not installed.
 
 The Full access confirmation and its help show:
 

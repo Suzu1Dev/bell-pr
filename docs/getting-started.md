@@ -226,7 +226,7 @@ Start the run with **Generate the team plan** (with plan approval) or
   the overall conclusion; the Reviewer opens by saying whether it agrees
   and adds only what the summary lacks, and the Test analyst keeps the one
   list of checks still to run.
-- With the default **Workspace** access, agents are told not to change
+- With the default **Working directory (default)** access, agents are told not to change
   your machine: no `sudo`, no global or
   user-level installs. When a check needs something the machine lacks, the
   teammate reports it, and **Overview & motivation** lists it under "Setup
