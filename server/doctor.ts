@@ -3,7 +3,8 @@
  * /api/status and the setup checklist: Node.js, Git and the identity
  * commits need, the GitHub CLI with its sign-in and permissions, the Codex
  * and Claude Code CLIs with their sign-ins, Claude Code's sandbox, the data
- * directory, the app and the platform.
+ * directory, the app, the platform, saved full access, and passwordless
+ * sudo (BELL PR's rule file, or another rule).
  *
  * The probes run in parallel, each with a 5-second limit. What they find is
  * kept for 10 seconds per data directory and PATH, and callers in that
@@ -11,7 +12,7 @@
  * details and fix labels) is worded in the locale in effect for each call.
  */
 import { constants } from "node:fs";
-import { access, readFile, statfs } from "node:fs/promises";
+import { access, readFile, stat, statfs } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { doctorCheckIds, type DoctorCheck, type DoctorReport } from "../shared/doctor.js";
@@ -20,9 +21,11 @@ import { codexEnabled } from "../shared/codex-switch.js";
 import {
   agentProviders,
   providerLabels,
+  type AgentAccessMode,
   type AgentProvider,
 } from "../shared/models.js";
 import { product } from "../shared/product.js";
+import { bellSudoersFile } from "../shared/sudo.js";
 import { agentLoginCheck } from "./agent-cli.js";
 import { defaultActiveRunLimit, defaultAgentProcessLimit } from "./agent-slots.js";
 import { AppSettingsService, withAppSettings } from "./app-settings.js";
@@ -37,7 +40,7 @@ import {
 } from "./cli-errors.js";
 import { resolvePort } from "./config.js";
 import { sm } from "./i18n/index.js";
-import { agentEnvironment, command, git, redact } from "./process.js";
+import { agentEnvironment, command, git, gitInvocationPrefix, redact } from "./process.js";
 import {
   allowUnsandboxedAgents,
   detectClaudeSandbox,
@@ -137,6 +140,22 @@ export interface DoctorOptions {
   app?: DoctorAppInfo;
   /** The platform the fixes are for; this one by default. */
   platform?: NodeJS.Platform;
+  /**
+   * Saved agent access. Read from `dataDir`/model-settings.json when absent.
+   * Only `"full"` warns.
+   */
+  agentAccess?: AgentAccessMode;
+  /**
+   * Sudoers file the passwordless-sudo check stats. It never reads the file.
+   * Default: `/etc/sudoers.d/bell-pr-agent`.
+   */
+  sudoersFile?: string;
+  /**
+   * Exit code of `sudo -n true`, or `"absent"` when sudo is not installed.
+   * Tests replace it. The default runs that command with a short timeout
+   * and does not prompt.
+   */
+  sudoRun?: () => Promise<number | "absent">;
 }
 
 const execOptions = { timeoutMs: probeTimeoutMs, maxBytes: 64_000 };
@@ -433,8 +452,23 @@ async function codexOnPath(): Promise<ToolFacts> {
 }
 
 async function probe(exec: DoctorExec, dataDir?: string): Promise<Facts> {
+  const run = async (
+    executable: string,
+    args: string[],
+    options?: Parameters<DoctorExec>[2],
+  ) =>
+    exec(
+      executable,
+      executable === "git"
+        ? [
+            ...(await gitInvocationPrefix(options?.cwd ?? os.tmpdir(), args)),
+            ...args,
+          ]
+        : args,
+      options,
+    );
   const [git, gh, codex, claude, dataDirFacts] = await Promise.all([
-    probeTool(exec, "git"),
+    probeTool(run, "git"),
     probeTool(exec, "gh"),
     // The switch off must not start Codex. Presence is a PATH check only.
     codexEnabled
@@ -446,7 +480,7 @@ async function probe(exec: DoctorExec, dataDir?: string): Promise<Facts> {
   const [identity, github, codexAuth, claudeAuth, sandbox] = await Promise.all([
     git.state === "ok"
       ? probeGitIdentity((args, options) =>
-          exec("git", args, { ...options, cwd: os.tmpdir() }),
+          run("git", args, { ...options, cwd: os.tmpdir() }),
         )
       : undefined,
     gh.state === "ok" ? probeGithub(exec) : undefined,
@@ -469,6 +503,48 @@ async function probe(exec: DoctorExec, dataDir?: string): Promise<Facts> {
     ...(sandbox ? { sandbox } : {}),
     ...(dataDirFacts ? { dataDir: dataDirFacts } : {}),
   };
+}
+
+/**
+ * `sudo -n true`: non-interactive, no prompt, only the exit code matters.
+ * A missing sudo is `"absent"`. Any other failure is not passwordless.
+ */
+async function sudoNonInteractive(exec: DoctorExec): Promise<number | "absent"> {
+  try {
+    const { code } = await exec("sudo", ["-n", "true"], {
+      timeoutMs: probeTimeoutMs,
+      allowedCodes: [0, 1],
+      maxBytes: 4_000,
+    });
+    return code;
+  } catch (error) {
+    if (missing(error)) return "absent";
+    return 1;
+  }
+}
+
+/** Whether the sudoers rule file is present. A missing file is not installed. */
+async function sudoersFileExists(file: string): Promise<boolean> {
+  try {
+    await stat(file);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Saved agent access in model-settings.json, when it is a known mode. */
+async function savedAgentAccess(dataDir: string): Promise<AgentAccessMode | undefined> {
+  try {
+    const value = JSON.parse(
+      await readFile(path.join(dataDir, "model-settings.json"), "utf8"),
+    ) as { agentAccess?: unknown };
+    return value?.agentAccess === "full" || value?.agentAccess === "workspace"
+      ? value.agentAccess
+      : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 /** The provider the model settings in `dataDir` chose, if any. */
@@ -545,9 +621,18 @@ function sandboxFixes(detection: SandboxDetection): Fix[] {
 }
 
 /** Builds the report in the locale in effect. */
+type PasswordlessSudoCheck =
+  | { status: "skip"; reason: "platform" | "missing" }
+  | { status: "ok" }
+  | { status: "warn"; reason: "installed" | "external" };
+
 function buildReport(
   facts: Facts,
-  options: DoctorOptions & { platform: NodeJS.Platform; provider?: AgentProvider },
+  options: DoctorOptions & {
+    platform: NodeJS.Platform;
+    provider?: AgentProvider;
+    passwordlessSudo: PasswordlessSudoCheck;
+  },
 ): DoctorReport {
   const m = sm().setup.doctor;
   const platform = options.platform;
@@ -887,6 +972,32 @@ function buildReport(
   });
 
   add({
+    id: "full-access",
+    required: false,
+    ...(options.agentAccess === "full"
+      ? { status: "warn" as const, reason: "full", detail: m.fullAccessDisclosure }
+      : { status: "ok" as const }),
+  });
+
+  const sudo = options.passwordlessSudo;
+  add({
+    id: "passwordless-sudo",
+    required: false,
+    ...(sudo.status === "skip"
+      ? { status: "skip" as const, reason: sudo.reason }
+      : sudo.status === "warn"
+        ? {
+            status: "warn" as const,
+            reason: sudo.reason,
+            detail:
+              sudo.reason === "installed"
+                ? m.passwordlessSudoInstalled
+                : m.passwordlessSudoExternal,
+          }
+        : { status: "ok" as const }),
+  });
+
+  add({
     id: "platform",
     required: false,
     ...(platform === "win32"
@@ -946,13 +1057,39 @@ export async function runDoctor(opts: DoctorOptions = {}): Promise<DoctorReport>
   return reportFrom(await entry.facts, opts);
 }
 
+/** Linux only. Warns when `sudo -n true` succeeds, and names whose rule allows it. */
+async function passwordlessSudoCheck(opts: DoctorOptions, platform: NodeJS.Platform): Promise<PasswordlessSudoCheck> {
+  if (platform !== "linux") return { status: "skip", reason: "platform" };
+  const run = opts.sudoRun ?? (() => sudoNonInteractive(opts.exec ?? command));
+  const [installed, code] = await Promise.all([
+    sudoersFileExists(opts.sudoersFile ?? bellSudoersFile),
+    run(),
+  ]);
+  if (code === "absent") return { status: "skip", reason: "missing" };
+  if (code !== 0) return { status: "ok" };
+  return installed
+    ? { status: "warn", reason: "installed" }
+    : { status: "warn", reason: "external" };
+}
+
 async function reportFrom(facts: Facts, opts: DoctorOptions) {
+  const platform = opts.platform ?? process.platform;
   const provider =
     opts.provider ?? (opts.dataDir ? await savedProvider(opts.dataDir) : undefined);
+  const [agentAccess, passwordlessSudo] = await Promise.all([
+    opts.agentAccess !== undefined
+      ? opts.agentAccess
+      : opts.dataDir
+        ? savedAgentAccess(opts.dataDir)
+        : undefined,
+    passwordlessSudoCheck(opts, platform),
+  ]);
   return buildReport(facts, {
     ...opts,
-    platform: opts.platform ?? process.platform,
+    platform,
     ...(provider ? { provider } : {}),
+    ...(agentAccess ? { agentAccess } : {}),
+    passwordlessSudo,
   });
 }
 

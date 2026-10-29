@@ -21,6 +21,7 @@ const m: Translation<typeof en> = {
   stepTooltip: ({ n, title, description }) => `${n} ${title}：${description}`,
   tabsLabel: "任務內容",
   tabs: {
+    session: "協作",
     overview: "全貌與動機",
     changes: "程式碼變更",
     activity: "Agent 動態",

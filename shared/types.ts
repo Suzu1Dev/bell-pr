@@ -1,3 +1,4 @@
+import type { WorkSession } from "./session.js";
 import type { LearnerNote, StoredExplanation } from "./explanations.js";
 import type { StoredWalkthrough } from "./walkthroughs.js";
 import type { EfficiencyMetrics } from "./efficiency.js";
@@ -90,6 +91,8 @@ export interface RunLogEntry {
  * `Run extends RunCore`; the server adds the fields only it records.
  */
 export interface RunCore {
+  /** Collaborative edits before publishing; absent on older records. */
+  session?: WorkSession;
   draftPreparation?: DraftPreparation;
   modelExecution?: ModelExecution;
   /** Stored per-file explanations keyed by path; the learning page aggregates the ready ones. */
@@ -108,6 +111,11 @@ export interface RunCore {
   baseSha?: string;
   /** Local checkout the learner may edit by hand; the server always records it, the demo run has none. */
   worktreePath?: string;
+  /**
+   * Git directory of that checkout, recorded when the worktree was created.
+   * Absent on runs saved before it was recorded.
+   */
+  gitDir?: string;
   createdAt: string;
   agents: Agent[];
   logs: RunLogEntry[];

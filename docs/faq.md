@@ -174,26 +174,32 @@ code your provider must not see.
 ### Can the agents harm my computer?
 
 Agents run the imported project's code, its tests and build scripts, on
-your computer, so import only projects you are willing to run. BELL PR
-limits what they can do: agents that write code run in their CLI's
-operating-system sandbox, which keeps their writes in the run's working
-copy and closes the network. With that sandbox on, both agents are denied
-the GitHub CLI config files, `~/.git-credentials` and credential-store
-files, `~/.netrc`, and `~/.ssh/`. Tokens in your system keyring are not
-covered: the agent can still read your GitHub token via `gh auth token`.
-Your main protection is a fine-grained token with the minimum permissions
-you need. Claude Code is also denied BELL PR's data outside its checkout.
-The project's own agent instructions and
-settings are never loaded. If you allow unsandboxed Claude Code agents,
-they have your full user rights, and those runs are marked. The
-[security model](security-model.md) explains every protection and its
-limits.
+your computer, so import only projects you are willing to run. In the
+default Working directory mode, agents that write code run in their CLI's
+operating-system sandbox: writes stay in the run's own worktree and the
+network is closed. Claude Code is denied the GitHub CLI config files,
+`~/.git-credentials` and credential-store files, `~/.netrc`, and `~/.ssh/`.
+`GH_TOKEN`/`GITHUB_TOKEN` are removed from the agent's environment. Tokens
+in your system keyring are not covered: the agent can still read your GitHub
+token via `gh auth token`. Your main protection is a fine-grained token with
+the minimum permissions you need. Claude Code is also denied BELL PR's own
+data outside its checkout. The project's own agent instructions and settings
+are never loaded. If you allow unsandboxed Claude Code agents, they have your
+full user rights, and those runs are marked. The
+[security model](security-model.md) explains every protection and its limits.
 
-Agents are also told never to change the machine: no `sudo` and no
-global or user-level installs. When a check needs a tool the machine
-lacks, the run's overview lists it with a suggested command, for you to
-check against the project's documentation and run yourself; BELL PR never
-runs it.
+In the default Working directory mode, agents are also told not to change the
+machine: no `sudo` and no global or user-level installs. When a check needs a
+tool the machine lacks, the run's overview lists it with a suggested command,
+for you to check against the project's documentation and run yourself; BELL PR
+never runs it from that checklist. Explicit **Full access** lets writable
+agents run outside their sandbox, install tools and use available sudo
+privileges:
+
+> "Full access" is off by default. It turns off the OS sandbox and the credential deny rules for roles that write files, so those agents can read `~/.git-credentials` and `~/.ssh` and run `gh`, `git push`, and `curl`. Read-only roles keep their limits. Only the removal of `GH_TOKEN`/`GITHUB_TOKEN` from the environment still applies. Use it only in a throwaway VM or container.
+
+The optional Linux sudo setup grants the user account that runs BELL PR
+passwordless root commands; see [Full access](security-model.md#explicit-full-access).
 
 ## Using it
 

@@ -41,6 +41,8 @@ const methods = [
   "revisePlan",
   "retryTeam",
   "cancel",
+  "startSession",
+  "cancelSession",
   "rerunReview",
   "diff",
   "explanations",

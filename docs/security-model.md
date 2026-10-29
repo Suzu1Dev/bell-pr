@@ -70,8 +70,10 @@ Microsoft Foundry); BELL PR never restricts or reads them. Codex receives
 other's keys. `GH_TOKEN` and `GITHUB_TOKEN` are removed from the agent
 child's environment when the process is spawned (`agentChildEnvironment`
 in `server/process.ts`), including when the sandbox is off. Other
-variables passed to that child are left in place. BELL PR's own server
-process still has the tokens for its own GitHub calls.
+variables passed to that child are left in place. BELL PR's own `gh`
+calls and git commands that talk to GitHub (`gitNetwork`) still receive
+the tokens. Every other server git command gets an allowlist
+(`gitChildEnv`) and does not.
 Usage-data opt-outs that you set also pass through, unchanged: `DO_NOT_TRACK`
 to both CLIs, and `DISABLE_TELEMETRY`, `DISABLE_ERROR_REPORTING`,
 `DISABLE_BUG_COMMAND`, `CLAUDE_CODE_DISABLE_FEEDBACK_SURVEY` and
@@ -89,6 +91,9 @@ to both CLIs, and `DISABLE_TELEMETRY`, `DISABLE_ERROR_REPORTING`,
 - Prompts mark repository text, reports and feedback as untrusted data.
 
 ### Claude Code
+
+The following restrictions describe the default **Working directory (default)** access. Explicit
+Full access changes writable roles as described [below](#explicit-full-access).
 
 - **Writable roles** (teammates, follow-up rounds, syncing) run every Bash
   command inside Claude Code's sandbox: bubblewrap with socat on Linux,
@@ -141,17 +146,62 @@ to both CLIs, and `DISABLE_TELEMETRY`, `DISABLE_ERROR_REPORTING`,
 
 - Writable roles run with a permission profile that extends `:workspace`:
   writes are limited to the checkout and command network access is off.
-  Read-only roles extend `:read-only`. BELL PR does not pass `--sandbox`.
-  On Codex CLI 0.165, `--sandbox` selects the older sandbox and ignores
-  `default_permissions`, which would drop the read denials below.
+  Read-only roles extend `:read-only`. BELL PR does not pass `--sandbox`
+  for that profile. On Codex CLI 0.165, `--sandbox` selects the older
+  sandbox and ignores `default_permissions`, which would drop the read
+  denials below. Explicit full access, described below, is the case that
+  passes `--sandbox danger-full-access`.
 - The profile names the same path list as Claude Code
   (`shared/credential-denials.ts`): GitHub CLI config files,
   `~/.git-credentials` and `credential.helper store --file` paths,
   `~/.netrc`, `~/.ssh`, and the other files in that list. Those denials
-  are part of the sandbox profile. The person can turn Claude Code's
-  sandbox off; Codex is started with this profile on each turn. Reads of
-  other files your user can read are still allowed. The profile does not
-  name the system keyring (Secret Service, D-Bus, or Keychain).
+  are part of the sandbox profile. The checkout's `.git` path and `.git/**`
+  are `read`, so that path cannot be edited or replaced and Git can still
+  read it. The person can turn Claude Code's sandbox off; Codex is started
+  with this profile on each turn unless full access is on. Reads of other
+  files your user can read are still allowed. The profile does not name
+  the system keyring (Secret Service, D-Bus, or Keychain).
+
+### Explicit full access
+
+Model settings offer **Full access** for roles that write files: implementation,
+collaborative sessions, follow-up fixes and conflict resolution. It is off by
+default and is recorded with the run's model settings. These roles use Codex's
+`--sandbox danger-full-access` or Claude Code's `bypassPermissions` mode without
+its Bash sandbox. Claude turns using it are marked as unsandboxed. Lead,
+reviewer, test analyst, project analysis and other read-only roles keep their
+restrictions. Learn by hand never gains a writable agent from this setting.
+
+Full access lets an agent install required tools, change files outside its
+checkout and use existing sudo privileges. Imported code, issues and reviews
+are untrusted input: an induced command can affect anything the user account that
+runs BELL PR can access. Permission deny lists are not an operating-system boundary for an
+unsandboxed shell.
+
+Choosing Full access asks for confirmation. Switching back to Working directory (default) does
+not. `bell-pr doctor` warns, and does not fail, when Full access is saved and
+when passwordless sudo is available. It tells BELL PR's rule file apart from
+another rule. On Linux it runs `sudo -n true` and uses only the exit code.
+It does not run that command on other platforms, or when sudo is not installed.
+
+The Full access confirmation and its help show:
+
+> "Full access" is off by default. It turns off the OS sandbox and the credential deny rules for roles that write files, so those agents can read `~/.git-credentials` and `~/.ssh` and run `gh`, `git push`, and `curl`. Read-only roles keep their limits. Only the removal of `GH_TOKEN`/`GITHUB_TOKEN` from the environment still applies. Use it only in a throwaway VM or container.
+
+On Linux, the optional sudo control accepts a password to install a validated
+`/etc/sudoers.d/bell-pr-agent` rule granting the user
+account that runs BELL PR `NOPASSWD: ALL`.
+The password is passed to sudo over standard input, never saved or logged, and
+cleared from the input after submission. This grants that account passwordless
+root commands, including to processes outside BELL PR. Three failed password
+attempts block this control for 15 minutes in process memory; restarting clears
+the counter. Removing BELL's rule does not remove privileges from other sudo
+rules. Enabling Full access alone does not install the sudo rule. The control
+is not shown on other platforms, and its API is not registered there.
+
+The sudo panel and the doctor warning for that file show:
+
+> "Passwordless sudo" (Linux only) is off by default. It lets every process under your user account, including the agent, run any command as root without a password and read every file on that machine, including tokens and SSH keys. Use it only in a throwaway VM or container.
 
 ### Limits that apply to every agent
 
@@ -174,12 +224,24 @@ to both CLIs, and `DISABLE_TELEMETRY`, `DISABLE_ERROR_REPORTING`,
   still has a worktree in your repository; until then its runs, new ones
   included, keep working there. Branches those runs already added stay in
   your repository; delete them yourself if you no longer need them.
-- **Hardened Git.** Every Git command runs with hooks, the file-system
-  monitor and the global attributes file switched off, and with BELL PR's
-  own pager, editor, password prompt and SSH command. Logs never verify
-  commit signatures, which would run a signing program. Fetches,
-  `ls-remote` and pushes take credentials from the GitHub CLI only, allow
-  HTTPS and SSH transports only, never follow submodules and never prompt.
+- **Hardened Git.** Every server Git command runs with `--no-pager`,
+  hooks, the file-system monitor and the global attributes file switched
+  off, and with BELL PR's own pager (`GIT_PAGER=cat`), editor, password
+  prompt and SSH command. `core.askPass` is cleared. `GIT_ASKPASS` and
+  `SSH_ASKPASS` are not passed to git. `credential.helper` is cleared and,
+  for a command that talks to GitHub, set to `gh auth git-credential`
+  only. Local and worktree filter, diff, merge and shell-alias drivers
+  are blanked before the command runs, including drivers brought in by
+  `include.path` or `includeIf`. `git diff`, `git show` and `git log` also
+  pass `--no-textconv` and `--no-ext-diff`. A `.gitattributes` file in the
+  checkout can still name a driver; the blanked command is what does not
+  run. Logs never verify commit signatures, which would run a signing
+  program. Fetches, `ls-remote` and pushes take credentials from the
+  GitHub CLI only, allow HTTPS and SSH transports only, never follow
+  submodules and never prompt. Those network commands are the only git
+  children that receive `GH_TOKEN` or `GITHUB_TOKEN`. System git config
+  is not read (`GIT_CONFIG_NOSYSTEM`). Your global `~/.gitconfig` still
+  is, or the file named by `GIT_CONFIG_GLOBAL` when that variable is set.
 - **Repository configuration.** Before a diff is read, a teammate's work is
   integrated or a snapshot taken, a checkout is synced, an agent's moved
   HEAD is put back, or anything is published, BELL PR refuses a repository
@@ -192,9 +254,19 @@ to both CLIs, and `DISABLE_TELEMETRY`, `DISABLE_ERROR_REPORTING`,
   settings above always replace them. Your global and system
   configuration are not checked. A `.gitattributes` file in the project
   can name a driver, but only configuration can define one.
-- **Teammate checkouts.** Before Git runs in a teammate's checkout, its
-  `.git` must be a plain file pointing at `<repository>/worktrees/<name>`,
-  and Git's own record of that worktree must point back at it.
+- **Run checkouts.** When a worktree is created, BELL records its git
+  directory (`gitDir` on the run, and on a teammate task). Every later git
+  command for that checkout passes that path as `--git-dir` and the
+  checkout as `--work-tree`. The checkout's `.git` file is not read.
+  A checkout under `worktrees/` or `team-worktrees/` with no recorded git
+  directory is refused (`worktreeForged`). With Claude Code's sandbox
+  on, writes to `<checkout>/.git` and `<checkout>/.git/**` are denied, so
+  that file cannot be edited or replaced with a directory, and writes to
+  `<clone>/.git/hooks`, `<clone>/.git/config` and the worktree's
+  `config.worktree` are denied as well. Codex sets that same checkout
+  `.git` path and `.git/**` to `read`, which forbids writes and still
+  allows Git to read them. A `deny` rule is not used there, because that
+  would hide the path from Git.
 - **Paths.** Diff paths that are absolute, contain `..` or `.git`, control
   characters, or the segments `__proto__`, `constructor` or `prototype` are
   refused. Conflict files are read and rewritten only when they are regular

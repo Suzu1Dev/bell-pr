@@ -98,7 +98,7 @@ of them. When a turn times out, its message says how long it waited.
 | **Data & privacy** | The data directory, disk use per run and freeing it, automatic cleanup, deleting all data, and what leaves this computer |
 | **About** | The version, and the About dialog with the data directory, the Apache-2.0 license, the notices and the security policy, help links and **Copy diagnostics** |
 
-The model settings (agent, model, reasoning effort, web access) are shared
+The model settings (agent, model, reasoning effort, web access and agent access) are shared
 by every project and saved in `<data dir>/model-settings.json`. Each new
 run records the settings it started with, so later changes do not affect
 runs that already exist. A project's contribution direction, team size,

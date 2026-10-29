@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createElement } from "react";
-import type { DoctorCheck, DoctorReport } from "../../shared/doctor";
+import { doctorCheckIds, type DoctorCheck, type DoctorReport } from "../../shared/doctor";
 import { chooseLocale, saveLocale } from "../i18n/LanguageSwitcher";
 import { assertNoHan, renderEn, renderZh } from "../test-utils/render";
 import { CopyCommand } from "./CopyCommand";
@@ -261,7 +261,7 @@ test("the checklist says it is checking while the first report loads, and report
   assertNoHan(html);
   assert.match(html, /Checking your environment…/);
   assert.match(html, /aria-busy="true"/);
-  assert.equal(html.match(/setup-check-checking/g)?.length, 15);
+  assert.equal(html.match(/setup-check-checking/g)?.length, doctorCheckIds.length);
   assert.doesNotMatch(html, /Not installed|Not ready/);
   assert.match(html, /<button type="button" class="button secondary setup-recheck" disabled="">/);
   const failed = renderEn(

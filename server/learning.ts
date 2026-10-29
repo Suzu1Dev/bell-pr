@@ -1,3 +1,4 @@
+import { assertSessionIdle } from "./session.js";
 /**
  * What helps the person learn from a finished run: explanations of each
  * changed file, follow-up questions to a mentor, their own notes, the
@@ -72,6 +73,7 @@ export async function rerunReview(ctx: WorkbenchContext, id: string) {
   if (run.learnByHand) return reviewAgain(ctx, id);
   if (!["review", "approved"].includes(run.status) || run.publishing)
     throw new AppError((m) => m.run.review.rerunNotAllowed, 409);
+  assertSessionIdle(run);
   if (ctx.reviewJobs.has(id) || ctx.controllers.has(id))
     throw new AppError((m) => m.run.review.rerunRunning, 409);
   // Registering the controller first makes a concurrent request a 409 and
@@ -361,6 +363,7 @@ export async function saveNote(
 ) {
   return ctx.lock(id, async () => {
     const run = ctx.run(id);
+    assertSessionIdle(run);
     if (!readableStatuses.includes(run.status))
       throw new AppError((m) => m.run.review.notesTooEarly, 409);
     const file = (await ctx.diff(id)).find(

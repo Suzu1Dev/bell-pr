@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { z } from "zod";
 import {
+  agentAccessModes,
   agentProviders,
   reasoningEfforts,
   type AgentProvider,
@@ -31,12 +32,14 @@ export const modelSettingsSchema = {
   model: modelId.or(z.literal("")).default(""),
   reasoningEffort: effort.or(z.literal("")).default(""),
   webAccess: z.boolean().optional(),
+  agentAccess: z.enum(agentAccessModes).optional(),
 };
 export const modelExecutionSchema = z.object({
   provider: provider.optional(),
   model: modelId.optional(),
   reasoningEffort: effort.optional(),
   webAccess: z.boolean().optional(),
+  agentAccess: z.enum(agentAccessModes).optional(),
   source: z.enum(["selected", "catalog-default", "cli-default"]),
   // Persisted insights and discovery records are parsed with this schema; unknown keys are stripped.
   reported: z
@@ -334,6 +337,7 @@ export function resolveModelExecution(
     ...(catalog.source === "codex" ? {} : { provider: catalog.source }),
     // Off is the default, so only an enabled flag is recorded on the run.
     ...(selected.webAccess ? { webAccess: true } : {}),
+    ...(selected.agentAccess === "full" ? { agentAccess: selected.agentAccess } : {}),
   };
   const model = selected.model
     ? catalog.models.find((item) => item.id === selected.model)

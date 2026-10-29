@@ -187,7 +187,7 @@ const team = {
   setupNeeds: {
     title: "Setup this machine needs from you",
     intro:
-      "Agents are asked not to change this machine (no sudo, no global or user-level installs), so the checks below did not fully run in this contribution. Each command is an agent's suggestion: check it against the project's documentation before you run it. Once it is installed, you can rerun these checks in the working directory yourself, and later contributions can run them directly.",
+      "The checks below could not finish with the permissions and environment available to the agent. In full-access mode, the agent can attempt required installation first; a password prompt or other unresolved requirement still needs you. Each command is an agent's suggestion: check it against the project's documentation before you run it. Once it is installed, you can rerun these checks in the working directory yourself, and later contributions can run them directly.",
     reportedBy: ({ names }: { names: string }) => `Reported by ${names}`,
     /** Who reported a need: a follow-up round, by its number among the run's rounds. */
     round: ({ number }: { number: number }) => `Follow-up round ${number}`,

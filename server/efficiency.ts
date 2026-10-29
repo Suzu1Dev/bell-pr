@@ -55,6 +55,8 @@ export function applyPonytail(
       ? "Analyze only the supplied excerpts. Do not call tools, inspect other files, execute code, or change files. Preserve exact source quotations and the required output schema."
       : role === "guide" || role === "walkthrough"
         ? "Preserve the requested complete teaching explanation, concrete examples, and design tradeoffs. Do not shorten away information that helps the learner."
+        : role === "session"
+          ? "Complete the person's request and keep the reply, unresolved questions, checks actually run and reasons for checks not run. Preserve the required response schema and evidence."
         : readonly
           ? "Keep this role read-only; do not edit files or execute project code. Give the required evidence and review findings."
           : "Work only within this task's owned file scopes and preserve the required validation evidence.";

@@ -50,6 +50,7 @@ const expandStep = 20;
 export interface DiffViewProps {
   file: DiffFile;
   reviewed: boolean;
+  reviewDisabled?: boolean;
   onReview: () => void;
   onAsk: (question: string) => void;
   view: "unified" | "split";
@@ -98,6 +99,7 @@ const Syntax = memo(function Syntax({ code }: { code: string }) {
 export function DiffView({
   file,
   reviewed,
+  reviewDisabled = false,
   onReview,
   onAsk,
   view,
@@ -566,7 +568,7 @@ export function DiffView({
               type="checkbox"
               checked={reviewed}
               onChange={onReview}
-              disabled={Boolean(file.blocked)}
+              disabled={reviewDisabled || Boolean(file.blocked)}
             />
             <span className="rv-review-check" aria-hidden="true">
               {reviewed && <Check size={11} strokeWidth={3} />}

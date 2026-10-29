@@ -8,7 +8,7 @@
  * roles have no Bash, and Codex brings its own sandbox, so neither needs it.
  */
 import { execFile } from "node:child_process";
-import { constants, readdirSync, readFileSync, realpathSync } from "node:fs";
+import { constants, lstatSync, readdirSync, readFileSync, realpathSync } from "node:fs";
 import { access } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -387,4 +387,49 @@ export function agentSandboxReadPaths(cwd: string) {
     allowRead.push(...open.map((value) => `/${value}`));
   }
   return { denyRead: [...new Set(denyRead)], allowRead: [...new Set(allowRead)] };
+}
+
+/**
+ * Paths a sandboxed agent must not write. Claude Code's
+ * `sandbox.filesystem.denyWrite` takes absolute paths and does not block
+ * reads. The checkout's `.git` pointer is inside the working directory, so
+ * the default write allow would otherwise cover it. Hooks and config live
+ * in the clone's git directory, which these paths name explicitly.
+ */
+export function agentGitWriteDenials(cwd: string): string[] {
+  const dotGit = path.join(cwd, ".git");
+  let metadata;
+  try {
+    metadata = lstatSync(dotGit);
+  } catch {
+    metadata = undefined;
+  }
+  // The path itself and everything under it: editing the file, or replacing
+  // it with a directory and writing inside that directory.
+  const rules: string[] = [dotGit, `${dotGit}/**`];
+  const deny = (target: string) => {
+    rules.push(target);
+    if (!target.endsWith("/**")) rules.push(`${target}/**`);
+  };
+  if (!metadata) return [...new Set(rules)];
+  if (metadata.isFile()) {
+    const pointer = /^gitdir: ([^\r\n]+)/.exec(readFileSync(dotGit, "utf8"))?.[1];
+    if (!pointer) return [...new Set(rules)];
+    const gitDir = path.resolve(cwd, pointer.trim());
+    const common = path.resolve(gitDir, "..", "..");
+    deny(path.join(common, "hooks"));
+    rules.push(path.join(common, "config"));
+    rules.push(path.join(gitDir, "config.worktree"));
+    return [...new Set(rules)];
+  }
+  if (!metadata.isDirectory()) return [];
+  deny(path.join(dotGit, "hooks"));
+  rules.push(path.join(dotGit, "config"));
+  try {
+    for (const name of readdirSync(path.join(dotGit, "worktrees")))
+      rules.push(path.join(dotGit, "worktrees", name, "config.worktree"));
+  } catch {
+    /* No worktrees recorded. */
+  }
+  return [...new Set(rules)];
 }

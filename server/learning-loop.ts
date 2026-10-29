@@ -1,3 +1,4 @@
+import { assertSessionIdle } from "./session.js";
 /**
  * The learning loop after review: feedback tags, the practice deck, the
  * plain counts and the coach debrief.
@@ -137,6 +138,7 @@ export function learningLoopFacade(ctx: WorkbenchContext): LearningLoopFacade {
     recordPractice(runId, input) {
       return ctx.lock(runId, async () => {
         const run = ctx.run(runId);
+        assertSessionIdle(run);
         const at = now();
         const { runs, repos } = ctx.store.data;
         recordPracticeAnswer(run, practiceCandidates(runs, repos, at), input, at);

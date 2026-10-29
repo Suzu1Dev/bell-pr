@@ -5,6 +5,12 @@ import os from "node:os";
 import path from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { setCodexEnabledForTests } from "../shared/codex-switch.js";
+import {
+  fullAccessDisclosure,
+  sudoDisclosure,
+} from "../shared/i18n/disclosures.en.js";
+import { fullAccessDisclosure as fullAccessDisclosureZh } from "../shared/i18n/disclosures.zh-TW.js";
+import { bellSudoersFile } from "../shared/sudo.js";
 import type { DoctorCheck, DoctorReport } from "../shared/doctor.js";
 import {
   claudeAuthDetail,
@@ -57,16 +63,18 @@ async function fakes(t: TestContext, scripts: Record<string, string>) {
   };
 }
 
-const git = (version = "2.45.1", identity = "ok") => `case "$1" in
-  --version) echo "git version ${version}" ;;
-  var) ${
-    identity === "missing"
-      ? `printf 'Author identity unknown\\n\\n*** Please tell me who you are.\\n\\nfatal: unable to auto-detect email address (got "me@host.(none)")\\n' >&2; exit 128`
-      : `echo "Test User <${identity === "ok" ? "test@example.com" : "me@host.example"}> 1760000000 +0000"`
-  } ;;
-  config) ${identity === "ok" ? 'echo "test@example.com"' : "exit 1"} ;;
-  *) exit 1 ;;
-esac`;
+const git = (version = "2.45.1", identity = "ok") => `for arg in "$@"; do
+  case "$arg" in
+    --version) echo "git version ${version}"; exit 0 ;;
+    var) ${
+      identity === "missing"
+        ? `printf 'Author identity unknown\\n\\n*** Please tell me who you are.\\n\\nfatal: unable to auto-detect email address (got "me@host.(none)")\\n' >&2; exit 128`
+        : `echo "Test User <${identity === "ok" ? "test@example.com" : "me@host.example"}> 1760000000 +0000"; exit 0`
+    } ;;
+    config) ${identity === "ok" ? 'echo "test@example.com"; exit 0' : "exit 1"} ;;
+  esac
+done
+exit 1`;
 
 const githubUser = (scopes: string | null) =>
   `printf 'HTTP/2.0 200 OK\\r\\nContent-Type: application/json\\r\\n${
@@ -126,6 +134,7 @@ test("nothing installed: Git and a provider are required, with install fixes", a
     [
       "node", "git", "git-identity", "gh", "gh-auth", "gh-scopes", "codex", "codex-auth",
       "claude", "claude-auth", "claude-sandbox", "provider-ready", "data-dir", "app", "platform",
+      "full-access", "passwordless-sudo",
     ],
   );
   assert.deepEqual(statuses(report), {
@@ -144,6 +153,8 @@ test("nothing installed: Git and a provider are required, with install fixes", a
     "data-dir": "skip",
     app: "ok",
     platform: "ok",
+    "full-access": "ok",
+    "passwordless-sudo": "skip",
   });
   assert.equal(check(report, "git").reason, "missing");
   assert.deepEqual(check(report, "git").fixes, [
@@ -378,7 +389,7 @@ test("a CLI that fails tells its error, offers a reinstall and is told apart fro
       force: true,
       platform: "linux",
       exec: async (executable, args, options) => {
-        if (executable === "git" && args[0] === "--version")
+        if (executable === "git" && args.includes("--version"))
           throw new AppError("git timed out", 504);
         return command(executable, args, options);
       },
@@ -603,6 +614,145 @@ test("the GitHub user answer and the Claude auth JSON are read defensively", () 
     withLocale("zh-TW", () => formatDoctorReport(identity)),
     /\n已就緒：所有必要的檢查都通過了。有些步驟要先修正標示 ✗ 的檢查（Git 身分）才能進行。\n$/,
   );
+});
+
+test("doctor warns for full access and an installed sudoers file, and stays quiet by default", async (t) => {
+  const f = await fakes(t, {
+    git: git(),
+    sudo: `case "$*" in
+  "-n true") exit 0 ;;
+  *) echo "unexpected sudo $*" >> "$0.bad"; exit 99 ;;
+esac`,
+  });
+  const missing = path.join(f.directory, "no-sudoers");
+  const quiet = await withLocale("en", () =>
+    runDoctor({
+      force: true,
+      platform: "linux",
+      sudoersFile: missing,
+      agentAccess: "workspace",
+      sudoRun: async () => 1,
+    }),
+  );
+  assert.equal(check(quiet, "full-access").status, "ok");
+  assert.equal(check(quiet, "full-access").required, false);
+  assert.equal(check(quiet, "passwordless-sudo").status, "ok");
+  assert.equal(check(quiet, "passwordless-sudo").required, false);
+  assert.doesNotMatch(
+    withLocale("en", () => formatDoctorReport(quiet)),
+    /TODO\(B38 disclosure\)/,
+  );
+
+  const full = await withLocale("en", () =>
+    runDoctor({
+      force: true,
+      platform: "linux",
+      sudoersFile: missing,
+      agentAccess: "full",
+      sudoRun: async () => 1,
+    }),
+  );
+  assert.equal(check(full, "full-access").status, "warn");
+  assert.equal(check(full, "full-access").reason, "full");
+  assert.equal(check(full, "full-access").detail, fullAccessDisclosure);
+  assert.equal(check(full, "passwordless-sudo").status, "ok");
+  assert.match(
+    withLocale("en", () => formatDoctorReport(full)),
+    /Full access +"Full access" is off by default\./,
+  );
+
+  const installed = path.join(f.directory, "bell-pr-agent");
+  await writeFile(installed, "# fixture only\nDO-NOT-READ-THIS-FILE\n");
+  const sudo = await withLocale("en", () =>
+    runDoctor({ force: true, platform: "linux", sudoersFile: installed, agentAccess: "workspace" }),
+  );
+  assert.equal(check(sudo, "passwordless-sudo").status, "warn");
+  assert.equal(check(sudo, "passwordless-sudo").reason, "installed");
+  assert.match(check(sudo, "passwordless-sudo").detail ?? "", /BELL PR's passwordless sudo rule is installed/);
+  assert.match(check(sudo, "passwordless-sudo").detail ?? "", /throwaway VM or container/);
+  assert.equal(check(sudo, "full-access").status, "ok");
+  assert.equal(JSON.stringify(sudo).includes("DO-NOT-READ-THIS-FILE"), false);
+  assert.deepEqual(
+    (await f.calls()).filter((line) => line.startsWith("sudo ")),
+    ["sudo -n true"],
+  );
+
+  const dataDir = path.join(f.directory, "data");
+  await mkdir(dataDir);
+  await writeFile(
+    path.join(dataDir, "model-settings.json"),
+    JSON.stringify({ agentAccess: "full", model: "" }),
+  );
+  const fromDisk = await withLocale("en", () =>
+    runDoctor({ force: true, platform: "linux", dataDir, sudoersFile: missing }),
+  );
+  assert.equal(check(fromDisk, "full-access").status, "warn");
+  assert.equal(check(fromDisk, "full-access").detail, fullAccessDisclosure);
+
+  const zh = await withLocale("zh-TW", () =>
+    runDoctor({ force: true, platform: "linux", sudoersFile: installed, agentAccess: "full" }),
+  );
+  assert.equal(check(zh, "full-access").detail, fullAccessDisclosureZh);
+  assert.match(check(zh, "passwordless-sudo").detail ?? "", /已安裝 BELL PR 的免密碼 sudo 規則/);
+  assert.match(check(zh, "passwordless-sudo").detail ?? "", /用完即丟的 VM 或 container/);
+  assert.match(withLocale("zh-TW", () => formatDoctorReport(zh)), /完整權限/);
+  assert.equal(bellSudoersFile, "/etc/sudoers.d/bell-pr-agent");
+  const securityModel = await readFile(new URL("../docs/security-model.md", import.meta.url), "utf8");
+  assert.ok(securityModel.includes(fullAccessDisclosure));
+  assert.ok(securityModel.includes(sudoDisclosure));
+});
+
+test("passwordless sudo warns for BELL's rule and for another rule, and skips when sudo is absent or this is not Linux", async (t) => {
+  const f = await fakes(t, { git: git() });
+  const installed = path.join(f.directory, "bell-pr-agent");
+  await writeFile(installed, "# fixture\nDO-NOT-READ-THIS-FILE\n");
+  const missing = path.join(f.directory, "no-sudoers");
+  const base = { force: true, platform: "linux" as const, agentAccess: "workspace" as const };
+
+  const bell = await withLocale("en", () =>
+    runDoctor({ ...base, sudoersFile: installed, sudoRun: async () => 0 }),
+  );
+  assert.equal(check(bell, "passwordless-sudo").status, "warn");
+  assert.equal(check(bell, "passwordless-sudo").required, false);
+  assert.equal(check(bell, "passwordless-sudo").reason, "installed");
+  assert.match(check(bell, "passwordless-sudo").detail ?? "", /rule is installed/);
+
+  const external = await withLocale("en", () =>
+    runDoctor({ ...base, sudoersFile: missing, sudoRun: async () => 0 }),
+  );
+  assert.equal(check(external, "passwordless-sudo").status, "warn");
+  assert.equal(check(external, "passwordless-sudo").reason, "external");
+  assert.match(check(external, "passwordless-sudo").detail ?? "", /another rule/);
+  assert.match(check(external, "passwordless-sudo").detail ?? "", /throwaway VM or container/);
+
+  const password = await withLocale("en", () =>
+    runDoctor({ ...base, sudoersFile: installed, sudoRun: async () => 1 }),
+  );
+  assert.equal(check(password, "passwordless-sudo").status, "ok");
+  assert.equal(check(password, "passwordless-sudo").reason, undefined);
+
+  const absent = await withLocale("en", () =>
+    runDoctor({ ...base, sudoersFile: installed, sudoRun: async () => "absent" }),
+  );
+  assert.equal(check(absent, "passwordless-sudo").status, "skip");
+  assert.equal(check(absent, "passwordless-sudo").reason, "missing");
+
+  let called = false;
+  const other = await withLocale("en", () =>
+    runDoctor({
+      ...base,
+      platform: "darwin",
+      sudoersFile: installed,
+      sudoRun: async () => {
+        called = true;
+        return 0;
+      },
+    }),
+  );
+  assert.equal(called, false);
+  assert.equal(check(other, "passwordless-sudo").status, "skip");
+  assert.equal(check(other, "passwordless-sudo").reason, "platform");
+  assert.equal(JSON.stringify(bell).includes("DO-NOT-READ-THIS-FILE"), false);
 });
 
 test("Codex turned off is disabled, not a required failure, and a saved Codex choice falls back", async (t) => {

@@ -1,4 +1,5 @@
 import type { DoctorCheckId } from "../../../shared/doctor.js";
+import { fullAccessDisclosure, sudoDisclosure } from "../../../shared/i18n/disclosures.en.js";
 import { formatters, intlLocale } from "../../../shared/i18n/locale.js";
 import { product } from "../../../shared/product.js";
 
@@ -37,6 +38,8 @@ const labels: Record<DoctorCheckId, string> = {
   "data-dir": "Data directory",
   app: product.name,
   platform: "Platform",
+  "full-access": "Full access",
+  "passwordless-sudo": "Passwordless sudo",
 };
 
 /** Environment checks (doctor), setup errors and app settings messages. */
@@ -144,6 +147,10 @@ export default {
       "Not available on this platform, so Claude Code agents cannot edit files.",
     sandboxAllowed:
       "Not available. Claude Code agents may edit files without it because you allowed that; such runs are marked.",
+    fullAccessDisclosure,
+    sudoDisclosure,
+    passwordlessSudoInstalled: `BELL PR's passwordless sudo rule is installed. ${sudoDisclosure}`,
+    passwordlessSudoExternal: `Passwordless sudo is available through another rule. ${sudoDisclosure}`,
     providersReady: ({ providers }: { providers: string[] }) =>
       `Ready: ${fmt.list(providers)}.`,
     noProvider:

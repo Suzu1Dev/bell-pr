@@ -1,3 +1,5 @@
+import { limitationsSection } from "../../shared/limitations";
+import { sessionTurnBlock } from "../session/state";
 import {
   Suspense,
   useEffect,
@@ -47,6 +49,7 @@ import {
 } from "./draftMounts";
 
 interface DraftTabProps {
+  onAddressLimitations?: (section: string) => void;
   run: Run;
   files: DiffFile[];
   demo: boolean;
@@ -144,6 +147,7 @@ export function SamplePublishedCard({ run }: { run: Run }) {
  * contribution guide, draft editor, checklist and feedback.
  */
 export function DraftTab({
+  onAddressLimitations,
   run,
   files,
   demo,
@@ -162,6 +166,8 @@ export function DraftTab({
   records,
 }: DraftTabProps) {
   const t = useT("workspace");
+  const sessionMessages = useT("session");
+  const sessionRunning = !!run.session?.running;
   const optional = useT("common").optional;
   const fmt = useFormat();
   // The run's own branch is shown as code inside the help sentence.
@@ -199,6 +205,8 @@ export function DraftTab({
     loadPublishChecks,
   } = draft;
   const { feedbackLoading, fetchPrFeedback } = actions;
+  const draftLimitations = limitationsSection(draftBody ?? "");
+  const sessionBlock = sessionTurnBlock(run, sessionMessages.blocks);
   // The guide lists the checks publishing runs on the saved draft, with
   // the ones only the server can make (this computer's folders, changed CI
   // files, the commit e-mail), read again whenever the saved draft changes.
@@ -238,7 +246,7 @@ export function DraftTab({
   const sync = !demo && !!run.baseSha && (
     <SyncPanel
       run={run}
-      busy={busy}
+      busy={busy || sessionRunning}
       onSync={() => void syncToLatest()}
       onResolve={() => void resolveSyncConflicts()}
       onUndo={() => void undoSync()}
@@ -298,7 +306,7 @@ export function DraftTab({
             )}
           {!followUp && (
             <Deferred resetKey={run.id}>
-              <YourWords run={run} record={record} body={draftBody} onInsert={setDraftBody} disabled={run.status === "published"} />
+              <YourWords run={run} record={record} body={draftBody} onInsert={setDraftBody} disabled={sessionRunning || run.status === "published"} />
             </Deferred>
           )}
           <label className="field-label" htmlFor="pr-title">
@@ -309,7 +317,7 @@ export function DraftTab({
             className="text-input draft-title"
             value={draftTitle}
             onChange={(e) => setDraftTitle(e.target.value)}
-            disabled={run.status === "published" || !!followUp}
+            disabled={sessionRunning || run.status === "published" || !!followUp}
           />
           <div className="editor-toolbar">
             <div role="group" aria-label={t.draft.modeLabel}>
@@ -344,8 +352,17 @@ export function DraftTab({
               aria-label={t.draft.bodyLabel}
               value={draftBody}
               onChange={(e) => setDraftBody(e.target.value)}
-              disabled={run.status === "published" || !!followUp}
+              disabled={sessionRunning || run.status === "published" || !!followUp}
             />
+          )}
+          {!demo && !run.learnByHand && draftLimitations && onAddressLimitations && (
+            <div className="session-limitations">
+              <p className="field-help">{sessionMessages.limitationsNotice}</p>
+              <button type="button" className="button secondary" disabled={busy || !!sessionBlock}
+                title={sessionBlock} onClick={() => onAddressLimitations(draftLimitations)}>
+                {sessionMessages.limitationsAction}
+              </button>
+            </div>
           )}
           <label
             className="field-label"
@@ -367,7 +384,7 @@ export function DraftTab({
             onChange={(e) =>
               setDraftCommitMessage(e.target.value)
             }
-            disabled={run.status === "published"}
+            disabled={sessionRunning || run.status === "published"}
           />
           <p id="pr-commit-message-help" className="field-help">
             {followUp ? t.draft.commitHelpRound : t.draft.commitHelp}
@@ -388,7 +405,7 @@ export function DraftTab({
             aria-invalid={publishBranchInvalid}
             onChange={(e) => setDraftPublishBranch(e.target.value)}
             disabled={
-              run.status === "published" ||
+              sessionRunning || run.status === "published" ||
               !!run.publishedBranch ||
               !!followUp
             }
@@ -416,7 +433,7 @@ export function DraftTab({
                 <button
                   type="button"
                   className="button secondary"
-                  disabled={run.status === "published"}
+                  disabled={sessionRunning || run.status === "published"}
                   onClick={applyCommitMessageSuggestion}
                 >
                   {t.draft.useSuggestion}
@@ -431,7 +448,7 @@ export function DraftTab({
             <button
               className="button primary"
               disabled={
-                busy || !draftDirty || run.status === "published"
+                busy || sessionRunning || !draftDirty || run.status === "published"
               }
               onClick={saveDraft}
             >
@@ -543,7 +560,7 @@ export function DraftTab({
           {draftTaskGroups.length > 0 && (
             <fieldset
               className="draft-task-items"
-              disabled={run.status === "published" || busy}
+              disabled={sessionRunning || run.status === "published" || busy}
             >
               <legend>{t.checklist.taskItems}</legend>
               <p>{t.checklist.taskItemsHelp}</p>

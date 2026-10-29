@@ -354,3 +354,15 @@ test("webAccess is optional in the shared settings and recorded on the execution
   assert.deepEqual(modelExecutionSchema.parse(execution), execution);
   assert.deepEqual(modelArguments(execution), ["--model", "codex-example"]);
 });
+
+test("full access is optional, validated and recorded only when explicitly selected", () => {
+  assert.deepEqual(z.object(modelSettingsSchema).parse({ agentAccess: "full" }), {
+    model: "", reasoningEffort: "", agentAccess: "full",
+  });
+  assert.throws(() => z.object(modelSettingsSchema).parse({ agentAccess: "root" }));
+  const execution = resolveModelExecution({ agentAccess: "full" }, catalog);
+  assert.equal(execution.agentAccess, "full");
+  assert.deepEqual(modelExecutionSchema.parse(execution), execution);
+  assert.equal(resolveModelExecution({ agentAccess: "workspace" }, catalog).agentAccess, undefined);
+  assert.equal(resolveModelExecution({}, catalog).agentAccess, undefined);
+});
