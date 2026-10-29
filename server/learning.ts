@@ -15,6 +15,7 @@ import path from "node:path";
 import { assertRunAgentAllowed } from "./codex-guard.js";
 import { command, redact } from "./process.js";
 import { baseFileLines, parseGitHubSource, readDiff } from "./git.js";
+import { reviewBaseSha } from "../shared/followups.js";
 import {
   conversationContentLimit,
   conversationMessageLimit,
@@ -337,7 +338,7 @@ export async function contextLines(
 ) {
   return ctx.lock(id, async () => {
     const run = ctx.run(id);
-    if (run.baseSha !== baseSha)
+    if (reviewBaseSha(run) !== baseSha)
       throw new AppError((m) => m.run.context.baseMoved, 409);
     const file = (await readDiff(run)).find((entry) => entry.path === filePath);
     if (!file) throw new AppError((m) => m.run.review.fileNotFound, 404);
@@ -346,7 +347,7 @@ export async function contextLines(
       throw new AppError((m) => m.run.context.stale, 409);
     if (file.status !== "modified")
       throw new AppError((m) => m.run.context.wholeFile, 409);
-    return { lines: await baseFileLines(run, filePath) };
+    return { lines: await baseFileLines({ ...run, baseSha }, filePath) };
   });
 }
 

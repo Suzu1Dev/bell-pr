@@ -216,6 +216,13 @@ the project requires it or you choose to, and publishing waits until a
 disclosure the project requires is there. Publishing pushes a branch (to
 your fork when needed) and opens a **Draft** PR through the GitHub CLI;
 nothing is ever force-pushed.
+An existing fork must belong to the target project before BELL PR pushes to it.
+
+If an earlier attempt created a local commit but stopped before pushing,
+**Recover unfinished publish** on the Draft tab checks GitHub and returns
+the contribution to review, keeping your files and draft. Review and approve
+it again before submitting. Recovery stops if a matching branch or PR exists,
+or GitHub cannot be checked.
 
 ![The PR draft tab: the pull request title and description editor, with what is left to do before you submit beside it](docs/images/en/run-draft-1280.png)
 
@@ -262,6 +269,10 @@ compare them with what you predicted, and tag what each comment raised and
 whether you saw it coming. Then let an agent address selected comments in a
 follow-up round, after you restate each one in your own words; you review
 the round and push it as one more commit.
+The code review shows that round's edits against the previous PR version.
+Use the selector in the code toolbar to view the initial submission, a published round,
+or all changes together. Historical and cumulative views are read-only;
+return to the current round to mark files reviewed and approve it.
 **Commit history** lists every commit of the pull request, from the first
 push to review rounds, syncs and commits made on GitHub, each opening to
 its files' diffs.

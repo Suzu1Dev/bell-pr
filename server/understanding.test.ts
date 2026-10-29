@@ -328,6 +328,10 @@ test("an open follow-up round asks only about the files the round changed", asyn
     ["fallback:src/a.ts", "untested"],
   );
   await passCheck(f);
+  await git(f.repository, ["add", "--", "src/a.ts", "src/b.ts"]);
+  await git(f.repository, ["commit", "-m", "Add numbered constants"]);
+  const firstCommit = (await git(f.repository, ["rev-parse", "HEAD"])).stdout.trim();
+  f.run.publishCommit = firstCommit;
   // The published PR gets a round: the agent changed b.ts only.
   f.run.followUps = [
     {
@@ -336,10 +340,11 @@ test("an open follow-up round asks only about the files the round changed", asyn
       feedbackUrls: [],
       note: "Name the constants.",
       status: "review",
-      parentCommit: f.baseSha,
+      parentCommit: firstCommit,
     },
   ];
   await f.write("src/b.ts", lines("bee", 30));
+  assert.deepEqual((await readDiff(f.run)).map((file) => file.path), ["src/b.ts"]);
   await f.reviewAll();
   const round = await f.workbench.understanding.status(f.run.id);
   assert.deepEqual(round.plan.map((item) => item.id), ["fallback:src/b.ts", "untested"]);

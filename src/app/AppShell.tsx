@@ -474,9 +474,34 @@ function AppShell({
   const [modal, setModal] = useState<ModalName>(initialModal);
   const exploreRepoId = route?.name === "repo" ? route.repoId : undefined;
   const settingsRequest = useRef(0);
-  const [showFiles, setShowFiles] = useState(true);
-  const [showExplanation, setShowExplanation] = useState(true);
-  const [focusMode, setFocusMode] = useState(false);
+  const [panes, setPanes] = useState<{
+    files: boolean;
+    explanation: boolean;
+    beforeFocus?: { files: boolean; explanation: boolean };
+  }>({ files: true, explanation: true });
+  const { files: showFiles, explanation: showExplanation } = panes;
+  const focusMode = !!panes.beforeFocus;
+  const setShowFiles = useCallback((value: SetStateAction<boolean>) => {
+    setPanes((previous) => ({ ...previous,
+      files: typeof value === "function" ? value(previous.files) : value,
+    }));
+  }, []);
+  const setShowExplanation = useCallback((value: SetStateAction<boolean>) => {
+    setPanes((previous) => ({ ...previous,
+      explanation: typeof value === "function" ? value(previous.explanation) : value,
+    }));
+  }, []);
+  const setFocusMode = useCallback((value: SetStateAction<boolean>) => {
+    setPanes((previous) => {
+      const focused = !!previous.beforeFocus;
+      const next = typeof value === "function" ? value(focused) : value;
+      if (next === focused) return previous;
+      // Focus starts with just the code, while its pane buttons remain usable.
+      return next ? { files: false, explanation: false,
+        beforeFocus: { files: previous.files, explanation: previous.explanation },
+      } : previous.beforeFocus ?? previous;
+    });
+  }, []);
   const [codeFont, setCodeFont] = useState(() => {
     try {
       return Number(localStorage.getItem("bellpr-code-font")) || 14;
@@ -622,7 +647,7 @@ function AppShell({
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [modal, commandOpen]);
+  }, [modal, commandOpen, setFocusMode]);
   useEffect(() => {
     // Errors stay until the reader closes them; success notices fade out.
     if (!toast || toast.tone === "error") return;

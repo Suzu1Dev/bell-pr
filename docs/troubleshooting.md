@@ -21,10 +21,33 @@ Contents:
 
 - [I lost the address](#i-lost-the-address)
 - [Error codes](#error-codes), one section per code
+- [An earlier publish made a different commit](#an-earlier-publish-made-a-different-commit)
 - [Publishing was blocked by a project rule, an issue or pacing](#publishing-was-blocked-by-a-project-rule-an-issue-or-pacing)
 - [BELL PR does not start](#bell-pr-does-not-start)
 - [Runs that wait, stop or cannot be reviewed](#runs-that-wait-stop-or-cannot-be-reviewed)
 - [Collecting details for a support request](#collecting-details-for-a-support-request)
+
+## An earlier publish made a different commit
+
+If a publish failed and you have not changed the code or commit message,
+retry **Submit Draft PR** after resolving the error. BELL PR reuses the saved
+commit; recovery is needed when that commit no longer matches your changes.
+
+A failed publish can leave a local commit. If you later change the files or
+commit message, retrying cannot reuse that commit. On the **Draft** tab, save
+your edits and choose **Recover unfinished publish**. This option appears
+only for attempts that stopped before pushing began.
+
+Recovery checks the project and your signed-in account's fork for matching
+branches, and checks the project for matching PRs in any state. If no branch
+or PR exists, it backs up the old commit locally, keeps your files and draft,
+and returns the contribution to review. Review and approve it again, then
+submit the Draft PR as usual.
+
+If GitHub cannot be checked, fix the connection or sign-in and try recovery
+again. If a branch or PR already exists, recovery leaves everything unchanged;
+check that branch or PR on GitHub. Attempts where pushing may have begun
+cannot use this recovery action.
 
 ## I lost the address
 

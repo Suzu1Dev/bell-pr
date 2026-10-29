@@ -246,6 +246,11 @@ Performance** allows (1 to 8, 2 by default); the others wait in the queue.
 
 ## 5. Review every change
 
+The code toolbar's focus button expands the reading area and initially hides
+both side panels. Its file-list and explanation buttons still open or close
+each panel. Leaving focus mode with the button or Escape restores the panel
+layout from before you entered it.
+
 Before publishing an agent contribution, the **Collaborate** tab lets you ask
 an agent to finish missing checks, add tests or fix failures in the run's working
 copy. The draft's Limitations shortcut fills the message box for you to review
@@ -516,6 +521,16 @@ and safety. When the dialog opens, BELL PR reads the GitHub facts once.
 (to a fork under your account when you cannot push to the project) and
 opens a Draft PR. Nothing is ever force-pushed.
 
+If a failed attempt left a local commit and you then changed the files or
+commit message, save the draft and choose **Recover unfinished publish** on
+the Draft tab. This is available only when that attempt stopped before
+pushing began. BELL PR checks the project and your fork for matching branches
+and PRs, including closed PRs. If those checks succeed and find none, it
+keeps your files and draft, backs up the old commit locally and returns the
+contribution to review. Review and approve again before submitting. Recovery
+does not publish anything; if a branch or PR exists, or the checks cannot
+finish, it leaves the contribution unchanged.
+
 ## 8. After publishing
 
 - **Sync to the latest target branch** when the project moved on: BELL PR
@@ -540,6 +555,16 @@ opens a Draft PR. Nothing is ever force-pushed.
   maintainer's comment only as context, then changes the code. You review
   each file, explain the round back (while the understanding check is on),
   and push the round as one new commit to the same PR.
+- **Choose which changes to read**: the Changes tab defaults to the current
+  feedback round, compared with the previous PR head. Files unchanged in
+  that round do not need another review, and reverting an earlier edit or
+  deleting a file added in the PR appears in this round's diff. The selector in the code toolbar
+  also offers the initial submission, each published round and the cumulative
+  PR changes. Those views are read-only and do not alter the current round's
+  review marks or approval; return to the current round to review and approve.
+  Failed or discarded rounds have no published snapshot to select. A sync
+  with the target branch keeps its existing review against the updated target;
+  published syncs can also be inspected separately.
 - **Commit history**: the tab lists every commit of the pull request,
   oldest first, labelled by where it came from (the first push, a review
   round, a sync with the target branch, a commit taken over from GitHub),
