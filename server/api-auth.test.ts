@@ -292,16 +292,20 @@ test("the server listens on 127.0.0.1 unless --host says otherwise, and warns th
   const exposedDir = await mkdtemp(path.join(tmpdir(), "bell-api-exposed-"));
   const exposedPort = await freePort();
   const exposed: string[] = [];
+  const warnings: string[] = [];
   const wide = await startServer({
     config: resolveConfig({ port: exposedPort, host: "0.0.0.0", dataDir: exposedDir }, {}),
     handleExit: false,
     print: (line) => exposed.push(line),
+    warn: (line) => warnings.push(line),
   });
   try {
     assert.equal((wide.server.address() as AddressInfo).address, "0.0.0.0");
-    assert.ok(exposed.some((line) => line.includes("0.0.0.0")));
+    // Wildcard bind without PUBLIC_URL warns on stderr (not the startup print line).
+    assert.ok(warnings.some((line) => line.includes("0.0.0.0") && line.includes("BELLPR_PUBLIC_URL")));
     const token = readApiToken(dataPaths(exposedDir).apiToken)!;
     assert.equal(exposed.some((line) => line.includes(token)), false);
+    assert.equal(warnings.some((line) => line.includes(token)), false);
   } finally {
     await wide.shutdown();
     await rm(directory, { recursive: true, force: true });
