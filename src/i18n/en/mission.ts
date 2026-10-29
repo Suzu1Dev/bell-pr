@@ -402,6 +402,7 @@ const mission = {
         missing: "not installed",
         broken: "not working",
         "signed-out": "not signed in",
+        disabled: "turned off",
       } satisfies Record<ProviderState, string>,
       model: "Model",
       providerDefault: ({ provider, model }: { provider: string; model?: string }) =>

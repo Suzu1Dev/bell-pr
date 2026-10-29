@@ -133,7 +133,7 @@ Failed subtasks can be retried.
 Before it plans, the Lead checks any assumption the request states against
 the code, and every role is told the verdict. The brief shows it, and once
 the run is finished you can check it again, also on a run made before
-these checks. With default **Workspace** access, agents are told not to change
+these checks. With default **Working directory (default)** access, agents are told not to change
 your machine: no `sudo` and no global installs. When a check needs something
 the machine lacks, the overview lists it with a suggested command, for you
 to verify and run yourself. Explicit **Full access** in model settings lets
@@ -209,8 +209,8 @@ another, the confirm before publishing lists them, and **Split into
 contributions** on the Draft tab can turn each part into its own contribution,
 by file. A part is a group of files, not always one fix, so check the grouping.
 
-It checks the text before anything is sent: credentials and unfinished
-placeholders block it, and a local path, a CI change or a public commit
+It checks the text before anything is sent. Blocks common token formats and private keys before publishing.
+Unfinished placeholders block it, and a local path, a CI change or a public commit
 e-mail address needs your confirmation. AI assistance is mentioned only if
 the project requires it or you choose to, and publishing waits until a
 disclosure the project requires is there. Publishing pushes a branch (to
@@ -338,15 +338,13 @@ Details: [Privacy and your data](docs/privacy-and-data.md).
 
 ## Security model
 
-- **Sandboxed agents.** Agents that write code run in their CLI's
-  operating-system sandbox: writes stay in the run's own worktree and the
-  network is closed. Claude Code agents are also denied your SSH keys, the
-  GitHub CLI's sign-in and BELL PR's own data; Codex's sandbox does not
-  limit reading.
+- **Sandboxed agents.** In the default Working directory mode, agents that write code run in their CLI's operating-system sandbox: writes stay in the run's own worktree and the network is closed. Claude Code is denied the GitHub CLI config files, `~/.git-credentials` and credential-store files, `~/.netrc`, and `~/.ssh/`. `GH_TOKEN`/`GITHUB_TOKEN` are removed from the agent's environment. Tokens in your system keyring are not covered: the agent can still read your GitHub token via `gh auth token`. Your main protection is a fine-grained token with the minimum permissions you need. Claude Code is also denied BELL PR's own data outside its checkout. "Full access" is off by default. It turns off the OS sandbox and the credential deny rules for roles that write files, so those agents can read `~/.git-credentials` and `~/.ssh` and run `gh`, `git push`, and `curl`. Read-only roles keep their limits. Only the removal of `GH_TOKEN`/`GITHUB_TOKEN` from the environment still applies. "Passwordless sudo" (Linux only) is off by default. It lets every process under your user account, including the agent, run any command as root without a password and read every file on that machine, including tokens and SSH keys. Use either only in a throwaway VM or container.
 - **Imported projects are untrusted.** Their code, documents and agent
   instructions (`AGENTS.md`, `CLAUDE.md`, `.claude/`) are treated as data:
   the CLIs never load the project's own settings, hooks or instructions,
   and a repository whose Git configuration could run programs is refused.
+  Git commands BELL PR itself runs also turn those programs off. Only a
+  git command that talks to GitHub receives `GH_TOKEN`.
   Agents still run the project's code, so import only projects you are
   willing to run on this computer.
 - **No sign-in.** BELL PR does not authenticate anyone. It listens on

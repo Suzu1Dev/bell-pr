@@ -40,6 +40,7 @@ const m: Translation<typeof en> = {
     signedOut: "尚未登入",
     missing: "尚未安裝",
     notWorking: "無法使用",
+    disabled: "已停用",
     connected: "已連線",
   },
   general: {

@@ -292,8 +292,7 @@ export default {
         "This new file is larger than 512 KB; review it by hand or split it.",
       binary:
         "Binary files need a separate manual review and cannot be published through this workflow.",
-      credentials:
-        "The change looks like it contains credentials, so its content is hidden; remove them and review it again.",
+      credentials: "Blocks common token formats and private keys before publishing.",
     },
     /** Shown in place of a held-back file's patch. */
     heldBack: ({ reason }: { reason: string }) =>
@@ -306,8 +305,7 @@ export default {
     tooLarge:
       "The file is larger than 512 KB, so the code around its changes cannot be shown.",
     binary: "A binary file has no code to show around its changes.",
-    credentials:
-      "The file looks like it contains credentials, so the code around its changes is not shown.",
+    credentials: "Blocks common token formats and private keys before publishing.",
     blocked:
       "This file cannot be reviewed right now, so the code around its changes is not shown either.",
     stale: "The file's changes were updated; refresh the changes.",
@@ -322,7 +320,7 @@ export default {
     sensitive: "A sensitive file or build artifact; its content is not shown.",
     binary: "A binary file; its content is not shown.",
     tooLarge: "The change is larger than 600 KB; its content is not shown.",
-    credentials: "The change looks like it contains credentials; its content is not shown.",
+    credentials: "Blocks common token formats and private keys before publishing.",
   },
   /** Checking the request's assumption again on a finished run. */
   premise: {

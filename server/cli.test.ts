@@ -375,12 +375,14 @@ async function withStandInClis<T>(
   });
 }
 
-const standInGit = `case "$1" in
-  --version) echo "git version 2.45.1" ;;
-  var) echo "Test User <test@example.com> 1760000000 +0000" ;;
-  config) echo "test@example.com" ;;
-  *) exit 1 ;;
-esac`;
+const standInGit = `for arg in "$@"; do
+  case "$arg" in
+    --version) echo "git version 2.45.1"; exit 0 ;;
+    var) echo "Test User <test@example.com> 1760000000 +0000"; exit 0 ;;
+    config) echo "test@example.com"; exit 0 ;;
+  esac
+done
+exit 1`;
 
 test("bell-pr doctor exits 1 when no provider is ready and prints the fix commands", async () => {
   await withStandInClis({ git: standInGit }, async (directory) => {

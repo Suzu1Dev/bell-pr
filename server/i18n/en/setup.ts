@@ -1,4 +1,5 @@
 import type { DoctorCheckId } from "../../../shared/doctor.js";
+import { fullAccessDisclosure, sudoDisclosure } from "../../../shared/i18n/disclosures.en.js";
 import { formatters, intlLocale } from "../../../shared/i18n/locale.js";
 import { product } from "../../../shared/product.js";
 
@@ -37,6 +38,8 @@ const labels: Record<DoctorCheckId, string> = {
   "data-dir": "Data directory",
   app: product.name,
   platform: "Platform",
+  "full-access": "Full access",
+  "passwordless-sudo": "Passwordless sudo",
 };
 
 /** Environment checks (doctor), setup errors and app settings messages. */
@@ -144,12 +147,21 @@ export default {
       "Not available on this platform, so Claude Code agents cannot edit files.",
     sandboxAllowed:
       "Not available. Claude Code agents may edit files without it because you allowed that; such runs are marked.",
+    fullAccessDisclosure,
+    sudoDisclosure,
+    passwordlessSudoInstalled: `BELL PR's passwordless sudo rule is installed. ${sudoDisclosure}`,
+    passwordlessSudoExternal: `Passwordless sudo is available through another rule. ${sudoDisclosure}`,
     providersReady: ({ providers }: { providers: string[] }) =>
       `Ready: ${fmt.list(providers)}.`,
     noProvider:
       `Install and sign in to the Codex CLI or Claude Code: ${product.name} needs at least one.`,
     savedProviderNotReady: ({ provider }: { provider: string }) =>
       `${provider} is chosen in the model settings but is not ready.`,
+    /** Codex when the release switch `codexEnabled` is false. Not a failure. */
+    codexDisabled: "Disabled. Codex is turned off in this build.",
+    /** Only Codex is installed, and the release switch leaves it off. */
+    claudeOnlyRelease: "Claude Code only in 1.0.0; Codex support is disabled",
+    installClaudeCode: "Please install Claude Code.",
     dataDirReady: ({ free }: { free: number }) => `Writable, ${size(free)} free.`,
     dataDirWritable: "Writable.",
     dataDirNew: "Will be created at the first start.",

@@ -21,6 +21,7 @@ import { tasteDimensions, understandingWords } from "../shared/understanding.js"
 import { currentLocale, shuttingDown } from "./i18n/index.js";
 import { redact } from "./process.js";
 import { coachPrompt, type CoachRecord } from "./prompts/coach.js";
+import { assertRunAgentAllowed } from "./codex-guard.js";
 import { runAgent } from "./run-executor.js";
 import { parseAgentOutput } from "./run-events.js";
 import { jsonText } from "./team.js";
@@ -357,6 +358,7 @@ export async function writeDebrief(
   const read = coachRecords(ctx.store.data.runs, repoId);
   if (!read.runs.length)
     throw new AppError((m) => m.understanding.debriefNoRecords, 422);
+  assertRunAgentAllowed({ modelExecution: read.runs[0].modelExecution });
   running.add(repoId);
   const work = (async () => {
     const controller = new AbortController();

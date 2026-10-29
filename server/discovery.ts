@@ -36,6 +36,7 @@ import {
   retryTransientAuth,
   type TransientSleep,
 } from "./agent-cli.js";
+import { assertCodexProviderAllowed } from "./codex-guard.js";
 import {
   getModelCatalog,
   modelExecutionSchema,
@@ -565,6 +566,7 @@ export class DiscoveryService {
   }
   async start(input: unknown): Promise<{ job: DiscoveryJob }> {
     const preferences = discoveryPreferencesSchema.parse(input);
+    assertCodexProviderAllowed(preferences.provider ?? "codex");
     await this.initialize();
     const completing = this.active;
     if (completing && this.job?.status !== "running") await completing.finished;

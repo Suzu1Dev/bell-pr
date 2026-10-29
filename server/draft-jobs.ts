@@ -26,6 +26,7 @@ import { AppError, type Run } from "./types.js";
 import { sameDraftProse } from "../shared/draft-checks.js";
 import { activeFollowUp } from "../shared/followups.js";
 import { editable } from "./publish.js";
+import { assertRunAgentAllowed } from "./codex-guard.js";
 import { runAgent } from "./run-executor.js";
 import { parseAgentOutput } from "./run-events.js";
 import type { WorkbenchContext } from "./workbench.js";
@@ -53,6 +54,7 @@ export async function prepareRunDraft(
   options: DraftOptions = {},
 ) {
   if (ctx.stopping()) throw new AppError(shuttingDown(), 503);
+  assertRunAgentAllowed(ctx.run(id));
   // Learn by hand: the pull request text is the person's own (DESIGN v1.2 F11).
   if (ctx.run(id).learnByHand)
     throw new AppError((m) => m.byHand.flow.draftRefused, 409);

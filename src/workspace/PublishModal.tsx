@@ -1,5 +1,4 @@
 import {
-  Suspense,
   useCallback,
   useEffect,
   useMemo,
@@ -19,6 +18,7 @@ import {
   RefreshCw,
   UserRound,
 } from "lucide-react";
+import { outgoingPublishText } from "../../shared/publish-payload";
 import type { ContributionFacts } from "../../shared/contribution";
 import type { DoctorReport } from "../../shared/doctor";
 import type { DraftCheck } from "../../shared/draft-checks";
@@ -28,7 +28,6 @@ import { useLocale, useT } from "../i18n";
 import { navigate } from "../navigation/route";
 import type { DiffFile, Repo, Run, RunSummary } from "../types";
 import type { Tab } from "../app/AppShell";
-import { ErrorBoundary } from "../app/ErrorBoundary";
 import type { DraftEditor } from "../app/hooks/useDraftEditor";
 import { useCheckSettings } from "../app/hooks/useUnderstanding";
 import { usePresentation } from "../app/presentation";
@@ -40,7 +39,7 @@ import {
 } from "../setup/ReadinessNotice";
 import { useDoctor, type DoctorState } from "../setup/useDoctor";
 import { useRulesRecheck } from "../draft/rulesRecheck";
-import { ByHandRecord, Deferred, MarkdownContent } from "./draftMounts";
+import { ByHandRecord, Deferred } from "./draftMounts";
 
 /** Publishing commits with the Git identity and pushes with the GitHub CLI. */
 const publishRequirements: readonly Requirement[] = ["git-identity", "gh"];
@@ -209,6 +208,39 @@ interface PublishModalProps {
   setTab: Dispatch<SetStateAction<Tab>>;
   /** A useDoctor() state to share; the dialog loads its own otherwise. */
   doctor?: DoctorState;
+}
+
+/**
+ * Title, commit message and PR body exactly as publish() sends them.
+ * The commit `<pre>` keeps `.publish-commit-preview` for the follow-up check.
+ */
+export function OutgoingText({
+  run,
+  followUp,
+  demo,
+}: {
+  run: Run;
+  followUp: boolean;
+  demo: boolean;
+}) {
+  const t = useT("workspace").publish;
+  const text = outgoingPublishText(run.draft, followUp);
+  return (
+    <div className="publish-outgoing">
+      <div>
+        <strong>{demo ? t.titlePreviewDemo : t.titlePreview}</strong>
+        <pre>{text.title}</pre>
+      </div>
+      <div className="publish-commit-preview">
+        <strong>{demo ? t.commitPreviewDemo : t.commitPreview}</strong>
+        <pre>{text.commitMessage}</pre>
+      </div>
+      <div className="publish-body-preview">
+        <strong>{demo ? t.bodyPreviewDemo : t.bodyPreview}</strong>
+        <pre>{text.body}</pre>
+      </div>
+    </div>
+  );
 }
 
 /**
@@ -417,38 +449,7 @@ export function PublishModal({
         doctor={doctor}
         maskUser={presentation.maskUser}
       />
-      {!demo && followUp && (
-        <div className="publish-commit-preview">
-          <strong>{t.commitPreview}</strong>
-          <pre>{run.draft.commitMessage}</pre>
-        </div>
-      )}
-      {!followUp && (
-        <details className="publish-body-preview" open>
-          <summary>
-            {draftChecks
-              ? (demo ? t.bodyPreviewDemoWords : t.bodyPreviewWords)({
-                  count: draftChecks.draftProseWords(run.draft.body),
-                })
-              : demo
-                ? t.bodyPreviewDemo
-                : t.bodyPreview}
-          </summary>
-          {/* It scrolls when long, so a keyboard can reach and scroll it. */}
-          <div
-            className="markdown-preview"
-            role="region"
-            aria-label={demo ? t.bodyPreviewDemo : t.bodyPreview}
-            tabIndex={0}
-          >
-            <ErrorBoundary>
-              <Suspense fallback={<p>{workspace.loadingPreview}</p>}>
-                <MarkdownContent>{run.draft.body}</MarkdownContent>
-              </Suspense>
-            </ErrorBoundary>
-          </div>
-        </details>
-      )}
+      <OutgoingText run={run} followUp={!!followUp} demo={demo} />
       {!followUp && (
         <PublishChecks
           checks={checks}

@@ -364,4 +364,5 @@ test("full access is optional, validated and recorded only when explicitly selec
   assert.equal(execution.agentAccess, "full");
   assert.deepEqual(modelExecutionSchema.parse(execution), execution);
   assert.equal(resolveModelExecution({ agentAccess: "workspace" }, catalog).agentAccess, undefined);
+  assert.equal(resolveModelExecution({}, catalog).agentAccess, undefined);
 });

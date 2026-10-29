@@ -1,4 +1,5 @@
 import test from "node:test";
+import { codexAccessMode } from "./agent-cli.js";
 import assert from "node:assert/strict";
 import { once } from "node:events";
 import { request } from "node:http";
@@ -314,7 +315,7 @@ test("analysis uses bounded read-only structured Codex context and excludes secr
       ]);
       assert.match(options.input!, /source\.tree .* only proves those paths exist/);
       assert.notEqual(options.cwd, f.repository);
-      assert.equal(args[args.indexOf("--sandbox") + 1], "read-only");
+      assert.equal(codexAccessMode(args), "read-only");
       assert.ok(args.includes("--ignore-user-config"));
       assert.ok(args.includes("--skip-git-repo-check"));
       assert.equal(options.timeoutMs, 240_000);
@@ -1536,7 +1537,7 @@ test("more recommendations request five new proposals per call, append atomicall
       if (beforeBatch)
         assert.deepEqual((await service.get(f.repo.id)).insights, beforeBatch);
       if (inspect) {
-        assert.equal(args[args.indexOf("--sandbox") + 1], "read-only");
+        assert.equal(codexAccessMode(args), "read-only");
         assert.ok(args.includes("--ignore-user-config"));
         assert.ok(args.includes('approval_policy="never"'));
         assert.notEqual(options.cwd, f.repository);

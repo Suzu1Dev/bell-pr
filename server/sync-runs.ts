@@ -31,6 +31,7 @@ import {
   restoreAgentHead,
   worktreeDirty,
 } from "./pr-branch.js";
+import { assertRunAgentAllowed } from "./codex-guard.js";
 import { runAgent } from "./run-executor.js";
 import { contributionContext } from "./prompts/team.js";
 import { conflictPrompt } from "./prompts/sync.js";
@@ -370,6 +371,7 @@ export async function resolveConflicts(ctx: WorkbenchContext, id: string) {
   if (ctx.stopping()) throw new AppError(shuttingDown(), 503);
   return ctx.lock(id, async () => {
     const run = ctx.run(id);
+    assertRunAgentAllowed(run);
     // No conflict agent in Learn by hand: the person resolves the markers.
     if (run.learnByHand) throw new AppError((m) => m.byHand.resolveByHand, 409);
     const target = conflictHolder(run);

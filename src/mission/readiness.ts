@@ -9,7 +9,7 @@ import type { AgentProvider } from "../../shared/models";
 import type { Readiness } from "../setup/ReadinessNotice";
 
 /** ready, or why not: the CLI is missing, fails, or is not signed in. */
-export type ProviderState = "ready" | "missing" | "broken" | "signed-out";
+export type ProviderState = "ready" | "missing" | "broken" | "signed-out" | "disabled";
 
 export interface ProviderReadiness {
   state: ProviderState;
@@ -28,6 +28,7 @@ export function providerReadiness(
 ): ProviderReadiness | undefined {
   const tool = report?.checks.find((check) => check.id === provider);
   if (!tool) return undefined;
+  if (tool.reason === "disabled") return { state: "disabled", checks: [tool] };
   if (tool.status !== "ok")
     return {
       state: tool.status === "skip" || tool.reason === "missing" ? "missing" : "broken",

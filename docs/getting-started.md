@@ -16,6 +16,9 @@ You need:
 - **The GitHub CLI** (`gh`), signed in with `gh auth login`, to import from
   GitHub, publish pull requests and find projects
   ([cli.github.com](https://cli.github.com/)).
+  To check, run `gh auth status`. Tokens in your system keyring are not covered:
+  the agent can still read your GitHub token via `gh auth token`. Your main
+  protection is a fine-grained token with the minimum permissions you need.
 - **An AI coding CLI**, installed and signed in, as the same user that runs
   BELL PR. Either one is enough:
   - the Codex CLI: `npm install -g @openai/codex`, then `codex login`.
@@ -223,7 +226,7 @@ Start the run with **Generate the team plan** (with plan approval) or
   the overall conclusion; the Reviewer opens by saying whether it agrees
   and adds only what the summary lacks, and the Test analyst keeps the one
   list of checks still to run.
-- With the default **Workspace** access, agents are told not to change
+- With the default **Working directory (default)** access, agents are told not to change
   your machine: no `sudo`, no global or
   user-level installs. When a check needs something the machine lacks, the
   teammate reports it, and **Overview & motivation** lists it under "Setup
@@ -483,8 +486,8 @@ repository, your own words, reviewability, disclosing AI help and the
 understanding check, each with its source and one sentence on why
 maintainers care.
 
-Before you can approve, BELL PR checks what will be sent: a credential in
-the text, or placeholders such as `TODO:` or an empty `Fixes #`, block it;
+Before you can approve, BELL PR checks what will be sent. Blocks common token formats and private keys before publishing.
+Placeholders such as `TODO:` or an empty `Fixes #` block it;
 a path from your computer, a change to CI workflows and a commit e-mail
 address that is not your GitHub no-reply address need your confirmation.
 The description mentions AI assistance only if the project's rules require

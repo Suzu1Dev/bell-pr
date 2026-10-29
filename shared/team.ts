@@ -35,6 +35,8 @@ export interface TeamTask {
   report?: string;
   error?: string;
   worktreePath?: string;
+  /** Git directory of that checkout, recorded when the worktree was created. */
+  gitDir?: string;
   /** The isolated checkout was removed after integration; worktreePath stays as a record. */
   worktreeRemoved?: boolean;
   baseSha?: string;

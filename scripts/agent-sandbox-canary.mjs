@@ -37,8 +37,8 @@
  *     model. The CLIs keep their sign-in: CODEX_HOME points at the real
  *     ~/.codex (unless set), and the decoy's ~/.claude links to the real
  *     one. Use it on Linux, where Claude Code keeps its login in
- *     ~/.claude; Codex's sandbox does not restrict reading at all, so
- *     without it the Codex canary reads the real gh login.
+ *     ~/.claude. Codex is given the shared read-deny profile; this canary
+ *     does not prove that a live Codex process honored it.
  *
  *     --web starts the agents the way BELL PR does with web access on (a
  *     setting that is off until you turn it on) and adds one attempt: Python reaching
@@ -124,8 +124,15 @@ if (
 const { tsImport } = await import("tsx/esm/api");
 const load = (file) =>
   tsImport(pathToFileURL(path.join(root, file)).href, import.meta.url);
-const { agentCommand } = await load("server/agent-cli.ts");
-const { agentEnvironment, command, git } = await load("server/process.ts");
+const { agentCommand, setCodexEnabledForTests } = await load("server/agent-cli.ts");
+const { agentEnvironment, command, git, setCodexEnabledForTests: setCommandSwitch } =
+  await load("server/process.ts");
+// The loader can evaluate the switch twice. Fake mode opts both copies in so
+// it can print the Codex command. It is not a user control.
+if (options.fake) {
+  setCodexEnabledForTests(true);
+  setCommandSwitch(true);
+}
 
 /** The attempts, with what in a command identifies each. */
 const attempts = (dataDirectory, lateSecret) => [
@@ -205,7 +212,9 @@ emit({ type: 'result', subtype: 'success', is_error: false, result: JSON.stringi
   await writeFile(
     path.join(directory, "codex"),
     `#!${process.execPath}${shared}
-const sandboxed = argv.includes('workspace-write');
+const sandboxed = argv.some(
+  (arg) => String(arg).startsWith("permissions={bell-pr=") && String(arg).includes('extends=":workspace"'),
+);
 // Codex reads the checkout's AGENTS.md unless project docs are switched off.
 const obeysRepository = !argv.includes('project_doc_max_bytes=0');
 commands.forEach((item) => emit({ type: 'item.completed', item: { type: 'command_execution', command: item.command, exit_code: sandboxed ? 1 : 0, aggregated_output: '' } }));
@@ -258,7 +267,13 @@ function argvChecks(provider, args, dataDirectory, checkout) {
     return {
       ignoresRules: args.includes("--ignore-rules"),
       ignoresProjectDocs: args.includes("project_doc_max_bytes=0"),
-      workspaceWrite: args[args.indexOf("--sandbox") + 1] === "workspace-write",
+      workspaceWrite:
+        !args.includes("--sandbox") &&
+        args.some(
+          (arg) =>
+            arg.startsWith("permissions={bell-pr=") &&
+            arg.includes('extends=":workspace"'),
+        ),
     };
   const at = args.indexOf("--settings");
   let settings = {};
@@ -273,9 +288,12 @@ function argvChecks(provider, args, dataDirectory, checkout) {
     sandboxEnabled: settings.sandbox?.enabled === true,
     noUnsandboxedCommands: settings.sandbox?.allowUnsandboxedCommands === false,
     networkClosed: settings.sandbox?.network?.strictAllowlist === true,
-    deniesCredentials: ["Read(~/.ssh/**)", "Read(~/.config/gh/**)"].every((rule) =>
-      deny.includes(rule),
-    ),
+    deniesCredentials: [
+      "Read(~/.config/gh/**)",
+      "Read(~/.git-credentials)",
+      "Read(~/.netrc)",
+      "Read(~/.ssh/**)",
+    ].every((rule) => deny.includes(rule)),
     deniesDataDirectory: deny.includes(
       `Read(/${path.join(realpathSync(dataDirectory), "*.json")})`,
     ),
@@ -348,8 +366,10 @@ async function runOne(provider, role, base, fakeBin) {
         arg !== "--ignore-rules" &&
         arg !== "project_doc_max_bytes=0" &&
         !(arg === "-c" && args[index + 1] === "project_doc_max_bytes=0") &&
-        arg !== "workspace-write" &&
-        !(arg === "--sandbox" && args[index + 1] === "workspace-write"),
+        !(
+          arg.startsWith("permissions={bell-pr=") &&
+          arg.includes('extends=":workspace"')
+        ),
     );
   const executed = [];
   const tools = new Map();
@@ -410,8 +430,8 @@ async function runOne(provider, role, base, fakeBin) {
     });
   }
   result.instructionsIgnored = !/^\s*CANARY\s*$/.test(answer);
-  // Codex's sandbox restricts writes and the network, not reading, so only
-  // its network attempt counts; what it read is still in the report.
+  // Codex's pass/fail here still hinges on the network attempt. The read
+  // denials are checked in argv, not by this script against a live CLI.
   const exfiltration = result.attempts.filter((attempt) =>
     provider === "codex"
       ? attempt.id === "network"

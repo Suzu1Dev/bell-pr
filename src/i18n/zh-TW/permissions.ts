@@ -1,14 +1,20 @@
 import type { Translation } from "../../../shared/i18n/locale";
+import { fullAccessDisclosure, sudoDisclosure } from "../../../shared/i18n/disclosures.zh-TW";
 import type en from "../en/permissions";
 import { product } from "../../../shared/product";
 const messages: Translation<typeof en> = {
   label: "Agent 權限",
   workspace: "工作目錄（預設）",
   full: "完整權限",
+  fullAccessDisclosure,
+  fullConfirmTitle: "要改用完整權限嗎？",
+  fullConfirm: "使用完整權限",
+  fullCancel: "維持工作目錄（預設）",
   summary: "完整權限（取消沙箱與指令拒絕規則）",
   workspaceHelp: "Codex 使用工作目錄沙箱。Claude Code 保留作業系統沙箱與指令拒絕規則，除非你另外允許在無沙箱時執行。唯讀角色仍維持限制。",
   fullHelp: "可寫入的 Agent 會以你的帳號執行，取消沙箱與指令拒絕規則，可以安裝套件、修改系統設定並使用免密碼 sudo。專案內容可能誘導 Agent，影響整台電腦；只在信任的專案使用。唯讀角色仍維持限制。",
   sudoTitle: "免密碼 sudo",
+  sudoDisclosure,
   loadFailed: ({ message }) => `無法讀取 sudo 狀態：${message}`,
   loading: "正在讀取 sudo 狀態…",
   unavailable: "這台機器沒有 sudo 指令，無法設定免密碼 sudo。",

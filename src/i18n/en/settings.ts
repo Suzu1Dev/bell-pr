@@ -48,6 +48,7 @@ const settings = {
     signedOut: "Not signed in",
     missing: "Not installed",
     notWorking: "Not working",
+    disabled: "Disabled",
     connected: "Connected",
   },
   general: {

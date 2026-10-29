@@ -2,6 +2,8 @@ import type { Express } from "express";
 import { z } from "zod";
 import { summarizeRun } from "../../shared/runs.js";
 import { splitLimits } from "../../shared/split.js";
+import { codexSelectionBlocked } from "../../shared/codex-switch.js";
+import { AppError } from "../types.js";
 import { contributionSettingsSchema } from "../insights.js";
 import { sm } from "../i18n/index.js";
 import type { RouteDeps } from "./types.js";
@@ -63,6 +65,9 @@ export function registerRunsRoutes(
         path: ["byHandFit"],
       })
       .parse(req.body);
+    if (codexSelectionBlocked(settings?.provider))
+      throw new AppError((m) => m.setup.doctor.codexDisabled, 422);
+    if (settings?.provider !== "claude") await insights.assertSavedProviderRunnable();
     const selected = settings ?? (await insights.getSettings(repoId));
     res.status(202).json({
       run: await workbench.createRun(repoId, prompt, title, selected, {

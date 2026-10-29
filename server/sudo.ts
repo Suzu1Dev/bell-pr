@@ -2,13 +2,13 @@ import { mkdtemp, rm, stat, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { z } from "zod";
-import type { SudoStatus } from "../shared/sudo.js";
+import { bellSudoersFile, type SudoStatus } from "../shared/sudo.js";
 import { command } from "./process.js";
 import { redact } from "./secrets.js";
 import { AppError } from "./types.js";
 
 /** The one rule file BELL writes; deleting it undoes what enabling did. */
-const sudoersFile = "/etc/sudoers.d/bell-pr-agent";
+const sudoersFile = bellSudoersFile;
 
 export const sudoPasswordSchema = z
   .object({

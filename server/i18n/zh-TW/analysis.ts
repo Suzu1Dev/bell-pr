@@ -96,7 +96,7 @@ const m: Translation<typeof en> = {
     cancelled: "貢獻探索已取消。",
     limitReached: "探索達到請求或時間上限。",
     unreadableText: ({ title }) => `${title} 不是可安全讀取的文字，已略過。`,
-    maskedCredentials: ({ title }) => `${title} 已遮蔽疑似憑證。`,
+    maskedCredentials: (_title) => "發佈前會擋下常見格式的 token 與私鑰。",
     truncatedSource: ({ title, bytes }) =>
       `${title} 僅保留前 ${bytes} bytes，尚未讀取完整內容。`,
     searching: "正在搜尋公開、未封存且符合條件的 GitHub 專案。",

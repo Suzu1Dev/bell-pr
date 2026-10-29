@@ -9,8 +9,7 @@ const fmt = formatters("en");
  * these messages.
  */
 export default {
-  secret:
-    "The PR title, description or commit message contains what looks like a credential, such as an access token or a private key. Remove it: everything you publish on GitHub is public.",
+  secret: "Blocks common token formats and private keys before publishing.",
   /** Which field holds it. */
   secretIn: ({ field }: { field: "title" | "body" | "commitMessage" }) =>
     ({

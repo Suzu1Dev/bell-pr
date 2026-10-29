@@ -18,6 +18,7 @@ import type {
   ContributionDirection,
   ContributionSettings,
 } from "../../shared/insights";
+import { codexEnabled } from "../../shared/codex-switch";
 import {
   agentProviders,
   providerLabels,
@@ -33,6 +34,7 @@ import {
 import { api } from "../api";
 import { usePresentation } from "../app/presentation";
 import { useT } from "../i18n";
+import { Modal } from "../modals/Modal";
 import { ReadinessMessage } from "../setup/ReadinessNotice";
 import { useDoctor, type DoctorState } from "../setup/useDoctor";
 import { providerReadiness, withProvider } from "./readiness";
@@ -42,6 +44,48 @@ import "./mission.css";
 
 // The task dialog's facts: their own chunk, with the respect rules.
 const BeforeYouStart = lazy(() => import("./BeforeYouStart"));
+
+/**
+ * Full access applies only after confirmation. Choosing the working
+ * directory applies immediately and leaves the current mode unchanged
+ * until the person confirms.
+ */
+export function agentAccessChoice(
+  current: "workspace" | "full",
+  selected: string,
+): { access: "workspace" | "full"; confirm: boolean } {
+  const next = selected === "full" ? "full" : "workspace";
+  if (next === "full" && current !== "full") return { access: current, confirm: true };
+  return { access: next, confirm: false };
+}
+
+/** Confirmation before Full access. Cancel is the first action. */
+export function FullAccessConfirmDialog({
+  onCancel,
+  onConfirm,
+}: {
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  const permissions = useT("permissions");
+  return (
+    <Modal title={permissions.fullConfirmTitle} onClose={onCancel}>
+      <p className="settings-dialog-text">{permissions.fullAccessDisclosure}</p>
+      <div className="modal-actions">
+        <button type="button" className="button secondary" onClick={onCancel}>
+          {permissions.fullCancel}
+        </button>
+        <button
+          type="button"
+          className="button primary settings-danger-button"
+          onClick={onConfirm}
+        >
+          {permissions.fullConfirm}
+        </button>
+      </div>
+    </Modal>
+  );
+}
 
 /** The directions in display order; their labels are in the `mission` dictionary. */
 export const directionOptions = [
@@ -128,7 +172,15 @@ export function DirectionSettings({
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loadingModels, setLoadingModels] = useState(!initialCatalog);
   const [catalogAttempt, setCatalogAttempt] = useState(0);
-  const provider = value.provider ?? "codex";
+  const [confirmingFull, setConfirmingFull] = useState(false);
+  const access = value.agentAccess === "full" ? "full" : "workspace";
+  const platform =
+    doctor?.report?.platform ??
+    report?.platform ??
+    (typeof process === "undefined" ? undefined : process.platform);
+  const linux = platform === "linux";
+  const provider =
+    !codexEnabled && value.provider !== "claude" ? "claude" : (value.provider ?? "codex");
   const providerLabel = providerLabels[provider];
   useEffect(() => {
     const controller = new AbortController();
@@ -325,19 +377,25 @@ export function DirectionSettings({
             id={`${id}-provider`}
             value={provider}
             aria-describedby={`${id}-provider-help`}
-            onChange={(event) =>
+            onChange={(event) => {
+              const next = event.target.value as AgentProvider;
+              if (next === "codex" && !codexEnabled) return;
               onChange({
                 ...value,
-                provider: event.target.value as AgentProvider,
+                provider: next,
                 model: "",
                 reasoningEffort: "",
-              })
-            }
+              });
+            }}
           >
             {agentProviders.map((option) => {
               const state = readiness(option)?.state;
               return (
-                <option key={option} value={option}>
+                <option
+                  key={option}
+                  value={option}
+                  disabled={option === "codex" && !codexEnabled}
+                >
                   {state
                     ? t.model.providerOption({
                         provider: providerLabels[option],
@@ -467,18 +525,35 @@ export function DirectionSettings({
           <label htmlFor={`${id}-agent-access`}>{permissions.label}</label>
           <select
             id={`${id}-agent-access`}
-            value={value.agentAccess === "full" ? "full" : "workspace"}
+            value={access}
             aria-describedby={`${id}-agent-access-help`}
-            onChange={(event) => update("agentAccess", event.target.value === "full" ? "full" : "workspace")}
+            onChange={(event) => {
+              const choice = agentAccessChoice(access, event.target.value);
+              if (choice.confirm) {
+                setConfirmingFull(true);
+                return;
+              }
+              setConfirmingFull(false);
+              update("agentAccess", choice.access);
+            }}
           >
             <option value="workspace">{permissions.workspace}</option>
             <option value="full">{permissions.full}</option>
           </select>
           <p id={`${id}-agent-access-help`} className="mission-field-note">
-            {value.agentAccess === "full" ? permissions.fullHelp : permissions.workspaceHelp}
+            {access === "full" ? permissions.fullAccessDisclosure : permissions.workspaceHelp}
           </p>
+          {confirmingFull && (
+            <FullAccessConfirmDialog
+              onCancel={() => setConfirmingFull(false)}
+              onConfirm={() => {
+                setConfirmingFull(false);
+                update("agentAccess", "full");
+              }}
+            />
+          )}
         </div>
-        {value.agentAccess === "full" && <SudoAccess id={id} />}
+        {access === "full" && linux && <SudoAccess id={id} />}
         {modelError && (
           <div className="mission-model-error" role="status">
             <span>{t.model.error({ message: modelError })}</span>

@@ -24,7 +24,13 @@ import {
 } from "./controls";
 
 /** How far an agent CLI is from working, as the environment check found it. */
-export type CliState = "checking" | "ready" | "signedOut" | "missing" | "notWorking";
+export type CliState =
+  | "checking"
+  | "ready"
+  | "signedOut"
+  | "missing"
+  | "notWorking"
+  | "disabled";
 
 const checkIds = {
   codex: { tool: "codex", auth: "codex-auth" },
@@ -40,6 +46,7 @@ export function providerState(
   const find = (id: string) => report.checks.find((check) => check.id === id);
   const tool = find(checkIds[provider].tool);
   const auth = find(checkIds[provider].auth);
+  if (tool?.reason === "disabled") return { state: "disabled", tool, auth };
   const state: CliState =
     !tool || tool.status === "skip" || tool.reason === "missing"
       ? "missing"

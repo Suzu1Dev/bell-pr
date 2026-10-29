@@ -9,7 +9,8 @@ import { randomUUID } from "node:crypto";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { command, git, agentEnvironment, redact } from "./process.js";
+import { assertRunAgentAllowed } from "./codex-guard.js";
+import { command, git, agentEnvironment, recordedGitDir, redact } from "./process.js";
 import { readDiff } from "./git.js";
 import {
   claimReadyTasks,
@@ -119,6 +120,7 @@ export async function runAgent(
     timeout?: Extract<AgentTimeoutKind, "explanations" | "draft">;
   } = {},
 ) {
+  assertRunAgentAllowed(run);
   // Learn by hand: BELL's agents never get a write turn (DESIGN v1.2 F2).
   if (run.learnByHand && !readonly) throw new AppError((m) => m.byHand.noWriteTurn, 409);
   const modelExecution = run.modelExecution ?? {
@@ -231,11 +233,20 @@ export async function runAgent(
         skipGitRepoCheck: context.isolated,
         web,
       });
+      // Full access is a saved setting. The confirm dialog is only in the
+      // UI, so a run created from the API or from the settings file still
+      // says so, once, on its first writable turn.
+      if (!readonly && modelExecution.agentAccess === "full") {
+        const notice = sm().sudo.fullAccessNotice;
+        if (!run.logs.some((entry) => entry.kind === "notice" && entry.message === notice))
+          ctx.log(run, role, notice, { kind: "notice" });
+      }
       // Marks the run once when an agent runs without the OS sandbox
       // because the person allowed it in Settings (agentCommand decides).
       if (cli.unsandboxed && !run.unsandboxed) {
         run.unsandboxed = true;
-        ctx.log(run, role, modelExecution.agentAccess === "full" ? sm().sudo.fullAccessNotice : sm().run.unsandboxedNotice, { kind: "notice" });
+        if (modelExecution.agentAccess !== "full")
+          ctx.log(run, role, sm().run.unsandboxedNotice, { kind: "notice" });
       }
       const read = agentEventReader(modelExecution.provider);
       const spawned = agentSpawn(run, role, cli.executable, timeoutMs);
@@ -538,6 +549,9 @@ async function executeTeamTask(
           { signal },
         ),
       );
+      const gitDir = recordedGitDir(task.worktreePath!);
+      if (!gitDir) throw new AppError((m) => m.security.worktreeForged, 409);
+      task.gitDir = gitDir;
     });
     ctx.log(run, task.owner, sm().run.team.taskClaimed({ title: task.title }));
     await ctx.store.save();

@@ -112,6 +112,19 @@ test("the provider step picks the only ready provider and lets the person choose
   const empty = renderEn(welcome("provider", { doctor: doctor(none) }));
   assert.match(empty, /No provider is ready yet\./);
   assert.match(empty, />Re-check</);
+  const onlyCodex = report(base);
+  const providerReady = onlyCodex.checks.find((check) => check.id === "provider-ready")!;
+  providerReady.reason = "claude-only";
+  providerReady.detail =
+    "Claude Code only in 1.0.0; Codex support is disabled\nPlease install Claude Code.";
+  const blocked = renderEn(welcome("provider", { doctor: doctor(onlyCodex) }));
+  assert.match(blocked, /Claude Code only in 1\.0\.0; Codex support is disabled/);
+  assert.match(blocked, /Please install Claude Code\./);
+  assert.doesNotMatch(blocked, /No provider is ready yet/);
+  providerReady.detail = "1.0.0 只支援 Claude Code；Codex 暫時停用\n請安裝 Claude Code。";
+  const blockedZh = renderZh(welcome("provider", { doctor: doctor(onlyCodex) }));
+  assert.match(blockedZh, /1\.0\.0 只支援 Claude Code；Codex 暫時停用/);
+  assert.match(blockedZh, /請安裝 Claude Code。/);
   const loading = renderEn(welcome("provider", { doctor: doctor(null) }));
   assert.match(loading, /Checking which providers are ready…/);
 });
