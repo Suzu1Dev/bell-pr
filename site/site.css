@@ -313,14 +313,22 @@ main {
   background: var(--bg);
 }
 .hero-copy {
-  max-width: 860px;
+  max-width: 960px;
   margin: 0 auto;
   text-align: center;
 }
 .hero h1 {
   line-height: 1.06;
 }
-.hero h1 span,
+.hero-line {
+  display: block;
+}
+.hero h1:lang(zh-Hant-TW),
+.page-head h1:lang(zh-Hant-TW) {
+  line-height: 1.2;
+  letter-spacing: 0;
+}
+.hero-accent,
 .page-head h1 span {
   color: var(--brand-600);
 }
@@ -330,6 +338,7 @@ main {
   color: var(--text-secondary);
   font-size: clamp(18px, 2vw, 22px);
   line-height: 1.55;
+  text-wrap: balance;
 }
 .hero-actions {
   display: flex;

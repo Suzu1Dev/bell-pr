@@ -31,8 +31,12 @@ joined with `&&`, so installation runs only if adding the tap succeeds.
 
 The header and homepage actions lead directly to the installation section.
 The layout uses a sticky navigation bar, a real workbench screenshot and
-progressively disclosed feature details. Native links and details work without
-JavaScript; smooth scrolling and transitions respect reduced-motion preferences.
+progressively disclosed feature details. Both homepages center the product mission
+on understanding AI-assisted changes, discussing design tradeoffs, developing
+engineering judgment and respecting maintainers' review time. The hero uses two
+explicit headline lines with natural Chinese character spacing. Native links and
+details work without JavaScript; smooth scrolling and transitions respect
+reduced-motion preferences.
 
 ## Working on the site
 
