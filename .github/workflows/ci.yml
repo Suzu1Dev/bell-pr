@@ -62,8 +62,16 @@ jobs:
       - run: node scripts/npm-readme.mjs --check-docs
       - run: node scripts/npm-readme.mjs --self-test
       - run: node site/check-site.mjs
+
+  homebrew-installer:
+    name: Homebrew installer
+    runs-on: macos-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Install and test the Homebrew formula
-        if: runner.os == 'macOS'
         run: |
           brew tap-new bell-pr/install-test
           cp Formula/bell-pr.rb "$(brew --repository bell-pr/install-test)/Formula/bell-pr.rb"
@@ -216,7 +224,8 @@ jobs:
           docker run --rm --entrypoint sh bell-pr:ci -c 'for c in bwrap socat codex gh git; do command -v "$c" || exit 1; done; git --version'
       - name: Start the image and wait until it is healthy
         run: |
-          docker run -d --name bellpr-ci --health-interval 2s -p 127.0.0.1:4311:4311 bell-pr:ci
+          # CI has no provider login; exercise the sample-tour startup path.
+          docker run -d --name bellpr-ci --health-interval 2s -p 127.0.0.1:4311:4311 bell-pr:ci start --force
           trap 'docker logs bellpr-ci 2>&1 | sed "s/t=[A-Za-z0-9_-]*/t=***/"; docker rm -f bellpr-ci' EXIT
           for attempt in $(seq 1 60); do
             status="$(docker inspect --format '{{.State.Health.Status}}' bellpr-ci)"
