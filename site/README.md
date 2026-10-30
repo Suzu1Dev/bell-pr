@@ -28,8 +28,10 @@ npx is selected initially. npm remains available for a global installation;
 without JavaScript, all seven commands are visible together.
 Homebrew uses one fully qualified `brew install` command. Its dedicated tap
 repository comes from `shared/product.ts`; Homebrew adds it automatically.
-The installation UI uses compact underline tabs and a command row with its copy
-button beside it. Single-line commands use only one row; PowerShell keeps its
+The installation UI groups platform information and the guide link at the right
+of the underline tabs, moving the group below the tabs on narrow screens. A
+compact dark green command row keeps its copy button beside the code.
+Single-line commands use only one row; PowerShell keeps its
 source line breaks. The demo retains its player controls and caption track
 without an additional caption below the player.
 

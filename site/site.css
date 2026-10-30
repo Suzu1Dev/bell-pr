@@ -415,7 +415,11 @@ main {
   text-align: center;
 }
 .install-section {
+  padding-block: clamp(64px, 7vw, 96px);
   background: var(--sunken);
+}
+.install-section .section-head {
+  margin-bottom: clamp(28px, 4vw, 44px);
 }
 .install-section .install-widget {
   margin-right: auto;
@@ -457,7 +461,7 @@ main {
 /* Installation methods remain readable as sections until site.js enables tabs. */
 .install-widget {
   width: 100%;
-  max-width: 960px;
+  max-width: 880px;
   min-width: 0;
 }
 .install-widget [hidden] {
@@ -467,13 +471,15 @@ main {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px 24px;
-  margin-bottom: 14px;
+  justify-content: space-between;
+  gap: 0 24px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--border-strong);
 }
 .install-tabs {
   display: flex;
-  gap: 14px;
-  border-bottom: 1px solid var(--border-strong);
+  gap: 10px;
+  margin-bottom: -1px;
 }
 .install-tab {
   min-width: 44px;
@@ -494,6 +500,13 @@ main {
   border-bottom-color: var(--brand-600);
   color: var(--brand-700);
 }
+.install-meta {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  margin-left: auto;
+  white-space: nowrap;
+}
 .install-platform {
   color: var(--text-muted);
   font-size: 12px;
@@ -502,21 +515,12 @@ main {
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  margin-left: auto;
-}
-[data-install-platform]::before {
-  content: "";
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: var(--brand-600);
 }
 .install-guide {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   min-height: 44px;
-  margin-left: auto;
   font-size: 13px;
   font-weight: 500;
   text-decoration: none;
@@ -548,16 +552,19 @@ main {
 }
 /* Code keeps its source whitespace. Only the code scrolls on narrow screens. */
 .install-command {
+  --command-bg: #172e25;
+  --command-border: #355145;
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 18px;
   width: 100%;
   min-height: 62px;
-  padding: 8px 8px 8px 18px;
-  border: 1px solid var(--border-strong);
+  padding: 8px 8px 8px 20px;
+  border: 1px solid var(--command-border);
   border-radius: 12px;
-  background: var(--surface);
-  color: var(--text);
+  background: var(--command-bg);
+  color: #f2f7f4;
+  box-shadow: 0 4px 12px rgb(23 46 37 / 8%);
 }
 .install-command code {
   flex: 1;
@@ -575,7 +582,7 @@ main {
   scrollbar-color: var(--brand-300) transparent;
 }
 .install-command code:focus-visible {
-  outline: 2px solid var(--brand-600);
+  outline: 2px solid var(--brand-300);
   outline-offset: -2px;
 }
 .install-command .copy-button {
@@ -588,10 +595,10 @@ main {
   min-width: 86px;
   min-height: 44px;
   padding: 8px 12px;
-  border: 0;
-  border-radius: 8px;
+  border: 1px solid var(--command-border);
+  border-radius: 6px;
   background: transparent;
-  color: var(--brand-700);
+  color: #d7e9dd;
   font: 500 12px var(--font-sans);
   cursor: pointer;
 }
@@ -601,10 +608,13 @@ main {
   height: 12px;
   border: 1px solid currentColor;
   border-radius: 2px;
-  box-shadow: -3px -3px 0 -1px var(--surface), -3px -3px 0 0 currentColor;
+  box-shadow: -3px -3px 0 -1px var(--command-bg), -3px -3px 0 0 currentColor;
 }
 .install-command .copy-button:hover {
-  background: var(--brand-50);
+  background: #284537;
+}
+.install-command .copy-button:focus-visible {
+  outline-color: var(--brand-300);
 }
 .install-command .copy-button[data-copy-state="copied"]::before {
   width: 6px;
@@ -625,27 +635,23 @@ main {
   margin-top: 4px;
   color: var(--text-muted);
 }
-@media (max-width: 700px) {
+@media (max-width: 760px) {
   .install-toolbar {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    gap: 4px 12px;
-    margin-bottom: 10px;
+    gap: 6px;
+    border-bottom: 0;
+    margin-bottom: 8px;
   }
   .install-tabs {
-    grid-column: 1 / -1;
+    width: 100%;
     justify-content: space-between;
     gap: 4px;
+    border-bottom: 1px solid var(--border-strong);
   }
   .install-tab {
     padding: 10px 2px;
     font-size: 13px;
   }
-  [data-install-platform] {
-    margin-left: 0;
-  }
   .install-guide {
-    grid-column: 2;
     font-size: 12px;
   }
   .install-command {
