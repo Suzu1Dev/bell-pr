@@ -19,14 +19,17 @@
  * - the site's files total at most 5 MB.
  *
  * Browser checks (--browser), with the pages served from a static server on
- * 127.0.0.1, at 1440 x 900 and 390 x 844:
+ * 127.0.0.1, at 1440 x 900, 390 x 844 and 320 x 740:
  * - no horizontal scroll (scrollWidth === clientWidth), and no text that is
  *   cut off or runs out of its box, FAQ answers opened (the rules of
  *   e2e/helpers/overflow.ts);
  * - no request outside the local server, no failed request, and no console
  *   error;
  * - the self-hosted DM Sans font is loaded, and every image decodes (lazy
- *   images are loaded first).
+ *   images are loaded first);
+ * - installer tabs support clicks and keyboard navigation, copy whole
+ *   commands, and select text if copying fails; all commands remain readable
+ *   without JavaScript.
  *
  * Options: --port <n> (default: a free port), --screenshots <dir>
  * (full-page PNGs for review).
@@ -48,6 +51,7 @@ const maxSiteBytes = 5 * 1024 * 1024;
 const widths = [
   { width: 1440, height: 900 },
   { width: 390, height: 844 },
+  { width: 320, height: 740 },
 ];
 
 /** Every .html file of the site, relative to site/. */
@@ -285,32 +289,112 @@ function serve(port) {
 }
 
 async function checkBrowser(files, { port, screenshots }) {
-  const { chromium } = await import("@playwright/test");
+  const { chromium, expect } = await import("@playwright/test");
   const server = await serve(port);
   const origin = `http://127.0.0.1:${server.address().port}`;
   const browser = await chromium.launch({
     executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE || undefined,
   });
   const problems = [];
+  const methods = ["npx", "npm", "curl", "brew", "bun", "powershell", "mise"];
+  const packageName = JSON.parse(fs.readFileSync(path.join(repoDir, "package.json"), "utf8")).name;
+  async function checkInstaller(page, noScript = false) {
+    const widget = page.locator("[data-install]");
+    await expect(widget).toHaveCount(1);
+    const toolbar = widget.locator("[data-install-tabs]");
+    if (noScript) await expect(toolbar).toBeHidden();
+    else {
+      await expect(toolbar).toBeVisible();
+      await expect(widget.getByRole("tab")).toHaveCount(methods.length);
+      expect(await widget.getByRole("tab").evaluateAll((tabs) => tabs.map((tab) => tab.id))).toEqual(methods.map((method) => `install-tab-${method}`));
+      await selected("npx");
+    }
+    const isZh = (await page.locator("html").getAttribute("lang")).startsWith("zh");
+    async function selected(method) {
+      await expect(widget.locator('[role="tabpanel"]:visible')).toHaveCount(1);
+      await expect(widget.locator(`#install-panel-${method}`)).toBeVisible();
+      await expect(widget.locator(`#install-tab-${method}`)).toHaveAttribute("aria-selected", "true");
+      await expect(widget.locator('[role="tab"][tabindex="0"]')).toHaveCount(1);
+      await expect(widget.locator(`#install-tab-${method}`)).toHaveAttribute("tabindex", "0");
+      await expect(widget.locator("[data-install-platform]")).toHaveText(await widget.locator(`#install-panel-${method}`).getAttribute("data-platform"));
+    }
+    for (const method of methods) {
+      const panel = widget.locator(`#install-panel-${method}`);
+      const code = widget.locator(`#install-command-${method}`);
+      if (!noScript) {
+        await widget.locator(`#install-tab-${method}`).click();
+        await selected(method);
+      }
+      await expect(panel).toBeVisible();
+      await expect(code).toBeVisible();
+      const command = (await code.textContent()).trim();
+      expect(command, `${method} has a readable install command`).not.toBe("");
+      if (method === "npx") expect(command).toBe(`npx ${packageName}`);
+      if (method === "npm") expect(command).toBe(`npm install -g ${packageName}`);
+      if (method === "brew" || method === "powershell") expect(command).toContain("\n");
+      if (!noScript) {
+        const button = widget.locator(`button[data-copy="install-command-${method}"]`);
+        await button.click();
+        await expect(button).toHaveText(isZh ? "已複製" : "Copied");
+        expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(command);
+        await expect(page.locator("#copy-status")).toHaveText(isZh ? "已複製到剪貼簿。" : "Copied to the clipboard.");
+      }
+      expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth), `${method}: page does not scroll sideways`).toBe(0);
+      expect(await page.evaluate(findTextOverflow), `${method}: text fits`).toEqual([]);
+    }
+    if (noScript) {
+      await expect(widget.locator("button[data-copy]:visible")).toHaveCount(0);
+      return;
+    }
+    await widget.locator("#install-tab-npx").focus();
+    for (const [key, method] of [["ArrowLeft", "mise"], ["ArrowRight", "npx"], ["ArrowRight", "npm"], ["End", "mise"], ["Home", "npx"]]) {
+      await page.keyboard.press(key);
+      await selected(method);
+      await expect(widget.locator(`#install-tab-${method}`)).toBeFocused();
+    }
+    await widget.locator("#install-tab-powershell").click();
+    await page.evaluate(() => {
+      Object.defineProperty(navigator.clipboard, "writeText", {
+        configurable: true,
+        value: async () => { throw new DOMException("Fixture permission denied", "NotAllowedError"); },
+      });
+    });
+    const fallback = widget.locator('button[data-copy="install-command-powershell"]');
+    await fallback.click();
+    await expect(fallback).toHaveText(isZh ? "已選取" : "Selected");
+    expect(await page.evaluate(() => window.getSelection().toString())).toBe((await widget.locator("#install-command-powershell").textContent()).trim());
+    await expect(page.locator("#copy-status")).toHaveText(isZh
+      ? "複製失敗。指令已選取；請用鍵盤複製。"
+      : "Copying failed. The command is selected; copy it with your keyboard.");
+    await widget.locator("#install-tab-npx").click();
+    await selected("npx");
+    await page.evaluate(() => window.getSelection().removeAllRanges());
+    await expect(widget.locator('button[data-copy="install-command-npx"]')).toHaveText(isZh ? "複製" : "Copy");
+  }
   try {
     for (const file of files) {
       for (const viewport of widths) {
         const label = `${file} @ ${viewport.width}px`;
-        const context = await browser.newContext({ viewport });
+        const context = await browser.newContext({ viewport, permissions: ["clipboard-read", "clipboard-write"] });
         const page = await context.newPage();
         const requests = [];
         const failures = [];
         const errors = [];
-        page.on("request", (request) => requests.push(request.url()));
-        page.on("response", (response) => {
-          if (response.status() >= 400) failures.push(`${response.status()} ${response.url()}`);
-        });
-        page.on("requestfailed", (request) => failures.push(`failed ${request.url()}`));
-        page.on("console", (message) => {
-          if (message.type() === "error") errors.push(message.text());
-        });
-        page.on("pageerror", (error) => errors.push(error.message));
+        const observe = (target) => {
+          target.on("request", (request) => requests.push(request.url()));
+          target.on("response", (response) => {
+            if (response.status() >= 400) failures.push(`${response.status()} ${response.url()}`);
+          });
+          target.on("requestfailed", (request) => failures.push(`failed ${request.url()}`));
+          target.on("console", (message) => {
+            if (message.type() === "error") errors.push(message.text());
+          });
+          target.on("pageerror", (error) => errors.push(error.message));
+        };
+        observe(page);
         await page.goto(`${origin}/${file}`, { waitUntil: "load" });
+        try { await checkInstaller(page); }
+        catch (error) { problems.push(`${label}: installer controls: ${error.message}`); }
         const result = await page.evaluate(async () => {
           await document.fonts.ready;
           const root = document.documentElement;
@@ -339,6 +423,16 @@ async function checkBrowser(files, { port, screenshots }) {
           await page.screenshot({ path: path.join(screenshots, name), fullPage: true });
         }
         await context.close();
+        if (viewport.width === 390) {
+          const noScript = await browser.newContext({ viewport, javaScriptEnabled: false });
+          try {
+            const plainPage = await noScript.newPage();
+            observe(plainPage);
+            await plainPage.goto(`${origin}/${file}`, { waitUntil: "load" });
+            await checkInstaller(plainPage, true);
+          } catch (error) { problems.push(`${label}: without JavaScript: ${error.message}`); }
+          finally { await noScript.close(); }
+        }
 
         if (result.scrollWidth !== result.clientWidth)
           problems.push(`${label}: horizontal scroll (scrollWidth ${result.scrollWidth}, clientWidth ${result.clientWidth})`);
@@ -363,7 +457,7 @@ async function checkBrowser(files, { port, screenshots }) {
   for (const problem of problems) console.log(problem);
   console.error(
     problems.length === 0
-      ? `check-site: ${files.length} pages pass the browser checks at ${widths.map((v) => v.width).join(" and ")} px.`
+      ? `check-site: ${files.length} pages pass the browser checks at ${widths.map((v) => v.width).join(", ")} px.`
       : `check-site: ${problems.length} problem(s) in the browser checks.`,
   );
   return problems.length === 0;

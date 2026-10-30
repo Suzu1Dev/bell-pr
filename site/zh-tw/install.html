@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="referrer" content="no-referrer">
     <title>安裝：BELL PR</title>
-    <meta name="description" content="安裝免費開源的 BELL PR：在 macOS、Linux 或透過 WSL2 的 Windows 上使用 npm 或 Docker，並連接你已在用的 AI coding CLI 與 GitHub CLI。">
+    <meta name="description" content="安裝免費開源的 BELL PR：在 macOS、Linux 上使用 Shell 腳本、Homebrew、Bun、mise、npm 或 Docker，或透過 PowerShell 在 Windows WSL2 安裝，並連接你已在用的 AI coding CLI 與 GitHub CLI。">
     <meta name="theme-color" content="#1f6d50">
     <link rel="icon" href="../assets/brand/favicon.svg" type="image/svg+xml">
     <link rel="icon" href="../assets/brand/favicon-32.png" sizes="32x32" type="image/png">
@@ -14,10 +14,12 @@
     <meta property="og:type" content="website">
     <meta property="og:site_name" content="BELL PR">
     <meta property="og:title" content="安裝：BELL PR">
-    <meta property="og:description" content="在你自己的電腦上，用 npx bell-pr 或 Docker 啟動 BELL PR。">
+    <meta property="og:description" content="選擇適合的安裝方式，在你自己的電腦上執行 BELL PR。">
     <!-- generated:product-meta key=homepageUrl property="og:url" path="install.html" -->
+    <meta property="og:url" content="https://bell-pr.suzu.tw/install.html">
     <!-- /generated:product-meta -->
     <!-- generated:product-meta key=homepageUrl property="og:image" path="assets/brand/og-image.png" -->
+    <meta property="og:image" content="https://bell-pr.suzu.tw/assets/brand/og-image.png">
     <!-- /generated:product-meta -->
     <meta property="og:image" content="../assets/brand/og-image.png">
     <meta name="twitter:card" content="summary_large_image">
@@ -50,9 +52,124 @@
       <section class="page-head">
         <div class="wrap">
           <h1>安裝 BELL PR</h1>
-          <p class="lead">BELL PR 是免費開源軟體（Apache License 2.0），在你自己的電腦上執行。用一條 npm 指令啟動，或執行 Docker 映像，然後開啟它印出的位址。</p>
+          <p class="lead">BELL PR 是免費開源軟體（Apache License 2.0），在你自己的電腦上執行。選擇下方的安裝方式，登入所需工具後，再啟動 BELL PR。</p>
           <div class="hero-actions">
-            <div class="command"><code id="start-command">npx bell-pr</code><button class="copy-button" type="button" data-copy="start-command" hidden>複製</button></div>
+            <div class="install-widget" data-install>
+              <div class="install-header">
+                <div>
+                  <p class="install-eyebrow">開始使用</p>
+                  <p class="install-title">一行指令，開啟你的工作台。</p>
+                </div>
+                <a class="install-guide" href="#requirements">開始之前<span aria-hidden="true"> ↗</span></a>
+              </div>
+              <div class="install-toolbar">
+                <div class="install-tabs" data-install-tabs aria-label="安裝方式" hidden>
+                  <button class="install-tab" type="button" id="install-tab-npx" data-install-target="install-panel-npx">npx</button>
+                  <button class="install-tab" type="button" id="install-tab-npm" data-install-target="install-panel-npm">npm</button>
+                  <button class="install-tab" type="button" id="install-tab-curl" data-install-target="install-panel-curl">curl</button>
+                  <button class="install-tab" type="button" id="install-tab-brew" data-install-target="install-panel-brew">brew</button>
+                  <button class="install-tab" type="button" id="install-tab-bun" data-install-target="install-panel-bun">bun</button>
+                  <button class="install-tab" type="button" id="install-tab-powershell" data-install-target="install-panel-powershell">ps1</button>
+                  <button class="install-tab" type="button" id="install-tab-mise" data-install-target="install-panel-mise">mise</button>
+                </div>
+                <span class="install-platform" data-install-platform hidden></span>
+              </div>
+              <section class="install-panel" id="install-panel-npx" data-platform="macOS · Linux" aria-labelledby="install-heading-npx">
+                <h2 class="install-method-title" id="install-heading-npx">npx</h2>
+                <p class="install-platform">macOS · Linux</p>
+                <div class="command install-command">
+                  <div class="install-command-heading">
+                    <span class="install-terminal-label"><span aria-hidden="true">›_</span> 終端機</span>
+                    <button class="copy-button" type="button" data-copy="install-command-npx" aria-label="複製 npx 安裝指令" hidden>複製</button>
+                  </div>
+                  <code id="install-command-npx" tabindex="0"><!-- generated:install-commands method=npx lang=zh-TW -->npx bell-pr<!-- /generated:install-commands --></code>
+                </div>
+                <p class="install-note">需要 Node.js 22 以上與 npm；不需全域安裝，直接啟動 BELL PR。</p>
+                <p class="install-next">先登入 GitHub 與 AI 工具，工作時保持終端機開啟。</p>
+              </section>
+              <section class="install-panel" id="install-panel-npm" data-platform="macOS · Linux" aria-labelledby="install-heading-npm">
+                <h2 class="install-method-title" id="install-heading-npm">npm</h2>
+                <p class="install-platform">macOS · Linux</p>
+                <div class="command install-command">
+                  <div class="install-command-heading">
+                    <span class="install-terminal-label"><span aria-hidden="true">›_</span> 終端機</span>
+                    <button class="copy-button" type="button" data-copy="install-command-npm" aria-label="複製 npm 安裝指令" hidden>複製</button>
+                  </div>
+                  <code id="install-command-npm" tabindex="0"><!-- generated:install-commands method=npm lang=zh-TW -->npm install -g bell-pr<!-- /generated:install-commands --></code>
+                </div>
+                <p class="install-note">需要 Node.js 22 以上與 npm；安裝後即可使用 bell-pr 指令。</p>
+                <p class="install-next">登入所需工具後，執行 <code>bell-pr</code>。</p>
+              </section>
+              <section class="install-panel" id="install-panel-curl" data-platform="macOS · Linux" aria-labelledby="install-heading-curl">
+                <h2 class="install-method-title" id="install-heading-curl">curl</h2>
+                <p class="install-platform">macOS · Linux</p>
+                <div class="command install-command">
+                  <div class="install-command-heading">
+                    <span class="install-terminal-label"><span aria-hidden="true">›_</span> 終端機</span>
+                    <button class="copy-button" type="button" data-copy="install-command-curl" aria-label="複製 curl 安裝指令" hidden>複製</button>
+                  </div>
+                  <code id="install-command-curl" tabindex="0"><!-- generated:install-commands method=curl lang=zh-TW -->curl -fsSL https://bell-pr.suzu.tw/install | sh -s -- --lang zh-TW<!-- /generated:install-commands --></code>
+                </div>
+                <p class="install-note">安裝到你的使用者目錄；需要時自動準備 Node.js 24。</p>
+                <p class="install-next">完成後，使用腳本印出的啟動指令或 PATH 設定。</p>
+              </section>
+              <section class="install-panel" id="install-panel-brew" data-platform="macOS · Linux" aria-labelledby="install-heading-brew">
+                <h2 class="install-method-title" id="install-heading-brew">brew</h2>
+                <p class="install-platform">macOS · Linux</p>
+                <div class="command install-command">
+                  <div class="install-command-heading">
+                    <span class="install-terminal-label"><span aria-hidden="true">›_</span> 終端機</span>
+                    <button class="copy-button" type="button" data-copy="install-command-brew" aria-label="複製 brew 安裝指令" hidden>複製</button>
+                  </div>
+                  <code id="install-command-brew" tabindex="0"><!-- generated:install-commands method=brew lang=zh-TW -->brew tap suzu1dev/bell-pr https://github.com/Suzu1Dev/bell-pr
+brew install suzu1dev/bell-pr/bell-pr<!-- /generated:install-commands --></code>
+                </div>
+                <p class="install-note">需要 Homebrew；會一併安裝 Node.js、Git 與 GitHub CLI。</p>
+                <p class="install-next">登入所需工具後，執行 <code>bell-pr</code>。</p>
+              </section>
+              <section class="install-panel" id="install-panel-bun" data-platform="macOS · Linux" aria-labelledby="install-heading-bun">
+                <h2 class="install-method-title" id="install-heading-bun">bun</h2>
+                <p class="install-platform">macOS · Linux</p>
+                <div class="command install-command">
+                  <div class="install-command-heading">
+                    <span class="install-terminal-label"><span aria-hidden="true">›_</span> 終端機</span>
+                    <button class="copy-button" type="button" data-copy="install-command-bun" aria-label="複製 bun 安裝指令" hidden>複製</button>
+                  </div>
+                  <code id="install-command-bun" tabindex="0"><!-- generated:install-commands method=bun lang=zh-TW -->bun add --global bell-pr<!-- /generated:install-commands --></code>
+                </div>
+                <p class="install-note">需要 Bun 與 Node.js 22 以上。</p>
+                <p class="install-next">登入所需工具後，執行 <code>bell-pr</code>。</p>
+              </section>
+              <section class="install-panel" id="install-panel-powershell" data-platform="Windows · WSL2" aria-labelledby="install-heading-powershell">
+                <h2 class="install-method-title" id="install-heading-powershell">ps1</h2>
+                <p class="install-platform">Windows · WSL2</p>
+                <div class="command install-command">
+                  <div class="install-command-heading">
+                    <span class="install-terminal-label"><span aria-hidden="true">›_</span> PowerShell</span>
+                    <button class="copy-button" type="button" data-copy="install-command-powershell" aria-label="複製 PowerShell 安裝指令" hidden>複製</button>
+                  </div>
+                  <code id="install-command-powershell" tabindex="0"><!-- generated:install-commands method=powershell lang=zh-TW -->&amp; {
+  Invoke-RestMethod &#39;https://bell-pr.suzu.tw/install.ps1&#39; -OutFile install.ps1 -ErrorAction Stop
+  powershell -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -Lang zh-TW
+}<!-- /generated:install-commands --></code>
+                </div>
+                <p class="install-note">在 WSL2 Ubuntu 內準備工具與 Codex CLI；若缺少 WSL，會列出設定步驟。</p>
+                <p class="install-next">在 Ubuntu 裡完成登入，再啟動 BELL PR。<a href="install.html#windows">Windows 設定步驟</a></p>
+              </section>
+              <section class="install-panel" id="install-panel-mise" data-platform="macOS · Linux" aria-labelledby="install-heading-mise">
+                <h2 class="install-method-title" id="install-heading-mise">mise</h2>
+                <p class="install-platform">macOS · Linux</p>
+                <div class="command install-command">
+                  <div class="install-command-heading">
+                    <span class="install-terminal-label"><span aria-hidden="true">›_</span> 終端機</span>
+                    <button class="copy-button" type="button" data-copy="install-command-mise" aria-label="複製 mise 安裝指令" hidden>複製</button>
+                  </div>
+                  <code id="install-command-mise" tabindex="0"><!-- generated:install-commands method=mise lang=zh-TW -->MISE_NPM_PACKAGE_MANAGER=npm mise use -g node@24 npm:bell-pr@1.0.0<!-- /generated:install-commands --></code>
+                </div>
+                <p class="install-note">安裝 Node.js 24，固定使用 BELL PR 1.0.0，這次安裝選用 npm。</p>
+                <p class="install-next">用 <code>mise exec -- bell-pr</code> 啟動。</p>
+              </section>
+            </div>
           </div>
         </div>
       </section>
@@ -62,7 +179,7 @@
           <div class="prose">
             <h2 id="requirements">需求</h2>
             <ul>
-              <li><strong>Node.js 22 以上</strong>以使用 npm，或改用 Docker。</li>
+              <li><strong>Node.js 22 以上。</strong>curl 腳本會在需要時準備 Node.js 24；Homebrew、mise 與 WSL 安裝腳本也會提供 Node.js。</li>
               <li><strong>Git 2.40 以上</strong>，將貢獻移到最新目標分支時需要。</li>
               <li><strong>GitHub CLI</strong>（<code>gh</code>），以 <code>gh auth login</code> 登入。BELL PR 用它發布 Draft PR 並尋找專案。</li>
               <li><strong>一套 AI coding CLI</strong>，已安裝並登入：OpenAI Codex CLI，或搭配你的 Claude 方案或 Anthropic API 金鑰的 Claude Code。用量計入你自己的帳號。</li>
@@ -72,10 +189,35 @@
 
             <h2 id="platforms">平台</h2>
             <ul>
-              <li><strong>macOS 與 Linux：</strong>用 npm 安裝。</li>
-              <li><strong>Windows：</strong>安裝 WSL2 與 Linux 發行版，再在其中依 npm 步驟操作。BELL PR 在 Windows 上僅透過 WSL2 執行。</li>
+              <li><strong>macOS 與 Linux：</strong>可選 curl、Homebrew、Bun、mise 或 npm。</li>
+              <li><strong>Windows：</strong>使用 ps1 腳本搭配 WSL2 Ubuntu 或 Debian。目前不支援原生 Windows，這套流程尚未在真實 Windows 主機驗證。<a href="#windows">查看下方 Windows 步驟。</a></li>
               <li><strong>Docker（beta）：</strong>從原始碼建置的映像，內含 Git、GitHub CLI 與 Codex CLI。</li>
             </ul>
+
+            <h2 id="first-start">安裝之後</h2>
+            <p>用 <code>git config --global user.name "Your Name"</code> 與 <code>git config --global user.email "you@example.com"</code> 設定 Git 身分，請將範例值換成自己的名字與電子郵件。執行 <code>gh auth login</code>，再用 <code>codex login</code> 或 <code>claude auth login</code> 登入 AI 工具，最後用 <code>bell-pr doctor</code> 檢查環境。</p>
+            <p>curl 腳本會印出啟動指令與 PATH 設定，請依照它操作，讓終端機找到已安裝的工具。Homebrew 或 Bun 安裝後用 <code>bell-pr</code>；mise 則用 <code>mise exec -- bell-pr</code>。工作時保持終端機開啟；<kbd>Ctrl</kbd>+<kbd>C</kbd> 可停止 BELL PR。</p>
+            <p>尚未登入時，可以用 <code>bell-pr start --force</code> 試用範例專案。範例不呼叫 AI，也不傳送內容到 GitHub；真實 Agent 工作仍需要已登入的 AI 服務。</p>
+
+            <h2 id="windows">Windows 與 WSL2</h2>
+            <ol class="setup-steps">
+              <li>若尚未安裝 WSL2，在系統管理員 PowerShell 執行：
+                <pre><code>wsl --install -d Ubuntu</code></pre>
+                <p>若系統要求，請重新啟動 Windows。開啟 Ubuntu，建立一般 Linux 使用者與密碼。用 <code>wsl --list --verbose</code> 確認版本為 2；必要時執行 <code>wsl --set-version Ubuntu 2</code>。</p>
+              </li>
+              <li>在一般 PowerShell 執行上方 <strong>ps1</strong> 指令。它會在 Ubuntu 中準備 Git、GitHub CLI、Node.js、BELL PR 與 Codex CLI，過程可能要求 Linux 的 sudo 密碼。腳本也支援既有的 Debian 發行版與 Claude Code，但不會代你登入。</li>
+              <li>用 <code>wsl -d Ubuntu</code> 進入 Ubuntu，在裡面設定 Git 身分，再於 Linux 終端機執行：
+                <pre><code>gh auth login
+codex login
+bell-pr doctor
+bell-pr</code></pre>
+                <p>若選擇 Claude Code，改用 <code>claude auth login</code>。專案請放在 WSL 中，例如 <code>~/projects</code>；Windows 版工具的登入狀態不會沿用到 WSL。</p>
+              </li>
+              <li>之後從 PowerShell 啟動只需：
+                <pre><code>wsl -d Ubuntu -- bash -lc '$HOME/.local/bin/bell-pr'</code></pre>
+                <p>若使用其他發行版，請替換 Ubuntu。瀏覽器沒有開啟時，在另一個 WSL 終端機執行 <code>bell-pr open --print --print-token</code>，再於 Windows 開啟印出的連結。連結包含存取憑證，請勿分享。</p>
+              </li>
+            </ol>
 
             <h2 id="npm">用 npm 啟動</h2>
             <pre><code>npx bell-pr</code></pre>
@@ -132,8 +274,8 @@ bell-pr</code></pre>
           <nav class="footer-col" aria-labelledby="footer-source">
             <h2 id="footer-source">開源</h2>
             <ul>
-              <li><!-- generated:product-link key=publicRepoUrl text="Source" --><a href="https://github.com/Suzu1Dev/bell-pr">原始碼</a><!-- /generated:product-link --></li>
-              <li><!-- generated:product-link key=publicRepoUrl path=blob/main/LICENSE text="Apache-2.0 license" --><a href="https://github.com/Suzu1Dev/bell-pr/blob/main/LICENSE">Apache-2.0 授權</a><!-- /generated:product-link --></li>
+              <li><!-- generated:product-link key=publicRepoUrl text="Source" --><a href="https://github.com/Suzu1Dev/bell-pr">Source</a><!-- /generated:product-link --></li>
+              <li><!-- generated:product-link key=publicRepoUrl path=blob/main/LICENSE text="Apache-2.0 license" --><a href="https://github.com/Suzu1Dev/bell-pr/blob/main/LICENSE">Apache-2.0 license</a><!-- /generated:product-link --></li>
             </ul>
           </nav>
           <div class="footer-col">
@@ -141,7 +283,7 @@ bell-pr</code></pre>
             <ul>
               <li><!-- generated:product-link key=supportEmail text="Support" --><!-- /generated:product-link --></li>
               <li><!-- generated:product-link key=securityEmail text="Report a vulnerability" --><!-- /generated:product-link --></li>
-              <li><!-- generated:product-link key=publicRepoUrl path=issues text="Report an issue" --><a href="https://github.com/Suzu1Dev/bell-pr/issues">回報問題</a><!-- /generated:product-link --></li>
+              <li><!-- generated:product-link key=publicRepoUrl path=issues text="Report an issue" --><a href="https://github.com/Suzu1Dev/bell-pr/issues">Report an issue</a><!-- /generated:product-link --></li>
               <li><!-- generated:product-link key=docsUrl text="Documentation" --><!-- /generated:product-link --></li>
             </ul>
           </div>

@@ -7,6 +7,15 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Install BELL PR with a user-local shell script, a repository-hosted Homebrew
+  formula, Bun or mise. A PowerShell helper prepares Ubuntu/Debian on WSL2;
+  English and Traditional Chinese READMEs include setup and repeat-launch commands.
+- English and Traditional Chinese landing pages offer npx, npm, curl, brew, Bun,
+  PowerShell and mise installation tabs with keyboard navigation and copy buttons.
+  The website serves matching shell, PowerShell and WSL helper scripts at short URLs.
+
 ### Changed
 
 - Desktop launches pass a private temporary file URL to the browser opener,

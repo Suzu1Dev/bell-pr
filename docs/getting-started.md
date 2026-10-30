@@ -4,11 +4,16 @@ This guide takes you from installing BELL PR to your first Draft PR. It
 takes a few minutes to set up, and the sample project lets you try every
 step before you touch a real project.
 
+Choose an [installation method](installation.md): npm, the shell installer,
+Homebrew, Bun or mise. On Windows, the [PowerShell setup](installation.md#windows-with-wsl2)
+prepares the tools inside WSL2; finish the sign-in steps there before continuing.
+
 ## Before you start
 
 You need:
 
-- **Node.js 22 or later** ([nodejs.org](https://nodejs.org/en)).
+- **Node.js 22 or later** ([nodejs.org](https://nodejs.org/en)). The shell
+  installer can prepare Node.js 24 when needed.
 - **Git**. Syncing a run onto the latest target branch needs Git 2.40 or
   later. Set your name and e-mail address once:
   `git config --global user.name "Your Name"` and
@@ -32,9 +37,10 @@ You need:
   run in the operating-system sandbox (`sudo apt-get install bubblewrap
   socat` on Debian and Ubuntu). macOS has its sandbox built in.
 
-BELL PR runs on macOS and Linux, and on Windows inside WSL2
-([install WSL](https://learn.microsoft.com/windows/wsl/install), then
-install everything above inside your WSL distribution).
+BELL PR runs on macOS and Linux. Windows uses WSL2, with every tool above
+installed and signed in inside the same distribution; native Windows is not
+supported. The WSL2 setup has not been verified on a real Windows host.
+See [Windows setup](installation.md#windows-with-wsl2).
 
 `bell-pr doctor` checks all of this and prints the command that fixes each
 problem.
@@ -74,6 +80,14 @@ npm install -g bell-pr
 bell-pr
 ```
 
+If you used another [installation method](installation.md), start with `bell-pr`
+(`mise exec -- bell-pr` for mise). After Windows setup, you can launch it from
+PowerShell each time with:
+
+```powershell
+wsl -d Ubuntu -- bash -lc '$HOME/.local/bin/bell-pr'
+```
+
 BELL PR starts on your computer, prints its address and opens BELL PR in your
 browser:
 
@@ -91,6 +105,11 @@ only this computer can reach it; see [Security model](security-model.md).
 > computer. It prints the address again, without the API token, and opens it.
 > More in
 > [Troubleshooting](troubleshooting.md#i-lost-the-address).
+
+In WSL2, browser launch depends on your Windows/WSL setup. If no browser opens,
+run `bell-pr open --print --print-token` in another terminal in the same WSL
+distribution and open that link in your Windows browser. The link contains a
+credential; keep it private.
 
 BELL PR listens on `127.0.0.1:4311`, so only this computer can reach it.
 `bell-pr start --port <port>` picks another port. To run it as a service or
@@ -134,8 +153,9 @@ On **Repositories**, import a project in any of these forms:
 - a GitHub link, such as `https://github.com/owner/repo`;
 - the path of a Git folder on your computer, such as
   `~/projects/repository` (`~/` is your home directory). On Windows, use
-  the path inside WSL2, where BELL PR runs; a Windows folder is under
-  `/mnt/c/`, for example `/mnt/c/projects/repository`.
+  the path inside WSL2, where BELL PR runs. Keep projects in the Linux filesystem
+  such as `~/projects`; an existing Windows folder is mounted under `/mnt/c/`,
+  for example `/mnt/c/projects/repository`. Do not enter a `C:\…` path.
 
 BELL PR makes its own full clone in its data directory. Your own folder is
 never changed: runs never add branches or worktrees to it. A clone that

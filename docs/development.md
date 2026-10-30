@@ -98,6 +98,9 @@ most of them on Linux and macOS with Node.js 22 and 24.
 | `npx tsx scripts/render-generated-regions.ts --check` | The generated product links are current |
 | `node scripts/npm-readme.mjs --check-docs` | Every link in the READMEs and `docs/` resolves, and every error code is in the troubleshooting guide |
 | `node site/check-site.mjs` | The landing site's links and resources, and its size |
+| `node scripts/sync-installers.mjs --check` | Standalone installer identity and the published Homebrew formula |
+| `node --test scripts/install.test.mjs scripts/install-wsl.test.mjs` | Installer argument, failure and environment behavior with isolated tool fixtures |
+| `node --test scripts/install-powershell.test.mjs` | PowerShell installer behavior with WSL fixtures; needs PowerShell (Windows CI uses 5.1) |
 | `node scripts/sync-package-meta.mjs --check` | `package.json` links match `shared/product.ts` |
 | `node scripts/tokenize-css.mjs --check` | The CSS uses the design tokens |
 | `node scripts/generate-third-party-notices.mjs --check` | The third-party notices are current |
@@ -121,6 +124,40 @@ A product link renders nothing while its value in `shared/product.ts` is
 empty, so write the text around it so that it reads well without the link.
 Links to other sites must start with one of the `publicUrls` in
 `scripts/npm-readme.mjs`, which `--check-docs` enforces.
+
+## Installer maintenance
+
+The standalone shell and PowerShell scripts carry generated product metadata
+from `shared/product.ts`. Update their metadata with:
+
+```sh
+node scripts/sync-installers.mjs --write
+npx tsx scripts/render-generated-regions.ts --write
+```
+
+The `install-commands` regions generate Markdown or HTML commands for all seven
+installation methods. Short installer URLs use the product's homepage when set,
+otherwise GitHub. Shell installer messages have embedded
+English and Traditional Chinese dictionaries so a downloaded script needs no
+other files. The PowerShell installer downloads `install-wsl.sh` from the same
+website (or `scripts/install-wsl.sh` from GitHub when no homepage is set).
+`sync-installers.mjs` also keeps the three scripts in `site/` byte-identical to
+their sources. Use `-LocalHelper` explicitly to select the
+adjacent helper in a source checkout for local validation.
+
+After publishing a new version to npm, refresh the Homebrew formula and commit
+it to the tap's main branch:
+
+```sh
+node scripts/sync-installers.mjs --refresh-formula
+```
+
+This downloads the published version from `package.json`, verifies npm's SHA-512
+integrity, and records the tarball's SHA-256 in `Formula/bell-pr.rb`. Do not hash a
+local repack: npm's published bytes are what Homebrew downloads. Normal `--check`
+is offline and keeps the last published formula version while a new release is
+being prepared. The formula installs Node.js, Git and GitHub CLI; AI CLIs and
+account sign-in remain user setup steps.
 
 ## Packaging
 
