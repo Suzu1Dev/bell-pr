@@ -1,12 +1,16 @@
+import { openBrowserFile, type BrowserOpener } from "./browser-open.js";
 /**
  * The `bell-pr` / `bellpr` command: start (the default), open, doctor,
- * version and help. bin/bellpr.mjs loads the bundle of this file
- * (build/cli.mjs) and calls `run`.
+ * token, pair, devices, version and help. bin/bellpr.mjs loads the bundle
+ * of this file (build/cli.mjs) and calls `run`.
  */
 import { spawn } from "node:child_process";
+import { randomBytes } from "node:crypto";
 import { existsSync } from "node:fs";
+import http from "node:http";
 import { parseArgs, type ParseArgsConfig } from "node:util";
-import { readApiToken, rotateApiToken, withApiToken } from "./api-token.js";
+import { apiListenerProof, readApiToken, rotateApiToken, tokensMatch, withApiToken } from "./api-token.js";
+import { product } from "../shared/product.js";
 import { buildDate, version } from "./build-info.js";
 import {
   browserHost,
@@ -18,7 +22,7 @@ import {
   resolvePort,
 } from "./config.js";
 import { readinessChecklist, runDoctorCli } from "./doctor.js";
-import { sm } from "./i18n/index.js";
+import { currentLocale, sm } from "./i18n/index.js";
 import {
   isEntryPoint,
   lockHolderRunning,
@@ -31,6 +35,10 @@ import {
   type StartServerOptions,
 } from "./index.js";
 import { redact } from "./process.js";
+import { clearPairing } from "./pairing.js";
+import { printPairQr } from "./pair-qr.js";
+import { formatters } from "../shared/i18n/locale.js";
+import type { DeviceSummary, PairCodeResponse, PairLockedResponse } from "../shared/pairing.js";
 
 interface Output {
   write(text: string): unknown;
@@ -44,11 +52,15 @@ export interface CliDeps {
   stderr?: Output;
   platform?: NodeJS.Platform;
   /** Opens a URL in the default browser. */
-  openUrl?: (url: string) => void;
+  openUrl?: BrowserOpener;
   /** Passed to startServer by `start`. */
   startOptions?: Partial<StartServerOptions>;
+  /** Starts the listener; tests can arrange a competing start at this boundary. */
+  startServer?: typeof startServer;
   /** Called with the running server after `start`. */
   onStarted?: (server: RunningServer) => void;
+  /** Draws the pairing QR code; tests spy on it. */
+  printPairQr?: typeof printPairQr;
 }
 
 /** A command-line mistake: the message, then exit code 2. */
@@ -161,13 +173,16 @@ function loadEnvFile(file: string | undefined) {
 
 /**
  * Whether opening a browser makes sense here: not when BELLPR_NO_OPEN or CI
- * is set, output is not a terminal, or in a container.
+ * is set, output is not a terminal, in a container or over SSH. Linux
+ * also needs a graphical session; a TTY alone cannot open a browser.
  */
-export function canOpenBrowser(env: NodeJS.ProcessEnv, stdout: Output) {
+export function canOpenBrowser(env: NodeJS.ProcessEnv, stdout: Output, platform = process.platform) {
   return (
     !envFlag(env.BELLPR_NO_OPEN) &&
     !envFlag(env.CI) &&
     Boolean(stdout.isTTY) &&
+    !env.SSH_CONNECTION && !env.SSH_CLIENT && !env.SSH_TTY &&
+    (platform !== "linux" || Boolean(env.DISPLAY?.trim() || env.WAYLAND_DISPLAY?.trim())) &&
     !existsSync("/.dockerenv") &&
     !existsSync("/run/.containerenv")
   );
@@ -181,18 +196,20 @@ export function openInBrowser(url: string, platform = process.platform) {
       : platform === "win32"
         ? ["cmd", ["/c", "start", '""', url]]
         : ["xdg-open", [url]];
-  try {
-    const child = spawn(command, args, {
-      detached: true,
-      stdio: "ignore",
-      windowsHide: true,
-    });
-    // ENOENT: no opener installed. The link is printed anyway.
-    child.on("error", () => {});
-    child.unref();
-  } catch {
-    // Same: the person can open the printed link.
-  }
+  return new Promise<boolean>((resolve) => {
+    try {
+      const child = spawn(command, args, {
+        detached: true,
+        stdio: "ignore",
+        windowsHide: true,
+      });
+      child.once("error", () => resolve(false));
+      child.once("exit", (code) => resolve(code === 0));
+
+    } catch {
+      resolve(false);
+    }
+  });
 }
 
 interface Context {
@@ -200,8 +217,61 @@ interface Context {
   stdout: Output;
   stderr: Output;
   platform: NodeJS.Platform;
-  openUrl: (url: string) => void;
+  openUrl: BrowserOpener;
   deps: CliDeps;
+}
+
+/** Keep automatic launches token-free in argv and headless output. */
+function startBrowserAction(ctx: Context, dataDir: string): ((url: string) => Promise<void>) | undefined {
+  if (!ctx.stdout.isTTY || envFlag(ctx.env.BELLPR_NO_OPEN) || envFlag(ctx.env.CI)) return undefined;
+  return async (url) => {
+    await openBrowserFile(dataDir, url,
+      canOpenBrowser(ctx.env, ctx.stdout, ctx.platform) ? ctx.openUrl : undefined,
+      () => ctx.stdout.write(`${sm().cli.browserOpenHint}\n`));
+  };
+}
+
+/** Only a listener proving possession of this directory's token may receive a login link. */
+async function provenInstance(dataDir: string): Promise<{ lock: LockInfo; token: string } | undefined> {
+  const lock = readLock(dataDir);
+  if (!lock || !lockHolderRunning(dataDir, lock)) return undefined;
+  const tokenFile = dataPaths(dataDir).apiToken;
+  const token = readApiToken(tokenFile);
+  if (!token) return undefined;
+  const nonce = randomBytes(32).toString("hex");
+  const verified = await new Promise<boolean>((resolve) => {
+    try {
+      const probe = http.get(
+        `http://${browserHost(lock.host ?? "127.0.0.1")}:${lock.port}/api/health?challenge=${nonce}`,
+        { headers: { host: `127.0.0.1:${lock.port}` }, timeout: 2000 },
+        (response) => {
+          const expected = apiListenerProof(token, nonce, response.socket.remoteAddress ?? "", response.socket.remotePort ?? 0);
+          let body = "";
+          response.setEncoding("utf8");
+          response.on("data", (chunk: string) => {
+            body += chunk;
+            if (body.length > 10_000) {
+              resolve(false);
+              probe.destroy();
+            }
+          });
+          response.on("error", () => resolve(false));
+          response.on("end", () => {
+            try {
+              const value = JSON.parse(body);
+              resolve(response.statusCode === 200 && value?.name === product.npmPackage &&
+                typeof value.proof === "string" && Boolean(expected && tokensMatch(expected, value.proof)));
+            } catch { resolve(false); }
+          });
+        },
+      );
+      probe.on("timeout", () => probe.destroy());
+      probe.on("error", () => resolve(false));
+    } catch { resolve(false); }
+  });
+  if (!verified || JSON.stringify(readLock(dataDir)) !== JSON.stringify(lock) || readApiToken(tokenFile) !== token)
+    return undefined;
+  return { lock, token };
 }
 
 async function start(args: string[], ctx: Context): Promise<number | undefined> {
@@ -224,6 +294,24 @@ async function start(args: string[], ctx: Context): Promise<number | undefined> 
     },
     ctx.env,
   );
+  const browserAction = startBrowserAction(ctx, config.dataDir);
+  const reuseRunning = async () => {
+    // --no-open, CI and development starts still mean "run a server".
+    // A service must not silently succeed while another process owns it.
+    if (!config.open) return false;
+    const instance = await provenInstance(config.dataDir);
+    if (!instance) return false;
+    const { lock, token } = instance;
+    if ((values.port !== undefined || ctx.env.BELLPR_PORT?.trim()) && lock.port !== config.port)
+      return false;
+    if ((values.host !== undefined || ctx.env.BELLPR_HOST?.trim()) && (lock.host ?? "127.0.0.1") !== config.host)
+      return false;
+    const url = lockUrl(lock);
+    ctx.stdout.write(`${sm().cli.start.reusing({ url })}\n`);
+    await browserAction?.(withApiToken(url, token));
+    return true;
+  };
+  if (await reuseRunning()) return 0;
   // Before anything listens: the same required checks as `bell-pr doctor`.
   // --force is how the sample tour still opens when no AI provider is ready.
   if (values.force) {
@@ -234,17 +322,25 @@ async function start(args: string[], ctx: Context): Promise<number | undefined> 
       port: config.port,
     });
     if (!readiness.ready) {
+      if (await reuseRunning()) return 0;
       ctx.stderr.write(readiness.text);
       ctx.stderr.write(`${sm().cli.start.notReady}\n`);
       return 1;
     }
   }
-  const running = await startServer({
-    config,
-    print: (line) => ctx.stdout.write(`${line}\n`),
-    ...(canOpenBrowser(ctx.env, ctx.stdout) ? { openBrowser: ctx.openUrl } : {}),
-    ...ctx.deps.startOptions,
-  });
+  let running: RunningServer;
+  try {
+    running = await (ctx.deps.startServer ?? startServer)({
+      config,
+      print: (line) => ctx.stdout.write(`${line}\n`),
+      warn: (line) => ctx.stderr.write(`${line}\n`),
+      ...(browserAction ? { openBrowser: browserAction } : {}),
+      ...ctx.deps.startOptions,
+    });
+  } catch (error) {
+    if (error instanceof StartupError && await reuseRunning()) return 0;
+    throw error;
+  }
   ctx.deps.onStarted?.(running);
   // The server keeps the process alive; there is no exit code yet.
   return undefined;
@@ -275,35 +371,181 @@ async function open(args: string[], ctx: Context): Promise<number> {
   loadEnvFile(values["env-file"]);
   const m = sm().cli.open;
   const dataDir = resolveDataDir({ dataDir: values["data-dir"] }, ctx.env);
-  const lock = readLock(dataDir);
-  if (
-    !lock ||
-    !lockHolderRunning(dataDir, lock) ||
-    !(await probeHealth(lock.host ?? "127.0.0.1", lock.port))
-  ) {
+  const instance = await provenInstance(dataDir);
+  if (!instance) {
     ctx.stderr.write(`${m.notRunning({ dataDir })}\n`);
     return 1;
   }
-  const base = lockUrl(lock);
-  const signed = withApiToken(base, readApiToken(dataPaths(dataDir).apiToken));
+  const base = lockUrl(instance.lock);
+  const signed = withApiToken(base, instance.token);
   // The token stays off stdout unless --print-token. The browser still gets it.
   ctx.stdout.write(`${values["print-token"] ? signed : base}\n`);
-  if (!values.print && !values["no-open"] && canOpenBrowser(ctx.env, ctx.stdout))
-    ctx.openUrl(signed);
+  if (!values.print && !values["no-open"] && canOpenBrowser(ctx.env, ctx.stdout, ctx.platform))
+    await openBrowserFile(dataDir, signed, ctx.openUrl,
+      () => ctx.stderr.write(`${sm().cli.browserOpenHint}\n`));
   return 0;
 }
 
-/** `bell-pr token rotate` replaces the token file. The new token is not printed. */
+/**
+ * `bell-pr token rotate` replaces the token file and signs out every paired
+ * device. The new token is not printed.
+ */
 async function rotateToken(args: string[], ctx: Context): Promise<number> {
   const [sub, ...rest] = args;
   if (sub !== "rotate")
     throw new UsageError(sm().cli.token.usage);
   const { values } = parse(rest, commonOptions);
   loadEnvFile(values["env-file"]);
-  const file = dataPaths(resolveDataDir({ dataDir: values["data-dir"] }, ctx.env)).apiToken;
+  const dataDir = resolveDataDir({ dataDir: values["data-dir"] }, ctx.env);
+  const file = dataPaths(dataDir).apiToken;
   await rotateApiToken(file);
-  ctx.stdout.write(`${sm().cli.token.rotated({ path: file })}\n`);
+  await clearPairing(dataDir);
+  ctx.stdout.write(`${sm().cli.token.rotated({ path: file })}\n${sm().cli.token.devicesCleared}\n`);
   return 0;
+}
+
+/** One JSON request to the proven instance, with the install token. */
+function callInstance(
+  { lock, token }: { lock: LockInfo; token: string },
+  method: string,
+  urlPath: string,
+  body: object,
+): Promise<{ status: number; body: unknown }> {
+  const text = JSON.stringify(body);
+  return new Promise((resolve, reject) => {
+    const request = http.request(
+      `http://${browserHost(lock.host ?? "127.0.0.1")}:${lock.port}${urlPath}`,
+      {
+        method,
+        headers: {
+          host: `127.0.0.1:${lock.port}`,
+          authorization: `Bearer ${token}`,
+          "content-type": "application/json",
+          "content-length": String(Buffer.byteLength(text)),
+        },
+        timeout: 10_000,
+      },
+      (response) => {
+        let data = "";
+        response.setEncoding("utf8");
+        response.on("data", (chunk: string) => (data += chunk));
+        response.on("error", reject);
+        response.on("end", () => {
+          let parsed: unknown;
+          try {
+            parsed = data ? JSON.parse(data) : undefined;
+          } catch {
+            parsed = undefined;
+          }
+          resolve({ status: response.statusCode ?? 0, body: parsed });
+        });
+      },
+    );
+    request.on("timeout", () => request.destroy(new Error("timeout")));
+    request.on("error", reject);
+    request.end(text);
+  });
+}
+
+/** A refused request: the status and the server's message, never a token. */
+function requestFailed(ctx: Context, response: { status: number; body: unknown }) {
+  const error = (response.body as { error?: unknown } | undefined)?.error;
+  ctx.stderr.write(
+    `${sm().cli.requestFailed({ status: response.status, error: redact(typeof error === "string" ? error : "") })}\n`,
+  );
+  return 1;
+}
+
+/** The running instance for `dataDir`, or undefined after saying it is not running. */
+async function runningInstance(values: { "data-dir"?: string }, ctx: Context) {
+  const dataDir = resolveDataDir({ dataDir: values["data-dir"] }, ctx.env);
+  const instance = await provenInstance(dataDir);
+  if (!instance) ctx.stderr.write(`${sm().cli.open.notRunning({ dataDir })}\n`);
+  return instance;
+}
+
+/**
+ * `bell-pr pair`: a one-time code for the /pair page, printed with its
+ * address. `--unlock` clears the failure lock instead.
+ */
+async function pair(args: string[], ctx: Context): Promise<number> {
+  const { values } = parse(args, {
+    ...commonOptions,
+    name: { type: "string" },
+    "no-qr": { type: "boolean" },
+    unlock: { type: "boolean" },
+  });
+  loadEnvFile(values["env-file"]);
+  const m = sm().cli.pair;
+  const instance = await runningInstance(values, ctx);
+  if (!instance) return 1;
+  if (values.unlock) {
+    const response = await callInstance(instance, "POST", "/api/pair/unlock", {});
+    if (response.status !== 204) return requestFailed(ctx, response);
+    ctx.stdout.write(`${m.unlocked}\n`);
+    return 0;
+  }
+  const response = await callInstance(instance, "POST", "/api/pair/codes", values.name ? { name: values.name } : {});
+  const format = formatters(currentLocale());
+  if (response.status === 423) {
+    const { lockedUntil } = response.body as PairLockedResponse;
+    ctx.stderr.write(
+      `${lockedUntil ? m.locked({ lockedUntil: format.dateTime(lockedUntil) }) : m.lockedDamaged}\n${m.unlockHint}\n`,
+    );
+    return 1;
+  }
+  if (response.status !== 201) return requestFailed(ctx, response);
+  const { code, expiresAt, pairUrl } = response.body as PairCodeResponse;
+  ctx.stdout.write(`${m.created({ pairUrl, code, expiresAt: format.time(expiresAt) })}\n`);
+  if (!values["no-qr"]) (ctx.deps.printPairQr ?? printPairQr)(`${pairUrl}#code=${code}`, ctx.stdout);
+  return 0;
+}
+
+/** `bell-pr devices list` and `bell-pr devices revoke <id>`. */
+async function devices(args: string[], ctx: Context): Promise<number> {
+  const [sub, ...rest] = args;
+  const m = sm().cli.devices;
+  if (sub === "list") {
+    const { values } = parse(rest, commonOptions);
+    loadEnvFile(values["env-file"]);
+    const instance = await runningInstance(values, ctx);
+    if (!instance) return 1;
+    const response = await callInstance(instance, "GET", "/api/devices", {});
+    if (response.status !== 200) return requestFailed(ctx, response);
+    const list = response.body as DeviceSummary[];
+    const format = formatters(currentLocale());
+    ctx.stdout.write(
+      list.length
+        ? list
+            .map((device) =>
+              m.line({
+                id: device.id,
+                name: device.name,
+                createdAt: format.dateTime(device.createdAt),
+                lastUsedAt: device.lastUsedAt ? format.dateTime(device.lastUsedAt) : m.neverUsed,
+              }),
+            )
+            .join("\n") + "\n"
+        : `${m.none}\n`,
+    );
+    return 0;
+  }
+  if (sub === "revoke" && rest[0] && !rest[0].startsWith("-")) {
+    const [id, ...options] = rest;
+    const { values } = parse(options, commonOptions);
+    loadEnvFile(values["env-file"]);
+    const instance = await runningInstance(values, ctx);
+    if (!instance) return 1;
+    const response = await callInstance(instance, "DELETE", `/api/devices/${encodeURIComponent(id)}`, {});
+    if (response.status === 404) {
+      ctx.stderr.write(`${m.notFound({ id })}\n`);
+      return 1;
+    }
+    if (response.status !== 204) return requestFailed(ctx, response);
+    ctx.stdout.write(`${m.revoked({ id })}\n`);
+    return 0;
+  }
+  throw new UsageError(m.usage);
 }
 
 function printVersion(args: string[], ctx: Context): number {
@@ -371,7 +613,7 @@ export async function main(
     stdout: deps.stdout ?? process.stdout,
     stderr: deps.stderr ?? process.stderr,
     platform: deps.platform ?? process.platform,
-    openUrl: deps.openUrl ?? ((url) => openInBrowser(url)),
+    openUrl: deps.openUrl ?? ((url) => openInBrowser(url, deps.platform ?? process.platform)),
     deps,
   };
   const [first, ...rest] = argv;
@@ -382,7 +624,7 @@ export async function main(
   try {
     // `bell-pr start --help` and the like show the help instead of failing.
     if (
-      ["start", "open", "token", "version", "--version", "-v"].includes(first) ||
+      ["start", "open", "token", "pair", "devices", "version", "--version", "-v"].includes(first) ||
       first?.startsWith("-")
     )
       if (wantsHelp(argv)) return help();
@@ -395,6 +637,10 @@ export async function main(
         return await open(rest, ctx);
       case "token":
         return await rotateToken(rest, ctx);
+      case "pair":
+        return await pair(rest, ctx);
+      case "devices":
+        return await devices(rest, ctx);
       case "doctor":
         return await doctor(rest, ctx);
       case "version":

@@ -5,6 +5,7 @@ const name = product.name;
 const bin = product.binNames[0];
 
 export default {
+  browserOpenHint: `Could not open the browser. Run \`${bin} open --print --print-token\` to get the address.`,
   /** `bell-pr help`. */
   help: ({ version }: { version: string }) =>
     [
@@ -13,10 +14,12 @@ export default {
       `Usage: ${bin} [command] [options]`,
       "",
       "Commands:",
-      `  start      Start ${name} (the default command)`,
+      `  start      Start ${name}, or open its running workspace (the default command)`,
       "  open       Print the address of the running server and open it in the browser",
       "  doctor     Check git, gh and the agent CLIs (--json for machine output)",
-      "  token      Replace the API token (`token rotate`)",
+      "  token      Replace the API token and sign out paired devices (`token rotate`)",
+      "  pair       Make a one-time code to pair a phone or another computer",
+      "  devices    List paired devices (`devices list`) or revoke one (`devices revoke <id>`)",
       "  version    Show the version, Node.js, platform and data directory",
       "  help       Show this help",
       "",
@@ -33,6 +36,11 @@ export default {
       "  --print-token       Print the address including the API token",
       "  --no-open           Do not open the browser",
       `  --data-dir <dir>    Data directory of the running ${name}`,
+      "",
+      "Options for pair:",
+      "  --name <name>       Suggested name for the new device",
+      "  --no-qr             Do not draw the QR code",
+      "  --unlock            Clear the pairing lock and the failure count",
       "",
       `Lost the address? Run \`${bin} open\` on this computer to print and open it again.`,
     ].join("\n"),
@@ -93,6 +101,7 @@ export default {
     /** The startup line with the address. */
     startup: ({ version, url }: { version: string; url: string }) =>
       `${name} ${version} → ${url}`,
+    reusing: ({ url }: { url: string }) => `${name} is running → ${url}`,
     /** Data left by an older version in the current folder; nothing moves. */
     legacyDataDir: ({ dataDir }: { dataDir: string }) =>
       `Found ${name} data in ./.bellpr. ${name} now uses ${dataDir} and moved nothing. To keep using the old folder, start it with: ${bin} start --data-dir ./.bellpr`,
@@ -121,6 +130,9 @@ export default {
     /** --host or BELLPR_HOST is not 127.0.0.1 (and not another loopback address). */
     exposedHost: ({ host }: { host: string }) =>
       `${name} is listening on ${host}, not only on 127.0.0.1. That address is an explicit setting (--host or BELLPR_HOST). The API token is still required.`,
+    /** 0.0.0.0 / :: without BELLPR_PUBLIC_URL: remote clients are refused by the Host guard. */
+    wildcardHostNeedsPublicUrl: ({ host }: { host: string }) =>
+      `${name} is listening on ${host} without BELLPR_PUBLIC_URL. Remote connections receive HTTP 403 until you set BELLPR_PUBLIC_URL to the HTTPS origin browsers use (for example https://bell.example.com).`,
   },
   /** `bell-pr open`. */
   open: {
@@ -132,5 +144,38 @@ export default {
     rotated: ({ path }: { path: string }) =>
       `Replaced the API token in ${path}. A running ${name} uses the new token on the next request. Run \`${bin} open\` to open the app with it.`,
     usage: `Run \`${bin} token rotate\` to replace the API token.`,
+    /** Printed after `rotated`. */
+    devicesCleared: "Paired devices are signed out and any pairing code is void. Pair them again with a new code.",
   },
+  /** `bell-pr pair`. The code is shown; no token ever is. */
+  pair: {
+    created: ({ pairUrl, code, expiresAt }: { pairUrl: string; code: string; expiresAt: string }) =>
+      [
+        `On the other device, open ${pairUrl}`,
+        `and enter the pairing code: ${code}`,
+        `The code works once and expires at ${expiresAt} (in 5 minutes). A new code replaces it.`,
+      ].join("\n"),
+    locked: ({ lockedUntil }: { lockedUntil: string }) =>
+      `Pairing is locked until ${lockedUntil} after too many wrong codes.`,
+    /** The failure record is missing or damaged, so pairing stays locked. */
+    lockedDamaged: "Pairing is locked: its record of failed attempts is missing or damaged.",
+    /** Also sent with every 423 response. */
+    unlockHint: `If you made the failed attempts yourself, run \`${bin} pair --unlock\` on the computer running ${name}.`,
+    unlocked: "Pairing is unlocked and its failure count is cleared.",
+    /** A device paired without a name. */
+    defaultDeviceName: "Paired device",
+  },
+  /** `bell-pr devices`. */
+  devices: {
+    usage: `Run \`${bin} devices list\` or \`${bin} devices revoke <id>\`.`,
+    none: "No paired devices.",
+    line: ({ id, name, createdAt, lastUsedAt }: { id: string; name: string; createdAt: string; lastUsedAt: string }) =>
+      `${id}  ${name}  paired ${createdAt}  last used ${lastUsedAt}`,
+    neverUsed: "never",
+    revoked: ({ id }: { id: string }) => `Revoked ${id}. Its token no longer works.`,
+    notFound: ({ id }: { id: string }) => `No paired device has the id ${id}. Run \`${bin} devices list\` to see them.`,
+  },
+  /** A pair or devices request the running server refused. */
+  requestFailed: ({ status, error }: { status: number; error: string }) =>
+    `${name} answered ${status}: ${error}`,
 };

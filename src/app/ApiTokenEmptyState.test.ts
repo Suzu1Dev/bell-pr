@@ -12,7 +12,7 @@ test("a missing API token shows how to open bell-pr, not the request header", ()
     createElement(LocaleProvider, { locale: "en", messages: en }, createElement(ApiTokenEmptyState)),
   );
   assert.match(english, /class="empty-state"/);
-  assert.match(english, /Open bell-pr from this computer by running `bell-pr open`\./);
+  assert.match(english, /Run `bell-pr` on the computer hosting BELL PR to reopen your workspace\./);
   assert.doesNotMatch(english, /Bearer|X-Bell-Token/);
 
   const chinese = renderToStaticMarkup(
@@ -22,6 +22,6 @@ test("a missing API token shows how to open bell-pr, not the request header", ()
       createElement(ApiTokenEmptyState),
     ),
   );
-  assert.match(chinese, /請在這台電腦執行 `bell-pr open` 開啟 bell-pr。/);
+  assert.match(chinese, /請在執行 BELL PR 的電腦上執行 `bell-pr`，重新開啟工作台。/);
   assert.doesNotMatch(chinese, /Bearer|X-Bell-Token/);
 });

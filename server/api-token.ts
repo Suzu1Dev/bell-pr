@@ -8,10 +8,11 @@
  * The file is mode 0600. The token is a bearer secret: it is not written
  * to the server log, the lock file, or `bell-pr doctor` output.
  */
-import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
+import { createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { chmod, mkdir } from "node:fs/promises";
 import { readFileSync } from "node:fs";
 import path from "node:path";
+import { isIP } from "node:net";
 import { writeDurable } from "./fs-atomic.js";
 
 /** 32 bytes, hex-encoded. */
@@ -66,6 +67,18 @@ export function tokensMatch(expected: string, presented: string): boolean {
   const left = createHash("sha256").update(expected).digest();
   const right = createHash("sha256").update(presented).digest();
   return timingSafeEqual(left, right);
+}
+
+/** Proves this install owns a listener, without sending its token to that listener. */
+export function apiListenerProof(token: string, nonce: string, address: string, port: number): string | undefined {
+  const host = address.toLowerCase().replace(/^::ffff:/, "");
+  if (!/^[0-9a-f]{64}$/.test(nonce) || !isIP(host) || !Number.isInteger(port) || port < 1 || port > 65535)
+    return undefined;
+  // Fixed purpose and actual socket endpoint prevent cross-protocol use
+  // and relaying the challenge to another BELL listener.
+  return createHmac("sha256", token)
+    .update(`bellpr-listener:v1\n${nonce}\n${host}\n${port}`)
+    .digest("hex");
 }
 
 /** The page address that carries the token in the fragment, never the query. */

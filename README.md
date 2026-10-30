@@ -57,6 +57,7 @@ BELL PR is a local workbench. Install and sign in to these tools **before**
 the Quickstart; `bell-pr doctor` prints a fix command for each miss.
 
 - **Node.js 22 or later** ([nodejs.org](https://nodejs.org/en)).
+- `engines` states the minimum supported Node.js; CI pins Node.js 24.22.1 (and npm 11.21.1).
 - **Git**, with your name and e-mail set
   (`git config --global user.name` / `user.email`). Syncing a run onto the
   latest target branch needs **Git 2.40 or later**.
@@ -449,11 +450,15 @@ Requests that change data must use `application/json`.
 address. The line printed at start does not include the token, so a service
 log does not either. `bell-pr open` prints that address without the token
 and gives the token to the browser. `bell-pr open --print` only prints it,
-still without the token. `bell-pr open --print-token` prints the address
+still without the token. Prefer `bell-pr pair` for phones and other devices.
+For SSH or headless hosts where you cannot pair,
+`bell-pr open --print --print-token` is a fallback that prints the address
 with the token (add `--print` to skip the browser). Treat that address like
 a password. It is not written to the server log or to `bell-pr doctor --json`.
 
-The token can remain in browser history; run `bell-pr token rotate` if you share this browser profile.
+The install API token can remain in browser history if you print it into a
+URL; prefer pairing. Run `bell-pr token rotate` if that token may have
+leaked — it also invalidates every paired device.
 
 ## Configuration
 
@@ -467,8 +472,8 @@ Settings are used unless a variable sets them.
 | Variable | Default | What it sets |
 | --- | --- | --- |
 | `BELLPR_PORT` | `4311` | Port of the web interface and the API (1024 to 65535) |
-| `BELLPR_HOST` | `127.0.0.1` | Address to listen on; to reach BELL PR from other machines, keep it and add an HTTPS reverse proxy with `BELLPR_PUBLIC_URL` |
-| `BELLPR_PUBLIC_URL` | none | The address browsers use behind a reverse proxy or another published port |
+| `BELLPR_HOST` | `127.0.0.1` | Address to listen on; keep loopback and reach other machines with Tailscale serve (or another private HTTPS front) plus `BELLPR_PUBLIC_URL` — not Funnel, not the public internet |
+| `BELLPR_PUBLIC_URL` | none | HTTPS origin browsers use (no path), required for Tailscale serve / remote access; without it remote Hosts get 403 |
 | `BELLPR_ALLOWED_ORIGINS` | none | Extra exact origins to accept, comma-separated |
 | `BELLPR_DATA_DIR` | `~/.bellpr` | The data directory |
 | `BELLPR_NO_OPEN` | not set | `1` never opens a browser |
@@ -609,3 +614,68 @@ or sponsored by GitHub, Inc., OpenAI, or Anthropic PBC. GitHub, OpenAI,
 Codex, Anthropic, Claude and Claude Code are trademarks of their
 respective owners; BELL PR names them only to say which tools it works
 with.
+
+Interactive SSH and headless starts may hint
+`bell-pr open --print --print-token` as a fallback when you cannot pair;
+run it explicitly if you need that private authorized URL. Prefer
+`bell-pr pair` when the other device can open `/pair`. Desktop launches use
+a temporary private `file://` redirect.
+
+## Prepare the host and pair devices
+
+Before installing with `npm install -g bell-pr`, install and sign in to your AI
+provider's CLI, install Git, and configure your Git identity (`git config --global
+user.name` and `git config --global user.email`). Run `bell-pr doctor` to check
+readiness. Missing prerequisites block `bell-pr start`; follow the doctor's fix
+commands, sign in to the selected provider, or configure the missing Git identity,
+then run doctor again before starting.
+
+Run `bell-pr pair` on the host and open the pairing page on the other device.
+Enter the code (or scan the QR code), optionally name the device, and pair it. The QR may not scan on a light-background terminal — use a dark background, or just open the printed URL. If the URL is too long, only the URL is printed, no QR.
+Prefer pairing over token URLs: a token URL stays in browser history. Paired-device
+credentials stay in that browser's localStorage; install tokens from launch links
+stay in sessionStorage and take precedence. API requests use the Authorization
+header. Browser storage must be enabled.
+
+Manage devices from the device list in Settings. On the host (including
+headless hosts), use `bell-pr devices list` and
+`bell-pr devices revoke <id>`. Both the install token and a paired-device
+credential can list and revoke any device. `bell-pr token rotate` replaces
+the install API token and invalidates every paired device; pair again
+afterward.
+
+## What to do if pairing is locked
+
+If pairing fails with HTTP **423** (or the CLI says pairing is locked), too many wrong tries temporarily locked pairing. This protects against code guessing on Tailscale serve / `ssh -L` paths where every client appears as `127.0.0.1`.
+
+**On the host** (where `bell-pr` runs), with the install token:
+
+```bash
+bell-pr pair --unlock
+bell-pr pair [--name "device name"]
+```
+
+Notes:
+
+- `bell-pr pair` without `--unlock` does **not** clear the lock or failure counter while locked.
+- A **device token cannot unlock** — only the install token on the host can.
+- If the lock/counter file is missing or corrupt, the server **fails closed** (treats pairing as locked) and hints `bell-pr pair --unlock`.
+- After a successful pair, the counter resets automatically.
+
+## Stolen or lost device
+
+Any paired device may list and revoke any device (including others). Device
+credentials still cannot create pairing codes, rotate the install token, or
+unlock pairing.
+
+1. From another paired device, revoke it in the device list in Settings.
+   On the host, run `bell-pr devices revoke <id>` with the install token.
+2. If your own device was revoked (or you no longer trust any device
+   credential), on the **host** run:
+
+```bash
+bell-pr token rotate
+```
+
+That replaces the install API token and invalidates every paired device.
+Then pair again with `bell-pr pair`.

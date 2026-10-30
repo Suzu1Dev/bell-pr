@@ -62,8 +62,8 @@ and `version` find the data directory of the BELL PR you mean.
 | Variable | Default | What it sets |
 | --- | --- | --- |
 | `BELLPR_PORT` | `4311` | Port of the web interface and the API, 1024 to 65535. Also `--port`. |
-| `BELLPR_HOST` | `127.0.0.1` | Address to listen on. Also `--host`. The default accepts connections from this computer only. `0.0.0.0` or `::` listen on every address (the Docker image uses this inside the container) but still answer only requests addressed to this computer or to `BELLPR_PUBLIC_URL`. Any other address needs `BELLPR_PUBLIC_URL`. |
-| `BELLPR_PUBLIC_URL` | none | The address browsers use when BELL PR sits behind a reverse proxy or a different published port, without a path, such as `https://bell.example.com`. BELL PR accepts requests for it and prints it as its address. It must be `https` unless it points to this computer. |
+| `BELLPR_HOST` | `127.0.0.1` | Address to listen on. Also `--host`. Prefer loopback. For another machine or phone, keep loopback and use Tailscale serve (not Funnel) with `BELLPR_PUBLIC_URL`. `0.0.0.0` or `::` listen on every address (Docker uses this inside the container) but still answer only this computer or `BELLPR_PUBLIC_URL`. Without `BELLPR_PUBLIC_URL`, a warning is printed to stderr and remote requests get 403. |
+| `BELLPR_PUBLIC_URL` | none | HTTPS origin browsers use (no path), e.g. `https://<your-url>`. Required for Tailscale serve / remote Host acceptance; without it those requests get 403. Must be `https` unless it points to this computer. |
 | `BELLPR_ALLOWED_ORIGINS` | none | Extra exact origins to accept, separated by commas. Rarely needed: `BELLPR_PUBLIC_URL` already adds its own. Plain `http` only for loopback addresses. |
 | `BELLPR_DATA_DIR` | `~/.bellpr` | Where repositories, worktrees, run records and settings live. Also `--data-dir`. An absolute path is safest. |
 | `BELLPR_NO_OPEN` | not set | Any value other than `0` or `false` stops BELL PR from opening a browser at start and for `bell-pr open`. It also stays closed in CI, in containers and when the output is not a terminal. Also `--no-open`. |
@@ -141,3 +141,8 @@ The server writes one log file per day to `<data dir>/logs/`
 and 50 MB, and redacts secrets. Prompts and page contents are never
 logged. In a terminal it also prints every entry in a readable form; under
 a service manager or in a container it prints warnings and errors only.
+
+Prefer `bell-pr pair` when the other device can open `/pair`. Interactive
+SSH and headless starts may hint `bell-pr open --print --print-token` as a
+fallback when you cannot pair; run it explicitly if you need that private
+authorized URL. Desktop launches use a temporary private `file://` redirect.

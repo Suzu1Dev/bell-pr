@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { spawn, type ChildProcess } from "node:child_process";
 import { once } from "node:events";
 import {
+  cpSync,
   existsSync,
   mkdirSync,
   readFileSync,
@@ -225,6 +226,67 @@ test("an invalid BELLPR_ALLOWED_ORIGINS is reported in the CLI's language", () =
         error instanceof ConfigError && /^BELLPR_ALLOWED_ORIGINS 必須/.test(error.message),
     ),
   );
+});
+
+test("a wildcard host without BELLPR_PUBLIC_URL warns once that remotes get 403", async () => {
+  const box = await sandbox();
+  try {
+    const warnings: string[] = [];
+    const printed: string[] = [];
+    await withLocale("en", async () => {
+    for (const host of ["0.0.0.0", "::"] as const) {
+      warnings.length = 0;
+      printed.length = 0;
+      const running = await startServer({
+        config: resolveConfig(
+          { host, port: String(await freePort()), dataDir: box.data },
+          box.env,
+        ),
+        handleExit: false,
+        print: (line) => printed.push(line),
+        warn: (line) => warnings.push(line),
+      });
+      try {
+        assert.equal(warnings.length, 1, host);
+        assert.match(warnings[0]!, /BELLPR_PUBLIC_URL/);
+        assert.match(warnings[0]!, /403/);
+        assert.equal(
+          printed.some((line) => /API token is still required/.test(line)),
+          false,
+          host,
+        );
+      } finally {
+        await running.shutdown();
+      }
+    }
+    });
+    // With PUBLIC_URL set, keep the generic exposed-host line instead.
+    warnings.length = 0;
+    printed.length = 0;
+    await withLocale("en", async () => {
+      const withUrl = await startServer({
+        config: resolveConfig(
+          { host: "0.0.0.0", port: String(await freePort()), dataDir: box.data },
+          { ...box.env, BELLPR_PUBLIC_URL: "https://bell.example.com" },
+        ),
+        handleExit: false,
+        print: (line) => printed.push(line),
+        warn: (line) => warnings.push(line),
+      });
+      try {
+        assert.equal(warnings.length, 0);
+        assert.equal(
+          printed.some((line) => /listening on 0\.0\.0\.0/.test(line) && /API token/.test(line)),
+          true,
+          printed.join("\n"),
+        );
+      } finally {
+        await withUrl.shutdown();
+      }
+    });
+  } finally {
+    await box.cleanup();
+  }
 });
 
 test("an out-of-range limit is reported in the CLI's language", () => {
@@ -716,6 +778,70 @@ test("createApp revalidates the page, caches hashed assets for good and explains
     }
     await workbench.shutdown();
     await box.cleanup();
+  }
+});
+
+async function serveFromDotPath() {
+  const box = await sandbox();
+  const store = new Store(box.data);
+  await store.initialize();
+  const workbench = new Workbench(store);
+  // npm i -g under nvm, ~/.local or ~/.npm-global puts the UI below a dot directory.
+  const staticDirectory = path.join(box.directory, ".nvm", "versions", "lib", "bell-pr", "dist");
+  mkdirSync(path.dirname(staticDirectory), { recursive: true });
+  cpSync(box.env.BELLPR_STATIC_DIR!, staticDirectory, { recursive: true });
+  writeFileSync(path.join(staticDirectory, ".env"), "SYNTHETIC_SECRET=dotfile-must-not-leak\n");
+  const app = createApp(workbench, { staticDirectory });
+  const server = app.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  const port = (server.address() as AddressInfo).port;
+  const fetchPage = (route: string) =>
+    get(`http://127.0.0.1:${port}${route}`, { host: "127.0.0.1:4311" });
+  const close = async () => {
+    server.closeAllConnections();
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+    await app.locals.insights.shutdown();
+    await app.locals.discovery.shutdown();
+    await workbench.shutdown();
+    await box.cleanup();
+  };
+  return { fetchPage, close };
+}
+
+test("an install below a dot-prefixed directory serves the page on every route", async () => {
+  const { fetchPage, close } = await serveFromDotPath();
+  try {
+    for (const route of ["/", "/pair", "/some/deep/link"]) {
+      const page = await fetchPage(route);
+      assert.equal(page.status, 200, route);
+      assert.match(page.body, /<title>ui<\/title>/, route);
+    }
+  } finally {
+    await close();
+  }
+});
+
+test("dotfiles inside the UI directory are never served", async () => {
+  const { fetchPage, close } = await serveFromDotPath();
+  try {
+    for (const route of ["/.env", "/pair/../.env", "/%2eenv"]) {
+      const page = await fetchPage(route);
+      assert.doesNotMatch(page.body, /dotfile-must-not-leak/, route);
+    }
+  } finally {
+    await close();
+  }
+});
+
+test("the page served from a dot-prefixed install is still revalidated", async () => {
+  const { fetchPage, close } = await serveFromDotPath();
+  try {
+    for (const route of ["/", "/pair", "/some/deep/link"]) {
+      const page = await fetchPage(route);
+      assert.equal(page.headers["cache-control"], "no-cache", route);
+    }
+  } finally {
+    await close();
   }
 });
 

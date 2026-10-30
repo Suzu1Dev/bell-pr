@@ -262,3 +262,19 @@ test("secrets: the URL-credential shape takes linear time on a crafted line", ()
   // A user name never holds a colon, so the password takes the rest: the whole pair is still masked.
   assert.equal(redact("https://user:pass:word@host/"), "https://[REDACTED]@host/");
 });
+
+test("secrets: device tokens and pairing codes are masked; ids that only look alike stay", () => {
+  const token = `bpd_${fakeHex}`;
+  assert.equal(redact(`device ${token} paired`), "device [REDACTED] paired");
+  assert.equal(redact(`Bearer ${token}`), "Bearer [REDACTED]");
+  assert.equal(redact(`bpd_${"A1b2-_".repeat(4)}`), "[REDACTED]");
+  assert.equal(secretInPatch(`+const t = "${token}";`), true);
+  assert.equal(redact("code FAKE-C0DE, then 0000-ZZZZ."), "code [REDACTED], then [REDACTED].");
+  assert.equal(redact("GET /pair?code=FAKEC0DE&x=1"), "GET /pair?code=[REDACTED]&x=1");
+  assert.equal(redact("https://bell.example/pair?code=FAKE-C0DE#top"), "https://bell.example/pair?code=[REDACTED]#top");
+  assert.equal(redact("https://bell.example/pair#code=FAKE-C0DE"), "https://bell.example/pair#code=[REDACTED]");
+  assert.equal(secretInPatch("code FAKE-C0DE"), false);
+  // UUID runs, lowercase words and longer ids are not pairing codes.
+  for (const text of ["abababab-7777-4777-8777-777777777777", "ABABABAB-7777-4777-8777-777777777777", "test-1234", "ABCD-EFGH-JK", "bpd_short"])
+    assert.equal(redact(text), text);
+});

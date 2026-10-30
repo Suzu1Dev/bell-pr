@@ -44,6 +44,18 @@ const m: Translation<typeof en> = {
     connected: "已連線",
   },
   general: {
+    devices: {
+      unknown: "無資料",
+      title: "裝置",
+      text: "任何已配對裝置都可列出並撤銷任何裝置。",
+      current: "此裝置",
+      created: "建立時間",
+      lastUsed: "上次使用",
+      never: "尚未使用",
+      revoke: "撤銷裝置",
+      empty: "沒有已配對裝置。",
+      access: "裝置遺失或遭竊？請從另一台已配對裝置撤銷，或在主機執行 bell-pr token rotate 使所有裝置失效。",
+    },
     language: {
       title: "語言",
       text: "介面的語言，也是之後新的貢獻、專案分析與問答使用的語言；已開始的貢獻沿用開始時的語言，已經產生的內容不會翻譯。",

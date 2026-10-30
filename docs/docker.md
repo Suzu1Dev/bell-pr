@@ -47,9 +47,15 @@ docker run -d --name bell-pr \
   image listens on `0.0.0.0` inside the container (an explicit setting; BELL
   PR prints a warning) and still requires the API token in `/data/api-token`.
   Do not publish the port on all interfaces unless you mean to. For access
-  from other machines, put an HTTPS reverse proxy in front, as
-  [docs/self-hosting.md](self-hosting.md) describes, and keep the token URL
-  private.
+  from other machines, use Tailscale serve plus pairing with
+  `BELLPR_PUBLIC_URL`, as
+  [Self-hosting: Reach BELL PR from another machine](self-hosting.md#reach-bell-pr-from-another-machine)
+  describes (never Tailscale Funnel; keep it off the public internet). An
+  HTTPS reverse proxy on the same host is an advanced option: it must not
+  rewrite `Host`, and you must set `BELLPR_PUBLIC_URL`. Prefer pairing;
+  manage devices from the device list in Settings, or on the host with
+  `bell-pr devices list` / `bell-pr devices revoke <id>`. Keep any
+  install-token URL private.
 - `bellpr-data` holds repositories, worktrees and run records (`/data`,
   `BELLPR_DATA_DIR`). `bellpr-home` keeps the container user's home:
   CLI sign-ins, the git configuration and anything you install with
@@ -88,15 +94,19 @@ or ask the running server for its address again, with your container's name
 in place of `bell-pr`:
 
 ```sh
-docker exec <container> bell-pr open --print --print-token
+docker exec <container> bell-pr open --print
 ```
 
-The browser never opens by itself from a container, so `--print` is the way to
-go. Add `--print-token`: the printed address then ends with `#bell_token=`
-and signs the page in. Without `--print-token` the printed address has no
-token. The startup line in `docker logs` does not include the token. Treat
-the `--print-token` address like a password. The health check (`GET /api/health`) does not need
-the token and is built into the image, so `docker ps` shows when BELL PR is
+The browser never opens by itself from a container. Prefer pairing when
+another device can open `/pair` on your private network (see
+[Self-hosting](self-hosting.md#reach-bell-pr-from-another-machine)). For
+SSH or headless use when you cannot pair,
+`docker exec <container> bell-pr open --print --print-token` is a fallback:
+the printed address ends with `#bell_token=` and signs the page in. Without
+`--print-token` the printed address has no token. The startup line in
+`docker logs` does not include the token. Treat the `--print-token` address
+like a password. The health check (`GET /api/health`) does not need the
+token and is built into the image, so `docker ps` shows when BELL PR is
 ready.
 
 To check the tools inside the container, run
@@ -198,7 +208,9 @@ volumes:
 ```sh
 docker rm -f bell-pr
 docker run -d --name bell-pr ... bell-pr
-docker exec bell-pr bell-pr open --print --print-token
+docker exec bell-pr bell-pr open --print
+# fallback when you cannot pair:
+# docker exec bell-pr bell-pr open --print --print-token
 ```
 
 Agents that were still running when the old container stopped are gone;

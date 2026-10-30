@@ -30,3 +30,6 @@ playwright-report/
 
 # Landing site build output (deployed separately, never committed)
 site/dist/
+
+# Local agent prompts (never ship)
+.codex-prompts/

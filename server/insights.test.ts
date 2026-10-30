@@ -1475,6 +1475,11 @@ test("analysis sends and persists the chosen model even when repository settings
 
 test("Claude Code analysis uses the signed-in CLI without tools, an inline schema and Claude usage fields", async () => {
   const f = await fixture();
+  // Host may export an Anthropic key for other tools; this case asserts the
+  // analysis spawn omits it so Claude Code uses its signed-in CLI session.
+  const previousAnthropicKey = process.env.ANTHROPIC_API_KEY;
+  delete process.env.ANTHROPIC_API_KEY;
+  try {
   const calls: {
     executable: string;
     args: string[];
@@ -1556,6 +1561,10 @@ test("Claude Code analysis uses the signed-in CLI without tools, an inline schem
   } finally {
     await service.shutdown();
     await f.cleanup();
+  }
+  } finally {
+    if (previousAnthropicKey === undefined) delete process.env.ANTHROPIC_API_KEY;
+    else process.env.ANTHROPIC_API_KEY = previousAnthropicKey;
   }
 });
 

@@ -4,6 +4,20 @@ import { product } from "../../../shared/product";
 import type en from "../en/common";
 
 const m: Translation<typeof en> = {
+  pair: {
+    title: "配對此裝置",
+    explainer: "請在主機電腦執行 bell-pr pair，再於此輸入配對碼。",
+    code: "配對碼",
+    name: "裝置名稱（選填）",
+    submit: "配對裝置",
+    pairing: "配對中…",
+    invalid: "配對碼無效或已過期。請執行 bell-pr pair 取得新的配對碼。",
+    locked: "配對暫時鎖定。",
+    remaining: ({ seconds }) => `請於 ${seconds} 秒後再試。`,
+    rateLimited: "嘗試次數過多，請稍後再試。",
+    failed: "無法配對或儲存此裝置。請檢查瀏覽器儲存空間後再試。",
+    open: "配對此裝置",
+  },
   runStatus: {
     queued: "等待執行",
     awaiting_plan: "等待確認計畫",
@@ -56,7 +70,7 @@ const m: Translation<typeof en> = {
   errors: {
     serverUnreachable: `無法連線至本機 ${product.name} 服務，請確認它仍在執行。`,
     generic: "操作未完成，請再試一次。",
-    apiTokenRequired: `請在這台電腦執行 \`${product.binNames[0]} open\` 開啟 ${product.binNames[0]}。`,
+    apiTokenRequired: `請在執行 ${product.name} 的電腦上執行 \`${product.binNames[0]}\`，重新開啟工作台。`,
   },
   failureText: {
     label: ({ label, fullWidth }) => (fullWidth ? `${label}。` : `${label}.`),

@@ -182,7 +182,7 @@ function AppRoot() {
   const [doctorLive, setDoctorLive] = useState(false);
   const [doctorSettled, setDoctorSettled] = useState(false);
   const doctor = useDoctor({
-    enabled: !doctorSettled || doctorLive || view === "welcome",
+    enabled: !data.apiTokenRequired && (!doctorSettled || doctorLive || view === "welcome"),
   });
   useEffect(() => {
     if (doctor.report || doctor.error) setDoctorSettled(true);
@@ -225,6 +225,15 @@ function AppRoot() {
   };
 
   const starting = <div className="app-starting" aria-busy="true" />;
+  if (data.apiTokenRequired)
+    return (
+      <main className="welcome-screen" id="main-content">
+        <div className="welcome-screen-logo">
+          <Logo variant="wordmark" size={34} title="" />
+        </div>
+        <ApiTokenEmptyState />
+      </main>
+    );
   if (view === "pending") return starting;
   if (view === "welcome")
     return (
@@ -388,7 +397,6 @@ function AppShell({
     setAppSettings,
     apiError,
     setApiError,
-    apiTokenRequired,
   } = data;
   const [lastRunId, setLastRunId] = useState(readLastRun);
   const [run, setRunState] = useState<Run>(() => loadDemo(locale));
@@ -1067,9 +1075,7 @@ function AppShell({
           githubUser={status?.githubUser ?? ""}
           sampleBadge={presentation.present && showingSample}
         />
-        {apiTokenRequired ? (
-          <ApiTokenEmptyState />
-        ) : apiError && (
+        {apiError && (
           <div role="alert" className="connection-banner">
             <Terminal size={16} />
             <span>{apiError}</span>

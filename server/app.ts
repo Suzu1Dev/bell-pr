@@ -36,6 +36,10 @@ import { registerByHandRoutes } from "./routes/by-hand.js";
 import { registerSessionRoutes } from "./routes/session.js";
 import { registerSudoRoutes } from "./routes/sudo.js";
 import type { PasswordlessSudo } from "./sudo.js";
+import { readApiToken } from "./api-token.js";
+import { DeviceTokens } from "./device-tokens.js";
+import { Pairing } from "./pairing.js";
+import { registerPairingRoutes } from "./routes/pairing.js";
 
 /** Masks secrets in string values, which may quote command output. */
 function redactValues<T extends Record<string, unknown>>(values?: T) {
@@ -113,6 +117,11 @@ export interface AppOptions {
    */
   apiToken?: string;
   readApiToken?: () => string | undefined;
+  /**
+   * Path to the install token file. When set, device pairing stores codes
+   * and device tokens next to it under the data directory.
+   */
+  apiTokenFile?: string;
 }
 
 export function createApp(workbench: Workbench, options: AppOptions = {}) {
@@ -158,6 +167,12 @@ export function createApp(workbench: Workbench, options: AppOptions = {}) {
     typeof allowedOrigins === "string"
       ? parseAllowedOrigins(allowedOrigins)
       : allowedOrigins;
+  const tokenFile = options.apiTokenFile;
+  const tokenReader = tokenFile
+    ? () => readApiToken(tokenFile)
+    : options.readApiToken;
+  // Device pairing keeps its files next to the token file.
+  const devices = tokenFile ? new DeviceTokens(path.dirname(tokenFile)) : undefined;
   app.use(
     localhostGuard({
       // The Vite dev server's port is trusted in development only.
@@ -171,7 +186,8 @@ export function createApp(workbench: Workbench, options: AppOptions = {}) {
         ),
       ],
       ...(options.apiToken !== undefined ? { apiToken: options.apiToken } : {}),
-      ...(options.readApiToken ? { readApiToken: options.readApiToken } : {}),
+      ...(tokenReader ? { readApiToken: tokenReader } : {}),
+      ...(devices ? { deviceToken: (presented, installToken) => devices.verify(presented, installToken) } : {}),
     }),
   );
   app.use(express.json({ limit: "160kb", strict: true }));
@@ -204,6 +220,12 @@ export function createApp(workbench: Workbench, options: AppOptions = {}) {
   registerContributionRoutes(app, deps);
   registerByHandRoutes(app, deps);
   registerSessionRoutes(app, deps);
+  if (tokenFile && devices)
+    registerPairingRoutes(app, tokenFile, {
+      devices,
+      pairing: new Pairing(path.dirname(tokenFile), devices),
+      publicUrl: options.publicUrl,
+    });
   if ((options.platform ?? process.platform) === "linux") registerSudoRoutes(app, deps);
   app.use("/api", (_req, res) => {
     res.status(404).json({ error: sm().common.notFound });
@@ -231,7 +253,7 @@ export function createApp(workbench: Workbench, options: AppOptions = {}) {
     );
     app.get("/{*splat}", (_req, res) => {
       res.setHeader("Cache-Control", "no-cache");
-      res.sendFile(indexFile, { cacheControl: false });
+      res.sendFile("index.html", { root: staticDirectory, cacheControl: false });
     });
   } else {
     // Started from source without `npm run build`: say so instead of a 404.

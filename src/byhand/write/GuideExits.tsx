@@ -1,3 +1,4 @@
+import { safeLink, WebLink } from "../../review/MarkdownContent";
 import { useState } from "react";
 import { CircleHelp, CircleMinus, ListOrdered, UserRound, Users } from "lucide-react";
 import type { ByHandCheckInInput, ByHandStep, ByHandStepInput, ExitKind, TestRun } from "../../../shared/by-hand";
@@ -95,9 +96,9 @@ export function GuideExits({
             <>
               <p>{t.humanText}</p>
               {issueUrl && (
-                <a href={issueUrl} target="_blank" rel="noreferrer">
+                <WebLink href={safeLink(issueUrl) || undefined} target="_blank" rel="noreferrer">
                   {t.issue}
-                </a>
+                </WebLink>
               )}
               <Channels channels={channels} />
               <textarea className="text-input" aria-label={t.human} rows={4} value={note} onChange={(event) => setNote(event.target.value)} />

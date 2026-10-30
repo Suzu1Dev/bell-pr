@@ -15,8 +15,8 @@
 - [Upgrading](upgrading.md): updates, backups and data from older
   versions.
 - [FAQ](faq.md).
-- [Self-hosting](self-hosting.md): running BELL PR as a service or behind
-  an HTTPS reverse proxy.
+- [Self-hosting](self-hosting.md): service install, Tailscale serve +
+  `BELLPR_PUBLIC_URL`, and pairing a phone or another device.
 - [Docker](docker.md) (beta).
 - [Security model](security-model.md): what BELL PR trusts, how agents are
   confined, and the limits of each protection.

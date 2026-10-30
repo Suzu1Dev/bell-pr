@@ -30,13 +30,19 @@ what BELL PR trusts, what it does not, and the limits of each protection.
 
 ## The local server
 
-- **API token.** The first start writes a random token to
-  `<data dir>/api-token` (mode 0600) and later starts reuse it.
-  `bell-pr token rotate` replaces it. Every API request except
-  `GET /api/health` must send `Authorization: Bearer <token>` or
-  `X-Bell-Token`. A missing or wrong token is rejected and changes nothing.
-  Whoever has the token can use everything BELL PR can do: start agents with
-  your Codex or Claude Code account and publish with your `gh` login.
+- **API token and paired devices.** The first start writes a random install
+  token to `<data dir>/api-token` (mode 0600) and later starts reuse it.
+  `bell-pr token rotate` replaces it and invalidates every paired device.
+  Every API request except `GET /api/health` must send
+  `Authorization: Bearer <token>` or `X-Bell-Token` with either the install
+  token or a paired device credential. A missing or wrong value is rejected
+  and changes nothing. Whoever holds a valid credential can use what that
+  credential allows: the install token can do everything BELL PR can do
+  (start agents with your Codex or Claude Code account and publish with
+  your `gh` login). Pair with `bell-pr pair`. Manage devices from the
+  device list in Settings; on the host use `bell-pr devices list` and
+  `bell-pr devices revoke <id>`. Browser auth is the install token handoff
+  or a paired device credential only.
 - **Loopback by default.** BELL PR listens on `127.0.0.1`. `--host` and
   `BELLPR_HOST` are how you listen elsewhere, and BELL PR prints a warning
   when the address is not a loopback address. Requests must name a trusted
@@ -48,13 +54,16 @@ what BELL PR trusts, what it does not, and the limits of each protection.
   frame it. There is no wildcard CORS. Requests that change data must send
   JSON, which a plain HTML form cannot.
 - **Proxies.** `BELLPR_ALLOWED_ORIGINS` accepts plain HTTP only for loopback
-  addresses; any other origin must be HTTPS, so requests and responses never
-  cross a network in clear text. The API token is still required behind a
-  proxy. Keep the token URL private.
+  addresses; any other origin must be HTTPS. Behind Tailscale serve or
+  another private HTTPS front, set `BELLPR_PUBLIC_URL`. Do not rewrite Host
+  in front of BELL PR. Do not use Tailscale Funnel or expose BELL PR on the
+  public internet. Prefer pairing over a token URL; keep any install-token
+  URL private. The install API token or a paired device credential is still
+  required.
 - **Other computers.** `--host 0.0.0.0` outside Docker, and publishing the
   Docker port beyond `127.0.0.1`, let other machines reach the port. They
-  still need the API token. Put a proxy that limits who can connect in
-  front as well (see
+  still need the install API token or a paired device credential. The
+  supported remote path is Tailscale serve plus `BELLPR_PUBLIC_URL` (see
   [Self-hosting](self-hosting.md#reach-bell-pr-from-another-machine)).
 - **Same-user programs.** Any program running as your OS user can read the
   token file and call the API. Agents you allowed to run without the
@@ -372,10 +381,11 @@ Release candidate 1.0.0-rc.1, run on Linux with `--real --decoy-home` from
 a shell started with `env -i` (so no token variable of the shell reached the
 agents). Each row is one model call.
 
-The fourth probe of this run, `open-link`, read BELL PR's one-time sign-in
-link (`<dataDir>/run/open-link.json`). BELL PR has no sign-in any more, and
-the canary reads `<dataDir>/state.json` instead (probe `data-dir`). The
-record below is unchanged and has not been run again.
+The fourth probe of this run, `open-link`, read BELL PR's old one-time sign-in
+link (`<dataDir>/run/open-link.json`). That mechanism has been removed; current
+browser sessions use the installation's API token. The canary now reads
+`<dataDir>/state.json` instead (probe `data-dir`). The record below is unchanged
+and has not been run again.
 
 | | |
 | --- | --- |
@@ -417,3 +427,15 @@ record below is unchanged and has not been run again.
 - **Pending (maintainers):** the macOS canary (`sandbox-exec`), and the canary on
   each newer Claude Code or Codex release before the supported range is
   widened.
+
+### Desktop browser handoff
+
+The opener receives only a `file://` URL to a random private redirect file
+in `<data dir>/browser-open` (directory 0700, file 0600). The HTML only calls
+`location.replace` with the authorized URL; it makes no API requests. Files
+are removed after 60 seconds, on process exit and termination signals, or
+immediately if the opener fails. Stale files are swept at the next launch.
+Same-user programs can still read them. Snap or Flatpak browsers may not be
+able to read data-directory files: this fails closed. Run
+`bell-pr open --print --print-token` explicitly in that case and keep the
+result private. Token URLs may remain in browser history.

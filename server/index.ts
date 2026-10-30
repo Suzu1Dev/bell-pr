@@ -45,6 +45,7 @@ import {
   browserHost,
   dataPaths,
   isLoopbackHost,
+  isWildcardHost,
   resolveConfig,
   type Config,
   type StartFlags,
@@ -74,8 +75,10 @@ export interface StartServerOptions {
   env?: NodeJS.ProcessEnv;
   /** Where the startup line and hints go; console.log by default. */
   print?: (line: string) => void;
+  /** One-line startup warnings (stderr); console.error by default. */
+  warn?: (line: string) => void;
   /** Opens the app's URL when the configuration says to open a browser. */
-  openBrowser?: (url: string) => void;
+  openBrowser?: (url: string) => unknown;
   /**
    * Shut down and exit the process on SIGINT, SIGTERM, SIGHUP and fatal
    * errors (true by default). In-process callers such as tests pass false
@@ -405,6 +408,7 @@ export async function startServer(
   const config =
     options.config ?? resolveConfig(options.flags ?? {}, options.env ?? process.env);
   const print = options.print ?? ((line: string) => console.log(line));
+  const warn = options.warn ?? ((line: string) => console.error(line));
   const messages = sm().cli.start;
   const paths = dataPaths(config.dataDir);
   const url = baseUrl(config);
@@ -578,17 +582,25 @@ export async function startServer(
       version,
       agentSlots,
       readApiToken: () => readApiToken(paths.apiToken),
+      apiTokenFile: paths.apiToken,
     });
     handler = app;
 
     print(messages.startup({ version, url }));
-    if (!isLoopbackHost(config.host)) {
+    // Wildcard bind without PUBLIC_URL: remote Host headers are not allowed, so
+    // every non-local request is 403. Say so once on stderr; keep the generic
+    // exposed-host line for other non-loopback binds (those already require PUBLIC_URL).
+    if (isWildcardHost(config.host) && !config.publicUrl) {
+      const warning = messages.wildcardHostNeedsPublicUrl({ host: config.host });
+      warn(warning);
+      log.warn(warning);
+    } else if (!isLoopbackHost(config.host)) {
       const warning = messages.exposedHost({ host: config.host });
       print(warning);
       log.warn(warning);
     }
     if (config.open && options.openBrowser)
-      options.openBrowser(withApiToken(url, readApiToken(paths.apiToken)));
+      await options.openBrowser(withApiToken(url, readApiToken(paths.apiToken)));
     return { server, app, url, shutdown };
   } catch (error) {
     if (workbench) await shutdown();

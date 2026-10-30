@@ -93,9 +93,11 @@ only this computer can reach it; see [Security model](security-model.md).
 > [Troubleshooting](troubleshooting.md#i-lost-the-address).
 
 BELL PR listens on `127.0.0.1:4311`, so only this computer can reach it.
-`bell-pr start --port <port>` picks another port. To run it as a service,
-in Docker or behind a reverse proxy, see [Self-hosting](self-hosting.md)
-and [Docker](docker.md).
+`bell-pr start --port <port>` picks another port. To run it as a service or
+in Docker, see [Self-hosting](self-hosting.md) and [Docker](docker.md). For
+remote use, see
+[Self-hosting: Reach BELL PR from another machine](self-hosting.md#reach-bell-pr-from-another-machine)
+(Tailscale serve + pairing, with `BELLPR_PUBLIC_URL`).
 
 ## The Welcome steps
 
@@ -637,3 +639,8 @@ finish, it leaves the contribution unchanged.
 
 Next: [Configuration](configuration.md), [Troubleshooting](troubleshooting.md)
 and [FAQ](faq.md).
+
+Prefer `bell-pr pair` when the other device can open `/pair`. Interactive
+SSH and headless starts may hint `bell-pr open --print --print-token` as a
+fallback when you cannot pair; run it explicitly if you need that private
+authorized URL. Desktop launches use a temporary private `file://` redirect.

@@ -1,3 +1,4 @@
+import { safeLink, WebLink } from "../review/MarkdownContent";
 import { useEffect, useState } from "react";
 import { ClipboardCopy, Copy, ExternalLink, TriangleAlert } from "lucide-react";
 import { productEmail, productLink } from "../../shared/product";
@@ -43,6 +44,16 @@ export function aboutLinks(
   return links.filter((item): item is AboutLink => item !== undefined);
 }
 
+/**
+ * About dialog hrefs: product mailto addresses that match exactly
+ * `mailto:local@domain` (no spaces), else the same http(s) rule as safeLink.
+ * Only About uses this — Markdown and WebLink stay on safeLink alone.
+ */
+export function aboutSafeHref(href: string): string {
+  if (/^mailto:[^\s@]+@[^\s@]+$/.test(href)) return href;
+  return safeLink(href);
+}
+
 /** The documents the server ships next to the app (dist/legal, dist/). */
 export const aboutDocuments = [
   { id: "license", href: "/legal/LICENSE.txt" },
@@ -60,6 +71,9 @@ export interface AboutDialogProps {
   maskPath: (value: string) => string;
   /** The server's version when the caller knows it; else /api/health is asked. */
   serverVersion?: string;
+  /** Tests inject product link/email readers; the app uses the defaults. */
+  link?: typeof productLink;
+  email?: typeof productEmail;
 }
 
 type CopyState = "idle" | "busy" | "copied" | "failed";
@@ -75,6 +89,8 @@ export function AboutDialog({
   presenting,
   maskPath,
   serverVersion: knownVersion,
+  link,
+  email,
 }: AboutDialogProps) {
   const t = useT("about");
   const legal = useT("legal");
@@ -96,7 +112,7 @@ export function AboutDialog({
   }, []);
   const serverVersion = health ?? knownVersion;
   const mismatch = !!serverVersion && serverVersion !== appVersion;
-  const links = aboutLinks();
+  const links = aboutLinks(link, email);
 
   const copyPath = async (path: string) => {
     try {
@@ -194,14 +210,41 @@ export function AboutDialog({
         <section className="about-section" aria-labelledby="about-help">
           <h3 id="about-help">{t.help}</h3>
           <ul className="about-links">
-            {links.map((item) => (
-              <li key={item.id}>
-                <a href={item.href} target="_blank" rel="noreferrer">
-                  {t.links[item.id]}
-                  <ExternalLink size={13} aria-hidden="true" />
-                </a>
-              </li>
-            ))}
+            {links.map((item) => {
+              const href = aboutSafeHref(item.href);
+              const label = t.links[item.id];
+              if (!href) {
+                return (
+                  <li key={item.id}>
+                    <span>
+                      {label}
+                      <ExternalLink size={13} aria-hidden="true" />
+                    </span>
+                  </li>
+                );
+              }
+              if (href.startsWith("mailto:")) {
+                const address = href.slice("mailto:".length);
+                return (
+                  <li key={item.id}>
+                    <a href={href} rel="noreferrer">
+                      {label}
+                      {": "}
+                      {address}
+                      <ExternalLink size={13} aria-hidden="true" />
+                    </a>
+                  </li>
+                );
+              }
+              return (
+                <li key={item.id}>
+                  <WebLink href={href} target="_blank" rel="noreferrer">
+                    {label}
+                    <ExternalLink size={13} aria-hidden="true" />
+                  </WebLink>
+                </li>
+              );
+            })}
           </ul>
         </section>
       )}

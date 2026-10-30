@@ -1,3 +1,4 @@
+import { safeLink, WebLink } from "../review/MarkdownContent";
 import { ArrowUpRight, Hand, Loader2 } from "lucide-react";
 import type { ContributionOpportunity } from "../../shared/discovery";
 import { useT } from "../i18n";
@@ -39,10 +40,10 @@ export function LearnByHandFooter({
         {quote && <blockquote>{quote}</blockquote>}
       </div>
       {issueLink && (
-        <a className="button secondary" href={issueLink} target="_blank" rel="noreferrer">
+        <WebLink className="button secondary" href={safeLink(issueLink) || undefined} target="_blank" rel="noreferrer">
           {t.openIssue}
           <ArrowUpRight size={16} aria-hidden="true" />
-        </a>
+        </WebLink>
       )}
       {!reserved && (
         <button type="button" className="button primary" disabled={disabled} onClick={onStart}>

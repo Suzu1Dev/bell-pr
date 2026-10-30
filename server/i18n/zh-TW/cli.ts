@@ -6,6 +6,7 @@ const name = product.name;
 const bin = product.binNames[0];
 
 const m: Translation<typeof en> = {
+  browserOpenHint: `無法開啟瀏覽器。請執行 \`${bin} open --print --print-token\` 取得位址。`,
   help: ({ version }) =>
     [
       `${name} ${version}：在本機參與開源貢獻的工作台。`,
@@ -13,10 +14,12 @@ const m: Translation<typeof en> = {
       `用法：${bin} [指令] [選項]`,
       "",
       "指令：",
-      `  start      啟動 ${name}（預設指令）`,
+      `  start      啟動 ${name}，或開啟執行中的工作區（預設指令）`,
       "  open       印出執行中伺服器的位址，並在瀏覽器開啟",
       "  doctor     檢查 git、gh 與 Agent CLI（加 --json 輸出機器可讀格式）",
-      "  token      更換 API 權杖（`token rotate`）",
+      "  token      更換 API 權杖，並登出已配對的裝置（`token rotate`）",
+      "  pair       產生一次性配對碼，讓手機或另一台電腦配對",
+      "  devices    列出已配對裝置（`devices list`）或撤銷其中一台（`devices revoke <id>`）",
       "  version    顯示版本、Node.js、平台與資料目錄",
       "  help       顯示這份說明",
       "",
@@ -33,6 +36,11 @@ const m: Translation<typeof en> = {
       "  --print-token       印出含 API 權杖的位址",
       "  --no-open           不開啟瀏覽器",
       `  --data-dir <目錄>   執行中 ${name} 的資料目錄`,
+      "",
+      "pair 的選項：",
+      "  --name <名稱>       新裝置的建議名稱",
+      "  --no-qr             不顯示 QR 碼",
+      "  --unlock            解除配對鎖定並清除失敗次數",
       "",
       `忘了位址？在這台電腦執行 \`${bin} open\`，即可再次印出並開啟。`,
     ].join("\n"),
@@ -69,6 +77,7 @@ const m: Translation<typeof en> = {
   },
   start: {
     startup: ({ version, url }) => `${name} ${version} → ${url}`,
+    reusing: ({ url }) => `${name} 執行中 → ${url}`,
     legacyDataDir: ({ dataDir }) =>
       `在 ./.bellpr 找到 ${name} 資料。${name} 現在使用 ${dataDir}，沒有搬移任何資料。若要繼續使用舊資料夾，請以此方式啟動：${bin} start --data-dir ./.bellpr`,
     alreadyRunning: ({ url }) =>
@@ -90,6 +99,8 @@ const m: Translation<typeof en> = {
       `${name} 的網頁介面尚未建置。請在 ${name} 原始碼資料夾執行 npm run build，再重新啟動 ${name}。`,
     exposedHost: ({ host }) =>
       `${name} 正在 ${host} 上監聽，而非只在 127.0.0.1。這是 --host 或 BELLPR_HOST 明確指定的位址。API 權杖仍然必要。`,
+    wildcardHostNeedsPublicUrl: ({ host }) =>
+      `${name} 正在 ${host} 上監聽，但尚未設定 BELLPR_PUBLIC_URL。遠端連線會收到 HTTP 403；請把 BELLPR_PUBLIC_URL 設為瀏覽器使用的 HTTPS 來源（例如 https://bell.example.com）。`,
   },
   open: {
     notRunning: ({ dataDir }) =>
@@ -99,6 +110,30 @@ const m: Translation<typeof en> = {
     rotated: ({ path }) =>
       `已更換 ${path} 的 API 權杖。執行中的 ${name} 會在下一個請求使用新權杖。執行 \`${bin} open\` 即可用它開啟。`,
     usage: `執行 \`${bin} token rotate\` 以更換 API 權杖。`,
+    devicesCleared: "已配對的裝置都已登出，配對碼也已作廢。請用新的配對碼重新配對。",
   },
+  pair: {
+    created: ({ pairUrl, code, expiresAt }) =>
+      [
+        `在另一台裝置開啟 ${pairUrl}`,
+        `並輸入配對碼：${code}`,
+        `配對碼只能用一次，於 ${expiresAt} 失效（5 分鐘後）。產生新碼會取代它。`,
+      ].join("\n"),
+    locked: ({ lockedUntil }) => `錯誤的配對碼太多次，配對已鎖定到 ${lockedUntil}。`,
+    lockedDamaged: "配對已鎖定：失敗次數的紀錄遺失或損壞。",
+    unlockHint: `若失敗的嘗試是你自己造成的，請在執行 ${name} 的電腦上執行 \`${bin} pair --unlock\`。`,
+    unlocked: "配對已解除鎖定，失敗次數已清除。",
+    defaultDeviceName: "已配對裝置",
+  },
+  devices: {
+    usage: `執行 \`${bin} devices list\` 或 \`${bin} devices revoke <id>\`。`,
+    none: "沒有已配對的裝置。",
+    line: ({ id, name, createdAt, lastUsedAt }) =>
+      `${id}  ${name}  配對於 ${createdAt}  最後使用 ${lastUsedAt}`,
+    neverUsed: "從未使用",
+    revoked: ({ id }) => `已撤銷 ${id}，它的權杖不再有效。`,
+    notFound: ({ id }) => `沒有 id 為 ${id} 的已配對裝置。執行 \`${bin} devices list\` 查看。`,
+  },
+  requestFailed: ({ status, error }) => `${name} 回應 ${status}：${error}`,
 };
 export default m;

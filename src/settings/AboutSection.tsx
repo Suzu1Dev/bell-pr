@@ -1,3 +1,4 @@
+import { safeLink, WebLink } from "../review/MarkdownContent";
 import { ExternalLink, Info } from "lucide-react";
 import { productLink } from "../../shared/product";
 import { useT } from "../i18n";
@@ -48,16 +49,16 @@ export function AboutSection({
             {t.open}
           </a>
           {links.map((link) => (
-            <a
+            <WebLink
               key={link.href}
               className="settings-link"
-              href={link.href}
+              href={safeLink(link.href) || undefined}
               target="_blank"
               rel="noreferrer"
             >
               {link.text}
               <ExternalLink size={13} aria-hidden="true" />
-            </a>
+            </WebLink>
           ))}
         </div>
       </SettingsGroup>

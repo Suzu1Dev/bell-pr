@@ -9,7 +9,7 @@ import { createServer, type AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import express from "express";
-import { localhostGuard, parseAllowedOrigins } from "./http-guard.js";
+import { contentSecurityPolicy, localhostGuard, parseAllowedOrigins } from "./http-guard.js";
 import { createApp } from "./index.js";
 import { Store } from "./store.js";
 import { Workbench } from "./workbench.js";
@@ -502,7 +502,7 @@ async function appServer(options: { port?: number; publicUrl?: string } = {}) {
 }
 
 const cspHeader =
-  "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'";
+  "default-src 'self'; script-src 'self'; object-src 'none'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'";
 
 test("an app with no API token configured answers without credentials, sets no cookie and carries the security headers", async () => {
   const server = await appServer();
@@ -528,4 +528,17 @@ test("an app with no API token configured answers without credentials, sets no c
   } finally {
     await server.close();
   }
+});
+
+test("CSP explicitly restricts scripts, connections, framing and objects", () => {
+  assert.equal(contentSecurityPolicy, cspHeader);
+  const directives = new Map(contentSecurityPolicy.split("; ").map((directive) => {
+    const [name, ...values] = directive.split(" ");
+    return [name, values.join(" ")];
+  }));
+  assert.equal(directives.get("script-src"), "'self'");
+  assert.equal(directives.get("connect-src"), "'self'");
+  assert.equal(directives.get("frame-ancestors"), "'none'");
+  assert.equal(directives.get("object-src"), "'none'");
+  assert.doesNotMatch(directives.get("script-src")!, /unsafe-inline|unsafe-eval/);
 });

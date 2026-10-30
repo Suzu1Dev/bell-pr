@@ -115,6 +115,12 @@ export function dataPaths(dataDir: string) {
     children: path.join(dataDir, "children.json"),
     /** The per-install API token (mode 0600). Not a setting and not logged. */
     apiToken: path.join(dataDir, "api-token"),
+    /** Paired devices: token hashes and metadata, never a token (mode 0600). */
+    devices: path.join(dataDir, "devices.json"),
+    /** The active pairing code's hash, expiry and failures (mode 0600). */
+    pairCode: path.join(dataDir, "pair-code.json"),
+    /** Pairing failures and lock; survives restarts (mode 0600). */
+    pairLock: path.join(dataDir, "pair-lock.json"),
   };
 }
 

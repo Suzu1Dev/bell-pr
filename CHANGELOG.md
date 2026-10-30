@@ -9,13 +9,29 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
-- **`bell-pr start` waits for `bell-pr doctor`.** When a required check
-  fails, start exits before it listens and prints the doctor's checklist
+- Desktop launches pass a private temporary file URL to the browser opener,
+  keeping the API token out of opener arguments. Interactive headless starts
+  show only `bell-pr open --print --print-token` as an explicit next step.
+
+- Pairing QR codes prefill from a hash fragment, which is cleared before confirmation; query codes are ignored. Paired devices can list and revoke any device.
+
+- Tighten CSP with explicit same-origin scripts and disabled objects; retain inline styles.
+
+- **Reopen with the normal launch command.** `bell-pr` and `bell-pr start`
+  reopen an instance already running with the same data directory, before
+  checking doctor readiness. Interactive SSH and headless terminals print
+  only `bell-pr open --print --print-token` as a hint. Noninteractive service output keeps the
+  token private. Explicit `--no-open`, CI and development starts retain
+  duplicate-instance protection.
+- **`bell-pr start` waits for `bell-pr doctor` before starting a new server.**
+  When a required check fails, start exits before it listens and prints the doctor's checklist
   with the command that fixes each one. `bell-pr start --force` starts
   anyway and prints a warning, which is how the sample tour opens when no
   AI provider is signed in. A real agent run is still refused until one is.
 
 ### Added
+
+- Pathname `/pair` page with QR-code prefill, header-only device credentials, and Devices settings for revocation.
 
 - **Collaborate before publishing.** A conversation with a writable agent can
   finish checks, fix failures and update the draft's Limitations section.
@@ -629,7 +645,7 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   Files that earlier builds saved load as before, and saved files are read
   as leniently as before.
 
-## [1.0.0-rc.1] - 2026-10-20
+## [1.0.0] - 【暫定】
 
 The first public release candidate of BELL PR, open source under the
 Apache License 2.0. BELL PR is a self-hosted, local-first workbench for

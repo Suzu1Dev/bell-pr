@@ -84,7 +84,7 @@ export function useAppData() {
   const [appSettings, setAppSettings] = useState<AppSettings | null>(null);
   const [loaded, setLoaded] = useState(pending);
   const [apiError, setApiError] = useState("");
-  /** A 401 on the first load: the page was opened without the API token. */
+  /** Missing, expired or revoked access, including in an already-open tab. */
   const [apiTokenRequired, setApiTokenRequired] = useState(false);
   useEffect(() => {
     let cancelled = false;
@@ -129,6 +129,7 @@ export function useAppData() {
     };
   }, []);
   useEffect(() => {
+    if (apiTokenRequired) return;
     let stopped = false;
     let fetching = false;
     const timer = setInterval(async () => {
@@ -137,7 +138,9 @@ export function useAppData() {
       try {
         const { runs: latest } = await api<{ runs: RunSummary[] }>("/runs");
         if (!stopped) setRuns(latest);
-      } catch {
+      } catch (error) {
+        if (!stopped && error instanceof ApiError && error.status === 401)
+          setApiTokenRequired(true);
         /* The current-run poll reports actionable connection errors. */
       } finally {
         fetching = false;
@@ -147,7 +150,7 @@ export function useAppData() {
       stopped = true;
       clearInterval(timer);
     };
-  }, []);
+  }, [apiTokenRequired]);
   return {
     repos,
     setRepos,

@@ -76,6 +76,25 @@ export const secretPatterns: readonly SecretPattern[] = [
     replacement: "[REDACTED]",
     blocks: false,
   },
+  {
+    // Device tokens (device-tokens.ts): bpd_ and 64 hex; any base64url tail too.
+    pattern: /\bbpd_[A-Za-z0-9_-]{16,}/g,
+    replacement: "[REDACTED]",
+    blocks: true,
+  },
+  {
+    // A pairing code in a /pair?code= or /pair#code= link (pair-qr.ts).
+    pattern: /([?#&]code=)[^&#\s"']+/gi,
+    replacement: "$1[REDACTED]",
+    blocks: false,
+  },
+  {
+    // A pairing code as shown: XXXX-XXXX in Crockford base32 (pairing.ts).
+    // Not a run inside a longer hyphenated id, such as a UUID.
+    pattern: /(?<![0-9A-Za-z-])[0-9A-HJKMNP-TV-Z]{4}-[0-9A-HJKMNP-TV-Z]{4}(?![0-9A-Za-z-])/g,
+    replacement: "[REDACTED]",
+    blocks: false,
+  },
 ];
 
 /**

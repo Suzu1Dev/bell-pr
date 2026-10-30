@@ -201,6 +201,29 @@ privileges:
 The optional Linux sudo setup grants the user account that runs BELL PR
 passwordless root commands; see [Full access](security-model.md#explicit-full-access).
 
+### Who can reach my BELL PR, from my computer or my phone?
+
+By default it listens on `127.0.0.1`. Every API request except the health
+check needs the install API token, or a credential from a paired device.
+`bell-pr token rotate` replaces the install token and invalidates every
+paired device.
+
+To use a phone or another machine: keep BELL PR on loopback, set
+`BELLPR_PUBLIC_URL`, and publish with `tailscale serve` on your private
+tailnet. Do not use Tailscale Funnel and do not expose it to the public
+internet. On the host run `bell-pr pair`, then open `<your-url>/pair` on
+the phone and enter the one-time code (single-use, valid 5 minutes).
+Manage devices from the device list in Settings; on the host use
+`bell-pr devices list` and `bell-pr devices revoke <id>`. Too many wrong
+tries temporarily lock pairing until `bell-pr pair --unlock` on the host.
+Lost device: revoke it from the Settings device list on another paired
+device (or on the host with the CLI). If your own device was revoked:
+`bell-pr token rotate` on the host, then pair again.
+
+Same-machine programs running as your user can still read the install
+token file. Other users on the machine cannot. This does not make remote
+access “safe by itself”; keep it on a private network.
+
 ## Using it
 
 ### Which platforms does it run on?
@@ -249,10 +272,12 @@ run whose working copy is gone.
 ### Can several people use one BELL PR?
 
 No. BELL PR is a single-user tool: it works with one person's Git, GitHub
-and AI sign-ins. Each person runs their own. To reach your BELL PR from
-another of your machines, put an HTTPS reverse proxy in front of it, as
-[Self-hosting](self-hosting.md) describes. BELL PR does no authentication
-itself, so never expose it to the internet without a proxy that does.
+and AI sign-ins. Each person runs their own. You can reach **your** BELL PR
+from another of your machines or your phone after pairing, behind Tailscale
+serve (or another private HTTPS front) with `BELLPR_PUBLIC_URL`, as
+[Self-hosting](self-hosting.md#reach-bell-pr-from-another-machine)
+describes. Do not use Funnel or put it on the public internet. Requests
+still need the install API token or a paired device credential.
 
 ### Can I run two BELL PRs on one computer?
 

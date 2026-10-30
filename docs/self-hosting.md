@@ -55,20 +55,26 @@ request except `GET /api/health` must send the token (`Authorization: Bearer`
 or `X-Bell-Token`). A missing or wrong token is HTTP 401 and changes nothing.
 
 BELL PR listens on 127.0.0.1 unless you set `--host` or `BELLPR_HOST`. Any
-other address prints a warning at start. `--host 0.0.0.0` outside Docker,
-and publishing the Docker port beyond `127.0.0.1`, let other machines reach
-the port; they still need the token. Put a proxy that limits who can connect
-in front as well (see
-[Reach BELL PR from another machine](#reach-bell-pr-from-another-machine)).
+other address prints a warning at start. Binding `BELLPR_HOST` to `0.0.0.0` or
+`::` without `BELLPR_PUBLIC_URL` still opens the port on every interface, but
+the request guard only accepts this computer's addresses: **every remote
+connection receives HTTP 403** until you set `BELLPR_PUBLIC_URL` to the HTTPS
+origin browsers use. Startup prints one stderr line in that case. `--host
+0.0.0.0` outside Docker, and publishing the Docker port beyond `127.0.0.1`,
+let other machines reach the port once `BELLPR_PUBLIC_URL` is set; they still
+need authorization. Put a proxy that limits who can connect in front as well
+(see [Reach BELL PR from another machine](#reach-bell-pr-from-another-machine)).
 
 `bell-pr open` prints the address browsers use (`BELLPR_PUBLIC_URL` when
 you set it, else the local address) without the API token, and opens that
 address with `#bell_token=` on the end. `--print` only prints the address,
-still without the token. `--print-token` prints `#bell_token=` as well
-(`bell-pr open --print --print-token` when there is no browser). The page
-stores the token and removes it from the address bar. The line printed at
-start does not include the token. Treat the `--print-token` address like a
-password: it is not in the server log or in `bell-pr doctor --json`.
+still without the token. Prefer pairing for phones and other devices. For
+SSH or headless hosts where you cannot pair in a browser,
+`bell-pr open --print --print-token` is a fallback that prints
+`#bell_token=` as well. The page stores the token and removes it from the
+address bar. The line printed at start does not include the token. Treat
+the `--print-token` address like a password: it is not in the server log
+or in `bell-pr doctor --json`.
 
 ## One instance per data directory
 
@@ -109,24 +115,37 @@ Logs: `journalctl --user -u bell-pr`.
 
 ## Reach BELL PR from another machine
 
-Keep BELL PR on 127.0.0.1 and put an HTTPS reverse proxy on the same
-machine in front of it. Never serve it over plain HTTP on any other address:
-pages, requests and API responses would cross the network unencrypted.
+Keep BELL PR on `127.0.0.1`. The supported way to reach it from another
+machine or your phone is **Tailscale serve** plus `BELLPR_PUBLIC_URL`, then
+pair a device (see [Pairing devices on your tailnet](#pairing-devices-on-your-tailnet)).
+Never use Tailscale Funnel. Do not put BELL PR on the public internet.
+Never serve it over plain HTTP on a non-loopback address.
 
-1. Run the proxy on the same machine and forward to `127.0.0.1:4311`.
-2. Keep the original `Host` header (or set it to the public host name).
-3. Set `BELLPR_PUBLIC_URL` to the public HTTPS address, without a path, for
-   example `BELLPR_PUBLIC_URL=https://bell.example.com`. BELL PR then accepts
-   requests for that address. BELL PR must be served at the root of that
-   address, not under a path.
-4. The API token is still required. Also limit who can reach the proxy,
-   such as with single sign-on, a VPN, HTTP basic authentication or an IP
-   allowlist, so the token URL is not the only barrier on the network.
+```sh
+tailscale serve --bg 4311
+BELLPR_PUBLIC_URL=https://<your-url> bell-pr
+```
 
-Caddy (certificates, `Host` and `X-Forwarded-Proto` are handled for you):
+Use your own HTTPS origin for `<your-url>` (for example a `*.ts.net` name
+from Tailscale). Serve BELL PR at the root of that origin, not under a path.
+Without `BELLPR_PUBLIC_URL`, requests to that host get HTTP 403. Prefer
+pairing over a token URL. The install API token still exists; treat any
+address that includes it like a password.
+
+### Advanced: HTTPS reverse proxy (Caddy / nginx)
+
+Only when Tailscale serve is not an option. Run the proxy on the same
+machine and forward to `127.0.0.1:4311`. The reverse proxy **must not
+rewrite the `Host` header** (keep the original `Host`); rewriting Host
+yields HTTP 403. Set `BELLPR_PUBLIC_URL` to that HTTPS origin (no path).
+Keep the service off the public internet (VPN or equivalent). The install
+API token or a paired device credential is still required.
+
+Caddy (certificates and `X-Forwarded-Proto` are handled for you; do not
+rewrite `Host`):
 
 ```text
-bell.example.com {
+<your-url> {
 	reverse_proxy 127.0.0.1:4311
 }
 ```
@@ -136,8 +155,8 @@ nginx:
 ```nginx
 server {
     listen 443 ssl;
-    server_name bell.example.com;
-    # ssl_certificate and ssl_certificate_key for bell.example.com
+    server_name <your-url>;
+    # ssl_certificate and ssl_certificate_key for <your-url>
 
     location / {
         proxy_pass http://127.0.0.1:4311;
@@ -164,3 +183,76 @@ and container health checks.
 
 [Upgrading](upgrading.md) covers backups, data from older versions and
 going back to an older version.
+
+Interactive SSH and headless starts may print a hint to run
+`bell-pr open --print --print-token` as a fallback when you cannot pair;
+run it explicitly if you need that private authorized URL. Prefer
+`bell-pr pair` when a browser on the other device can open `/pair`.
+Desktop launches use a temporary private `file://` redirect.
+
+## Pairing devices on your tailnet
+
+Tailscale serve is the supported remote path. Set
+`BELLPR_PUBLIC_URL=https://<your-url>` before starting BELL PR, then use
+`tailscale serve --bg 4311` for the default server port. On the host run
+`bell-pr pair`. On the other device open `<your-url>/pair` and enter the
+one-time code (or scan the QR if the terminal shows one). The QR may not scan on a light-background terminal — use a dark background, or just open the printed URL. If the URL is too long, only the URL is printed, no QR. The device stores
+a credential in that browser's local storage. Prefer pairing: token URLs
+stay in browser history.
+
+Without `BELLPR_PUBLIC_URL`, requests to that host get HTTP 403. The same
+applies when `BELLPR_HOST` is `0.0.0.0` or `::` without `BELLPR_PUBLIC_URL`.
+Do not place a Host-rewriting reverse proxy in front: changing Host causes
+403. Never use Tailscale Funnel; keep the service on your private tailnet.
+
+As an alternative, forward the default port with
+`ssh -L 4311:127.0.0.1:4311 <user>@<hostname>` and open
+`http://127.0.0.1:4311/pair`. Run `bell-pr pair` on the host.
+
+Manage devices from the device list in Settings. On the host (including
+headless hosts), use `bell-pr devices list` and
+`bell-pr devices revoke <id>`. `bell-pr token rotate` replaces the install
+API token and invalidates every paired device.
+The pairing page removes its code hash fragment immediately and the server sends
+`Referrer-Policy: no-referrer`. Scripts must come from the same origin under CSP;
+`style-src` retains `'unsafe-inline'` for the current React inline styles.
+
+## What to do if pairing is locked
+
+If pairing fails with HTTP **423** (or the CLI says pairing is locked), too
+many wrong tries temporarily locked pairing. This protects against code
+guessing on Tailscale serve / `ssh -L` paths where every client appears as
+`127.0.0.1`.
+
+**On the host** (where `bell-pr` runs), with the install token:
+
+```bash
+bell-pr pair --unlock
+bell-pr pair [--name "device name"]
+```
+
+Notes:
+
+- `bell-pr pair` without `--unlock` does **not** clear the lock or failure counter while locked.
+- A **device token cannot unlock** — only the install token on the host can.
+- If the lock/counter file is missing or corrupt, the server **fails closed** (treats pairing as locked) and hints `bell-pr pair --unlock`.
+- After a successful pair, the counter resets automatically.
+
+## Stolen or lost device
+
+Any paired device may list devices and revoke any device (including others).
+Device credentials still cannot create pairing codes, rotate the install
+token, or unlock pairing.
+
+1. From another paired device, revoke it in the device list in Settings.
+   On the host (including headless), run `bell-pr devices revoke <id>`
+   with the install token.
+2. If your own device was revoked (or you no longer trust any device
+   credential), on the **host** run:
+
+```bash
+bell-pr token rotate
+```
+
+That replaces the install API token and invalidates every paired device.
+Then pair again with `bell-pr pair`.

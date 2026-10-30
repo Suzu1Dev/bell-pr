@@ -3,9 +3,9 @@
 //
 //   node scripts/check-pack.mjs
 //
-// Lists the package with `npm pack --dry-run --json --ignore-scripts`, so
-// it checks the build already in the working tree (run `npm run build`
-// first; `npm pack` itself rebuilds through prepack). It prints the actual
+// Packs the package with `npm pack --json --ignore-scripts`, so it checks
+// the build already in the working tree (run `npm run build` first;
+// a plain `npm pack` rebuilds through prepack). It prints the actual
 // numbers and fails when the package:
 //   - is larger than 3 MB packed or 10 MB unpacked, or has over 150 files;
 //   - contains any .woff file, or more than 12 .woff2 files;
@@ -13,7 +13,9 @@
 //     tooling, keys, the Vite build manifest);
 //   - ships a document for the app (dist/legal/) that still has an HTML
 //     comment;
-//   - ships web bundles over the gzip budgets below.
+//   - ships web bundles over the gzip budgets below;
+//   - lacks a dist/ tree, or its bin is missing, not executable, or fails
+//     `bell-pr --help` after a temp-prefix install of the tarball.
 //
 // Raising a budget needs a reason in the commit message body.
 //
@@ -27,10 +29,12 @@
 //
 // Exit status: 0 within budget, 1 over budget, 2 on a setup error.
 import { spawnSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, statSync, unlinkSync } from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { gzipSync } from "node:zlib";
+import { diffExpected, readExpected } from "./pack-expected.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const MB = 1000 * 1000;
@@ -58,8 +62,14 @@ const required = [
   "THIRD_PARTY_NOTICES.md",
   "LICENSE",
   "NOTICE",
+  "README.md",
+  "README.zh-TW.md",
 ];
 const forbidden = [
+  { pattern: /(^|\/)\.codex-prompts(\/|$)/, reason: "private prompts" },
+  { pattern: /\.map$/, reason: "source map" },
+  { pattern: /(^|\/)\.git(\/|$)/, reason: "Git metadata" },
+  { pattern: /(^|\/)(tests?|e2e)(\/|$)/, reason: "tests" },
   { pattern: /\.test\.tsx?$/, reason: "test file" },
   { pattern: /^deploy\//, reason: "deployment files" },
   { pattern: /^\.agents\//, reason: "agent instructions" },
@@ -70,7 +80,7 @@ const forbidden = [
   { pattern: /(^|\/)fixtures\//, reason: "test fixtures" },
   { pattern: /^node_modules\//, reason: "dependencies" },
   { pattern: /\.(pem|key)$/, reason: "key or certificate" },
-  { pattern: /(^|\/)\.env(\.|$)/, reason: "environment file" },
+  { pattern: /(^|\/)\.env[^/]*(\/|$)/, reason: "environment file" },
 ];
 
 class SetupError extends Error {}
@@ -85,14 +95,20 @@ function parsePackReport(stdout) {
   } catch {
     // Reported below.
   }
-  throw new SetupError("could not read the JSON report of `npm pack --dry-run --json`.");
+  throw new SetupError("could not read the JSON report of `npm pack --json`.");
+}
+
+function npmCommand() {
+  return process.platform === "win32" ? "npm.cmd" : "npm";
 }
 
 function pack() {
   const windows = process.platform === "win32";
+  // Real pack (not dry-run) so the install smoke can use the same tarball.
+  // --ignore-scripts skips prepack; callers must already have run `npm run build`.
   const result = spawnSync(
-    windows ? "npm.cmd" : "npm",
-    ["pack", "--dry-run", "--json", "--ignore-scripts"],
+    npmCommand(),
+    ["pack", "--json", "--ignore-scripts"],
     {
       cwd: root,
       encoding: "utf8",
@@ -103,8 +119,88 @@ function pack() {
   );
   if (result.error) throw new SetupError(`could not run npm: ${result.error.message}`);
   if (result.status !== 0)
-    throw new SetupError(`npm pack --dry-run exited with status ${result.status}.`);
+    throw new SetupError(`npm pack exited with status ${result.status}.`);
   return parsePackReport(result.stdout);
+}
+
+/** Install the tarball into a temp prefix and run `bell-pr --help`. */
+function installAndRunHelp(tarball) {
+  const problems = [];
+  const prefix = mkdtempSync(path.join(os.tmpdir(), "bell-pr-pack-smoke-"));
+  const windows = process.platform === "win32";
+  try {
+    // -g --prefix puts bins under <prefix>/bin (local --prefix only links
+    // node_modules/.bin). Same layout as a user global install into a prefix.
+    const install = spawnSync(
+      npmCommand(),
+      ["install", "-g", "--prefix", prefix, "--no-fund", "--no-audit", tarball],
+      {
+        cwd: root,
+        encoding: "utf8",
+        maxBuffer: 64 * 1024 * 1024,
+        shell: windows,
+        stdio: ["ignore", "pipe", "pipe"],
+      },
+    );
+    if (install.error) {
+      problems.push(`could not install the packed tarball: ${install.error.message}`);
+      return problems;
+    }
+    if (install.status !== 0) {
+      const detail = (install.stderr || install.stdout || "").trim().split(/\n/).slice(-8).join(" ");
+      problems.push(
+        `npm install of the packed tarball exited with status ${install.status}${detail ? `: ${detail}` : "."}`,
+      );
+      return problems;
+    }
+    const binName = windows ? "bell-pr.cmd" : "bell-pr";
+    const binPath = path.join(prefix, "bin", binName);
+    let mode;
+    try {
+      mode = statSync(binPath).mode;
+    } catch (error) {
+      problems.push(`packed bin missing after install (${binPath}): ${error.message}`);
+      return problems;
+    }
+    if (!windows && (mode & 0o111) === 0) {
+      problems.push(`packed bin is not executable after install: ${binPath}`);
+    }
+    const targetBin = path.join(prefix, "lib", "node_modules", "bell-pr", "bin", "bellpr.mjs");
+    try {
+      const targetMode = statSync(targetBin).mode;
+      if ((targetMode & 0o111) === 0) {
+        problems.push(`packaged bin/bellpr.mjs is not executable after install: ${targetBin}`);
+      }
+    } catch (error) {
+      problems.push(`packaged bin/bellpr.mjs missing after install (${targetBin}): ${error.message}`);
+    }
+    const help = spawnSync(binPath, ["--help"], {
+      cwd: prefix,
+      encoding: "utf8",
+      maxBuffer: 4 * 1024 * 1024,
+      shell: windows,
+      stdio: ["ignore", "pipe", "pipe"],
+      env: { ...process.env, npm_config_prefix: prefix },
+    });
+    if (help.error) {
+      problems.push(`could not run packed bell-pr --help: ${help.error.message}`);
+      return problems;
+    }
+    if (help.status !== 0) {
+      const detail = (help.stderr || help.stdout || "").trim().split(/\n/).slice(-5).join(" ");
+      problems.push(
+        `packed bell-pr --help exited with status ${help.status}${detail ? `: ${detail}` : "."}`,
+      );
+      return problems;
+    }
+    const out = `${help.stdout || ""}${help.stderr || ""}`;
+    if (!/Usage:\s*bell-pr/i.test(out)) {
+      problems.push("packed bell-pr --help did not print the expected usage line.");
+    }
+  } finally {
+    rmSync(prefix, { recursive: true, force: true });
+  }
+  return problems;
 }
 
 const formatBytes = (bytes) =>
@@ -151,11 +247,34 @@ function main() {
     if (readFileSync(path.join(root, file), "utf8").includes("<!--"))
       problems.push(`${file} contains an HTML comment; the app shows it as plain text (scripts/generate-third-party-notices.mjs removes them).`);
 
+  if (!files.some((file) => file === "dist" || file.startsWith("dist/")))
+    problems.push("dist/ is missing from the package (run `npm run build` first).");
+
+  try {
+    const expected = readExpected();
+    for (const problem of diffExpected([...files].sort(), expected)) problems.push(problem);
+  } catch (error) {
+    problems.push(error instanceof Error ? error.message : String(error));
+  }
+
+  const tarball = path.join(root, report.filename);
+  try {
+    // Budget/forbidden findings still fail the check; still run the install smoke
+    // so a single report lists every problem.
+    problems.push(...installAndRunHelp(tarball));
+  } finally {
+    try {
+      unlinkSync(tarball);
+    } catch {
+      // The pack step may have failed before writing the file.
+    }
+  }
+
   if (problems.length) {
     for (const problem of problems) console.error(`check-pack: ${problem}`);
     return 1;
   }
-  console.error("check-pack: the package is within every budget.");
+  console.error("check-pack: the package is within every budget; dist/ present; packed bin runs --help.");
   return 0;
 }
 

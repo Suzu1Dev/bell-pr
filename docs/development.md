@@ -256,3 +256,7 @@ product.
   [Code of Conduct](../CODE_OF_CONDUCT.md).
 - `vendor/ponytail/README.md`: the pinned Ponytail rules behind the
   efficiency modes, with their license.
+
+Interactive SSH and headless starts print only the instruction
+`bell-pr open --print --print-token`; run it explicitly to obtain a private
+authorized URL. Desktop launches use a temporary private `file://` redirect.

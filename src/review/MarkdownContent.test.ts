@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { createElement } from "react";
 import { assertNoHan, renderEn, renderZh } from "../test-utils/render";
-import { MarkdownContent } from "./MarkdownContent";
+import { MarkdownContent, safeLink, WebLink } from "./MarkdownContent";
 
 const render = (children: string) =>
   renderZh(createElement(MarkdownContent, { children }));
@@ -67,4 +67,53 @@ test("a diff block marks its added and removed lines and keeps the text as it wa
     /<pre><code class="language-ts">\+1\n<\/code><\/pre>/,
   );
   assertNoHan(html);
+});
+
+test("safeLink allows only absolute HTTP and HTTPS links", () => {
+  for (const value of [
+    "javascript:alert(1)",
+    "JAVASCRIPT:alert(1)",
+    " javascript:alert(1)",
+    "\u0000javascript:alert(1)",
+    "\tjavascript:alert(1)",
+    "data:text/html,x",
+    "vbscript:msgbox(1)",
+    "file:///etc/passwd",
+    "/relative",
+    "//evil.example",
+    "ftp://example.com/x",
+  ])
+    assert.equal(safeLink(value), "");
+  for (const value of ["https://example.com/path", "http://example.com/path"])
+    assert.equal(safeLink(value), value);
+  assert.equal(safeLink("  https://example.com/a  "), "https://example.com/a");
+});
+
+test("rejected external links render their text without an anchor", () => {
+  assert.equal(renderEn(createElement(WebLink, { href: safeLink("javascript:alert(1)") || undefined }, "Source")), "<span>Source</span>");
+});
+
+test("WebLink never emits a javascript: href even if passed unsanitized", () => {
+  const html = renderEn(createElement(WebLink, { href: "javascript:alert(1)" }, "Evil"));
+  assert.equal(html, "<span>Evil</span>");
+  assert.equal(html.toLowerCase().includes("javascript:"), false);
+  assert.equal(html.includes("href="), false);
+});
+
+test("WebLink keeps in-page hash hrefs and still blocks javascript:", () => {
+  assert.match(renderEn(createElement(WebLink, { href: "#source-1" }, "Ref")), /href="#source-1"/);
+  assert.equal(renderEn(createElement(WebLink, { href: "javascript:alert(1)" }, "Evil")), "<span>Evil</span>");
+});
+
+test("mailto: and javascript: in Markdown stay blocked (About allowlist does not apply)", () => {
+  const html = render(
+    "[mail](mailto:security@example.test) [evil](javascript:alert(1)) [ok](https://example.com/x)",
+  );
+  assert.doesNotMatch(html, /href="mailto:|javascript:/i);
+  assert.match(
+    html,
+    /href="https:\/\/example\.com\/x" target="_blank" rel="noopener noreferrer"/,
+  );
+  assert.equal(safeLink("mailto:security@example.test"), "");
+  assert.equal(safeLink("javascript:alert(1)"), "");
 });

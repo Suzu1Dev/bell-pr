@@ -82,7 +82,7 @@ time.
 | @types/ms | 2.1.0 | MIT | [15](#license-text-15) |
 | @types/unist | 3.0.3 | MIT | [15](#license-text-15) |
 | accepts | 2.0.0 | MIT | [16](#license-text-16) |
-| body-parser | 2.3.0 | MIT | [17](#license-text-17) |
+| body-parser | 2.4.0 | MIT | [17](#license-text-17) |
 | bytes | 3.1.2 | MIT | [18](#license-text-18) |
 | call-bind-apply-helpers | 1.0.2 | MIT | [19](#license-text-19) |
 | call-bound | 1.0.4 | MIT | [19](#license-text-19) |
@@ -176,7 +176,7 @@ time.
 | parseurl | 1.3.3 | MIT | [53](#license-text-53) |
 | path-to-regexp | 8.4.2 | MIT | [54](#license-text-54) |
 | proxy-addr | 2.0.8 | MIT | [31](#license-text-31) |
-| qs | 6.16.0 | BSD-3-Clause | [55](#license-text-55) |
+| qs | 6.17.1 | BSD-3-Clause | [55](#license-text-55) |
 | range-parser | 1.3.0 | MIT | [56](#license-text-56) |
 | raw-body | 3.0.2 | MIT | [57](#license-text-57) |
 | router | 2.2.0 | MIT | [58](#license-text-58) |
@@ -743,7 +743,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 <a id="license-text-17"></a>
 
-### 17. Used by body-parser 2.3.0, type-is 2.1.0
+### 17. Used by body-parser 2.4.0, type-is 2.1.0
 
 ```text
 (The MIT License)
@@ -1807,7 +1807,7 @@ THE SOFTWARE.
 
 <a id="license-text-55"></a>
 
-### 55. Used by qs 6.16.0
+### 55. Used by qs 6.17.1
 
 ```text
 BSD 3-Clause License
