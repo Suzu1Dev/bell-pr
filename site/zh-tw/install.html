@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; media-src 'self'; base-uri 'none'; form-action 'none'">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="referrer" content="no-referrer">
+    <title>安裝：BELL PR</title>
+    <meta name="description" content="安裝免費開源的 BELL PR：在 macOS、Linux 或透過 WSL2 的 Windows 上使用 npm 或 Docker，並連接你已在用的 AI coding CLI 與 GitHub CLI。">
+    <meta name="theme-color" content="#1f6d50">
+    <link rel="icon" href="../assets/brand/favicon.svg" type="image/svg+xml">
+    <link rel="icon" href="../assets/brand/favicon-32.png" sizes="32x32" type="image/png">
+    <link rel="apple-touch-icon" href="../assets/brand/apple-touch-icon.png">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="BELL PR">
+    <meta property="og:title" content="安裝：BELL PR">
+    <meta property="og:description" content="在你自己的電腦上，用 npx bell-pr 或 Docker 啟動 BELL PR。">
+    <!-- generated:product-meta key=homepageUrl property="og:url" path="install.html" -->
+    <!-- /generated:product-meta -->
+    <!-- generated:product-meta key=homepageUrl property="og:image" path="assets/brand/og-image.png" -->
+    <!-- /generated:product-meta -->
+    <meta property="og:image" content="../assets/brand/og-image.png">
+    <meta name="twitter:card" content="summary_large_image">
+    <link rel="alternate" hreflang="en" href="https://bell-pr.suzu.tw/install.html">
+    <link rel="alternate" hreflang="zh-Hant-TW" href="https://bell-pr.suzu.tw/zh-tw/install.html">
+    <link rel="alternate" hreflang="x-default" href="https://bell-pr.suzu.tw/install.html">
+    <link rel="stylesheet" href="../site.css">
+    <script src="../site.js" defer></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">跳到主要內容</a>
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href="index.html"><img src="../assets/brand/logo-wordmark.svg" alt="BELL PR" width="104" height="34"></a>
+        <nav class="site-nav" aria-label="主選單">
+          <ul>
+            <li><a href="index.html#how-it-works">運作方式</a></li>
+            <li><a href="install.html" aria-current="page">安裝</a></li>
+          </ul>
+        </nav>
+        <nav class="lang-switch" aria-label="語言">
+          <a href="../install.html" hreflang="en" lang="en">English</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="install.html" hreflang="zh-Hant-TW" lang="zh-Hant-TW" aria-current="true">中文</a>
+        </nav>
+      </div>
+    </header>
+
+    <main id="main">
+      <section class="page-head">
+        <div class="wrap">
+          <h1>安裝 BELL PR</h1>
+          <p class="lead">BELL PR 是免費開源軟體（Apache License 2.0），在你自己的電腦上執行。用一條 npm 指令啟動，或執行 Docker 映像，然後開啟它印出的位址。</p>
+          <div class="hero-actions">
+            <div class="command"><code id="start-command">npx bell-pr</code><button class="copy-button" type="button" data-copy="start-command" hidden>複製</button></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section section-tinted">
+        <div class="wrap">
+          <div class="prose">
+            <h2 id="requirements">需求</h2>
+            <ul>
+              <li><strong>Node.js 22 以上</strong>以使用 npm，或改用 Docker。</li>
+              <li><strong>Git 2.40 以上</strong>，將貢獻移到最新目標分支時需要。</li>
+              <li><strong>GitHub CLI</strong>（<code>gh</code>），以 <code>gh auth login</code> 登入。BELL PR 用它發布 Draft PR 並尋找專案。</li>
+              <li><strong>一套 AI coding CLI</strong>，已安裝並登入：OpenAI Codex CLI，或搭配你的 Claude 方案或 Anthropic API 金鑰的 Claude Code。用量計入你自己的帳號。</li>
+              <li><strong>在 Linux 上需要 bubblewrap 與 socat</strong>（例如 <code>sudo apt-get install bubblewrap socat</code>），讓會修改程式碼的 Claude Code agents 能在作業系統沙箱中執行。</li>
+            </ul>
+            <p><code>bell-pr doctor</code> 會檢查以上項目，並說明如何補齊缺少的部分。</p>
+
+            <h2 id="platforms">平台</h2>
+            <ul>
+              <li><strong>macOS 與 Linux：</strong>用 npm 安裝。</li>
+              <li><strong>Windows：</strong>安裝 WSL2 與 Linux 發行版，再在其中依 npm 步驟操作。BELL PR 在 Windows 上僅透過 WSL2 執行。</li>
+              <li><strong>Docker（beta）：</strong>從原始碼建置的映像，內含 Git、GitHub CLI 與 Codex CLI。</li>
+            </ul>
+
+            <h2 id="npm">用 npm 啟動</h2>
+            <pre><code>npx bell-pr</code></pre>
+            <p>BELL PR 會在 <code>http://127.0.0.1:4311</code> 啟動（僅本機可連線），並在瀏覽器開啟。工作時請保持終端機開啟；<kbd>Ctrl</kbd>+<kbd>C</kbd> 可停止 BELL PR。</p>
+            <p>若要改為安裝 <code>bell-pr</code> 指令：</p>
+            <pre><code>npm install -g bell-pr
+bell-pr</code></pre>
+
+            <h3 id="commands">常用指令</h3>
+            <ul>
+              <li><code>bell-pr doctor</code> 檢查 Git、GitHub CLI 與 AI coding CLIs，並說明如何補齊缺少的部分。</li>
+              <li><code>bell-pr start --port 4400</code> 使用其他埠號。</li>
+              <li><code>bell-pr start --data-dir ./bellpr-data</code> 將資料放在預設 <code>~/.bellpr</code> 以外的位置。</li>
+            </ul>
+
+            <h2 id="docker">用 Docker 執行（beta）</h2>
+            <p class="notice">Docker 支援目前為 beta。在 Docker 預設安全設定下，agents 無法啟動其沙箱，因此分析、審查與程式碼變更會卡住。若要讓它們運作，請在 <code>docker run</code> 加上 <code>--security-opt seccomp=unconfined --security-opt apparmor=unconfined --security-opt systempaths=unconfined</code>。這些選項會放寬容器本身的限制，好讓 agent 沙箱能啟動；請只在你能掌控的機器上使用。</p>
+            <p>從原始碼 checkout 建置映像後執行：</p>
+            <pre><code>docker build -t bell-pr .</code></pre>
+            <pre><code>docker run -d --name bell-pr \
+  -p 127.0.0.1:4311:4311 \
+  -v bellpr-data:/data \
+  -v bellpr-home:/home/node \
+  -e GH_TOKEN \
+  -e OPENAI_API_KEY \
+  -e BELLPR_PUBLIC_URL=http://localhost:4311 \
+  bell-pr</code></pre>
+            <ul>
+              <li><code>-p 127.0.0.1:4311:4311</code> 只在本機的 loopback 介面上公開埠號，因此網路上的其他裝置無法連到 BELL PR。容器內 BELL PR 會監聽所有介面，所以絕不要在沒有 <code>127.0.0.1:</code> 的情況下公開埠號。對外公開時，僅剩 API token 保護完整存取。請保持埠號私有；遠端存取請使用搭配 <code>BELLPR_PUBLIC_URL</code> 的 <code>tailscale serve</code>，或 <code>ssh -L</code>。</li>
+              <li><code>bellpr-data</code> volume 保存你的 repositories、執行紀錄與筆記；<code>bellpr-home</code> 保存容器內工具的登入狀態。</li>
+              <li>可用 <code>docker exec bell-pr bell-pr open --print --print-token</code> 再次取得位址。<code>--print-token</code> 會包含 API token；請勿分享該位址。</li>
+              <li>映像內含 Git、GitHub CLI 與 Codex CLI。<code>-e OPENAI_API_KEY</code> 會把你的 OpenAI 金鑰傳給 Codex CLI；也可以在容器內登入。可用 <code>-e GIT_AUTHOR_NAME</code>、<code>-e GIT_AUTHOR_EMAIL</code>、<code>-e GIT_COMMITTER_NAME</code> 與 <code>-e GIT_COMMITTER_EMAIL</code> 設定 commit 的 Git 身分。</li>
+              <li>Claude Code 未預先安裝。若要使用，請執行 <code>docker exec -it bell-pr npm install -g @anthropic-ai/claude-code</code>，接著 <code>docker exec -it bell-pr claude auth login</code>。</li>
+            </ul>
+
+            <h2 id="next">下一步</h2>
+            <p>開啟範例專案查看一份完成的貢獻，再匯入你想貢獻的 repository。在你發布 Draft PR 之前，一切都留在你的電腦上。原始碼 repo 在 <code>docs/security-model.md</code> 說明 agents 在你電腦上可做什麼，在 <code>docs/privacy-and-data.md</code> 說明什麼會離開你的電腦。</p>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div class="wrap">
+        <div class="footer-grid">
+          <div class="footer-brand"><img src="../assets/brand/logo-wordmark.svg" alt="BELL PR" width="92" height="30"></div>
+          <nav class="footer-col" aria-labelledby="footer-product">
+            <h2 id="footer-product">產品</h2>
+            <ul>
+              <li><a href="index.html#how-it-works">運作方式</a></li>
+              <li><a href="install.html">安裝</a></li>
+            </ul>
+          </nav>
+          <nav class="footer-col" aria-labelledby="footer-source">
+            <h2 id="footer-source">開源</h2>
+            <ul>
+              <li><!-- generated:product-link key=publicRepoUrl text="Source" --><a href="https://github.com/Suzu1Dev/bell-pr">原始碼</a><!-- /generated:product-link --></li>
+              <li><!-- generated:product-link key=publicRepoUrl path=blob/main/LICENSE text="Apache-2.0 license" --><a href="https://github.com/Suzu1Dev/bell-pr/blob/main/LICENSE">Apache-2.0 授權</a><!-- /generated:product-link --></li>
+            </ul>
+          </nav>
+          <div class="footer-col">
+            <h2>聯絡</h2>
+            <ul>
+              <li><!-- generated:product-link key=supportEmail text="Support" --><!-- /generated:product-link --></li>
+              <li><!-- generated:product-link key=securityEmail text="Report a vulnerability" --><!-- /generated:product-link --></li>
+              <li><!-- generated:product-link key=publicRepoUrl path=issues text="Report an issue" --><a href="https://github.com/Suzu1Dev/bell-pr/issues">回報問題</a><!-- /generated:product-link --></li>
+              <li><!-- generated:product-link key=docsUrl text="Documentation" --><!-- /generated:product-link --></li>
+            </ul>
+          </div>
+        </div>
+        <p class="disclaimer">BELL PR 是依 Apache License 2.0 授權的開源軟體，並依「現狀」提供，不附帶任何形式的保證。BELL PR 是本專案的商標；名稱與標誌不受該授權涵蓋。BELL PR 是獨立產品，與 GitHub, Inc.、OpenAI 或 Anthropic PBC 無隸屬、背書或贊助關係。GitHub、OpenAI、Codex、Anthropic、Claude 與 Claude Code 為其各自擁有者之商標；BELL PR 提及它們僅為說明可搭配的工具。</p>
+      </div>
+    </footer>
+    <p class="visually-hidden" role="status" id="copy-status"></p>
+  </body>
+</html>

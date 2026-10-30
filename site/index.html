@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="utf-8">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; base-uri 'none'; form-action 'none'">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; media-src 'self'; base-uri 'none'; form-action 'none'">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="referrer" content="no-referrer">
     <title>BELL PR: from vibe coding to knowing why</title>
@@ -21,6 +21,9 @@
     <!-- /generated:product-meta -->
     <meta property="og:image" content="assets/brand/og-image.png">
     <meta name="twitter:card" content="summary_large_image">
+    <link rel="alternate" hreflang="en" href="https://bell-pr.suzu.tw/">
+    <link rel="alternate" hreflang="zh-Hant-TW" href="https://bell-pr.suzu.tw/zh-tw/">
+    <link rel="alternate" hreflang="x-default" href="https://bell-pr.suzu.tw/">
     <link rel="stylesheet" href="site.css">
     <script src="site.js" defer></script>
   </head>
@@ -31,9 +34,15 @@
         <a class="brand" href="index.html"><img src="assets/brand/logo-wordmark.svg" alt="BELL PR" width="104" height="34"></a>
         <nav class="site-nav" aria-label="Main">
           <ul>
+            <li><a href="#demo">Demo</a></li>
             <li><a href="#how-it-works">How it works</a></li>
             <li><a href="install.html">Install</a></li>
           </ul>
+        </nav>
+        <nav class="lang-switch" aria-label="Language">
+          <a href="index.html" hreflang="en" lang="en" aria-current="true">English</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="zh-tw/" hreflang="zh-Hant-TW" lang="zh-Hant-TW">中文</a>
         </nav>
       </div>
     </header>
@@ -49,6 +58,24 @@
             <a class="button" href="install.html">Install guide</a>
           </div>
           <p class="hero-note">Free and open source under the Apache License 2.0, with no account. Needs Node.js 22 or later, Git, the GitHub CLI, and the Codex CLI or Claude Code.</p>
+        </div>
+      </section>
+
+      <section class="section" id="demo" aria-labelledby="demo-title">
+        <div class="wrap">
+          <div class="section-head">
+            <p class="eyebrow">Demo</p>
+            <h2 id="demo-title">Watch the 90-second demo</h2>
+            <p>See the flow from reading the project&#39;s rules to a Draft PR you understand.</p>
+          </div>
+          <figure class="promo-video">
+            <video controls preload="none" playsinline poster="assets/video/poster.jpg" width="1920" height="1080">
+              <source src="assets/video/bell-pr-promo-en-1080p.webm" type="video/webm">
+              <source src="assets/video/bell-pr-promo-en-1080p.mp4" type="video/mp4">
+              <track kind="captions" srclang="en" label="English" src="assets/video/captions.en.vtt" default>
+            </video>
+            <figcaption>About 90 seconds · English captions · Plays only when you press play</figcaption>
+          </figure>
         </div>
       </section>
 

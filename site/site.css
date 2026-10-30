@@ -319,6 +319,26 @@ main {
   font-size: 15px;
 }
 
+/* Promo video */
+.promo-video {
+  margin: 0;
+  max-width: 960px;
+}
+.promo-video video {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  background: #0b1a14;
+  box-shadow: var(--shadow);
+}
+.promo-video figcaption {
+  margin-top: 12px;
+  color: var(--text-muted);
+  font-size: 15px;
+}
+
 /* Command box with an optional copy button (site.js shows it). */
 .command {
   display: inline-flex;
@@ -664,4 +684,37 @@ kbd {
   background: var(--surface);
   font-family: var(--font-mono);
   font-size: 0.85em;
+}
+
+/* Language switch */
+.lang-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 14px;
+  font-weight: 550;
+  color: var(--text-muted);
+}
+.lang-switch a {
+  color: var(--text-secondary);
+  text-decoration: none;
+}
+.lang-switch a:hover {
+  color: var(--brand-700);
+}
+.lang-switch a[aria-current="true"] {
+  color: var(--brand-700);
+}
+.lang-switch .sep {
+  color: var(--border-strong);
+  user-select: none;
+}
+
+/* Traditional Chinese: CJK system font fallback (no remote fonts; CSP font-src 'self') */
+html[lang="zh-Hant-TW"] {
+  --font-sans: "DM Sans", "PingFang TC", "Noto Sans TC", "Microsoft JhengHei",
+    "Heiti TC", system-ui, -apple-system, sans-serif;
 }

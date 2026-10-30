@@ -40,6 +40,13 @@ BELL PR is free and open-source software under
 [Troubleshooting](#troubleshooting) · [Documentation](#documentation) ·
 [Contributing](#contributing) · [License](#license-and-trademarks)
 
+
+## Watch the 90-second demo
+
+[![From vibe coding to knowing why — BELL PR promo](site/assets/video/poster.jpg)](https://bell-pr.suzu.tw/#demo)
+
+[Watch the 90-second demo](https://bell-pr.suzu.tw/#demo) on the site (English captions, plays when you press play).
+
 ## Try the sample project
 
 A finished sample contribution — project rules, plan, diffs, explanations,

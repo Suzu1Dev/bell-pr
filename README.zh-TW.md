@@ -26,6 +26,13 @@ BELL PR 是以 [Apache-2.0](LICENSE) 授權的免費開源軟體。沒有付費�
 `bell-pr start --force` 啟動，範例導覽才能開啟。真實的 Agent 工作仍要等到
 有已登入的 AI 服務。
 
+
+## 觀看 90 秒示範
+
+[![從 vibe coding 到真正搞懂為什麼 — BELL PR 示範](site/assets/video/poster.jpg)](https://bell-pr.suzu.tw/zh-tw/#demo)
+
+在網站上[觀看 90 秒示範](https://bell-pr.suzu.tw/zh-tw/#demo)（英文字幕，需自行按下播放）。
+
 ## 開始之前
 
 BELL PR 是本機工作台。請先裝好並登入下列工具，再跑快速開始；`bell-pr doctor`

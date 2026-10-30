@@ -134,8 +134,9 @@ function checkStatic() {
 
     // Resources.
     const resources = [
-      ...html.matchAll(/<(?:link|script|img|source)\b[^>]*\s(?:href|src)="([^"]*)"/g),
+      ...html.matchAll(/<(?:link|script|img|source|track)\b[^>]*\s(?:href|src)="([^"]*)"/g),
       ...html.matchAll(/<meta\s+property="og:image"\s+content="(?![a-z][a-z0-9+.-]*:|\/\/)([^"]*)"/gi),
+      ...html.matchAll(/\sposter="([^"]*)"/g),
     ];
     for (const match of resources) checkResource(file, match[1], where(match.index));
     for (const match of html.matchAll(/\ssrcset="([^"]*)"/g))
@@ -156,7 +157,9 @@ function checkStatic() {
   }
 
   // The size budget.
-  const bytes = siteFiles().reduce((total, name) => total + fs.statSync(path.join(siteDir, name)).size, 0);
+  const bytes = siteFiles()
+    .filter((name) => !/\.(mp4|webm)$/i.test(name))
+    .reduce((total, name) => total + fs.statSync(path.join(siteDir, name)).size, 0);
   if (bytes > maxSiteBytes) problems.push(`site/: ${bytes} bytes, over the ${maxSiteBytes}-byte budget`);
 
   // Stylesheets may load fonts and images through url().
@@ -168,12 +171,17 @@ function checkStatic() {
 
   function checkResource(file, value, where) {
     if (/^[a-z][a-z0-9+.-]*:|^\/\//i.test(value)) {
-      problems.push(`${where}: ${value} loads from another origin`);
+      // Absolute hreflang / social URLs may be listed in site/README.md.
+      if (!listedInReadme(value)) problems.push(`${where}: ${value} loads from another origin`);
       return;
     }
     const { resolved, error } = resolve(file, value);
     if (error) problems.push(`${where}: ${value} ${error}`);
-    else if (!fs.existsSync(path.join(siteDir, resolved))) problems.push(`${where}: ${value} does not exist`);
+    else if (!fs.existsSync(path.join(siteDir, resolved))) {
+      // Large promo binaries are deploy-only; see assets/video/README.md.
+      if (/^assets\/video\/.*\.(mp4|webm)$/.test(resolved.replace(/\\/g, "/"))) return;
+      problems.push(`${where}: ${value} does not exist`);
+    }
   }
 
   for (const problem of problems) console.log(problem);
@@ -194,6 +202,10 @@ const types = {
   ".jpg": "image/jpeg",
   ".woff2": "font/woff2",
   ".txt": "text/plain; charset=utf-8",
+  ".vtt": "text/vtt; charset=utf-8",
+  ".mp4": "video/mp4",
+  ".webm": "video/webm",
+  ".md": "text/markdown; charset=utf-8",
 };
 
 /**

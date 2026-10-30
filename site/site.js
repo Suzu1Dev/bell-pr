@@ -6,6 +6,15 @@
 
 (() => {
   const status = document.getElementById("copy-status");
+  const isZh = (document.documentElement.lang || "").toLowerCase().startsWith("zh");
+  const msg = {
+    copied: isZh ? "已複製" : "Copied",
+    selected: isZh ? "已選取" : "Selected",
+    announceOk: isZh ? "已複製到剪貼簿。" : "Copied to the clipboard.",
+    announceFail: isZh
+      ? "複製失敗。指令已選取；請用鍵盤複製。"
+      : "Copying failed. The command is selected; copy it with your keyboard.",
+  };
   const announce = (message) => {
     if (!status) return;
     status.textContent = "";
@@ -25,13 +34,13 @@
       window.clearTimeout(reset);
       try {
         await navigator.clipboard.writeText(source.textContent.trim());
-        button.textContent = "Copied";
-        announce("Copied to the clipboard.");
+        button.textContent = msg.copied;
+        announce(msg.announceOk);
       } catch {
         // Permission denied: select the text so the reader can copy it.
         window.getSelection().selectAllChildren(source);
-        button.textContent = "Selected";
-        announce("Copying failed. The command is selected; copy it with your keyboard.");
+        button.textContent = msg.selected;
+        announce(msg.announceFail);
       }
       reset = window.setTimeout(() => {
         button.textContent = label;

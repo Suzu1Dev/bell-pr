@@ -11,12 +11,14 @@ as an HTTP header. Light theme only; the layout works from 390 to 1440 px.
 
 | Path | What it is |
 | --- | --- |
-| `index.html` | Hero with the `npx bell-pr` command, how it works, screenshots, features, the open-source license, privacy and trust, FAQ |
+| `index.html` | Hero with the `npx bell-pr` command, 90-second demo video, how it works, screenshots, features, the open-source license, privacy and trust, FAQ |
 | `install.html` | Requirements, platforms, npm, the address and `bell-pr open`, Docker, next steps |
+| `zh-tw/index.html`, `zh-tw/install.html` | Traditional Chinese (Taiwan) counterparts of the homepage and install guide |
 | `site.css`, `site.js` | Styles, and the copy buttons (the pages work without the script) |
 | `assets/brand/` | Logo, favicons and the social preview image, copied from `public/` |
 | `assets/fonts/` | Self-hosted DM Sans and IBM Plex Mono (SIL Open Font License 1.1, licenses included) |
 | `assets/screenshots/` | Screens of the sample project, copied from `docs/images/en/`; the landing page shows four of them |
+| `assets/video/` | Promo poster and English captions; the `.webm`/`.mp4` binaries are deploy-only (see that folder's README) and served in production at https://bell-pr.suzu.tw/assets/video/ |
 | `README.md`, `check-site.mjs` | This file and the site checks; they are not part of the site |
 
 ## Working on the site
@@ -39,6 +41,8 @@ as an HTTP header. Light theme only; the layout works from 390 to 1440 px.
   the brand copies drift from `public/`. See `docs/brand.md`.
 - **Checks.** `node site/check-site.mjs` checks links, resources, the
   no-inline-script rule, the screenshot copies and the 5 MB size budget.
+  Missing `.mp4`/`.webm` under `assets/video/` are allowed (deploy-only) and
+  those extensions do not count toward the size budget.
   `node site/check-site.mjs --browser --port <port>` also loads every page in
   Chromium at 1440 and 390 px: no horizontal scroll, no text cut off or out
   of its box, no request outside the local server, no failed request, no
@@ -75,6 +79,20 @@ the page's address. The license link assumes the repository's default
 branch is `main`; if it is not, change `path=blob/main/LICENSE` on both
 pages.
 
+
+## Allowed absolute URLs
+
+These absolute addresses may appear on the site (hreflang alternates). The
+site check allows them when they are named here:
+
+- https://bell-pr.suzu.tw/
+- https://bell-pr.suzu.tw/zh-tw/
+- https://bell-pr.suzu.tw/install.html
+- https://bell-pr.suzu.tw/zh-tw/install.html
+- https://bell-pr.suzu.tw/assets/video/
+- https://bell-pr.suzu.tw/#demo
+- https://bell-pr.suzu.tw/zh-tw/#demo
+
 ## Hosting
 
 Host the site anywhere that serves static files (for example Cloudflare
@@ -84,7 +102,7 @@ without `README.md` and `check-site.mjs`. Set `homepageUrl` in
 appear. Recommended HTTP headers:
 
 ```text
-Content-Security-Policy: default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'
+Content-Security-Policy: default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; media-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'
 X-Content-Type-Options: nosniff
 Referrer-Policy: no-referrer
 ```
