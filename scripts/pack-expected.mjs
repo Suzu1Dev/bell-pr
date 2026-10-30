@@ -28,7 +28,8 @@ function npmCommand() {
 /** Sorted package paths from `npm pack --dry-run --json`. */
 export function packFileList(cwd = root) {
   const windows = process.platform === "win32";
-  const result = spawnSync(npmCommand(), ["pack", "--dry-run", "--json"], {
+  // Run lifecycle scripts without mixing their (possibly colored) output into JSON.
+  const result = spawnSync(npmCommand(), ["pack", "--dry-run", "--json", "--foreground-scripts=false"], {
     cwd,
     encoding: "utf8",
     maxBuffer: 64 * 1024 * 1024,

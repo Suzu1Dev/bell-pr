@@ -489,19 +489,31 @@ test("Data & privacy has the data directory, storage, retention, erasing and the
   assert.match(renderZh(createElement(DataSection, { doctor: doctor(report), settings: appSettings(null), ...plain })), /資料與隱私/);
 });
 
-test("About shows the version and the About link", () => {
+test("About shows the version, About link and configured website", () => {
   const about = renderEn(
     createElement(AboutSection, { aboutHref: "#/about?present=1", openAbout() {} }),
   );
   assertNoHan(about);
   assert.ok(about.includes(`<code>${appVersion}</code>`));
   assert.match(about, /<a class="button secondary" href="#\/about\?present=1">.*?About BELL PR<\/a>/);
-  // Product links show only once they are set.
-  assert.doesNotMatch(about, /Documentation|Website/);
+  assert.match(about, /<a class="settings-link" href="https:\/\/bell-pr\.suzu\.tw\/" target="_blank" rel="noreferrer">Website<svg/);
+  assert.doesNotMatch(about, /Documentation/);
   assert.match(
     renderZh(createElement(AboutSection, { aboutHref: "#/about", openAbout() {} })),
     /關於 BELL PR/,
   );
+});
+
+test("About hides product links when their metadata is explicitly empty", () => {
+  const saved = { homepageUrl: product.homepageUrl, docsUrl: product.docsUrl };
+  try {
+    Object.assign(product, { homepageUrl: "", docsUrl: "" });
+    const about = createElement(AboutSection, { aboutHref: "#/about", openAbout() {} });
+    for (const html of [renderEn(about), renderZh(about)])
+      assert.doesNotMatch(html, /class="settings-link"/);
+  } finally {
+    Object.assign(product, saved);
+  }
 });
 
 test("a plain click on the About link opens the dialog over Settings; a modified one keeps the link", async () => {

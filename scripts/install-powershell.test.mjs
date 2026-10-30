@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { copyFile, mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, mkdtemp, readFile, realpath, rm, stat, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -137,7 +137,7 @@ test("PowerShell explicitly selects local helper with bounded arguments and Trad
     assert.equal(result.status, 0, result.stderr || result.stdout);
     assert.equal(result.calls.some((call) => call.command === "download"), false);
     const commands = result.calls.map((call) => call.arguments);
-    assert.equal(commands.at(-2).at(-1), result.local);
+    assert.equal(await realpath(commands.at(-2).at(-1)), await realpath(result.local));
     assert.deepEqual(commands.at(-1), ["-d", "Ubuntu Dev", "bash", "/tmp/bellpr-fixture-helper.sh", "--provider", "none", "--version", "1.2.3-rc.1", "--lang", "zh-TW"]);
     assert.match(result.stdout, /正在 WSL2 發行版「Ubuntu Dev」內安裝/);
     assert.match(result.stdout, /完成上述登入指令後/);
