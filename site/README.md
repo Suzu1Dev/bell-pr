@@ -36,6 +36,7 @@ source line breaks. The demo retains its player controls and caption track
 without an additional caption below the player.
 
 The header and homepage actions lead directly to the installation section.
+The header links follow the homepage's content order: demo, then how it works.
 The layout uses a sticky navigation bar, a real workbench screenshot and
 progressively disclosed feature details. Both homepages center the product mission
 on understanding AI-assisted changes, discussing design tradeoffs, developing
