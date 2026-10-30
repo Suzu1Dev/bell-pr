@@ -26,8 +26,12 @@ as an HTTP header. Light theme only; the layout works from 320 to 1440 px.
 The installation tabs are ordered npx, npm, curl, brew, bun, PowerShell and mise.
 npx is selected initially. npm remains available for a global installation;
 without JavaScript, all seven commands are visible together.
-Homebrew uses one copyable line: adding the existing tap and installing are
-joined with `&&`, so installation runs only if adding the tap succeeds.
+Homebrew uses one fully qualified `brew install` command. Its dedicated tap
+repository comes from `shared/product.ts`; Homebrew adds it automatically.
+The installation UI uses compact underline tabs and a command row with its copy
+button beside it. Single-line commands use only one row; PowerShell keeps its
+source line breaks. The demo retains its player controls and caption track
+without an additional caption below the player.
 
 The header and homepage actions lead directly to the installation section.
 The layout uses a sticky navigation bar, a real workbench screenshot and
@@ -47,7 +51,7 @@ reduced-motion preferences.
   `npx tsx scripts/render-generated-regions.ts --write`; CI runs `--check`.
   The script finds tracked files with regions by itself, so a new page only
   needs the markers. Only the keys `homepageUrl`, `docsUrl`, `publicRepoUrl`,
-  `supportEmail` and `securityEmail` exist.
+  `homebrewRepoUrl`, `supportEmail` and `securityEmail` exist.
 - **Screenshots.** `assets/screenshots/` holds byte-identical copies of
   images in `docs/images/en/`. After the documentation images are
   captured again, copy them again, for example
@@ -132,9 +136,9 @@ is the installation guide.
 
 Before deployment, restore the current deploy-only `.mp4` and `.webm` files in
 `assets/video/`; they are not in Git (see that folder's README). A deployment of
-the Git checkout alone would remove the live video. Merge the Homebrew formula
-into the public repository's default branch before advertising the brew command;
-the tap downloads that branch. Check `/install`, `/install.ps1` and
+the Git checkout alone would remove the live video. Publish the reviewed Homebrew
+formula to the dedicated tap before advertising its install command; see
+`docs/development.md` for the formula update procedure. Check `/install`, `/install.ps1` and
 `/install-wsl.sh` as well as the four pages after publishing.
 
 Other static hosts can serve the same directory. Set the following headers

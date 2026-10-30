@@ -71,13 +71,6 @@
             <p>使用你熟悉的工具，在終端機執行指令。</p>
           </div>
             <div class="install-widget" data-install>
-              <div class="install-header">
-                <div>
-                  <p class="install-eyebrow">開始使用</p>
-                  <p class="install-title">一行指令，開啟你的工作台。</p>
-                </div>
-                <a class="install-guide" href="#requirements">開始之前<span aria-hidden="true"> ↗</span></a>
-              </div>
               <div class="install-toolbar">
                 <div class="install-tabs" data-install-tabs aria-label="安裝方式" hidden>
                   <button class="install-tab" type="button" id="install-tab-npx" data-install-target="install-panel-npx">npx</button>
@@ -89,16 +82,14 @@
                   <button class="install-tab" type="button" id="install-tab-mise" data-install-target="install-panel-mise">mise</button>
                 </div>
                 <span class="install-platform" data-install-platform hidden></span>
+                <a class="install-guide" href="#requirements">開始之前<span aria-hidden="true"> ↗</span></a>
               </div>
               <section class="install-panel" id="install-panel-npx" data-platform="macOS · Linux" aria-labelledby="install-heading-npx">
                 <h2 class="install-method-title" id="install-heading-npx">npx</h2>
                 <p class="install-platform">macOS · Linux</p>
                 <div class="command install-command">
-                  <div class="install-command-heading">
-                    <span class="install-terminal-label"><span aria-hidden="true">›_</span> 終端機</span>
-                    <button class="copy-button" type="button" data-copy="install-command-npx" aria-label="複製 npx 安裝指令" hidden>複製</button>
-                  </div>
                   <code id="install-command-npx" tabindex="0"><!-- generated:install-commands method=npx lang=zh-TW -->npx bell-pr<!-- /generated:install-commands --></code>
+                  <button class="copy-button" type="button" data-copy="install-command-npx" aria-label="複製 npx 安裝指令" hidden>複製</button>
                 </div>
                 <p class="install-note">需要 Node.js 22 以上與 npm；不需全域安裝，直接啟動 BELL PR。</p>
                 <p class="install-next">先登入 GitHub 與 AI 工具，工作時保持終端機開啟。</p>
@@ -107,11 +98,8 @@
                 <h2 class="install-method-title" id="install-heading-npm">npm</h2>
                 <p class="install-platform">macOS · Linux</p>
                 <div class="command install-command">
-                  <div class="install-command-heading">
-                    <span class="install-terminal-label"><span aria-hidden="true">›_</span> 終端機</span>
-                    <button class="copy-button" type="button" data-copy="install-command-npm" aria-label="複製 npm 安裝指令" hidden>複製</button>
-                  </div>
                   <code id="install-command-npm" tabindex="0"><!-- generated:install-commands method=npm lang=zh-TW -->npm install -g bell-pr<!-- /generated:install-commands --></code>
+                  <button class="copy-button" type="button" data-copy="install-command-npm" aria-label="複製 npm 安裝指令" hidden>複製</button>
                 </div>
                 <p class="install-note">需要 Node.js 22 以上與 npm；安裝後即可使用 bell-pr 指令。</p>
                 <p class="install-next">登入所需工具後，執行 <code>bell-pr</code>。</p>
@@ -120,11 +108,8 @@
                 <h2 class="install-method-title" id="install-heading-curl">curl</h2>
                 <p class="install-platform">macOS · Linux</p>
                 <div class="command install-command">
-                  <div class="install-command-heading">
-                    <span class="install-terminal-label"><span aria-hidden="true">›_</span> 終端機</span>
-                    <button class="copy-button" type="button" data-copy="install-command-curl" aria-label="複製 curl 安裝指令" hidden>複製</button>
-                  </div>
                   <code id="install-command-curl" tabindex="0"><!-- generated:install-commands method=curl lang=zh-TW -->curl -fsSL https://bell-pr.suzu.tw/install | sh -s -- --lang zh-TW<!-- /generated:install-commands --></code>
+                  <button class="copy-button" type="button" data-copy="install-command-curl" aria-label="複製 curl 安裝指令" hidden>複製</button>
                 </div>
                 <p class="install-note">安裝到你的使用者目錄；需要時自動準備 Node.js 24。</p>
                 <p class="install-next">完成後，使用腳本印出的啟動指令或 PATH 設定。</p>
@@ -133,11 +118,8 @@
                 <h2 class="install-method-title" id="install-heading-brew">brew</h2>
                 <p class="install-platform">macOS · Linux</p>
                 <div class="command install-command">
-                  <div class="install-command-heading">
-                    <span class="install-terminal-label"><span aria-hidden="true">›_</span> 終端機</span>
-                    <button class="copy-button" type="button" data-copy="install-command-brew" aria-label="複製 brew 安裝指令" hidden>複製</button>
-                  </div>
-                  <code id="install-command-brew" tabindex="0"><!-- generated:install-commands method=brew lang=zh-TW -->brew tap suzu1dev/bell-pr https://github.com/Suzu1Dev/bell-pr &amp;&amp; brew install suzu1dev/bell-pr/bell-pr<!-- /generated:install-commands --></code>
+                  <code id="install-command-brew" tabindex="0"><!-- generated:install-commands method=brew lang=zh-TW -->brew install suzu1dev/bell-pr/bell-pr<!-- /generated:install-commands --></code>
+                  <button class="copy-button" type="button" data-copy="install-command-brew" aria-label="複製 brew 安裝指令" hidden>複製</button>
                 </div>
                 <p class="install-note">需要 Homebrew；會一併安裝 Node.js、Git 與 GitHub CLI。</p>
                 <p class="install-next">登入所需工具後，執行 <code>bell-pr</code>。</p>
@@ -146,11 +128,8 @@
                 <h2 class="install-method-title" id="install-heading-bun">bun</h2>
                 <p class="install-platform">macOS · Linux</p>
                 <div class="command install-command">
-                  <div class="install-command-heading">
-                    <span class="install-terminal-label"><span aria-hidden="true">›_</span> 終端機</span>
-                    <button class="copy-button" type="button" data-copy="install-command-bun" aria-label="複製 bun 安裝指令" hidden>複製</button>
-                  </div>
                   <code id="install-command-bun" tabindex="0"><!-- generated:install-commands method=bun lang=zh-TW -->bun add --global bell-pr<!-- /generated:install-commands --></code>
+                  <button class="copy-button" type="button" data-copy="install-command-bun" aria-label="複製 bun 安裝指令" hidden>複製</button>
                 </div>
                 <p class="install-note">需要 Bun 與 Node.js 22 以上。</p>
                 <p class="install-next">登入所需工具後，執行 <code>bell-pr</code>。</p>
@@ -159,14 +138,11 @@
                 <h2 class="install-method-title" id="install-heading-powershell">ps1</h2>
                 <p class="install-platform">Windows · WSL2</p>
                 <div class="command install-command">
-                  <div class="install-command-heading">
-                    <span class="install-terminal-label"><span aria-hidden="true">›_</span> PowerShell</span>
-                    <button class="copy-button" type="button" data-copy="install-command-powershell" aria-label="複製 PowerShell 安裝指令" hidden>複製</button>
-                  </div>
                   <code id="install-command-powershell" tabindex="0"><!-- generated:install-commands method=powershell lang=zh-TW -->&amp; {
   Invoke-RestMethod &#39;https://bell-pr.suzu.tw/install.ps1&#39; -OutFile install.ps1 -ErrorAction Stop
   powershell -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -Lang zh-TW
 }<!-- /generated:install-commands --></code>
+                  <button class="copy-button" type="button" data-copy="install-command-powershell" aria-label="複製 PowerShell 安裝指令" hidden>複製</button>
                 </div>
                 <p class="install-note">在 WSL2 Ubuntu 內準備工具與 Codex CLI；若缺少 WSL，會列出設定步驟。</p>
                 <p class="install-next">在 Ubuntu 裡完成登入，再啟動 BELL PR。<a href="install.html#windows">Windows 設定步驟</a></p>
@@ -175,11 +151,8 @@
                 <h2 class="install-method-title" id="install-heading-mise">mise</h2>
                 <p class="install-platform">macOS · Linux</p>
                 <div class="command install-command">
-                  <div class="install-command-heading">
-                    <span class="install-terminal-label"><span aria-hidden="true">›_</span> 終端機</span>
-                    <button class="copy-button" type="button" data-copy="install-command-mise" aria-label="複製 mise 安裝指令" hidden>複製</button>
-                  </div>
                   <code id="install-command-mise" tabindex="0"><!-- generated:install-commands method=mise lang=zh-TW -->MISE_NPM_PACKAGE_MANAGER=npm mise use -g node@24 npm:bell-pr@1.0.0<!-- /generated:install-commands --></code>
+                  <button class="copy-button" type="button" data-copy="install-command-mise" aria-label="複製 mise 安裝指令" hidden>複製</button>
                 </div>
                 <p class="install-note">安裝 Node.js 24，固定使用 BELL PR 1.0.0，這次安裝選用 npm。</p>
                 <p class="install-next">用 <code>mise exec -- bell-pr</code> 啟動。</p>

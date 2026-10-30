@@ -9,10 +9,10 @@ as the same user that runs BELL PR. On Linux, Claude Code's sandbox also needs
 `bubblewrap` and `socat`. See the full [requirements](getting-started.md#before-you-start).
 The Windows helper installs these tools, but sign-in stays manual.
 
-The shell and PowerShell download commands use the public website; the Homebrew
-tap uses this repository's `main` branch. When testing an unpublished installer
-change, use the files from that checkout. Publish the website's installer copies
-and merge the Homebrew formula before using the corresponding remote commands.
+The shell and PowerShell download commands use the public website; Homebrew uses
+the dedicated tap's `main` branch. When testing an unpublished installer change,
+use the files from that checkout. Publish the website's installer copies and
+update the dedicated tap before using the corresponding remote commands.
 
 ## npm
 
@@ -70,16 +70,20 @@ The installer language changes its messages; choose the app's language in Welcom
 
 ## Homebrew (macOS and Linux)
 
-With Homebrew already installed, paste this line to add the repository as a tap
-and install BELL PR:
+With Homebrew already installed, run one command. Homebrew adds the dedicated
+tap automatically:
 
 <!-- generated:install-commands method=brew -->
 ```sh
-brew tap suzu1dev/bell-pr https://github.com/Suzu1Dev/bell-pr && brew install suzu1dev/bell-pr/bell-pr
+brew install suzu1dev/bell-pr/bell-pr
 ```
 <!-- /generated:install-commands -->
 
-Then run `bell-pr`. This is a repository-hosted formula, not a Homebrew core
+Then run `bell-pr`. The formula comes from the
+<!-- generated:product-link key=homebrewRepoUrl text="dedicated Homebrew tap" -->
+[dedicated Homebrew tap](https://github.com/Suzu1Dev/homebrew-bell-pr)
+<!-- /generated:product-link -->.
+It is not a Homebrew core
 formula. It installs BELL PR and its formula dependencies; finish the GitHub
 and AI CLI sign-in steps separately.
 

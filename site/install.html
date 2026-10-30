@@ -71,13 +71,6 @@
             <p>Use the tools you know. Run one command in your terminal.</p>
           </div>
             <div class="install-widget" data-install>
-              <div class="install-header">
-                <div>
-                  <p class="install-eyebrow">GET STARTED</p>
-                  <p class="install-title">Your workbench, one command away.</p>
-                </div>
-                <a class="install-guide" href="#requirements">Before you start<span aria-hidden="true"> ↗</span></a>
-              </div>
               <div class="install-toolbar">
                 <div class="install-tabs" data-install-tabs aria-label="Installation method" hidden>
                   <button class="install-tab" type="button" id="install-tab-npx" data-install-target="install-panel-npx">npx</button>
@@ -89,16 +82,14 @@
                   <button class="install-tab" type="button" id="install-tab-mise" data-install-target="install-panel-mise">mise</button>
                 </div>
                 <span class="install-platform" data-install-platform hidden></span>
+                <a class="install-guide" href="#requirements">Before you start<span aria-hidden="true"> ↗</span></a>
               </div>
               <section class="install-panel" id="install-panel-npx" data-platform="macOS · Linux" aria-labelledby="install-heading-npx">
                 <h2 class="install-method-title" id="install-heading-npx">npx</h2>
                 <p class="install-platform">macOS · Linux</p>
                 <div class="command install-command">
-                  <div class="install-command-heading">
-                    <span class="install-terminal-label"><span aria-hidden="true">›_</span> Terminal</span>
-                    <button class="copy-button" type="button" data-copy="install-command-npx" aria-label="Copy npx installation commands" hidden>Copy</button>
-                  </div>
                   <code id="install-command-npx" tabindex="0"><!-- generated:install-commands method=npx lang=en -->npx bell-pr<!-- /generated:install-commands --></code>
+                  <button class="copy-button" type="button" data-copy="install-command-npx" aria-label="Copy npx installation commands" hidden>Copy</button>
                 </div>
                 <p class="install-note">Requires Node.js 22 or later and npm. Starts BELL PR without a global install.</p>
                 <p class="install-next">Sign in to your GitHub and AI tools first; keep this terminal open while you work.</p>
@@ -107,11 +98,8 @@
                 <h2 class="install-method-title" id="install-heading-npm">npm</h2>
                 <p class="install-platform">macOS · Linux</p>
                 <div class="command install-command">
-                  <div class="install-command-heading">
-                    <span class="install-terminal-label"><span aria-hidden="true">›_</span> Terminal</span>
-                    <button class="copy-button" type="button" data-copy="install-command-npm" aria-label="Copy npm installation commands" hidden>Copy</button>
-                  </div>
                   <code id="install-command-npm" tabindex="0"><!-- generated:install-commands method=npm lang=en -->npm install -g bell-pr<!-- /generated:install-commands --></code>
+                  <button class="copy-button" type="button" data-copy="install-command-npm" aria-label="Copy npm installation commands" hidden>Copy</button>
                 </div>
                 <p class="install-note">Requires Node.js 22 or later and npm. Installs the bell-pr command.</p>
                 <p class="install-next">After signing in to your tools, run <code>bell-pr</code>.</p>
@@ -120,11 +108,8 @@
                 <h2 class="install-method-title" id="install-heading-curl">curl</h2>
                 <p class="install-platform">macOS · Linux</p>
                 <div class="command install-command">
-                  <div class="install-command-heading">
-                    <span class="install-terminal-label"><span aria-hidden="true">›_</span> Terminal</span>
-                    <button class="copy-button" type="button" data-copy="install-command-curl" aria-label="Copy curl installation commands" hidden>Copy</button>
-                  </div>
                   <code id="install-command-curl" tabindex="0"><!-- generated:install-commands method=curl lang=en -->curl -fsSL https://bell-pr.suzu.tw/install | sh<!-- /generated:install-commands --></code>
+                  <button class="copy-button" type="button" data-copy="install-command-curl" aria-label="Copy curl installation commands" hidden>Copy</button>
                 </div>
                 <p class="install-note">Installs for your user. Prepares Node.js 24 when needed.</p>
                 <p class="install-next">Use the launch command or PATH setting printed by the installer.</p>
@@ -133,11 +118,8 @@
                 <h2 class="install-method-title" id="install-heading-brew">brew</h2>
                 <p class="install-platform">macOS · Linux</p>
                 <div class="command install-command">
-                  <div class="install-command-heading">
-                    <span class="install-terminal-label"><span aria-hidden="true">›_</span> Terminal</span>
-                    <button class="copy-button" type="button" data-copy="install-command-brew" aria-label="Copy brew installation commands" hidden>Copy</button>
-                  </div>
-                  <code id="install-command-brew" tabindex="0"><!-- generated:install-commands method=brew lang=en -->brew tap suzu1dev/bell-pr https://github.com/Suzu1Dev/bell-pr &amp;&amp; brew install suzu1dev/bell-pr/bell-pr<!-- /generated:install-commands --></code>
+                  <code id="install-command-brew" tabindex="0"><!-- generated:install-commands method=brew lang=en -->brew install suzu1dev/bell-pr/bell-pr<!-- /generated:install-commands --></code>
+                  <button class="copy-button" type="button" data-copy="install-command-brew" aria-label="Copy brew installation commands" hidden>Copy</button>
                 </div>
                 <p class="install-note">Requires Homebrew. Includes Node.js, Git and GitHub CLI.</p>
                 <p class="install-next">After signing in to your tools, run <code>bell-pr</code>.</p>
@@ -146,11 +128,8 @@
                 <h2 class="install-method-title" id="install-heading-bun">bun</h2>
                 <p class="install-platform">macOS · Linux</p>
                 <div class="command install-command">
-                  <div class="install-command-heading">
-                    <span class="install-terminal-label"><span aria-hidden="true">›_</span> Terminal</span>
-                    <button class="copy-button" type="button" data-copy="install-command-bun" aria-label="Copy bun installation commands" hidden>Copy</button>
-                  </div>
                   <code id="install-command-bun" tabindex="0"><!-- generated:install-commands method=bun lang=en -->bun add --global bell-pr<!-- /generated:install-commands --></code>
+                  <button class="copy-button" type="button" data-copy="install-command-bun" aria-label="Copy bun installation commands" hidden>Copy</button>
                 </div>
                 <p class="install-note">Requires Bun and Node.js 22 or later.</p>
                 <p class="install-next">After signing in to your tools, run <code>bell-pr</code>.</p>
@@ -159,14 +138,11 @@
                 <h2 class="install-method-title" id="install-heading-powershell">ps1</h2>
                 <p class="install-platform">Windows · WSL2</p>
                 <div class="command install-command">
-                  <div class="install-command-heading">
-                    <span class="install-terminal-label"><span aria-hidden="true">›_</span> PowerShell</span>
-                    <button class="copy-button" type="button" data-copy="install-command-powershell" aria-label="Copy PowerShell installation commands" hidden>Copy</button>
-                  </div>
                   <code id="install-command-powershell" tabindex="0"><!-- generated:install-commands method=powershell lang=en -->&amp; {
   Invoke-RestMethod &#39;https://bell-pr.suzu.tw/install.ps1&#39; -OutFile install.ps1 -ErrorAction Stop
   powershell -NoProfile -ExecutionPolicy Bypass -File .\install.ps1
 }<!-- /generated:install-commands --></code>
+                  <button class="copy-button" type="button" data-copy="install-command-powershell" aria-label="Copy PowerShell installation commands" hidden>Copy</button>
                 </div>
                 <p class="install-note">Prepares tools and Codex CLI inside WSL2 Ubuntu. Prints setup steps if WSL is missing.</p>
                 <p class="install-next">Sign in inside Ubuntu, then start BELL PR. <a href="install.html#windows">Windows setup</a></p>
@@ -175,11 +151,8 @@
                 <h2 class="install-method-title" id="install-heading-mise">mise</h2>
                 <p class="install-platform">macOS · Linux</p>
                 <div class="command install-command">
-                  <div class="install-command-heading">
-                    <span class="install-terminal-label"><span aria-hidden="true">›_</span> Terminal</span>
-                    <button class="copy-button" type="button" data-copy="install-command-mise" aria-label="Copy mise installation commands" hidden>Copy</button>
-                  </div>
                   <code id="install-command-mise" tabindex="0"><!-- generated:install-commands method=mise lang=en -->MISE_NPM_PACKAGE_MANAGER=npm mise use -g node@24 npm:bell-pr@1.0.0<!-- /generated:install-commands --></code>
+                  <button class="copy-button" type="button" data-copy="install-command-mise" aria-label="Copy mise installation commands" hidden>Copy</button>
                 </div>
                 <p class="install-note">Installs Node.js 24 and pins BELL PR 1.0.0, using npm for this installation.</p>
                 <p class="install-next">Start with <code>mise exec -- bell-pr</code>.</p>

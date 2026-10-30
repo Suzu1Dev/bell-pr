@@ -332,8 +332,8 @@ async function checkBrowser(files, { port, screenshots }) {
       if (method === "npx") expect(command).toBe(`npx ${packageName}`);
       if (method === "npm") expect(command).toBe(`npm install -g ${packageName}`);
       if (method === "brew") {
-        expect(command).not.toContain("\n");
-        expect(command).toContain(" && brew install ");
+        expect(command).toMatch(/^brew install [a-z0-9_.-]+\/[a-z0-9_.-]+\/[a-z0-9_.@+-]+$/i);
+        expect(command.split("/").at(-1)).toBe(packageName);
       }
       if (method === "powershell") expect(command).toContain("\n");
       if (!noScript) {
