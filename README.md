@@ -145,12 +145,11 @@ curl -fsSL https://bell-pr.suzu.tw/install | sh
 
 Then use the launch command or PATH setting printed by the installer.
 
-**Homebrew** — uses this repository as the tap:
+**Homebrew** — paste this line to add the tap and install:
 
 <!-- generated:install-commands method=brew -->
 ```sh
-brew tap suzu1dev/bell-pr https://github.com/Suzu1Dev/bell-pr
-brew install suzu1dev/bell-pr/bell-pr
+brew tap suzu1dev/bell-pr https://github.com/Suzu1Dev/bell-pr && brew install suzu1dev/bell-pr/bell-pr
 ```
 <!-- /generated:install-commands -->
 

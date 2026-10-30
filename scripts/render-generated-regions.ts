@@ -321,7 +321,7 @@ function installCommands(region: Region, format: Format, where: string, context:
     lines = [`curl -fsSL ${homepage ? `${homepage}/install` : `${raw}/install.sh`} | sh${lang === "zh-TW" ? " -s -- --lang zh-TW" : ""}`];
   } else if (method === "brew") {
     const tap = `${repo[1]}/${repo[2]}`.toLowerCase();
-    lines = [`brew tap ${tap} ${url}`, `brew install ${tap}/${bin}`];
+    lines = [`brew tap ${tap} ${url} && brew install ${tap}/${bin}`];
   } else if (method === "bun") {
     lines = [`bun add --global ${pkg}`];
   } else if (method === "mise") {
@@ -610,7 +610,12 @@ function selfTest(): number {
     const html = renderText(`<code>${install(method).trim()}</code>`, "install.html", installerContext);
     assert.ok(!html.text.includes("```"));
     assert.deepEqual(renderText(html.text, "install.html", installerContext).stale, []);
-    if (method === "brew") assert.match(html.text, /workbench\nbrew install/);
+    if (method === "brew") {
+      const brew = `brew tap example/workbench https://github.com/example/workbench && brew install example/workbench/${product.binNames[0]}`;
+      assert.ok(rendered.text.includes(`\n${brew}\n`));
+      assert.ok(html.text.includes(brew.replace("&&", "&amp;&amp;")));
+      assert.doesNotMatch(html.text, /workbench\nbrew install/);
+    }
     if (method === "powershell") assert.match(html.text, /&amp; \{/);
     if (method === "npx") assert.ok(html.text.includes(`npx ${product.npmPackage}`));
     if (method === "npm") assert.ok(html.text.includes(`npm install -g ${product.npmPackage}`));

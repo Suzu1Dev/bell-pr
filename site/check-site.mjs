@@ -331,7 +331,11 @@ async function checkBrowser(files, { port, screenshots }) {
       expect(command, `${method} has a readable install command`).not.toBe("");
       if (method === "npx") expect(command).toBe(`npx ${packageName}`);
       if (method === "npm") expect(command).toBe(`npm install -g ${packageName}`);
-      if (method === "brew" || method === "powershell") expect(command).toContain("\n");
+      if (method === "brew") {
+        expect(command).not.toContain("\n");
+        expect(command).toContain(" && brew install ");
+      }
+      if (method === "powershell") expect(command).toContain("\n");
       if (!noScript) {
         const button = widget.locator(`button[data-copy="install-command-${method}"]`);
         await button.click();

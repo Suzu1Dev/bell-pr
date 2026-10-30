@@ -29,7 +29,7 @@
     <link rel="stylesheet" href="../site.css">
     <script src="../site.js" defer></script>
   </head>
-  <body>
+  <body class="guide-page">
     <a class="skip-link" href="#main">跳到主要內容</a>
     <header class="site-header">
       <div class="wrap">
@@ -37,7 +37,7 @@
         <nav class="site-nav" aria-label="主選單">
           <ul>
             <li><a href="index.html#how-it-works">運作方式</a></li>
-            <li><a href="install.html" aria-current="page">安裝</a></li>
+            <li><a href="index.html#demo">示範影片</a></li>
           </ul>
         </nav>
         <nav class="lang-switch" aria-label="語言">
@@ -45,15 +45,31 @@
           <span class="sep" aria-hidden="true">/</span>
           <a href="install.html" hreflang="zh-Hant-TW" lang="zh-Hant-TW" aria-current="true">中文</a>
         </nav>
+        <a class="nav-cta" href="#install">開始使用</a>
       </div>
     </header>
 
     <main id="main">
-      <section class="page-head">
+      <section class="page-head" aria-labelledby="guide-title">
         <div class="wrap">
-          <h1>安裝 BELL PR</h1>
-          <p class="lead">BELL PR 是免費開源軟體（Apache License 2.0），在你自己的電腦上執行。選擇下方的安裝方式，登入所需工具後，再啟動 BELL PR。</p>
-          <div class="hero-actions">
+          <p class="eyebrow">安裝指南</p>
+          <h1 id="guide-title">你的工作台，<br><span>準備就緒。</span></h1>
+          <p class="lead">安裝 BELL PR，登入你自己的工具，開始第一項貢獻。</p>
+          <ol class="setup-overview">
+            <li><a href="#install"><span>01</span>選擇安裝方式</a></li>
+            <li><a href="#first-start"><span>02</span>登入所需工具</a></li>
+            <li><a href="#launch"><span>03</span>開啟工作台</a></li>
+          </ol>
+        </div>
+      </section>
+
+      <section class="section install-section" id="install" aria-labelledby="install-title">
+        <div class="wrap">
+          <div class="section-head centered">
+            <p class="eyebrow">開始使用</p>
+            <h2 id="install-title">選擇你的安裝方式。</h2>
+            <p>使用你熟悉的工具，在終端機執行指令。</p>
+          </div>
             <div class="install-widget" data-install>
               <div class="install-header">
                 <div>
@@ -121,8 +137,7 @@
                     <span class="install-terminal-label"><span aria-hidden="true">›_</span> 終端機</span>
                     <button class="copy-button" type="button" data-copy="install-command-brew" aria-label="複製 brew 安裝指令" hidden>複製</button>
                   </div>
-                  <code id="install-command-brew" tabindex="0"><!-- generated:install-commands method=brew lang=zh-TW -->brew tap suzu1dev/bell-pr https://github.com/Suzu1Dev/bell-pr
-brew install suzu1dev/bell-pr/bell-pr<!-- /generated:install-commands --></code>
+                  <code id="install-command-brew" tabindex="0"><!-- generated:install-commands method=brew lang=zh-TW -->brew tap suzu1dev/bell-pr https://github.com/Suzu1Dev/bell-pr &amp;&amp; brew install suzu1dev/bell-pr/bell-pr<!-- /generated:install-commands --></code>
                 </div>
                 <p class="install-note">需要 Homebrew；會一併安裝 Node.js、Git 與 GitHub CLI。</p>
                 <p class="install-next">登入所需工具後，執行 <code>bell-pr</code>。</p>
@@ -170,12 +185,23 @@ brew install suzu1dev/bell-pr/bell-pr<!-- /generated:install-commands --></code>
                 <p class="install-next">用 <code>mise exec -- bell-pr</code> 啟動。</p>
               </section>
             </div>
-          </div>
+          <p class="install-footnote">BELL PR 免費開源，不需建立 BELL PR 帳號。真實貢獻需要 Git、已登入的 GitHub CLI，以及 Codex CLI 或 Claude Code。</p>
         </div>
       </section>
 
-      <section class="section section-tinted">
-        <div class="wrap">
+      <section class="section guide-section">
+        <div class="wrap guide-layout">
+          <nav class="guide-toc" aria-label="本頁目錄">
+            <p>本頁目錄</p>
+              <a href="#requirements">開始之前</a>
+              <a href="#platforms">支援平台</a>
+              <a href="#first-start">登入所需工具</a>
+              <a href="#launch">開啟工作台</a>
+              <a href="#windows">Windows 與 WSL2</a>
+              <a href="#npm">npm 與常用指令</a>
+              <a href="#docker">Docker（beta）</a>
+              <a href="#next">下一步</a>
+          </nav>
           <div class="prose">
             <h2 id="requirements">需求</h2>
             <ul>
@@ -194,9 +220,10 @@ brew install suzu1dev/bell-pr/bell-pr<!-- /generated:install-commands --></code>
               <li><strong>Docker（beta）：</strong>從原始碼建置的映像，內含 Git、GitHub CLI 與 Codex CLI。</li>
             </ul>
 
-            <h2 id="first-start">安裝之後</h2>
-            <p>用 <code>git config --global user.name "Your Name"</code> 與 <code>git config --global user.email "you@example.com"</code> 設定 Git 身分，請將範例值換成自己的名字與電子郵件。執行 <code>gh auth login</code>，再用 <code>codex login</code> 或 <code>claude auth login</code> 登入 AI 工具，最後用 <code>bell-pr doctor</code> 檢查環境。</p>
-            <p>curl 腳本會印出啟動指令與 PATH 設定，請依照它操作，讓終端機找到已安裝的工具。Homebrew 或 Bun 安裝後用 <code>bell-pr</code>；mise 則用 <code>mise exec -- bell-pr</code>。工作時保持終端機開啟；<kbd>Ctrl</kbd>+<kbd>C</kbd> 可停止 BELL PR。</p>
+            <h2 id="first-start">登入所需工具</h2>
+            <p>用 <code>git config --global user.name "Your Name"</code> 與 <code>git config --global user.email "you@example.com"</code> 設定 Git 身分，請將範例值換成自己的名字與電子郵件。執行 <code>gh auth login</code>，再用 <code>codex login</code> 或 <code>claude auth login</code> 登入 AI 工具，最後用 <code>bell-pr doctor</code> 檢查環境；使用 npx 時則執行 <code>npx bell-pr doctor</code>。</p>
+            <h2 id="launch">開啟工作台</h2>
+            <p>curl 腳本會印出啟動指令與 PATH 設定，請依照它操作，讓終端機找到已安裝的工具。使用 npx 時，再次執行 <code>npx bell-pr</code>。Homebrew 或 Bun 安裝後用 <code>bell-pr</code>；mise 則用 <code>mise exec -- bell-pr</code>。工作時保持終端機開啟；<kbd>Ctrl</kbd>+<kbd>C</kbd> 可停止 BELL PR。</p>
             <p>尚未登入時，可以用 <code>bell-pr start --force</code> 試用範例專案。範例不呼叫 AI，也不傳送內容到 GitHub；真實 Agent 工作仍需要已登入的 AI 服務。</p>
 
             <h2 id="windows">Windows 與 WSL2</h2>
@@ -254,7 +281,7 @@ bell-pr</code></pre>
             </ul>
 
             <h2 id="next">下一步</h2>
-            <p>開啟範例專案查看一份完成的貢獻，再匯入你想貢獻的 repository。在你發布 Draft PR 之前，一切都留在你的電腦上。原始碼 repo 在 <code>docs/security-model.md</code> 說明 agents 在你電腦上可做什麼，在 <code>docs/privacy-and-data.md</code> 說明什麼會離開你的電腦。</p>
+            <p>開啟範例專案查看一份完成的貢獻，再匯入你想貢獻的 repository。BELL PR 只會在你核准後，才將變更發布到 GitHub；AI 任務會將相關程式碼與指令交給你選用的服務商。原始碼 repo 在 <code>docs/security-model.md</code> 說明 agents 在你電腦上可做什麼，在 <code>docs/privacy-and-data.md</code> 說明什麼會離開你的電腦。</p>
           </div>
         </div>
       </section>

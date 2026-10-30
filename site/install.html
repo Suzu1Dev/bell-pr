@@ -29,7 +29,7 @@
     <link rel="stylesheet" href="site.css">
     <script src="site.js" defer></script>
   </head>
-  <body>
+  <body class="guide-page">
     <a class="skip-link" href="#main">Skip to content</a>
     <header class="site-header">
       <div class="wrap">
@@ -37,7 +37,7 @@
         <nav class="site-nav" aria-label="Main">
           <ul>
             <li><a href="index.html#how-it-works">How it works</a></li>
-            <li><a href="install.html" aria-current="page">Install</a></li>
+            <li><a href="index.html#demo">Watch the demo</a></li>
           </ul>
         </nav>
         <nav class="lang-switch" aria-label="Language">
@@ -45,15 +45,31 @@
           <span class="sep" aria-hidden="true">/</span>
           <a href="zh-tw/install.html" hreflang="zh-Hant-TW" lang="zh-Hant-TW">中文</a>
         </nav>
+        <a class="nav-cta" href="#install">Get started</a>
       </div>
     </header>
 
     <main id="main">
-      <section class="page-head">
+      <section class="page-head" aria-labelledby="guide-title">
         <div class="wrap">
-          <h1>Install BELL PR</h1>
-          <p class="lead">BELL PR is free, open-source software (Apache License 2.0) that runs on your own computer. Choose your installation method below, sign in to your tools, then start BELL PR.</p>
-          <div class="hero-actions">
+          <p class="eyebrow">Installation guide</p>
+          <h1 id="guide-title">A little setup.<br><span>A lot to make your own.</span></h1>
+          <p class="lead">Install BELL PR, connect your own tools, and make your first contribution.</p>
+          <ol class="setup-overview">
+            <li><a href="#install"><span>01</span>Install your way</a></li>
+            <li><a href="#first-start"><span>02</span>Sign in to your tools</a></li>
+            <li><a href="#launch"><span>03</span>Open your workbench</a></li>
+          </ol>
+        </div>
+      </section>
+
+      <section class="section install-section" id="install" aria-labelledby="install-title">
+        <div class="wrap">
+          <div class="section-head centered">
+            <p class="eyebrow">Get started</p>
+            <h2 id="install-title">Choose your way to install.</h2>
+            <p>Use the tools you know. Run one command in your terminal.</p>
+          </div>
             <div class="install-widget" data-install>
               <div class="install-header">
                 <div>
@@ -121,8 +137,7 @@
                     <span class="install-terminal-label"><span aria-hidden="true">›_</span> Terminal</span>
                     <button class="copy-button" type="button" data-copy="install-command-brew" aria-label="Copy brew installation commands" hidden>Copy</button>
                   </div>
-                  <code id="install-command-brew" tabindex="0"><!-- generated:install-commands method=brew lang=en -->brew tap suzu1dev/bell-pr https://github.com/Suzu1Dev/bell-pr
-brew install suzu1dev/bell-pr/bell-pr<!-- /generated:install-commands --></code>
+                  <code id="install-command-brew" tabindex="0"><!-- generated:install-commands method=brew lang=en -->brew tap suzu1dev/bell-pr https://github.com/Suzu1Dev/bell-pr &amp;&amp; brew install suzu1dev/bell-pr/bell-pr<!-- /generated:install-commands --></code>
                 </div>
                 <p class="install-note">Requires Homebrew. Includes Node.js, Git and GitHub CLI.</p>
                 <p class="install-next">After signing in to your tools, run <code>bell-pr</code>.</p>
@@ -170,12 +185,23 @@ brew install suzu1dev/bell-pr/bell-pr<!-- /generated:install-commands --></code>
                 <p class="install-next">Start with <code>mise exec -- bell-pr</code>.</p>
               </section>
             </div>
-          </div>
+          <p class="install-footnote">Free and open source. No BELL PR account. Real contributions need Git, a signed-in GitHub CLI, and Codex CLI or Claude Code.</p>
         </div>
       </section>
 
-      <section class="section section-tinted">
-        <div class="wrap">
+      <section class="section guide-section">
+        <div class="wrap guide-layout">
+          <nav class="guide-toc" aria-label="On this page">
+            <p>On this page</p>
+              <a href="#requirements">Before you start</a>
+              <a href="#platforms">Platforms</a>
+              <a href="#first-start">Sign in to your tools</a>
+              <a href="#launch">Open your workbench</a>
+              <a href="#windows">Windows and WSL2</a>
+              <a href="#npm">npm and useful commands</a>
+              <a href="#docker">Docker (beta)</a>
+              <a href="#next">Next steps</a>
+          </nav>
           <div class="prose">
             <h2 id="requirements">Requirements</h2>
             <ul>
@@ -194,9 +220,10 @@ brew install suzu1dev/bell-pr/bell-pr<!-- /generated:install-commands --></code>
               <li><strong>Docker (beta):</strong> an image you build from the source, with Git, the GitHub CLI and the Codex CLI.</li>
             </ul>
 
-            <h2 id="first-start">After installation</h2>
-            <p>Set your Git identity with <code>git config --global user.name "Your Name"</code> and <code>git config --global user.email "you@example.com"</code>, replacing the sample values with yours. Sign in with <code>gh auth login</code>, then <code>codex login</code> or <code>claude auth login</code>. Run <code>bell-pr doctor</code> to check what is ready.</p>
-            <p>The curl installer prints a launch command and a PATH setting; use those so your terminal finds the installed tools. With Homebrew or Bun, run <code>bell-pr</code>. With mise, run <code>mise exec -- bell-pr</code>. Keep the terminal open while you work; <kbd>Ctrl</kbd>+<kbd>C</kbd> stops BELL PR.</p>
+            <h2 id="first-start">Sign in to your tools</h2>
+            <p>Set your Git identity with <code>git config --global user.name "Your Name"</code> and <code>git config --global user.email "you@example.com"</code>, replacing the sample values with yours. Sign in with <code>gh auth login</code>, then <code>codex login</code> or <code>claude auth login</code>. Run <code>bell-pr doctor</code> (or <code>npx bell-pr doctor</code> when using npx) to check what is ready.</p>
+            <h2 id="launch">Open your workbench</h2>
+            <p>The curl installer prints a launch command and a PATH setting; use those so your terminal finds the installed tools. With npx, run <code>npx bell-pr</code> again. With Homebrew or Bun, run <code>bell-pr</code>. With mise, run <code>mise exec -- bell-pr</code>. Keep the terminal open while you work; <kbd>Ctrl</kbd>+<kbd>C</kbd> stops BELL PR.</p>
             <p>To try the sample project before signing in, use <code>bell-pr start --force</code>. The sample makes no AI call and sends nothing to GitHub; real agent work waits for a signed-in provider.</p>
 
             <h2 id="windows">Windows with WSL2</h2>
@@ -254,7 +281,7 @@ bell-pr</code></pre>
             </ul>
 
             <h2 id="next">Next steps</h2>
-            <p>Open the sample project to see a finished contribution, then import a repository you want to contribute to. Everything stays on your computer until you publish a Draft PR. The source repository explains what the agents may do on your computer in <code>docs/security-model.md</code>, and what leaves it in <code>docs/privacy-and-data.md</code>.</p>
+            <p>Open the sample project to see a finished contribution, then import a repository you want to contribute to. BELL PR publishes your changes to GitHub only with your approval. AI tasks send relevant code and instructions to your chosen provider. The source repository explains what the agents may do on your computer in <code>docs/security-model.md</code>, and what leaves it in <code>docs/privacy-and-data.md</code>.</p>
           </div>
         </div>
       </section>

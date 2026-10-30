@@ -105,12 +105,11 @@ curl -fsSL https://bell-pr.suzu.tw/install | sh -s -- --lang zh-TW
 
 完成後，使用腳本印出的啟動指令或 PATH 設定。
 
-**Homebrew**：使用本專案儲存庫作為 tap：
+**Homebrew**：貼上這一行，即可加入 tap 並安裝：
 
 <!-- generated:install-commands method=brew -->
 ```sh
-brew tap suzu1dev/bell-pr https://github.com/Suzu1Dev/bell-pr
-brew install suzu1dev/bell-pr/bell-pr
+brew tap suzu1dev/bell-pr https://github.com/Suzu1Dev/bell-pr && brew install suzu1dev/bell-pr/bell-pr
 ```
 <!-- /generated:install-commands -->
 

@@ -29,16 +29,15 @@
     <link rel="stylesheet" href="../site.css">
     <script src="../site.js" defer></script>
   </head>
-  <body>
+  <body class="home-page">
     <a class="skip-link" href="#main">跳到主要內容</a>
     <header class="site-header">
       <div class="wrap">
         <a class="brand" href="index.html"><img src="../assets/brand/logo-wordmark.svg" alt="BELL PR" width="104" height="34"></a>
         <nav class="site-nav" aria-label="主選單">
           <ul>
-            <li><a href="#demo">示範影片</a></li>
             <li><a href="#how-it-works">運作方式</a></li>
-            <li><a href="install.html">安裝</a></li>
+            <li><a href="#demo">示範影片</a></li>
           </ul>
         </nav>
         <nav class="lang-switch" aria-label="語言">
@@ -46,16 +45,40 @@
           <span class="sep" aria-hidden="true">/</span>
           <a href="index.html" hreflang="zh-Hant-TW" lang="zh-Hant-TW" aria-current="true">中文</a>
         </nav>
+        <a class="nav-cta" href="#install">開始使用</a>
       </div>
     </header>
 
     <main id="main">
-      <section class="hero">
+      <section class="hero" aria-labelledby="hero-title">
         <div class="wrap">
-          <p class="eyebrow">開源 · 以本機為主 · 用自己的話解釋回去 · 無遙測</p>
-          <h1>從 vibe coding 到真正搞懂為什麼。</h1>
-          <p class="lead">你的 AI agent 團隊負責跑腿。你理解每一項變更、用自己的話解釋回去，只送出維護者樂意審查的內容。BELL PR 在你自己的電腦上執行，搭配你已在用的 AI coding CLI 與 GitHub CLI，而且只會開啟經你核准的 Draft pull request。</p>
-          <div class="hero-actions">
+          <div class="hero-copy">
+            <p class="eyebrow">你的開源貢獻工作台</p>
+            <h1 id="hero-title">讓貢獻，<br><span>成為你的成長。</span></h1>
+            <p class="lead">AI 團隊協助你貢獻開源。理解每一項變更，由你決定何時送出。</p>
+            <div class="hero-actions">
+              <a class="button button-primary" href="#install">開始使用<span aria-hidden="true"> ↗</span></a>
+              <a class="text-link" href="#demo">觀看 90 秒示範<span aria-hidden="true"> ▷</span></a>
+            </div>
+            <p class="hero-note">在你的電腦上執行。免費開源，沒有遙測。</p>
+          </div>
+          <figure class="hero-product">
+            <div class="product-window">
+              <div class="window-bar" aria-hidden="true"><span class="window-dots"><i></i><i></i><i></i></span><span>BELL PR</span><span class="window-state">本機工作台</span></div>
+              <a href="../assets/screenshots/run-changes-1440.png"><img src="../assets/screenshots/run-changes-1440.png" alt="BELL PR 範例工作台，並排顯示程式碼變更與白話說明。" width="1440" height="900" fetchpriority="high"></a>
+            </div>
+            <figcaption>真正的工作台。從範例貢獻，看見每一項變更的來由。</figcaption>
+          </figure>
+        </div>
+      </section>
+
+      <section class="section install-section" id="install" aria-labelledby="install-title">
+        <div class="wrap">
+          <div class="section-head centered">
+            <p class="eyebrow">開始使用</p>
+            <h2 id="install-title">選個方式，開始使用。</h2>
+            <p>使用你熟悉的工具，在終端機執行指令。</p>
+          </div>
             <div class="install-widget" data-install>
               <div class="install-header">
                 <div>
@@ -123,8 +146,7 @@
                     <span class="install-terminal-label"><span aria-hidden="true">›_</span> 終端機</span>
                     <button class="copy-button" type="button" data-copy="install-command-brew" aria-label="複製 brew 安裝指令" hidden>複製</button>
                   </div>
-                  <code id="install-command-brew" tabindex="0"><!-- generated:install-commands method=brew lang=zh-TW -->brew tap suzu1dev/bell-pr https://github.com/Suzu1Dev/bell-pr
-brew install suzu1dev/bell-pr/bell-pr<!-- /generated:install-commands --></code>
+                  <code id="install-command-brew" tabindex="0"><!-- generated:install-commands method=brew lang=zh-TW -->brew tap suzu1dev/bell-pr https://github.com/Suzu1Dev/bell-pr &amp;&amp; brew install suzu1dev/bell-pr/bell-pr<!-- /generated:install-commands --></code>
                 </div>
                 <p class="install-note">需要 Homebrew；會一併安裝 Node.js、Git 與 GitHub CLI。</p>
                 <p class="install-next">登入所需工具後，執行 <code>bell-pr</code>。</p>
@@ -172,12 +194,11 @@ brew install suzu1dev/bell-pr/bell-pr<!-- /generated:install-commands --></code>
                 <p class="install-next">用 <code>mise exec -- bell-pr</code> 啟動。</p>
               </section>
             </div>
-          </div>
-          <p class="hero-note">依 Apache-2.0 免費開源，不需 BELL PR 帳號。真實貢獻需要 Git，以及已登入的 GitHub CLI 與 Codex CLI 或 Claude Code。</p>
+          <p class="install-footnote">BELL PR 免費開源，不需建立 BELL PR 帳號。真實貢獻需要 Git、已登入的 GitHub CLI，以及 Codex CLI 或 Claude Code。</p>
         </div>
       </section>
 
-      <section class="section" id="demo" aria-labelledby="demo-title">
+      <section class="section demo-section" id="demo" aria-labelledby="demo-title">
         <div class="wrap">
           <div class="section-head">
             <p class="eyebrow">示範影片</p>
@@ -195,7 +216,7 @@ brew install suzu1dev/bell-pr/bell-pr<!-- /generated:install-commands --></code>
         </div>
       </section>
 
-      <section class="section section-tinted" id="how-it-works" aria-labelledby="how-title">
+      <section class="section section-tinted process-section" id="how-it-works" aria-labelledby="how-title">
         <div class="wrap">
           <div class="section-head">
             <p class="eyebrow">運作方式</p>
@@ -223,7 +244,7 @@ brew install suzu1dev/bell-pr/bell-pr<!-- /generated:install-commands --></code>
         </div>
       </section>
 
-      <section class="section" id="screenshots" aria-labelledby="screenshots-title">
+      <section class="section showcase-section" id="screenshots" aria-labelledby="screenshots-title">
         <div class="wrap">
           <div class="section-head">
             <p class="eyebrow">仔細看看</p>
@@ -259,13 +280,16 @@ brew install suzu1dev/bell-pr/bell-pr<!-- /generated:install-commands --></code>
         </div>
       </section>
 
-      <section class="section section-tinted" id="features" aria-labelledby="features-title">
+      <section class="section section-tinted features-section" id="features" aria-labelledby="features-title">
         <div class="wrap">
           <div class="section-head">
             <h2 id="features-title">為你能站得住腳的貢獻而設計</h2>
             <p>搞懂自己送出的內容、在真實程式碼上磨練品味，並尊重維護者的時間。</p>
           </div>
-          <ul class="grid">
+          <div class="feature-groups">
+            <details class="feature-group">
+              <summary><span class="feature-group-title">把每次貢獻，變成你的能力。</span><span class="feature-group-description">理解變更、自我檢查，再練習漏掉的地方。</span></summary>
+              <ul class="grid">
             <li class="card">
               <h3>說明裡有你自己要答的題</h3>
               <p>每個變更的檔案都附上改了什麼、為什麼、範例、取捨與另一種做法。你要先回答問題才看得到答案，並選擇你會採取哪一種做法。</p>
@@ -279,6 +303,15 @@ brew install suzu1dev/bell-pr/bell-pr<!-- /generated:install-commands --></code>
               <p>你曾自信卻答錯的題，以及讓你意外的維護者留言，會在幾天後回到你的練習牌組。沒有連續紀錄，也沒有分數。</p>
             </li>
             <li class="card">
+              <h3>會讀你紀錄的教練</h3>
+              <p>教練回顧會讀取你在單一專案的紀錄，點出該專案維護者最常提出的事項，並依你自己的貢獻建立練習。可將一項貢獻的完整學習紀錄匯出為 Markdown。</p>
+            </li>
+              </ul>
+            </details>
+            <details class="feature-group">
+              <summary><span class="feature-group-title">尊重每個專案的做法。</span><span class="feature-group-description">從貢獻規則到審查回覆，讓每一步都有依據。</span></summary>
+              <ul class="grid">
+            <li class="card">
               <h3>引用專案自己的規則</h3>
               <p>關於 AI 使用、揭露與「用自己的話寫說明」等規則，會從專案自己的檔案引用（含檔案與行號），並在你發布時再次核對。</p>
             </li>
@@ -290,6 +323,15 @@ brew install suzu1dev/bell-pr/bell-pr<!-- /generated:install-commands --></code>
               <h3>下一份 PR 之前先把迴圈關上</h3>
               <p>每個專案的發布有節奏：先回應你已開啟的 pull request 上的審查意見，再在該專案開啟更多。</p>
             </li>
+            <li class="card">
+              <h3>跟進審查意見</h3>
+              <p>閱讀維護者的回饋，並與你的預估對照。接著可讓 agent 在後續一輪處理你選定的留言——你先用自己的話重述每一則；你審查該輪後，再以一個 commit 推送。</p>
+            </li>
+              </ul>
+            </details>
+            <details class="feature-group">
+              <summary><span class="feature-group-title">你熟悉的工具，一起工作。</span><span class="feature-group-description">尋找方向、協作實作，由你選擇工具與投入程度。</span></summary>
+              <ul class="grid">
             <li class="card">
               <h3>有依據的方向建議</h3>
               <p>agent 會閱讀專案並建議貢獻方向，每一項都引用所依據的程式碼或文件，BELL PR 會核對每一段引用確實存在。隨時可再要五個，每個專案最多 30 個。</p>
@@ -303,18 +345,12 @@ brew install suzu1dev/bell-pr/bell-pr<!-- /generated:install-commands --></code>
               <p>一位 Lead、兩到四位 teammates、一位 Reviewer 與一位 Test analyst；每位 teammate 各自在獨立的 git worktree。可同時處理多項貢獻，上限由你設定（預設 2，最多 8）。</p>
             </li>
             <li class="card">
-              <h3>跟進審查意見</h3>
-              <p>閱讀維護者的回饋，並與你的預估對照。接著可讓 agent 在後續一輪處理你選定的留言——你先用自己的話重述每一則；你審查該輪後，再以一個 commit 推送。</p>
-            </li>
-            <li class="card">
-              <h3>會讀你紀錄的教練</h3>
-              <p>教練回顧會讀取你在單一專案的紀錄，點出該專案維護者最常提出的事項，並依你自己的貢獻建立練習。可將一項貢獻的完整學習紀錄匯出為 Markdown。</p>
-            </li>
-            <li class="card">
               <h3>你的工具、你的投入</h3>
               <p>選擇 Codex CLI 或 Claude Code、模型、推理力度（含最深層級）與效率模式。agents 的網路存取預設關閉，直到你自行開啟。</p>
             </li>
-          </ul>
+              </ul>
+            </details>
+          </div>
         </div>
       </section>
 
@@ -414,6 +450,13 @@ brew install suzu1dev/bell-pr/bell-pr<!-- /generated:install-commands --></code>
               <p>不是。BELL PR 是獨立產品。它搭配你自行安裝並登入的那些公司工具運作。</p>
             </details>
           </div>
+        </div>
+      </section>
+      <section class="section closing-section" aria-labelledby="closing-title">
+        <div class="wrap">
+          <p class="eyebrow">下一步，由你開始</p>
+          <h2 id="closing-title">從「能執行」，<br>到「我懂了」。</h2>
+          <a class="button button-primary" href="#install">開始使用 BELL PR<span aria-hidden="true"> ↗</span></a>
         </div>
       </section>
     </main>

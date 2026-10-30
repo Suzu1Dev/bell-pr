@@ -70,12 +70,12 @@ The installer language changes its messages; choose the app's language in Welcom
 
 ## Homebrew (macOS and Linux)
 
-With Homebrew already installed, add this repository as the tap, then install:
+With Homebrew already installed, paste this line to add the repository as a tap
+and install BELL PR:
 
 <!-- generated:install-commands method=brew -->
 ```sh
-brew tap suzu1dev/bell-pr https://github.com/Suzu1Dev/bell-pr
-brew install suzu1dev/bell-pr/bell-pr
+brew tap suzu1dev/bell-pr https://github.com/Suzu1Dev/bell-pr && brew install suzu1dev/bell-pr/bell-pr
 ```
 <!-- /generated:install-commands -->
 
