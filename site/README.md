@@ -20,7 +20,7 @@ as an HTTP header. Light theme only; the layout works from 320 to 1440 px.
 | `assets/brand/` | Logo, favicons and the social preview image, copied from `public/` |
 | `assets/fonts/` | Self-hosted DM Sans and IBM Plex Mono (SIL Open Font License 1.1, licenses included) |
 | `assets/screenshots/` | Screens of the sample project, copied from `docs/images/en/`; the landing page shows four of them |
-| `assets/video/` | Promo poster and English captions; the `.webm`/`.mp4` binaries are deploy-only (see that folder's README) and served in production at https://bell-pr.suzu.tw/assets/video/ |
+| `assets/video/` | Promo poster and retained caption source; the `.webm`/`.mp4` binaries are deploy-only (see that folder's README) and served in production at https://bell-pr.suzu.tw/assets/video/ |
 | `README.md`, `check-site.mjs` | This file and the site checks; they are not part of the site |
 
 The installation tabs are ordered npx, npm, curl, brew, bun, PowerShell and mise.
@@ -32,8 +32,8 @@ The installation UI groups platform information and the guide link at the right
 of the underline tabs, moving the group below the tabs on narrow screens. A
 compact dark green command row keeps its copy button beside the code.
 Single-line commands use only one row; PowerShell keeps its
-source line breaks. The demo retains its player controls and caption track
-without an additional caption below the player.
+source line breaks. The demo retains its player controls, with no caption track
+loaded and no additional caption below the player.
 
 The header and homepage actions lead directly to the installation section.
 The header links follow the homepage's content order: demo, then how it works.
