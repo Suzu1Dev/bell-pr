@@ -319,6 +319,26 @@ main {
   font-size: 15px;
 }
 
+/* Promo video */
+.promo-video {
+  margin: 0;
+  max-width: 960px;
+}
+.promo-video video {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  background: #0b1a14;
+  box-shadow: var(--shadow);
+}
+.promo-video figcaption {
+  margin-top: 12px;
+  color: var(--text-muted);
+  font-size: 15px;
+}
+
 /* Command box with an optional copy button (site.js shows it). */
 .command {
   display: inline-flex;
@@ -362,6 +382,275 @@ main {
 }
 .copy-button:focus-visible {
   box-shadow: 0 0 0 2px var(--text), 0 0 0 4px var(--brand-300);
+}
+
+/* Installation methods remain readable as sections until site.js enables tabs. */
+.install-widget {
+  width: 100%;
+  max-width: 900px;
+  min-width: 0;
+  border: 1px solid var(--border-strong);
+  border-radius: 18px;
+  background: var(--surface);
+  box-shadow: 0 16px 40px -24px rgb(23 90 64 / 24%), 0 2px 4px rgb(23 90 64 / 3%);
+}
+.install-widget [hidden] {
+  display: none !important;
+}
+.install-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px 24px;
+  padding: 22px 24px 20px;
+}
+.install-eyebrow {
+  margin-bottom: 5px;
+  color: var(--brand-600);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+}
+.install-title {
+  font-size: 19px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  line-height: 1.4;
+}
+.install-guide {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+}
+.install-guide:hover {
+  text-decoration: underline;
+}
+.install-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 20px;
+  padding: 0 24px;
+}
+.install-tabs {
+  display: flex;
+  gap: 2px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--sunken);
+}
+.install-tab {
+  min-height: 44px;
+  padding: 8px 16px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  font: 500 14px var(--font-mono);
+  cursor: pointer;
+  transition: color 150ms, background-color 150ms, box-shadow 150ms;
+}
+.install-tab:hover {
+  color: var(--brand-700);
+  background: var(--brand-100);
+}
+.install-tab[aria-selected="true"] {
+  border-color: var(--border-strong);
+  background: var(--surface);
+  color: var(--brand-700);
+  box-shadow: 0 1px 3px rgb(23 90 64 / 10%);
+}
+.install-platform {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+[data-install-platform] {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+[data-install-platform]::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--brand-600);
+}
+.install-panel {
+  padding: 18px 24px 22px;
+}
+.install-panel + .install-panel {
+  border-top: 1px solid var(--border);
+}
+.install-method-title {
+  margin-bottom: 6px;
+  font-family: var(--font-mono);
+  font-size: 19px;
+}
+.install-panel > .install-platform {
+  margin: 0 0 10px;
+}
+.install-enhanced .install-panel {
+  border-top: 0;
+}
+.install-enhanced .install-method-title,
+.install-enhanced .install-panel > .install-platform {
+  display: none;
+}
+.install-command {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  align-items: stretch;
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid #294337;
+  border-radius: 12px;
+  background: #172b23;
+  box-shadow: 0 3px 6px rgb(23 43 35 / 8%);
+}
+.install-command-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 4px 10px 4px 18px;
+  border-bottom: 1px solid rgb(211 224 214 / 12%);
+  background: rgb(211 224 214 / 4%);
+}
+.install-terminal-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  color: var(--text-inverse-muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+.install-terminal-label [aria-hidden] {
+  color: var(--brand-300);
+  font-family: var(--font-mono);
+}
+.install-command code {
+  min-width: 0;
+  padding: 20px;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.8;
+  white-space: pre;
+  overflow-wrap: normal;
+  scrollbar-width: thin;
+  scrollbar-color: var(--brand-300) transparent;
+}
+.install-command code::before {
+  content: none;
+}
+.install-command code:focus-visible {
+  outline: 2px solid var(--brand-300);
+  outline-offset: -2px;
+}
+.install-command .copy-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-width: 86px;
+  min-height: 44px;
+  padding: 6px 12px;
+  border: 1px solid rgb(211 224 214 / 20%);
+  background: rgb(211 224 214 / 6%);
+  color: var(--text-inverse-muted);
+  font-size: 12px;
+}
+.install-command .copy-button::before {
+  content: "";
+  width: 10px;
+  height: 12px;
+  border: 1px solid currentColor;
+  border-radius: 2px;
+  box-shadow: -3px -3px 0 -1px #22372c, -3px -3px 0 0 currentColor;
+}
+.install-command .copy-button:hover {
+  border-color: var(--brand-300);
+  background: rgb(141 187 159 / 14%);
+  color: var(--text-inverse);
+}
+.install-command .copy-button[data-copy-state="copied"] {
+  color: var(--brand-300);
+  border-color: var(--brand-300);
+}
+.install-command .copy-button[data-copy-state="copied"]::before {
+  width: 6px;
+  height: 10px;
+  border-width: 0 2px 2px 0;
+  border-radius: 0;
+  box-shadow: none;
+  transform: translateY(-1px) rotate(45deg);
+}
+.install-note,
+.install-next {
+  margin: 14px 0 0;
+  color: var(--text-secondary);
+  font-size: 14px;
+  line-height: 1.6;
+}
+.install-next {
+  margin-top: 4px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+@media (max-width: 600px) {
+  .install-header {
+    gap: 12px;
+    padding: 18px 16px;
+  }
+  .install-title {
+    max-width: 16em;
+    font-size: 17px;
+  }
+  .install-guide {
+    gap: 4px;
+    font-size: 12px;
+  }
+  .install-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    padding: 0 16px;
+  }
+  .install-tabs {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+  .install-tab {
+    padding: 8px 6px;
+    font-size: 13px;
+  }
+  [data-install-platform] {
+    justify-content: flex-end;
+  }
+  .install-panel {
+    padding: 14px 16px 18px;
+  }
+  .install-command-heading {
+    padding-left: 14px;
+  }
+  .install-command code {
+    padding: 16px 14px;
+    font-size: 13px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .install-tab {
+    transition: none;
+  }
 }
 
 .button {
@@ -500,6 +789,9 @@ main {
 }
 .prose li + li {
   margin-top: 6px;
+}
+.prose .setup-steps > li + li {
+  margin-top: 24px;
 }
 .prose pre code {
   font-size: inherit;
@@ -664,4 +956,37 @@ kbd {
   background: var(--surface);
   font-family: var(--font-mono);
   font-size: 0.85em;
+}
+
+/* Language switch */
+.lang-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 14px;
+  font-weight: 550;
+  color: var(--text-muted);
+}
+.lang-switch a {
+  color: var(--text-secondary);
+  text-decoration: none;
+}
+.lang-switch a:hover {
+  color: var(--brand-700);
+}
+.lang-switch a[aria-current="true"] {
+  color: var(--brand-700);
+}
+.lang-switch .sep {
+  color: var(--border-strong);
+  user-select: none;
+}
+
+/* Traditional Chinese: CJK system font fallback (no remote fonts; CSP font-src 'self') */
+html[lang="zh-Hant-TW"] {
+  --font-sans: "DM Sans", "PingFang TC", "Noto Sans TC", "Microsoft JhengHei",
+    "Heiti TC", system-ui, -apple-system, sans-serif;
 }

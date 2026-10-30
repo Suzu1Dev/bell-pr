@@ -33,12 +33,22 @@ BELL PR is free and open-source software under
 
 [Try the sample project](#try-the-sample-project) ·
 [Before you start](#before-you-start) · [Quickstart](#quickstart) ·
+[Installation options](#installation-options) ·
 [Requirements](#requirements) ·
 [Features](#features) · [Privacy](#privacy) ·
 [Security](#security-model) · [Local API](#local-api) ·
 [Configuration](#configuration) ·
 [Troubleshooting](#troubleshooting) · [Documentation](#documentation) ·
 [Contributing](#contributing) · [License](#license-and-trademarks)
+
+
+## Watch the 90-second demo
+
+![From vibe coding to knowing why — BELL PR promo](site/assets/video/poster.jpg)
+
+<!-- generated:product-link key=homepageUrl path=#demo text="Watch the 90-second demo" -->
+[Watch the 90-second demo](https://bell-pr.suzu.tw/#demo)
+<!-- /generated:product-link --> on the site (English captions, plays when you press play).
 
 ## Try the sample project
 
@@ -56,7 +66,8 @@ tour can open. A real agent run still waits for a signed-in AI provider.
 BELL PR is a local workbench. Install and sign in to these tools **before**
 the Quickstart; `bell-pr doctor` prints a fix command for each miss.
 
-- **Node.js 22 or later** ([nodejs.org](https://nodejs.org/en)).
+- **Node.js 22 or later** ([nodejs.org](https://nodejs.org/en)); the shell
+  installer can prepare Node.js 24 for you.
 - `engines` states the minimum supported Node.js; CI pins Node.js 24.22.1 (and npm 11.21.1).
 - **Git**, with your name and e-mail set
   (`git config --global user.name` / `user.email`). Syncing a run onto the
@@ -74,7 +85,8 @@ the Quickstart; `bell-pr doctor` prints a fix command for each miss.
   macOS uses its built-in sandbox.
 
 Supported today: **macOS**, **Linux**. **Windows via WSL2 (untested):** install
-everything above inside your WSL distribution.
+everything above inside your WSL distribution. The [Windows installer](#windows-wsl2)
+can prepare the tools there; sign in afterward. Native Windows is not supported.
 
 When `bell-pr doctor` reports every required check green, continue.
 `bell-pr start` exits before it listens until then. With no AI provider
@@ -112,6 +124,93 @@ and opens it. The browser receives the token.
 To keep BELL PR installed, run `npm install -g bell-pr`, then start it with
 `bell-pr`. The [getting started guide](docs/getting-started.md) walks
 through a whole contribution.
+
+## Installation options
+
+Choose one method. Git, GitHub sign-in and an AI CLI remain prerequisites for
+real work; the sample tour can run with `bell-pr start --force`.
+See the [installation guide](docs/installation.md) for options and PATH setup.
+
+### macOS and Linux
+
+**Shell installer** — installs BELL PR under `~/.local` and prepares Node.js 24
+if a suitable Node.js/npm is missing. Automatic Node.js downloads are available
+for macOS/Linux x64 and arm64; no sudo or shell-profile changes:
+
+<!-- generated:install-commands method=curl -->
+```sh
+curl -fsSL https://bell-pr.suzu.tw/install | sh
+```
+<!-- /generated:install-commands -->
+
+Then use the launch command or PATH setting printed by the installer.
+
+**Homebrew** — uses this repository as the tap:
+
+<!-- generated:install-commands method=brew -->
+```sh
+brew tap suzu1dev/bell-pr https://github.com/Suzu1Dev/bell-pr
+brew install suzu1dev/bell-pr/bell-pr
+```
+<!-- /generated:install-commands -->
+
+**npm or Bun** — choose one; Bun installation still needs Node.js 22+ to run
+BELL PR:
+
+```sh
+npm install -g bell-pr
+bell-pr
+```
+
+Or:
+
+```sh
+bun add --global bell-pr
+bell-pr
+```
+
+**mise** — installs Node.js 24 and pins BELL PR to 1.0.0. It uses npm for this
+installation because mise's default npm backend can reject newly published
+packages:
+
+```sh
+MISE_NPM_PACKAGE_MANAGER=npm mise use -g node@24 npm:bell-pr@1.0.0
+mise exec -- bell-pr
+```
+
+`mise exec` works without shell activation. The npm selection applies only to
+that command; for upgrades, repeat the prefix and choose the desired version.
+
+### Windows (WSL2)
+
+Run the following in PowerShell. It prepares an existing WSL2 Ubuntu
+distribution with Git, GitHub CLI, Node.js, BELL PR and Codex CLI. Claude Code
+or no AI CLI can be selected instead. If WSL2 is missing, it prints the setup
+steps; complete them, create your Linux user and rerun the installer.
+
+<!-- generated:install-commands method=powershell -->
+```powershell
+& {
+  Invoke-RestMethod 'https://bell-pr.suzu.tw/install.ps1' -OutFile install.ps1 -ErrorAction Stop
+  powershell -NoProfile -ExecutionPolicy Bypass -File .\install.ps1
+}
+```
+<!-- /generated:install-commands -->
+
+Then enter Ubuntu with `wsl -d Ubuntu`. Inside WSL, configure your Git identity,
+run `gh auth login` and `codex login` (or `claude auth login` if selected), then
+start BELL PR. For later launches from PowerShell:
+
+```powershell
+wsl -d Ubuntu -- bash -lc '$HOME/.local/bin/bell-pr'
+```
+
+Keep projects inside WSL, for example `~/projects`. If the Windows browser
+does not open, run `bell-pr open --print --print-token` in another WSL terminal
+and open the printed link yourself; it contains a credential, so keep it private.
+See [Windows setup and options](docs/installation.md#windows-with-wsl2).
+Native Windows is unsupported; this WSL2 setup has not been verified on a real
+Windows host.
 
 ## Requirements
 
@@ -589,6 +688,7 @@ To report a security vulnerability privately, follow
 [SECURITY.md](SECURITY.md). Do not open a public issue.
 
 <!-- generated:product-link key=homepageUrl text="Website" -->
+[Website](https://bell-pr.suzu.tw)
 <!-- /generated:product-link -->
 <!-- generated:product-link key=supportEmail text="Contact support by e-mail" -->
 <!-- /generated:product-link -->

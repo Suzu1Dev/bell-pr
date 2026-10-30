@@ -1,5 +1,7 @@
 # BELL PR documentation
 
+- [Installation](installation.md): npm, shell script, Homebrew, Bun, mise,
+  and Windows setup through WSL2.
 - [Getting started](getting-started.md): install, sign in to your tools, and your first
   contribution from import to Draft PR.
 - [Configuration](configuration.md): commands, `BELLPR_*` variables and

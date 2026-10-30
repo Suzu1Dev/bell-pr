@@ -1,0 +1,454 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; media-src 'self'; base-uri 'none'; form-action 'none'">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="referrer" content="no-referrer">
+    <title>BELL PR：從 vibe coding 到真正搞懂為什麼</title>
+    <meta name="description" content="BELL PR 是免費、開源軟體（Apache-2.0），幫助你在為開源專案貢獻的同時學習。AI agent 團隊在你自己的電腦上跑腿；你理解每一項變更、用自己的話解釋回去，並送出一份符合專案規則、且經你核准的 Draft PR。在你核准之前，什麼都不會公開。">
+    <meta name="theme-color" content="#1f6d50">
+    <link rel="icon" href="../assets/brand/favicon.svg" type="image/svg+xml">
+    <link rel="icon" href="../assets/brand/favicon-32.png" sizes="32x32" type="image/png">
+    <link rel="apple-touch-icon" href="../assets/brand/apple-touch-icon.png">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="BELL PR">
+    <meta property="og:title" content="BELL PR：從 vibe coding 到真正搞懂為什麼">
+    <meta property="og:description" content="免費、開源、以本機為主。你的 AI agent 團隊跑腿；你理解每一項變更、用自己的話解釋回去，只送出維護者樂意審查的內容。">
+    <!-- generated:product-meta key=homepageUrl property="og:url" -->
+    <meta property="og:url" content="https://bell-pr.suzu.tw">
+    <!-- /generated:product-meta -->
+    <!-- generated:product-meta key=homepageUrl property="og:image" path="assets/brand/og-image.png" -->
+    <meta property="og:image" content="https://bell-pr.suzu.tw/assets/brand/og-image.png">
+    <!-- /generated:product-meta -->
+    <meta property="og:image" content="../assets/brand/og-image.png">
+    <meta name="twitter:card" content="summary_large_image">
+    <link rel="alternate" hreflang="en" href="https://bell-pr.suzu.tw/">
+    <link rel="alternate" hreflang="zh-Hant-TW" href="https://bell-pr.suzu.tw/zh-tw/">
+    <link rel="alternate" hreflang="x-default" href="https://bell-pr.suzu.tw/">
+    <link rel="stylesheet" href="../site.css">
+    <script src="../site.js" defer></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">跳到主要內容</a>
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href="index.html"><img src="../assets/brand/logo-wordmark.svg" alt="BELL PR" width="104" height="34"></a>
+        <nav class="site-nav" aria-label="主選單">
+          <ul>
+            <li><a href="#demo">示範影片</a></li>
+            <li><a href="#how-it-works">運作方式</a></li>
+            <li><a href="install.html">安裝</a></li>
+          </ul>
+        </nav>
+        <nav class="lang-switch" aria-label="語言">
+          <a href="../index.html" hreflang="en" lang="en">English</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html" hreflang="zh-Hant-TW" lang="zh-Hant-TW" aria-current="true">中文</a>
+        </nav>
+      </div>
+    </header>
+
+    <main id="main">
+      <section class="hero">
+        <div class="wrap">
+          <p class="eyebrow">開源 · 以本機為主 · 用自己的話解釋回去 · 無遙測</p>
+          <h1>從 vibe coding 到真正搞懂為什麼。</h1>
+          <p class="lead">你的 AI agent 團隊負責跑腿。你理解每一項變更、用自己的話解釋回去，只送出維護者樂意審查的內容。BELL PR 在你自己的電腦上執行，搭配你已在用的 AI coding CLI 與 GitHub CLI，而且只會開啟經你核准的 Draft pull request。</p>
+          <div class="hero-actions">
+            <div class="install-widget" data-install>
+              <div class="install-header">
+                <div>
+                  <p class="install-eyebrow">開始使用</p>
+                  <p class="install-title">一行指令，開啟你的工作台。</p>
+                </div>
+                <a class="install-guide" href="install.html">安裝指南<span aria-hidden="true"> ↗</span></a>
+              </div>
+              <div class="install-toolbar">
+                <div class="install-tabs" data-install-tabs aria-label="安裝方式" hidden>
+                  <button class="install-tab" type="button" id="install-tab-npx" data-install-target="install-panel-npx">npx</button>
+                  <button class="install-tab" type="button" id="install-tab-npm" data-install-target="install-panel-npm">npm</button>
+                  <button class="install-tab" type="button" id="install-tab-curl" data-install-target="install-panel-curl">curl</button>
+                  <button class="install-tab" type="button" id="install-tab-brew" data-install-target="install-panel-brew">brew</button>
+                  <button class="install-tab" type="button" id="install-tab-bun" data-install-target="install-panel-bun">bun</button>
+                  <button class="install-tab" type="button" id="install-tab-powershell" data-install-target="install-panel-powershell">ps1</button>
+                  <button class="install-tab" type="button" id="install-tab-mise" data-install-target="install-panel-mise">mise</button>
+                </div>
+                <span class="install-platform" data-install-platform hidden></span>
+              </div>
+              <section class="install-panel" id="install-panel-npx" data-platform="macOS · Linux" aria-labelledby="install-heading-npx">
+                <h2 class="install-method-title" id="install-heading-npx">npx</h2>
+                <p class="install-platform">macOS · Linux</p>
+                <div class="command install-command">
+                  <div class="install-command-heading">
+                    <span class="install-terminal-label"><span aria-hidden="true">›_</span> 終端機</span>
+                    <button class="copy-button" type="button" data-copy="install-command-npx" aria-label="複製 npx 安裝指令" hidden>複製</button>
+                  </div>
+                  <code id="install-command-npx" tabindex="0"><!-- generated:install-commands method=npx lang=zh-TW -->npx bell-pr<!-- /generated:install-commands --></code>
+                </div>
+                <p class="install-note">需要 Node.js 22 以上與 npm；不需全域安裝，直接啟動 BELL PR。</p>
+                <p class="install-next">先登入 GitHub 與 AI 工具，工作時保持終端機開啟。</p>
+              </section>
+              <section class="install-panel" id="install-panel-npm" data-platform="macOS · Linux" aria-labelledby="install-heading-npm">
+                <h2 class="install-method-title" id="install-heading-npm">npm</h2>
+                <p class="install-platform">macOS · Linux</p>
+                <div class="command install-command">
+                  <div class="install-command-heading">
+                    <span class="install-terminal-label"><span aria-hidden="true">›_</span> 終端機</span>
+                    <button class="copy-button" type="button" data-copy="install-command-npm" aria-label="複製 npm 安裝指令" hidden>複製</button>
+                  </div>
+                  <code id="install-command-npm" tabindex="0"><!-- generated:install-commands method=npm lang=zh-TW -->npm install -g bell-pr<!-- /generated:install-commands --></code>
+                </div>
+                <p class="install-note">需要 Node.js 22 以上與 npm；安裝後即可使用 bell-pr 指令。</p>
+                <p class="install-next">登入所需工具後，執行 <code>bell-pr</code>。</p>
+              </section>
+              <section class="install-panel" id="install-panel-curl" data-platform="macOS · Linux" aria-labelledby="install-heading-curl">
+                <h2 class="install-method-title" id="install-heading-curl">curl</h2>
+                <p class="install-platform">macOS · Linux</p>
+                <div class="command install-command">
+                  <div class="install-command-heading">
+                    <span class="install-terminal-label"><span aria-hidden="true">›_</span> 終端機</span>
+                    <button class="copy-button" type="button" data-copy="install-command-curl" aria-label="複製 curl 安裝指令" hidden>複製</button>
+                  </div>
+                  <code id="install-command-curl" tabindex="0"><!-- generated:install-commands method=curl lang=zh-TW -->curl -fsSL https://bell-pr.suzu.tw/install | sh -s -- --lang zh-TW<!-- /generated:install-commands --></code>
+                </div>
+                <p class="install-note">安裝到你的使用者目錄；需要時自動準備 Node.js 24。</p>
+                <p class="install-next">完成後，使用腳本印出的啟動指令或 PATH 設定。</p>
+              </section>
+              <section class="install-panel" id="install-panel-brew" data-platform="macOS · Linux" aria-labelledby="install-heading-brew">
+                <h2 class="install-method-title" id="install-heading-brew">brew</h2>
+                <p class="install-platform">macOS · Linux</p>
+                <div class="command install-command">
+                  <div class="install-command-heading">
+                    <span class="install-terminal-label"><span aria-hidden="true">›_</span> 終端機</span>
+                    <button class="copy-button" type="button" data-copy="install-command-brew" aria-label="複製 brew 安裝指令" hidden>複製</button>
+                  </div>
+                  <code id="install-command-brew" tabindex="0"><!-- generated:install-commands method=brew lang=zh-TW -->brew tap suzu1dev/bell-pr https://github.com/Suzu1Dev/bell-pr
+brew install suzu1dev/bell-pr/bell-pr<!-- /generated:install-commands --></code>
+                </div>
+                <p class="install-note">需要 Homebrew；會一併安裝 Node.js、Git 與 GitHub CLI。</p>
+                <p class="install-next">登入所需工具後，執行 <code>bell-pr</code>。</p>
+              </section>
+              <section class="install-panel" id="install-panel-bun" data-platform="macOS · Linux" aria-labelledby="install-heading-bun">
+                <h2 class="install-method-title" id="install-heading-bun">bun</h2>
+                <p class="install-platform">macOS · Linux</p>
+                <div class="command install-command">
+                  <div class="install-command-heading">
+                    <span class="install-terminal-label"><span aria-hidden="true">›_</span> 終端機</span>
+                    <button class="copy-button" type="button" data-copy="install-command-bun" aria-label="複製 bun 安裝指令" hidden>複製</button>
+                  </div>
+                  <code id="install-command-bun" tabindex="0"><!-- generated:install-commands method=bun lang=zh-TW -->bun add --global bell-pr<!-- /generated:install-commands --></code>
+                </div>
+                <p class="install-note">需要 Bun 與 Node.js 22 以上。</p>
+                <p class="install-next">登入所需工具後，執行 <code>bell-pr</code>。</p>
+              </section>
+              <section class="install-panel" id="install-panel-powershell" data-platform="Windows · WSL2" aria-labelledby="install-heading-powershell">
+                <h2 class="install-method-title" id="install-heading-powershell">ps1</h2>
+                <p class="install-platform">Windows · WSL2</p>
+                <div class="command install-command">
+                  <div class="install-command-heading">
+                    <span class="install-terminal-label"><span aria-hidden="true">›_</span> PowerShell</span>
+                    <button class="copy-button" type="button" data-copy="install-command-powershell" aria-label="複製 PowerShell 安裝指令" hidden>複製</button>
+                  </div>
+                  <code id="install-command-powershell" tabindex="0"><!-- generated:install-commands method=powershell lang=zh-TW -->&amp; {
+  Invoke-RestMethod &#39;https://bell-pr.suzu.tw/install.ps1&#39; -OutFile install.ps1 -ErrorAction Stop
+  powershell -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -Lang zh-TW
+}<!-- /generated:install-commands --></code>
+                </div>
+                <p class="install-note">在 WSL2 Ubuntu 內準備工具與 Codex CLI；若缺少 WSL，會列出設定步驟。</p>
+                <p class="install-next">在 Ubuntu 裡完成登入，再啟動 BELL PR。<a href="install.html#windows">Windows 設定步驟</a></p>
+              </section>
+              <section class="install-panel" id="install-panel-mise" data-platform="macOS · Linux" aria-labelledby="install-heading-mise">
+                <h2 class="install-method-title" id="install-heading-mise">mise</h2>
+                <p class="install-platform">macOS · Linux</p>
+                <div class="command install-command">
+                  <div class="install-command-heading">
+                    <span class="install-terminal-label"><span aria-hidden="true">›_</span> 終端機</span>
+                    <button class="copy-button" type="button" data-copy="install-command-mise" aria-label="複製 mise 安裝指令" hidden>複製</button>
+                  </div>
+                  <code id="install-command-mise" tabindex="0"><!-- generated:install-commands method=mise lang=zh-TW -->MISE_NPM_PACKAGE_MANAGER=npm mise use -g node@24 npm:bell-pr@1.0.0<!-- /generated:install-commands --></code>
+                </div>
+                <p class="install-note">安裝 Node.js 24，固定使用 BELL PR 1.0.0，這次安裝選用 npm。</p>
+                <p class="install-next">用 <code>mise exec -- bell-pr</code> 啟動。</p>
+              </section>
+            </div>
+          </div>
+          <p class="hero-note">依 Apache-2.0 免費開源，不需 BELL PR 帳號。真實貢獻需要 Git，以及已登入的 GitHub CLI 與 Codex CLI 或 Claude Code。</p>
+        </div>
+      </section>
+
+      <section class="section" id="demo" aria-labelledby="demo-title">
+        <div class="wrap">
+          <div class="section-head">
+            <p class="eyebrow">示範影片</p>
+            <h2 id="demo-title">觀看 90 秒示範</h2>
+            <p>看看從讀專案規則，到送出你真正搞得懂的 Draft PR 的流程。</p>
+          </div>
+          <figure class="promo-video">
+            <video controls preload="none" playsinline poster="../assets/video/poster.jpg" width="1920" height="1080">
+              <source src="../assets/video/bell-pr-promo-en-1080p.webm" type="video/webm">
+              <source src="../assets/video/bell-pr-promo-en-1080p.mp4" type="video/mp4">
+              <track kind="captions" srclang="en" label="English" src="../assets/video/captions.en.vtt" default>
+            </video>
+            <figcaption>約 90 秒 · 英文字幕 · 需自行按下播放</figcaption>
+          </figure>
+        </div>
+      </section>
+
+      <section class="section section-tinted" id="how-it-works" aria-labelledby="how-title">
+        <div class="wrap">
+          <div class="section-head">
+            <p class="eyebrow">運作方式</p>
+            <h2 id="how-title">讓 AI 跑腿，理解留給你。</h2>
+            <p>邊貢獻邊學習：agents 寫程式碼，每個決定由你做主，最後你能清楚解釋自己送出的變更。</p>
+          </div>
+          <ol class="steps">
+            <li>
+              <h3>先讀規則</h3>
+              <p>BELL PR 會引用專案自己的貢獻規則、確認該專案接受你的 pull request，並顯示你選定的 issue 是否仍開啟、還有誰在處理。</p>
+            </li>
+            <li>
+              <h3>核准計畫，讓團隊動手</h3>
+              <p>Lead 擬定工作計畫，由你核准。接著 Teammates、Reviewer 與 Test analyst 在隔離的 git worktree 中工作，使用你已在用的 AI coding CLI。</p>
+            </li>
+            <li>
+              <h3>先試答，再用自己的話解釋回去</h3>
+              <p>每個檔案的問題要先回答，解釋才會顯示；接著用自己的話解釋整項變更，再核准。</p>
+            </li>
+            <li>
+              <h3>送出一份 Draft PR，再從審查中學習</h3>
+              <p>專案檢查通過後，用自己的話發布 Draft PR；再把維護者的審查意見與你原先的預估對照，練習你漏掉的地方。</p>
+            </li>
+          </ol>
+        </div>
+      </section>
+
+      <section class="section" id="screenshots" aria-labelledby="screenshots-title">
+        <div class="wrap">
+          <div class="section-head">
+            <p class="eyebrow">仔細看看</p>
+            <h2 id="screenshots-title">你實際會用到的畫面</h2>
+            <p>截圖來自 BELL PR 內附的範例專案。點選可看完整尺寸。</p>
+          </div>
+          <ul class="shots">
+            <li>
+              <figure class="shot">
+                <a href="../assets/screenshots/repo-overview-1440.png"><img src="../assets/screenshots/repo-overview-1440.png" alt="範例專案總覽：專案脈絡，以及「貢獻前」卡片，說明 pull request 對你開放，並引用專案規則與其檔案與行號。" width="1440" height="900" loading="lazy" decoding="async"></a>
+                <figcaption><strong>先讀規則</strong>在選定貢獻方向之前，BELL PR 會引用專案自己的規則（含檔案與行號）、說明發布對各項規則的影響，並確認 pull request 對你開放。</figcaption>
+              </figure>
+            </li>
+            <li>
+              <figure class="shot">
+                <a href="../assets/screenshots/run-changes-1440.png"><img src="../assets/screenshots/run-changes-1440.png" alt="範例貢獻的程式碼變更：變更的檔案、diff，以及所選檔案旁的白話說明。" width="1440" height="900" loading="lazy" decoding="async"></a>
+                <figcaption><strong>每一項變更都有說明</strong>邊看變更的檔案邊讀白話說明與範例，先回答問題才會顯示答案，也可以針對任何一行發問。</figcaption>
+              </figure>
+            </li>
+            <li>
+              <figure class="shot">
+                <a href="../assets/screenshots/run-check-1440.png"><img src="../assets/screenshots/run-check-1440.png" alt="範例貢獻的理解檢查與 diff：當事人自己的解釋、答案與自評分數，以及頁尾顯示已解釋回去並可核准。" width="1440" height="900" loading="lazy" decoding="async"></a>
+                <figcaption><strong>核准前用自己的話解釋回去</strong>在 diff 旁做一輪簡短的閉卷檢查：你的解釋、你的答案與你自己的評分。沒有 AI 模型幫你打分數。</figcaption>
+              </figure>
+            </li>
+            <li>
+              <figure class="shot">
+                <a href="../assets/screenshots/run-draft-1440.png"><img src="../assets/screenshots/run-draft-1440.png" alt="範例貢獻的 pull request 草稿：標題與說明編輯器，旁側是提交前尚待完成的事項。" width="1440" height="900" loading="lazy" decoding="async"></a>
+                <figcaption><strong>符合專案的 pull request</strong>你編輯標題與說明，旁側列出尚待完成事項。再往下，維護者檢查清單會依專案規則、issue 與你在該處的節奏核對變更。只有在專案要求或你選擇時，才會提到 AI 協助。</figcaption>
+              </figure>
+            </li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="section section-tinted" id="features" aria-labelledby="features-title">
+        <div class="wrap">
+          <div class="section-head">
+            <h2 id="features-title">為你能站得住腳的貢獻而設計</h2>
+            <p>搞懂自己送出的內容、在真實程式碼上磨練品味，並尊重維護者的時間。</p>
+          </div>
+          <ul class="grid">
+            <li class="card">
+              <h3>說明裡有你自己要答的題</h3>
+              <p>每個變更的檔案都附上改了什麼、為什麼、範例、取捨與另一種做法。你要先回答問題才看得到答案，並選擇你會採取哪一種做法。</p>
+            </li>
+            <li class="card">
+              <h3>核准前用自己的話解釋回去</h3>
+              <p>只送出你能解釋的內容：一輪簡短的閉卷檢查，包含你自己的摘要與答案，由你自評。預設開啟；關閉時每次執行都會清楚標示。</p>
+            </li>
+            <li class="card">
+              <h3>練習你漏掉的地方</h3>
+              <p>你曾自信卻答錯的題，以及讓你意外的維護者留言，會在幾天後回到你的練習牌組。沒有連續紀錄，也沒有分數。</p>
+            </li>
+            <li class="card">
+              <h3>引用專案自己的規則</h3>
+              <p>關於 AI 使用、揭露與「用自己的話寫說明」等規則，會從專案自己的檔案引用（含檔案與行號），並在你發布時再次核對。</p>
+            </li>
+            <li class="card">
+              <h3>仍開啟、仍是你的</h3>
+              <p>開始前與發布前，BELL PR 都會確認 issue 仍開啟，並查找是否有其他人被指派、認領，或已有連結到該 issue 的 pull request。</p>
+            </li>
+            <li class="card">
+              <h3>下一份 PR 之前先把迴圈關上</h3>
+              <p>每個專案的發布有節奏：先回應你已開啟的 pull request 上的審查意見，再在該專案開啟更多。</p>
+            </li>
+            <li class="card">
+              <h3>有依據的方向建議</h3>
+              <p>agent 會閱讀專案並建議貢獻方向，每一項都引用所依據的程式碼或文件，BELL PR 會核對每一段引用確實存在。隨時可再要五個，每個專案最多 30 個。</p>
+            </li>
+            <li class="card">
+              <h3>找到下一個貢獻</h3>
+              <p>探索功能會在 GitHub 搜尋符合你興趣、語言與難度的專案與 issue，讀取其貢獻規則，並說明投入程度與第一步。</p>
+            </li>
+            <li class="card">
+              <h3>依變更規模組成的團隊</h3>
+              <p>一位 Lead、兩到四位 teammates、一位 Reviewer 與一位 Test analyst；每位 teammate 各自在獨立的 git worktree。可同時處理多項貢獻，上限由你設定（預設 2，最多 8）。</p>
+            </li>
+            <li class="card">
+              <h3>跟進審查意見</h3>
+              <p>閱讀維護者的回饋，並與你的預估對照。接著可讓 agent 在後續一輪處理你選定的留言——你先用自己的話重述每一則；你審查該輪後，再以一個 commit 推送。</p>
+            </li>
+            <li class="card">
+              <h3>會讀你紀錄的教練</h3>
+              <p>教練回顧會讀取你在單一專案的紀錄，點出該專案維護者最常提出的事項，並依你自己的貢獻建立練習。可將一項貢獻的完整學習紀錄匯出為 Markdown。</p>
+            </li>
+            <li class="card">
+              <h3>你的工具、你的投入</h3>
+              <p>選擇 Codex CLI 或 Claude Code、模型、推理力度（含最深層級）與效率模式。agents 的網路存取預設關閉，直到你自行開啟。</p>
+            </li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="section" id="open-source" aria-labelledby="open-source-title">
+        <div class="wrap">
+          <div class="section-head">
+            <p class="eyebrow">開源</p>
+            <h2 id="open-source-title">免費、Apache-2.0 授權、由社群維護</h2>
+            <p>BELL PR 是開源軟體。沒有費用、沒有帳號、沒有 BELL PR 伺服器，由社群建置與維護。</p>
+          </div>
+          <ul class="grid">
+            <li class="card">
+              <h3>免費使用</h3>
+              <p>不用購買或註冊。你連接的 AI coding CLI 由其供應商向你自己的帳號計費，用量計入該帳號。</p>
+            </li>
+            <li class="card">
+              <h3>Apache License 2.0</h3>
+              <p>可依 Apache License 2.0 使用、研究、修改與分享。軟體依現狀提供，不附帶任何形式的保證。</p>
+            </li>
+            <li class="card">
+              <h3>由社群維護</h3>
+              <p>回報問題、提出建議、送出 pull request。專案對你的要求，與 BELL PR 對使用者的要求相同：小幅、你理解且能解釋的變更。</p>
+            </li>
+            <li class="card">
+              <h3>名稱與標誌</h3>
+              <p>BELL PR 是本專案的商標。Apache License 涵蓋程式碼，不含名稱或標誌；原始碼 repo 中的商標政策 <code>TRADEMARKS.md</code> 說明你可如何使用它們。</p>
+            </li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="section section-tinted" id="privacy" aria-labelledby="privacy-title">
+        <div class="wrap">
+          <div class="section-head">
+            <p class="eyebrow">隱私與信任</p>
+            <h2 id="privacy-title">你的電腦、你的帳號、你的決定</h2>
+          </div>
+          <ul class="trust">
+            <li>
+              <h3>以本機為主</h3>
+              <p>BELL PR 在你的電腦上執行，預設監聽 127.0.0.1。Repositories、執行紀錄與筆記留在其資料目錄，可從應用程式刪除。</p>
+            </li>
+            <li>
+              <h3>沒有 BELL 雲端</h3>
+              <p>沒有 BELL PR 伺服器，也沒有帳號。BELL PR 搭配你已安裝並登入的 OpenAI Codex CLI 或 Claude Code CLI，以及 GitHub CLI：你的程式碼只會送到它們送達的地方，用量計入你自己的帳號。</p>
+            </li>
+            <li>
+              <h3>無遙測</h3>
+              <p>應用程式與本站皆無分析、使用資料或當機回報。應用程式不會從其他網站載入任何內容。</p>
+            </li>
+            <li>
+              <h3>開源</h3>
+              <p>程式碼以 Apache License 2.0 授權並公開可讀，方便你檢查 BELL PR 做了什麼、以及什麼會離開你的電腦。</p>
+            </li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="section" id="faq" aria-labelledby="faq-title">
+        <div class="wrap">
+          <div class="faq">
+            <h2 id="faq-title">常見問題</h2>
+            <details>
+              <summary>執行 BELL PR 需要什麼？</summary>
+              <p>macOS、Linux，或透過 WSL2 的 Windows；Node.js 22 以上（或 Docker）；Git；已登入的 GitHub CLI；以及一套已安裝並登入的 AI coding CLI：OpenAI Codex CLI 或 Claude Code。<a href="install.html">安裝指南</a>有詳細說明。</p>
+            </details>
+            <details>
+              <summary>它用的是誰的 AI 帳號？</summary>
+              <p>你的。BELL PR 執行你已安裝並登入的 AI coding CLI：Codex CLI，或搭配你的 Claude 方案或 Anthropic API 金鑰的 Claude Code CLI。用量計入你自己的帳號。</p>
+            </details>
+            <details>
+              <summary>它會自己開啟 pull request 嗎？</summary>
+              <p>不會。只有在你審查過每個變更的檔案、用自己的話解釋變更（除非你關閉該檢查）並核准草稿之後，BELL PR 才會發布 Draft PR。發布前會再次確認專案接受你的 pull request，且 issue 仍屬於你。</p>
+            </details>
+            <details>
+              <summary>我的程式碼會送到 BELL PR 嗎？</summary>
+              <p>不會。沒有 BELL PR 雲端。你的程式碼會送到你所選 coding CLI 背後的 AI 供應商，以及 GitHub，受你自己的帳號與各服務條件約束。</p>
+            </details>
+            <details>
+              <summary>要花多少錢？</summary>
+              <p>不用。BELL PR 依 Apache License 2.0 免費開源，無需帳號。你只需向所選 AI coding CLI 的供應商，為自己的用量付費。</p>
+            </details>
+            <details>
+              <summary>BELL PR 是開源的嗎？</summary>
+              <p>是。以 Apache License 2.0 授權、由社群維護，並依現狀提供、不附保證。授權涵蓋程式碼；BELL PR 名稱與標誌為專案商標，原始碼 repo 中的 <code>TRADEMARKS.md</code> 說明使用方式。歡迎貢獻：<code>CONTRIBUTING.md</code> 說明作法。</p>
+            </details>
+            <details>
+              <summary>Pull request 會說明有 AI 協助嗎？</summary>
+              <p>只有在你選擇、或專案要求時。草稿結尾可有一行可編輯的文字，說明 AI coding agents 協助準備變更且你已審查。除非你開啟，或專案自己的規則要求揭露，否則該行預設關閉。若專案要求揭露，BELL PR 在說明寫入前不會發布。請遵守各專案對 AI 輔助貢獻的規則；原始碼 repo 中的 <code>docs/contributing-responsibly.md</code> 說明負責任使用的意義。</p>
+            </details>
+            <details>
+              <summary>可以關閉理解檢查嗎？</summary>
+              <p>可以，在「設定 → 學習」中，經確認後關閉（確認會說明變更內容）。每個檔案仍須審查，你仍須核准 pull request；所有專案規則、issue 與節奏檢查仍適用，且未做檢查就核准的執行會永久標示。</p>
+            </details>
+            <details>
+              <summary>BELL PR 是 GitHub、OpenAI 或 Anthropic 做的嗎？</summary>
+              <p>不是。BELL PR 是獨立產品。它搭配你自行安裝並登入的那些公司工具運作。</p>
+            </details>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div class="wrap">
+        <div class="footer-grid">
+          <div class="footer-brand"><img src="../assets/brand/logo-wordmark.svg" alt="BELL PR" width="92" height="30"></div>
+          <nav class="footer-col" aria-labelledby="footer-product">
+            <h2 id="footer-product">產品</h2>
+            <ul>
+              <li><a href="index.html#how-it-works">運作方式</a></li>
+              <li><a href="install.html">安裝</a></li>
+            </ul>
+          </nav>
+          <nav class="footer-col" aria-labelledby="footer-source">
+            <h2 id="footer-source">開源</h2>
+            <ul>
+              <li><!-- generated:product-link key=publicRepoUrl text="Source" --><a href="https://github.com/Suzu1Dev/bell-pr">Source</a><!-- /generated:product-link --></li>
+              <li><!-- generated:product-link key=publicRepoUrl path=blob/main/LICENSE text="Apache-2.0 license" --><a href="https://github.com/Suzu1Dev/bell-pr/blob/main/LICENSE">Apache-2.0 license</a><!-- /generated:product-link --></li>
+            </ul>
+          </nav>
+          <div class="footer-col">
+            <h2>聯絡</h2>
+            <ul>
+              <li><!-- generated:product-link key=supportEmail text="Support" --><!-- /generated:product-link --></li>
+              <li><!-- generated:product-link key=securityEmail text="Report a vulnerability" --><!-- /generated:product-link --></li>
+              <li><!-- generated:product-link key=publicRepoUrl path=issues text="Report an issue" --><a href="https://github.com/Suzu1Dev/bell-pr/issues">Report an issue</a><!-- /generated:product-link --></li>
+              <li><!-- generated:product-link key=docsUrl text="Documentation" --><!-- /generated:product-link --></li>
+            </ul>
+          </div>
+        </div>
+        <p class="disclaimer">BELL PR 是依 Apache License 2.0 授權的開源軟體，並依「現狀」提供，不附帶任何形式的保證。BELL PR 是本專案的商標；名稱與標誌不受該授權涵蓋。BELL PR 是獨立產品，與 GitHub, Inc.、OpenAI 或 Anthropic PBC 無隸屬、背書或贊助關係。GitHub、OpenAI、Codex、Anthropic、Claude 與 Claude Code 為其各自擁有者之商標；BELL PR 提及它們僅為說明可搭配的工具。</p>
+      </div>
+    </footer>
+    <p class="visually-hidden" role="status" id="copy-status"></p>
+  </body>
+</html>

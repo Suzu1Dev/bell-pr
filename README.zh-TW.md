@@ -14,7 +14,7 @@ BELL PR 是以 [Apache-2.0](LICENSE) 授權的免費開源軟體。沒有付費�
 
 ![「程式碼變更」頁籤：diff 旁邊是這次變更的白話解說](docs/images/zh-TW/run-changes-1280.png)
 
-[用範例專案試試看](#用範例專案試試看) · [開始之前](#開始之前) · [快速開始](#快速開始) · [系統需求](#系統需求) · [功能](#功能) · [隱私](#隱私) · [安全模型](#安全模型) · [本機 API](#本機-api) · [設定](#設定) · [疑難排解](#疑難排解) · [文件](#文件) · [參與貢獻](#參與貢獻) · [授權條款](#授權條款與商標)
+[用範例專案試試看](#用範例專案試試看) · [開始之前](#開始之前) · [快速開始](#快速開始) · [安裝方式](#安裝方式) · [系統需求](#系統需求) · [功能](#功能) · [隱私](#隱私) · [安全模型](#安全模型) · [本機 API](#本機-api) · [設定](#設定) · [疑難排解](#疑難排解) · [文件](#文件) · [參與貢獻](#參與貢獻) · [授權條款](#授權條款與商標)
 
 ## 用範例專案試試看
 
@@ -26,12 +26,20 @@ BELL PR 是以 [Apache-2.0](LICENSE) 授權的免費開源軟體。沒有付費�
 `bell-pr start --force` 啟動，範例導覽才能開啟。真實的 Agent 工作仍要等到
 有已登入的 AI 服務。
 
+
+## 觀看 90 秒示範
+
+![從 vibe coding 到真正搞懂為什麼 — BELL PR 示範](site/assets/video/poster.jpg)
+
+在網站上<!-- generated:product-link key=homepageUrl path=zh-tw/#demo text="觀看 90 秒示範" -->[觀看 90 秒示範](https://bell-pr.suzu.tw/zh-tw/#demo)<!-- /generated:product-link -->（英文字幕，需自行按下播放）。
+
 ## 開始之前
 
 BELL PR 是本機工作台。請先裝好並登入下列工具，再跑快速開始；`bell-pr doctor`
 會為每一項缺失印出修正指令。
 
-- **Node.js 22 以上**（[nodejs.org](https://nodejs.org/en)）。
+- **Node.js 22 以上**（[nodejs.org](https://nodejs.org/en)）；Shell 安裝腳本可自動
+  準備 Node.js 24。
 - `engines` 記載支援的最低 Node.js 版本；CI 釘選 Node.js 24.22.1（以及 npm 11.21.1）。
 - **Git**，並設定名字與電子郵件（`git config --global user.name` /
   `user.email`）。同步到最新目標分支需要 **Git 2.40 以上**。
@@ -46,7 +54,8 @@ BELL PR 是本機工作台。請先裝好並登入下列工具，再跑快速開
   `sudo apt-get install bubblewrap socat`）。macOS 使用內建沙箱。
 
 目前支援：**macOS**、**Linux**。**Windows 透過 WSL2（尚未測試）：** 請在 WSL
-發行版內安裝以上全部。
+發行版內安裝以上全部。[Windows 安裝腳本](#windowswsl2) 可以先準備工具，再由你登入。
+目前不支援原生 Windows 執行。
 
 `bell-pr doctor` 必要檢查全過後，再繼續。在那之前 `bell-pr start` 會在監聽前
 結束。尚未安裝／登入 AI 服務時，`bell-pr start --force` 仍會開啟 BELL PR，
@@ -76,6 +85,87 @@ BELL PR 是本機工作台。請先裝好並登入下列工具，再跑快速開
 **位址不見了？執行 `bell-pr open`**（若用 `npx` 啟動，請執行 `npx bell-pr open`）。它會再次印出位址（不含 API 權杖）並在瀏覽器中開啟。瀏覽器會收到權杖。
 
 想要保留安裝，請執行 `npm install -g bell-pr`，之後用 `bell-pr` 啟動。[入門指南](docs/getting-started.md)（英文）會帶你走完一次完整的貢獻。
+
+## 安裝方式
+
+選擇一種即可。真實工作仍需要 Git、已登入的 GitHub CLI 與 AI CLI；尚未登入時，
+可用 `bell-pr start --force` 開啟範例導覽。參數與 PATH 設定請見[安裝指南](docs/installation.md)（英文）。
+
+### macOS 與 Linux
+
+**Shell 腳本**：將 BELL PR 安裝到 `~/.local`，缺少適用的 Node.js／npm 時會自動
+準備 Node.js 24。自動下載適用於 macOS、Linux 的 x64／arm64；不使用 sudo，
+也不修改 shell 設定檔：
+
+<!-- generated:install-commands method=curl lang=zh-TW -->
+```sh
+curl -fsSL https://bell-pr.suzu.tw/install | sh -s -- --lang zh-TW
+```
+<!-- /generated:install-commands -->
+
+完成後，使用腳本印出的啟動指令或 PATH 設定。
+
+**Homebrew**：使用本專案儲存庫作為 tap：
+
+<!-- generated:install-commands method=brew -->
+```sh
+brew tap suzu1dev/bell-pr https://github.com/Suzu1Dev/bell-pr
+brew install suzu1dev/bell-pr/bell-pr
+```
+<!-- /generated:install-commands -->
+
+**npm 或 Bun**：擇一執行。以 Bun 安裝後，執行 BELL PR 仍需要 Node.js 22 以上：
+
+```sh
+npm install -g bell-pr
+bell-pr
+```
+
+或：
+
+```sh
+bun add --global bell-pr
+bell-pr
+```
+
+**mise**：安裝 Node.js 24，並固定使用 BELL PR 1.0.0。mise 預設的 npm 後端可能
+擋下剛發佈的套件，因此這次安裝明確選用 npm：
+
+```sh
+MISE_NPM_PACKAGE_MANAGER=npm mise use -g node@24 npm:bell-pr@1.0.0
+mise exec -- bell-pr
+```
+
+`mise exec` 不需要 shell 整合；選用 npm 只影響這次指令，不會永久修改套件管理器
+設定。之後升級時保留相同前綴，並指定要安裝的版本。
+
+### Windows（WSL2）
+
+在 PowerShell 執行下列指令，便會在既有的 WSL2 Ubuntu 中準備 Git、GitHub CLI、
+Node.js、BELL PR 與 Codex CLI，也可改選 Claude Code 或不安裝 AI CLI。
+若尚未安裝 WSL2，腳本會列出設定步驟；完成設定、建立 Linux 使用者後，再執行一次。
+
+<!-- generated:install-commands method=powershell lang=zh-TW -->
+```powershell
+& {
+  Invoke-RestMethod 'https://bell-pr.suzu.tw/install.ps1' -OutFile install.ps1 -ErrorAction Stop
+  powershell -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -Lang zh-TW
+}
+```
+<!-- /generated:install-commands -->
+
+接著用 `wsl -d Ubuntu` 進入 Ubuntu，在裡面設定 Git 身分、執行 `gh auth login`
+與 `codex login`（選 Claude Code 則用 `claude auth login`），再啟動 BELL PR。
+以後從 PowerShell 啟動只需：
+
+```powershell
+wsl -d Ubuntu -- bash -lc '$HOME/.local/bin/bell-pr'
+```
+
+專案請放在 WSL 裡，例如 `~/projects`。若 Windows 瀏覽器沒有自動開啟，在另一個
+WSL 終端機執行 `bell-pr open --print --print-token`，自行開啟印出的連結；
+連結包含存取憑證，請勿分享。完整選項請見 [Windows 設定](docs/installation.md#windows-with-wsl2)（英文）。
+目前不支援原生 Windows；這套 WSL2 安裝流程尚未在真實 Windows 主機驗證。
 
 ## 系統需求
 
@@ -313,6 +403,7 @@ BELL PR 把所有資料放在 `~/.bellpr`（或 `--data-dir`／`BELLPR_DATA_DIR`
 私下回報安全性漏洞請見 [SECURITY.md](SECURITY.md)。請勿公開開 issue。
 
 <!-- generated:product-link key=homepageUrl text="網站" -->
+[網站](https://bell-pr.suzu.tw)
 <!-- /generated:product-link -->
 <!-- generated:product-link key=supportEmail text="以電子郵件聯絡支援" -->
 <!-- /generated:product-link -->

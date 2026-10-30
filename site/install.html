@@ -2,11 +2,11 @@
 <html lang="en">
   <head>
     <meta charset="utf-8">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; base-uri 'none'; form-action 'none'">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; media-src 'self'; base-uri 'none'; form-action 'none'">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="referrer" content="no-referrer">
     <title>Install: BELL PR</title>
-    <meta name="description" content="Install BELL PR, free and open-source software, with npm or Docker on macOS, Linux, or Windows through WSL2, and connect the AI coding CLI and GitHub CLI you already use.">
+    <meta name="description" content="Install BELL PR, free and open-source software, with a shell script, Homebrew, Bun, mise, npm or Docker on macOS, Linux, or PowerShell through Windows WSL2, and connect the AI coding CLI and GitHub CLI you already use.">
     <meta name="theme-color" content="#1f6d50">
     <link rel="icon" href="assets/brand/favicon.svg" type="image/svg+xml">
     <link rel="icon" href="assets/brand/favicon-32.png" sizes="32x32" type="image/png">
@@ -14,13 +14,18 @@
     <meta property="og:type" content="website">
     <meta property="og:site_name" content="BELL PR">
     <meta property="og:title" content="Install: BELL PR">
-    <meta property="og:description" content="Start BELL PR with npx bell-pr or Docker, on your own machine.">
+    <meta property="og:description" content="Choose an installation method and run BELL PR on your own machine.">
     <!-- generated:product-meta key=homepageUrl property="og:url" path="install.html" -->
+    <meta property="og:url" content="https://bell-pr.suzu.tw/install.html">
     <!-- /generated:product-meta -->
     <!-- generated:product-meta key=homepageUrl property="og:image" path="assets/brand/og-image.png" -->
+    <meta property="og:image" content="https://bell-pr.suzu.tw/assets/brand/og-image.png">
     <!-- /generated:product-meta -->
     <meta property="og:image" content="assets/brand/og-image.png">
     <meta name="twitter:card" content="summary_large_image">
+    <link rel="alternate" hreflang="en" href="https://bell-pr.suzu.tw/install.html">
+    <link rel="alternate" hreflang="zh-Hant-TW" href="https://bell-pr.suzu.tw/zh-tw/install.html">
+    <link rel="alternate" hreflang="x-default" href="https://bell-pr.suzu.tw/install.html">
     <link rel="stylesheet" href="site.css">
     <script src="site.js" defer></script>
   </head>
@@ -35,6 +40,11 @@
             <li><a href="install.html" aria-current="page">Install</a></li>
           </ul>
         </nav>
+        <nav class="lang-switch" aria-label="Language">
+          <a href="install.html" hreflang="en" lang="en" aria-current="true">English</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="zh-tw/install.html" hreflang="zh-Hant-TW" lang="zh-Hant-TW">中文</a>
+        </nav>
       </div>
     </header>
 
@@ -42,9 +52,124 @@
       <section class="page-head">
         <div class="wrap">
           <h1>Install BELL PR</h1>
-          <p class="lead">BELL PR is free, open-source software (Apache License 2.0) that runs on your own computer. Start it with one npm command or run the Docker image, then open the address it prints.</p>
+          <p class="lead">BELL PR is free, open-source software (Apache License 2.0) that runs on your own computer. Choose your installation method below, sign in to your tools, then start BELL PR.</p>
           <div class="hero-actions">
-            <div class="command"><code id="start-command">npx bell-pr</code><button class="copy-button" type="button" data-copy="start-command" hidden>Copy</button></div>
+            <div class="install-widget" data-install>
+              <div class="install-header">
+                <div>
+                  <p class="install-eyebrow">GET STARTED</p>
+                  <p class="install-title">Your workbench, one command away.</p>
+                </div>
+                <a class="install-guide" href="#requirements">Before you start<span aria-hidden="true"> ↗</span></a>
+              </div>
+              <div class="install-toolbar">
+                <div class="install-tabs" data-install-tabs aria-label="Installation method" hidden>
+                  <button class="install-tab" type="button" id="install-tab-npx" data-install-target="install-panel-npx">npx</button>
+                  <button class="install-tab" type="button" id="install-tab-npm" data-install-target="install-panel-npm">npm</button>
+                  <button class="install-tab" type="button" id="install-tab-curl" data-install-target="install-panel-curl">curl</button>
+                  <button class="install-tab" type="button" id="install-tab-brew" data-install-target="install-panel-brew">brew</button>
+                  <button class="install-tab" type="button" id="install-tab-bun" data-install-target="install-panel-bun">bun</button>
+                  <button class="install-tab" type="button" id="install-tab-powershell" data-install-target="install-panel-powershell">ps1</button>
+                  <button class="install-tab" type="button" id="install-tab-mise" data-install-target="install-panel-mise">mise</button>
+                </div>
+                <span class="install-platform" data-install-platform hidden></span>
+              </div>
+              <section class="install-panel" id="install-panel-npx" data-platform="macOS · Linux" aria-labelledby="install-heading-npx">
+                <h2 class="install-method-title" id="install-heading-npx">npx</h2>
+                <p class="install-platform">macOS · Linux</p>
+                <div class="command install-command">
+                  <div class="install-command-heading">
+                    <span class="install-terminal-label"><span aria-hidden="true">›_</span> Terminal</span>
+                    <button class="copy-button" type="button" data-copy="install-command-npx" aria-label="Copy npx installation commands" hidden>Copy</button>
+                  </div>
+                  <code id="install-command-npx" tabindex="0"><!-- generated:install-commands method=npx lang=en -->npx bell-pr<!-- /generated:install-commands --></code>
+                </div>
+                <p class="install-note">Requires Node.js 22 or later and npm. Starts BELL PR without a global install.</p>
+                <p class="install-next">Sign in to your GitHub and AI tools first; keep this terminal open while you work.</p>
+              </section>
+              <section class="install-panel" id="install-panel-npm" data-platform="macOS · Linux" aria-labelledby="install-heading-npm">
+                <h2 class="install-method-title" id="install-heading-npm">npm</h2>
+                <p class="install-platform">macOS · Linux</p>
+                <div class="command install-command">
+                  <div class="install-command-heading">
+                    <span class="install-terminal-label"><span aria-hidden="true">›_</span> Terminal</span>
+                    <button class="copy-button" type="button" data-copy="install-command-npm" aria-label="Copy npm installation commands" hidden>Copy</button>
+                  </div>
+                  <code id="install-command-npm" tabindex="0"><!-- generated:install-commands method=npm lang=en -->npm install -g bell-pr<!-- /generated:install-commands --></code>
+                </div>
+                <p class="install-note">Requires Node.js 22 or later and npm. Installs the bell-pr command.</p>
+                <p class="install-next">After signing in to your tools, run <code>bell-pr</code>.</p>
+              </section>
+              <section class="install-panel" id="install-panel-curl" data-platform="macOS · Linux" aria-labelledby="install-heading-curl">
+                <h2 class="install-method-title" id="install-heading-curl">curl</h2>
+                <p class="install-platform">macOS · Linux</p>
+                <div class="command install-command">
+                  <div class="install-command-heading">
+                    <span class="install-terminal-label"><span aria-hidden="true">›_</span> Terminal</span>
+                    <button class="copy-button" type="button" data-copy="install-command-curl" aria-label="Copy curl installation commands" hidden>Copy</button>
+                  </div>
+                  <code id="install-command-curl" tabindex="0"><!-- generated:install-commands method=curl lang=en -->curl -fsSL https://bell-pr.suzu.tw/install | sh<!-- /generated:install-commands --></code>
+                </div>
+                <p class="install-note">Installs for your user. Prepares Node.js 24 when needed.</p>
+                <p class="install-next">Use the launch command or PATH setting printed by the installer.</p>
+              </section>
+              <section class="install-panel" id="install-panel-brew" data-platform="macOS · Linux" aria-labelledby="install-heading-brew">
+                <h2 class="install-method-title" id="install-heading-brew">brew</h2>
+                <p class="install-platform">macOS · Linux</p>
+                <div class="command install-command">
+                  <div class="install-command-heading">
+                    <span class="install-terminal-label"><span aria-hidden="true">›_</span> Terminal</span>
+                    <button class="copy-button" type="button" data-copy="install-command-brew" aria-label="Copy brew installation commands" hidden>Copy</button>
+                  </div>
+                  <code id="install-command-brew" tabindex="0"><!-- generated:install-commands method=brew lang=en -->brew tap suzu1dev/bell-pr https://github.com/Suzu1Dev/bell-pr
+brew install suzu1dev/bell-pr/bell-pr<!-- /generated:install-commands --></code>
+                </div>
+                <p class="install-note">Requires Homebrew. Includes Node.js, Git and GitHub CLI.</p>
+                <p class="install-next">After signing in to your tools, run <code>bell-pr</code>.</p>
+              </section>
+              <section class="install-panel" id="install-panel-bun" data-platform="macOS · Linux" aria-labelledby="install-heading-bun">
+                <h2 class="install-method-title" id="install-heading-bun">bun</h2>
+                <p class="install-platform">macOS · Linux</p>
+                <div class="command install-command">
+                  <div class="install-command-heading">
+                    <span class="install-terminal-label"><span aria-hidden="true">›_</span> Terminal</span>
+                    <button class="copy-button" type="button" data-copy="install-command-bun" aria-label="Copy bun installation commands" hidden>Copy</button>
+                  </div>
+                  <code id="install-command-bun" tabindex="0"><!-- generated:install-commands method=bun lang=en -->bun add --global bell-pr<!-- /generated:install-commands --></code>
+                </div>
+                <p class="install-note">Requires Bun and Node.js 22 or later.</p>
+                <p class="install-next">After signing in to your tools, run <code>bell-pr</code>.</p>
+              </section>
+              <section class="install-panel" id="install-panel-powershell" data-platform="Windows · WSL2" aria-labelledby="install-heading-powershell">
+                <h2 class="install-method-title" id="install-heading-powershell">ps1</h2>
+                <p class="install-platform">Windows · WSL2</p>
+                <div class="command install-command">
+                  <div class="install-command-heading">
+                    <span class="install-terminal-label"><span aria-hidden="true">›_</span> PowerShell</span>
+                    <button class="copy-button" type="button" data-copy="install-command-powershell" aria-label="Copy PowerShell installation commands" hidden>Copy</button>
+                  </div>
+                  <code id="install-command-powershell" tabindex="0"><!-- generated:install-commands method=powershell lang=en -->&amp; {
+  Invoke-RestMethod &#39;https://bell-pr.suzu.tw/install.ps1&#39; -OutFile install.ps1 -ErrorAction Stop
+  powershell -NoProfile -ExecutionPolicy Bypass -File .\install.ps1
+}<!-- /generated:install-commands --></code>
+                </div>
+                <p class="install-note">Prepares tools and Codex CLI inside WSL2 Ubuntu. Prints setup steps if WSL is missing.</p>
+                <p class="install-next">Sign in inside Ubuntu, then start BELL PR. <a href="install.html#windows">Windows setup</a></p>
+              </section>
+              <section class="install-panel" id="install-panel-mise" data-platform="macOS · Linux" aria-labelledby="install-heading-mise">
+                <h2 class="install-method-title" id="install-heading-mise">mise</h2>
+                <p class="install-platform">macOS · Linux</p>
+                <div class="command install-command">
+                  <div class="install-command-heading">
+                    <span class="install-terminal-label"><span aria-hidden="true">›_</span> Terminal</span>
+                    <button class="copy-button" type="button" data-copy="install-command-mise" aria-label="Copy mise installation commands" hidden>Copy</button>
+                  </div>
+                  <code id="install-command-mise" tabindex="0"><!-- generated:install-commands method=mise lang=en -->MISE_NPM_PACKAGE_MANAGER=npm mise use -g node@24 npm:bell-pr@1.0.0<!-- /generated:install-commands --></code>
+                </div>
+                <p class="install-note">Installs Node.js 24 and pins BELL PR 1.0.0, using npm for this installation.</p>
+                <p class="install-next">Start with <code>mise exec -- bell-pr</code>.</p>
+              </section>
+            </div>
           </div>
         </div>
       </section>
@@ -54,7 +179,7 @@
           <div class="prose">
             <h2 id="requirements">Requirements</h2>
             <ul>
-              <li><strong>Node.js 22 or later</strong> for npm, or Docker instead.</li>
+              <li><strong>Node.js 22 or later.</strong> The curl installer prepares Node.js 24 when needed; Homebrew, mise and the WSL helper also supply Node.js.</li>
               <li><strong>Git 2.40 or later</strong>, which moving a contribution onto the latest target branch needs.</li>
               <li><strong>The GitHub CLI</strong> (<code>gh</code>), signed in with <code>gh auth login</code>. BELL PR uses it to publish Draft PRs and to find projects.</li>
               <li><strong>One AI coding CLI</strong>, installed and signed in: the OpenAI Codex CLI, or Claude Code with your Claude plan or Anthropic API key. Usage counts against your own account.</li>
@@ -64,10 +189,35 @@
 
             <h2 id="platforms">Platforms</h2>
             <ul>
-              <li><strong>macOS and Linux:</strong> install with npm.</li>
-              <li><strong>Windows:</strong> install WSL2 and a Linux distribution, then follow the npm steps inside it. BELL PR runs on Windows only through WSL2.</li>
+              <li><strong>macOS and Linux:</strong> choose curl, Homebrew, Bun, mise or npm.</li>
+              <li><strong>Windows:</strong> use the ps1 installer with WSL2 Ubuntu or Debian. Native Windows is unsupported; this setup has not been verified on a real Windows host. <a href="#windows">Follow the Windows steps below.</a></li>
               <li><strong>Docker (beta):</strong> an image you build from the source, with Git, the GitHub CLI and the Codex CLI.</li>
             </ul>
+
+            <h2 id="first-start">After installation</h2>
+            <p>Set your Git identity with <code>git config --global user.name "Your Name"</code> and <code>git config --global user.email "you@example.com"</code>, replacing the sample values with yours. Sign in with <code>gh auth login</code>, then <code>codex login</code> or <code>claude auth login</code>. Run <code>bell-pr doctor</code> to check what is ready.</p>
+            <p>The curl installer prints a launch command and a PATH setting; use those so your terminal finds the installed tools. With Homebrew or Bun, run <code>bell-pr</code>. With mise, run <code>mise exec -- bell-pr</code>. Keep the terminal open while you work; <kbd>Ctrl</kbd>+<kbd>C</kbd> stops BELL PR.</p>
+            <p>To try the sample project before signing in, use <code>bell-pr start --force</code>. The sample makes no AI call and sends nothing to GitHub; real agent work waits for a signed-in provider.</p>
+
+            <h2 id="windows">Windows with WSL2</h2>
+            <ol class="setup-steps">
+              <li>If WSL2 is missing, run this in an Administrator PowerShell:
+                <pre><code>wsl --install -d Ubuntu</code></pre>
+                <p>Restart Windows if prompted. Open Ubuntu and create your regular Linux user and password. Use <code>wsl --list --verbose</code> to check for version 2; if needed, run <code>wsl --set-version Ubuntu 2</code>.</p>
+              </li>
+              <li>Run the <strong>ps1</strong> command above in a normal PowerShell. It prepares Git, GitHub CLI, Node.js, BELL PR and Codex CLI inside Ubuntu. It may ask for your Linux sudo password. The installer also supports an existing Debian distribution and Claude Code; it does not sign in for you.</li>
+              <li>Enter Ubuntu with <code>wsl -d Ubuntu</code>. Set your Git identity there, then run these commands in the Linux terminal:
+                <pre><code>gh auth login
+codex login
+bell-pr doctor
+bell-pr</code></pre>
+                <p>If you selected Claude Code, use <code>claude auth login</code> instead. Keep your projects in WSL, for example <code>~/projects</code>; sign-ins from Windows copies of these tools do not carry over.</p>
+              </li>
+              <li>For later launches, run this from PowerShell:
+                <pre><code>wsl -d Ubuntu -- bash -lc '$HOME/.local/bin/bell-pr'</code></pre>
+                <p>Use your distribution&#39;s name if it is not Ubuntu. If no browser opens, run <code>bell-pr open --print --print-token</code> in another WSL terminal and open that link in Windows. The link contains a credential; keep it private.</p>
+              </li>
+            </ol>
 
             <h2 id="npm">Start with npm</h2>
             <pre><code>npx bell-pr</code></pre>
