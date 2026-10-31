@@ -5,6 +5,13 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    ignore:
+      # The types track the oldest supported Node.js (engines: node >=22).
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
+      # typescript-eslint's peer range (typescript >=4.8.4 <6.1.0) excludes TS 7.
+      - dependency-name: typescript
+        versions: [">=7.0.0"]
   - package-ecosystem: github-actions
     directory: /
     schedule:
