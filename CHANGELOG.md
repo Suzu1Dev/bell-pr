@@ -653,6 +653,19 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   Unicode code points instead of UTF-16 units, so most emoji count once.
   Files that earlier builds saved load as before, and saved files are read
   as leniently as before.
+- **Your Claude Code hooks no longer run in BELL PR's agent turns, and auto
+  memory is off.** Hooks from your user settings and plugins ran outside the
+  sandbox during every Claude turn, and auto memory kept notes about imported
+  projects in `~/.claude/projects/` from one run to the next. Each turn now
+  also leaves out your own `CLAUDE.md`, rules, output style and language
+  setting, so BELL PR's prompt sets the instructions and the output language.
+  Your sign-in, `env` and default model still apply. BELL PR does not delete
+  notes that earlier versions let Claude Code save; Privacy and your data
+  says where to find them. The security model lists the user settings that
+  still widen what agents may do, such as `permissions.additionalDirectories`
+  and `sandbox.excludedCommands`. The sandbox canary checks that hooks and
+  auto memory stay off, and its `--decoy-home` links only Claude Code's
+  login file instead of your whole `~/.claude`.
 
 ## [1.0.0] - 【暫定】
 

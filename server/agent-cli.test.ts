@@ -44,6 +44,12 @@ async function withSandboxTools(t: TestContext) {
 /** The parsed --settings value of a Claude Code command. */
 const settingsOf = (args: string[]) =>
   JSON.parse(args[args.indexOf("--settings") + 1]) as {
+    disableAllHooks?: boolean;
+    autoMemoryEnabled?: boolean;
+    env?: Record<string, string>;
+    outputStyle?: string;
+    language?: string;
+    claudeMdExcludes?: string[];
     permissions: { deny: string[]; blockReadsOutsideWorkingDirectories?: boolean };
     sandbox?: {
       enabled: boolean;
@@ -53,6 +59,20 @@ const settingsOf = (args: string[]) =>
       network: { allowedDomains: string[]; strictAllowlist: boolean };
     };
   };
+
+/**
+ * What every Claude turn switches off in the user's settings: hooks (they run
+ * outside the sandbox), auto memory (kept under ~/.claude/projects/ across
+ * runs), and the user's own instructions, output style and language.
+ */
+function assertUserCustomizationsOff(settings: ReturnType<typeof settingsOf>) {
+  assert.equal(settings.disableAllHooks, true);
+  assert.equal(settings.autoMemoryEnabled, false);
+  assert.deepEqual(settings.env, { CLAUDE_CODE_DISABLE_AUTO_MEMORY: "1" });
+  assert.equal(settings.outputStyle, "default");
+  assert.equal(settings.language, "");
+  assert.equal(settings.claudeMdExcludes?.length, 2);
+}
 
 const credentialDenials = [
   "Read(~/.config/gh/**)",
@@ -195,6 +215,7 @@ test("Claude Code arguments map access levels, inline the schema and keep MCP co
     const settings = settingsOf(command.args);
     for (const rule of credentialDenials)
       assert.ok(settings.permissions.deny.includes(rule), rule);
+    assertUserCustomizationsOff(settings);
   }
   assert.equal(settingsOf(none.args).sandbox, undefined);
   assert.equal(settingsOf(read.args).sandbox, undefined);
@@ -228,6 +249,28 @@ test("Claude Code arguments map access levels, inline the schema and keep MCP co
     executable: "claude",
     args: ["auth", "status"],
   });
+});
+
+test("Claude turns leave out the user's CLAUDE.md and rules where CLAUDE_CONFIG_DIR puts them", async (t) => {
+  const previous = process.env.CLAUDE_CONFIG_DIR;
+  t.after(() => {
+    if (previous === undefined) delete process.env.CLAUDE_CONFIG_DIR;
+    else process.env.CLAUDE_CONFIG_DIR = previous;
+  });
+  const claude = { provider: "claude" as const, source: "cli-default" as const };
+  process.env.CLAUDE_CONFIG_DIR = "/config/claude";
+  const moved = await agentCommand(claude, { cwd: "/work/tree", access: "none" });
+  assert.deepEqual(settingsOf(moved.args).claudeMdExcludes, [
+    path.join(path.resolve("/config/claude"), "CLAUDE.md"),
+    path.join(path.resolve("/config/claude"), "rules", "**"),
+  ]);
+  delete process.env.CLAUDE_CONFIG_DIR;
+  const home = path.join(os.homedir(), ".claude");
+  const standard = await agentCommand(claude, { cwd: "/work/tree", access: "none" });
+  assert.deepEqual(settingsOf(standard.args).claudeMdExcludes, [
+    path.join(home, "CLAUDE.md"),
+    path.join(home, "rules", "**"),
+  ]);
 });
 
 test("teammates combine write access with an output schema on both providers", async (t) => {
@@ -1155,9 +1198,12 @@ test("explicit full access affects write turns only and retains isolation from r
   assert.ok(write.args.includes("--strict-mcp-config"));
   assert.equal(write.args[write.args.indexOf("--setting-sources") + 1], "user");
   assert.ok(!write.args.includes("--disallowedTools"));
+  // Without the sandbox, the user's hooks and auto memory stay off all the same.
+  assertUserCustomizationsOff(settingsOf(write.args));
   for (const access of ["read", "none"] as const) {
     const read = await agentCommand(execution, { cwd: "/work/tree", access, full: true });
     assert.equal(read.args[read.args.indexOf("--permission-mode") + 1], "dontAsk");
+    assertUserCustomizationsOff(settingsOf(read.args));
     assert.equal(settingsOf(read.args).permissions.blockReadsOutsideWorkingDirectories, true);
     assert.equal(read.unsandboxed, undefined);
     const codex = await agentCommand({ ...execution, provider: "codex" }, { cwd: "/work/tree", access });

@@ -1,4 +1,5 @@
 import { readFile } from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { sharedCredentialDenials } from "../shared/credential-denials.js";
@@ -144,6 +145,18 @@ export function codexAccessMode(
 }
 
 /**
+ * The user's own instruction files in Claude Code's config directory, the
+ * way the CLI names them (verified with 2.1.292: the path as given matches
+ * through a symbolic link too).
+ */
+function claudeUserMemoryFiles(): string[] {
+  const directory = path.resolve(
+    process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), ".claude"),
+  );
+  return [path.join(directory, "CLAUDE.md"), path.join(directory, "rules", "**")];
+}
+
+/**
  * The `--settings` value for one Claude Code turn. Every turn denies
  * reading credential files and BELL's data outside its checkout. Read-only
  * turns also refuse file reads outside the working directory. A write turn
@@ -154,11 +167,24 @@ export function codexAccessMode(
  * (`allowUnsandboxedCommands: false`); `failIfUnavailable` stops the turn
  * instead of running unsandboxed if the sandbox cannot start after all.
  *
+ * The user's own settings still load (`--setting-sources user`), so sign-in
+ * through `env`, `apiKeyHelper` or a cloud provider keeps working. A single
+ * value given here wins over the user's; lists and `env` merge with theirs
+ * (docs/security-model.md names what that leaves). So every turn also turns
+ * off what would run or persist outside BELL's control: hooks, which run
+ * outside the sandbox (`disableAllHooks`; managed hooks still run), and auto
+ * memory under ~/.claude/projects/, also when the user's `env` forces it on
+ * (`autoMemoryEnabled`, `CLAUDE_CODE_DISABLE_AUTO_MEMORY`). Besides managed
+ * policy, BELL's prompt is the only instruction: the user's CLAUDE.md and
+ * rules (`claudeMdExcludes`), output style and `language` are left out.
+ *
  * Keys verified against the settings schema bundled in Claude Code 2.1.292
  * (`permissions` and `sandbox` are passthrough objects there, so a key a
  * release does not know is ignored rather than rejected);
  * `sandbox.filesystem.denyRead` and `allowRead` are in the schema since
- * 2.1.114 at the latest, and both apply on Linux and macOS. Supported range:
+ * 2.1.114 at the latest, and both apply on Linux and macOS. The top-level
+ * keys, and that each wins over the user's settings, were verified with
+ * 2.1.292 against a local stand-in for the API. Supported range:
  * Claude Code >= 2.1.292 and < 2.2; scripts/agent-sandbox-canary.mjs must
  * pass on a release before the range is widened.
  */
@@ -168,6 +194,12 @@ export function claudeSettings(options: {
   sandbox: boolean;
   full?: boolean;
 }): {
+  disableAllHooks: true;
+  autoMemoryEnabled: false;
+  env: { CLAUDE_CODE_DISABLE_AUTO_MEMORY: "1" };
+  outputStyle: "default";
+  language: "";
+  claudeMdExcludes: string[];
   permissions: { deny: string[]; blockReadsOutsideWorkingDirectories?: boolean };
   sandbox?: {
     enabled: boolean;
@@ -179,6 +211,12 @@ export function claudeSettings(options: {
   };
 } {
   return {
+    disableAllHooks: true,
+    autoMemoryEnabled: false,
+    env: { CLAUDE_CODE_DISABLE_AUTO_MEMORY: "1" },
+    outputStyle: "default",
+    language: "",
+    claudeMdExcludes: claudeUserMemoryFiles(),
     permissions: {
       deny: agentReadDenials(options.cwd),
       ...(options.access === "write"
