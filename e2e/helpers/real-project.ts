@@ -22,6 +22,7 @@ import os from "node:os";
 import path from "node:path";
 import type { FakeFacts, FakeGitHub } from "../../test/fake-github";
 import { fakeGitHub } from "../../test/fake-github";
+import { git as bellGit } from "../../server/process";
 import { readDiff } from "../../server/git";
 import { launchServer, type LaunchedServer } from "../start-server.mjs";
 import { readyStandIns } from "./ready-server";
@@ -405,7 +406,7 @@ esac
         const baseSha = git(checkout, "rev-parse", "HEAD");
         const worktreePath = path.join(dataDir, "worktrees", runId);
         await mkdir(path.dirname(worktreePath), { recursive: true });
-        git(checkout, "worktree", "add", "-q", "-b", "fix/greet-languages", worktreePath, baseSha);
+        await bellGit(checkout, ["worktree", "add", "-q", "-b", "fix/greet-languages", worktreePath, baseSha]);
         await writeFile(path.join(worktreePath, files.greeting), greetingAfter);
         await writeFile(path.join(worktreePath, files.format), formatAfter);
         await writeFile(path.join(worktreePath, files.test), testBody("expect(greeting(\"Ada\")).toBeDefined();"));

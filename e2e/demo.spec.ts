@@ -182,7 +182,8 @@ test("presentation flags stay in the address while the reader moves around", asy
 for (const width of [1440, 390])
   test(`every tab's English text fits at ${width} px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 900 });
-    for (const name of runTabs) {
+    // The sample has no collaboration session, so that tab is intentionally hidden.
+    for (const name of runTabs.filter((name) => name !== "session")) {
       await page.goto(`/#/runs/demo-run/${name}?locale=en`);
       await expectTab(page, name);
       await page.waitForLoadState("networkidle");

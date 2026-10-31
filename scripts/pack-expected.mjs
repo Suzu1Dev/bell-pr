@@ -16,6 +16,8 @@ import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { parsePackReport } from "./npm-pack-report.mjs";
+
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const expectedPath = path.join(root, "scripts", "pack-expected.txt");
 
@@ -40,17 +42,12 @@ export function packFileList(cwd = root) {
     const detail = (result.stderr || result.stdout || "").trim().split(/\n/).slice(-12).join("\n");
     throw new SetupError(`npm pack --dry-run failed (status ${result.status})${detail ? `:\n${detail}` : "."}`);
   }
-  const stdout = result.stdout;
-  const start = stdout.indexOf("[");
-  const end = stdout.lastIndexOf("]");
-  let report;
+  let entry;
   try {
-    report = JSON.parse(stdout.slice(start, end + 1));
+    entry = parsePackReport(result.stdout);
   } catch {
     throw new SetupError("could not read the JSON report of `npm pack --dry-run --json`.");
   }
-  const entry = Array.isArray(report) ? report[0] : report;
-  if (!entry?.files) throw new SetupError("npm pack report has no files list.");
   return {
     files: entry.files.map((file) => file.path).sort(),
     size: entry.size,

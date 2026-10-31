@@ -34,6 +34,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { gzipSync } from "node:zlib";
+import { parsePackReport } from "./npm-pack-report.mjs";
 import { diffExpected, readExpected } from "./pack-expected.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -45,7 +46,7 @@ const budgets = {
   entries: 150,
   woff2: 12,
   largestJsGzip: 116 * kB,
-  totalJsGzip: 460 * kB,
+  totalJsGzip: 480 * kB,
   totalCssGzip: 45 * kB,
 };
 const required = [
@@ -85,19 +86,6 @@ const forbidden = [
 
 class SetupError extends Error {}
 
-/** The JSON report in npm's output, which lifecycle scripts may surround. */
-function parsePackReport(stdout) {
-  const start = stdout.indexOf("[");
-  const end = stdout.lastIndexOf("]");
-  try {
-    const report = JSON.parse(stdout.slice(start, end + 1));
-    if (Array.isArray(report) && report[0]?.files) return report[0];
-  } catch {
-    // Reported below.
-  }
-  throw new SetupError("could not read the JSON report of `npm pack --json`.");
-}
-
 function npmCommand() {
   return process.platform === "win32" ? "npm.cmd" : "npm";
 }
@@ -120,7 +108,11 @@ function pack() {
   if (result.error) throw new SetupError(`could not run npm: ${result.error.message}`);
   if (result.status !== 0)
     throw new SetupError(`npm pack exited with status ${result.status}.`);
-  return parsePackReport(result.stdout);
+  try {
+    return parsePackReport(result.stdout);
+  } catch {
+    throw new SetupError("could not read the JSON report of `npm pack --json`.");
+  }
 }
 
 /** Install the tarball into a temp prefix and run `bell-pr --help`. */

@@ -498,6 +498,11 @@ there, then publish again.
 
 ## Runs that wait, stop or cannot be reviewed
 
+Worktree identity checks resolve symbolic links in the data directory, including
+macOS temporary paths under `/var/folders`. Using the same directory through its
+physical path or a symbolic link keeps the recorded Git directory; a different
+checkout with a copied `.git` pointer is still refused.
+
 - **A run is queued**: only as many contributions execute at once as
   **Settings → Performance → Runs at a time** allows
   (`BELLPR_MAX_ACTIVE_RUNS`, 1 to 8, 2 by default). The others wait in the
