@@ -3,7 +3,7 @@
 // both agents' sandbox settings.
 import test, { type TestContext } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, realpath, rm, symlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -107,6 +107,36 @@ test("a fixture git config's store --file paths are denied, and a missing config
   });
   assert.ok(unreadable.includes("~/.git-credentials"));
   assert.ok(unreadable.includes("~/.netrc"));
+});
+
+test("a config directory under a symlinked parent is denied as given and at its physical path", { skip: process.platform === "win32" }, async (t) => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "bell-credential-link-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const physical = path.join(root, "physical");
+  const link = path.join(root, "link");
+  await mkdir(physical);
+  await symlink(physical, link, "dir");
+  const gh = path.join(link, "gh-config");
+  await mkdir(gh);
+  const xdg = path.join(link, "xdg");
+  await mkdir(xdg);
+  const denials = sharedCredentialDenials({
+    env: {
+      PATH: process.env.PATH,
+      HOME: path.join(root, "home"),
+      GIT_CONFIG_GLOBAL: path.join(root, "missing.gitconfig"),
+      GIT_CONFIG_NOSYSTEM: "1",
+      GH_CONFIG_DIR: gh,
+      XDG_CONFIG_HOME: xdg,
+    },
+    home: path.join(root, "home"),
+  });
+  const realGh = await realpath(gh);
+  assert.notEqual(realGh, gh);
+  assert.ok(denials.includes(`${gh}/**`), "given GH_CONFIG_DIR");
+  assert.ok(denials.includes(`${realGh}/**`), "physical GH_CONFIG_DIR");
+  assert.ok(denials.includes(`${path.join(xdg, "gh")}/**`), "given XDG gh");
+  assert.ok(denials.includes(`${path.join(await realpath(xdg), "gh")}/**`), "physical XDG gh");
 });
 
 test("Claude and Codex are given the same shared credential denials", async (t) => {
