@@ -195,15 +195,16 @@ a Docker build) and publishes nothing.
 ## Size limits
 
 Two files have a line cap, and `node scripts/check-pack.mjs` (run it after
-`npm run build`) holds the web bundle to gzip budgets. Do not raise a
-budget; make room instead.
+`npm run build`) holds the web bundle to gzip budgets. Make room before you
+raise a budget; when a raise cannot be avoided, give the reason in the
+commit message body.
 
 | What | Limit |
 | --- | --- |
 | `server/workbench.ts` | 700 lines |
 | `server/run-executor.ts` | 900 lines |
-| Largest JS chunk (the startup chunk) | 116 kB gzip |
-| All JS | 460 kB gzip |
+| Largest JS chunk | 116 kB gzip |
+| All JS, lazily loaded chunks included | 480 kB gzip |
 | All CSS | 45 kB gzip |
 
 How the code stays within them:

@@ -17,15 +17,20 @@
 //   - lacks a dist/ tree, or its bin is missing, not executable, or fails
 //     `bell-pr --help` after a temp-prefix install of the tarball.
 //
-// Raising a budget needs a reason in the commit message body.
+// Make room before you raise a budget; a raise needs a reason in the commit
+// message body.
 //
 // Gzip budgets for dist/assets (level 9). Measured for 1.0.0-beta.0: largest
 // JS chunk 80 kB (the app), all JS 270 kB, all CSS 31 kB. Measured for
 // 1.0.0-rc.1: largest JS chunk 97.8 kB (the startup chunk), all JS 350.0 kB
 // in 25 files, all CSS 38.6 kB. Measured for v1.1 after wave L2: largest
 // JS chunk 110.6 kB (the startup chunk), all JS 437.0 kB in 42 files, all
-// CSS 43.9 kB; the budget raise that v1.1 needed covers it. All JS counts
-// every lazy chunk, so moving code out of the startup chunk adds a little to it.
+// CSS 43.9 kB; the budget raise that v1.1 needed covers it. Measured for
+// 1.0.0 with Node.js 22.22.1: largest JS chunk 65.4 kB (zh-TW, which loads
+// only when zh-TW shows; the startup chunk is 65.1 kB), all JS 472.2 kB in
+// 52 files, all CSS 42.9 kB, 90 entries. CI's Node.js 24 gzips the same
+// files about 2 kB larger (all JS 474.2 kB). All JS counts every lazy
+// chunk, so moving code out of the startup chunk adds a little to it.
 //
 // Exit status: 0 within budget, 1 over budget, 2 on a setup error.
 import { spawnSync } from "node:child_process";
