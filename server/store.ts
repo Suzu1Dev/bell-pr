@@ -460,6 +460,7 @@ export const repositoryReadSchema = loose({
     defaultBranch: text,
     url: text,
     language: text.optional(),
+    originUserinfoIgnored: later(z.boolean()),
     updatedAt: text.optional(),
     contributionRules: later(contributionRulesSchema),
     debriefs: later(z.array(debriefSchema).max(5)),

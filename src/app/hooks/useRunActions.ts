@@ -672,7 +672,8 @@ export function useRunActions({
       closeModal();
       setExploreRepoId(repo.id);
       navigate("explore");
-      notify(t.imported({ name: repo.fullName }));
+      if (repo.originNotice) notify(repo.originNotice, "error");
+      else notify(t.imported({ name: repo.fullName }));
     } catch (error) {
       setFormError((error as Error).message);
     } finally {

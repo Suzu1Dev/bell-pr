@@ -3,6 +3,7 @@ import { z } from "zod";
 import { contributionSettingsSchema } from "../insights.js";
 import type { Repository } from "../types.js";
 import type { RouteDeps } from "./types.js";
+import { sm } from "../i18n/index.js";
 
 /**
  * Repositories: the list and import, updating BELL's own clone, project
@@ -18,6 +19,9 @@ export function registerReposRoutes(
   const presentRepo = ({ debriefs: _debriefs, ...repo }: Repository) => ({
     ...repo,
     updatable: workbench.managedClone(repo),
+    ...(repo.originUserinfoIgnored
+      ? { originNotice: sm().run.repos.originUserinfo }
+      : {}),
   });
   app.get("/api/repos", (_req, res) => {
     res.json({ repos: workbench.store.data.repos.map(presentRepo) });

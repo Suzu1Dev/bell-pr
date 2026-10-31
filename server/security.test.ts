@@ -25,6 +25,8 @@ import path from "node:path";
 import { fakeGitHub } from "../test/fake-github.js";
 import { createApp } from "./index.js";
 import { git } from "./process.js";
+import { recentLogLines } from "./log.js";
+import { sm } from "./i18n/index.js";
 import { readDiff, reviewFingerprint } from "./git.js";
 import { adoptLegacyCheckout, createRunWorktree } from "./repositories.js";
 import { publishChecks } from "./publish.js";
@@ -307,8 +309,9 @@ test("a local import is cloned, so runs never add worktrees or branches to the p
   assert.equal(cloned.url, "https://github.com/test-owner/example");
   assert.equal(cloned.fullName, "test-owner/example");
   assert.equal(workbench.managedClone(cloned), true);
+  // The URL stored on the clone. `remote get-url` applies insteadOf.
   assert.equal(
-    (await git(cloned.path, ["remote", "get-url", "origin"])).stdout.trim(),
+    (await git(cloned.path, ["config", "--local", "--get", "remote.origin.url"])).stdout.trim(),
     "https://github.com/test-owner/example.git",
   );
   assert.deepEqual(await repositoryState(github), githubBefore);
@@ -326,6 +329,86 @@ test("a local import is cloned, so runs never add worktrees or branches to the p
     url: "",
   });
   assert.equal((await workbench.importRepository(legacy)).id, "legacy");
+});
+
+test("a global insteadOf rewrite does not hide a GitHub origin on a local import", async (t) => {
+  const directory = await realpath(await mkdtemp(path.join(os.tmpdir(), "bell-security-insteadof-")));
+  const global = path.join(directory, "global.gitconfig");
+  await writeFile(
+    global,
+    '[url "https://user:password@github.com/"]\n\tinsteadOf = https://github.com/\n',
+  );
+  const previous = process.env.GIT_CONFIG_GLOBAL;
+  process.env.GIT_CONFIG_GLOBAL = global;
+  const store = new Store(path.join(directory, "state"));
+  await store.initialize();
+  const workbench = new Workbench(store);
+  t.after(async () => {
+    if (previous === undefined) delete process.env.GIT_CONFIG_GLOBAL;
+    else process.env.GIT_CONFIG_GLOBAL = previous;
+    await workbench.shutdown();
+    await rm(directory, { recursive: true, force: true });
+  });
+  const checkout = path.join(directory, "checkout");
+  await repository(checkout, { "lib.ts": "lib\n" });
+  await git(checkout, ["remote", "add", "origin", "https://github.com/test-owner/example.git"]);
+  const repo = await workbench.importRepository(checkout);
+  assert.equal(repo.url, "https://github.com/test-owner/example");
+  assert.equal(repo.fullName, "test-owner/example");
+  assert.equal(workbench.managedClone(repo), true);
+  assert.equal(
+    (await git(repo.path, ["config", "--local", "--get", "remote.origin.url"])).stdout.trim(),
+    "https://github.com/test-owner/example.git",
+  );
+});
+
+test("an origin with userinfo is imported as local, and the message leaves that userinfo out", async (t) => {
+  const marker = "synthetic-userinfo-marker";
+  const directory = await realpath(await mkdtemp(path.join(os.tmpdir(), "bell-security-userinfo-")));
+  const store = new Store(path.join(directory, "state"));
+  await store.initialize();
+  const workbench = new Workbench(store);
+  t.after(async () => {
+    await workbench.shutdown();
+    await rm(directory, { recursive: true, force: true });
+  });
+  const checkout = path.join(directory, "checkout");
+  await repository(checkout, { "lib.ts": "lib\n" });
+  await git(checkout, [
+    "remote",
+    "add",
+    "origin",
+    `https://${marker}@github.com/test-owner/example.git`,
+  ]);
+  const repo = await withLocale("en", () => workbench.importRepository(checkout));
+  const message = withLocale("en", () => sm().run.repos.originUserinfo);
+  const zh = withLocale("zh-TW", () => sm().run.repos.originUserinfo);
+  assert.equal(repo.url, "");
+  assert.equal(repo.owner, "local");
+  assert.equal(repo.originUserinfoIgnored, true);
+  assert.equal(workbench.managedClone(repo), false);
+  const command = "git remote set-url origin https://github.com/OWNER/REPO";
+  const helperLine = "Use a credential helper for authentication; don't put a GitHub token in .git/config.";
+  assert.match(message, /embedded credentials or userinfo/);
+  assert.match(message, /not used as a GitHub source/);
+  assert.match(message, /treated as a local project/);
+  assert.ok(message.includes(command));
+  assert.ok(message.includes(helperLine));
+  assert.match(zh, /使用者資訊/);
+  assert.ok(zh.includes(command));
+  assert.match(zh, /驗證請使用 credential helper，不要把 GitHub token 寫進 \.git\/config。/);
+  const logs = (await recentLogLines(store.directory)).join("\n");
+  assert.match(logs, /repo\.origin_userinfo/);
+  const returned = JSON.stringify({
+    repo,
+    message,
+    zh,
+    originNotice: message,
+    saved: await readFile(path.join(store.directory, "state.json"), "utf8"),
+    cloneConfig: await readFile(path.join(repo.path, ".git", "config"), "utf8"),
+    logs,
+  });
+  assert.equal(returned.includes(marker), false);
 });
 
 test("a project an earlier build worked on in place moves to a clone once none of its runs works there", async (t) => {
