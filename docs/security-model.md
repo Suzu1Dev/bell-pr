@@ -278,9 +278,10 @@ The sudo panel and the doctor warning for that file show:
   directory (`gitDir` on the run, and on a teammate task). Every later git
   command for that checkout passes that path as `--git-dir` and the
   checkout as `--work-tree`. The checkout's `.git` file is not read.
-  Finding that directory again follows symbolic links above the checkout
-  (such as macOS `/var`), but not the checkout's `.git` entry, so a `.git`
-  replaced with a link to another run's cannot take that run's directory.
+  Finding that directory again resolves symbolic links in the checkout and
+  the directories above it (such as macOS `/var`), but never follows the
+  checkout's own `.git` entry, so a `.git` replaced with a link to another
+  run's cannot take that run's directory.
   A checkout under `worktrees/` or `team-worktrees/` with no recorded git
   directory is refused (`worktreeForged`). With Claude Code's sandbox
   on, writes to `<checkout>/.git` and `<checkout>/.git/**` are denied, so

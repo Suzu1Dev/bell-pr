@@ -38,16 +38,6 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   anyway and prints a warning, which is how the sample tour opens when no
   AI provider is signed in. A real agent run is still refused until one is.
 
-### Security
-
-- Finding a run checkout's Git directory no longer follows the checkout's
-  own `.git` entry, so a `.git` replaced with a symbolic link to another
-  run's cannot take that run's Git directory. Links above the checkout,
-  such as macOS `/var`, are still resolved. Credential paths that
-  `GH_CONFIG_DIR`, `XDG_CONFIG_HOME`, `CLAUDE_CONFIG_DIR` or `CODEX_HOME`
-  move into a directory that does not exist yet are denied at their
-  physical path too.
-
 ### Added
 
 - Pathname `/pair` page with QR-code prefill, header-only device credentials, and Devices settings for revocation.
@@ -663,6 +653,15 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   Unicode code points instead of UTF-16 units, so most emoji count once.
   Files that earlier builds saved load as before, and saved files are read
   as leniently as before.
+- **Symbolic links in the data directory and moved config directories.**
+  When the data directory is reached through a symbolic link (macOS `/var`
+  is `/private/var`), run and teammate checkouts keep the Git directory
+  BELL PR recorded for them instead of being refused (`worktreeForged`).
+  The lookup resolves the checkout and the directories above it, never the
+  checkout's own `.git` entry. The credential paths that `GH_CONFIG_DIR`,
+  `XDG_CONFIG_HOME`, `CLAUDE_CONFIG_DIR` or `CODEX_HOME` move are denied
+  both as given and at their physical path, also before that directory
+  exists.
 
 ## [1.0.0] - 【暫定】
 
