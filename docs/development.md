@@ -105,7 +105,7 @@ most of them on Linux and macOS with Node.js 22 and 24.
 | `node scripts/tokenize-css.mjs --check` | The CSS uses the design tokens |
 | `node scripts/generate-third-party-notices.mjs --check` | The third-party notices are current |
 | `node scripts/audit.mjs` | No high or critical advisories outside the allowlist |
-| `node scripts/check-pack.mjs` (and `--tarball <file>`) | The package's size, contents and bundle budgets; `--tarball` checks a packed tarball as it is, including that its README has no relative link left |
+| `node scripts/check-pack.mjs` (and `--tarball <file>`) | The package's size, contents and bundle budgets; `--tarball` checks a packed tarball as it is, including that no README in it has a relative link left |
 
 Most scripts also have a `--self-test`.
 
@@ -166,16 +166,19 @@ npm pack
 ```
 
 `prepack` builds the product and runs `node scripts/npm-readme.mjs --pre`,
-which readies `README.md` for npmjs.com. The package does not contain
-`docs/`, so a relative screenshot or link becomes an absolute URL under
-`homepageUrl` from `shared/product.ts` when the website (`site/`) holds a
-byte-identical copy of the file. Everything else, and everything while
-`homepageUrl` is empty, becomes plain text.
-npm packs every `README.*` at the root and takes the first one it finds as
-the package's README, so `README.zh-TW.md` is set aside during the pack.
-The originals wait in the folder `.README.md.orig` (gitignored) and
-`postpack` puts them back byte for byte. If a pack stops halfway, run
-`node scripts/npm-readme.mjs --post` before you pack again.
+which readies `README.md` and `README.zh-TW.md` for npmjs.com. The package
+does not contain `docs/`, so a relative screenshot or link becomes an
+absolute URL under `homepageUrl` from `shared/product.ts` when the website
+(`site/`) holds a byte-identical copy of the file. Everything else, and
+everything while `homepageUrl` is empty, becomes plain text (`截圖：` marks
+a screenshot in the Chinese README).
+npm packs every `README.*` at the root, and `npm publish` takes the first
+Markdown one its file search returns as the package's README. That order is
+not fixed, and npmjs.com shows `README.zh-TW.md` for bell-pr 1.0.0, so both
+READMEs the package ships are readied. Any other root `README.*` is set
+aside during the pack. The originals wait in the folder `.README.md.orig`
+(gitignored) and `postpack` puts them back byte for byte. If a pack stops
+halfway, run `node scripts/npm-readme.mjs --post` before you pack again.
 
 Official releases are published only by `.github/workflows/release.yml`,
 from a pushed `v*` tag that names the version in `package.json`; never run

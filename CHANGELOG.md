@@ -641,18 +641,21 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   and on its own only while the AI-assistance note is on for all drafts.
   Projects that do not ask get no trailer, and a message you wrote is kept.
 
-- **The npm package keeps the README written for npmjs.com.** The package
+- **The npm package keeps the READMEs written for npmjs.com.** The package
   check in CI and in the release workflow packed the package again without
   `prepack`, over the tarball the workflow had just made, so a release would
   have checksummed, uploaded and published a package whose README still had
-  links and screenshots npmjs.com cannot show. `node scripts/check-pack.mjs`
-  now packs into a temporary folder that it removes, and with `--tarball`
-  checks the tarball that CI and the release workflow packed, as it is,
-  including that its README has no relative link or image left. A release
-  now publishes only from a pushed `v*` tag that matches `package.json`;
-  started by hand, the release workflow only runs its dry run. The Docker
-  image is pushed only after npm publish succeeded, and the GitHub release
-  is created on the commit that was built.
+  links and screenshots npmjs.com cannot show. And `npm publish` may take
+  either README as the package's (npmjs.com shows the Chinese one for
+  1.0.0, with links into `docs/` that do not work there), while prepack
+  readied only `README.md`; it now readies `README.zh-TW.md` the same way.
+  `node scripts/check-pack.mjs` now packs into a temporary folder that it
+  removes, and with `--tarball` checks the tarball that CI and the release
+  workflow packed, as it is, including that no README in it has a relative
+  link or image left. A release now publishes only from a pushed `v*` tag
+  that matches `package.json`; started by hand, the release workflow only
+  runs its dry run. The Docker image is pushed only after npm publish
+  succeeded, and the GitHub release is created on the commit that was built.
 
 ### Security
 

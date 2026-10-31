@@ -21,9 +21,11 @@
 //   - ships web bundles over the gzip budgets below;
 //   - lacks a dist/ tree, or its bin is missing, not executable, or fails
 //     `bell-pr --help` after a temp-prefix install of the tarball;
-//   - with --tarball only: ships a README.md that still has a relative link
-//     or image, which npmjs.com cannot show, because prepack's
-//     `node scripts/npm-readme.mjs --pre` did not rewrite it.
+//   - with --tarball only: ships a root README (README.md, README.zh-TW.md
+//     or any other README.*) that still has a relative link or image, which
+//     npmjs.com cannot show, because prepack's
+//     `node scripts/npm-readme.mjs --pre` did not rewrite it. `npm publish`
+//     may take any of them as the package's README.
 //
 // Make room before you raise a budget; a raise needs a reason in the commit
 // message body.
@@ -50,7 +52,7 @@ import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import { gzipSync } from "node:zlib";
 import { parsePackReport, tarballReport } from "./npm-pack-report.mjs";
-import { relativeReferencesLeft } from "./npm-readme.mjs";
+import { isReadme, packageReadmeProblems } from "./npm-readme.mjs";
 import { diffExpected, readExpected } from "./pack-expected.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -214,7 +216,7 @@ function installAndRunHelp(tarball) {
 const formatBytes = (bytes) =>
   bytes >= MB ? `${(bytes / MB).toFixed(2)} MB` : `${(bytes / kB).toFixed(1)} kB`;
 
-/** Every check of the tarball; `readme` adds the README.md check. */
+/** Every check of the tarball; `readme` adds the check of its READMEs. */
 function check(tarball, { readme }) {
   let report;
   try {
@@ -271,16 +273,9 @@ function check(tarball, { readme }) {
     problems.push(error instanceof Error ? error.message : String(error));
   }
 
-  const packedReadme = report.contents.get("README.md");
-  if (readme && packedReadme) {
-    const left = relativeReferencesLeft(packedReadme.toString("utf8"));
-    if (left.length)
-      problems.push(
-        "README.md is not the one prepack (`node scripts/npm-readme.mjs --pre`) writes for npmjs.com; pack with a plain `npm pack`.",
-        ...left.slice(0, 5).map((problem) => `README.md: ${problem}`),
-      );
-    if (left.length > 5) problems.push(`README.md: ${left.length - 5} more like these.`);
-  }
+  // npm publish may take any root README as the package's, so all of them.
+  const readmes = files.filter(isReadme).sort();
+  if (readme) problems.push(...packageReadmeProblems(report.contents));
 
   // Budget/forbidden findings still fail the check; still run the install smoke
   // so a single report lists every problem.
@@ -291,7 +286,7 @@ function check(tarball, { readme }) {
     return 1;
   }
   console.error(
-    `check-pack: the package is within every budget; dist/ present; packed bin runs --help${readme ? "; README.md is ready for npmjs.com" : ""}.`,
+    `check-pack: the package is within every budget; dist/ present; packed bin runs --help${readme ? `; ${readmes.join(", ")} ready for npmjs.com` : ""}.`,
   );
   return 0;
 }
@@ -303,8 +298,8 @@ function main(args) {
   const destination = mkdtempSync(path.join(os.tmpdir(), "bell-pr-check-pack-"));
   try {
     const report = pack(destination);
-    // --ignore-scripts skipped prepack, so this README.md is the repository's
-    // own, relative links and all: only --tarball checks the README.
+    // --ignore-scripts skipped prepack, so these READMEs are the repository's
+    // own, relative links and all: only --tarball checks the READMEs.
     return check(path.join(destination, report.filename), { readme: false });
   } finally {
     rmSync(destination, { recursive: true, force: true });
