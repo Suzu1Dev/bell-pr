@@ -10,6 +10,7 @@ import {
   agentEventReader,
   agentLoginCheck,
   applyReportedModel,
+  claudeSettings,
   codexAccessMode,
   codexSandboxConfig,
   retryTransientAuth,
@@ -46,15 +47,43 @@ async function withSandboxTools(t: TestContext) {
 /** The parsed --settings value of a Claude Code command. */
 const settingsOf = (args: string[]) =>
   JSON.parse(args[args.indexOf("--settings") + 1]) as {
+    disableAllHooks?: boolean;
+    autoMemoryEnabled?: boolean;
+    env?: Record<string, string>;
+    outputStyle?: string;
+    language?: string;
+    claudeMdExcludes?: string[];
     permissions: { deny: string[]; blockReadsOutsideWorkingDirectories?: boolean };
     sandbox?: {
       enabled: boolean;
       failIfUnavailable: boolean;
       allowUnsandboxedCommands: boolean;
-      filesystem: { denyRead: string[]; allowRead: string[] };
-      network: { allowedDomains: string[]; strictAllowlist: boolean };
+      enableWeakerNestedSandbox?: boolean;
+      enableWeakerNetworkIsolation?: boolean;
+      allowAppleEvents?: boolean;
+      filesystem: { denyRead: string[]; allowRead: string[]; disabled?: boolean };
+      network: {
+        allowedDomains: string[];
+        strictAllowlist: boolean;
+        allowAllUnixSockets?: boolean;
+        allowLocalBinding?: boolean;
+      };
     };
   };
+
+/**
+ * What every Claude turn switches off in the user's settings: hooks (they run
+ * outside the sandbox), auto memory (kept under ~/.claude/projects/ across
+ * runs), and the user's own instructions, output style and language.
+ */
+function assertUserCustomizationsOff(settings: ReturnType<typeof settingsOf>) {
+  assert.equal(settings.disableAllHooks, true);
+  assert.equal(settings.autoMemoryEnabled, false);
+  assert.deepEqual(settings.env, { CLAUDE_CODE_DISABLE_AUTO_MEMORY: "1" });
+  assert.equal(settings.outputStyle, "default");
+  assert.equal(settings.language, "");
+  assert.equal(settings.claudeMdExcludes?.length, 2);
+}
 
 const credentialDenials = [
   "Read(~/.config/gh/**)",
@@ -303,6 +332,7 @@ test("Claude Code arguments map access levels, inline the schema and keep MCP co
     const settings = settingsOf(command.args);
     for (const rule of credentialDenials)
       assert.ok(settings.permissions.deny.includes(rule), rule);
+    assertUserCustomizationsOff(settings);
   }
   assert.equal(settingsOf(none.args).sandbox, undefined);
   assert.equal(settingsOf(read.args).sandbox, undefined);
@@ -316,8 +346,19 @@ test("Claude Code arguments map access levels, inline the schema and keep MCP co
     failIfUnavailable: true,
     autoAllowBashIfSandboxed: true,
     allowUnsandboxedCommands: false,
-    network: { allowedDomains: [], strictAllowlist: true },
+    // A single value wins over the user's settings, so those that would
+    // weaken the sandbox are set back to their defaults.
+    enableWeakerNestedSandbox: false,
+    enableWeakerNetworkIsolation: false,
+    allowAppleEvents: false,
+    network: {
+      allowedDomains: [],
+      strictAllowlist: true,
+      allowAllUnixSockets: false,
+      allowLocalBinding: false,
+    },
   });
+  assert.equal(filesystem.disabled, false);
   // Outside BELL's data directory, sandboxed commands may read none of it.
   assert.ok(filesystem.denyRead.length > 0);
   assert.deepEqual(filesystem.allowRead, []);
@@ -336,6 +377,51 @@ test("Claude Code arguments map access levels, inline the schema and keep MCP co
     executable: "claude",
     args: ["auth", "status"],
   });
+});
+
+test("Claude turns leave out the user's CLAUDE.md and rules where CLAUDE_CONFIG_DIR puts them", async (t) => {
+  const previous = process.env.CLAUDE_CONFIG_DIR;
+  t.after(() => {
+    if (previous === undefined) delete process.env.CLAUDE_CONFIG_DIR;
+    else process.env.CLAUDE_CONFIG_DIR = previous;
+  });
+  const claude = { provider: "claude" as const, source: "cli-default" as const };
+  process.env.CLAUDE_CONFIG_DIR = "/config/claude";
+  const moved = await agentCommand(claude, { cwd: "/work/tree", access: "none" });
+  assert.deepEqual(settingsOf(moved.args).claudeMdExcludes, [
+    path.join(path.resolve("/config/claude"), "CLAUDE.md"),
+    path.join(path.resolve("/config/claude"), "rules", "**"),
+  ]);
+  delete process.env.CLAUDE_CONFIG_DIR;
+  const home = path.join(os.homedir(), ".claude");
+  const standard = await agentCommand(claude, { cwd: "/work/tree", access: "none" });
+  assert.deepEqual(settingsOf(standard.args).claudeMdExcludes, [
+    path.join(home, "CLAUDE.md"),
+    path.join(home, "rules", "**"),
+  ]);
+});
+
+test("Claude settings hold no empty value and leave sandbox.ripgrep to Claude Code", () => {
+  // Claude Code 2.1.292 ignores all of --settings, without a message, when
+  // one value fails its schema; `sandbox.ripgrep: null` was tried.
+  const empty = (value: unknown, where: string): string[] =>
+    value === null || value === undefined
+      ? [where]
+      : typeof value === "object"
+        ? Object.entries(value).flatMap(([key, item]) => empty(item, `${where}.${key}`))
+        : [];
+  for (const access of ["none", "read", "write"] as const)
+    for (const [sandbox, full] of [
+      [true, false],
+      [false, false],
+      [false, true],
+    ] as const) {
+      const settings = claudeSettings({ cwd: "/work/tree", access, sandbox, full });
+      assert.deepEqual(empty(settings, "settings"), [], `${access} ${sandbox} ${full}`);
+      // Any value BELL could write would replace Claude Code's own ripgrep,
+      // which the sandbox uses to keep files such as .bashrc read-only.
+      assert.ok(!("ripgrep" in (settings.sandbox ?? {})));
+    }
 });
 
 test("teammates combine write access with an output schema on both providers", async (t) => {
@@ -1263,9 +1349,12 @@ test("explicit full access affects write turns only and retains isolation from r
   assert.ok(write.args.includes("--strict-mcp-config"));
   assert.equal(write.args[write.args.indexOf("--setting-sources") + 1], "user");
   assert.ok(!write.args.includes("--disallowedTools"));
+  // Without the sandbox, the user's hooks and auto memory stay off all the same.
+  assertUserCustomizationsOff(settingsOf(write.args));
   for (const access of ["read", "none"] as const) {
     const read = await agentCommand(execution, { cwd: "/work/tree", access, full: true });
     assert.equal(read.args[read.args.indexOf("--permission-mode") + 1], "dontAsk");
+    assertUserCustomizationsOff(settingsOf(read.args));
     assert.equal(settingsOf(read.args).permissions.blockReadsOutsideWorkingDirectories, true);
     assert.equal(read.unsandboxed, undefined);
     const codex = await agentCommand({ ...execution, provider: "codex" }, { cwd: "/work/tree", access });

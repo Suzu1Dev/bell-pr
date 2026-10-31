@@ -534,6 +534,13 @@ test("the sandbox canary's fake mode checks the harness without a model call", (
     report.results[0].argv.sandboxDeniesDataDirectory && report.results[0].argv.sandboxOpensCheckout,
   );
   assert.ok(report.results[3].argv.ignoresRules && report.results[3].argv.ignoresProjectDocs);
+  for (const result of report.results.slice(0, 3)) {
+    const { hooksDisabled, autoMemoryOff, userInstructionsExcluded, sandboxNotWeakened } =
+      result.argv;
+    assert.ok(hooksDisabled && autoMemoryOff && userInstructionsExcluded, JSON.stringify(result.argv));
+    assert.equal(sandboxNotWeakened, true);
+    assert.equal(result.autoMemory, false);
+  }
   // Without the hardening flags the stand-ins behave unsandboxed, and the canary fails.
   const stripped = run(["--fake", "--fake-strip"]);
   assert.equal(stripped.status, 1, stripped.stderr);
@@ -544,6 +551,12 @@ test("the sandbox canary's fake mode checks the harness without a model call", (
     failed.results
       .filter((result: { provider: string }) => result.provider === "codex")
       .every((result: { instructionsIgnored: boolean }) => !result.instructionsIgnored),
+  );
+  // Without --settings, the stand-in reports an auto-memory folder as Claude Code would.
+  assert.ok(
+    failed.results
+      .filter((result: { provider: string }) => result.provider === "claude")
+      .every((result: { autoMemory: boolean }) => result.autoMemory === true),
   );
   // Never a real model call by accident: one mode must be chosen.
   assert.equal(run([]).status, 2);

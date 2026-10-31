@@ -689,6 +689,28 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `XDG_CONFIG_HOME`, `CLAUDE_CONFIG_DIR` or `CODEX_HOME` move are denied
   both as given and at their physical path, also before that directory
   exists.
+- **Your Claude Code hooks no longer run in BELL PR's agent turns, and auto
+  memory is off.** Hooks from your user settings and plugins ran outside the
+  sandbox during every Claude turn, and auto memory kept notes about imported
+  projects in `~/.claude/projects/` from one run to the next. Each turn now
+  also leaves out your own `CLAUDE.md`, rules, output style and language
+  setting, so BELL PR's prompt sets the instructions and the output language.
+  Your sign-in, `env` and default model still apply. BELL PR does not delete
+  notes that earlier versions let Claude Code save; Privacy and your data
+  says where to find them. In sandboxed turns, single sandbox values in your
+  user settings that would weaken the sandbox, such as
+  `sandbox.filesystem.disabled`, `sandbox.enableWeakerNestedSandbox` and
+  `sandbox.network.allowAllUnixSockets`, are set back to their defaults. The
+  security model lists the user settings that still widen what agents may
+  do, such as `permissions.additionalDirectories`,
+  `sandbox.excludedCommands` and your own proxy in
+  `sandbox.network.httpProxyPort`. Your plugins' language servers and a
+  `sandbox.ripgrep` command in your user settings still run outside the
+  sandbox when a writable role works; disable plugins that bring language
+  servers on a computer that runs BELL PR. The sandbox canary checks that
+  hooks and auto memory stay off and that those sandbox values are set
+  back, and its `--decoy-home` links only Claude Code's login file instead
+  of your whole `~/.claude`.
 
 ## [1.0.0] - 【暫定】
 
