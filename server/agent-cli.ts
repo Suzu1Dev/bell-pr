@@ -169,9 +169,14 @@ function claudeUserMemoryFiles(): string[] {
  *
  * The user's own settings still load (`--setting-sources user`), so sign-in
  * through `env`, `apiKeyHelper` or a cloud provider keeps working. A single
- * value given here wins over the user's; lists and `env` merge with theirs
- * (docs/security-model.md names what that leaves). So every turn also turns
- * off what would run or persist outside BELL's control: hooks, which run
+ * value given here wins over the user's; lists, `env` and the proxy ports
+ * BELL cannot unset stay theirs (docs/security-model.md names what that
+ * leaves). A sandboxed turn therefore sets each single value that would
+ * weaken the sandbox back to its default: filesystem isolation stays on
+ * (`filesystem.disabled`), /proc is fresh (`enableWeakerNestedSandbox`),
+ * Unix sockets stay blocked (`allowAllUnixSockets`), and on macOS there is
+ * no local port binding, trustd access or Apple Events. Every turn also
+ * turns off what would run or persist outside BELL's control: hooks, which run
  * outside the sandbox (`disableAllHooks`; managed hooks still run), and auto
  * memory under ~/.claude/projects/, also when the user's `env` forces it on
  * (`autoMemoryEnabled`, `CLAUDE_CODE_DISABLE_AUTO_MEMORY`). Besides managed
@@ -184,7 +189,9 @@ function claudeUserMemoryFiles(): string[] {
  * `sandbox.filesystem.denyRead` and `allowRead` are in the schema since
  * 2.1.114 at the latest, and both apply on Linux and macOS. The top-level
  * keys, and that each wins over the user's settings, were verified with
- * 2.1.292 against a local stand-in for the API. Supported range:
+ * 2.1.292 against a local stand-in for the API; so were the Linux sandbox
+ * values above, through the arguments the CLI passed to bwrap (the macOS
+ * ones only against the schema). Supported range:
  * Claude Code >= 2.1.292 and < 2.2; scripts/agent-sandbox-canary.mjs must
  * pass on a release before the range is widened.
  */
@@ -206,8 +213,19 @@ export function claudeSettings(options: {
     failIfUnavailable?: boolean;
     autoAllowBashIfSandboxed?: boolean;
     allowUnsandboxedCommands?: boolean;
-    filesystem?: ReturnType<typeof agentSandboxReadPaths> & { denyWrite?: string[] };
-    network?: { allowedDomains: string[]; strictAllowlist: boolean };
+    enableWeakerNestedSandbox?: false;
+    enableWeakerNetworkIsolation?: false;
+    allowAppleEvents?: false;
+    filesystem?: ReturnType<typeof agentSandboxReadPaths> & {
+      denyWrite?: string[];
+      disabled?: false;
+    };
+    network?: {
+      allowedDomains: string[];
+      strictAllowlist: boolean;
+      allowAllUnixSockets?: false;
+      allowLocalBinding?: false;
+    };
   };
 } {
   return {
@@ -230,11 +248,20 @@ export function claudeSettings(options: {
             failIfUnavailable: true,
             autoAllowBashIfSandboxed: true,
             allowUnsandboxedCommands: false,
+            enableWeakerNestedSandbox: false,
+            enableWeakerNetworkIsolation: false,
+            allowAppleEvents: false,
             filesystem: {
               ...agentSandboxReadPaths(options.cwd),
               denyWrite: agentGitWriteDenials(options.cwd),
+              disabled: false,
             },
-            network: { allowedDomains: [], strictAllowlist: true },
+            network: {
+              allowedDomains: [],
+              strictAllowlist: true,
+              allowAllUnixSockets: false,
+              allowLocalBinding: false,
+            },
           },
         }
       : options.full

@@ -55,8 +55,16 @@ const settingsOf = (args: string[]) =>
       enabled: boolean;
       failIfUnavailable: boolean;
       allowUnsandboxedCommands: boolean;
-      filesystem: { denyRead: string[]; allowRead: string[] };
-      network: { allowedDomains: string[]; strictAllowlist: boolean };
+      enableWeakerNestedSandbox?: boolean;
+      enableWeakerNetworkIsolation?: boolean;
+      allowAppleEvents?: boolean;
+      filesystem: { denyRead: string[]; allowRead: string[]; disabled?: boolean };
+      network: {
+        allowedDomains: string[];
+        strictAllowlist: boolean;
+        allowAllUnixSockets?: boolean;
+        allowLocalBinding?: boolean;
+      };
     };
   };
 
@@ -229,8 +237,19 @@ test("Claude Code arguments map access levels, inline the schema and keep MCP co
     failIfUnavailable: true,
     autoAllowBashIfSandboxed: true,
     allowUnsandboxedCommands: false,
-    network: { allowedDomains: [], strictAllowlist: true },
+    // A single value wins over the user's settings, so those that would
+    // weaken the sandbox are set back to their defaults.
+    enableWeakerNestedSandbox: false,
+    enableWeakerNetworkIsolation: false,
+    allowAppleEvents: false,
+    network: {
+      allowedDomains: [],
+      strictAllowlist: true,
+      allowAllUnixSockets: false,
+      allowLocalBinding: false,
+    },
   });
+  assert.equal(filesystem.disabled, false);
   // Outside BELL's data directory, sandboxed commands may read none of it.
   assert.ok(filesystem.denyRead.length > 0);
   assert.deepEqual(filesystem.allowRead, []);

@@ -40,9 +40,11 @@
  *     ~/.codex (unless set), and the decoy's ~/.claude links only the real
  *     login file, .credentials.json (a refreshed sign-in is copied back at
  *     the end). Its settings.json holds user hooks that leave a file when
- *     they run (reported as userHooksRan) and its CLAUDE.md says "reply
- *     CANARY". Use it on Linux, where Claude Code keeps its login in that
- *     file, or with an API key or cloud provider in the environment; a
+ *     they run (reported as userHooksRan) and sandbox values that would
+ *     switch off filesystem isolation (a leaked marker shows BELL PR did not
+ *     set them back), and its CLAUDE.md says "reply CANARY". Use it on
+ *     Linux, where Claude Code keeps its login in that file, or with an
+ *     API key or cloud provider in the environment; a
  *     sign-in that depends on the real user settings (apiKeyHelper, env)
  *     needs a run without --decoy-home. Codex is given the shared
  *     read-deny profile; this canary does not prove that a live Codex
@@ -318,6 +320,14 @@ function argvChecks(provider, args, dataDirectory, checkout) {
     sandboxEnabled: settings.sandbox?.enabled === true,
     noUnsandboxedCommands: settings.sandbox?.allowUnsandboxedCommands === false,
     networkClosed: settings.sandbox?.network?.strictAllowlist === true,
+    // Single values in the user's settings that would weaken the sandbox are set back.
+    sandboxNotWeakened:
+      settings.sandbox?.filesystem?.disabled === false &&
+      settings.sandbox?.enableWeakerNestedSandbox === false &&
+      settings.sandbox?.enableWeakerNetworkIsolation === false &&
+      settings.sandbox?.allowAppleEvents === false &&
+      settings.sandbox?.network?.allowAllUnixSockets === false &&
+      settings.sandbox?.network?.allowLocalBinding === false,
     deniesCredentials: [
       "Read(~/.config/gh/**)",
       "Read(~/.git-credentials)",
@@ -358,8 +368,10 @@ async function decoyHome(base) {
     mode: 0o600,
   });
   // Claude Code gets a decoy config directory: user settings whose hooks
-  // leave a file when they run, and a user CLAUDE.md that says "reply
-  // CANARY", so the report shows whether either reached the agent. Only the
+  // leave a file when they run and whose sandbox values would switch off
+  // filesystem isolation (the attempts then read the markers), the fresh
+  // /proc and the Unix socket block, and a user CLAUDE.md that says "reply
+  // CANARY", so the report shows whether they reached the agent. Only the
   // login file is linked from the real directory, where Claude Code keeps
   // the claude.ai sign-in on Linux; API keys and cloud providers come from
   // the environment. The real transcripts, memory and settings stay out of
@@ -372,7 +384,14 @@ async function decoyHome(base) {
   ];
   await writeFile(
     path.join(claude, "settings.json"),
-    JSON.stringify({ hooks: { SessionStart: hook, UserPromptSubmit: hook, PreToolUse: hook } }),
+    JSON.stringify({
+      hooks: { SessionStart: hook, UserPromptSubmit: hook, PreToolUse: hook },
+      sandbox: {
+        filesystem: { disabled: true },
+        enableWeakerNestedSandbox: true,
+        network: { allowAllUnixSockets: true },
+      },
+    }),
     { mode: 0o600 },
   );
   await writeFile(path.join(claude, "CLAUDE.md"), instructionsFile);

@@ -527,8 +527,10 @@ test("the sandbox canary's fake mode checks the harness without a model call", (
   );
   assert.ok(report.results[3].argv.ignoresRules && report.results[3].argv.ignoresProjectDocs);
   for (const result of report.results.slice(0, 3)) {
-    const { hooksDisabled, autoMemoryOff, userInstructionsExcluded } = result.argv;
+    const { hooksDisabled, autoMemoryOff, userInstructionsExcluded, sandboxNotWeakened } =
+      result.argv;
     assert.ok(hooksDisabled && autoMemoryOff && userInstructionsExcluded, JSON.stringify(result.argv));
+    assert.equal(sandboxNotWeakened, true);
     assert.equal(result.autoMemory, false);
   }
   // Without the hardening flags the stand-ins behave unsandboxed, and the canary fails.

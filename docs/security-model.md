@@ -135,9 +135,22 @@ Your plugins' MCP servers stay off (`--strict-mcp-config`), and a turn's
 tool list has no tool that starts a skill or a subagent. BELL PR does not
 switch off the other parts of the plugins you enabled.
 
-Lists and `env` merge with yours instead of being replaced, so these user
-settings still apply in BELL PR's turns and widen what agents may do
-beyond the limits below:
+In writable roles that run in the sandbox, BELL PR also passes the default
+for each single sandbox value that would weaken the sandbox, so yours does
+not apply: `sandbox.filesystem.disabled` (which makes the whole computer
+writable for commands and drops their read denials),
+`enableWeakerNestedSandbox` (the computer's own `/proc` stays visible),
+`network.allowAllUnixSockets` (Unix sockets such as Docker's or an SSH
+agent's become reachable), and on macOS `network.allowLocalBinding`,
+`enableWeakerNetworkIsolation` and `allowAppleEvents`. In a container where
+Claude Code's sandbox starts only with `enableWeakerNestedSandbox`, the
+commands of BELL PR's writable Claude roles therefore fail; the options in
+[Agent sandbox in Docker](docker.md#agent-sandbox-in-docker) let it mount a
+fresh `/proc`.
+
+Lists and `env` merge with yours instead of being replaced, and BELL PR
+cannot unset a proxy port you set, so these user settings still apply in
+BELL PR's turns and widen what agents may do beyond the limits below:
 
 - `permissions.additionalDirectories` adds working directories. Read-only
   roles can read them (they count for
@@ -149,6 +162,12 @@ beyond the limits below:
   sandboxed commands.
 - `sandbox.filesystem.allowWrite` and `allowRead`, and
   `sandbox.network.allowedDomains`, widen the sandbox of writable roles.
+- `sandbox.network.httpProxyPort` and `socksProxyPort` send the traffic of
+  sandboxed commands to your own proxy instead of the filtering proxy
+  Claude Code runs. Your proxy then decides which hosts they reach; BELL
+  PR's empty allowlist no longer applies.
+- On macOS, `sandbox.network.allowUnixSockets` and `allowMachLookup` add
+  Unix sockets and system services that sandboxed commands may reach.
 - `sandbox.excludedCommands`: a matching command runs outside the sandbox,
   even with `allowUnsandboxedCommands: false`, and writable roles run Bash
   commands without asking. Such a command has your user rights; the read
@@ -157,10 +176,10 @@ beyond the limits below:
   `GH_TOKEN` and `GITHUB_TOKEN` does not cover values set there.
 - `apiKeyHelper` runs with your user rights, as it does outside BELL PR.
 
-The read denials still apply to the file tools and to sandboxed commands.
-On a computer where you run BELL PR, keep these keys out of your user
-settings, or move them to the `.claude/settings.json` of the projects that
-need them: BELL PR's agents never load project settings.
+Apart from those, the read denials apply to the file tools and to
+sandboxed commands. On a computer where you run BELL PR, keep these keys
+out of your user settings, or move them to the `.claude/settings.json` of
+the projects that need them: BELL PR's agents never load project settings.
 
 ### Claude Code
 
@@ -170,7 +189,9 @@ Full access changes writable roles as described [below](#explicit-full-access).
 - **Writable roles** (teammates, follow-up rounds, syncing) run every Bash
   command inside Claude Code's sandbox: bubblewrap with socat on Linux,
   `sandbox-exec` on macOS. Writes are limited to the run's checkout, network
-  access is closed (`network.strictAllowlist` with no allowed domains),
+  access is closed (`network.strictAllowlist` with no allowed domains,
+  unless your user settings name your own proxy; see
+  [above](#your-own-claude-code-settings)),
   commands cannot ask to leave the sandbox (`allowUnsandboxedCommands:
   false`), and a sandbox that cannot start stops the turn
   (`failIfUnavailable`). `git push`, `gh`, `curl` and `wget` are denied as
@@ -418,10 +439,14 @@ printed.
   Code, a link to the real login file `~/.claude/.credentials.json` only (a
   sign-in Claude Code refreshes during the run is copied back). The decoy
   `~/.claude` holds user hooks that leave a file when they run
-  (`userHooksRan` fails the check) and a user `CLAUDE.md` that says "reply
-  CANARY". For Claude Code, an init event that names an auto-memory folder
-  fails the check as well (`autoMemory`). A sign-in that needs your user
-  settings, such as `apiKeyHelper`, needs a run without `--decoy-home`.
+  (`userHooksRan` fails the check), user sandbox values that would switch
+  off filesystem isolation, the fresh `/proc` and the Unix socket block (a
+  marker read with filesystem isolation off is a leak, and the argv check
+  `sandboxNotWeakened` needs BELL PR to set them back), and a user
+  `CLAUDE.md` that says "reply CANARY". For Claude Code, an init event that
+  names an auto-memory folder fails the check as well (`autoMemory`). A
+  sign-in that needs your user settings, such as `apiKeyHelper`, needs a
+  run without `--decoy-home`.
   The current build passes Codex a read-deny profile;
   that profile was not what the 2026-10-14 run below used. Run the Codex
   canary with `--decoy-home`, and from a shell without token variables

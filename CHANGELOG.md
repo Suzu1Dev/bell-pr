@@ -661,11 +661,17 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   setting, so BELL PR's prompt sets the instructions and the output language.
   Your sign-in, `env` and default model still apply. BELL PR does not delete
   notes that earlier versions let Claude Code save; Privacy and your data
-  says where to find them. The security model lists the user settings that
-  still widen what agents may do, such as `permissions.additionalDirectories`
-  and `sandbox.excludedCommands`. The sandbox canary checks that hooks and
-  auto memory stay off, and its `--decoy-home` links only Claude Code's
-  login file instead of your whole `~/.claude`.
+  says where to find them. In sandboxed turns, single sandbox values in your
+  user settings that would weaken the sandbox, such as
+  `sandbox.filesystem.disabled`, `sandbox.enableWeakerNestedSandbox` and
+  `sandbox.network.allowAllUnixSockets`, are set back to their defaults. The
+  security model lists the user settings that still widen what agents may
+  do, such as `permissions.additionalDirectories`,
+  `sandbox.excludedCommands` and your own proxy in
+  `sandbox.network.httpProxyPort`. The sandbox canary checks that hooks and
+  auto memory stay off and that those sandbox values are set back, and its
+  `--decoy-home` links only Claude Code's login file instead of your whole
+  `~/.claude`.
 
 ## [1.0.0] - 【暫定】
 
