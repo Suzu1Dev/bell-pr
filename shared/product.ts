@@ -22,6 +22,8 @@ export interface ProductInfo {
   securityEmail: string;
   /** The public source or issue-tracker repository. */
   publicRepoUrl: string;
+  /** The dedicated GitHub homebrew-<tap> repository for direct installation. */
+  homebrewRepoUrl: string;
 }
 
 export const product: ProductInfo = {
@@ -33,9 +35,10 @@ export const product: ProductInfo = {
   supportEmail: "",
   securityEmail: "",
   publicRepoUrl: "https://github.com/Suzu1Dev/bell-pr",
+  homebrewRepoUrl: "https://github.com/Suzu1Dev/homebrew-bell-pr",
 };
 
-export type ProductLinkKey = "homepageUrl" | "docsUrl" | "publicRepoUrl";
+export type ProductLinkKey = "homepageUrl" | "docsUrl" | "publicRepoUrl" | "homebrewRepoUrl";
 
 /** The URL, or undefined while it is undecided; hide the link then. */
 export function productLink(key: ProductLinkKey): string | undefined {

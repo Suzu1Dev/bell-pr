@@ -145,14 +145,24 @@ website (or `scripts/install-wsl.sh` from GitHub when no homepage is set).
 their sources. Use `-LocalHelper` explicitly to select the
 adjacent helper in a source checkout for local validation.
 
-After publishing a new version to npm, refresh the Homebrew formula and commit
-it to the tap's main branch:
+After publishing a new version to npm, refresh the Homebrew formula:
 
 ```sh
 node scripts/sync-installers.mjs --refresh-formula
 ```
 
-This downloads the published version from `package.json`, verifies npm's SHA-512
+Commit the refreshed `Formula/bell-pr.rb` in the main project, then copy that
+file unchanged into `Formula/bell-pr.rb` in the
+<!-- generated:product-link key=homebrewRepoUrl text="dedicated Homebrew tap" -->
+[dedicated Homebrew tap](https://github.com/Suzu1Dev/homebrew-bell-pr)
+<!-- /generated:product-link -->
+and commit it there. This manual synchronization is a release step: publishing
+to npm alone does not update the tap. Run the tap's macOS installation check
+before finishing the release. It verifies the single `brew install` command
+from a clean environment and tests the installed command. No cross-repository
+token or synchronization service is required.
+
+The refresh command downloads the published version from `package.json`, verifies npm's SHA-512
 integrity, and records the tarball's SHA-256 in `Formula/bell-pr.rb`. Do not hash a
 local repack: npm's published bytes are what Homebrew downloads. Normal `--check`
 is offline and keeps the last published formula version while a new release is

@@ -1,6 +1,7 @@
 # Promo video assets
 
 - `poster.jpg` and `captions.en.vtt` are tracked here.
+- The caption source is retained, but the landing-page players do not load it.
 - The self-hosted `bell-pr-promo-en-1080p.webm` and `.mp4` binaries are
   deploy-only (they exceed the site's 5 MB check budget). Production serves
   them at https://bell-pr.suzu.tw/assets/video/.

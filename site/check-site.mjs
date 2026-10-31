@@ -331,7 +331,11 @@ async function checkBrowser(files, { port, screenshots }) {
       expect(command, `${method} has a readable install command`).not.toBe("");
       if (method === "npx") expect(command).toBe(`npx ${packageName}`);
       if (method === "npm") expect(command).toBe(`npm install -g ${packageName}`);
-      if (method === "brew" || method === "powershell") expect(command).toContain("\n");
+      if (method === "brew") {
+        expect(command).toMatch(/^brew install [a-z0-9_.-]+\/[a-z0-9_.-]+\/[a-z0-9_.@+-]+$/i);
+        expect(command.split("/").at(-1)).toBe(packageName);
+      }
+      if (method === "powershell") expect(command).toContain("\n");
       if (!noScript) {
         const button = widget.locator(`button[data-copy="install-command-${method}"]`);
         await button.click();
@@ -364,7 +368,7 @@ async function checkBrowser(files, { port, screenshots }) {
     await expect(fallback).toHaveText(isZh ? "已選取" : "Selected");
     expect(await page.evaluate(() => window.getSelection().toString())).toBe((await widget.locator("#install-command-powershell").textContent()).trim());
     await expect(page.locator("#copy-status")).toHaveText(isZh
-      ? "複製失敗。指令已選取；請用鍵盤複製。"
+      ? "複製失敗。命令已選取；請用鍵盤複製。"
       : "Copying failed. The command is selected; copy it with your keyboard.");
     await widget.locator("#install-tab-npx").click();
     await selected("npx");

@@ -11,6 +11,7 @@ const linkKeys: ProductLinkKey[] = [
   "homepageUrl",
   "docsUrl",
   "publicRepoUrl",
+  "homebrewRepoUrl",
 ];
 const emailKeys = ["supportEmail", "securityEmail"] as const;
 
@@ -20,20 +21,21 @@ test("the product is BELL PR, installed as bell-pr with two commands", () => {
   assert.deepEqual([...product.binNames], ["bell-pr", "bellpr"]);
 });
 
-test("every URL and email is a string, the website and repository are decided and the rest stay empty", () => {
+test("every URL and email is a string, the website and repositories are decided and the rest stay empty", () => {
   for (const key of [...linkKeys, ...emailKeys]) {
     assert.equal(typeof product[key], "string", key);
     // Nothing is invented: a value stays "" until the project decides it.
     // Update this expectation together with the value when that happens.
     if (key === "homepageUrl") assert.equal(product[key], "https://bell-pr.suzu.tw", key);
     else if (key === "publicRepoUrl") assert.equal(product[key], "https://github.com/Suzu1Dev/bell-pr", key);
+    else if (key === "homebrewRepoUrl") assert.equal(product[key], "https://github.com/Suzu1Dev/homebrew-bell-pr", key);
     else assert.equal(product[key], "", key);
   }
 });
 
 test("productLink and productEmail return undefined for empty values and the value once decided", () => {
   for (const key of linkKeys)
-    assert.equal(productLink(key), key === "publicRepoUrl" || key === "homepageUrl" ? product[key] : undefined, key);
+    assert.equal(productLink(key), key === "docsUrl" ? undefined : product[key], key);
   for (const key of emailKeys) assert.equal(productEmail(key), undefined, key);
 });
 
@@ -41,12 +43,16 @@ test("productLink and productEmail hide explicitly empty metadata and expose con
   const saved = { ...product };
   try {
     product.homepageUrl = "";
+    product.homebrewRepoUrl = "";
     product.supportEmail = "";
     assert.equal(productLink("homepageUrl"), undefined);
+    assert.equal(productLink("homebrewRepoUrl"), undefined);
     assert.equal(productEmail("supportEmail"), undefined);
     product.homepageUrl = "https://example.test/bell-pr";
+    product.homebrewRepoUrl = "https://github.com/example/homebrew-tools";
     product.supportEmail = "support@example.test";
     assert.equal(productLink("homepageUrl"), "https://example.test/bell-pr");
+    assert.equal(productLink("homebrewRepoUrl"), "https://github.com/example/homebrew-tools");
     assert.equal(productEmail("supportEmail"), "support@example.test");
   } finally {
     Object.assign(product, saved);

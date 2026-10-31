@@ -16,7 +16,7 @@
  * - `product-link key=<key> text="…" [path="…"]`: a link to a value of
  *   shared/product.ts, `<a href>` in HTML and `[text](url)` in Markdown, or
  *   **nothing at all** while that value is empty. The key is a
- *   `ProductLinkKey` (homepageUrl, docsUrl, publicRepoUrl) or supportEmail /
+ *   `ProductLinkKey` (homepageUrl, docsUrl, publicRepoUrl, homebrewRepoUrl) or supportEmail /
  *   securityEmail, which become mailto: links. `path` is appended to a URL,
  *   as in `key=publicRepoUrl path=issues`. `text` is plain text; it is
  *   escaped on output.
@@ -26,8 +26,9 @@
  *   need absolute URLs.
  * - `install-commands method=npx|npm|curl|brew|bun|powershell|mise [lang=en|zh-TW]`:
  *   Fenced Markdown or escaped HTML command text. Installers use homepageUrl
- *   when set, otherwise the public GitHub repository. Empty publicRepoUrl
- *   hides the block. HTML callers provide the surrounding <code> element.
+ *   when set, otherwise the public GitHub repository. Homebrew uses its
+ *   dedicated homebrewRepoUrl. An empty repository URL hides its block.
+ *   HTML callers provide the surrounding <code> element.
  *
  * Layout: when the opening comment stands alone on its line, the content
  * goes on the lines between the comments, at the comment's indentation.
@@ -68,7 +69,7 @@ const scriptPath = fileURLToPath(import.meta.url);
 const repoRoot = path.resolve(path.dirname(scriptPath), "..");
 const command = "npx tsx scripts/render-generated-regions.ts";
 
-const urlKeys: readonly ProductLinkKey[] = ["homepageUrl", "docsUrl", "publicRepoUrl"];
+const urlKeys: readonly ProductLinkKey[] = ["homepageUrl", "docsUrl", "publicRepoUrl", "homebrewRepoUrl"];
 const emailKeys = ["supportEmail", "securityEmail"] as const;
 type EmailKey = (typeof emailKeys)[number];
 
@@ -301,16 +302,16 @@ function installCommands(region: Region, format: Format, where: string, context:
   const { method, lang = "en" } = region.attrs;
   if (!["npx", "npm", "curl", "brew", "bun", "powershell", "mise"].includes(method) || !["en", "zh-TW"].includes(lang))
     throw new RegionError(`${where}: invalid installation method or language.`);
-  if (!context.product.publicRepoUrl) return [];
-  const repo = /^https:\/\/github\.com\/([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)\/?$/.exec(context.product.publicRepoUrl);
+  const repoUrl = method === "brew" ? context.product.homebrewRepoUrl : context.product.publicRepoUrl;
+  if (!repoUrl) return [];
+  const repo = /^https:\/\/github\.com\/([A-Za-z0-9][A-Za-z0-9_.-]*)\/([A-Za-z0-9][A-Za-z0-9_.-]*)\/?$/.exec(repoUrl);
   const bin = context.product.binNames[0];
   const pkg = context.product.npmPackage;
   if (!repo || !/^[a-z0-9][a-z0-9-]*$/.test(bin) || !/^[a-z0-9][a-z0-9-]*$/.test(pkg))
     throw new RegionError(`${where}: installation commands need a GitHub repository and a safe command name.`);
-  const url = `https://github.com/${repo[1]}/${repo[2]}`;
   const raw = `https://raw.githubusercontent.com/${repo[1]}/${repo[2]}/main`;
   const homepage = context.product.homepageUrl.replace(/\/+$/, "");
-  if (homepage && !/^https:\/\/[A-Za-z0-9.-]+(?::[0-9]+)?(?:\/[A-Za-z0-9._~-]+)*$/.test(homepage))
+  if (method !== "brew" && homepage && !/^https:\/\/[A-Za-z0-9.-]+(?::[0-9]+)?(?:\/[A-Za-z0-9._~-]+)*$/.test(homepage))
     throw new RegionError(`${where}: installation commands need a safe HTTPS homepage URL.`);
   let lines: string[];
   if (method === "npx") {
@@ -320,8 +321,10 @@ function installCommands(region: Region, format: Format, where: string, context:
   } else if (method === "curl") {
     lines = [`curl -fsSL ${homepage ? `${homepage}/install` : `${raw}/install.sh`} | sh${lang === "zh-TW" ? " -s -- --lang zh-TW" : ""}`];
   } else if (method === "brew") {
-    const tap = `${repo[1]}/${repo[2]}`.toLowerCase();
-    lines = [`brew tap ${tap} ${url}`, `brew install ${tap}/${bin}`];
+    const tapName = /^homebrew-([A-Za-z0-9][A-Za-z0-9_.-]*)$/.exec(repo[2])?.[1];
+    if (!tapName) throw new RegionError(`${where}: Homebrew needs a GitHub repository named homebrew-<tap>.`);
+    const tap = `${repo[1]}/${tapName}`.toLowerCase();
+    lines = [`brew install ${tap}/${bin}`];
   } else if (method === "bun") {
     lines = [`bun add --global ${pkg}`];
   } else if (method === "mise") {
@@ -499,6 +502,7 @@ function selfTest(): number {
     homepageUrl: "https://bell.example.test/",
     docsUrl: "",
     publicRepoUrl: "https://code.example.test/bell-pr/",
+    homebrewRepoUrl: "https://github.com/packager/homebrew-tools",
     supportEmail: "help@example.test",
     securityEmail: "",
   };
@@ -602,19 +606,41 @@ function selfTest(): number {
   const installerContext = { product: { ...product, homepageUrl: "", publicRepoUrl: "https://github.com/example/workbench" } };
   for (const method of ["npx", "npm", "curl", "brew", "bun", "powershell", "mise"]) {
     const rendered = renderText(install(method), "install.md", installerContext);
-    if (["curl", "brew", "powershell"].includes(method))
+    if (["curl", "powershell"].includes(method))
       assert.match(rendered.text, /github(?:usercontent)?\.com\/example\/workbench/);
     assert.deepEqual(renderText(rendered.text, "install.md", installerContext).stale, []);
-    const hidden = renderText(install(method), "install.md", { product: { ...product, publicRepoUrl: "" } }).text;
+    const hidden = renderText(install(method), "install.md", { product: { ...product, publicRepoUrl: "", homebrewRepoUrl: "" } }).text;
     assert.ok(!hidden.includes("```"));
     const html = renderText(`<code>${install(method).trim()}</code>`, "install.html", installerContext);
     assert.ok(!html.text.includes("```"));
     assert.deepEqual(renderText(html.text, "install.html", installerContext).stale, []);
-    if (method === "brew") assert.match(html.text, /workbench\nbrew install/);
+    if (method === "brew") {
+      const brew = `brew install packager/tools/${product.binNames[0]}`;
+      assert.ok(rendered.text.includes(`\n${brew}\n`));
+      assert.ok(html.text.includes(`-->${brew}<!--`));
+      assert.doesNotMatch(html.text, /brew tap|&&|&amp;/);
+    }
     if (method === "powershell") assert.match(html.text, /&amp; \{/);
     if (method === "npx") assert.ok(html.text.includes(`npx ${product.npmPackage}`));
     if (method === "npm") assert.ok(html.text.includes(`npm install -g ${product.npmPackage}`));
   }
+  const noTap = { product: { ...installerContext.product, homebrewRepoUrl: "" } };
+  assert.ok(!renderText(install("brew"), "install.md", noTap).text.includes("```"));
+  assert.match(renderText(install("npm"), "install.md", noTap).text, /npm install -g/);
+  assert.match(renderText(install("brew"), "install.md", {
+    product: { ...installerContext.product, publicRepoUrl: "" },
+  }).text, /brew install packager\/tools\//);
+  for (const homebrewRepoUrl of [
+    "https://github.com/example/workbench",
+    "https://github.com/example/homebrew-",
+    "https://github.com/example/homebrew-tools;touch",
+    "https://example.test/example/homebrew-tools",
+  ]) assert.match(errorOf(() => renderText(install("brew"), "install.md", {
+    product: { ...installerContext.product, homebrewRepoUrl },
+  })), /Homebrew needs|GitHub repository/);
+  const tapLink = '<!-- generated:product-link key=homebrewRepoUrl text="Homebrew tap" --><!-- /generated:product-link -->';
+  assert.match(renderText(tapLink, "install.md", installerContext).text, /\[Homebrew tap\]\(https:\/\/github\.com\/packager\/homebrew-tools\)/);
+  assert.ok(!renderText(tapLink, "install.md", noTap).text.includes("[Homebrew tap]"));
   const hostedInstaller = { product: { ...installerContext.product, homepageUrl: "https://install.example.test" } };
   assert.match(renderText(install("curl"), "install.md", hostedInstaller).text, /https:\/\/install\.example\.test\/install \| sh/);
   assert.match(renderText(install("powershell"), "install.md", hostedInstaller).text, /https:\/\/install\.example\.test\/install\.ps1/);
