@@ -1,7 +1,8 @@
 import { readFile } from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
-import { sharedCredentialDenials } from "../shared/credential-denials.js";
+import { expandHome, sharedCredentialDenials } from "../shared/credential-denials.js";
 import { codexEnabled } from "../shared/codex-switch.js";
 export { setCodexEnabledForTests } from "../shared/codex-switch.js";
 import {
@@ -19,6 +20,8 @@ import {
   agentReadDenials,
   agentSandboxReadPaths,
   enforceAgentSandbox,
+  inside,
+  resolved,
 } from "./sandbox.js";
 import { cancelled, currentLocale, sm } from "./i18n/index.js";
 
@@ -100,6 +103,48 @@ function claudeAccess(access: AgentAccess, web: boolean, full: boolean): string[
 }
 
 /**
+ * The shared credential denials as Codex deny entries, leaving out an
+ * entry that repeats an earlier one or lies under a denied directory (an
+ * entry written with a trailing `/`), as written or at its physical path.
+ * `~` is expanded only to compare; entries keep their spelling.
+ *
+ * On Linux, bubblewrap cannot place a deny inside a directory it has
+ * already denied: with `~/.ssh/` and `~/.ssh/**` both listed, any file in
+ * `~/.ssh` stopped every command from starting ("Can't create file at
+ * …/.ssh/authorized_keys: Read-only file system"), and a `store --file`
+ * path inside `~/.ssh` did the same. The directory form stays, because
+ * `X/**` alone still lists the names in X and stops at
+ * `glob_scan_max_depth`. Verified with codex-cli 0.159.0 and 0.166.0
+ * (`codex sandbox`) on Linux with bubblewrap 0.11.1; there, a deny path
+ * that passes through a symbolic link (such as a symlinked HOME) still
+ * stops the sandbox from starting.
+ */
+function codexDenials(): string[] {
+  const home = process.env.HOME || os.homedir();
+  const entries = sharedCredentialDenials().map((entry) => {
+    const target = path.resolve(expandHome(entry, home));
+    return {
+      entry,
+      target,
+      physical: resolved(target),
+      directory: entry.endsWith("/"),
+    };
+  });
+  return entries
+    .filter(
+      (item, index) =>
+        !entries.some(
+          (other, at) =>
+            (at < index && other.target === item.target) ||
+            (other.directory &&
+              (inside(item.target, other.target) ||
+                inside(item.physical, other.physical))),
+        ),
+    )
+    .map((item) => item.entry);
+}
+
+/**
  * Codex permission profile for one turn. `--sandbox` is not passed: on
  * Codex CLI 0.165 it selects the older sandbox, which does not apply
  * `default_permissions`, so the read denials would be ignored.
@@ -115,7 +160,7 @@ export function codexSandboxConfig(access: AgentAccess, cwd: string): string[] {
   const dotGit = path.join(cwd, ".git");
   const filesystem = [
     "glob_scan_max_depth=4",
-    ...sharedCredentialDenials().flatMap((entry) =>
+    ...codexDenials().flatMap((entry) =>
       /["\\\r\n{}]/.test(entry) ? [] : [`"${entry}"="deny"`],
     ),
     ...[dotGit, `${dotGit}/**`].flatMap((entry) =>

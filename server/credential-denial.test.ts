@@ -224,7 +224,8 @@ test("Claude and Codex are given the same shared credential denials", async (t) 
     "~/.npmrc",
   ]) {
     assert.ok(settings.permissions.deny.includes(`Read(${entry})`), entry);
-    assert.ok(table!.includes(`"${entry}"="deny"`), entry);
+    // Codex leaves out ~/.ssh/**: ~/.ssh/ denies it already, and both stop bubblewrap.
+    assert.equal(table!.includes(`"${entry}"="deny"`), entry !== "~/.ssh/**", entry);
   }
   const custom = path.join(os.homedir(), ".bell-pr-custom-credentials");
   assert.ok(settings.permissions.deny.some((rule) => rule.includes(custom)));

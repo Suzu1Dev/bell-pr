@@ -1,6 +1,7 @@
 import test, { type TestContext } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { realpathSync } from "node:fs";
+import { mkdir, mkdtemp, realpath, rm, symlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
@@ -14,6 +15,7 @@ import {
   retryTransientAuth,
   type AgentEvent,
 } from "./agent-cli.js";
+import { sharedCredentialDenials } from "../shared/credential-denials.js";
 import type { ModelExecution } from "../shared/models.js";
 import { formatters } from "../shared/i18n/locale.js";
 import { agentEnvironment } from "./process.js";
@@ -120,6 +122,112 @@ test("Codex arguments keep the existing sandbox, approval and schema flags", asy
     executable: "codex",
     args: ["login", "status"],
   });
+});
+
+/** The deny entries of a Codex profile, in order. */
+function codexDenyEntries(args: string[]) {
+  const table = args.find((arg) => arg.startsWith("permissions={bell-pr="));
+  assert.ok(table);
+  return [...table.matchAll(/"([^"]+)"="deny"/g)].map((match) => match[1]);
+}
+
+/** An entry with `~` expanded and trailing slashes dropped, as given and physical. */
+function denyForms(entry: string, home: string) {
+  const expanded = entry === "~" ? home : entry.startsWith("~/") ? path.join(home, entry.slice(2)) : entry;
+  const given = expanded.replace(/\/+$/, "");
+  let physical = given;
+  try {
+    physical = realpathSync(given);
+  } catch {
+    /* A missing path keeps its given form. */
+  }
+  return { given, physical, directory: entry.endsWith("/") };
+}
+
+const under = (child: string, parent: string) => child.startsWith(`${parent}/`);
+
+test("Codex deny entries never repeat or lie inside a denied directory", { skip: process.platform === "win32" }, async (t) => {
+  // bubblewrap fails to start when one does, for example with ~/.ssh/ and
+  // ~/.ssh/** both listed and any file in ~/.ssh.
+  const root = await realpath(await mkdtemp(path.join(os.tmpdir(), "bell-codex-deny-")));
+  const keys = ["HOME", "GIT_CONFIG_GLOBAL", "GIT_CONFIG_NOSYSTEM", "XDG_CONFIG_HOME", "CODEX_HOME", "CLAUDE_CONFIG_DIR", "GH_CONFIG_DIR"];
+  const previous = Object.fromEntries(keys.map((key) => [key, process.env[key]]));
+  t.after(async () => {
+    for (const [key, value] of Object.entries(previous)) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+    await rm(root, { recursive: true, force: true });
+  });
+  const gitconfig = path.join(root, "gitconfig");
+  // A store file inside ~/.ssh, and two siblings that only share its prefix.
+  await writeFile(
+    gitconfig,
+    "[credential]\n\thelper = store --file ~/.ssh/git-creds\n\thelper = store --file ~/.ssh-backup/creds\n\thelper = store --file ~/.sshx\n",
+  );
+  const makeHome = async (home: string) => {
+    for (const directory of [".ssh", ".ssh-backup", ".codex", ".claude", ".config/gh"])
+      await mkdir(path.join(home, directory), { recursive: true });
+    for (const file of [".ssh/known_hosts", ".ssh/authorized_keys", ".ssh/git-creds", ".ssh-backup/creds", ".sshx"])
+      await writeFile(path.join(home, file), "decoy\n");
+  };
+  const plain = path.join(root, "home");
+  await makeHome(plain);
+  const physical = path.join(root, "physical-home");
+  await makeHome(physical);
+  const linked = path.join(root, "linked-home");
+  await symlink(physical, linked, "dir");
+  const defaults = (home: string) => ({
+    XDG_CONFIG_HOME: path.join(home, ".config"),
+    CODEX_HOME: path.join(home, ".codex"),
+    CLAUDE_CONFIG_DIR: path.join(home, ".claude"),
+    GH_CONFIG_DIR: path.join(home, ".config", "gh"),
+  });
+  const cases: { name: string; home: string; env: Record<string, string> }[] = [
+    { name: "plain HOME", home: plain, env: {} },
+    { name: "config variables at their default places", home: plain, env: defaults(plain) },
+    { name: "symlinked HOME", home: linked, env: defaults(linked) },
+  ];
+  for (const { name, home, env } of cases) {
+    for (const key of keys) delete process.env[key];
+    Object.assign(process.env, { HOME: home, GIT_CONFIG_GLOBAL: gitconfig, GIT_CONFIG_NOSYSTEM: "1" }, env);
+    const shared = sharedCredentialDenials();
+    // The shared list (and so Claude's Read rules) keeps every entry.
+    assert.ok(shared.includes("~/.ssh/**"), name);
+    assert.ok(shared.some((entry) => entry.endsWith("/.ssh/git-creds")), name);
+    for (const access of ["read", "write"] as const) {
+      const entries = codexDenyEntries(codexSandboxConfig(access, path.join(root, "work")));
+      const forms = entries.map((entry) => ({ entry, ...denyForms(entry, home) }));
+      for (const item of forms)
+        for (const other of forms) {
+          if (item === other) continue;
+          assert.notEqual(item.given, other.given, `${name}: ${item.entry} repeats ${other.entry}`);
+          if (other.directory)
+            assert.ok(
+              !under(item.given, other.given) && !under(item.physical, other.physical),
+              `${name}: ${item.entry} lies inside ${other.entry}`,
+            );
+        }
+      assert.ok(entries.includes("~/.ssh/"), name);
+      assert.ok(!entries.includes("~/.ssh/**"), name);
+      // A path that only shares the ~/.ssh prefix is not inside it.
+      assert.ok(entries.some((entry) => entry.endsWith("/.ssh-backup/creds")), name);
+      assert.ok(entries.some((entry) => entry.endsWith("/.sshx")), name);
+      // Nothing is lost: each left-out entry repeats a kept one or lies inside a kept directory.
+      for (const entry of shared.filter((value) => !entries.includes(value))) {
+        const left = denyForms(entry, home);
+        assert.ok(
+          forms.some(
+            (kept) =>
+              kept.given === left.given ||
+              (kept.directory &&
+                (under(left.given, kept.given) || under(left.physical, kept.physical))),
+          ),
+          `${name}: ${entry} is no longer denied`,
+        );
+      }
+    }
+  }
 });
 
 test("Claude Code arguments map access levels, inline the schema and keep MCP connectors out", async (t) => {
