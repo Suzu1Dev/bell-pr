@@ -58,8 +58,10 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   The lookup resolves the checkout and the directories above it, never the
   checkout's own `.git` entry. The credential paths that `GH_CONFIG_DIR`,
   `XDG_CONFIG_HOME`, `CLAUDE_CONFIG_DIR` or `CODEX_HOME` move are denied
-  both as given and at their physical path, also before that directory
-  exists.
+  to Claude Code both as given and at their physical path, also before that
+  directory exists. Codex keeps getting the physical path only: on Linux,
+  its sandbox does not start with a deny path that passes through a
+  symbolic link.
 - **Your Claude Code hooks no longer run in BELL PR's agent turns, and auto
   memory is off.** Hooks from your user settings and plugins ran outside the
   sandbox during every Claude turn, and auto memory kept notes about imported

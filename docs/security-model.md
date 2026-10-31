@@ -292,13 +292,18 @@ Full access changes writable roles as described [below](#explicit-full-access).
   as a directory, so `~/.ssh/**` and a `store --file` path inside `~/.ssh`
   are not listed again. On Linux, bubblewrap fails to start when a deny
   lies inside a denied directory, and also when a deny path passes through
-  a symbolic link, such as a symlinked home directory (seen with Codex CLI
-  0.159 and 0.166). The checkout's `.git` path and `.git/**`
-  are `read`, so that path cannot be edited or replaced and Git can still
-  read it. The person can turn Claude Code's sandbox off; Codex is started
-  with this profile on each turn unless full access is on. Reads of other
-  files your user can read are still allowed. The profile does not name
-  the system keyring (Secret Service, D-Bus, or Keychain).
+  a symbolic link (seen with Codex CLI 0.159 and 0.166). So where
+  `GH_CONFIG_DIR`, `XDG_CONFIG_HOME`, `CLAUDE_CONFIG_DIR` or `CODEX_HOME`
+  names a directory through a symbolic link, the profile lists only its
+  physical path, which Claude Code's rules name next to the path as given.
+  On Linux, reads through the link are still denied, but a symlinked home
+  directory still stops Codex's sandbox from starting. The checkout's
+  `.git` path and `.git/**` are `read`, so that path cannot be edited or
+  replaced and Git can still read it. The person can turn Claude Code's
+  sandbox off; Codex is started with this profile on each turn unless
+  full access is on. Reads of other files your user can read are still
+  allowed. The profile does not name the system keyring (Secret Service,
+  D-Bus, or Keychain).
 
 ### Explicit full access
 

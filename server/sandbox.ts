@@ -209,7 +209,7 @@ export function setAgentDataDirectory(directory?: string) {
 }
 
 /** The path with symlinks resolved when it exists, else as given. */
-export function resolved(value: string) {
+function resolved(value: string) {
   try {
     return realpathSync(value);
   } catch {

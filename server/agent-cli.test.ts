@@ -164,24 +164,30 @@ function codexDenyEntries(args: string[]) {
   return [...table.matchAll(/"([^"]+)"="deny"/g)].map((match) => match[1]);
 }
 
-/** An entry with `~` expanded and trailing slashes dropped, as given and physical. */
+/**
+ * An entry with `~` expanded and trailing slashes dropped, as given and
+ * physical. A missing path is resolved through its nearest existing parent.
+ */
 function denyForms(entry: string, home: string) {
   const expanded = entry === "~" ? home : entry.startsWith("~/") ? path.join(home, entry.slice(2)) : entry;
   const given = expanded.replace(/\/+$/, "");
-  let physical = given;
-  try {
-    physical = realpathSync(given);
-  } catch {
-    /* A missing path keeps its given form. */
-  }
-  return { given, physical, directory: entry.endsWith("/") };
+  const physicalOf = (value: string): string => {
+    try {
+      return realpathSync(value);
+    } catch {
+      const parent = path.dirname(value);
+      return parent === value ? value : path.join(physicalOf(parent), path.basename(value));
+    }
+  };
+  return { given, physical: physicalOf(given), directory: entry.endsWith("/") };
 }
 
 const under = (child: string, parent: string) => child.startsWith(`${parent}/`);
 
-test("Codex deny entries never repeat or lie inside a denied directory", { skip: process.platform === "win32" }, async (t) => {
+test("Codex deny entries never repeat, lie inside a denied directory or pass through a link", { skip: process.platform === "win32" }, async (t) => {
   // bubblewrap fails to start when one does, for example with ~/.ssh/ and
-  // ~/.ssh/** both listed and any file in ~/.ssh.
+  // ~/.ssh/** both listed and any file in ~/.ssh, or with CODEX_HOME named
+  // through a symbolic link.
   const root = await realpath(await mkdtemp(path.join(os.tmpdir(), "bell-codex-deny-")));
   const keys = ["HOME", "GIT_CONFIG_GLOBAL", "GIT_CONFIG_NOSYSTEM", "XDG_CONFIG_HOME", "CODEX_HOME", "CLAUDE_CONFIG_DIR", "GH_CONFIG_DIR"];
   const previous = Object.fromEntries(keys.map((key) => [key, process.env[key]]));
@@ -210,6 +216,12 @@ test("Codex deny entries never repeat or lie inside a denied directory", { skip:
   await makeHome(physical);
   const linked = path.join(root, "linked-home");
   await symlink(physical, linked, "dir");
+  // Config directories named through a link, one of them not created yet.
+  const realConfig = path.join(root, "real-config");
+  for (const directory of ["codex", "claude", "gh", "xdg/gh"])
+    await mkdir(path.join(realConfig, directory), { recursive: true });
+  const linkConfig = path.join(root, "link-config");
+  await symlink(realConfig, linkConfig, "dir");
   const defaults = (home: string) => ({
     XDG_CONFIG_HOME: path.join(home, ".config"),
     CODEX_HOME: path.join(home, ".codex"),
@@ -220,6 +232,16 @@ test("Codex deny entries never repeat or lie inside a denied directory", { skip:
     { name: "plain HOME", home: plain, env: {} },
     { name: "config variables at their default places", home: plain, env: defaults(plain) },
     { name: "symlinked HOME", home: linked, env: defaults(linked) },
+    {
+      name: "config directories through a link",
+      home: plain,
+      env: {
+        CODEX_HOME: path.join(linkConfig, "codex"),
+        CLAUDE_CONFIG_DIR: path.join(linkConfig, "claude"),
+        GH_CONFIG_DIR: path.join(linkConfig, "new", "gh"),
+        XDG_CONFIG_HOME: path.join(linkConfig, "xdg"),
+      },
+    },
   ];
   for (const { name, home, env } of cases) {
     for (const key of keys) delete process.env[key];
@@ -246,18 +268,37 @@ test("Codex deny entries never repeat or lie inside a denied directory", { skip:
       // A path that only shares the ~/.ssh prefix is not inside it.
       assert.ok(entries.some((entry) => entry.endsWith("/.ssh-backup/creds")), name);
       assert.ok(entries.some((entry) => entry.endsWith("/.sshx")), name);
-      // Nothing is lost: each left-out entry repeats a kept one or lies inside a kept directory.
+      // A deny path through a symbolic link also stops bubblewrap: when the
+      // physical form is listed, the linked one is not.
+      for (const item of forms)
+        if (item.physical !== item.given)
+          assert.ok(
+            !forms.some((other) => other.given === item.physical),
+            `${name}: ${item.entry} passes through a link to ${item.physical}`,
+          );
+      // Nothing is lost: each left-out entry repeats a kept one, names the
+      // same physical path, or lies inside a kept directory.
       for (const entry of shared.filter((value) => !entries.includes(value))) {
         const left = denyForms(entry, home);
         assert.ok(
           forms.some(
             (kept) =>
               kept.given === left.given ||
+              kept.physical === left.physical ||
               (kept.directory &&
                 (under(left.given, kept.given) || under(left.physical, kept.physical))),
           ),
           `${name}: ${entry} is no longer denied`,
         );
+      }
+      if (name === "config directories through a link") {
+        // Claude Code's Read rules keep both forms; Codex gets the physical one only.
+        for (const file of ["codex/auth.json", "claude/.credentials.json", "new/gh/**", "xdg/gh/**"]) {
+          assert.ok(shared.includes(path.join(linkConfig, file)), `${name}: shared ${file}`);
+          assert.ok(shared.includes(path.join(realConfig, file)), `${name}: shared physical ${file}`);
+          assert.ok(entries.includes(path.join(realConfig, file)), `${name}: Codex physical ${file}`);
+        }
+        assert.ok(!entries.some((entry) => entry.startsWith(`${linkConfig}/`)), `${name}: ${entries.join(" ")}`);
       }
     }
   }
