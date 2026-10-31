@@ -10,6 +10,7 @@ import { spawnSync } from "node:child_process";
 import { realpathSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { physicalPath } from "./physical-path.js";
 
 /** Home paths denied for both agents, plus the files that were already denied. */
 const staticPaths = [
@@ -34,22 +35,13 @@ function resolved(value: string) {
 
 /**
  * The absolute path as given, plus its physical path when a symbolic link
- * makes them differ. A missing leaf uses the parent's physical path.
- * Denying only the physical path misses the path a CLI opens on macOS,
- * where `/var` is `/private/var`.
+ * makes them differ. A missing path uses its nearest existing ancestor's
+ * physical path. Denying only the physical path misses the path a CLI opens
+ * on macOS, where `/var` is `/private/var`.
  */
 function pathForms(value: string): string[] {
   const given = path.resolve(value);
-  let physical = given;
-  try {
-    physical = realpathSync(value);
-  } catch {
-    try {
-      physical = path.join(realpathSync(path.dirname(given)), path.basename(given));
-    } catch {
-      physical = given;
-    }
-  }
+  const physical = physicalPath(value);
   return physical === given ? [given] : [given, physical];
 }
 

@@ -669,6 +669,15 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   Unicode code points instead of UTF-16 units, so most emoji count once.
   Files that earlier builds saved load as before, and saved files are read
   as leniently as before.
+- **Symbolic links in the data directory and moved config directories.**
+  When the data directory is reached through a symbolic link (macOS `/var`
+  is `/private/var`), run and teammate checkouts keep the Git directory
+  BELL PR recorded for them instead of being refused (`worktreeForged`).
+  The lookup resolves the checkout and the directories above it, never the
+  checkout's own `.git` entry. The credential paths that `GH_CONFIG_DIR`,
+  `XDG_CONFIG_HOME`, `CLAUDE_CONFIG_DIR` or `CODEX_HOME` move are denied
+  both as given and at their physical path, also before that directory
+  exists.
 
 ## [1.0.0] - 【暫定】
 
