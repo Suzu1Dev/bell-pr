@@ -9,6 +9,7 @@ import {
   agentEventReader,
   agentLoginCheck,
   applyReportedModel,
+  claudeSettings,
   codexAccessMode,
   codexSandboxConfig,
   retryTransientAuth,
@@ -290,6 +291,29 @@ test("Claude turns leave out the user's CLAUDE.md and rules where CLAUDE_CONFIG_
     path.join(home, "CLAUDE.md"),
     path.join(home, "rules", "**"),
   ]);
+});
+
+test("Claude settings hold no empty value and leave sandbox.ripgrep to Claude Code", () => {
+  // Claude Code 2.1.292 ignores all of --settings, without a message, when
+  // one value fails its schema; `sandbox.ripgrep: null` was tried.
+  const empty = (value: unknown, where: string): string[] =>
+    value === null || value === undefined
+      ? [where]
+      : typeof value === "object"
+        ? Object.entries(value).flatMap(([key, item]) => empty(item, `${where}.${key}`))
+        : [];
+  for (const access of ["none", "read", "write"] as const)
+    for (const [sandbox, full] of [
+      [true, false],
+      [false, false],
+      [false, true],
+    ] as const) {
+      const settings = claudeSettings({ cwd: "/work/tree", access, sandbox, full });
+      assert.deepEqual(empty(settings, "settings"), [], `${access} ${sandbox} ${full}`);
+      // Any value BELL could write would replace Claude Code's own ripgrep,
+      // which the sandbox uses to keep files such as .bashrc read-only.
+      assert.ok(!("ripgrep" in (settings.sandbox ?? {})));
+    }
 });
 
 test("teammates combine write access with an output schema on both providers", async (t) => {

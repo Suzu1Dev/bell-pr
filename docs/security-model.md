@@ -132,8 +132,8 @@ Full access included, it switches off:
   Managed policy files still load.
 
 Your plugins' MCP servers stay off (`--strict-mcp-config`), and a turn's
-tool list has no tool that starts a skill or a subagent. BELL PR does not
-switch off the other parts of the plugins you enabled.
+tool list has no tool that starts a skill or a subagent. Your plugins'
+language servers stay on; the list below says when they run.
 
 In writable roles that run in the sandbox, BELL PR also passes the default
 for each single sandbox value that would weaken the sandbox, so yours does
@@ -148,9 +148,11 @@ commands of BELL PR's writable Claude roles therefore fail; the options in
 [Agent sandbox in Docker](docker.md#agent-sandbox-in-docker) let it mount a
 fresh `/proc`.
 
-Lists and `env` merge with yours instead of being replaced, and BELL PR
-cannot unset a proxy port you set, so these user settings still apply in
-BELL PR's turns and widen what agents may do beyond the limits below:
+Lists and `env` merge with yours instead of being replaced. BELL PR cannot
+unset a proxy port or a `sandbox.ripgrep` command you set, and it has no
+switch for your plugins' language servers. So these user settings still
+apply in BELL PR's turns and widen what agents may do beyond the limits
+below:
 
 - `permissions.additionalDirectories` adds working directories. Read-only
   roles can read them (they count for
@@ -172,14 +174,36 @@ BELL PR's turns and widen what agents may do beyond the limits below:
   even with `allowUnsandboxedCommands: false`, and writable roles run Bash
   commands without asking. Such a command has your user rights; the read
   denials below do not apply to it.
+- Language servers from your plugins (a plugin's `.lsp.json` or
+  `lspServers`) start outside the sandbox when a writable role edits or
+  writes a file of their language. This covers the plugins you enabled
+  (`enabledPlugins`) and the plugin folders in `~/.claude/skills/<name>/`,
+  which Claude Code loads by itself. A language server runs in the run's
+  checkout with your user rights and network. Some run code from the
+  project they open, such as build scripts, and their diagnostics are
+  added to the turn. Read-only roles do not start them.
+- On Linux, `sandbox.ripgrep` replaces the ripgrep Claude Code runs before
+  each sandboxed command of a writable role. Your command runs outside the
+  sandbox, in the run's checkout, with your user rights. The sandbox keeps
+  the files that ripgrep finds below the checkout, such as `.bashrc`,
+  `.gitconfig` or `.vscode`, read-only for commands, so a file your command
+  does not report stays writable. The settings source with the highest
+  priority that sets `sandbox.ripgrep` owns it whole, and Claude Code's own
+  ripgrep cannot be named in `--settings`, so BELL PR cannot set it back.
 - `env` values reach every command an agent runs. The removal of
   `GH_TOKEN` and `GITHUB_TOKEN` does not cover values set there.
-- `apiKeyHelper` runs with your user rights, as it does outside BELL PR.
+- `apiKeyHelper`, `awsAuthRefresh`, `awsCredentialExport`,
+  `gcpAuthRefresh`, `otelHeadersHelper` and `proxyAuthHelper` run with your
+  user rights when Claude Code needs them, as they do outside BELL PR.
 
 Apart from those, the read denials apply to the file tools and to
 sandboxed commands. On a computer where you run BELL PR, keep these keys
-out of your user settings, or move them to the `.claude/settings.json` of
-the projects that need them: BELL PR's agents never load project settings.
+out of your user settings where your sign-in allows it. The `permissions`
+keys and the sandbox lists can move to the `.claude/settings.json` of the
+projects that need them, because BELL PR's agents never load project
+settings (Claude Code ignores the proxy ports, the macOS lists and
+`sandbox.ripgrep` there). Disable plugins that bring language servers,
+for example with `claude plugin disable <plugin>`.
 
 ### Claude Code
 
@@ -188,14 +212,15 @@ Full access changes writable roles as described [below](#explicit-full-access).
 
 - **Writable roles** (teammates, follow-up rounds, syncing) run every Bash
   command inside Claude Code's sandbox: bubblewrap with socat on Linux,
-  `sandbox-exec` on macOS. Writes are limited to the run's checkout, network
-  access is closed (`network.strictAllowlist` with no allowed domains,
-  unless your user settings name your own proxy; see
-  [above](#your-own-claude-code-settings)),
+  `sandbox-exec` on macOS. The writes of these commands are limited to the
+  run's checkout, their network access is closed (`network.strictAllowlist`
+  with no allowed domains, unless your user settings name your own proxy),
   commands cannot ask to leave the sandbox (`allowUnsandboxedCommands:
   false`), and a sandbox that cannot start stops the turn
   (`failIfUnavailable`). `git push`, `gh`, `curl` and `wget` are denied as
-  well.
+  well. The language servers of your plugins and a `sandbox.ripgrep`
+  command from your user settings run outside the sandbox; see
+  [above](#your-own-claude-code-settings).
 - **Without the sandbox** a writable Claude role is refused with the error
   code `claude_sandbox_unavailable` and three ways out: install bubblewrap
   and socat, use Codex for the project, or allow unsandboxed Claude agents

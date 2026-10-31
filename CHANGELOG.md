@@ -668,10 +668,13 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   security model lists the user settings that still widen what agents may
   do, such as `permissions.additionalDirectories`,
   `sandbox.excludedCommands` and your own proxy in
-  `sandbox.network.httpProxyPort`. The sandbox canary checks that hooks and
-  auto memory stay off and that those sandbox values are set back, and its
-  `--decoy-home` links only Claude Code's login file instead of your whole
-  `~/.claude`.
+  `sandbox.network.httpProxyPort`. Your plugins' language servers and a
+  `sandbox.ripgrep` command in your user settings still run outside the
+  sandbox when a writable role works; disable plugins that bring language
+  servers on a computer that runs BELL PR. The sandbox canary checks that
+  hooks and auto memory stay off and that those sandbox values are set
+  back, and its `--decoy-home` links only Claude Code's login file instead
+  of your whole `~/.claude`.
 
 ## [1.0.0] - 【暫定】
 

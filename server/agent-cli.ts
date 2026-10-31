@@ -170,9 +170,12 @@ function claudeUserMemoryFiles(): string[] {
  * The user's own settings still load (`--setting-sources user`), so sign-in
  * through `env`, `apiKeyHelper` or a cloud provider keeps working. A single
  * value given here wins over the user's; lists, `env` and the proxy ports
- * BELL cannot unset stay theirs (docs/security-model.md names what that
- * leaves). A sandboxed turn therefore sets each single value that would
- * weaken the sandbox back to its default: filesystem isolation stays on
+ * BELL cannot unset stay theirs. So does `sandbox.ripgrep`: the highest
+ * source that sets it owns it whole, and Claude Code's own ripgrep cannot
+ * be written here. Plugin language servers have no switch at all
+ * (docs/security-model.md names what that leaves). A sandboxed turn
+ * therefore sets each single value that would weaken the sandbox back to
+ * its default: filesystem isolation stays on
  * (`filesystem.disabled`), /proc is fresh (`enableWeakerNestedSandbox`),
  * Unix sockets stay blocked (`allowAllUnixSockets`), and on macOS there is
  * no local port binding, trustd access or Apple Events. Every turn also
@@ -185,7 +188,9 @@ function claudeUserMemoryFiles(): string[] {
  *
  * Keys verified against the settings schema bundled in Claude Code 2.1.292
  * (`permissions` and `sandbox` are passthrough objects there, so a key a
- * release does not know is ignored rather than rejected);
+ * release does not know is ignored rather than rejected, but one value of
+ * the wrong type, such as `sandbox.ripgrep: null`, makes the CLI ignore all
+ * of `--settings` without a message);
  * `sandbox.filesystem.denyRead` and `allowRead` are in the schema since
  * 2.1.114 at the latest, and both apply on Linux and macOS. The top-level
  * keys, and that each wins over the user's settings, were verified with
