@@ -132,12 +132,14 @@ Full access changes writable roles as described [below](#explicit-full-access).
   `permissions.blockReadsOutsideWorkingDirectories`).
 - **Every role** is denied reading the shared list in
   `shared/credential-denials.ts`: `~/.config/gh` (also where `GH_CONFIG_DIR`
-  or `XDG_CONFIG_HOME` moved it), `~/.git-credentials`, each file named by
+  or `XDG_CONFIG_HOME` moved it; a symbolic link denies that path and its
+  physical path), `~/.git-credentials`, each file named by
   `credential.helper store --file` in the global, XDG or system Git config,
   `~/.netrc`, `~/.ssh`, `~/.aws`, `~/.npmrc`, and Claude Code's and Codex's
   credential files (also where `CLAUDE_CONFIG_DIR` or `CODEX_HOME` moved
-  them). Plain `store` with no `--file` is the default `~/.git-credentials`
-  path, which is always on the list. A missing or unreadable Git config
+  them, likewise at both paths when a symbolic link differs). Plain
+  `store` with no `--file` is the default `~/.git-credentials` path, which
+  is always on the list. A missing or unreadable Git config
   adds no store path and leaves the rest of the list in place. BELL PR's
   data directory outside the agent's own checkout is denied as well: state
   and settings files, other runs' checkouts and other projects' clones.
