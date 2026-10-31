@@ -104,7 +104,7 @@ sample tour; agent runs and publishing wait until a provider is ready.
 2. It prints its address and opens BELL PR in your browser:
 
    ```text
-   BELL PR 1.0.0-rc.1 → http://127.0.0.1:4311
+   BELL PR <version> → http://127.0.0.1:4311
    ```
 
 3. Walk through Welcome: choose your **language**, check your

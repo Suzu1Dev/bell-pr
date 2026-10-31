@@ -33,7 +33,7 @@ the tools are ready. A real agent run is still refused until a provider
 is signed in.
 
 ```text
-BELL PR 1.0.0 → http://127.0.0.1:4311
+BELL PR <version> → http://127.0.0.1:4311
 ```
 
 BELL PR opens that address for you when it runs in a terminal. `bell-pr help`

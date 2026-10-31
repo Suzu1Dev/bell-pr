@@ -92,7 +92,7 @@ BELL PR starts on your computer, prints its address and opens BELL PR in your
 browser:
 
 ```text
-BELL PR 1.0.0-rc.1 → http://127.0.0.1:4311
+BELL PR <version> → http://127.0.0.1:4311
 ```
 
 Keep the terminal open: BELL PR runs until you stop it with Ctrl+C. The API

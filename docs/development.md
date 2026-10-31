@@ -194,7 +194,7 @@ its dry run, and turning `dry_run` off makes it fail.
 Try the result without installing it:
 
 ```sh
-npx ./bell-pr-1.0.0-rc.1.tgz start --no-open --port 4400 --data-dir /tmp/bellpr-try
+npx ./bell-pr-<version>.tgz start --no-open --port 4400 --data-dir /tmp/bellpr-try
 ```
 
 `node scripts/release-dry-run.mjs` runs the whole release locally (build,
