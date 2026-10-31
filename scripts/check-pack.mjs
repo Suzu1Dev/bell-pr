@@ -255,10 +255,14 @@ function main() {
     // so a single report lists every problem.
     problems.push(...installAndRunHelp(tarball));
   } finally {
-    try {
-      unlinkSync(tarball);
-    } catch {
-      // The pack step may have failed before writing the file.
+    // Package smoke and the release workflow install this same tarball next.
+    // Local runs remove it (it is gitignored). CI is set on GitHub Actions.
+    if (!process.env.CI) {
+      try {
+        unlinkSync(tarball);
+      } catch {
+        // The pack step may have failed before writing the file.
+      }
     }
   }
 
