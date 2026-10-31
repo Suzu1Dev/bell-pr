@@ -12,7 +12,7 @@
     selected: isZh ? "已選取" : "Selected",
     announceOk: isZh ? "已複製到剪貼簿。" : "Copied to the clipboard.",
     announceFail: isZh
-      ? "複製失敗。指令已選取；請用鍵盤複製。"
+      ? "複製失敗。命令已選取；請用鍵盤複製。"
       : "Copying failed. The command is selected; copy it with your keyboard.",
   };
   const announce = (message) => {

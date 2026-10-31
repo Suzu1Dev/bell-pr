@@ -17,14 +17,15 @@ and respect the maintainers' time. It explains every changed file in plain
 language, asks you to explain the change back before you approve it, and
 drafts a pull request that follows the project's own rules. Before the
 pull request goes out, it checks that the project takes pull requests from
-you, that the issue is still open and yours, and that the change is
-reviewable and honest about its tests.
+you, reviews the issue's open status, claims and existing pull requests,
+and checks that the change is reviewable and honest about its tests.
 
-**Learn while you contribute, never automatic PRs.** Nothing is published
+**Learn while you contribute. No PR is published without your review and approval.**
+Nothing is published
 until you have reviewed every file, explained the change back (on by
 default; you can turn it off, and the run says so) and approved the pull
 request yourself. Publishing checks that the project welcomes it. There is
-no BELL PR cloud, no telemetry and no account.
+no BELL PR cloud, no telemetry and no BELL PR account.
 
 BELL PR is free and open-source software under
 [Apache-2.0](LICENSE). No paid tier.
@@ -48,7 +49,7 @@ BELL PR is free and open-source software under
 
 <!-- generated:product-link key=homepageUrl path=#demo text="Watch the 90-second demo" -->
 [Watch the 90-second demo](https://bell-pr.suzu.tw/#demo)
-<!-- /generated:product-link --> on the site (English captions, plays when you press play).
+<!-- /generated:product-link --> on the site (plays when you press play).
 
 ## Try the sample project
 
@@ -245,7 +246,7 @@ installed and signed in; Discovery also needs a signed-in GitHub CLI.
 ### Cost of a sample run
 
 Agent usage is billed by **your** Codex / Claude account. BELL PR does not
-set prices. Exact tokens and cost for a typical first contribution are
+set prices. Exact token usage and cost for a typical first contribution are
 **not published yet** — they will be added here after one measured run.
 
 ## Supported platforms

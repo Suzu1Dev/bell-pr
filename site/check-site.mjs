@@ -368,7 +368,7 @@ async function checkBrowser(files, { port, screenshots }) {
     await expect(fallback).toHaveText(isZh ? "已選取" : "Selected");
     expect(await page.evaluate(() => window.getSelection().toString())).toBe((await widget.locator("#install-command-powershell").textContent()).trim());
     await expect(page.locator("#copy-status")).toHaveText(isZh
-      ? "複製失敗。指令已選取；請用鍵盤複製。"
+      ? "複製失敗。命令已選取；請用鍵盤複製。"
       : "Copying failed. The command is selected; copy it with your keyboard.");
     await widget.locator("#install-tab-npx").click();
     await selected("npx");
