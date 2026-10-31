@@ -133,7 +133,8 @@ Full access changes writable roles as described [below](#explicit-full-access).
 - **Every role** is denied reading the shared list in
   `shared/credential-denials.ts`: `~/.config/gh` (also where `GH_CONFIG_DIR`
   or `XDG_CONFIG_HOME` moved it; a symbolic link denies that path and its
-  physical path), `~/.git-credentials`, each file named by
+  physical path, also before that directory exists), `~/.git-credentials`,
+  each file named by
   `credential.helper store --file` in the global, XDG or system Git config,
   `~/.netrc`, `~/.ssh`, `~/.aws`, `~/.npmrc`, and Claude Code's and Codex's
   credential files (also where `CLAUDE_CONFIG_DIR` or `CODEX_HOME` moved
@@ -277,6 +278,9 @@ The sudo panel and the doctor warning for that file show:
   directory (`gitDir` on the run, and on a teammate task). Every later git
   command for that checkout passes that path as `--git-dir` and the
   checkout as `--work-tree`. The checkout's `.git` file is not read.
+  Finding that directory again follows symbolic links above the checkout
+  (such as macOS `/var`), but not the checkout's `.git` entry, so a `.git`
+  replaced with a link to another run's cannot take that run's directory.
   A checkout under `worktrees/` or `team-worktrees/` with no recorded git
   directory is refused (`worktreeForged`). With Claude Code's sandbox
   on, writes to `<checkout>/.git` and `<checkout>/.git/**` are denied, so

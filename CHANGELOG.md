@@ -38,6 +38,16 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   anyway and prints a warning, which is how the sample tour opens when no
   AI provider is signed in. A real agent run is still refused until one is.
 
+### Security
+
+- Finding a run checkout's Git directory no longer follows the checkout's
+  own `.git` entry, so a `.git` replaced with a symbolic link to another
+  run's cannot take that run's Git directory. Links above the checkout,
+  such as macOS `/var`, are still resolved. Credential paths that
+  `GH_CONFIG_DIR`, `XDG_CONFIG_HOME`, `CLAUDE_CONFIG_DIR` or `CODEX_HOME`
+  move into a directory that does not exist yet are denied at their
+  physical path too.
+
 ### Added
 
 - Pathname `/pair` page with QR-code prefill, header-only device credentials, and Devices settings for revocation.

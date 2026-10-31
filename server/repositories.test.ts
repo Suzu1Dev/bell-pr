@@ -9,7 +9,7 @@ import { mkdir, mkdtemp, realpath, rm, symlink, writeFile } from "node:fs/promis
 import os from "node:os";
 import path from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
-import { git, recordedGitDir, locateWorktreeGitDir } from "./process.js";
+import { git, recordedGitDir, locateWorktreeGitDir, rememberCheckout } from "./process.js";
 import { createRunWorktree } from "./repositories.js";
 import { AppError, type Repository, type Run } from "./types.js";
 
@@ -176,4 +176,45 @@ test("a run created through a symlinked data directory is recorded under both pa
   await writeFile(path.join(impostor, ".git"), `gitdir: ${run.gitDir}\n`);
   await assert.rejects(git(impostor, ["status"]), (error: unknown) =>
     error instanceof AppError && error.statusCode === 409);
+});
+
+test("a checkout whose .git is replaced by a link to another run's .git keeps its own admin directory", { skip: process.platform === "win32" }, async (t) => {
+  const { directory, repo, run, baseSha } = await fixture(t);
+  // Through a symlinked data directory, as macOS gives /var for /private/var.
+  const alias = `${directory}-alias`;
+  await symlink(directory, alias, "dir");
+  t.after(() => rm(alias, { force: true }));
+  repo.path = path.join(alias, "repo");
+  run.worktreePath = path.join(alias, "worktrees", run.id);
+  await assertRetryWorks(repo, run, baseSha);
+  const common = path.join(repo.path, ".git");
+  // Several other checkouts, so the result does not depend on directory order.
+  const others = ["other-a", "other-b", "other-c"].map((id) => path.join(alias, "worktrees", id));
+  for (const [index, other] of others.entries())
+    await git(repo.path, ["worktree", "add", "-q", "-b", `other/${index}`, other, baseSha]);
+  const admins = await Promise.all(
+    others.map((other) => realpath(path.join(directory, "repo", ".git", "worktrees", path.basename(other)))),
+  );
+  // Each agent replaces its own checkout's .git file with a link to the run's.
+  for (const other of others) {
+    await rm(path.join(other, ".git"));
+    await symlink(path.join(run.worktreePath, ".git"), path.join(other, ".git"));
+  }
+  const physical = await realpath(run.worktreePath);
+  assert.equal(await locateWorktreeGitDir(common, run.worktreePath), run.gitDir);
+  assert.equal(await locateWorktreeGitDir(common, physical), run.gitDir);
+  for (const [index, other] of others.entries())
+    assert.equal(await locateWorktreeGitDir(common, other), admins[index]);
+});
+
+test("a checkout recorded while missing is found through either path to it", { skip: process.platform === "win32" }, async (t) => {
+  const { directory } = await fixture(t);
+  const alias = `${directory}-alias`;
+  await symlink(directory, alias, "dir");
+  t.after(() => rm(alias, { force: true }));
+  // A stored run whose checkout is not there: two levels below the link are missing.
+  rememberCheckout(path.join(alias, "worktrees", "missing-run"), path.join(alias, "repo", ".git", "worktrees", "missing-run"));
+  const gitDir = path.join(directory, "repo", ".git", "worktrees", "missing-run");
+  assert.equal(recordedGitDir(path.join(directory, "worktrees", "missing-run")), gitDir);
+  assert.equal(recordedGitDir(path.join(alias, "worktrees", "missing-run")), gitDir);
 });
