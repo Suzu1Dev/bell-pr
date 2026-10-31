@@ -150,6 +150,17 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **Codex commands start on Linux when `~/.ssh` holds files.** Codex's
+  sandbox profile denied both `~/.ssh/` and `~/.ssh/**`. With any file in
+  `~/.ssh`, such as `known_hosts` or `authorized_keys`, bubblewrap failed to
+  start, so no shell command of a Codex agent ran, in read-only or writable
+  roles. The profile now leaves out an entry that repeats another or lies
+  inside a denied directory, such as a `credential.helper store --file` path
+  inside `~/.ssh`. `~/.ssh` stays denied, file names included. Claude Code's
+  rules are unchanged. The sandbox canary now fails a run whose output
+  contains `bwrap:`, and checks without a model call that Codex's sandbox
+  starts.
+
 - **Opening a contribution from a link.** A link or a reload that names a
   contribution showed the sample project's workspace under that address for a
   moment, so a click there, such as on the **Ask** tab, was lost when the

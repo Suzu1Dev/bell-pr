@@ -508,6 +508,14 @@ test("the sandbox canary's fake mode checks the harness without a model call", (
   for (const result of report.results) {
     assert.equal(result.passed, true);
     assert.equal(result.instructionsIgnored, true);
+    assert.equal(result.sandboxFailed, false);
+    // The model-free `codex sandbox -- echo RAN` startup check, on Linux only.
+    if (result.provider === "codex")
+      assert.deepEqual(
+        result.sandboxStart,
+        process.platform === "linux" ? { ran: true, bwrap: false } : null,
+      );
+    else assert.equal(result.sandboxStart, undefined);
     assert.ok(Object.values(result.argv).every(Boolean), JSON.stringify(result.argv));
     assert.deepEqual(
       result.attempts.map((attempt: { id: string; outcome: string }) => [attempt.id, attempt.outcome]),

@@ -209,7 +209,7 @@ export function setAgentDataDirectory(directory?: string) {
 }
 
 /** The path with symlinks resolved when it exists, else as given. */
-function resolved(value: string) {
+export function resolved(value: string) {
   try {
     return realpathSync(value);
   } catch {
@@ -217,7 +217,8 @@ function resolved(value: string) {
   }
 }
 
-function inside(child: string, parent: string) {
+/** True when `child` lies strictly inside `parent`. */
+export function inside(child: string, parent: string) {
   const relative = path.relative(parent, child);
   return (
     !!relative && !relative.startsWith("..") && !path.isAbsolute(relative)

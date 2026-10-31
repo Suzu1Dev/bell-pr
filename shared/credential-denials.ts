@@ -85,7 +85,7 @@ function tokenize(value: string): string[] {
   return out;
 }
 
-function expandHome(file: string, home: string) {
+export function expandHome(file: string, home: string) {
   if (file === "~") return home;
   if (file.startsWith("~/") || file.startsWith("~\\"))
     return path.join(home, file.slice(2));
