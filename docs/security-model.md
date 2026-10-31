@@ -297,7 +297,11 @@ Full access changes writable roles as described [below](#explicit-full-access).
   names a directory through a symbolic link, the profile lists only its
   physical path, which Claude Code's rules name next to the path as given.
   On Linux, reads through the link are still denied, but a symlinked home
-  directory still stops Codex's sandbox from starting. The checkout's
+  directory still stops Codex's sandbox from starting. A path with a
+  quote, backslash, brace or line break in it cannot be written into the
+  profile and is left out. When that is the physical path of a link, the path as given
+  stays listed instead, so on Linux Codex's sandbox does not start rather
+  than leave the file readable. The checkout's
   `.git` path and `.git/**` are `read`, so that path cannot be edited or
   replaced and Git can still read it. The person can turn Claude Code's
   sandbox off; Codex is started with this profile on each turn unless

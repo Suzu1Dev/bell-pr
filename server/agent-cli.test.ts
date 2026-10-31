@@ -222,6 +222,13 @@ test("Codex deny entries never repeat, lie inside a denied directory or pass thr
     await mkdir(path.join(realConfig, directory), { recursive: true });
   const linkConfig = path.join(root, "link-config");
   await symlink(realConfig, linkConfig, "dir");
+  // ~/.codex links to a folder whose physical path the profile cannot hold.
+  const braceHome = path.join(root, "brace-home");
+  await makeHome(braceHome);
+  const braceCodex = path.join(root, "Sync {work}", "codex");
+  await mkdir(braceCodex, { recursive: true });
+  await rm(path.join(braceHome, ".codex"), { recursive: true });
+  await symlink(braceCodex, path.join(braceHome, ".codex"), "dir");
   const defaults = (home: string) => ({
     XDG_CONFIG_HOME: path.join(home, ".config"),
     CODEX_HOME: path.join(home, ".codex"),
@@ -241,6 +248,11 @@ test("Codex deny entries never repeat, lie inside a denied directory or pass thr
         GH_CONFIG_DIR: path.join(linkConfig, "new", "gh"),
         XDG_CONFIG_HOME: path.join(linkConfig, "xdg"),
       },
+    },
+    {
+      name: "CODEX_HOME through a link to a path the profile cannot hold",
+      home: braceHome,
+      env: { CODEX_HOME: path.join(braceHome, ".codex") },
     },
   ];
   for (const { name, home, env } of cases) {
@@ -299,6 +311,12 @@ test("Codex deny entries never repeat, lie inside a denied directory or pass thr
           assert.ok(entries.includes(path.join(realConfig, file)), `${name}: Codex physical ${file}`);
         }
         assert.ok(!entries.some((entry) => entry.startsWith(`${linkConfig}/`)), `${name}: ${entries.join(" ")}`);
+      }
+      if (name === "CODEX_HOME through a link to a path the profile cannot hold") {
+        // The physical form cannot be written, so the linked one stays and
+        // the sandbox fails closed instead of leaving auth.json readable.
+        assert.ok(shared.includes(path.join(braceCodex, "auth.json")), `${name}: shared physical`);
+        assert.ok(entries.includes("~/.codex/auth.json"), `${name}: ${entries.join(" ")}`);
       }
     }
   }

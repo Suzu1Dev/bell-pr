@@ -103,6 +103,14 @@ function claudeAccess(access: AgentAccess, web: boolean, full: boolean): string[
 }
 
 /**
+ * A path the Codex profile can hold as a quoted TOML key: no quote,
+ * backslash, brace or line break. Other paths are left out of the profile.
+ */
+function codexProfilePath(entry: string): boolean {
+  return !/["\\\r\n{}]/.test(entry);
+}
+
+/**
  * The shared credential denials as Codex deny entries, leaving out an
  * entry that repeats an earlier one or lies under a denied directory (an
  * entry written with a trailing `/`), as written or at its physical path,
@@ -125,18 +133,26 @@ function claudeAccess(access: AgentAccess, web: boolean, full: boolean): string[
  * Under a symlinked HOME the `~` entries still pass through the link, so
  * that case still fails. Verified with codex-cli 0.159.0 and 0.166.0
  * (`codex sandbox`) on Linux with bubblewrap 0.11.1.
+ *
+ * Entries the profile cannot hold are taken out before anything is
+ * compared, so an entry is only left out for one that reaches the profile.
+ * When a link's physical path holds such a character, the linked form
+ * stays: the sandbox then fails to start instead of leaving the file
+ * readable.
  */
 function codexDenials(): string[] {
   const home = process.env.HOME || os.homedir();
-  const entries = sharedCredentialDenials().map((entry) => {
-    const target = path.resolve(expandHome(entry, home));
-    return {
-      entry,
-      target,
-      physical: physicalPath(target),
-      directory: entry.endsWith("/"),
-    };
-  });
+  const entries = sharedCredentialDenials()
+    .filter(codexProfilePath)
+    .map((entry) => {
+      const target = path.resolve(expandHome(entry, home));
+      return {
+        entry,
+        target,
+        physical: physicalPath(target),
+        directory: entry.endsWith("/"),
+      };
+    });
   return entries
     .filter(
       (item, index) =>
@@ -168,12 +184,10 @@ export function codexSandboxConfig(access: AgentAccess, cwd: string): string[] {
   const dotGit = path.join(cwd, ".git");
   const filesystem = [
     "glob_scan_max_depth=4",
-    ...codexDenials().flatMap((entry) =>
-      /["\\\r\n{}]/.test(entry) ? [] : [`"${entry}"="deny"`],
-    ),
-    ...[dotGit, `${dotGit}/**`].flatMap((entry) =>
-      /["\\\r\n{}]/.test(entry) ? [] : [`"${entry}"="read"`],
-    ),
+    ...codexDenials().map((entry) => `"${entry}"="deny"`),
+    ...[dotGit, `${dotGit}/**`]
+      .filter(codexProfilePath)
+      .map((entry) => `"${entry}"="read"`),
   ].join(", ");
   const parent = access === "write" ? ":workspace" : ":read-only";
   return [
