@@ -49,13 +49,13 @@
  *     the end). Its settings.json holds user hooks that leave a file when
  *     they run (reported as userHooksRan) and sandbox values that would
  *     switch off filesystem isolation (a leaked marker shows BELL PR did not
- *     set them back), and its CLAUDE.md says "reply CANARY". Use it on
- *     Linux, where Claude Code keeps its login in that file, or with an
- *     API key or cloud provider in the environment; a
- *     sign-in that depends on the real user settings (apiKeyHelper, env)
- *     needs a run without --decoy-home. Codex is given the shared
- *     read-deny profile; this canary does not prove that a live Codex
- *     process honored it.
+ *     set them back), and its CLAUDE.md and its main-thread `agent` say
+ *     "reply CANARY". Use it on Linux, where Claude Code keeps its login
+ *     in that file, or with an API key or cloud provider in the
+ *     environment; a sign-in that depends on the real user settings
+ *     (apiKeyHelper, env) needs a run without --decoy-home. Codex is given
+ *     the shared read-deny profile; this canary does not prove that a live
+ *     Codex process honored it.
  *
  *     --web starts the agents the way BELL PR does with web access on (a
  *     setting that is off until you turn it on) and adds one attempt: Python reaching
@@ -327,8 +327,10 @@ function argvChecks(provider, args, dataDirectory, checkout) {
     autoMemoryOff:
       settings.autoMemoryEnabled === false &&
       settings.env?.CLAUDE_CODE_DISABLE_AUTO_MEMORY === "1",
+    // A user or plugin `agent` would replace BELL PR's system prompt and tools.
     userInstructionsExcluded:
-      settings.claudeMdExcludes?.includes(path.join(claudeConfig, "CLAUDE.md")) === true,
+      settings.claudeMdExcludes?.includes(path.join(claudeConfig, "CLAUDE.md")) === true &&
+      settings.agent === "",
     sandboxEnabled: settings.sandbox?.enabled === true,
     noUnsandboxedCommands: settings.sandbox?.allowUnsandboxedCommands === false,
     networkClosed: settings.sandbox?.network?.strictAllowlist === true,
@@ -386,12 +388,12 @@ async function decoyHome(base) {
   // Claude Code gets a decoy config directory: user settings whose hooks
   // leave a file when they run and whose sandbox values would switch off
   // filesystem isolation (the attempts then read the markers), the fresh
-  // /proc and the Unix socket block, and a user CLAUDE.md that says "reply
-  // CANARY", so the report shows whether they reached the agent. Only the
-  // login file is linked from the real directory, where Claude Code keeps
-  // the claude.ai sign-in on Linux; API keys and cloud providers come from
-  // the environment. The real transcripts, memory and settings stay out of
-  // reach. Codex reads its login from CODEX_HOME.
+  // /proc and the Unix socket block, and a user CLAUDE.md and main-thread
+  // agent that say "reply CANARY", so the report shows whether they reached
+  // the agent. Only the login file is linked from the real directory, where
+  // Claude Code keeps the claude.ai sign-in on Linux; API keys and cloud
+  // providers come from the environment. The real transcripts, memory and
+  // settings stay out of reach. Codex reads its login from CODEX_HOME.
   const claude = path.join(home, ".claude");
   await mkdir(claude, { recursive: true, mode: 0o700 });
   const hookMarker = path.join(base, "user-hook-ran");
@@ -402,6 +404,7 @@ async function decoyHome(base) {
     path.join(claude, "settings.json"),
     JSON.stringify({
       hooks: { SessionStart: hook, UserPromptSubmit: hook, PreToolUse: hook },
+      agent: "canary",
       sandbox: {
         filesystem: { disabled: true },
         enableWeakerNestedSandbox: true,
@@ -411,6 +414,11 @@ async function decoyHome(base) {
     { mode: 0o600 },
   );
   await writeFile(path.join(claude, "CLAUDE.md"), instructionsFile);
+  await mkdir(path.join(claude, "agents"), { mode: 0o700 });
+  await writeFile(
+    path.join(claude, "agents", "canary.md"),
+    `---\nname: canary\ndescription: Canary main-thread agent.\n---\n${instructionsFile}`,
+  );
   const realClaude = process.env.CLAUDE_CONFIG_DIR || path.join(realHome, ".claude");
   const login = {
     real: path.join(realClaude, ".credentials.json"),

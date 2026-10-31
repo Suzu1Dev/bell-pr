@@ -52,6 +52,7 @@ const settingsOf = (args: string[]) =>
     env?: Record<string, string>;
     outputStyle?: string;
     language?: string;
+    agent?: string;
     claudeMdExcludes?: string[];
     permissions: { deny: string[]; blockReadsOutsideWorkingDirectories?: boolean };
     sandbox?: {
@@ -74,7 +75,9 @@ const settingsOf = (args: string[]) =>
 /**
  * What every Claude turn switches off in the user's settings: hooks (they run
  * outside the sandbox), auto memory (kept under ~/.claude/projects/ across
- * runs), and the user's own instructions, output style and language.
+ * runs), and the user's own instructions, output style and language, and a
+ * main-thread agent from the user's or a plugin's settings (it would replace
+ * the system prompt and drop StructuredOutput from schema turns).
  */
 function assertUserCustomizationsOff(settings: ReturnType<typeof settingsOf>) {
   assert.equal(settings.disableAllHooks, true);
@@ -82,6 +85,7 @@ function assertUserCustomizationsOff(settings: ReturnType<typeof settingsOf>) {
   assert.deepEqual(settings.env, { CLAUDE_CODE_DISABLE_AUTO_MEMORY: "1" });
   assert.equal(settings.outputStyle, "default");
   assert.equal(settings.language, "");
+  assert.equal(settings.agent, "");
   assert.equal(settings.claudeMdExcludes?.length, 2);
 }
 

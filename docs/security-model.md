@@ -127,13 +127,18 @@ Full access included, it switches off:
   `~/.claude/projects/<working directory>/memory/`, so nothing from an
   imported project is kept there between runs.
 - **Your own instructions**: your `CLAUDE.md` and `rules/` in that folder
-  (`claudeMdExcludes`), your output style (`outputStyle: "default"`) and
-  your `language` setting. BELL PR's prompt sets the output language.
-  Managed policy files still load.
+  (`claudeMdExcludes`), your output style (`outputStyle: "default"`), your
+  `language` setting, and a main-thread `agent` set in your settings or in
+  a plugin's `settings.json` (`agent: ""`), which would replace Claude
+  Code's system prompt and narrow the tools, so a turn that must answer in
+  a fixed format could not. BELL PR's prompt sets the output language.
+  Managed policy files still load, and so does an output style that one of
+  your plugins forces (see the list below).
 
 Your plugins' MCP servers stay off (`--strict-mcp-config`), and a turn's
 tool list has no tool that starts a skill or a subagent. Your plugins'
-language servers stay on; the list below says when they run.
+language servers and an output style a plugin forces stay on; the list
+below says when they apply.
 
 In writable roles that run in the sandbox, BELL PR also passes the default
 for each single sandbox value that would weaken the sandbox, so yours does
@@ -150,9 +155,9 @@ fresh `/proc`.
 
 Lists and `env` merge with yours instead of being replaced. BELL PR cannot
 unset a proxy port or a `sandbox.ripgrep` command you set, and it has no
-switch for your plugins' language servers. So these user settings still
-apply in BELL PR's turns and widen what agents may do beyond the limits
-below:
+switch for your plugins' language servers or for an output style a plugin
+forces. So these user settings still apply in BELL PR's turns and widen
+what agents may do beyond the limits below, or add to their instructions:
 
 - `permissions.additionalDirectories` adds working directories. Read-only
   roles can read them (they count for
@@ -182,6 +187,12 @@ below:
   checkout with your user rights and network. Some run code from the
   project they open, such as build scripts, and their diagnostics are
   added to the turn. Read-only roles do not start them.
+- An output style that one of your plugins forces (`force-for-plugin: true`
+  in the style's front matter), from the plugins you enabled or a plugin
+  folder in `~/.claude/skills/<name>/`, is added to every turn in every
+  role, including the read-only roles and the turns that must answer in a
+  fixed format. Claude Code chooses it before it reads `outputStyle`, and
+  it still reports the default style, so BELL PR cannot see or reset it.
 - On Linux, `sandbox.ripgrep` replaces the ripgrep Claude Code runs before
   each sandboxed command of a writable role. Your command runs outside the
   sandbox, in the run's checkout, with your user rights. The sandbox keeps
@@ -202,8 +213,8 @@ out of your user settings where your sign-in allows it. The `permissions`
 keys and the sandbox lists can move to the `.claude/settings.json` of the
 projects that need them, because BELL PR's agents never load project
 settings (Claude Code ignores the proxy ports, the macOS lists and
-`sandbox.ripgrep` there). Disable plugins that bring language servers,
-for example with `claude plugin disable <plugin>`.
+`sandbox.ripgrep` there). Disable plugins that bring language servers or
+force an output style, for example with `claude plugin disable <plugin>`.
 
 ### Claude Code
 
@@ -480,10 +491,11 @@ printed.
   off filesystem isolation, the fresh `/proc` and the Unix socket block (a
   marker read with filesystem isolation off is a leak, and the argv check
   `sandboxNotWeakened` needs BELL PR to set them back), and a user
-  `CLAUDE.md` that says "reply CANARY". For Claude Code, an init event that
-  names an auto-memory folder fails the check as well (`autoMemory`). A
-  sign-in that needs your user settings, such as `apiKeyHelper`, needs a
-  run without `--decoy-home`.
+  `CLAUDE.md` and a main-thread `agent` that say "reply CANARY" (the argv
+  check `userInstructionsExcluded` needs `agent: ""`). For Claude Code, an
+  init event that names an auto-memory folder fails the check as well
+  (`autoMemory`). A sign-in that needs your user settings, such as
+  `apiKeyHelper`, needs a run without `--decoy-home`.
   The current build passes Codex a read-deny profile;
   that profile was not what the 2026-10-14 run below used. Run the Codex
   canary with `--decoy-home`, and from a shell without token variables

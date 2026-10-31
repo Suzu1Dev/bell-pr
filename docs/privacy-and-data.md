@@ -112,12 +112,13 @@ Codex's built-in defaults apply instead.
 Claude Code agents still load your user settings (`~/.claude/settings.json`),
 so your sign-in, your default model and an opt-out you set in its `env`
 apply to them. BELL PR switches off your hooks, auto memory, `CLAUDE.md`,
-output style and language setting for its agents; the
-[security model](security-model.md#your-own-claude-code-settings) lists the
-settings that still apply. With auto memory off, Claude Code keeps no notes
-about the projects you imported in `~/.claude/projects/`. Earlier BELL PR
-versions left it on, so such notes may already exist there; see
-[Deleting data](#deleting-data).
+output style, language setting and main-thread `agent` setting for its
+agents. An output style that one of your plugins forces still applies; the
+[security model](security-model.md#your-own-claude-code-settings) lists it
+and the other settings that still apply. With auto memory off, Claude Code
+keeps no notes about the projects you imported in `~/.claude/projects/`.
+Earlier BELL PR versions left it on, so such notes may already exist there;
+see [Deleting data](#deleting-data).
 
 ## What BELL PR stores
 

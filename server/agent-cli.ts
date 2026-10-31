@@ -226,9 +226,14 @@ function claudeUserMemoryFiles(): string[] {
  * turns off what would run or persist outside BELL's control: hooks, which run
  * outside the sandbox (`disableAllHooks`; managed hooks still run), and auto
  * memory under ~/.claude/projects/, also when the user's `env` forces it on
- * (`autoMemoryEnabled`, `CLAUDE_CODE_DISABLE_AUTO_MEMORY`). Besides managed
- * policy, BELL's prompt is the only instruction: the user's CLAUDE.md and
- * rules (`claudeMdExcludes`), output style and `language` are left out.
+ * (`autoMemoryEnabled`, `CLAUDE_CODE_DISABLE_AUTO_MEMORY`). The user's own
+ * instructions are left out too: CLAUDE.md and rules (`claudeMdExcludes`),
+ * output style, `language`, and a main-thread `agent` from the user's or a
+ * plugin's settings, which would replace the system prompt and narrow the
+ * tools, StructuredOutput included (`agent: ""` selects none). Managed
+ * policy still applies, and so does an output style that a loaded plugin
+ * forces (`force-for-plugin`): Claude Code picks it before reading
+ * `outputStyle`, and only disabling that plugin stops it.
  *
  * Keys verified against the settings schema bundled in Claude Code 2.1.292
  * (`permissions` and `sandbox` are passthrough objects there, so a key a
@@ -255,6 +260,7 @@ export function claudeSettings(options: {
   env: { CLAUDE_CODE_DISABLE_AUTO_MEMORY: "1" };
   outputStyle: "default";
   language: "";
+  agent: "";
   claudeMdExcludes: string[];
   permissions: { deny: string[]; blockReadsOutsideWorkingDirectories?: boolean };
   sandbox?: {
@@ -283,6 +289,7 @@ export function claudeSettings(options: {
     env: { CLAUDE_CODE_DISABLE_AUTO_MEMORY: "1" },
     outputStyle: "default",
     language: "",
+    agent: "",
     claudeMdExcludes: claudeUserMemoryFiles(),
     permissions: {
       deny: agentReadDenials(options.cwd),
