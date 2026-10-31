@@ -18,6 +18,7 @@ import { changeFingerprint } from "../shared/change-fingerprint";
 import type { DiscoveryJob } from "../shared/discovery";
 import type { Locale } from "../shared/i18n/locale";
 import { readDiff } from "../server/git";
+import { git as bellGit } from "../server/process";
 import byHandText from "../src/byhand/write/i18n/en";
 import byHandZh from "../src/byhand/write/i18n/zh-TW";
 import { getSampleDiscoveryJob } from "../src/demo/discovery";
@@ -60,7 +61,7 @@ async function seed(dataDir: string) {
   const baseSha = git(checkout, "rev-parse", "HEAD");
   const worktree = async (id: string) => {
     const worktreePath = path.join(dataDir, "worktrees", id);
-    git(checkout, "worktree", "add", "-q", "-b", `by-hand/${id}`, worktreePath, baseSha);
+    await bellGit(checkout, ["worktree", "add", "-q", "-b", `by-hand/${id}`, worktreePath, baseSha]);
     await writeFile(path.join(worktreePath, source), retryAfter);
     const files = await readDiff({ worktreePath, baseSha, locale: "en" });
     return { worktreePath, fingerprint: changeFingerprint(files.map((file) => ({ path: file.path, fingerprint: file.fingerprint }))) };

@@ -14,6 +14,7 @@ import { expect, test, type Browser, type Page } from "@playwright/test";
 import { e2eApiHeaders } from "./api-token.mjs";
 import { changeFingerprint } from "../shared/change-fingerprint";
 import { readDiff } from "../server/git";
+import { git as bellGit } from "../server/process";
 import byHandText from "../src/byhand/write/i18n/en";
 import { startReadyServer } from "./helpers/ready-server";
 import type { LaunchedServer } from "./start-server.mjs";
@@ -45,7 +46,7 @@ async function seed(dataDir: string) {
   const baseSha = git(checkout, "rev-parse", "HEAD");
   const worktree = async (id: string) => {
     const worktreePath = path.join(dataDir, "worktrees", id);
-    git(checkout, "worktree", "add", "-q", "-b", `by-hand/${id}`, worktreePath, baseSha);
+    await bellGit(checkout, ["worktree", "add", "-q", "-b", `by-hand/${id}`, worktreePath, baseSha]);
     await writeFile(path.join(worktreePath, source), retryAfter);
     const files = await readDiff({ worktreePath, baseSha, locale: "en" });
     return { worktreePath, fingerprint: changeFingerprint(files.map((file) => ({ path: file.path, fingerprint: file.fingerprint }))) };
