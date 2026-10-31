@@ -105,7 +105,7 @@ most of them on Linux and macOS with Node.js 22 and 24.
 | `node scripts/tokenize-css.mjs --check` | The CSS uses the design tokens |
 | `node scripts/generate-third-party-notices.mjs --check` | The third-party notices are current |
 | `node scripts/audit.mjs` | No high or critical advisories outside the allowlist |
-| `node scripts/check-pack.mjs` | The package's size, contents and bundle budgets |
+| `node scripts/check-pack.mjs` (and `--tarball <file>`) | The package's size, contents and bundle budgets; `--tarball` checks a packed tarball as it is, including that its README has no relative link left |
 
 Most scripts also have a `--self-test`.
 
@@ -177,10 +177,16 @@ The originals wait in the folder `.README.md.orig` (gitignored) and
 `postpack` puts them back byte for byte. If a pack stops halfway, run
 `node scripts/npm-readme.mjs --post` before you pack again.
 
-Publish the packed tarball (`npm publish bell-pr-<version>.tgz`), as the
-release workflow does. `npm publish` from the folder reads the README again
-after `postpack` has restored the originals, so npmjs.com would show the
-unprocessed README, possibly the Chinese one.
+Official releases are published only by `.github/workflows/release.yml`,
+from a pushed `v*` tag that names the version in `package.json`; never run
+`npm publish` by hand. The workflow packs once with `npm pack`, checks that
+tarball as it is with `node scripts/check-pack.mjs --tarball`, and
+checksums, uploads and publishes that same file. It publishes the tarball,
+not the folder: `npm publish` from the folder reads the README again after
+`postpack` has restored the originals, so npmjs.com would show the
+unprocessed README, possibly the Chinese one. The Docker image is pushed
+only after npm publish succeeded. Started by hand, the workflow only runs
+its dry run, and turning `dry_run` off makes it fail.
 
 Try the result without installing it:
 

@@ -123,7 +123,8 @@ jobs:
         run: node scripts/pack-expected.mjs --check
       - name: Pack (prepack builds)
         run: npm pack
-      - run: node scripts/check-pack.mjs
+      - name: Check the packed tarball as it is
+        run: node scripts/check-pack.mjs --tarball "bell-pr-$(node -p "require('./package.json').version").tgz"
       - name: Install the tarball into a temporary prefix
         run: npm install -g --prefix "$RUNNER_TEMP/p" ./bell-pr-*.tgz
       - name: Run the installed command outside the checkout

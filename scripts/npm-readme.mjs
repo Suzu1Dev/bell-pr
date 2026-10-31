@@ -415,6 +415,19 @@ export function npmReadme(text, { homepageUrl = "", sitePath = () => undefined }
   return { text: output + text.slice(cursor), changed, linked };
 }
 
+/**
+ * What still keeps a README from showing on npmjs.com after npmReadme: each
+ * relative link or image left in `text`. Empty for a README ready for npm.
+ * scripts/check-pack.mjs --tarball runs it on the README of a packed tarball.
+ */
+export function relativeReferencesLeft(text) {
+  const found = [];
+  for (const reference of references(text))
+    if (isRelative(reference.dest)) found.push(`line ${reference.line} still links to "${reference.dest}".`);
+  if (/\]\((?:\.\/)?docs\//.test(text)) found.push("still contains ](docs/.");
+  return found;
+}
+
 function readProduct(root) {
   const file = path.join(root, "shared", "product.ts");
   let source;
@@ -634,10 +647,7 @@ export function checkDocs(root, env = process.env) {
     for (const homepageUrl of new Set([readProduct(root).homepageUrl, "https://homepage.invalid"])) {
       try {
         const { text: packed, linked } = npmReadme(read(readmeName), { homepageUrl, sitePath });
-        for (const reference of references(packed))
-          if (isRelative(reference.dest))
-            found.add(`README.md (npm): line ${reference.line} still links to "${reference.dest}".`);
-        if (/\]\((?:\.\/)?docs\//.test(packed)) found.add("README.md (npm): still contains ](docs/.");
+        for (const problem of relativeReferencesLeft(packed)) found.add(`README.md (npm): ${problem}`);
         for (const link of linked)
           if (!deployed.has(link.sitePath))
             found.add(`README.md (npm): line ${link.line} links "${link.target}" to ${link.sitePath}, which site/ does not serve.`);
@@ -746,6 +756,19 @@ function selfTest() {
     assert.ok(output.includes("<!-- a comment with [a link](docs/c.md) -->"));
     assert.deepEqual(references(output).filter((reference) => isRelative(reference.dest)), []);
   }
+  // What check-pack --tarball reports for a README that --pre did not rewrite.
+  assert.deepEqual(relativeReferencesLeft(readme), [
+    'line 3 still links to "README.zh-TW.md".',
+    'line 5 still links to "docs/images/en/run-changes-1280.png".',
+    'line 7 still links to "./docs/images/en/home-1280.png".',
+    'line 9 still links to "docs/getting-started.md#requirements".',
+    'line 9 still links to ".env.example".',
+    'line 10 still links to "CONTRIBUTING.md".',
+    'line 13 still links to "docs/images/en/team-390.png".',
+    'line 13 still links to "docs/faq.md".',
+    "still contains ](docs/.",
+  ]);
+  assert.deepEqual(relativeReferencesLeft("# Ready\n\n[Node](https://nodejs.org/en) and [Features](#features).\n"), []);
   // The rewrite keeps line endings, and a text without paths stays as it is.
   const crlf = readme.replace(/\n/g, "\r\n");
   assert.equal(npmReadme(crlf, site).text, a.replace(/\n/g, "\r\n"));
