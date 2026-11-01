@@ -2,6 +2,18 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { gunzipSync } from "node:zlib";
 
+/**
+ * `value` as the command or one argument of a spawnSync call that uses
+ * `shell: true` exactly on Windows, as npm (npm.cmd) needs there. Node
+ * passes that command line to cmd.exe unquoted, so a path with a space,
+ * such as a temporary folder under C:\Users\Octo Cat, would split. Quoted
+ * on Windows (a backslash before the closing quote doubled), unchanged
+ * elsewhere.
+ */
+export function shellArg(value, platform = process.platform) {
+  return platform === "win32" ? `"${value.replace(/(\\+)$/, "$1$1")}"` : value;
+}
+
 /** Finds npm's pack report among lifecycle output and bracketed build warnings. */
 export function parsePackReport(stdout) {
   const offsets = (regex) => [...stdout.matchAll(regex)].map((match) => match.index);
@@ -40,7 +52,9 @@ export function tarballReport(file) {
   // Two zero blocks end the archive.
   for (let offset = 0; offset + 512 <= data.length && data[offset] !== 0; ) {
     const size = Number.parseInt(text(offset + 124, 12).trim() || "0", 8);
-    if (!Number.isSafeInteger(size)) throw new Error(`unreadable tar header at byte ${offset}.`);
+    // A size of -512 or less would keep the cursor in place, or move it back.
+    if (!Number.isSafeInteger(size) || size < 0) throw new Error(`unreadable tar header at byte ${offset}.`);
+    if (offset + 512 + size > data.length) throw new Error(`the tar entry at byte ${offset} is cut short.`);
     const type = text(offset + 156, 1) || "0";
     const ustar = data.toString("latin1", offset + 257, offset + 263) === "ustar\0";
     const prefix = ustar ? text(offset + 345, 155) : "";

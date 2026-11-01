@@ -51,7 +51,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import { gzipSync } from "node:zlib";
-import { parsePackReport, tarballReport } from "./npm-pack-report.mjs";
+import { parsePackReport, shellArg, tarballReport } from "./npm-pack-report.mjs";
 import { isReadme, packageReadmeProblems } from "./npm-readme.mjs";
 import { diffExpected, readExpected } from "./pack-expected.mjs";
 
@@ -114,7 +114,7 @@ function pack(destination) {
   // --ignore-scripts skips prepack; callers must already have run `npm run build`.
   const result = spawnSync(
     npmCommand(),
-    ["pack", "--json", "--ignore-scripts", "--pack-destination", destination],
+    ["pack", "--json", "--ignore-scripts", "--pack-destination", shellArg(destination)],
     {
       cwd: root,
       encoding: "utf8",
@@ -143,7 +143,7 @@ function installAndRunHelp(tarball) {
     // node_modules/.bin). Same layout as a user global install into a prefix.
     const install = spawnSync(
       npmCommand(),
-      ["install", "-g", "--prefix", prefix, "--no-fund", "--no-audit", tarball],
+      ["install", "-g", "--prefix", shellArg(prefix), "--no-fund", "--no-audit", shellArg(tarball)],
       {
         cwd: root,
         encoding: "utf8",
@@ -184,7 +184,7 @@ function installAndRunHelp(tarball) {
     } catch (error) {
       problems.push(`packaged bin/bellpr.mjs missing after install (${targetBin}): ${error.message}`);
     }
-    const help = spawnSync(binPath, ["--help"], {
+    const help = spawnSync(shellArg(binPath), ["--help"], {
       cwd: prefix,
       encoding: "utf8",
       maxBuffer: 4 * 1024 * 1024,
