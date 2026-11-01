@@ -118,6 +118,17 @@ function codexProfilePath(entry: string): boolean {
  * names its physical path. `~` is expanded only to compare; entries keep
  * their spelling.
  *
+ * Every `X/**` entry (`~/.config/gh/**`, `~/.aws/**`, `~/.ssh/**` and the
+ * gh config directory that `GH_CONFIG_DIR` or `XDG_CONFIG_HOME` moves)
+ * reaches Codex as the directory `X/`. Codex skips symbolic links when it
+ * expands `**`, so a credential file in X that is a link (as dotfile
+ * managers and vaults leave them) stayed readable: in every role with
+ * 0.159, in read-only roles with 0.166 (its writable roles failed to
+ * start instead). The directory form hides it with the rest of X, nested
+ * files included, and both roles start. The link's target outside X is
+ * still readable at its own path. `~/.ssh/**` then repeats `~/.ssh/` and
+ * is left out. Claude Code's Read rules keep `X/**`.
+ *
  * On Linux, bubblewrap cannot place a deny inside a directory it has
  * already denied: with `~/.ssh/` and `~/.ssh/**` both listed, any file in
  * `~/.ssh` stopped every command from starting ("Can't create file at
@@ -144,6 +155,7 @@ function codexDenials(): string[] {
   const home = process.env.HOME || os.homedir();
   const entries = sharedCredentialDenials()
     .filter(codexProfilePath)
+    .map((entry) => (entry.endsWith("/**") ? entry.slice(0, -2) : entry))
     .map((entry) => {
       const target = path.resolve(expandHome(entry, home));
       return {
@@ -172,7 +184,8 @@ function codexDenials(): string[] {
  * Codex permission profile for one turn. `--sandbox` is not passed: on
  * Codex CLI 0.165 it selects the older sandbox, which does not apply
  * `default_permissions`, so the read denials would be ignored.
- * `glob_scan_max_depth` makes a `**` deny apply on Linux.
+ * `glob_scan_max_depth` makes a glob deny apply on Linux; the credential
+ * directories reach Codex as directories instead (see codexDenials).
  *
  * Filesystem values are only `read`, `write`, or `deny`. `deny` blocks
  * reads and writes. `read` allows reads and forbids writes, including

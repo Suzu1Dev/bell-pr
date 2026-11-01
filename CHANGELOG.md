@@ -51,6 +51,18 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Security
 
+- **Codex no longer reads credential files that are symbolic links in
+  `~/.aws` or the GitHub CLI config directory.** On Linux, Codex leaves
+  out symbolic links when it expands `**`, so a `~/.aws/credentials` or
+  `~/.config/gh/hosts.yml` that a dotfile manager or vault links into
+  place stayed readable: in every role with Codex CLI 0.159, and in
+  read-only roles with 0.166, whose writable roles failed to start
+  instead. Codex's profile now denies these directories themselves
+  (`~/.aws/`, `~/.config/gh/`, and the directory `GH_CONFIG_DIR` or
+  `XDG_CONFIG_HOME` moves gh to), as it already did for `~/.ssh`, so
+  their file names are hidden as well and both roles start. A link's
+  target outside the directory is still readable at its own path.
+  Claude Code's rules are unchanged.
 - **Symbolic links in the data directory and moved config directories.**
   When the data directory is reached through a symbolic link (macOS `/var`
   is `/private/var`), run and teammate checkouts keep the Git directory

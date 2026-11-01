@@ -229,6 +229,27 @@ test("Codex deny entries never repeat, lie inside a denied directory or pass thr
   await mkdir(braceCodex, { recursive: true });
   await rm(path.join(braceHome, ".codex"), { recursive: true });
   await symlink(braceCodex, path.join(braceHome, ".codex"), "dir");
+  // Credential files that are symbolic links into a vault, as a dotfile
+  // manager leaves them, in ~/.aws, ~/.config/gh and the moved gh config.
+  // Codex skips links when it expands `**`, so only `X/` denies them.
+  const linkFilesHome = path.join(root, "link-files-home");
+  await makeHome(linkFilesHome);
+  const vault = path.join(root, "vault");
+  await mkdir(vault);
+  const movedGh = path.join(root, "moved-gh");
+  const movedXdg = path.join(root, "moved-xdg");
+  await mkdir(path.join(linkFilesHome, ".aws", "sso", "cache"), { recursive: true });
+  await writeFile(path.join(linkFilesHome, ".aws", "sso", "cache", "x.json"), "decoy\n");
+  for (const [name, at] of [
+    ["aws-credentials", path.join(linkFilesHome, ".aws", "credentials")],
+    ["gh-hosts.yml", path.join(linkFilesHome, ".config", "gh", "hosts.yml")],
+    ["moved-gh-hosts.yml", path.join(movedGh, "hosts.yml")],
+    ["moved-xdg-hosts.yml", path.join(movedXdg, "gh", "hosts.yml")],
+  ]) {
+    await writeFile(path.join(vault, name), "decoy\n");
+    await mkdir(path.dirname(at), { recursive: true });
+    await symlink(path.join(vault, name), at, "file");
+  }
   const defaults = (home: string) => ({
     XDG_CONFIG_HOME: path.join(home, ".config"),
     CODEX_HOME: path.join(home, ".codex"),
@@ -254,6 +275,11 @@ test("Codex deny entries never repeat, lie inside a denied directory or pass thr
       home: braceHome,
       env: { CODEX_HOME: path.join(braceHome, ".codex") },
     },
+    {
+      name: "credential files that are symbolic links",
+      home: linkFilesHome,
+      env: { GH_CONFIG_DIR: movedGh, XDG_CONFIG_HOME: movedXdg },
+    },
   ];
   for (const { name, home, env } of cases) {
     for (const key of keys) delete process.env[key];
@@ -277,6 +303,10 @@ test("Codex deny entries never repeat, lie inside a denied directory or pass thr
         }
       assert.ok(entries.includes("~/.ssh/"), name);
       assert.ok(!entries.includes("~/.ssh/**"), name);
+      // Codex skips symbolic links when it expands `**`: every `X/**`
+      // credential entry reaches it as the directory `X/`.
+      assert.ok(entries.includes("~/.aws/"), name);
+      assert.ok(!entries.some((entry) => entry.endsWith("/**")), `${name}: ${entries.join(" ")}`);
       // A path that only shares the ~/.ssh prefix is not inside it.
       assert.ok(entries.some((entry) => entry.endsWith("/.ssh-backup/creds")), name);
       assert.ok(entries.some((entry) => entry.endsWith("/.sshx")), name);
@@ -308,7 +338,8 @@ test("Codex deny entries never repeat, lie inside a denied directory or pass thr
         for (const file of ["codex/auth.json", "claude/.credentials.json", "new/gh/**", "xdg/gh/**"]) {
           assert.ok(shared.includes(path.join(linkConfig, file)), `${name}: shared ${file}`);
           assert.ok(shared.includes(path.join(realConfig, file)), `${name}: shared physical ${file}`);
-          assert.ok(entries.includes(path.join(realConfig, file)), `${name}: Codex physical ${file}`);
+          const codex = path.join(realConfig, file.replace(/\*\*$/, ""));
+          assert.ok(entries.includes(codex), `${name}: Codex physical ${codex}`);
         }
         assert.ok(!entries.some((entry) => entry.startsWith(`${linkConfig}/`)), `${name}: ${entries.join(" ")}`);
       }
@@ -317,6 +348,14 @@ test("Codex deny entries never repeat, lie inside a denied directory or pass thr
         // the sandbox fails closed instead of leaving auth.json readable.
         assert.ok(shared.includes(path.join(braceCodex, "auth.json")), `${name}: shared physical`);
         assert.ok(entries.includes("~/.codex/auth.json"), `${name}: ${entries.join(" ")}`);
+      }
+      if (name === "credential files that are symbolic links") {
+        // Claude Code's Read rules keep `X/**`; Codex gets the directories,
+        // which also hide the nested ~/.aws/sso/cache/x.json.
+        for (const directory of ["~/.aws/", "~/.config/gh/", `${movedGh}/`, `${movedXdg}/gh/`]) {
+          assert.ok(shared.includes(`${directory}**`), `${name}: shared ${directory}**`);
+          assert.ok(entries.includes(directory), `${name}: Codex ${directory} in ${entries.join(" ")}`);
+        }
       }
     }
   }

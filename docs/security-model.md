@@ -286,8 +286,18 @@ Full access changes writable roles as described [below](#explicit-full-access).
 - The profile names the same path list as Claude Code
   (`shared/credential-denials.ts`): GitHub CLI config files,
   `~/.git-credentials` and `credential.helper store --file` paths,
-  `~/.netrc`, `~/.ssh`, and the other files in that list. Those denials
-  are part of the sandbox profile. An entry that repeats another, or lies
+  `~/.netrc`, `~/.ssh`, `~/.aws`, and the other files in that list. Those
+  denials are part of the sandbox profile. Where Claude Code's rules name
+  every file in a directory (`~/.config/gh/**`, `~/.aws/**`, and the
+  GitHub CLI directory that `GH_CONFIG_DIR` or `XDG_CONFIG_HOME` moves),
+  the profile denies the directory itself, such as `~/.config/gh/` and
+  `~/.aws/`, with every file in it, nested ones such as `~/.aws/sso/cache`
+  included. On Linux, Codex leaves out symbolic links when it expands
+  `**` (Codex CLI 0.159 in every role, 0.166 in read-only roles), so with
+  `~/.aws/**` a credential file that a dotfile manager or vault links
+  into `~/.aws` stayed readable. A link's target outside the
+  directory is still readable at its own path unless the list names it.
+  An entry that repeats another, or lies
   inside a denied directory, is left out of the profile: `~/.ssh` is denied
   as a directory, so `~/.ssh/**` and a `store --file` path inside `~/.ssh`
   are not listed again. On Linux, bubblewrap fails to start when a deny
@@ -297,7 +307,9 @@ Full access changes writable roles as described [below](#explicit-full-access).
   names a directory through a symbolic link, the profile lists only its
   physical path, which Claude Code's rules name next to the path as given.
   On Linux, reads through the link are still denied, but a symlinked home
-  directory still stops Codex's sandbox from starting. A path with a
+  directory, or a symbolic link on a listed path under it (such as a
+  linked `~/.config`, `~/.aws` or `~/.git-credentials`), still stops
+  Codex's sandbox from starting. A path with a
   quote, backslash, brace or line break in it cannot be written into the
   profile and is left out. When that is the physical path of a link, the path as given
   stays listed instead, so on Linux Codex's sandbox does not start rather
