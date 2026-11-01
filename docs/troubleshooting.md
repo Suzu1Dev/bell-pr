@@ -17,6 +17,13 @@ other than `~/.bellpr`; when you started it with `npx`, run
 runs with that data directory, even one started with `--port`, or, while
 none runs, the port that a start would use.
 
+A warning does not by itself change that exit code or make `bell-pr start`
+refuse to listen; of the checks, only a failed required one does. For
+example, the Claude Code check warns when Claude Code is outside the
+versions BELL PR supports (2.1.292 or later, before 2.2); agents still
+start, and the [security model](security-model.md#claude-code) says why
+the version matters.
+
 Contents:
 
 - [I lost the address](#i-lost-the-address)
@@ -224,11 +231,6 @@ See the [Claude Code documentation](https://code.claude.com/docs/en/overview)
 for other ways to install it. BELL PR uses the Claude Code CLI you installed
 and signed in to (Claude plan or Anthropic API key). Usage counts against
 your own account.
-
-BELL PR supports Claude Code 2.1.292 or later, before 2.2. The environment
-check warns about another version and agents still start; the
-[security model](security-model.md#claude-code) says why the version
-matters.
 
 ### `claude_unauthenticated`
 

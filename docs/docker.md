@@ -178,10 +178,12 @@ code cannot start their sandbox.
 ## Beta status
 
 Docker stays **beta** because the agent sandbox needs the three
-`--security-opt` options above. What was verified on Linux before 1.0.0
-(Docker Engine 29.7):
+`--security-opt` options above. What was verified on Linux (Docker Engine
+29.7) with an image built from 1.0.0-rc.1, which was never published:
 
-- the image builds, reports healthy within seconds and prints its address;
+- the image builds, reports healthy within seconds and prints its address
+  (in that build, a one-time sign-in link, a mechanism BELL PR has since
+  removed);
 - git, the GitHub CLI, the Codex CLI, bubblewrap and socat are in the
   image, and `bell-pr doctor` runs in it;
 - the sandbox probe in the table above: it fails with the default options
