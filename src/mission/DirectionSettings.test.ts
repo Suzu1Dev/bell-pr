@@ -309,6 +309,19 @@ test("each provider says whether it is ready, and a selected provider that is no
   assert.match(claude, /<option value="claude" selected="">Claude Code — ready<\/option>/);
   assert.doesNotMatch(claude, /readiness-notice/);
 
+  // A Claude Code release outside the supported versions only warns.
+  const untested = renderEn(
+    props({ provider: "claude" }, {
+      doctor: doctor([
+        check("claude", "warn", { reason: "unsupported-version", version: "2.2.0" }),
+        check("claude-auth", "ok"),
+      ]),
+      demo: false,
+    }),
+  );
+  assert.match(untested, /<option value="claude" selected="">Claude Code — ready<\/option>/);
+  assert.doesNotMatch(untested, /readiness-notice/);
+
   const missing = renderEn(
     props({ provider: "claude" }, {
       doctor: doctor([check("codex", "warn", { reason: "broken" }), check("claude", "skip", { reason: "missing", detail: "Not installed." })]),

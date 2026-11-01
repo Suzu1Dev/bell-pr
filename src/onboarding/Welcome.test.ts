@@ -101,6 +101,14 @@ test("the provider step picks the only ready provider and lets the person choose
   assert.deepEqual(readyProviders(both), ["codex", "claude"]);
   assert.deepEqual(readyProviders(none), []);
   assert.deepEqual(readyProviders(null), []);
+  // A Claude Code release outside the supported versions only warns.
+  const untested: DoctorReport = {
+    ...claudeOnly,
+    checks: claudeOnly.checks.map((value) =>
+      value.id === "claude" ? { ...value, status: "warn", reason: "unsupported-version" } : value,
+    ),
+  };
+  assert.deepEqual(readyProviders(untested), ["claude"]);
   const only = renderEn(welcome("provider"));
   assert.match(only, /Claude Code is installed and signed in, so your agents use it\./);
   // Neutral wording about the person's own Claude Code sign-in.

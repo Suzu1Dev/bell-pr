@@ -4,7 +4,7 @@
  * saved provider; a form that lets the person pick another one asks about
  * that one instead.
  */
-import type { DoctorCheck, DoctorReport } from "../../shared/doctor";
+import { toolUsable, type DoctorCheck, type DoctorReport } from "../../shared/doctor";
 import type { AgentProvider } from "../../shared/models";
 import type { Readiness } from "../setup/ReadinessNotice";
 
@@ -29,7 +29,7 @@ export function providerReadiness(
   const tool = report?.checks.find((check) => check.id === provider);
   if (!tool) return undefined;
   if (tool.reason === "disabled") return { state: "disabled", checks: [tool] };
-  if (tool.status !== "ok")
+  if (!toolUsable(tool))
     return {
       state: tool.status === "skip" || tool.reason === "missing" ? "missing" : "broken",
       checks: [tool],

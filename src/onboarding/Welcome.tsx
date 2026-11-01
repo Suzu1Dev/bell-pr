@@ -9,7 +9,7 @@ import {
   Languages,
   Stethoscope,
 } from "lucide-react";
-import type { DoctorReport } from "../../shared/doctor";
+import { toolUsable, type DoctorReport } from "../../shared/doctor";
 import {
   agentProviders,
   providerLabels,
@@ -64,9 +64,10 @@ export function providerUpdate(
 /** The providers that are installed and signed in, from the report. */
 export function readyProviders(report: DoctorReport | null): AgentProvider[] {
   if (!report) return [];
-  const ok = (id: string) =>
-    report.checks.find((check) => check.id === id)?.status === "ok";
-  return agentProviders.filter((provider) => ok(provider) && ok(`${provider}-auth`));
+  const find = (id: string) => report.checks.find((check) => check.id === id);
+  return agentProviders.filter(
+    (provider) => toolUsable(find(provider)) && find(`${provider}-auth`)?.status === "ok",
+  );
 }
 
 export interface WelcomeProps {

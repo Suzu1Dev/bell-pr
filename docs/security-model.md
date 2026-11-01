@@ -273,9 +273,18 @@ Full access changes writable roles as described [below](#explicit-full-access).
   `raw.githubusercontent.com` only. When web access is on, the mentor sees
   pull-request comments only from the repository's owners, members and
   collaborators.
-- **Supported versions:** Claude Code 2.1.292 or later within 2.1.x. The
-  settings keys were checked against the schema bundled in 2.1.292; a newer
-  release is supported once the canary below passes on it.
+- **Supported versions:** Claude Code 2.1.292 or later, before 2.2. The
+  settings keys were checked against the schema bundled in 2.1.292, and
+  `sandbox.allowNestedUserNamespaces` against 2.1.316. BELL PR does not
+  block another version: `bell-pr doctor` and the setup checklist show a
+  warning on the Claude Code check, and agents still start. A mismatch
+  matters because Claude Code ignores all of `--settings`, without a
+  message, when one value fails its schema, and because a newer release can
+  add a setting that weakens the sandbox and that BELL PR does not set back
+  yet. Your hooks, auto memory, own instructions or weakening sandbox values
+  described [above](#your-own-claude-code-settings) could then apply in
+  BELL PR's turns. The range is widened only after the canary below passes
+  on a newer release.
 
 ### Codex
 

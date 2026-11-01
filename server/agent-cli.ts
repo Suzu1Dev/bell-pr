@@ -239,6 +239,12 @@ function claudeUserMemoryFiles(): string[] {
 }
 
 /**
+ * The Claude Code releases BELL PR supports: `min` or later, before `below`.
+ * Doctor warns about another release but does not block it.
+ */
+export const claudeSupportedVersions = { min: "2.1.292", below: "2.2" } as const;
+
+/**
  * The `--settings` value for one Claude Code turn. Every turn denies
  * reading credential files and BELL's data outside its checkout. Read-only
  * turns also refuse file reads outside the working directory. A write turn
@@ -290,9 +296,9 @@ function claudeUserMemoryFiles(): string[] {
  * checked with 2.1.316: its schema, and the bwrap arguments against the
  * stand-in, where `false` here won over a user `true`. 2.1.292 does not know
  * the key and, the sandbox object being passthrough, still applies the rest
- * of `--settings` with it. Supported range: Claude Code >= 2.1.292 and
- * < 2.2; scripts/agent-sandbox-canary.mjs must pass on a release before the
- * range is widened.
+ * of `--settings` with it. Supported range: claudeSupportedVersions;
+ * scripts/agent-sandbox-canary.mjs must pass on a release before the range
+ * is widened.
  */
 export function claudeSettings(options: {
   cwd: string;

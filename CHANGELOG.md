@@ -19,6 +19,9 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   The website serves matching shell, PowerShell and WSL helper scripts at short URLs.
 - Settings → About links to the BELL PR website, which is also the npm
   package's homepage.
+- `bell-pr doctor` and the setup checklist warn when the installed Claude
+  Code is outside the supported versions (2.1.292 or later, before 2.2).
+  Agents still start; the security model says why the version matters.
 
 ### Fixed
 

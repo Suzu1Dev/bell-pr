@@ -123,6 +123,16 @@ export default {
       `Installed, but \`${command}\` failed: ${output}`,
     gitTooOld: ({ version }: { version: string }) =>
       `Git ${version} works, but moving a run onto the latest target branch needs Git 2.40 or later. Everything else works.`,
+    claudeVersionUnsupported: ({
+      version,
+      min,
+      below,
+    }: {
+      version: string;
+      min: string;
+      below: string;
+    }) =>
+      `Claude Code ${version} is outside the versions ${product.name} supports (${min} or later, before ${below}). Agents still start, but ${product.name} has not checked that this release applies its sandbox and hook settings.`,
     identityMissing:
       "Not set: Git does not know your name and e-mail address, so nothing can be committed or published.",
     identityAutodetected: ({ email }: { email: string }) =>
