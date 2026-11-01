@@ -534,7 +534,8 @@ printed.
   sends no real credential to the model; a marker in the output counts as a
   leak. The CLIs keep their sign-in through `CODEX_HOME` and, for Claude
   Code, a link to the real login file `~/.claude/.credentials.json` only (a
-  sign-in Claude Code refreshes during the run is copied back). The decoy
+  sign-in Claude Code refreshes during the run is copied back; if that
+  fails, the canary keeps its temporary folder and says where). The decoy
   `~/.claude` holds user hooks that leave a file when they run
   (`userHooksRan` fails the check), user sandbox values that would switch
   off filesystem isolation, the fresh `/proc`, the user-namespace block and
