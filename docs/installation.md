@@ -103,12 +103,12 @@ MISE_NPM_PACKAGE_MANAGER=npm mise use -g node@24 npm:bell-pr@1.0.1
 mise exec -- bell-pr
 ```
 
-This selects Node.js 24 and pins BELL PR to the version in the command, in
-your global mise tool configuration. The explicit version avoids latest-release cooldown selection;
-the npm choice uses npm's normal installation checks instead of the default
-backend's additional new-package and download-count gates. The environment
-variable applies only to this command, without permanently changing mise's
-package-manager setting.
+In your global mise tool configuration, this selects Node.js 24 and pins
+BELL PR to the version in the command. The explicit version avoids
+latest-release cooldown selection; the npm choice uses npm's normal
+installation checks instead of the default backend's additional new-package
+and download-count gates. The environment variable applies only to this
+command, without permanently changing mise's package-manager setting.
 
 For upgrades, repeat `MISE_NPM_PACKAGE_MANAGER=npm mise use -g node@24` with
 `npm:bell-pr@<version>`, replacing `<version>` with the release you want.

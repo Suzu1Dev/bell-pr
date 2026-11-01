@@ -27,6 +27,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
+import { shellArg } from "./npm-pack-report.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const windows = process.platform === "win32";
@@ -124,7 +125,7 @@ function main() {
   if (!values["skip-tests"])
     run("test", "npm", ["test"], { env: { TSX_DISABLE_CACHE: process.env.TSX_DISABLE_CACHE ?? "1" } });
   const packed = packReport(
-    run("pack", "npm", ["pack", "--json", "--pack-destination", out], { capture: true }),
+    run("pack", "npm", ["pack", "--json", "--pack-destination", shellArg(out)], { capture: true }),
   );
   const tarball = path.join(out, packed.filename);
   run("check-pack", process.execPath, ["scripts/check-pack.mjs", "--tarball", tarball]);
@@ -136,7 +137,7 @@ function main() {
 
   run("npm publish --dry-run", "npm", [
     "publish",
-    tarball,
+    shellArg(tarball),
     "--dry-run",
     ...(prerelease ? ["--tag", "next"] : []),
   ], { env: { npm_config_dry_run: "true" } });

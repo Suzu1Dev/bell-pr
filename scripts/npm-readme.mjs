@@ -125,7 +125,8 @@ export function proseOnly(text, { regions = false } = {}) {
   const lines = text.split("\n");
   let fence;
   for (let index = 0; index < lines.length; index++) {
-    const match = /^ {0,3}(`{3,}|~{3,})/.exec(lines[index]);
+    // A backtick fence has no backtick in its info string; such a line is prose.
+    const match = /^ {0,3}(`{3,}(?=[^`]*$)|~{3,})/.exec(lines[index]);
     if (fence) {
       if (
         match &&
@@ -427,6 +428,10 @@ export function npmReadme(text, { homepageUrl = "", sitePath = () => undefined, 
 /**
  * What still keeps a README from showing on npmjs.com after npmReadme: each
  * relative link or image left in `text`. Empty for a README ready for npm.
+ * The search for "](docs/" reads the raw text on purpose, code and HTML
+ * comments included: proseOnly is a heuristic, and a fence, code span or
+ * comment it misreads would otherwise hide a link from both npmReadme and
+ * this check. A code example with such a link fails the check; reword it.
  */
 export function relativeReferencesLeft(text) {
   const found = [];
@@ -851,6 +856,16 @@ function selfTest() {
     "still contains ](docs/.",
   ]);
   assert.deepEqual(relativeReferencesLeft("# Ready\n\n[Node](https://nodejs.org/en) and [Features](#features).\n"), []);
+  // The ](docs/ search reads code and comments too: here an escaped
+  // backtick makes proseOnly mask a real link as a code span.
+  assert.deepEqual(relativeReferencesLeft("Type \\`[Guide](docs/guide.md)\\` here.\n"), ["still contains ](docs/."]);
+  assert.deepEqual(relativeReferencesLeft("```md\n[Guide](docs/guide.md)\n```\n"), ["still contains ](docs/."]);
+  // A backtick fence has no backtick in its info string, so this line is
+  // prose and does not hide the rest of the file.
+  assert.deepEqual(relativeReferencesLeft("```npm install``` is the command.\n\n[Guide](docs/guide.md)\n"), [
+    'line 3 still links to "docs/guide.md".',
+    "still contains ](docs/.",
+  ]);
   // check-pack --tarball checks every root README of the package, since
   // npm publish may take any of them. Here README.md is ready and the
   // translation is not, as in a pack where --pre left it alone.

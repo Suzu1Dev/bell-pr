@@ -279,16 +279,21 @@ Full access changes writable roles as described [below](#explicit-full-access).
   collaborators.
 - **Supported versions:** Claude Code 2.1.292 or later, before 2.2. The
   settings keys were checked against the schema bundled in 2.1.292, and
-  `sandbox.allowNestedUserNamespaces` against 2.1.316. BELL PR does not
-  block another version: `bell-pr doctor` and the setup checklist show a
-  warning on the Claude Code check, and agents still start. A mismatch
+  `sandbox.allowNestedUserNamespaces` against 2.1.316. The only recorded
+  run of the real canary below used 2.1.292, before BELL PR turned off your
+  hooks, auto memory and own instructions or set your weakening sandbox
+  values back. Later 2.1 releases are in the range, so `bell-pr doctor` does
+  not warn about them, but no canary run is recorded for them. BELL PR does
+  not block a version outside the range: `bell-pr doctor` and the setup
+  checklist show a warning on the Claude Code check, and agents still start.
+  A release that no canary run covers, inside the range or outside it,
   matters because Claude Code ignores all of `--settings`, without a
   message, when one value fails its schema, and because a newer release can
-  add a setting that weakens the sandbox and that BELL PR does not set back
-  yet. Your hooks, auto memory, own instructions or weakening sandbox values
-  described [above](#your-own-claude-code-settings) could then apply in
-  BELL PR's turns. The range is widened only after the canary below passes
-  on a newer release.
+  add a setting that weakens the sandbox before BELL PR knows to set it
+  back. Your hooks, auto memory, own instructions or weakening sandbox
+  values described [above](#your-own-claude-code-settings) could then
+  apply in BELL PR's turns. The range is extended to 2.2 only after the
+  canary below passes on a 2.2 release.
 
 ### Codex
 
@@ -389,8 +394,9 @@ The sudo panel and the doctor warning for that file show:
   conversation. Do not import a project into BELL PR if your provider must
   not see it.
 - The sandboxes are the CLIs' own. BELL PR configures them and checks the
-  configuration in its tests; the canary below checks the real behaviour of
-  each supported release.
+  configuration in its tests; the canary below checks their real
+  behaviour, and its results name the releases and the BELL PR build it
+  last ran on.
 
 ## Repositories and Git
 
@@ -527,7 +533,8 @@ printed.
   sends no real credential to the model; a marker in the output counts as a
   leak. The CLIs keep their sign-in through `CODEX_HOME` and, for Claude
   Code, a link to the real login file `~/.claude/.credentials.json` only (a
-  sign-in Claude Code refreshes during the run is copied back). The decoy
+  sign-in Claude Code refreshes during the run is copied back; if that
+  fails, the canary keeps its temporary folder and says where). The decoy
   `~/.claude` holds user hooks that leave a file when they run
   (`userHooksRan` fails the check), user sandbox values that would switch
   off filesystem isolation, the fresh `/proc`, the user-namespace block and
@@ -609,9 +616,11 @@ and has not been run again.
   `network.strictAllowlist` keeps the sandbox's allowlist empty.
 - Codex followed none of the repository's instructions and its sandbox
   blocked the network; it read the files above, as the Codex section says.
-- **Pending (maintainers):** the macOS canary (`sandbox-exec`), and the canary on
-  each newer Claude Code or Codex release before the supported range is
-  widened.
+- **Pending (maintainers):** the macOS canary (`sandbox-exec`); Claude Code
+  canary runs with the current settings, on 2.1.292 and on 2.1.305 or later
+  (both in the supported range); a Codex canary run with the current
+  read-deny profile; and the canary on Claude Code 2.2 before the range is
+  extended to it, and on each newer Codex release.
 
 ### Desktop browser handoff
 
