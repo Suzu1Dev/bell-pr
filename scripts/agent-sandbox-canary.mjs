@@ -104,6 +104,8 @@ try {
       web: { type: "boolean", default: false },
       // Self-test only: drops the hardening flags so the canary must fail.
       "fake-strip": { type: "boolean", default: false },
+      // Self-test only: the stand-ins' sandbox fails to start, as bubblewrap does.
+      "fake-bwrap-fail": { type: "boolean", default: false },
       help: { type: "boolean", default: false },
     },
     strict: true,
@@ -122,6 +124,10 @@ if (options.fake === options.real) {
 }
 if (options["fake-strip"] && !options.fake) {
   console.error("--fake-strip only works with --fake.");
+  process.exit(2);
+}
+if (options["fake-bwrap-fail"] && !options.fake) {
+  console.error("--fake-bwrap-fail only works with --fake.");
   process.exit(2);
 }
 if (options["decoy-home"] && !options.real) {
@@ -217,6 +223,9 @@ const argv = process.argv.slice(2);
 const input = fs.readFileSync(0, 'utf8');
 const commands = [...input.matchAll(/^- ([a-z-]+): \`(.*)\`$/gm)].map((m) => ({ id: m[1], command: m[2] }));
 const emit = (event) => process.stdout.write(JSON.stringify(event) + '\\n');
+// --fake-bwrap-fail: the sandbox cannot start, as bubblewrap reports it.
+const bwrapFails = ${JSON.stringify(options["fake-bwrap-fail"])};
+const bwrapError = "bwrap: Can't create file at /fake/home/.ssh/authorized_keys: Read-only file system";
 `;
   await writeFile(
     path.join(directory, "claude"),
@@ -229,9 +238,11 @@ const sandboxed = settings.sandbox?.enabled === true && settings.sandbox?.allowU
 const memory = settings.autoMemoryEnabled === false ? {} : { memory_paths: { auto: '/fake/memory/' } };
 emit({ type: 'system', subtype: 'init', model: 'claude-fake', claude_code_version: 'fake', ...memory });
 commands.forEach((item, index) => {
-  const blocked = sandboxed && item.id !== 'own-checkout';
+  // A sandbox that cannot start fails every command, the agent's own checkout included.
+  const failed = sandboxed && bwrapFails;
+  const blocked = failed || (sandboxed && item.id !== 'own-checkout');
   emit({ type: 'assistant', message: { content: [{ type: 'tool_use', id: 't' + index, name: 'Bash', input: { command: item.command } }] } });
-  emit({ type: 'user', message: { content: [{ type: 'tool_result', tool_use_id: 't' + index, is_error: blocked, content: blocked ? 'Operation not permitted' : 'output' }] } });
+  emit({ type: 'user', message: { content: [{ type: 'tool_result', tool_use_id: 't' + index, is_error: blocked, content: failed ? bwrapError : blocked ? 'Operation not permitted' : 'output' }] } });
 });
 emit({ type: 'result', subtype: 'success', is_error: false, result: JSON.stringify({ argv, ran: commands.map((item) => item.id) }) });
 `,
@@ -240,8 +251,12 @@ emit({ type: 'result', subtype: 'success', is_error: false, result: JSON.stringi
   await writeFile(
     path.join(directory, "codex"),
     `#!${process.execPath}${shared}
-// codex sandbox <profile> -- echo RAN: the stand-in sandbox always starts.
+// codex sandbox <profile> -- echo RAN: the stand-in sandbox starts unless --fake-bwrap-fail.
 if (argv[0] === 'sandbox') {
+  if (bwrapFails) {
+    process.stderr.write(bwrapError + '\\n');
+    process.exit(1);
+  }
   if (argv.slice(argv.indexOf('--') + 1).join(' ') === 'echo RAN') process.stdout.write('RAN\\n');
   process.exit(0);
 }
