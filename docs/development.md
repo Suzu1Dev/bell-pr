@@ -85,7 +85,8 @@ scripts first on `PATH`; the tests do the same.
 ## Checks
 
 Run these before you send a change. CI (`.github/workflows/ci.yml`) runs
-most of them on Linux and macOS with Node.js 22 and 24.
+most of them on Linux and macOS with Node.js 24; the release workflow also
+builds, tests and packs on Linux with Node.js 22.
 
 | Command | What it checks |
 | --- | --- |

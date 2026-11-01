@@ -177,9 +177,9 @@ code cannot start their sandbox.
 
 ## Beta status
 
-Docker stays **beta** in 1.0.0-rc.1 because the agent sandbox needs the
-three `--security-opt` options above. What the release candidate verified
-on Linux (Docker Engine 29.7):
+Docker stays **beta** because the agent sandbox needs the three
+`--security-opt` options above. What was verified on Linux before 1.0.0
+(Docker Engine 29.7):
 
 - the image builds, reports healthy within seconds and prints its address;
 - git, the GitHub CLI, the Codex CLI, bubblewrap and socat are in the

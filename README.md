@@ -255,13 +255,14 @@ set prices. Exact tokens and cost for a typical first contribution are
 - **Linux**
 - **Windows through WSL2 (untested):** install and run BELL PR, Git, the
   GitHub CLI and your AI CLI inside your WSL distribution. Browser tests and
-  real agent runs for 1.0.0-rc.1 were done on Linux only.
+  real agent runs were done on Linux only.
 
-The 1.0.0-rc.1 release candidate's unit tests, build and package check run
-on Linux and macOS with Node.js 22 and 24 (see the CI workflow). The browser
-tests and the real agent runs were done on Linux only, and WSL2 has not been
-tested (see the [changelog](CHANGELOG.md)). A Docker image is available in
-beta.
+CI runs the unit tests and the build on Linux and macOS with Node.js 24,
+and the package check, the browser tests and a Docker build on Linux; the
+release workflow also builds, tests and packs on Linux with Node.js 22 (see
+the CI and release workflows). The real agent runs were done on Linux only,
+and WSL2 has not been tested (see the [changelog](CHANGELOG.md)). A Docker
+image is available in beta.
 
 ## Features
 

@@ -196,10 +196,9 @@ Agent 用量由**你自己的** Codex／Claude 帳戶計費。BELL PR 不定價�
 - **macOS**
 - **Linux**
 - **Windows（透過 WSL2，尚未測試）：** 請在 WSL 發行版中安裝並執行 BELL PR、
-  Git、GitHub CLI 與你的 AI CLI。1.0.0-rc.1 的瀏覽器測試與真實 agent 執行只在
-  Linux 上做過。
+  Git、GitHub CLI 與你的 AI CLI。瀏覽器測試與真實 agent 執行只在 Linux 上做過。
 
-1.0.0-rc.1 候選版本的單元測試、建置與套件檢查，在 Linux 與 macOS 上以 Node.js 22 與 24 執行（請見 CI 工作流程）。瀏覽器測試與真實 agent 執行只在 Linux 上做過，WSL2 尚未測試（請見[變更紀錄](CHANGELOG.md)）。另有 Docker 映像檔，目前為 beta。
+CI 在 Linux 與 macOS 上以 Node.js 24 執行單元測試與建置，並在 Linux 上執行套件檢查、瀏覽器測試與 Docker 建置；發佈工作流程另外在 Linux 上以 Node.js 22 建置、測試並打包（請見 CI 與發佈工作流程）。真實 agent 執行只在 Linux 上做過，WSL2 尚未測試（請見[變更紀錄](CHANGELOG.md)）。另有 Docker 映像檔，目前為 beta。
 
 ## 功能
 
