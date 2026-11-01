@@ -503,6 +503,21 @@ test("Claude turns leave out the user's CLAUDE.md and rules where CLAUDE_CONFIG_
     path.join(home, "CLAUDE.md"),
     path.join(home, "rules", "**"),
   ]);
+  // Claude Code reads them as picomatch globs: `(` would start a group, and
+  // rules/** would no longer match the files under it.
+  process.env.CLAUDE_CONFIG_DIR = "/Users/me/Dropbox (Personal)/claude";
+  const parenthesised = await agentCommand(claude, { cwd: "/work/tree", access: "none" });
+  const escaped = path.resolve("/Users/me/Dropbox [(]Personal[)]/claude");
+  assert.deepEqual(settingsOf(parenthesised.args).claudeMdExcludes, [
+    path.join(escaped, "CLAUDE.md"),
+    path.join(escaped, "rules", "**"),
+  ]);
+  process.env.CLAUDE_CONFIG_DIR = "/c/a{b,c}[d]*?!(e)+@|";
+  const glob = await agentCommand(claude, { cwd: "/work/tree", access: "none" });
+  assert.equal(
+    settingsOf(glob.args).claudeMdExcludes?.[0],
+    path.join(path.resolve("/c/a[{]b,c[}][[]d[]][*][?][!][(]e[)][+][@][|]"), "CLAUDE.md"),
+  );
 });
 
 test("Claude settings hold no empty value and leave sandbox.ripgrep to Claude Code", () => {

@@ -316,9 +316,10 @@ function argvChecks(provider, args, dataDirectory, checkout) {
     /* Reported as missing below. */
   }
   const deny = settings.permissions?.deny ?? [];
-  const claudeConfig = path.resolve(
-    process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), ".claude"),
-  );
+  // Glob characters in the folder name reach Claude Code as one-character classes.
+  const claudeConfig = path
+    .resolve(process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), ".claude"))
+    .replace(/[()[\]{}*?!+@|]/g, "[$&]");
   return {
     settings: at >= 0,
     // The user's hooks would run outside the sandbox; auto memory would

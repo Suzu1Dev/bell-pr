@@ -226,12 +226,15 @@ export function codexAccessMode(
 /**
  * The user's own instruction files in Claude Code's config directory, the
  * way the CLI names them (verified with 2.1.292: the path as given matches
- * through a symbolic link too).
+ * through a symbolic link too). Claude Code reads these as picomatch globs,
+ * so each glob character in the directory, such as the parentheses of
+ * `Dropbox (Personal)`, becomes a one-character class like `[(]`. A
+ * backslash cannot escape it: Claude Code turns backslashes into `/`.
  */
 function claudeUserMemoryFiles(): string[] {
-  const directory = path.resolve(
-    process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), ".claude"),
-  );
+  const directory = path
+    .resolve(process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), ".claude"))
+    .replace(/[()[\]{}*?!+@|]/g, "[$&]");
   return [path.join(directory, "CLAUDE.md"), path.join(directory, "rules", "**")];
 }
 
