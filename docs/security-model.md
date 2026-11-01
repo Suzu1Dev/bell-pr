@@ -289,12 +289,11 @@ Full access changes writable roles as described [below](#explicit-full-access).
   A release that no canary run covers, inside the range or outside it,
   matters because Claude Code ignores all of `--settings`, without a
   message, when one value fails its schema, and because a newer release can
-  add a setting that weakens the sandbox and that BELL PR does not set back
-  yet, as 2.1.305 did with `allowNestedUserNamespaces`. Your hooks, auto
-  memory, own instructions or weakening sandbox values described
-  [above](#your-own-claude-code-settings) could then apply in BELL PR's
-  turns. The range is extended to 2.2 only after the canary below passes
-  on a 2.2 release.
+  add a setting that weakens the sandbox before BELL PR knows to set it
+  back. Your hooks, auto memory, own instructions or weakening sandbox
+  values described [above](#your-own-claude-code-settings) could then
+  apply in BELL PR's turns. The range is extended to 2.2 only after the
+  canary below passes on a 2.2 release.
 
 ### Codex
 
