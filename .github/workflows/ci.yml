@@ -122,9 +122,26 @@ jobs:
       - name: Pack file list matches scripts/pack-expected.txt
         run: node scripts/pack-expected.mjs --check
       - name: Pack (prepack builds)
-        run: npm pack
+        run: |
+          npm pack
+          # check-pack must leave this tarball as it is; the next two steps compare.
+          sha256sum "bell-pr-$(node -p "require('./package.json').version").tgz" > "$RUNNER_TEMP/tarball.sha256"
       - name: Check the packed tarball as it is
-        run: node scripts/check-pack.mjs --tarball "bell-pr-$(node -p "require('./package.json').version").tgz"
+        run: |
+          node scripts/check-pack.mjs --tarball "bell-pr-$(node -p "require('./package.json').version").tgz"
+          sha256sum -c "$RUNNER_TEMP/tarball.sha256"
+      - name: Check the build with check-pack's own pack, which leaves nothing behind
+        run: |
+          # The default mode packs into a temporary folder of its own and removes it.
+          mkdir "$RUNNER_TEMP/check-pack-tmp"
+          TMPDIR="$RUNNER_TEMP/check-pack-tmp" node scripts/check-pack.mjs
+          sha256sum -c "$RUNNER_TEMP/tarball.sha256"
+          tarballs="$(ls bell-pr-*.tgz)"
+          if [ "$tarballs" != "bell-pr-$(node -p "require('./package.json').version").tgz" ]; then
+            echo "::error::check-pack left a tarball in the checkout: $tarballs"; exit 1
+          fi
+          left="$(find "$RUNNER_TEMP/check-pack-tmp" -mindepth 1 -maxdepth 1 -name 'bell-pr-*')"
+          if [ -n "$left" ]; then echo "::error::check-pack left $left"; exit 1; fi
       - name: Install the tarball into a temporary prefix
         run: npm install -g --prefix "$RUNNER_TEMP/p" ./bell-pr-*.tgz
       - name: Run the installed command outside the checkout
