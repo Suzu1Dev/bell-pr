@@ -88,9 +88,12 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   turns, single sandbox values in your user settings that would weaken the
   sandbox, such as
   `sandbox.filesystem.disabled`, `sandbox.enableWeakerNestedSandbox` and
-  `sandbox.network.allowAllUnixSockets`, are set back to their defaults. The
-  security model lists the user settings that still widen what agents may
-  do, such as `permissions.additionalDirectories`,
+  `sandbox.network.allowAllUnixSockets`, are set back to their defaults.
+  So is `sandbox.allowNestedUserNamespaces`, which Claude Code 2.1.305 added:
+  on Linux it lets sandboxed commands create user namespaces and with them
+  undo the sandbox's write denials, such as those on the checkout's `.git`.
+  The security model lists the user settings that still widen what agents
+  may do, such as `permissions.additionalDirectories`,
   `sandbox.excludedCommands` and your own proxy in
   `sandbox.network.httpProxyPort`. Your plugins' language servers and a
   `sandbox.ripgrep` command in your user settings still run outside the

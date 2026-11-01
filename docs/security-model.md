@@ -146,7 +146,10 @@ not apply: `sandbox.filesystem.disabled` (which makes the whole computer
 writable for commands and drops their read denials),
 `enableWeakerNestedSandbox` (the computer's own `/proc` stays visible),
 `network.allowAllUnixSockets` (Unix sockets such as Docker's or an SSH
-agent's become reachable), and on macOS `network.allowLocalBinding`,
+agent's become reachable), on Linux `allowNestedUserNamespaces` (Claude
+Code 2.1.305 and later; commands may create user namespaces of their own,
+with which a hostile command can undo the sandbox's write denials, such as
+those on the checkout's `.git`), and on macOS `network.allowLocalBinding`,
 `enableWeakerNetworkIsolation` and `allowAppleEvents`. In a container where
 Claude Code's sandbox starts only with `enableWeakerNestedSandbox`, the
 commands of BELL PR's writable Claude roles therefore fail; the options in
@@ -509,7 +512,8 @@ printed.
   sign-in Claude Code refreshes during the run is copied back). The decoy
   `~/.claude` holds user hooks that leave a file when they run
   (`userHooksRan` fails the check), user sandbox values that would switch
-  off filesystem isolation, the fresh `/proc` and the Unix socket block (a
+  off filesystem isolation, the fresh `/proc`, the user-namespace block and
+  the Unix socket block (a
   marker read with filesystem isolation off is a leak, and the argv check
   `sandboxNotWeakened` needs BELL PR to set them back), and a user
   `CLAUDE.md` and a main-thread `agent` that say "reply CANARY" (the argv

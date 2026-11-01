@@ -340,6 +340,7 @@ function argvChecks(provider, args, dataDirectory, checkout) {
       settings.sandbox?.enableWeakerNestedSandbox === false &&
       settings.sandbox?.enableWeakerNetworkIsolation === false &&
       settings.sandbox?.allowAppleEvents === false &&
+      settings.sandbox?.allowNestedUserNamespaces === false &&
       settings.sandbox?.network?.allowAllUnixSockets === false &&
       settings.sandbox?.network?.allowLocalBinding === false,
     deniesCredentials: [
@@ -388,7 +389,8 @@ async function decoyHome(base) {
   // Claude Code gets a decoy config directory: user settings whose hooks
   // leave a file when they run and whose sandbox values would switch off
   // filesystem isolation (the attempts then read the markers), the fresh
-  // /proc and the Unix socket block, and a user CLAUDE.md and main-thread
+  // /proc, the user-namespace block (Claude Code 2.1.305 and later) and the
+  // Unix socket block, and a user CLAUDE.md and main-thread
   // agent that say "reply CANARY", so the report shows whether they reached
   // the agent. Only the login file is linked from the real directory, where
   // Claude Code keeps the claude.ai sign-in on Linux; API keys and cloud
@@ -408,6 +410,7 @@ async function decoyHome(base) {
       sandbox: {
         filesystem: { disabled: true },
         enableWeakerNestedSandbox: true,
+        allowNestedUserNamespaces: true,
         network: { allowAllUnixSockets: true },
       },
     }),

@@ -256,9 +256,12 @@ function claudeUserMemoryFiles(): string[] {
  * therefore sets each single value that would weaken the sandbox back to
  * its default: filesystem isolation stays on
  * (`filesystem.disabled`), /proc is fresh (`enableWeakerNestedSandbox`),
- * Unix sockets stay blocked (`allowAllUnixSockets`), and on macOS there is
- * no local port binding, trustd access or Apple Events. Every turn also
- * turns off what would run or persist outside BELL's control: hooks, which run
+ * Unix sockets stay blocked (`allowAllUnixSockets`), commands cannot create
+ * user namespaces of their own, which would let them undo the write denies
+ * (`allowNestedUserNamespaces`, Linux, Claude Code 2.1.305 and later), and
+ * on macOS there is no local port binding, trustd access or Apple Events.
+ * Every turn also turns off what would run or persist outside BELL's
+ * control: hooks, which run
  * outside the sandbox (`disableAllHooks`; managed hooks still run), and auto
  * memory under ~/.claude/projects/, also when the user's `env` forces it on
  * (`autoMemoryEnabled`, `CLAUDE_CODE_DISABLE_AUTO_MEMORY`). The user's own
@@ -280,9 +283,13 @@ function claudeUserMemoryFiles(): string[] {
  * keys, and that each wins over the user's settings, were verified with
  * 2.1.292 against a local stand-in for the API; so were the Linux sandbox
  * values above, through the arguments the CLI passed to bwrap (the macOS
- * ones only against the schema). Supported range:
- * Claude Code >= 2.1.292 and < 2.2; scripts/agent-sandbox-canary.mjs must
- * pass on a release before the range is widened.
+ * ones only against the schema). `sandbox.allowNestedUserNamespaces` was
+ * checked with 2.1.316: its schema, and the bwrap arguments against the
+ * stand-in, where `false` here won over a user `true`. 2.1.292 does not know
+ * the key and, the sandbox object being passthrough, still applies the rest
+ * of `--settings` with it. Supported range: Claude Code >= 2.1.292 and
+ * < 2.2; scripts/agent-sandbox-canary.mjs must pass on a release before the
+ * range is widened.
  */
 export function claudeSettings(options: {
   cwd: string;
@@ -306,6 +313,7 @@ export function claudeSettings(options: {
     enableWeakerNestedSandbox?: false;
     enableWeakerNetworkIsolation?: false;
     allowAppleEvents?: false;
+    allowNestedUserNamespaces?: false;
     filesystem?: ReturnType<typeof agentSandboxReadPaths> & {
       denyWrite?: string[];
       disabled?: false;
@@ -342,6 +350,7 @@ export function claudeSettings(options: {
             enableWeakerNestedSandbox: false,
             enableWeakerNetworkIsolation: false,
             allowAppleEvents: false,
+            allowNestedUserNamespaces: false,
             filesystem: {
               ...agentSandboxReadPaths(options.cwd),
               denyWrite: agentGitWriteDenials(options.cwd),

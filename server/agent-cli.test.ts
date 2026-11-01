@@ -62,6 +62,7 @@ const settingsOf = (args: string[]) =>
       enableWeakerNestedSandbox?: boolean;
       enableWeakerNetworkIsolation?: boolean;
       allowAppleEvents?: boolean;
+      allowNestedUserNamespaces?: boolean;
       filesystem: { denyRead: string[]; allowRead: string[]; disabled?: boolean };
       network: {
         allowedDomains: string[];
@@ -453,6 +454,7 @@ test("Claude Code arguments map access levels, inline the schema and keep MCP co
     enableWeakerNestedSandbox: false,
     enableWeakerNetworkIsolation: false,
     allowAppleEvents: false,
+    allowNestedUserNamespaces: false,
     network: {
       allowedDomains: [],
       strictAllowlist: true,
