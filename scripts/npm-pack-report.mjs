@@ -3,15 +3,22 @@ import path from "node:path";
 import { gunzipSync } from "node:zlib";
 
 /**
- * `value` as the command or one argument of a spawnSync call that uses
+ * The path `value` as one argument of a spawnSync call that uses
  * `shell: true` exactly on Windows, as npm (npm.cmd) needs there. Node
- * passes that command line to cmd.exe unquoted, so a path with a space,
- * such as a temporary folder under C:\Users\Octo Cat, would split. Quoted
- * on Windows (a backslash before the closing quote doubled), unchanged
+ * passes that command line to cmd.exe unescaped, so a path with a space,
+ * such as a temporary folder under C:\Users\Octo Cat, would split, and
+ * cmd.exe expands %NAME% even inside quotes. On Windows the path is quoted
+ * for the program (a backslash before the closing quote doubled), then
+ * every character special to cmd.exe, the quotes included, gets a ^, which
+ * cmd.exe removes: with a ^ before each % and :, no %NAME% or %NAME:...%
+ * in the path names a variable, so cmd.exe leaves it as written. With
+ * delayed expansion turned on in the registry (off by default), a path
+ * with a ! still changes: !NAME! expands and a ^ is dropped. Unchanged
  * elsewhere.
  */
 export function shellArg(value, platform = process.platform) {
-  return platform === "win32" ? `"${value.replace(/(\\+)$/, "$1$1")}"` : value;
+  if (platform !== "win32") return value;
+  return `"${value.replace(/(\\+)$/, "$1$1")}"`.replace(/[()[\]%!^"`<>&|;, *?:]/g, "^$&");
 }
 
 /** Finds npm's pack report among lifecycle output and bracketed build warnings. */

@@ -20,11 +20,14 @@ test("finds the pack report among bracketed build output", () => {
   assert.throws(() => parsePackReport('[{"filename":"no-files.tgz"}]\n[warning]'), /could not read/);
 });
 
-test("quotes a spawn argument for the Windows shell only", () => {
-  assert.equal(shellArg("C:\\Users\\Octo Cat\\Temp\\pack", "win32"), '"C:\\Users\\Octo Cat\\Temp\\pack"');
+test("quotes and escapes a spawn argument for the Windows shell only", () => {
+  assert.equal(shellArg("C:\\Users\\Octo Cat\\Temp\\pack", "win32"), '^"C^:\\Users\\Octo^ Cat\\Temp\\pack^"');
   // A backslash before the closing quote would escape it.
-  assert.equal(shellArg("C:\\Temp\\", "win32"), '"C:\\Temp\\\\"');
-  assert.equal(shellArg("/tmp/with space", "linux"), "/tmp/with space");
+  assert.equal(shellArg("C:\\Temp\\", "win32"), '^"C^:\\Temp\\\\^"');
+  // cmd.exe would expand %TEMP% and %PATH:a=b%, quoted or not.
+  assert.equal(shellArg("C:\\100%\\%TEMP%\\%PATH:a=b%", "win32"), '^"C^:\\100^%\\^%TEMP^%\\^%PATH^:a=b^%^"');
+  assert.equal(shellArg("C:\\R&D (1)\\a^b!", "win32"), '^"C^:\\R^&D^ ^(1^)\\a^^b^!^"');
+  assert.equal(shellArg("/tmp/with space %TEMP%", "linux"), "/tmp/with space %TEMP%");
 });
 
 test("reads a packed tarball back as npm reported it, long paths included", () => {

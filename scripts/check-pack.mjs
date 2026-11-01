@@ -139,8 +139,10 @@ function installAndRunHelp(tarball) {
   const prefix = mkdtempSync(path.join(os.tmpdir(), "bell-pr-pack-smoke-"));
   const windows = process.platform === "win32";
   try {
-    // -g --prefix puts bins under <prefix>/bin (local --prefix only links
-    // node_modules/.bin). Same layout as a user global install into a prefix.
+    // -g --prefix puts bins under <prefix>/bin and the package under
+    // <prefix>/lib/node_modules (local --prefix only links node_modules/.bin);
+    // on Windows, bins go in <prefix> itself and the package under
+    // <prefix>\node_modules. Same layout as a user global install into a prefix.
     const install = spawnSync(
       npmCommand(),
       ["install", "-g", "--prefix", shellArg(prefix), "--no-fund", "--no-audit", shellArg(tarball)],
@@ -164,7 +166,7 @@ function installAndRunHelp(tarball) {
       return problems;
     }
     const binName = windows ? "bell-pr.cmd" : "bell-pr";
-    const binPath = path.join(prefix, "bin", binName);
+    const binPath = windows ? path.join(prefix, binName) : path.join(prefix, "bin", binName);
     let mode;
     try {
       mode = statSync(binPath).mode;
@@ -175,16 +177,22 @@ function installAndRunHelp(tarball) {
     if (!windows && (mode & 0o111) === 0) {
       problems.push(`packed bin is not executable after install: ${binPath}`);
     }
-    const targetBin = path.join(prefix, "lib", "node_modules", "bell-pr", "bin", "bellpr.mjs");
+    const packages = windows ? path.join(prefix, "node_modules") : path.join(prefix, "lib", "node_modules");
+    const targetBin = path.join(packages, "bell-pr", "bin", "bellpr.mjs");
     try {
       const targetMode = statSync(targetBin).mode;
-      if ((targetMode & 0o111) === 0) {
+      // Windows reports no execute bits.
+      if (!windows && (targetMode & 0o111) === 0) {
         problems.push(`packaged bin/bellpr.mjs is not executable after install: ${targetBin}`);
       }
     } catch (error) {
       problems.push(`packaged bin/bellpr.mjs missing after install (${targetBin}): ${error.message}`);
     }
-    const help = spawnSync(shellArg(binPath), ["--help"], {
+    // On Windows the command goes through cmd.exe: .\bell-pr.cmd, run in
+    // prefix, holds no folder name it could split or expand, and the .\ makes
+    // it look in the current folder even with NoDefaultCurrentDirectoryInExePath.
+    // A UNC temp folder is not supported: cmd.exe does not start in one.
+    const help = spawnSync(windows ? `.\\${binName}` : binPath, ["--help"], {
       cwd: prefix,
       encoding: "utf8",
       maxBuffer: 4 * 1024 * 1024,
