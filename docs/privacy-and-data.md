@@ -109,6 +109,17 @@ means that a setting you made only in that file, such as
 `[analytics] enabled = false`, does not apply to the agents BELL PR runs:
 Codex's built-in defaults apply instead.
 
+Claude Code agents still load your user settings (`~/.claude/settings.json`),
+so your sign-in, your default model and an opt-out you set in its `env`
+apply to them. BELL PR switches off your hooks, auto memory, `CLAUDE.md`,
+output style, language setting and main-thread `agent` setting for its
+agents. An output style that one of your plugins forces still applies; the
+[security model](security-model.md#your-own-claude-code-settings) lists it
+and the other settings that still apply. With auto memory off, Claude Code
+keeps no notes about the projects you imported in `~/.claude/projects/`.
+Earlier BELL PR versions left it on, so such notes may already exist there;
+see [Deleting data](#deleting-data).
+
 ## What BELL PR stores
 
 Everything lives in one data directory: `~/.bellpr` by default, or the
@@ -158,6 +169,7 @@ this reaches the server's data directory.
 | Everything | **Settings → Data & privacy → Delete all data**, then type `ERASE`. Every project, run, analysis, discovery result, log and backup is deleted; your settings stay. Stop running work first. |
 | The sample project's progress | **Settings → General → Reset sample project** (this browser only). |
 | BELL PR itself | Stop it, delete the data directory (`~/.bellpr` by default), and uninstall with `npm uninstall -g bell-pr`. A copy run through `npx` sits in npm's cache. |
+| Claude Code memory notes from earlier BELL PR versions | BELL PR never deletes them, and deleting its data directory does not remove them. In `~/.claude/projects/` (or `projects/` in the folder `CLAUDE_CONFIG_DIR` names), delete the folders named after BELL PR's checkouts and clones: the path with each `/` and `.` written as `-`, so for `~/.bellpr` the name contains `--bellpr-`. |
 
 Data you sent to GitHub or to your AI provider is under that service's
 control: delete it there, for example by closing a pull request or deleting

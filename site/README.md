@@ -66,12 +66,13 @@ without JavaScript, all seven commands are visible together.
   the WSL helper from that same website. Keep all three files in one deployment.
 - **Preview.** Any static file server works, for example
   `python3 -m http.server --bind 127.0.0.1 <port> --directory site`.
-- **The npm package's README.** `scripts/npm-readme.mjs` links an image or
-  file from the package's README to this site only when `site/` holds a
-  byte-identical copy of it, such as the files in `assets/screenshots/`.
-  Every other screenshot stays the text "Screenshot: …" and every other
-  link its text. To show a README screenshot on npmjs.com, copy it from
-  `docs/images/en/` into `site/assets/screenshots/`.
+- **The npm package's READMEs.** `scripts/npm-readme.mjs` links an image or
+  file from the package's `README.md` or `README.zh-TW.md` to this site only
+  when `site/` holds a byte-identical copy of it, such as the files in
+  `assets/screenshots/`. Every other screenshot stays the text
+  "Screenshot: …" ("截圖：…" in the Chinese README) and every other link its
+  text. To show a README screenshot on npmjs.com, copy it from
+  `docs/images/en/` or `docs/images/zh-TW/` into `site/assets/screenshots/`.
 
 ## Hidden while a product value is empty
 

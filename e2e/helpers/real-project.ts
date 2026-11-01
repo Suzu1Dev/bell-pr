@@ -22,6 +22,7 @@ import os from "node:os";
 import path from "node:path";
 import type { FakeFacts, FakeGitHub } from "../../test/fake-github";
 import { fakeGitHub } from "../../test/fake-github";
+import { git as bellGit } from "../../server/process";
 import { readDiff } from "../../server/git";
 import { launchServer, type LaunchedServer } from "../start-server.mjs";
 import { readyStandIns } from "./ready-server";
@@ -212,6 +213,11 @@ const git = (cwd: string, ...args: string[]) =>
     // The person's own Git settings (signing, hooks) stay out of it.
     env: { ...process.env, GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_NOSYSTEM: "1" },
   }).trim();
+
+// The run's worktree goes through BELL's git so this process's readDiff
+// (fingerprints below) accepts it, with the same isolation as `git` above
+// (BELL's git sets GIT_CONFIG_NOSYSTEM).
+const seedGit = { env: { GIT_CONFIG_GLOBAL: "/dev/null" } };
 
 /**
  * The run's diff as the server reads it, for its files' fingerprints:
@@ -405,7 +411,7 @@ esac
         const baseSha = git(checkout, "rev-parse", "HEAD");
         const worktreePath = path.join(dataDir, "worktrees", runId);
         await mkdir(path.dirname(worktreePath), { recursive: true });
-        git(checkout, "worktree", "add", "-q", "-b", "fix/greet-languages", worktreePath, baseSha);
+        await bellGit(checkout, ["worktree", "add", "-q", "-b", "fix/greet-languages", worktreePath, baseSha], seedGit);
         await writeFile(path.join(worktreePath, files.greeting), greetingAfter);
         await writeFile(path.join(worktreePath, files.format), formatAfter);
         await writeFile(path.join(worktreePath, files.test), testBody("expect(greeting(\"Ada\")).toBeDefined();"));

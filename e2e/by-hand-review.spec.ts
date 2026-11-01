@@ -14,6 +14,7 @@ import { expect, test, type Browser, type Page } from "@playwright/test";
 import { e2eApiHeaders } from "./api-token.mjs";
 import { changeFingerprint } from "../shared/change-fingerprint";
 import { readDiff } from "../server/git";
+import { git as bellGit } from "../server/process";
 import byHandText from "../src/byhand/write/i18n/en";
 import { startReadyServer } from "./helpers/ready-server";
 import type { LaunchedServer } from "./start-server.mjs";
@@ -31,6 +32,10 @@ const git = (cwd: string, ...args: string[]) =>
     env: { ...process.env, GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_NOSYSTEM: "1" },
   }).trim();
 
+// Worktrees go through BELL's git so this process's readDiff accepts them,
+// with the same isolation as `git` above (BELL's git sets GIT_CONFIG_NOSYSTEM).
+const seedGit = { env: { GIT_CONFIG_GLOBAL: "/dev/null" } };
+
 const retryBase = "export const maxRetries = Infinity;\n\nexport function shouldRetry(attempt: number) {\n  return attempt < maxRetries;\n}\n";
 const retryAfter = retryBase.replace("Infinity", "3");
 
@@ -45,7 +50,7 @@ async function seed(dataDir: string) {
   const baseSha = git(checkout, "rev-parse", "HEAD");
   const worktree = async (id: string) => {
     const worktreePath = path.join(dataDir, "worktrees", id);
-    git(checkout, "worktree", "add", "-q", "-b", `by-hand/${id}`, worktreePath, baseSha);
+    await bellGit(checkout, ["worktree", "add", "-q", "-b", `by-hand/${id}`, worktreePath, baseSha], seedGit);
     await writeFile(path.join(worktreePath, source), retryAfter);
     const files = await readDiff({ worktreePath, baseSha, locale: "en" });
     return { worktreePath, fingerprint: changeFingerprint(files.map((file) => ({ path: file.path, fingerprint: file.fingerprint }))) };

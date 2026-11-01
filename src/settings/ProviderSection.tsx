@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { Bot, Check, CircleCheck, Loader2, TriangleAlert } from "lucide-react";
-import type { DoctorCheck, DoctorReport } from "../../shared/doctor";
+import { toolUsable, type DoctorCheck, type DoctorReport } from "../../shared/doctor";
 import type { Fix } from "../../shared/errors";
 import { defaultContributionSettings } from "../../shared/insights";
 import {
@@ -50,7 +50,7 @@ export function providerState(
   const state: CliState =
     !tool || tool.status === "skip" || tool.reason === "missing"
       ? "missing"
-      : tool.status !== "ok"
+      : !toolUsable(tool)
         ? "notWorking"
         : auth?.status === "ok"
           ? "ready"

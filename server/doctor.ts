@@ -15,7 +15,12 @@ import { constants } from "node:fs";
 import { access, readFile, stat, statfs } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { doctorCheckIds, type DoctorCheck, type DoctorReport } from "../shared/doctor.js";
+import {
+  doctorCheckIds,
+  toolUsable,
+  type DoctorCheck,
+  type DoctorReport,
+} from "../shared/doctor.js";
 import type { Fix } from "../shared/errors.js";
 import { codexEnabled } from "../shared/codex-switch.js";
 import {
@@ -26,7 +31,7 @@ import {
 } from "../shared/models.js";
 import { product } from "../shared/product.js";
 import { bellSudoersFile } from "../shared/sudo.js";
-import { agentLoginCheck } from "./agent-cli.js";
+import { agentLoginCheck, claudeSupportedVersions } from "./agent-cli.js";
 import { defaultActiveRunLimit, defaultAgentProcessLimit } from "./agent-slots.js";
 import { AppSettingsService, withAppSettings } from "./app-settings.js";
 import { version as appVersion } from "./build-info.js";
@@ -572,6 +577,25 @@ function gitSupportsSync(version?: string) {
   );
 }
 
+/**
+ * Whether Claude Code is in claudeSupportedVersions; an unknown version
+ * counts as supported, so only a version that is known to be outside warns.
+ */
+export function claudeVersionSupported(version?: string): boolean {
+  const numbers = (text: string) => {
+    const match = /^(\d+)\.(\d+)(?:\.(\d+))?/.exec(text);
+    return match ? [Number(match[1]), Number(match[2]), Number(match[3] ?? 0)] : undefined;
+  };
+  const found = version ? numbers(version) : undefined;
+  if (!found) return true;
+  const compare = (other: number[]) =>
+    found.map((part, index) => part - other[index]).find((difference) => difference) ?? 0;
+  return (
+    compare(numbers(claudeSupportedVersions.min)!) >= 0 &&
+    compare(numbers(claudeSupportedVersions.below)!) < 0
+  );
+}
+
 /** The providers that are installed and signed in, Codex first. */
 function readyProviders(facts: Facts): AgentProvider[] {
   return agentProviders.filter((provider) =>
@@ -818,7 +842,17 @@ function buildReport(
       required: false,
       ...(tool.version ? { version: tool.version } : {}),
       ...(tool.state === "ok"
-        ? { status: "ok" }
+        ? provider === "claude" && !claudeVersionSupported(tool.version)
+          ? {
+              // Agents still start: toolUsable() counts this warning as working.
+              status: "warn",
+              reason: "unsupported-version",
+              detail: m.claudeVersionUnsupported({
+                version: tool.version ?? "",
+                ...claudeSupportedVersions,
+              }),
+            }
+          : { status: "ok" }
         : tool.state === "missing"
           ? {
               status: "skip",
@@ -1140,7 +1174,7 @@ export function cliStatus(report: DoctorReport): CliStatus {
   return {
     codex: ok("codex"),
     codexAuthenticated: ok("codex-auth"),
-    claude: ok("claude"),
+    claude: toolUsable(check("claude")),
     claudeAuthenticated: ok("claude-auth"),
     github: ok("gh-auth"),
     ...(typeof login === "string" ? { githubUser: login } : {}),

@@ -111,6 +111,8 @@ const m: Translation<typeof en> = {
       `已安裝，但執行 \`${command}\` 失敗：${output}`,
     gitTooOld: ({ version }) =>
       `Git ${version} 可以使用，但要把工作移到目標分支的最新版本，需要 Git 2.40 以上。其他功能都能正常使用。`,
+    claudeVersionUnsupported: ({ version, min, below }) =>
+      `Claude Code ${version} 不在 ${product.name} 支援的版本範圍內（${min} 以上、${below} 之前）。Agent 仍會啟動，但 ${product.name} 尚未確認這個版本會套用它的沙箱與 hooks 設定。`,
     identityMissing:
       "尚未設定：Git 不知道你的名字與電子郵件地址，因此無法提交或發佈任何內容。",
     identityAutodetected: ({ email }) =>

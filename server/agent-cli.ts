@@ -1,7 +1,9 @@
 import { readFile } from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
-import { sharedCredentialDenials } from "../shared/credential-denials.js";
+import { expandHome, sharedCredentialDenials } from "../shared/credential-denials.js";
+import { physicalPath } from "../shared/physical-path.js";
 import { codexEnabled } from "../shared/codex-switch.js";
 export { setCodexEnabledForTests } from "../shared/codex-switch.js";
 import {
@@ -19,6 +21,7 @@ import {
   agentReadDenials,
   agentSandboxReadPaths,
   enforceAgentSandbox,
+  inside,
 } from "./sandbox.js";
 import { cancelled, currentLocale, sm } from "./i18n/index.js";
 
@@ -100,10 +103,89 @@ function claudeAccess(access: AgentAccess, web: boolean, full: boolean): string[
 }
 
 /**
+ * A path the Codex profile can hold as a quoted TOML key: no quote,
+ * backslash, brace or line break. Other paths are left out of the profile.
+ */
+function codexProfilePath(entry: string): boolean {
+  return !/["\\\r\n{}]/.test(entry);
+}
+
+/**
+ * The shared credential denials as Codex deny entries, leaving out an
+ * entry that repeats an earlier one or lies under a denied directory (an
+ * entry written with a trailing `/`), as written or at its physical path,
+ * and an entry that passes through a symbolic link when another entry
+ * names its physical path. `~` is expanded only to compare; entries keep
+ * their spelling.
+ *
+ * Every `X/**` entry (`~/.config/gh/**`, `~/.aws/**`, `~/.ssh/**` and the
+ * gh config directory that `GH_CONFIG_DIR` or `XDG_CONFIG_HOME` moves)
+ * reaches Codex as the directory `X/`. Codex skips symbolic links when it
+ * expands `**`, so a credential file in X that is a link (as dotfile
+ * managers and vaults leave them) stayed readable: in every role with
+ * 0.159, in read-only roles with 0.166 (its writable roles failed to
+ * start instead). The directory form hides it with the rest of X, nested
+ * files included, and both roles start. The link's target outside X is
+ * still readable at its own path. `~/.ssh/**` then repeats `~/.ssh/` and
+ * is left out. Claude Code's Read rules keep `X/**`.
+ *
+ * On Linux, bubblewrap cannot place a deny inside a directory it has
+ * already denied: with `~/.ssh/` and `~/.ssh/**` both listed, any file in
+ * `~/.ssh` stopped every command from starting ("Can't create file at
+ * …/.ssh/authorized_keys: Read-only file system"), and a `store --file`
+ * path inside `~/.ssh` did the same. The directory form stays, because
+ * `X/**` alone still lists the names in X and stops at
+ * `glob_scan_max_depth`. A deny path that passes through a symbolic link
+ * stops the sandbox from starting as well ("Can't create file at
+ * <link>/auth.json"), so a config directory that `CODEX_HOME`,
+ * `XDG_CONFIG_HOME`, `CLAUDE_CONFIG_DIR` or `GH_CONFIG_DIR` names through a
+ * link reaches Codex at its physical path only, as in 1.0.0; reads through
+ * the link are still denied. Claude Code's Read rules keep both forms.
+ * Under a symlinked HOME the `~` entries still pass through the link, so
+ * that case still fails. Verified with codex-cli 0.159.0 and 0.166.0
+ * (`codex sandbox`) on Linux with bubblewrap 0.11.1.
+ *
+ * Entries the profile cannot hold are taken out before anything is
+ * compared, so an entry is only left out for one that reaches the profile.
+ * When a link's physical path holds such a character, the linked form
+ * stays: the sandbox then fails to start instead of leaving the file
+ * readable.
+ */
+function codexDenials(): string[] {
+  const home = process.env.HOME || os.homedir();
+  const entries = sharedCredentialDenials()
+    .filter(codexProfilePath)
+    .map((entry) => (entry.endsWith("/**") ? entry.slice(0, -2) : entry))
+    .map((entry) => {
+      const target = path.resolve(expandHome(entry, home));
+      return {
+        entry,
+        target,
+        physical: physicalPath(target),
+        directory: entry.endsWith("/"),
+      };
+    });
+  return entries
+    .filter(
+      (item, index) =>
+        !entries.some(
+          (other, at) =>
+            (at < index && other.target === item.target) ||
+            (item.physical !== item.target && other.target === item.physical) ||
+            (other.directory &&
+              (inside(item.target, other.target) ||
+                inside(item.physical, other.physical))),
+        ),
+    )
+    .map((item) => item.entry);
+}
+
+/**
  * Codex permission profile for one turn. `--sandbox` is not passed: on
  * Codex CLI 0.165 it selects the older sandbox, which does not apply
  * `default_permissions`, so the read denials would be ignored.
- * `glob_scan_max_depth` makes a `**` deny apply on Linux.
+ * `glob_scan_max_depth` makes a glob deny apply on Linux; the credential
+ * directories reach Codex as directories instead (see codexDenials).
  *
  * Filesystem values are only `read`, `write`, or `deny`. `deny` blocks
  * reads and writes. `read` allows reads and forbids writes, including
@@ -115,12 +197,10 @@ export function codexSandboxConfig(access: AgentAccess, cwd: string): string[] {
   const dotGit = path.join(cwd, ".git");
   const filesystem = [
     "glob_scan_max_depth=4",
-    ...sharedCredentialDenials().flatMap((entry) =>
-      /["\\\r\n{}]/.test(entry) ? [] : [`"${entry}"="deny"`],
-    ),
-    ...[dotGit, `${dotGit}/**`].flatMap((entry) =>
-      /["\\\r\n{}]/.test(entry) ? [] : [`"${entry}"="read"`],
-    ),
+    ...codexDenials().map((entry) => `"${entry}"="deny"`),
+    ...[dotGit, `${dotGit}/**`]
+      .filter(codexProfilePath)
+      .map((entry) => `"${entry}"="read"`),
   ].join(", ");
   const parent = access === "write" ? ":workspace" : ":read-only";
   return [
@@ -144,6 +224,27 @@ export function codexAccessMode(
 }
 
 /**
+ * The user's own instruction files in Claude Code's config directory, the
+ * way the CLI names them (verified with 2.1.292: the path as given matches
+ * through a symbolic link too). Claude Code reads these as picomatch globs,
+ * so each glob character in the directory, such as the parentheses of
+ * `Dropbox (Personal)`, becomes a one-character class like `[(]`. A
+ * backslash cannot escape it: Claude Code turns backslashes into `/`.
+ */
+function claudeUserMemoryFiles(): string[] {
+  const directory = path
+    .resolve(process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), ".claude"))
+    .replace(/[()[\]{}*?!+@|]/g, "[$&]");
+  return [path.join(directory, "CLAUDE.md"), path.join(directory, "rules", "**")];
+}
+
+/**
+ * The Claude Code releases BELL PR supports: `min` or later, before `below`.
+ * Doctor warns about another release but does not block it.
+ */
+export const claudeSupportedVersions = { min: "2.1.292", below: "2.2" } as const;
+
+/**
  * The `--settings` value for one Claude Code turn. Every turn denies
  * reading credential files and BELL's data outside its checkout. Read-only
  * turns also refuse file reads outside the working directory. A write turn
@@ -154,13 +255,50 @@ export function codexAccessMode(
  * (`allowUnsandboxedCommands: false`); `failIfUnavailable` stops the turn
  * instead of running unsandboxed if the sandbox cannot start after all.
  *
+ * The user's own settings still load (`--setting-sources user`), so sign-in
+ * through `env`, `apiKeyHelper` or a cloud provider keeps working. A single
+ * value given here wins over the user's; lists, `env` and the proxy ports
+ * BELL cannot unset stay theirs. So does `sandbox.ripgrep`: the highest
+ * source that sets it owns it whole, and Claude Code's own ripgrep cannot
+ * be written here. Plugin language servers have no switch at all
+ * (docs/security-model.md names what that leaves). A sandboxed turn
+ * therefore sets each single value that would weaken the sandbox back to
+ * its default: filesystem isolation stays on
+ * (`filesystem.disabled`), /proc is fresh (`enableWeakerNestedSandbox`),
+ * Unix sockets stay blocked (`allowAllUnixSockets`), commands cannot create
+ * user namespaces of their own, which would let them undo the write denies
+ * (`allowNestedUserNamespaces`, Linux, Claude Code 2.1.305 and later), and
+ * on macOS there is no local port binding, trustd access or Apple Events.
+ * Every turn also turns off what would run or persist outside BELL's
+ * control: hooks, which run
+ * outside the sandbox (`disableAllHooks`; managed hooks still run), and auto
+ * memory under ~/.claude/projects/, also when the user's `env` forces it on
+ * (`autoMemoryEnabled`, `CLAUDE_CODE_DISABLE_AUTO_MEMORY`). The user's own
+ * instructions are left out too: CLAUDE.md and rules (`claudeMdExcludes`),
+ * output style, `language`, and a main-thread `agent` from the user's or a
+ * plugin's settings, which would replace the system prompt and narrow the
+ * tools, StructuredOutput included (`agent: ""` selects none). Managed
+ * policy still applies, and so does an output style that a loaded plugin
+ * forces (`force-for-plugin`): Claude Code picks it before reading
+ * `outputStyle`, and only disabling that plugin stops it.
+ *
  * Keys verified against the settings schema bundled in Claude Code 2.1.292
  * (`permissions` and `sandbox` are passthrough objects there, so a key a
- * release does not know is ignored rather than rejected);
+ * release does not know is ignored rather than rejected, but one value of
+ * the wrong type, such as `sandbox.ripgrep: null`, makes the CLI ignore all
+ * of `--settings` without a message);
  * `sandbox.filesystem.denyRead` and `allowRead` are in the schema since
- * 2.1.114 at the latest, and both apply on Linux and macOS. Supported range:
- * Claude Code >= 2.1.292 and < 2.2; scripts/agent-sandbox-canary.mjs must
- * pass on a release before the range is widened.
+ * 2.1.114 at the latest, and both apply on Linux and macOS. The top-level
+ * keys, and that each wins over the user's settings, were verified with
+ * 2.1.292 against a local stand-in for the API; so were the Linux sandbox
+ * values above, through the arguments the CLI passed to bwrap (the macOS
+ * ones only against the schema). `sandbox.allowNestedUserNamespaces` was
+ * checked with 2.1.316: its schema, and the bwrap arguments against the
+ * stand-in, where `false` here won over a user `true`. 2.1.292 does not know
+ * the key and, the sandbox object being passthrough, still applies the rest
+ * of `--settings` with it. Supported range: claudeSupportedVersions;
+ * scripts/agent-sandbox-canary.mjs must pass on a release before the range
+ * is widened.
  */
 export function claudeSettings(options: {
   cwd: string;
@@ -168,17 +306,43 @@ export function claudeSettings(options: {
   sandbox: boolean;
   full?: boolean;
 }): {
+  disableAllHooks: true;
+  autoMemoryEnabled: false;
+  env: { CLAUDE_CODE_DISABLE_AUTO_MEMORY: "1" };
+  outputStyle: "default";
+  language: "";
+  agent: "";
+  claudeMdExcludes: string[];
   permissions: { deny: string[]; blockReadsOutsideWorkingDirectories?: boolean };
   sandbox?: {
     enabled: boolean;
     failIfUnavailable?: boolean;
     autoAllowBashIfSandboxed?: boolean;
     allowUnsandboxedCommands?: boolean;
-    filesystem?: ReturnType<typeof agentSandboxReadPaths> & { denyWrite?: string[] };
-    network?: { allowedDomains: string[]; strictAllowlist: boolean };
+    enableWeakerNestedSandbox?: false;
+    enableWeakerNetworkIsolation?: false;
+    allowAppleEvents?: false;
+    allowNestedUserNamespaces?: false;
+    filesystem?: ReturnType<typeof agentSandboxReadPaths> & {
+      denyWrite?: string[];
+      disabled?: false;
+    };
+    network?: {
+      allowedDomains: string[];
+      strictAllowlist: boolean;
+      allowAllUnixSockets?: false;
+      allowLocalBinding?: false;
+    };
   };
 } {
   return {
+    disableAllHooks: true,
+    autoMemoryEnabled: false,
+    env: { CLAUDE_CODE_DISABLE_AUTO_MEMORY: "1" },
+    outputStyle: "default",
+    language: "",
+    agent: "",
+    claudeMdExcludes: claudeUserMemoryFiles(),
     permissions: {
       deny: agentReadDenials(options.cwd),
       ...(options.access === "write"
@@ -192,11 +356,21 @@ export function claudeSettings(options: {
             failIfUnavailable: true,
             autoAllowBashIfSandboxed: true,
             allowUnsandboxedCommands: false,
+            enableWeakerNestedSandbox: false,
+            enableWeakerNetworkIsolation: false,
+            allowAppleEvents: false,
+            allowNestedUserNamespaces: false,
             filesystem: {
               ...agentSandboxReadPaths(options.cwd),
               denyWrite: agentGitWriteDenials(options.cwd),
+              disabled: false,
             },
-            network: { allowedDomains: [], strictAllowlist: true },
+            network: {
+              allowedDomains: [],
+              strictAllowlist: true,
+              allowAllUnixSockets: false,
+              allowLocalBinding: false,
+            },
           },
         }
       : options.full

@@ -7,6 +7,7 @@ import { lstat, readdir, readFile, realpath } from "node:fs/promises";
 import path from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import type { AgentProvider } from "../shared/models.js";
+import { physicalPath } from "../shared/physical-path.js";
 import { log } from "./log.js";
 import { redact } from "./secrets.js";
 import { assertCodexExecutableAllowed } from "./codex-guard.js";
@@ -612,12 +613,14 @@ function runCheckout(cwd: string) {
 /** Git directory recorded for a checkout path. The checkout's `.git` file is not read. */
 const checkoutGitDirs = new Map<string, string>();
 
+// Keys and values use Git's physical paths, including when the data
+// directory has a symlinked parent.
 export function rememberCheckout(worktreePath: string, gitDir: string) {
-  checkoutGitDirs.set(path.resolve(worktreePath), path.resolve(gitDir));
+  checkoutGitDirs.set(physicalPath(worktreePath), physicalPath(gitDir));
 }
 
 export function recordedGitDir(worktreePath: string): string | undefined {
-  return checkoutGitDirs.get(path.resolve(worktreePath));
+  return checkoutGitDirs.get(physicalPath(worktreePath));
 }
 
 /**
@@ -630,13 +633,16 @@ export async function locateWorktreeGitDir(
 ): Promise<string | undefined> {
   const root = path.join(commonGit, "worktrees");
   const names = await readdir(root).catch(() => [] as string[]);
-  const want = path.resolve(worktreePath);
+  const want = physicalPath(worktreePath);
   const wantGit = path.join(want, ".git");
   for (const name of names) {
     const admin = path.join(root, name);
     const text = (await readFile(path.join(admin, "gitdir"), "utf8").catch(() => "")).trim();
     if (!text) continue;
-    const linked = path.resolve(admin, text);
+    // Only the checkout directory is resolved, not its `.git` entry: an agent
+    // can replace its own `.git` with a link to another run's.
+    const pointer = path.resolve(admin, text);
+    const linked = path.join(physicalPath(path.dirname(pointer)), path.basename(pointer));
     if (linked === wantGit || path.dirname(linked) === want)
       return realpath(admin).catch(() => admin);
   }

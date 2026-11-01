@@ -225,6 +225,11 @@ for other ways to install it. BELL PR uses the Claude Code CLI you installed
 and signed in to (Claude plan or Anthropic API key). Usage counts against
 your own account.
 
+BELL PR supports Claude Code 2.1.292 or later, before 2.2. The environment
+check warns about another version and agents still start; the
+[security model](security-model.md#claude-code) says why the version
+matters.
+
 ### `claude_unauthenticated`
 
 "Claude Code is not signed in, or its sign-in expired." Sign in again:
@@ -497,6 +502,11 @@ there, then publish again.
   variable. [Configuration](configuration.md) lists every range.
 
 ## Runs that wait, stop or cannot be reviewed
+
+Worktree identity checks resolve symbolic links in the data directory, including
+macOS temporary paths under `/var/folders`. Using the same directory through its
+physical path or a symbolic link keeps the recorded Git directory; a different
+checkout with a copied `.git` pointer is still refused.
 
 - **A run is queued**: only as many contributions execute at once as
   **Settings → Performance → Runs at a time** allows

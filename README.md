@@ -104,7 +104,7 @@ sample tour; agent runs and publishing wait until a provider is ready.
 2. It prints its address and opens BELL PR in your browser:
 
    ```text
-   BELL PR 1.0.0-rc.1 → http://127.0.0.1:4311
+   BELL PR <version> → http://127.0.0.1:4311
    ```
 
 3. Walk through Welcome: choose your **language**, check your
@@ -169,12 +169,12 @@ bun add --global bell-pr
 bell-pr
 ```
 
-**mise** — installs Node.js 24 and pins BELL PR to 1.0.0. It uses npm for this
-installation because mise's default npm backend can reject newly published
-packages:
+**mise** — installs Node.js 24 and pins BELL PR to the version in the command.
+It uses npm for this installation because mise's default npm backend can
+reject newly published packages:
 
 ```sh
-MISE_NPM_PACKAGE_MANAGER=npm mise use -g node@24 npm:bell-pr@1.0.0
+MISE_NPM_PACKAGE_MANAGER=npm mise use -g node@24 npm:bell-pr@1.0.1
 mise exec -- bell-pr
 ```
 
@@ -255,13 +255,14 @@ set prices. Exact tokens and cost for a typical first contribution are
 - **Linux**
 - **Windows through WSL2 (untested):** install and run BELL PR, Git, the
   GitHub CLI and your AI CLI inside your WSL distribution. Browser tests and
-  real agent runs for 1.0.0-rc.1 were done on Linux only.
+  real agent runs were done on Linux only.
 
-The 1.0.0-rc.1 release candidate's unit tests, build and package check run
-on Linux and macOS with Node.js 22 and 24 (see the CI workflow). The browser
-tests and the real agent runs were done on Linux only, and WSL2 has not been
-tested (see the [changelog](CHANGELOG.md)). A Docker image is available in
-beta.
+CI runs the unit tests and the build on Linux and macOS with Node.js 24,
+and the package check, the browser tests and a Docker build on Linux; the
+release workflow also builds, tests and packs on Linux with Node.js 22 (see
+the CI and release workflows). The real agent runs were done on Linux only,
+and WSL2 has not been tested (see the [changelog](CHANGELOG.md)). A Docker
+image is available in beta.
 
 ## Features
 
@@ -493,7 +494,7 @@ Details: [Privacy and your data](docs/privacy-and-data.md).
 
 ## Security model
 
-- **Sandboxed agents.** In the default Working directory mode, agents that write code run in their CLI's operating-system sandbox: writes stay in the run's own worktree and the network is closed. Claude Code is denied the GitHub CLI config files, `~/.git-credentials` and credential-store files, `~/.netrc`, and `~/.ssh/`. `GH_TOKEN`/`GITHUB_TOKEN` are removed from the agent's environment. Tokens in your system keyring are not covered: the agent can still read your GitHub token via `gh auth token`. Your main protection is a fine-grained token with the minimum permissions you need. Claude Code is also denied BELL PR's own data outside its checkout. "Full access" is off by default. It turns off the OS sandbox and the credential deny rules for roles that write files, so those agents can read `~/.git-credentials` and `~/.ssh` and run `gh`, `git push`, and `curl`. Read-only roles keep their limits. Only the removal of `GH_TOKEN`/`GITHUB_TOKEN` from the environment still applies. "Passwordless sudo" (Linux only) is off by default. It lets every process under your user account, including the agent, run any command as root without a password and read every file on that machine, including tokens and SSH keys. Use either only in a throwaway VM or container.
+- **Sandboxed agents.** In the default Working directory mode, agents that write code run in their CLI's operating-system sandbox: writes stay in the run's own worktree and the CLI's temporary folders, and the network is closed. Your own Claude Code user settings can widen Claude Code's sandbox (proxy ports, allowed domains or paths, excluded commands, plugin language servers; see [Your own Claude Code settings](docs/security-model.md#your-own-claude-code-settings)). Claude Code is denied the GitHub CLI config files, `~/.git-credentials` and credential-store files, `~/.netrc`, and `~/.ssh/`. `GH_TOKEN`/`GITHUB_TOKEN` are removed from the agent's environment. Tokens in your system keyring are not covered: the agent can still read your GitHub token via `gh auth token`. Your main protection is a fine-grained token with the minimum permissions you need. Claude Code is also denied BELL PR's own data outside its checkout. "Full access" is off by default. It turns off the OS sandbox and the credential deny rules for roles that write files, so those agents can read `~/.git-credentials` and `~/.ssh` and run `gh`, `git push`, and `curl`. Read-only roles keep their limits. Only the removal of `GH_TOKEN`/`GITHUB_TOKEN` from the environment still applies. "Passwordless sudo" (Linux only) is off by default. It lets every process under your user account, including the agent, run any command as root without a password and read every file on that machine, including tokens and SSH keys. Use either only in a throwaway VM or container.
 - **Imported projects are untrusted.** Their code, documents and agent
   instructions (`AGENTS.md`, `CLAUDE.md`, `.claude/`) are treated as data:
   the CLIs never load the project's own settings, hooks or instructions,

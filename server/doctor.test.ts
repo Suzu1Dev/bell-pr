@@ -14,6 +14,7 @@ import { bellSudoersFile } from "../shared/sudo.js";
 import type { DoctorCheck, DoctorReport } from "../shared/doctor.js";
 import {
   claudeAuthDetail,
+  claudeVersionSupported,
   cliStatus,
   defaultProviderFrom,
   formatDoctorReport,
@@ -104,8 +105,8 @@ const codex = (signedIn = true) => `case "$1" in
   *) exit 1 ;;
 esac`;
 
-const claude = (signedIn = true) => `case "$1" in
-  --version) echo "2.1.292 (Claude Code)" ;;
+const claude = (signedIn = true, version = "2.1.292") => `case "$1" in
+  --version) echo "${version} (Claude Code)" ;;
   auth) ${
     signedIn
       ? `echo '{"loggedIn": true, "authMethod": "claude.ai", "apiProvider": "firstParty", "email": "me@example.com", "subscriptionType": "pro"}'`
@@ -347,6 +348,46 @@ test("token scopes: workflow missing warns, repo missing fails, fine-grained is 
   assert.equal(check(fineGrained, "gh-scopes").status, "skip");
   assert.equal(check(fineGrained, "gh-scopes").reason, "unknown");
   assert.equal(check(fineGrained, "gh-auth").detail, "octocat");
+});
+
+test("Claude Code outside the supported versions works with a warning", async (t) => {
+  const f = await fakes(t, { git: git(), claude: claude(true, "2.2.0") });
+  const report = await withLocale("en", () => runDoctor({ force: true, platform: "linux" }));
+  const tool = check(report, "claude");
+  assert.equal(tool.status, "warn");
+  assert.equal(tool.reason, "unsupported-version");
+  assert.equal(tool.version, "2.2.0");
+  assert.equal(
+    tool.detail,
+    "Claude Code 2.2.0 is outside the versions BELL PR supports (2.1.292 or later, before 2.2). Agents still start, but BELL PR has not checked that this release applies its sandbox and hook settings.",
+  );
+  // Only a warning: Claude Code still counts as ready and runs are not refused.
+  assert.equal(check(report, "provider-ready").status, "ok");
+  assert.equal(report.ready, true);
+  assert.equal(cliStatus(report).claude, true);
+  const zh = await withLocale("zh-TW", () => runDoctor({ platform: "linux" }));
+  assert.match(check(zh, "claude").detail!, /2\.1\.292 以上、2\.2 之前/);
+  for (const [version, status] of [
+    ["2.1.291", "warn"],
+    ["2.1.292", "ok"],
+    ["2.1.316", "ok"],
+  ] as const) {
+    await writeFile(path.join(f.directory, "bin", "claude"), `#!/bin/sh\n${claude(true, version)}\n`);
+    const again = await withLocale("en", () => runDoctor({ force: true, platform: "linux" }));
+    assert.equal(check(again, "claude").status, status, version);
+  }
+});
+
+test("the supported Claude Code range compares numbers; an unknown version is not flagged", () => {
+  assert.equal(claudeVersionSupported("2.1.292"), true);
+  assert.equal(claudeVersionSupported("2.1.1000"), true);
+  assert.equal(claudeVersionSupported("2.1.300-beta.1"), true);
+  assert.equal(claudeVersionSupported("2.1.29"), false);
+  assert.equal(claudeVersionSupported("2.2"), false);
+  assert.equal(claudeVersionSupported("10.0.0"), false);
+  assert.equal(claudeVersionSupported("1.9.999"), false);
+  assert.equal(claudeVersionSupported(undefined), true);
+  assert.equal(claudeVersionSupported("unknown"), true);
 });
 
 test("Git older than 2.40 works with a warning that syncing needs a newer one", async (t) => {

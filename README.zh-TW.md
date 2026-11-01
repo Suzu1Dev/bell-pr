@@ -72,7 +72,7 @@ BELL PR 是本機工作台。請先裝好並登入下列工具，再跑快速開
 2. 它會印出位址，並在瀏覽器中開啟 BELL PR：
 
    ```text
-   BELL PR 1.0.0-rc.1 → http://127.0.0.1:4311
+   BELL PR <version> → http://127.0.0.1:4311
    ```
 
 3. 依照歡迎畫面完成設定：選擇**語言**、檢查**工作環境**（缺少的工具都會附上修正指令），再選擇 Agent 使用的 **AI 服務**。
@@ -128,11 +128,11 @@ bun add --global bell-pr
 bell-pr
 ```
 
-**mise**：安裝 Node.js 24，並固定使用 BELL PR 1.0.0。mise 預設的 npm 後端可能
+**mise**：安裝 Node.js 24，並把 BELL PR 固定在指令中的版本。mise 預設的 npm 後端可能
 擋下剛發佈的套件，因此這次安裝明確選用 npm：
 
 ```sh
-MISE_NPM_PACKAGE_MANAGER=npm mise use -g node@24 npm:bell-pr@1.0.0
+MISE_NPM_PACKAGE_MANAGER=npm mise use -g node@24 npm:bell-pr@1.0.1
 mise exec -- bell-pr
 ```
 
@@ -196,10 +196,9 @@ Agent 用量由**你自己的** Codex／Claude 帳戶計費。BELL PR 不定價�
 - **macOS**
 - **Linux**
 - **Windows（透過 WSL2，尚未測試）：** 請在 WSL 發行版中安裝並執行 BELL PR、
-  Git、GitHub CLI 與你的 AI CLI。1.0.0-rc.1 的瀏覽器測試與真實 agent 執行只在
-  Linux 上做過。
+  Git、GitHub CLI 與你的 AI CLI。瀏覽器測試與真實 agent 執行只在 Linux 上做過。
 
-1.0.0-rc.1 候選版本的單元測試、建置與套件檢查，在 Linux 與 macOS 上以 Node.js 22 與 24 執行（請見 CI 工作流程）。瀏覽器測試與真實 agent 執行只在 Linux 上做過，WSL2 尚未測試（請見[變更紀錄](CHANGELOG.md)）。另有 Docker 映像檔，目前為 beta。
+CI 在 Linux 與 macOS 上以 Node.js 24 執行單元測試與建置，並在 Linux 上執行套件檢查、瀏覽器測試與 Docker 建置；發佈工作流程另外在 Linux 上以 Node.js 22 建置、測試並打包（請見 CI 與發佈工作流程）。真實 agent 執行只在 Linux 上做過，WSL2 尚未測試（請見[變更紀錄](CHANGELOG.md)）。另有 Docker 映像檔，目前為 beta。
 
 ## 功能
 
@@ -291,7 +290,7 @@ BELL PR 會閱讀專案的貢獻指南、AI 政策、PR 範本、Agent 指南與
 
 ## 安全模型
 
-- **在沙箱中執行的 Agent。** 在預設的「工作目錄」模式下，會寫程式的 Agent 在各自 CLI 的作業系統沙箱中執行：寫入限制在該工作自己的 worktree，網路也會關閉。Claude Code 無法讀取 GitHub CLI 的設定檔、`~/.git-credentials` 與 credential-store 檔案、`~/.netrc` 與 `~/.ssh/`。`GH_TOKEN`/`GITHUB_TOKEN` 會從 agent 的環境變數中移除。系統 keyring 裡的 token 不在保護範圍內：agent 仍可透過 `gh auth token` 讀到你的 GitHub token。主要防線是改用權限最小的 fine-grained token。Claude Code 另外無法讀取自己 checkout 以外的 BELL PR 資料。「完整權限」預設關閉。開啟後會對寫入檔案的角色關掉 OS sandbox 和 credential deny 規則，這些 agent 可以讀 `~/.git-credentials` 和 `~/.ssh`，也能執行 `gh`、`git push`、`curl`；唯讀角色維持原本限制。只剩 `GH_TOKEN`/`GITHUB_TOKEN` 從環境變數移除這一項還有效。「免密碼 sudo」（僅 Linux）預設關閉。開啟後這個使用者帳號底下所有 process（包括 agent）都能不用密碼以 root 執行任何指令，讀得到那台機器上所有檔案，包括 token 和 SSH key。兩者都只在用完即丟的 VM 或 container 裡開。
+- **在沙箱中執行的 Agent。** 在預設的「工作目錄」模式下，會寫程式的 Agent 在各自 CLI 的作業系統沙箱中執行：寫入限制在該工作自己的 worktree 與 CLI 的暫存資料夾，網路也會關閉。你自己的 Claude Code 使用者設定可能放寬 Claude Code 的沙箱（proxy 連接埠、允許的網域或路徑、排除的指令、外掛的語言伺服器；請見[你自己的 Claude Code 設定](docs/security-model.md#your-own-claude-code-settings)，英文）。Claude Code 無法讀取 GitHub CLI 的設定檔、`~/.git-credentials` 與 credential-store 檔案、`~/.netrc` 與 `~/.ssh/`。`GH_TOKEN`/`GITHUB_TOKEN` 會從 agent 的環境變數中移除。系統 keyring 裡的 token 不在保護範圍內：agent 仍可透過 `gh auth token` 讀到你的 GitHub token。主要防線是改用權限最小的 fine-grained token。Claude Code 另外無法讀取自己 checkout 以外的 BELL PR 資料。「完整權限」預設關閉。開啟後會對寫入檔案的角色關掉 OS sandbox 和 credential deny 規則，這些 agent 可以讀 `~/.git-credentials` 和 `~/.ssh`，也能執行 `gh`、`git push`、`curl`；唯讀角色維持原本限制。只剩 `GH_TOKEN`/`GITHUB_TOKEN` 從環境變數移除這一項還有效。「免密碼 sudo」（僅 Linux）預設關閉。開啟後這個使用者帳號底下所有 process（包括 agent）都能不用密碼以 root 執行任何指令，讀得到那台機器上所有檔案，包括 token 和 SSH key。兩者都只在用完即丟的 VM 或 container 裡開。
 - **匯入的專案不受信任。** 專案的程式碼、文件與 Agent 指示（`AGENTS.md`、`CLAUDE.md`、`.claude/`）都只被當成資料：CLI 不會載入專案自己的設定、hooks 或指示；Git 設定可能執行其他程式的 repository 會被拒絕。BELL PR 自己執行的 git 也會關掉這些程式；只有會連到 GitHub 的 git 才會拿到 `GH_TOKEN`。Agent 仍會執行專案的程式碼，請只匯入你願意在這台電腦上執行的專案。
 - **API 權杖。** 每次安裝都會在資料目錄保存一枚權杖，沒有送出權杖的 API 請求會被拒絕。預設只在 `127.0.0.1` 上監聽。其他網站可以連結到它的頁面，但無法呼叫它的 API，也無法以框架嵌入它。
 - **在沙箱外執行必須明確開啟。** 沒有沙箱時（例如使用預設設定的 Docker），會修改檔案的 Claude Code Agent 會被拒絕。你可以在**設定 → Agent 安全**或用 `BELLPR_ALLOW_UNSANDBOXED_AGENTS=1` 允許；這類 Agent 擁有你完整的使用者權限，用過它的每個工作都會顯示「**未使用沙箱執行**」標記。

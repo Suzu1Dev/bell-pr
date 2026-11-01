@@ -7,6 +7,8 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-10-31
+
 ### Added
 
 - Install BELL PR with a user-local shell script, a repository-hosted Homebrew
@@ -15,6 +17,109 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - English and Traditional Chinese landing pages offer npx, npm, curl, brew, Bun,
   PowerShell and mise installation tabs with keyboard navigation and copy buttons.
   The website serves matching shell, PowerShell and WSL helper scripts at short URLs.
+- Settings → About links to the BELL PR website, which is also the npm
+  package's homepage.
+- `bell-pr doctor` and the setup checklist warn when the installed Claude
+  Code is outside the supported versions (2.1.292 or later, before 2.2).
+  Agents still start; the security model says why the version matters.
+
+### Fixed
+
+- **Codex commands start on Linux when `~/.ssh` holds files.** Codex's
+  sandbox profile denied both `~/.ssh/` and `~/.ssh/**`. With any file in
+  `~/.ssh`, such as `known_hosts` or `authorized_keys`, bubblewrap failed to
+  start, so no shell command of a Codex agent ran, in read-only or writable
+  roles. The profile now leaves out an entry that repeats another or lies
+  inside a denied directory, such as a `credential.helper store --file` path
+  inside `~/.ssh`. `~/.ssh` stays denied, file names included. Claude Code's
+  rules are unchanged. The sandbox canary now fails a run whose output
+  contains `bwrap:`, and checks without a model call that Codex's sandbox
+  starts.
+
+- **The npm package keeps the READMEs written for npmjs.com.** The package
+  check in CI and in the release workflow packed the package again without
+  `prepack`, over the tarball the workflow had just made, so a release would
+  have checksummed, uploaded and published a package whose README still had
+  links and screenshots npmjs.com cannot show. And `npm publish` may take
+  either README as the package's (npmjs.com shows the Chinese one for
+  1.0.0, with links into `docs/` that do not work there), while prepack
+  readied only `README.md`; it now readies `README.zh-TW.md` the same way.
+  `node scripts/check-pack.mjs` now packs into a temporary folder that it
+  removes, and with `--tarball` checks the tarball that CI and the release
+  workflow packed, as it is, including that no README in it has a relative
+  link or image left. A release now publishes only from a pushed `v*` tag
+  that matches `package.json`; started by hand, the release workflow only
+  runs its dry run. The Docker image is pushed only after npm publish
+  succeeded, and the GitHub release is created on the commit that was built.
+
+### Security
+
+- **Codex no longer reads credential files that are symbolic links in
+  `~/.aws` or the GitHub CLI config directory.** On Linux, Codex leaves
+  out symbolic links when it expands `**`, so a `~/.aws/credentials` or
+  `~/.config/gh/hosts.yml` that a dotfile manager or vault links into
+  place stayed readable: in every role with Codex CLI 0.159, and in
+  read-only roles with 0.166, whose writable roles failed to start
+  instead. Codex's profile now denies these directories themselves
+  (`~/.aws/`, `~/.config/gh/`, and the directory `GH_CONFIG_DIR` or
+  `XDG_CONFIG_HOME` moves gh to), as it already did for `~/.ssh`, so
+  their file names are hidden as well and both roles start. A link's
+  target outside the directory is still readable at its own path.
+  Claude Code's rules are unchanged.
+- **Symbolic links in the data directory and moved config directories.**
+  When the data directory is reached through a symbolic link (macOS `/var`
+  is `/private/var`), run and teammate checkouts keep the Git directory
+  BELL PR recorded for them instead of being refused (`worktreeForged`).
+  The lookup resolves the checkout and the directories above it, never the
+  checkout's own `.git` entry. The credential paths that `GH_CONFIG_DIR`,
+  `XDG_CONFIG_HOME`, `CLAUDE_CONFIG_DIR` or `CODEX_HOME` move are denied
+  to Claude Code both as given and at their physical path, also before that
+  directory exists. Codex keeps getting the physical path only: on Linux,
+  its sandbox does not start with a deny path that passes through a
+  symbolic link.
+- **Your Claude Code hooks no longer run in BELL PR's agent turns, and auto
+  memory is off.** Hooks from your user settings and plugins ran outside the
+  sandbox during every Claude turn, and auto memory kept notes about imported
+  projects in `~/.claude/projects/` from one run to the next. Each turn now
+  also leaves out your own `CLAUDE.md`, rules, output style and language
+  setting, and a main-thread `agent` from your settings or a plugin's, which
+  would replace BELL PR's system prompt and tools; BELL PR's prompt sets the
+  output language. An output style that one of your plugins forces still
+  applies to every turn. Your sign-in, `env` and default model still
+  apply. BELL PR does not delete notes that earlier versions let Claude
+  Code save; Privacy and your data says where to find them. In sandboxed
+  turns, single sandbox values in your user settings that would weaken the
+  sandbox, such as
+  `sandbox.filesystem.disabled`, `sandbox.enableWeakerNestedSandbox` and
+  `sandbox.network.allowAllUnixSockets`, are set back to their defaults.
+  So is `sandbox.allowNestedUserNamespaces`, which Claude Code 2.1.305 added:
+  on Linux it lets sandboxed commands create user namespaces and with them
+  undo the sandbox's write denials, such as those on the checkout's `.git`.
+  The security model lists the user settings that still widen what agents
+  may do, such as `permissions.additionalDirectories`,
+  `sandbox.excludedCommands` and your own proxy in
+  `sandbox.network.httpProxyPort`. Your plugins' language servers and a
+  `sandbox.ripgrep` command in your user settings still run outside the
+  sandbox when a writable role works; disable plugins that bring language
+  servers or force an output style on a computer that runs BELL PR. The
+  sandbox canary checks that hooks and auto memory stay off, that a user
+  `agent` is reset and that those sandbox values are set back, and its
+  `--decoy-home` links only Claude Code's login file instead of your whole
+  `~/.claude`.
+- **Where sandboxed commands may also write, now documented.** Besides the
+  run's checkout, commands of writable roles may write to the CLI's
+  temporary folders: `/tmp` and `$TMPDIR` for Codex (its `:workspace`
+  profile), and `/tmp/claude`, `~/.npm/_logs` and `~/.claude/debug` for
+  Claude Code 2.1.292. This is not new in 1.0.1. Codex's profile does not
+  deny BELL PR's data directory, so keep the data directory out of `/tmp`
+  and `$TMPDIR` when Codex agents write code (the security model and the
+  configuration guide say so). The READMEs, the FAQ and Settings → Agent
+  safety now mention the temporary folders, and that your own Claude Code
+  user settings can widen Claude Code's sandbox.
+
+## [1.0.0] - 2026-10-30
+
+Published to npm by hand, without provenance.
 
 ### Changed
 
@@ -654,7 +759,10 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   Files that earlier builds saved load as before, and saved files are read
   as leniently as before.
 
-## [1.0.0] - 【暫定】
+## [1.0.0-rc.1] - 2026-10-20
+
+This release candidate was never published to npm; its changes reached npm in
+1.0.0.
 
 The first public release candidate of BELL PR, open source under the
 Apache License 2.0. BELL PR is a self-hosted, local-first workbench for

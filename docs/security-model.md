@@ -101,11 +101,123 @@ to both CLIs, and `DISABLE_TELEMETRY`, `DISABLE_ERROR_REPORTING`,
 
 - Claude Code runs with `--setting-sources user` and `--strict-mcp-config`,
   so the target repository's `.claude` settings, hooks and MCP servers do not
-  load, and neither do your claude.ai connectors.
+  load, and neither do your claude.ai connectors. Which of your own settings
+  still load is described [below](#your-own-claude-code-settings).
 - Codex runs with `--ignore-user-config`, `--ignore-rules` (no execpolicy
   `.rules` files) and `-c project_doc_max_bytes=0`, so the target
   repository's `AGENTS.md` is never loaded as instructions.
 - Prompts mark repository text, reports and feedback as untrusted data.
+
+### Your own Claude Code settings
+
+Claude Code agents still load your user settings (`~/.claude/settings.json`,
+or the one in the folder `CLAUDE_CONFIG_DIR` names). That keeps a sign-in
+through `env`, `apiKeyHelper`, a gateway or a cloud provider working, and
+your default `model` applies when a role uses the CLI default. For each key
+BELL PR passes in `--settings`, its value wins over yours. In every role,
+Full access included, it switches off:
+
+- **Hooks** (`disableAllHooks`). Hooks run outside the sandbox with your
+  user rights, so none of yours, and none from your installed plugins, runs
+  during a BELL PR turn. Hooks from your organization's managed settings
+  still run.
+- **Auto memory** (`autoMemoryEnabled: false`, plus
+  `CLAUDE_CODE_DISABLE_AUTO_MEMORY=1` in case your `env` turns it back on).
+  Agents neither read nor write notes in
+  `~/.claude/projects/<working directory>/memory/`, so nothing from an
+  imported project is kept there between runs.
+- **Your own instructions**: your `CLAUDE.md` and `rules/` in that folder
+  (`claudeMdExcludes`), your output style (`outputStyle: "default"`), your
+  `language` setting, and a main-thread `agent` set in your settings or in
+  a plugin's `settings.json` (`agent: ""`), which would replace Claude
+  Code's system prompt and narrow the tools, so a turn that must answer in
+  a fixed format could not. BELL PR's prompt sets the output language.
+  Managed policy files still load, and so does an output style that one of
+  your plugins forces (see the list below).
+
+Your plugins' MCP servers stay off (`--strict-mcp-config`), and a turn's
+tool list has no tool that starts a skill or a subagent. Your plugins'
+language servers and an output style a plugin forces stay on; the list
+below says when they apply.
+
+In writable roles that run in the sandbox, BELL PR also passes the default
+for each single sandbox value that would weaken the sandbox, so yours does
+not apply: `sandbox.filesystem.disabled` (which makes the whole computer
+writable for commands and drops their read denials),
+`enableWeakerNestedSandbox` (the computer's own `/proc` stays visible),
+`network.allowAllUnixSockets` (Unix sockets such as Docker's or an SSH
+agent's become reachable), on Linux `allowNestedUserNamespaces` (Claude
+Code 2.1.305 and later; commands may create user namespaces of their own,
+with which a hostile command can undo the sandbox's write denials, such as
+those on the checkout's `.git`), and on macOS `network.allowLocalBinding`,
+`enableWeakerNetworkIsolation` and `allowAppleEvents`. In a container where
+Claude Code's sandbox starts only with `enableWeakerNestedSandbox`, the
+commands of BELL PR's writable Claude roles therefore fail; the options in
+[Agent sandbox in Docker](docker.md#agent-sandbox-in-docker) let it mount a
+fresh `/proc`.
+
+Lists and `env` merge with yours instead of being replaced. BELL PR cannot
+unset a proxy port or a `sandbox.ripgrep` command you set, and it has no
+switch for your plugins' language servers or for an output style a plugin
+forces. So these user settings still apply in BELL PR's turns and widen
+what agents may do beyond the limits below, or add to their instructions:
+
+- `permissions.additionalDirectories` adds working directories. Read-only
+  roles can read them (they count for
+  `blockReadsOutsideWorkingDirectories`), writable roles can edit them, and
+  sandboxed commands can write there.
+- `permissions.allow`: read-only roles stay inside the working directories,
+  but the file tools of writable roles follow your `Read(...)` and
+  `Edit(...)` allow rules, and `Edit(...)` paths are also writable for
+  sandboxed commands.
+- `sandbox.filesystem.allowWrite` and `allowRead`, and
+  `sandbox.network.allowedDomains`, widen the sandbox of writable roles.
+- `sandbox.network.httpProxyPort` and `socksProxyPort` send the traffic of
+  sandboxed commands to your own proxy instead of the filtering proxy
+  Claude Code runs. Your proxy then decides which hosts they reach; BELL
+  PR's empty allowlist no longer applies.
+- On macOS, `sandbox.network.allowUnixSockets` and `allowMachLookup` add
+  Unix sockets and system services that sandboxed commands may reach.
+- `sandbox.excludedCommands`: a matching command runs outside the sandbox,
+  even with `allowUnsandboxedCommands: false`, and writable roles run Bash
+  commands without asking. Such a command has your user rights; the read
+  denials below do not apply to it.
+- Language servers from your plugins (a plugin's `.lsp.json` or
+  `lspServers`) start outside the sandbox when a writable role edits or
+  writes a file of their language. This covers the plugins you enabled
+  (`enabledPlugins`) and the plugin folders in `~/.claude/skills/<name>/`,
+  which Claude Code loads by itself. A language server runs in the run's
+  checkout with your user rights and network. Some run code from the
+  project they open, such as build scripts, and their diagnostics are
+  added to the turn. Read-only roles do not start them.
+- An output style that one of your plugins forces (`force-for-plugin: true`
+  in the style's front matter), from the plugins you enabled or a plugin
+  folder in `~/.claude/skills/<name>/`, is added to every turn in every
+  role, including the read-only roles and the turns that must answer in a
+  fixed format. Claude Code chooses it before it reads `outputStyle`, and
+  it still reports the default style, so BELL PR cannot see or reset it.
+- On Linux, `sandbox.ripgrep` replaces the ripgrep Claude Code runs before
+  each sandboxed command of a writable role. Your command runs outside the
+  sandbox, in the run's checkout, with your user rights. The sandbox keeps
+  the files that ripgrep finds below the checkout, such as `.bashrc`,
+  `.gitconfig` or `.vscode`, read-only for commands, so a file your command
+  does not report stays writable. The settings source with the highest
+  priority that sets `sandbox.ripgrep` owns it whole, and Claude Code's own
+  ripgrep cannot be named in `--settings`, so BELL PR cannot set it back.
+- `env` values reach every command an agent runs. The removal of
+  `GH_TOKEN` and `GITHUB_TOKEN` does not cover values set there.
+- `apiKeyHelper`, `awsAuthRefresh`, `awsCredentialExport`,
+  `gcpAuthRefresh`, `otelHeadersHelper` and `proxyAuthHelper` run with your
+  user rights when Claude Code needs them, as they do outside BELL PR.
+
+Apart from those, the read denials apply to the file tools and to
+sandboxed commands. On a computer where you run BELL PR, keep these keys
+out of your user settings where your sign-in allows it. The `permissions`
+keys and the sandbox lists can move to the `.claude/settings.json` of the
+projects that need them, because BELL PR's agents never load project
+settings (Claude Code ignores the proxy ports, the macOS lists and
+`sandbox.ripgrep` there). Disable plugins that bring language servers or
+force an output style, for example with `claude plugin disable <plugin>`.
 
 ### Claude Code
 
@@ -114,12 +226,19 @@ Full access changes writable roles as described [below](#explicit-full-access).
 
 - **Writable roles** (teammates, follow-up rounds, syncing) run every Bash
   command inside Claude Code's sandbox: bubblewrap with socat on Linux,
-  `sandbox-exec` on macOS. Writes are limited to the run's checkout, network
-  access is closed (`network.strictAllowlist` with no allowed domains),
-  commands cannot ask to leave the sandbox (`allowUnsandboxedCommands:
-  false`), and a sandbox that cannot start stops the turn
+  `sandbox-exec` on macOS. The writes of these commands are limited to the
+  run's checkout and the places Claude Code always lets them write (seen in
+  2.1.292): its temporary folder `/tmp/claude`, by default also their
+  `TMPDIR`, which every BELL PR run and your other Claude Code sessions
+  share, `~/.npm/_logs` and `~/.claude/debug`. Their network access is
+  closed (`network.strictAllowlist` with no allowed domains, unless your
+  user settings name your own proxy), commands cannot ask to leave the
+  sandbox (`allowUnsandboxedCommands: false`), and a sandbox that cannot
+  start stops the turn
   (`failIfUnavailable`). `git push`, `gh`, `curl` and `wget` are denied as
-  well.
+  well. The language servers of your plugins and a `sandbox.ripgrep`
+  command from your user settings run outside the sandbox; see
+  [above](#your-own-claude-code-settings).
 - **Without the sandbox** a writable Claude role is refused with the error
   code `claude_sandbox_unavailable` and three ways out: install bubblewrap
   and socat, use Codex for the project, or allow unsandboxed Claude agents
@@ -132,12 +251,15 @@ Full access changes writable roles as described [below](#explicit-full-access).
   `permissions.blockReadsOutsideWorkingDirectories`).
 - **Every role** is denied reading the shared list in
   `shared/credential-denials.ts`: `~/.config/gh` (also where `GH_CONFIG_DIR`
-  or `XDG_CONFIG_HOME` moved it), `~/.git-credentials`, each file named by
+  or `XDG_CONFIG_HOME` moved it; a symbolic link denies that path and its
+  physical path, also before that directory exists), `~/.git-credentials`,
+  each file named by
   `credential.helper store --file` in the global, XDG or system Git config,
   `~/.netrc`, `~/.ssh`, `~/.aws`, `~/.npmrc`, and Claude Code's and Codex's
   credential files (also where `CLAUDE_CONFIG_DIR` or `CODEX_HOME` moved
-  them). Plain `store` with no `--file` is the default `~/.git-credentials`
-  path, which is always on the list. A missing or unreadable Git config
+  them, likewise at both paths when a symbolic link differs). Plain
+  `store` with no `--file` is the default `~/.git-credentials` path, which
+  is always on the list. A missing or unreadable Git config
   adds no store path and leaves the rest of the list in place. BELL PR's
   data directory outside the agent's own checkout is denied as well: state
   and settings files, other runs' checkouts and other projects' clones.
@@ -155,29 +277,70 @@ Full access changes writable roles as described [below](#explicit-full-access).
   `raw.githubusercontent.com` only. When web access is on, the mentor sees
   pull-request comments only from the repository's owners, members and
   collaborators.
-- **Supported versions:** Claude Code 2.1.292 or later within 2.1.x. The
-  settings keys were checked against the schema bundled in 2.1.292; a newer
-  release is supported once the canary below passes on it.
+- **Supported versions:** Claude Code 2.1.292 or later, before 2.2. The
+  settings keys were checked against the schema bundled in 2.1.292, and
+  `sandbox.allowNestedUserNamespaces` against 2.1.316. BELL PR does not
+  block another version: `bell-pr doctor` and the setup checklist show a
+  warning on the Claude Code check, and agents still start. A mismatch
+  matters because Claude Code ignores all of `--settings`, without a
+  message, when one value fails its schema, and because a newer release can
+  add a setting that weakens the sandbox and that BELL PR does not set back
+  yet. Your hooks, auto memory, own instructions or weakening sandbox values
+  described [above](#your-own-claude-code-settings) could then apply in
+  BELL PR's turns. The range is widened only after the canary below passes
+  on a newer release.
 
 ### Codex
 
 - Writable roles run with a permission profile that extends `:workspace`:
-  writes are limited to the checkout and command network access is off.
-  Read-only roles extend `:read-only`. BELL PR does not pass `--sandbox`
-  for that profile. On Codex CLI 0.165, `--sandbox` selects the older
-  sandbox and ignores `default_permissions`, which would drop the read
+  writes are limited to the checkout and the temporary folders `/tmp` and
+  `$TMPDIR`, which `:workspace` opens (seen with Codex CLI 0.159 on
+  Linux), and command network access is off. The profile does not deny
+  BELL PR's data directory, so do not put the data directory under `/tmp`
+  or `$TMPDIR` when Codex agents write code: their commands could change
+  `state.json`, the settings and other runs' checkouts there. Read-only
+  roles extend `:read-only`, which allows no writes. BELL PR does not pass
+  `--sandbox` for that profile. On Codex CLI 0.165, `--sandbox` selects the
+  older sandbox and ignores `default_permissions`, which would drop the read
   denials below. Explicit full access, described below, is the case that
   passes `--sandbox danger-full-access`.
 - The profile names the same path list as Claude Code
   (`shared/credential-denials.ts`): GitHub CLI config files,
   `~/.git-credentials` and `credential.helper store --file` paths,
-  `~/.netrc`, `~/.ssh`, and the other files in that list. Those denials
-  are part of the sandbox profile. The checkout's `.git` path and `.git/**`
-  are `read`, so that path cannot be edited or replaced and Git can still
-  read it. The person can turn Claude Code's sandbox off; Codex is started
-  with this profile on each turn unless full access is on. Reads of other
-  files your user can read are still allowed. The profile does not name
-  the system keyring (Secret Service, D-Bus, or Keychain).
+  `~/.netrc`, `~/.ssh`, `~/.aws`, and the other files in that list. Those
+  denials are part of the sandbox profile. Where Claude Code's rules name
+  every file in a directory (`~/.config/gh/**`, `~/.aws/**`, and the
+  GitHub CLI directory that `GH_CONFIG_DIR` or `XDG_CONFIG_HOME` moves),
+  the profile denies the directory itself, such as `~/.config/gh/` and
+  `~/.aws/`, with every file in it, nested ones such as `~/.aws/sso/cache`
+  included. On Linux, Codex leaves out symbolic links when it expands
+  `**` (Codex CLI 0.159 in every role, 0.166 in read-only roles), so with
+  `~/.aws/**` a credential file that a dotfile manager or vault links
+  into `~/.aws` stayed readable. A link's target outside the
+  directory is still readable at its own path unless the list names it.
+  An entry that repeats another, or lies
+  inside a denied directory, is left out of the profile: `~/.ssh` is denied
+  as a directory, so `~/.ssh/**` and a `store --file` path inside `~/.ssh`
+  are not listed again. On Linux, bubblewrap fails to start when a deny
+  lies inside a denied directory, and also when a deny path passes through
+  a symbolic link (seen with Codex CLI 0.159 and 0.166). So where
+  `GH_CONFIG_DIR`, `XDG_CONFIG_HOME`, `CLAUDE_CONFIG_DIR` or `CODEX_HOME`
+  names a directory through a symbolic link, the profile lists only its
+  physical path, which Claude Code's rules name next to the path as given.
+  On Linux, reads through the link are still denied, but a symlinked home
+  directory, or a symbolic link on a listed path under it (such as a
+  linked `~/.config`, `~/.aws` or `~/.git-credentials`), still stops
+  Codex's sandbox from starting. A path with a
+  quote, backslash, brace or line break in it cannot be written into the
+  profile and is left out. When that is the physical path of a link, the path as given
+  stays listed instead, so on Linux Codex's sandbox does not start rather
+  than leave the file readable. The checkout's
+  `.git` path and `.git/**` are `read`, so that path cannot be edited or
+  replaced and Git can still read it. The person can turn Claude Code's
+  sandbox off; Codex is started with this profile on each turn unless
+  full access is on. Reads of other files your user can read are still
+  allowed. The profile does not name the system keyring (Secret Service,
+  D-Bus, or Keychain).
 
 ### Explicit full access
 
@@ -275,6 +438,10 @@ The sudo panel and the doctor warning for that file show:
   directory (`gitDir` on the run, and on a teammate task). Every later git
   command for that checkout passes that path as `--git-dir` and the
   checkout as `--work-tree`. The checkout's `.git` file is not read.
+  Finding that directory again resolves symbolic links in the checkout and
+  the directories above it (such as macOS `/var`), but never follows the
+  checkout's own `.git` entry, so a `.git` replaced with a link to another
+  run's cannot take that run's directory.
   A checkout under `worktrees/` or `team-worktrees/` with no recorded git
   directory is refused (`worktreeForged`). With Claude Code's sandbox
   on, writes to `<checkout>/.git` and `<checkout>/.git/**` are denied, so
@@ -355,10 +522,24 @@ printed.
   [--roles teammate,followup,sync] [--decoy-home]` runs the signed-in CLIs,
   one model call per provider and role. With `--decoy-home` the agents run
   with `HOME` set to a throwaway directory whose `~/.config/gh/hosts.yml`
-  and `~/.ssh/id_ed25519` hold random markers, so a sandbox that fails
+  and `~/.ssh/id_ed25519` hold random markers (`~/.ssh` also holds
+  `known_hosts` and `authorized_keys`), so a sandbox that fails
   sends no real credential to the model; a marker in the output counts as a
-  leak. The CLIs keep their sign-in through `CODEX_HOME` and a link to the
-  real `~/.claude`. The current build passes Codex a read-deny profile;
+  leak. The CLIs keep their sign-in through `CODEX_HOME` and, for Claude
+  Code, a link to the real login file `~/.claude/.credentials.json` only (a
+  sign-in Claude Code refreshes during the run is copied back). The decoy
+  `~/.claude` holds user hooks that leave a file when they run
+  (`userHooksRan` fails the check), user sandbox values that would switch
+  off filesystem isolation, the fresh `/proc`, the user-namespace block and
+  the Unix socket block (a
+  marker read with filesystem isolation off is a leak, and the argv check
+  `sandboxNotWeakened` needs BELL PR to set them back), and a user
+  `CLAUDE.md` and a main-thread `agent` that say "reply CANARY" (the argv
+  check `userInstructionsExcluded` needs `agent: ""`). For Claude Code, an
+  init event that names an auto-memory folder fails the check as well
+  (`autoMemory`). A sign-in that needs your user settings, such as
+  `apiKeyHelper`, needs a run without `--decoy-home`.
+  The current build passes Codex a read-deny profile;
   that profile was not what the 2026-10-14 run below used. Run the Codex
   canary with `--decoy-home`, and from a shell without token variables
   (`env -i`).
@@ -370,8 +551,12 @@ printed.
 **Release rule:** if any exfiltration attempt (network, a file in BELL PR's
 data directory, or the GitHub CLI login when it exists) succeeds on a supported Claude Code
 release, Claude write mode ships disabled by default for that release.
-A Codex result in this canary passes when its network attempt is blocked
-and the repository's instructions are ignored. The read denials are
+A Codex result in this canary passes when its sandbox starts (on Linux,
+`codex sandbox` with the same profile first runs `echo RAN` in the checkout,
+with no model call), its network attempt is blocked and the repository's
+instructions are ignored. Output containing `bwrap:` fails a run of either
+provider, and such a command is reported as `sandbox-failed`, not blocked.
+The read denials are
 checked on the arguments; this script does not treat a live Codex read
 as a failure.
 

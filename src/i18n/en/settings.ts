@@ -114,7 +114,7 @@ const settings = {
       "Agents run the project's code on this computer. These settings decide what they may reach.",
     sandbox: {
       title: "Claude Code sandbox",
-      text: "Claude Code agents that edit files run every command in the operating-system sandbox: writes stay in the run's checkout and the network is closed. The Codex CLI uses its own sandbox.",
+      text: "Claude Code agents that edit files run every command in the operating-system sandbox: writes stay in the run's checkout and Claude Code's temporary folders, and the network is closed. Your own Claude Code user settings can widen it (proxy ports, allowed domains or paths, excluded commands, plugin language servers). The Codex CLI uses its own sandbox.",
     },
     unsandboxed: {
       label: "Allow unsandboxed Claude Code agents",

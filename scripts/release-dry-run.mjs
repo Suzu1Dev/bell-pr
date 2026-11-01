@@ -5,7 +5,7 @@
 //   2. npm test
 //   3. npm pack into the output directory (prepack builds once more, as in
 //      the workflow)
-//   4. node scripts/check-pack.mjs
+//   4. node scripts/check-pack.mjs --tarball <that tarball>
 //   5. SHA256SUMS for the tarball
 //   6. release-notes.md: the CHANGELOG.md section of this version
 //   7. npm publish <tarball> --dry-run (--tag next for a prerelease)
@@ -127,7 +127,7 @@ function main() {
     run("pack", "npm", ["pack", "--json", "--pack-destination", out], { capture: true }),
   );
   const tarball = path.join(out, packed.filename);
-  run("check-pack", process.execPath, ["scripts/check-pack.mjs"]);
+  run("check-pack", process.execPath, ["scripts/check-pack.mjs", "--tarball", tarball]);
 
   const sum = createHash("sha256").update(readFileSync(tarball)).digest("hex");
   writeFileSync(path.join(out, "SHA256SUMS"), `${sum}  ${path.basename(tarball)}\n`);

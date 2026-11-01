@@ -61,3 +61,15 @@ export interface DoctorReport {
   checkedAt: string;
   platform: NodeJS.Platform | string;
 }
+
+/**
+ * Whether the CLI behind a tool check (such as "claude") can be used: the
+ * check passed, or it only warns that the version is outside the range
+ * BELL PR supports, which does not stop agents from starting.
+ */
+export function toolUsable(check: DoctorCheck | undefined): boolean {
+  return (
+    check?.status === "ok" ||
+    (check?.status === "warn" && check.reason === "unsupported-version")
+  );
+}

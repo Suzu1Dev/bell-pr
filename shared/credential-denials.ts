@@ -10,6 +10,7 @@ import { spawnSync } from "node:child_process";
 import { realpathSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { physicalPath } from "./physical-path.js";
 
 /** Home paths denied for both agents, plus the files that were already denied. */
 const staticPaths = [
@@ -30,6 +31,18 @@ function resolved(value: string) {
   } catch {
     return path.resolve(value);
   }
+}
+
+/**
+ * The absolute path as given, plus its physical path when a symbolic link
+ * makes them differ. A missing path uses its nearest existing ancestor's
+ * physical path. Denying only the physical path misses the path a CLI opens
+ * on macOS, where `/var` is `/private/var`.
+ */
+function pathForms(value: string): string[] {
+  const given = path.resolve(value);
+  const physical = physicalPath(value);
+  return physical === given ? [given] : [given, physical];
 }
 
 /** Split a credential.helper value into words, keeping quoted paths intact. */
@@ -64,7 +77,7 @@ function tokenize(value: string): string[] {
   return out;
 }
 
-function expandHome(file: string, home: string) {
+export function expandHome(file: string, home: string) {
   if (file === "~") return home;
   if (file.startsWith("~/") || file.startsWith("~\\"))
     return path.join(home, file.slice(2));
@@ -192,16 +205,14 @@ function configuredHelpers(env: NodeJS.ProcessEnv, home: string): string[] {
 
 function moved(env: NodeJS.ProcessEnv): string[] {
   const out: string[] = [];
-  const directory = (value: string | undefined) =>
-    value && path.isAbsolute(value) ? resolved(value) : undefined;
-  const gh = directory(env.GH_CONFIG_DIR);
-  if (gh) out.push(`${gh}/**`);
-  const xdg = directory(env.XDG_CONFIG_HOME);
-  if (xdg) out.push(`${resolved(path.join(xdg, "gh"))}/**`);
-  const claude = directory(env.CLAUDE_CONFIG_DIR);
-  if (claude) out.push(path.join(claude, ".credentials.json"));
-  const codex = directory(env.CODEX_HOME);
-  if (codex) out.push(path.join(codex, "auth.json"));
+  const add = (value: string | undefined, suffix: string) => {
+    if (!value || !path.isAbsolute(value)) return;
+    for (const form of pathForms(value)) out.push(`${form}${suffix}`);
+  };
+  add(env.GH_CONFIG_DIR, "/**");
+  if (env.XDG_CONFIG_HOME) add(path.join(env.XDG_CONFIG_HOME, "gh"), "/**");
+  if (env.CLAUDE_CONFIG_DIR) add(path.join(env.CLAUDE_CONFIG_DIR, ".credentials.json"), "");
+  if (env.CODEX_HOME) add(path.join(env.CODEX_HOME, "auth.json"), "");
   return out;
 }
 
@@ -214,7 +225,8 @@ export interface CredentialDenialOptions {
 
 /**
  * Every path both agents are told not to read: the static credential files,
- * the same files where an environment variable moved them, `~/.git-credentials`,
+ * the same files where an environment variable moved them (as given, and
+ * the physical path when a symbolic link differs), `~/.git-credentials`,
  * and each `credential.helper store --file` path from the global, XDG and
  * system Git config. A missing or unreadable config adds no store path and
  * does not drop the rest of the list.

@@ -99,12 +99,12 @@ your AI CLI are still required for real work.
 With mise already installed:
 
 ```sh
-MISE_NPM_PACKAGE_MANAGER=npm mise use -g node@24 npm:bell-pr@1.0.0
+MISE_NPM_PACKAGE_MANAGER=npm mise use -g node@24 npm:bell-pr@1.0.1
 mise exec -- bell-pr
 ```
 
-This selects Node.js 24 and pins BELL PR 1.0.0 in your global mise tool
-configuration. The explicit version avoids latest-release cooldown selection;
+This selects Node.js 24 and pins BELL PR to the version in the command, in
+your global mise tool configuration. The explicit version avoids latest-release cooldown selection;
 the npm choice uses npm's normal installation checks instead of the default
 backend's additional new-package and download-count gates. The environment
 variable applies only to this command, without permanently changing mise's
