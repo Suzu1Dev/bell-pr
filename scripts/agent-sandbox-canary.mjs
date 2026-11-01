@@ -26,7 +26,7 @@
  * Before the Codex turn, on Linux, `codex sandbox` with the same permission
  * profile runs `echo RAN` in the checkout (sandboxStart; no model call), so
  * a profile bubblewrap cannot apply fails the run even when every attempt
- * looks blocked.
+ * looks blocked. With --fake the stand-in runs this check on every platform.
  *
  *   node scripts/agent-sandbox-canary.mjs --fake
  *     Drives stand-in claude and codex executables that echo what they were
@@ -454,7 +454,9 @@ async function decoyHome(base) {
  * Claude Code saves a refreshed sign-in by replacing the file, so the link
  * becomes a regular file in the decoy directory. Copies it back over the
  * real login (written next to it, then renamed) before the decoy is removed,
- * so the real sign-in stays current.
+ * so the real sign-in stays current. A copy that cannot be renamed stays,
+ * and the error names it: the decoy home is removed next, so that copy may
+ * be the only current sign-in left.
  */
 async function keepRefreshedLogin(login) {
   try {
@@ -468,20 +470,25 @@ async function keepRefreshedLogin(login) {
   }
   const next = `${login.real}.canary-${process.pid}`;
   await writeFile(next, await readFile(login.decoy), { mode: 0o600, flag: "wx" });
-  await rename(next, login.real);
+  try {
+    await rename(next, login.real);
+  } catch (error) {
+    throw new Error(`${error?.message ?? error}; the refreshed sign-in is in ${next}, move it over ${login.real}`);
+  }
 }
 
 /**
  * Model-free Codex startup check: `codex sandbox` with the permission
- * profile from the turn's argv runs `echo RAN` in the checkout. Null off
- * Linux (not verified there) or without a profile (full access).
+ * profile from the turn's argv runs `echo RAN` in the checkout. Null in a
+ * real run off Linux (not verified there) or without a profile (full
+ * access). The stand-in runs on every platform, so --fake checks it there.
  */
 async function codexSandboxStart(executable, args, checkout) {
   const profile = [];
   for (let index = 0; index + 1 < args.length; index++)
     if (args[index] === "-c" && /^(?:default_permissions|permissions)=/.test(args[index + 1]))
       profile.push("-c", args[index + 1]);
-  if (process.platform !== "linux" || profile.length < 4) return null;
+  if ((process.platform !== "linux" && !options.fake) || profile.length < 4) return null;
   let output = "";
   try {
     const run = await command(
