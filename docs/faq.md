@@ -177,7 +177,11 @@ Agents run the imported project's code, its tests and build scripts, on
 your computer, so import only projects you are willing to run. In the
 default Working directory mode, agents that write code run in their CLI's
 operating-system sandbox: writes stay in the run's own worktree and the
-network is closed. Claude Code is denied the GitHub CLI config files,
+CLI's temporary folders, and the network is closed. Your own Claude Code
+user settings can widen Claude Code's sandbox (proxy ports, allowed domains
+or paths, excluded commands, plugin language servers; see
+[Your own Claude Code settings](security-model.md#your-own-claude-code-settings)).
+Claude Code is denied the GitHub CLI config files,
 `~/.git-credentials` and credential-store files, `~/.netrc`, and `~/.ssh/`.
 `GH_TOKEN`/`GITHUB_TOKEN` are removed from the agent's environment. Tokens
 in your system keyring are not covered: the agent can still read your GitHub

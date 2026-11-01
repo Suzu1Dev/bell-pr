@@ -227,10 +227,14 @@ Full access changes writable roles as described [below](#explicit-full-access).
 - **Writable roles** (teammates, follow-up rounds, syncing) run every Bash
   command inside Claude Code's sandbox: bubblewrap with socat on Linux,
   `sandbox-exec` on macOS. The writes of these commands are limited to the
-  run's checkout, their network access is closed (`network.strictAllowlist`
-  with no allowed domains, unless your user settings name your own proxy),
-  commands cannot ask to leave the sandbox (`allowUnsandboxedCommands:
-  false`), and a sandbox that cannot start stops the turn
+  run's checkout and the places Claude Code always lets them write (seen in
+  2.1.292): its temporary folder `/tmp/claude`, by default also their
+  `TMPDIR`, which every BELL PR run and your other Claude Code sessions
+  share, `~/.npm/_logs` and `~/.claude/debug`. Their network access is
+  closed (`network.strictAllowlist` with no allowed domains, unless your
+  user settings name your own proxy), commands cannot ask to leave the
+  sandbox (`allowUnsandboxedCommands: false`), and a sandbox that cannot
+  start stops the turn
   (`failIfUnavailable`). `git push`, `gh`, `curl` and `wget` are denied as
   well. The language servers of your plugins and a `sandbox.ripgrep`
   command from your user settings run outside the sandbox; see
@@ -289,10 +293,15 @@ Full access changes writable roles as described [below](#explicit-full-access).
 ### Codex
 
 - Writable roles run with a permission profile that extends `:workspace`:
-  writes are limited to the checkout and command network access is off.
-  Read-only roles extend `:read-only`. BELL PR does not pass `--sandbox`
-  for that profile. On Codex CLI 0.165, `--sandbox` selects the older
-  sandbox and ignores `default_permissions`, which would drop the read
+  writes are limited to the checkout and the temporary folders `/tmp` and
+  `$TMPDIR`, which `:workspace` opens (seen with Codex CLI 0.159 on
+  Linux), and command network access is off. The profile does not deny
+  BELL PR's data directory, so do not put the data directory under `/tmp`
+  or `$TMPDIR` when Codex agents write code: their commands could change
+  `state.json`, the settings and other runs' checkouts there. Read-only
+  roles extend `:read-only`, which allows no writes. BELL PR does not pass
+  `--sandbox` for that profile. On Codex CLI 0.165, `--sandbox` selects the
+  older sandbox and ignores `default_permissions`, which would drop the read
   denials below. Explicit full access, described below, is the case that
   passes `--sandbox danger-full-access`.
 - The profile names the same path list as Claude Code

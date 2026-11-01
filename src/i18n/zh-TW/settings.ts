@@ -97,7 +97,7 @@ const m: Translation<typeof en> = {
     intro: "Agent 會在這台電腦上執行專案的程式碼，這些設定決定它們能接觸到哪些東西。",
     sandbox: {
       title: "Claude Code 沙箱",
-      text: "會修改檔案的 Claude Code Agent 在作業系統沙箱裡執行每個指令：寫入只限於該工作的 checkout，網路也是關閉的。Codex CLI 使用它自己的沙箱。",
+      text: "會修改檔案的 Claude Code Agent 在作業系統沙箱裡執行每個指令：寫入只限於該工作的 checkout 與 Claude Code 的暫存資料夾，網路也是關閉的。你自己的 Claude Code 使用者設定可能放寬沙箱（proxy 連接埠、允許的網域或路徑、排除的指令、外掛的語言伺服器）。Codex CLI 使用它自己的沙箱。",
     },
     unsandboxed: {
       label: "允許 Claude Code Agent 在沙箱外執行",

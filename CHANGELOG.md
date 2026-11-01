@@ -106,6 +106,16 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `agent` is reset and that those sandbox values are set back, and its
   `--decoy-home` links only Claude Code's login file instead of your whole
   `~/.claude`.
+- **Where sandboxed commands may also write, now documented.** Besides the
+  run's checkout, commands of writable roles may write to the CLI's
+  temporary folders: `/tmp` and `$TMPDIR` for Codex (its `:workspace`
+  profile), and `/tmp/claude`, `~/.npm/_logs` and `~/.claude/debug` for
+  Claude Code 2.1.292. This is not new in 1.0.1. Codex's profile does not
+  deny BELL PR's data directory, so keep the data directory out of `/tmp`
+  and `$TMPDIR` when Codex agents write code (the security model and the
+  configuration guide say so). The READMEs, the FAQ and Settings → Agent
+  safety now mention the temporary folders, and that your own Claude Code
+  user settings can widen Claude Code's sandbox.
 
 ## [1.0.0] - 2026-10-30
 
