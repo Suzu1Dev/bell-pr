@@ -96,7 +96,7 @@ most of them on Linux and macOS with Node.js 22 and 24.
 | `node scripts/check-i18n.mjs` | No user-facing text outside the translation dictionaries |
 | `node scripts/check-personal-info.mjs` (and `--pack`) | No personal details (a real person's home path, tailnet host names, private keys, access tokens) in the repository or the package |
 | `npx tsx scripts/render-generated-regions.ts --check` | The generated product links are current |
-| `node scripts/npm-readme.mjs --check-docs` | Every link in the READMEs and `docs/` resolves, and every error code is in the troubleshooting guide |
+| `node scripts/npm-readme.mjs --check-docs` | Every link in the READMEs and `docs/` resolves, every error code is in the troubleshooting guide, and every `bell-pr@<version>` pin (such as the mise command's) names the version in `package.json` |
 | `node site/check-site.mjs` | The landing site's links and resources, and its size |
 | `node scripts/sync-installers.mjs --check` | Standalone installer identity and the published Homebrew formula |
 | `node --test scripts/install.test.mjs scripts/install-wsl.test.mjs` | Installer argument, failure and environment behavior with isolated tool fixtures |

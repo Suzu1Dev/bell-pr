@@ -5,7 +5,7 @@
  *
  *   node scripts/npm-readme.mjs --pre          prepack: ready README.md for npm
  *   node scripts/npm-readme.mjs --post         postpack: restore the READMEs
- *   node scripts/npm-readme.mjs --check-docs   links, anchors and error codes
+ *   node scripts/npm-readme.mjs --check-docs   links, anchors, error codes, pins
  *   node scripts/npm-readme.mjs --self-test    this script, on fixtures
  *
  * npmjs.com shows the package's README but cannot resolve a relative path
@@ -49,6 +49,9 @@
  *     (scripts/render-generated-regions.ts), which this check skips;
  *   - an ErrorCode of shared/errors.ts has no heading in
  *     docs/troubleshooting.md;
+ *   - a document pins the package to another version than package.json's
+ *     (`npm:bell-pr@1.0.0` in the mise command while the release is
+ *     1.0.1), code included: the packed READMEs keep the pin;
  *   - README.md or README.zh-TW.md, rewritten as --pre would, still has a
  *     relative path, or, rewritten with the current or a stand-in
  *     `homepageUrl`, links to a path that site/ does not serve.
@@ -584,6 +587,34 @@ export function errorCodesOf(source) {
   return codes;
 }
 
+/**
+ * The exact versions a text pins the package to, such as the mise command's
+ * `npm:bell-pr@1.0.1`: `<name>@<semver>`, wherever it is written, code
+ * included. `<name>@latest` and `<name>@<version>` are no pins.
+ */
+export function versionPins(text, name) {
+  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const part = "[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*";
+  const pin = new RegExp(`(?<![\\w@/.-])${escaped}@(\\d+\\.\\d+\\.\\d+(?:-${part})?(?:\\+${part})?)`, "g");
+  return [...text.matchAll(pin)].map((match) => ({
+    line: text.slice(0, match.index).split("\n").length,
+    version: match[1],
+  }));
+}
+
+/** The package's name and version, from package.json at the root. */
+function packageVersion(root) {
+  let manifest;
+  try {
+    manifest = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8"));
+  } catch (error) {
+    throw new SetupError(`cannot read package.json: ${error.message}`);
+  }
+  if (typeof manifest.name !== "string" || typeof manifest.version !== "string")
+    throw new SetupError("package.json has no name or version.");
+  return { name: manifest.name, version: manifest.version };
+}
+
 /** The Markdown files --check-docs reads, relative to the root. */
 function documents(root, files) {
   return [...files]
@@ -619,6 +650,7 @@ export function checkDocs(root, env = process.env) {
     if (!anchorCache.has(file)) anchorCache.set(file, anchors(read(file)));
     return anchorCache.get(file);
   };
+  const manifest = packageVersion(root);
   for (const name of documents(root, files)) {
     const text = read(name);
     for (const reference of references(text, proseOnly(text, { regions: true }))) {
@@ -661,6 +693,13 @@ export function checkDocs(root, env = process.env) {
         }
       }
     }
+    // A pin is written by hand (the mise command), and the packed READMEs
+    // keep it: it must name the version being released, not the last one.
+    for (const pin of versionPins(text, manifest.name))
+      if (pin.version !== manifest.version)
+        problems.push(
+          `${name}:${pin.line}: pins ${manifest.name}@${pin.version}, but package.json is version ${manifest.version}.`,
+        );
   }
   // Every error code has its own heading in the troubleshooting guide.
   const codes = errorCodesOf(fs.readFileSync(path.join(root, "shared", "errors.ts"), "utf8"));
@@ -711,7 +750,7 @@ function checkDocsCommand(root, log, out) {
     log(`npm-readme --check-docs: ${problems.length} problem(s).`);
     return 1;
   }
-  log("npm-readme --check-docs: links, anchors and error codes are fine.");
+  log("npm-readme --check-docs: links, anchors, error codes and version pins are fine.");
   return 0;
 }
 
@@ -862,6 +901,19 @@ function selfTest() {
   assert.equal(typeof real.homepageUrl, "string");
   assert.ok(errorCodesOf(fs.readFileSync(path.join(repoRoot, "shared", "errors.ts"), "utf8")).includes("server_unreachable"));
 
+  // Version pins: exact versions only, in code too, not another package's.
+  assert.deepEqual(
+    versionPins(
+      "mise use -g npm:bell-pr@1.0.0\n`npx bell-pr@latest` or bell-pr@<version>,\n" +
+        "npm i bell-pr@2.0.0-rc.1+build.5. Not @scope/bell-pr@9.9.9, my-bell-pr@9.9.9 or bell-pr@1.\n",
+      "bell-pr",
+    ),
+    [
+      { line: 1, version: "1.0.0" },
+      { line: 3, version: "2.0.0-rc.1+build.5" },
+    ],
+  );
+
   // Anchors as GitHub makes them.
   const headings = anchors(
     "# BELL PR\n\n## Support\n\n## Support\n\n### `server_unreachable`: reconnect\n\n## 快速開始（60 秒）\n\n```\n# not a heading\n```\n\n## [Linked](x.md) *heading*\n",
@@ -971,6 +1023,7 @@ function selfTest() {
     for (const name of ["readme.txt", "README.md~", "docs/README.md"]) fs.rmSync(at(name));
 
     // --check-docs on a small repository.
+    write("package.json", JSON.stringify({ name: "bell-pr", version: "1.2.3" }));
     write("shared/product.ts", source(""));
     write("shared/errors.ts", 'export const errorCodes = [\n  "server_unreachable",\n  "git_missing",\n] as const;\n');
     write(
@@ -989,7 +1042,11 @@ function selfTest() {
         "",
       ].join("\n"),
     );
-    write("README.zh-TW.md", "# 範例\n\n[English](README.md) [Ignored](ignored.md)\n");
+    write(
+      "README.zh-TW.md",
+      "# 範例\n\n[English](README.md) [Ignored](ignored.md)\n\n```sh\nmise use -g npm:bell-pr@1.2.2\n```\n",
+    );
+    write("docs/installation.md", "# Install\n\n```sh\nmise use -g npm:bell-pr@1.2.3\nnpx bell-pr@latest\n```\n");
     write(
       "docs/start.md",
       "# Start\n\n## Install\n\n[Back](../README.md#fixture) [Up](../../x.md)\n[Bad escape](#100%) [Bad file](../README.md#%zz)\n",
@@ -1010,6 +1067,7 @@ function selfTest() {
       "README.md:5: write e-mail addresses only through a generated product-link region (mailto:help@example.test).",
       "README.md:6: https://bell.example.test/ is neither a file of the repository nor on the list of public URLs in scripts/npm-readme.mjs; product URLs belong in generated product-link regions.",
       'README.zh-TW.md:3: "ignored.md" names no file or folder of the repository.',
+      "README.zh-TW.md:6: pins bell-pr@1.2.2, but package.json is version 1.2.3.",
       'docs/start.md:5: "../../x.md" leaves the repository.',
       'docs/start.md:6: no heading in docs/start.md has the anchor "#100%".',
       'docs/start.md:6: no heading in README.md has the anchor "#%zz".',
@@ -1025,6 +1083,8 @@ function selfTest() {
       'README.md (npm): README.md:5: write "docs/start.md" as an inline link; a reference definition cannot become text.',
       'README.zh-TW.md (npm): README.zh-TW.md:5: write "README.md" as an inline link; a reference definition cannot become text.',
     ]);
+    fs.rmSync(at("package.json"));
+    assert.throws(() => checkDocs(temp, env), /cannot read package\.json/);
   } finally {
     fs.rmSync(temp, { recursive: true, force: true });
   }

@@ -128,11 +128,11 @@ bun add --global bell-pr
 bell-pr
 ```
 
-**mise**：安裝 Node.js 24，並固定使用 BELL PR 1.0.0。mise 預設的 npm 後端可能
+**mise**：安裝 Node.js 24，並把 BELL PR 固定在指令中的版本。mise 預設的 npm 後端可能
 擋下剛發佈的套件，因此這次安裝明確選用 npm：
 
 ```sh
-MISE_NPM_PACKAGE_MANAGER=npm mise use -g node@24 npm:bell-pr@1.0.0
+MISE_NPM_PACKAGE_MANAGER=npm mise use -g node@24 npm:bell-pr@1.0.1
 mise exec -- bell-pr
 ```
 
