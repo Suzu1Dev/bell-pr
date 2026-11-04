@@ -552,8 +552,12 @@ export async function agentCommand(
         JSON.stringify(
           antigravitySettings({ cwd: options.cwd, access: options.access, web, sandbox, full }),
         ),
-        // agy's model IDs name their thinking level, so no --effort is passed.
-        ...(value.model ? ["--model", value.model] : []),
+        // agy lists each thinking level as a model of its own, so the effort
+        // goes back into the ID it listed (parseAntigravityModels) rather
+        // than into --effort.
+        ...(value.model
+          ? ["--model", value.reasoningEffort ? `${value.model}-${value.reasoningEffort}` : value.model]
+          : []),
         ...(options.outputSchema
           ? ["--json-schema", await readFile(options.outputSchema, "utf8")]
           : []),

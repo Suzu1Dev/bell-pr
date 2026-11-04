@@ -7,6 +7,15 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- **Antigravity's models are listed once each, with their thinking levels
+  as reasoning efforts**, as Claude Code's and Codex's are. The Antigravity
+  CLI lists every level as a model of its own (Gemini 4 Argon Low, Medium
+  and High), so the model picker showed each model up to three times. agy
+  still receives the model IDs it listed. A model saved with its level, as
+  1.1.0-beta.1 saved it, reads as that model and effort.
+
 ## [1.1.0-beta.1] - 2026-11-04
 
 A prerelease on npm's `next` tag, to try the Antigravity provider before

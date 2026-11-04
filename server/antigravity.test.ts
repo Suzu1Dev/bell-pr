@@ -16,7 +16,12 @@ import { canaryHit } from "./by-hand-canary.js";
 import { withCliSetupHint } from "./cli-errors.js";
 import { trackEfficiency } from "./efficiency.js";
 import { withLocale } from "./i18n/index.js";
-import { parseAntigravityModels, readAntigravityModelCatalog } from "./models.js";
+import {
+  parseAntigravityModels,
+  readAntigravityModelCatalog,
+  resolveModelExecution,
+  splitAntigravityModel,
+} from "./models.js";
 import { agentEnvironment, agentProviderOf } from "./process.js";
 import {
   antigravityWorkspaceConfig,
@@ -369,13 +374,35 @@ test("agy's reported usage is measured with cached input inside input", () => {
   );
 });
 
-test("agy models gives the catalog: one model per line, no separate effort, no default", async () => {
-  const output = "Fetching available models...\ngemini-4-argon-medium\tGemini 4 Argon (Medium)\nclaude-sonnet-5-5-low\tClaude Sonnet 5.5 (Low)\nnot a model line\n";
+test("agy models gives the catalog: each model once, its thinking levels as efforts, no default model", async () => {
+  // As agy 1.5.0 printed it, trimmed.
+  const output = [
+    "Fetching available models...",
+    "gemini-4-argon-medium\tGemini 4 Argon (Medium)",
+    "gemini-4-argon-high\tGemini 4 Argon (High)",
+    "gemini-4-argon-low\tGemini 4 Argon (Low)",
+    "claude-sonnet-5-5-low\tClaude Sonnet 5.5 (Low)",
+    "claude-sonnet-5-5-high\tClaude Sonnet 5.5 (High)",
+    "gpt-oss-120b-medium\tGPT-OSS 120B (Medium)",
+    "custom-model\tCustom model",
+    "not a model line",
+    "",
+  ].join("\n");
   const models = withLocale("en", () => parseAntigravityModels(output));
-  assert.deepEqual(models.map(({ id, name, isDefault, reasoningEfforts }) => ({ id, name, isDefault, reasoningEfforts })), [
-    { id: "gemini-4-argon-medium", name: "Gemini 4 Argon (Medium)", isDefault: false, reasoningEfforts: [] },
-    { id: "claude-sonnet-5-5-low", name: "Claude Sonnet 5.5 (Low)", isDefault: false, reasoningEfforts: [] },
-  ]);
+  assert.deepEqual(
+    models.map(({ id, name, isDefault, reasoningEfforts, defaultReasoningEffort }) => ({ id, name, isDefault, reasoningEfforts, defaultReasoningEffort })),
+    [
+      { id: "gemini-4-argon", name: "Gemini 4 Argon", isDefault: false, reasoningEfforts: ["low", "medium", "high"], defaultReasoningEffort: "medium" },
+      { id: "claude-sonnet-5-5", name: "Claude Sonnet 5.5", isDefault: false, reasoningEfforts: ["low", "high"], defaultReasoningEffort: "low" },
+      { id: "gpt-oss-120b", name: "GPT-OSS 120B", isDefault: false, reasoningEfforts: ["medium"], defaultReasoningEffort: "medium" },
+      { id: "custom-model", name: "Custom model", isDefault: false, reasoningEfforts: [], defaultReasoningEffort: undefined },
+    ],
+  );
+  // A level of a model that agy also lists without one stays a model of its own.
+  assert.deepEqual(
+    parseAntigravityModels("m\tM\nm-high\tM (High)\n").map(({ id, reasoningEfforts }) => ({ id, reasoningEfforts })),
+    [{ id: "m", reasoningEfforts: [] }, { id: "m-high", reasoningEfforts: [] }],
+  );
   assert.throws(() => parseAntigravityModels("a\tA\na\tA again\n"));
 
   const calls: string[][] = [];
@@ -385,7 +412,7 @@ test("agy models gives the catalog: one model per line, no separate effort, no d
   }) as never);
   assert.deepEqual(calls, [["agy", "models"]]);
   assert.equal(catalog.source, "antigravity");
-  assert.equal(catalog.models.length, 2);
+  assert.equal(catalog.models.length, 4);
   assert.equal(catalog.error, undefined);
   const signedOut = await withLocale("en", () =>
     readAntigravityModelCatalog((async () => {
@@ -396,6 +423,35 @@ test("agy models gives the catalog: one model per line, no separate effort, no d
   assert.match(signedOut.error!, /Antigravity model list/);
   // Listing models signs in over the network (about 6 seconds), so the check gets 20.
   assert.deepEqual(agentLoginCheck("antigravity"), { executable: "agy", args: ["models"], timeoutMs: 20_000 });
+});
+
+test("a model and effort go to agy as the ID it listed; an ID saved with its level reads as model and effort", async (t) => {
+  const catalog = withLocale("en", () => ({
+    source: "antigravity" as const,
+    models: parseAntigravityModels("gemini-4-argon-low\tGemini 4 Argon (Low)\ngemini-4-argon-high\tGemini 4 Argon (High)\n"),
+  }));
+  const chosen = resolveModelExecution({ provider: "antigravity", model: "gemini-4-argon", reasoningEffort: "high" }, catalog);
+  assert.deepEqual(
+    { model: chosen.model, reasoningEffort: chosen.reasoningEffort, source: chosen.source },
+    { model: "gemini-4-argon", reasoningEffort: "high", source: "selected" },
+  );
+  const cli = await agentCommand(chosen, { cwd: await checkout(t), access: "read" });
+  assert.equal(cli.args[cli.args.indexOf("--model") + 1], "gemini-4-argon-high");
+  assert.ok(!cli.args.includes("--effort"));
+  // Without a chosen effort, the model's default applies: low here, as there is no medium.
+  assert.equal(resolveModelExecution({ provider: "antigravity", model: "gemini-4-argon" }, catalog).reasoningEffort, "low");
+  // 1.1.0-beta.1 saved the whole ID; it is the same choice now.
+  const saved = resolveModelExecution({ provider: "antigravity", model: "gemini-4-argon-high" }, catalog);
+  assert.deepEqual({ model: saved.model, reasoningEffort: saved.reasoningEffort }, { model: "gemini-4-argon", reasoningEffort: "high" });
+  assert.deepEqual(splitAntigravityModel({ provider: "antigravity", model: "gemini-4-argon-high" }), {
+    provider: "antigravity",
+    model: "gemini-4-argon",
+    reasoningEffort: "high",
+  });
+  // A level the catalog does not list for the model is not invented.
+  assert.throws(() => resolveModelExecution({ provider: "antigravity", model: "gemini-4-argon-medium" }, catalog));
+  // Other providers' choices are left alone.
+  assert.deepEqual(splitAntigravityModel({ provider: "claude", model: "opus-high" }), { provider: "claude", model: "opus-high" });
 });
 
 test("agy failures get Antigravity's setup codes and fixes", () => {

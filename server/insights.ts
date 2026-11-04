@@ -84,6 +84,7 @@ import {
   modelExecutionSchema,
   modelSettingsSchema,
   resolveModelExecution,
+  splitAntigravityModel,
 } from "./models.js";
 import {
   addEfficiency,
@@ -822,9 +823,11 @@ export class ProjectInsightsService {
   async getModelSettings(): Promise<ModelSettings> {
     await this.modelWrite.catch(() => undefined);
     try {
-      return presentedModelSettings(
-        persistedModelSettingsSchema.parse(
-          JSON.parse(await readFile(this.modelSettingsPath, "utf8")),
+      return splitAntigravityModel(
+        presentedModelSettings(
+          persistedModelSettingsSchema.parse(
+            JSON.parse(await readFile(this.modelSettingsPath, "utf8")),
+          ),
         ),
       );
     } catch (error) {

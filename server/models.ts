@@ -306,32 +306,71 @@ export function claudeModelCatalog(): ModelCatalog {
 }
 
 /**
+ * The thinking level at the end of an Antigravity model ID, such as `high`
+ * in gemini-4-argon-high, and the ID without it; undefined for an ID that
+ * names none.
+ */
+export function antigravityEffort(id: string): { model: string; effort: ReasoningEffort } | undefined {
+  const match = /^(.+)-([a-z]+)$/.exec(id);
+  const parsed = effort.safeParse(match?.[2]);
+  return match && parsed.success ? { model: match[1], effort: parsed.data } : undefined;
+}
+
+/**
  * The Antigravity CLI's models from `agy models` (agy 1.5.0): after a
  * "Fetching available models..." line, one model per line as its ID, a tab
- * and its name. Each ID names a thinking level (gemini-4-argon-high), so no
- * model offers a separate reasoning effort, and none is marked as the
- * default: without a choice agy uses its own. Other lines are skipped; a
- * repeated ID or more than 200 models make the list unusable.
+ * and its name. agy lists each thinking level as a model of its own
+ * (gemini-4-argon-low, -medium and -high, named "Gemini 4 Argon (Low)" and
+ * so on), so the IDs that differ only in a level become one model with
+ * those levels as its reasoning efforts, medium by default when it has one,
+ * as Claude Code's and Codex's models offer theirs. agentCommand puts the ID
+ * together again, so agy only ever receives an ID it listed. An ID without
+ * a level stays as it is, without efforts, and so does a level of a model
+ * that agy also lists without one. None is marked as the default: without a
+ * choice agy uses its own. Other lines are skipped; a repeated ID or more
+ * than 200 models make the list unusable.
  */
 export function parseAntigravityModels(stdout: string): ModelOption[] {
   const description = sm().analysis.models.antigravityModel;
-  const models: ModelOption[] = stdout.split(/\r?\n/).flatMap((line) => {
+  const listed = stdout.split(/\r?\n/).flatMap((line) => {
     const fields = line.split("\t");
     const id = modelId.safeParse(fields[0]);
     if (fields.length !== 2 || !id.success) return [];
-    return [
-      {
-        id: id.data,
-        name: fields[1].trim().slice(0, 300) || id.data,
-        description,
-        isDefault: false,
-        reasoningEfforts: [],
-      },
-    ];
+    return [{ id: id.data, name: fields[1].trim().slice(0, 300) || id.data }];
   });
-  if (models.length > 200 || new Set(models.map((item) => item.id)).size !== models.length)
+  if (listed.length > 200 || new Set(listed.map((item) => item.id)).size !== listed.length)
     throw new Error("Unusable Antigravity model list.");
-  return models;
+  const plain = new Set(listed.map((item) => item.id));
+  const models = new Map<string, ModelOption>();
+  for (const { id, name } of listed) {
+    const level = antigravityEffort(id);
+    if (!level || plain.has(level.model)) {
+      models.set(id, { id, name, description, isDefault: false, reasoningEfforts: [] });
+      continue;
+    }
+    const model = models.get(level.model) ?? {
+      id: level.model,
+      // "Gemini 4 Argon (High)" without the level it names.
+      name: name.replace(new RegExp(`\\s*\\(${level.effort}\\)$`, "i"), "") || level.model,
+      description,
+      isDefault: false,
+      reasoningEfforts: [],
+    };
+    model.reasoningEfforts = reasoningEfforts.filter(
+      (value) => value === level.effort || model.reasoningEfforts.includes(value),
+    );
+    models.set(level.model, model);
+  }
+  return [...models.values()].map((model) =>
+    model.reasoningEfforts.length
+      ? {
+          ...model,
+          defaultReasoningEffort: model.reasoningEfforts.includes("medium")
+            ? "medium"
+            : model.reasoningEfforts[0],
+        }
+      : model,
+  );
 }
 
 /** Lists models only: `agy models` starts no model turn. Run in an empty folder, like the Codex read. */
@@ -385,6 +424,28 @@ export function getModelCatalog(
   return read;
 }
 
+/**
+ * An Antigravity choice saved while each thinking level was a model of its
+ * own (1.1.0-beta.1 saved gemini-4-argon-high without an effort), as the
+ * model and effort the catalog lists now. With a catalog, only a model it
+ * lists with that effort is split; without one, the ID's ending decides, as
+ * for the settings the UI is shown. Any other choice is returned as it is.
+ */
+export function splitAntigravityModel<
+  T extends { provider?: AgentProvider; model?: string; reasoningEffort?: string },
+>(settings: T, catalog?: ModelCatalog): T {
+  if (settings.provider !== "antigravity" || !settings.model || settings.reasoningEffort)
+    return settings;
+  if (catalog?.models.some((item) => item.id === settings.model)) return settings;
+  const level = antigravityEffort(settings.model);
+  const listed =
+    !catalog ||
+    catalog.models.some(
+      (item) => item.id === level?.model && item.reasoningEfforts.includes(level.effort),
+    );
+  return level && listed ? { ...settings, model: level.model, reasoningEffort: level.effort } : settings;
+}
+
 export function resolveModelExecution(
   settings: ModelSettings,
   catalog: ModelCatalog,
@@ -392,7 +453,7 @@ export function resolveModelExecution(
   const parsed = z.object(modelSettingsSchema).safeParse(settings);
   if (!parsed.success)
     throw new AppError((m) => m.analysis.models.invalidSettings, 400);
-  const selected = parsed.data;
+  const selected = splitAntigravityModel(parsed.data, catalog);
   if ((selected.provider ?? "codex") !== catalog.source)
     throw new AppError((m) => m.analysis.models.providerMismatch, 400);
   const recordedProvider = {
