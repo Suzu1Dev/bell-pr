@@ -7,10 +7,12 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-## [1.1.0-beta.0] - 2026-11-04
+## [1.1.0-beta.1] - 2026-11-04
 
 A prerelease on npm's `next` tag, to try the Antigravity provider before
-it is released.
+it is released. The tag v1.1.0-beta.0 was never published: its release
+stalled, and this version also gives the Antigravity sign-in check the
+time `agy models` needs.
 
 ### Added
 
