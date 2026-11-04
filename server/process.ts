@@ -1,4 +1,4 @@
-import { spawn as nodeSpawn, spawnSync, type ChildProcess } from "node:child_process";
+import { execFile, spawn as nodeSpawn, type ChildProcess } from "node:child_process";
 
 /** The spawn both `command` and the Codex catalog use. Tests replace `spawn`. */
 export const processSpawn: { spawn: typeof nodeSpawn } = { spawn: nodeSpawn };
@@ -6,6 +6,7 @@ import { existsSync } from "node:fs";
 import { lstat, readdir, readFile, realpath } from "node:fs/promises";
 import path from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
+import { promisify } from "node:util";
 import { agentProviders, providerExecutables, type AgentProvider } from "../shared/models.js";
 import { physicalPath } from "../shared/physical-path.js";
 import { log } from "./log.js";
@@ -544,16 +545,22 @@ export const gitSafetyArgs = [
 const driverKey =
   /^(?:filter\.[^.]+\.(?:clean|smudge|process)|diff\.(?:external|.+\.(?:textconv|command))|merge\.[^.]+\.driver|alias\.[^.]+|gpg\.(?:.+\.)?program)$/i;
 
+const execFileAsync = promisify(execFile);
+
 /**
  * `-c` blanks for drivers this repository defines, so a `filter` named by
  * `.gitattributes` has no command left to run. Shell aliases are blanked
  * only when the value starts with `!`.
+ *
+ * Read without blocking the event loop: every server Git command waits for
+ * it, and a server stalled while Git starts lets keep-alive timers close
+ * sockets that already carry the next request (ECONNRESET for the client).
  */
-function repoDriverOverrides(cwd: string, gitDir?: string): string[] {
+async function repoDriverOverrides(cwd: string, gitDir?: string): Promise<string[]> {
   if (!existsSync(cwd)) return [];
   let stdout = "";
   try {
-    const result = spawnSync(
+    const result = await execFileAsync(
       "git",
       [
         ...(gitDir ? ["--git-dir", gitDir, "--work-tree", cwd] : []),
@@ -577,7 +584,7 @@ function repoDriverOverrides(cwd: string, gitDir?: string): string[] {
         env: gitChildEnv(undefined, false),
       },
     );
-    if (result.status !== 0 || !result.stdout) return [];
+    if (!result.stdout) return [];
     stdout = result.stdout;
   } catch {
     return [];
@@ -946,7 +953,7 @@ export async function serverGitArgs(cwd: string, args: string[]): Promise<string
   const gitDir = await commandGitDir(cwd, args);
   return [
     ...(await gitInvocationPrefix(cwd, args)),
-    ...repoDriverOverrides(cwd, gitDir),
+    ...(await repoDriverOverrides(cwd, gitDir)),
     ...withDiffSafety(args),
   ];
 }
