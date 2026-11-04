@@ -38,6 +38,7 @@ const methods = [
   "createRun",
   "sendTeamMessage",
   "approvePlan",
+  "planOverlaps",
   "revisePlan",
   "retryTeam",
   "cancel",

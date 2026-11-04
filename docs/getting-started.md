@@ -262,6 +262,31 @@ Start the run with **Generate the team plan** (with plan approval) or
 - With plan approval on, you read the plan first. **Approve the plan and
   start development**, or **Send back with feedback** for a new plan (up
   to 3 times).
+- When your other contributions to the same project change files the plan
+  covers, the plan lists each of them with its status and the files it
+  shares, and each task that touches those files says **Also changed in**
+  and names them. This counts contributions in progress, in review or
+  approved (their plan while it is still to be carried out, and what their
+  working copy changed), and ones with a pull request for what it changes,
+  until their change to a file is in this run's base commit, also after a
+  squash merge. A pull request you read as merged or closed (**Read
+  feedback**) no longer counts, nor does a contribution whose working copy
+  was removed before it was published. The parts of one split never count
+  against each other or the original, and an original that was split counts
+  only for the files none of its parts holds.
+  Whichever of two overlapping changes is merged second may need its
+  conflicts resolved, so approving needs the tick **I know these overlap;
+  approve anyway**. The tick counts only for what it was given on: when the
+  overlap or the plan changes before you approve, you confirm again. A run
+  started without plan approval waits for your approval instead, also after
+  **Stop** and a retry. A Learn by hand plan's files are checked the same
+  way at **This is my plan**. BELL PR only reads its own records and
+  working copies for this, without changing them; nothing is saved or
+  sent, and the temporary copy of a working copy's Git index it reads
+  through is deleted right after.
+- A file scope the Lead writes without a trailing `/` that is a directory
+  in the base commit, such as `src`, is read as `src/`, so it covers the
+  files inside; the activity log says so.
 - **Teammates** work at the same time, each in its own Git worktree, and
   share findings through the team inbox. You can message the Lead, one
   task or everyone.
@@ -526,7 +551,14 @@ or approved that is not published, is not a Learn-by-hand run and still has
 its working copy; it is not offered on the sample run. Conflicts a sync left
 must be resolved before the split, as before approval. BELL PR cannot check
 that a part works on its own, because one part's tests may need another
-part, so run each part's tests.
+part, so run each part's tests. When a plan task of one part depends on a
+task with files in another part, the part remembers that it builds on the
+other. Publishing it while the other is not merged asks you to confirm
+(`split-order`): publish that part first. A part counts as merged when you
+read its pull request as merged or when its change is in this part's base
+commit. Deleting a part removes it from the parts that build on it, and
+splitting a part again passes what it builds on to its new parts; deleting
+those new parts makes the parts that built on them build on that part again.
 
 **The maintainer checklist** shows, row by row, the project's rules,
 whether pull requests are open to you, the linked issue, your pace in this

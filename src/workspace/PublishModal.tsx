@@ -128,6 +128,7 @@ const checkTopics = {
   rules: ["pr-closed", "ai-ban", "ai-disclosure", "project-rules", "issue"],
   issue: ["issue-closed", "issue-has-pr", "area-reserved", "issue-state"],
   pacing: ["pacing", "pacing-max"],
+  others: ["group-own-overlap", "split-order"],
   words: ["own-words", "disclosure-accuracy", "brevity", "reviewability", "tests-weakened", "placeholder", "unchecked"],
   safety: ["secret", "local-paths", "workflows", "author-email"],
 } as const satisfies Record<string, readonly DraftCheck["id"][]>;

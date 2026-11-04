@@ -80,7 +80,8 @@ export async function retryTeam(
           queueTeamMessage(ctx, run, "user", task.id, message);
       else queueTeamMessage(ctx, run, "user", "lead", message);
     }
-    if (team.config.requirePlanApproval && !team.approvedAt) {
+    // Also a plan the overlap check held back from starting on its own.
+    if (!team.approvedAt) {
       team.phase = "awaiting_approval";
       run.status = "awaiting_plan";
       ctx.log(run, "user", sm().run.team.retryAwaitingApproval);

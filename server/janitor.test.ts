@@ -247,6 +247,22 @@ test("a file written just after the start is kept although the file system clock
   ].sort());
 });
 
+test("a copy of a Git index made since the start is kept although it carries the index's older time", async (t) => {
+  const p = await plantedDataDirectory();
+  t.after(p.cleanup);
+  const startedAt = Date.now() - 1000;
+  const copy = path.join(p.dataDir, "group-index-0a1b2c3d");
+  await writeFile(copy, "index");
+  const earlier = new Date(Date.now() - 60 * 60 * 1000);
+  await utimes(copy, earlier, earlier);
+  await runJanitor({ store: p.store, lock: (_id, task) => task() }, { startedAt });
+  assert.equal(await exists(copy), true);
+  // One left by an earlier start goes like the other index files.
+  const removed = await runJanitor({ store: p.store, lock: (_id, task) => task() }, { startedAt: Date.now() + 1000 });
+  assert.equal(await exists(copy), false);
+  assert.ok(removed.includes("group-index-0a1b2c3d"));
+});
+
 test("the Workbench runs the janitor when it starts", async (t) => {
   const p = await plantedDataDirectory();
   await age(p.dataDir, [

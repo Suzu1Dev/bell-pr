@@ -55,6 +55,7 @@ import type {
 } from "../shared/contribution.js";
 import { explainPrCreateFailure, refreshRunFacts } from "./contribution-facts.js";
 import { outgoingPublishText } from "../shared/publish-payload.js";
+import { localPublishChecks } from "./group-local.js";
 
 const now = () => new Date().toISOString();
 
@@ -135,7 +136,8 @@ function changesOf(run: Run, files: DiffFile[], repo?: Repository) {
  * (the project's rules, the stored GitHub facts, reviewability, pacing).
  * The publish dialog shows the same list (GET /api/runs/:id/preflight),
  * which never calls GitHub: it uses the facts stored on the run unless
- * `extra.facts` passes fresher ones.
+ * `extra.facts` passes fresher ones. With `extra.runs`, the person's other
+ * contributions of the project are checked too (server/group-local.ts).
  */
 export async function publishChecks(
   run: Run,
@@ -146,6 +148,7 @@ export async function publishChecks(
     repo?: Repository;
     facts?: ContributionFacts;
     overrides?: GuardOverride[];
+    runs?: readonly Run[];
   } = {},
 ): Promise<DraftCheck[]> {
   const confirmed = await confirmedEmails(dataDirectory);
@@ -184,6 +187,10 @@ export async function publishChecks(
     },
     locale,
   );
+  if (extra.repo && extra.runs)
+    checks.push(
+      ...(await localPublishChecks({ runs: extra.runs, repo: extra.repo, directory: dataDirectory }, run, files)),
+    );
   // The quoted confirm carries a digest of its words, which publish() wants back with its tick.
   return checks.map((check) => (check.id === "by-hand-rules" ? { ...check, digest: checkDigest(check) } : check));
 }
@@ -731,7 +738,7 @@ export async function publish(
       files,
       ctx.store.directory,
       currentLocale(),
-      { repo, overrides: guardOverrides },
+      { repo, overrides: guardOverrides, runs: ctx.store.data.runs },
     );
     const blocking = checks.find((check) => check.kind === "block");
     if (blocking)

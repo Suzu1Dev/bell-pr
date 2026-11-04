@@ -10,7 +10,7 @@ import { log } from "./log.js";
 import type { WorkbenchContext } from "./workbench.js";
 
 /** Temporary files and Git index files that outlived the step that made them. */
-const rootLeftover = /^(?:team|publish|sync)-index-|\.tmp$/;
+const rootLeftover = /^(?:team|publish|sync|group)-index-|\.tmp$/;
 /** Analysis scratch directories and temporary cache files. */
 const insightsLeftover = /^analysis-|\.tmp$/;
 /**
@@ -37,7 +37,8 @@ async function quarantinedRuns(directory: string) {
 
 /**
  * Deletes, in the data directory:
- * - `*.tmp`, `team-index-*`, `publish-index-*` and `sync-index-*` files;
+ * - `*.tmp`, `team-index-*`, `publish-index-*`, `sync-index-*` and
+ *   `group-index-*` files;
  * - `insights/analysis-*` directories and `insights/*.tmp` files;
  * - `worktrees/<id>` and `team-worktrees/<id>` directories no run
  *   references (quarantined runs count as references), unless this start
@@ -57,10 +58,16 @@ export async function runJanitor(
   const removed: string[] = [];
   const names = (folder: string) =>
     readdir(folder).catch(() => [] as string[]);
-  /** Removes `entry` when it predates this start and has the expected kind. */
-  const removeStale = async (entry: string, kind: "file" | "directory" | "any") => {
+  /**
+   * Removes `entry` when it predates this start and has the expected kind.
+   * With `changed`, its change time counts too: a `group-index-*` copy made
+   * since keeps the older modification time of the index it copies
+   * (server/group-local.ts), and nothing can set the change time back.
+   */
+  const removeStale = async (entry: string, kind: "file" | "directory" | "any", changed = false) => {
     const info = await lstat(entry).catch(() => undefined);
-    if (!info || info.mtimeMs >= startedAt - startClockSlackMs) return;
+    const time = changed ? Math.max(info?.mtimeMs ?? 0, info?.ctimeMs ?? 0) : info?.mtimeMs;
+    if (!info || time === undefined || time >= startedAt - startClockSlackMs) return;
     if (kind === "file" && !info.isFile()) return;
     if (kind === "directory" && !info.isDirectory()) return;
     await rm(entry, { recursive: true, force: true });
@@ -69,7 +76,7 @@ export async function runJanitor(
 
   for (const name of await names(directory))
     if (rootLeftover.test(name))
-      await removeStale(path.join(directory, name), "file");
+      await removeStale(path.join(directory, name), "file", name.startsWith("group-index-"));
   const insights = path.join(directory, "insights");
   for (const name of await names(insights))
     if (insightsLeftover.test(name))

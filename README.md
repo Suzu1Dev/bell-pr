@@ -379,6 +379,9 @@ reason before you publish. When the plan has parts that do not depend on one
 another, the confirm before publishing lists them, and **Split into
 contributions** on the Draft tab can turn each part into its own contribution,
 by file. A part is a group of files, not always one fix, so check the grouping.
+Publishing a part that builds on another asks you to confirm until that other
+part is merged, and when two of your contributions to a project change the
+same files, approving the plan and publishing ask you to confirm the overlap.
 
 It checks the text before anything is sent. Blocks common token formats and private keys before publishing.
 Unfinished placeholders block it, and a local path, a CI change or a public commit

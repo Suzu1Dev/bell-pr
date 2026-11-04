@@ -1,9 +1,21 @@
 import { formatters, type Translation } from "../../../shared/i18n/locale.js";
 import { product } from "../../../shared/product.js";
+import type { RunStatus } from "../../../shared/types.js";
 import type en from "../en/run.js";
 
 const list = (items: readonly string[]) =>
   formatters("zh-TW").list(items, { type: "unit" });
+/** 另一個貢獻目前的狀態，重疊確認用。 */
+const runStates: Record<RunStatus, string> = {
+  queued: "排隊中",
+  running: "進行中",
+  awaiting_plan: "等待核准計畫",
+  review: "審閱中",
+  approved: "已核准、尚未發佈",
+  published: "已發佈、尚未看到合併",
+  failed: "失敗",
+  cancelled: "已取消",
+};
 const followUpAgentCommitted =
   "Agent 自行建立了 commit 或切換了分支；已還原到已推送的 PR，修改保留在工作目錄供你審閱。";
 
@@ -101,6 +113,8 @@ const m: Translation<typeof en> = {
       `重試失敗的子任務：${kept} 個已完成任務不重跑，${retried} 個任務以新快照重新開始。`,
     retryIntegration: "重試：所有子任務都已完成，直接重跑整合與獨立審查。",
     retryPending: "重試：繼續執行尚未開始的子任務。",
+    scopeDirectories: ({ scopes }) =>
+      `${list(scopes)} 在基準版本中是資料夾，已當成資料夾處理，計畫涵蓋其中的檔案。`,
   },
   agentCli: {
     commandSucceeded: "成功",
@@ -421,6 +435,22 @@ const m: Translation<typeof en> = {
       "複製出來的檔案與原檔不一致，所以沒有拆分。改寫檔案內容的 Git 設定（例如換行轉換）可能造成這種情況。",
     startedFrom: ({ title }) => `拆分自「${title}」。`,
     wasSplit: ({ count }) => `已拆成 ${count} 個貢獻。`,
+    tooManyEdges: ({ limit }) => `這樣拆分會讓一個貢獻建立在超過 ${limit} 個其他貢獻上，請拆成較少的貢獻。`,
+  },
+  local: {
+    overlapWith: ({ title, status, paths }) => `「${title}」（${runStates[status]}）：${list(paths)}`,
+    planOverlap: ({ titles }) =>
+      `你在這個專案的其他貢獻也改了這個計畫涵蓋的檔案：${list(titles.map((title) => `「${title}」`))}。請先在計畫上查看並確認重疊，再核准一次。`,
+    autoOverlap: "這個計畫涵蓋的檔案也被你在這個專案的其他貢獻修改，所以改為等待你核准，不會自動開始。",
+    overlapChanged: "你確認重疊之後，你的其他貢獻或這個計畫有了變化。請在計畫上重新查看並確認重疊，再核准一次。",
+    approvedOverlap: ({ titles }) =>
+      `已核准；${list(titles.map((title) => `「${title}」`))}也改了其中部分檔案。`,
+    publishOverlap:
+      "你在這個專案的其他貢獻也改了部分相同的檔案，較晚合併的那一個可能需要解決衝突。請依你希望的合併順序發佈，或把它們合併成一個。",
+    splitOrder:
+      "這個拆分出來的部分建立在同一次拆分中尚未合併的其他部分上。請先發佈那些部分，否則這個 PR 在它們合併前可能無法通過檢查。",
+    buildsOn: ({ title, prUrl }) =>
+      prUrl ? `「${title}」：已發佈於 ${prUrl}，尚未看到合併` : `「${title}」：尚未發佈`,
   },
   publish: {
     recoveryStale: "未完成的發佈記錄已變更；請重新載入後再恢復。",

@@ -217,4 +217,19 @@ export interface RunCore {
    * with it, so the run can be split again.
    */
   splitInto?: SplitRef[];
+  /**
+   * How this contribution relates to the person's other ones (group mode,
+   * Phase 0). Absent on every run that has nothing to record.
+   */
+  group?: RunGroup;
+}
+
+export interface RunGroup {
+  /**
+   * The ids of the parts of the same split this part builds on: a task of
+   * this part depends on a task with files in that part. Publishing before
+   * those are merged needs a confirmation (`split-order`). Set only by a
+   * split; a deleted part leaves the list.
+   */
+  after?: string[];
 }
