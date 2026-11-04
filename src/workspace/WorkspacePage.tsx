@@ -512,7 +512,8 @@ export function WorkspacePage({
               }
               checkingPremise={premise.checkingPremise}
               onSetupTurn={
-                setupHandOffShown(run, demo) && onSessionRun
+                // The Collaborate tab it opens needs both.
+                setupHandOffShown(run, demo) && onSessionRun && onSessionDraftChange
                   ? async (commands) => {
                       const { run: updated } = await api<{ run: Run }>(
                         `${runPath(run.id)}/session/setup`,

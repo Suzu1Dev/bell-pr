@@ -25,17 +25,18 @@ export const unsafeSetupCommand =
 
 /**
  * A command BELL PR never hands to an agent, which runs it without the
- * sandbox and perhaps as root: the shapes above; anything that downloads
- * (curl, wget) and pipes, chains or substitutes the result; and a pipe into
- * a shell or another interpreter, whatever sudo or env options stand in
- * front of it. Stricter than what reaches the person's own checklist,
- * where they run the command themselves.
+ * sandbox and perhaps as root: the shapes above; anything that runs a
+ * downloader (curl, wget, aria2c, axel, fetch) and pipes, chains or
+ * substitutes; and a pipe into a shell or another interpreter, whatever
+ * sudo or env options stand in front of it. Stricter than what reaches the
+ * person's own checklist, where they run the command themselves. A shape
+ * it does not know still reaches the dialog, where the person reads it.
  */
 export function handOffRefused(command: string) {
   return (
     unsafeSetupCommand.test(command) ||
-    (/\b(?:curl|wget)\b/.test(command) && /[|;&<>`]|\$\(/.test(command)) ||
-    /\|&?[^|]*?(?:^|[\s/])(?:sh|bash|zsh|dash|ksh|fish|python[\d.]*|perl|ruby|node|php|deno|bun)(?:\s|$)/.test(command)
+    (/\b(?:curl|wget|aria2c|axel|fetch)\b/.test(command) && /[|;&<>`]|\$\(/.test(command)) ||
+    /\|&?(?:[^|]*?[\s/])?(?:sh|bash|zsh|dash|ksh|fish|python[\d.]*|perl|ruby|node|php|deno|bun)(?:\s|$)/.test(command)
   );
 }
 

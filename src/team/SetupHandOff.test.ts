@@ -130,7 +130,7 @@ test("without sudo in the commands, the dialog does not ask about sudo", async (
 
 test("the sudo line says when sudo needs no password or is missing, and commands go in the list's order", async () => {
   for (const [status, line] of [
-    [{ user: "octo", available: true, installed: true, passwordless: true }, /sudo needs no password for octo, so the agent can run these sudo commands as root/],
+    [{ user: "octo", available: true, installed: true, passwordless: true }, /sudo runs without a password for octo here, so the agent can run these sudo commands as root, unless a sudo rule limits/],
     [{ user: "octo", available: false, installed: false, passwordless: false }, /sudo is not installed here/],
   ] as const) {
     stubSudo(200, { sudo: status });
@@ -171,6 +171,21 @@ test("a command no longer listed is not sent, and the count says so", async () =
     await click(find((element) => element.nodeName === "BUTTON" && element.textContent === "Start the agent (1)")[0]);
     await settle();
     assert.deepEqual(started, [[need(2).command]]);
+  } finally {
+    await view.unmount();
+  }
+});
+
+test("the sudo line follows the ticked commands: none of them uses sudo, no line", async () => {
+  stubSudo(200, { sudo: { user: "octo", available: true, installed: false, passwordless: false } });
+  const view = await mount(createElement(SetupHandOff, { needs: [need(1), need(2, "corepack enable")], async onStart() {} }));
+  try {
+    const find = (match: (element: FakeElement) => boolean) => view.container.querySelectorAll(match);
+    await click(find((element) => element.nodeName === "BUTTON" && element.textContent === "Let the agent set this up")[0]);
+    await settle();
+    assert.match(view.text(), /sudo asks octo for a password here/);
+    await tick(find((element) => element.nodeName === "INPUT")[0], false);
+    assert.doesNotMatch(view.text(), /sudo asks octo/);
   } finally {
     await view.unmount();
   }

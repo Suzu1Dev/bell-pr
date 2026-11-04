@@ -308,8 +308,9 @@ these checks. With default **Working directory (default)** access, agents are to
 your machine: no `sudo` and no global installs. When a check needs something
 the machine lacks, the overview lists it with a suggested command, for you
 to verify and run yourself. On a Full access run you can instead tick those
-commands and confirm, and one Collaborate turn installs them, reruns the
-blocked checks and reports each item. Explicit **Full access** in model settings lets
+commands and confirm, and one Collaborate turn installs them without the
+sandbox and with your account, reruns the blocked checks and reports each
+item; stopping it does not undo installs. Explicit **Full access** in model settings lets
 writable roles install tools outside the checkout and use available sudo
 privileges; read-only roles keep their restrictions. Linux also offers an
 optional passwordless sudo setup. See the [security model](docs/security-model.md#explicit-full-access).

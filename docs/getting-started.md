@@ -310,12 +310,15 @@ Start the run with **Generate the team plan** (with plan approval) or
   privileges outside the checkout. Read the [access settings](security-model.md#explicit-full-access)
   before enabling it; read-only roles keep their restrictions. On a Full
   access run in review or approved, **Let the agent set this up** opens the commands for
-  you to tick and confirm, then hands them to one Collaborate turn. The agent
-  runs only the ticked commands that match the project's documentation,
-  adding at most non-interactive flags, `sudo -n` and a package-index
-  refresh. It verifies them, reruns the checks they blocked and reports each
-  item as installed, already present, failed or needs you. sudo works only
-  when it needs no password, and stopping the turn does not undo installs.
+  you to tick and confirm, at most 10 per turn, then hands them to one
+  Collaborate turn, which runs without the sandbox and with your account.
+  The agent is told to run only the ticked commands that match the
+  project's documentation, adding at most non-interactive flags, `sudo -n`
+  and a package-index refresh. It verifies them, reruns the checks they
+  blocked and reports each item as installed, already present, failed or
+  needs you; an item it does not report shows as no result, and a turn
+  that is stopped or fails reports none. sudo works only when it needs no
+  password, and stopping the turn does not undo installs.
 - **Run details** folds the model and the AI usage: its line names the
   agent, the model, the calls and the input and output tokens, marks
   partial reports and says when usage was not reported, never 0.
@@ -336,8 +339,8 @@ an agent to finish missing checks, add tests or fix failures in the run's workin
 copy. The draft's Limitations shortcut fills the message box for you to review
 and send. The setup checklist's **Let the agent set this up** (Full access runs
 only) starts its turn once you confirm the commands; the agent is told not to
-change code in that turn, and its per-item results appear in the conversation
-and on the checklist. Each message starts a fresh agent call with recent conversation and
+change code in that turn, and when the turn finishes, its per-item results
+appear in the conversation and on the checklist. Each message starts a fresh agent call with recent conversation and
 the existing reports as context; it uses your own CLI account.
 
 The conversation lists changed files, commands BELL actually observed, checks

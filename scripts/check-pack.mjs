@@ -41,6 +41,11 @@
 // 52 files, all CSS 42.9 kB, 90 entries. CI's Node.js 24 gzips the same
 // files about 2 kB larger (all JS 474.2 kB). All JS counts every lazy
 // chunk, so moving code out of the startup chunk adds a little to it.
+// Measured for 1.1.0-beta.1 with group mode Phase 0 and the setup hand-off,
+// with Node.js 22.22.1: all JS 479.4 kB in 53 files, 481.4 kB on CI's
+// Node.js 24. The hand-off added 4.0 kB: its dialog and the en and zh-TW
+// texts it must show (no sandbox, your account, sudo, what Stop leaves),
+// so the all-JS budget rose from 480 kB to 490 kB.
 //
 // Exit status: 0 when every check passes, 1 when one fails, 2 on a usage or
 // setup error.
@@ -64,7 +69,7 @@ const budgets = {
   entries: 150,
   woff2: 12,
   largestJsGzip: 116 * kB,
-  totalJsGzip: 480 * kB,
+  totalJsGzip: 490 * kB,
   totalCssGzip: 45 * kB,
 };
 const required = [

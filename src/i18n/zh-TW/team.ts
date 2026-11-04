@@ -169,7 +169,8 @@ const m: Translation<typeof en> = {
       choose: "要交給 Agent 的指令",
       sudoTag: "使用 sudo",
       limit: ({ limit }) => `每輪最多 ${limit} 項，其餘留在清單上，下一輪再處理。`,
-      sudoPasswordless: ({ user }) => `${user} 使用 sudo 不需要密碼，Agent 可以用 root 權限執行這些 sudo 指令。`,
+      sudoPasswordless: ({ user }) =>
+        `${user} 在這台機器使用 sudo 不需要密碼，Agent 可以用 root 權限執行這些 sudo 指令；但若 sudo 規則限制了可以免密碼執行的指令，則以規則為準。`,
       sudoPassword: ({ user }) =>
         `${user} 在這台機器使用 sudo 需要密碼，Agent 不會輸入密碼，因此需要 sudo 的項目會交回給你；若 sudo 規則允許某個指令免密碼執行，Agent 就會以 root 執行它。請自行執行，或在模型設定開啟「免密碼 sudo」；開啟後，你帳號下的每個程式都能以 root 執行任何指令。`,
       sudoMissing: "這台機器沒有安裝 sudo，需要 sudo 的項目會交回給你。",

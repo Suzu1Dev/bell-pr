@@ -79,8 +79,12 @@ function SetupHandOffDialog({
       current = false;
     };
   }, [sudoNeeded]);
+  // What is sent: the ticked commands still listed, in the list's order (a poll may have closed one).
+  const chosen = needs.filter((need) => ticked.includes(need.command)).map((need) => need.command.trim());
+  const chosenSudo = chosen.some(usesSudo);
+  // About the commands that will run: none, once every ticked one goes without sudo.
   const sudoLine =
-    sudo === undefined
+    sudo === undefined || !chosenSudo
       ? undefined
       : sudo === "unknown"
         ? t.dialog.sudoUnknown
@@ -89,8 +93,6 @@ function SetupHandOffDialog({
           : sudo.passwordless
             ? t.dialog.sudoPasswordless({ user: sudo.user })
             : t.dialog.sudoPassword({ user: sudo.user });
-  // What is sent: the ticked commands still listed, in the list's order (a poll may have closed one).
-  const chosen = needs.filter((need) => ticked.includes(need.command)).map((need) => need.command.trim());
   const full = chosen.length >= setupTurnLimit;
   const start = async () => {
     setBusy(true);

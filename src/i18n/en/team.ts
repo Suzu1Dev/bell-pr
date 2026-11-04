@@ -220,7 +220,7 @@ const team = {
       limit: ({ limit }: { limit: number }) =>
         `At most ${limit} items per turn; the rest stay on the list for the next turn.`,
       sudoPasswordless: ({ user }: { user: string }) =>
-        `sudo needs no password for ${user}, so the agent can run these sudo commands as root.`,
+        `sudo runs without a password for ${user} here, so the agent can run these sudo commands as root, unless a sudo rule limits which commands may run that way.`,
       sudoPassword: ({ user }: { user: string }) =>
         `sudo asks ${user} for a password here, and the agent never enters one, so an item that needs sudo comes back to you, unless a sudo rule lets that command run without a password; then the agent runs it as root. Run them yourself, or turn on Passwordless sudo in the model settings; that lets every process under your account run any command as root.`,
       sudoMissing: "sudo is not installed here, so items that need it come back to you.",
