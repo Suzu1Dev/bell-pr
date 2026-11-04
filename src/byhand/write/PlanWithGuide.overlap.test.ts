@@ -80,6 +80,7 @@ test("a click while the overlaps were unread still counts, stops for the tick wh
     // Ticking the overlap lets the next click confirm with the digest it was read with.
     const tick = find((element) => element.nodeName === "INPUT" && element.parentNode?.nodeName === "LABEL").at(-1)!;
     await act(async () => handlers(tick).onChange({ target: { checked: true } }));
+    assert.notEqual(handlers(confirm()).disabled, true);
     await act(async () => handlers(confirm()).onClick());
     await settle();
     assert.deepEqual(confirms, [{ overlapDigest: "d".repeat(64) }]);
