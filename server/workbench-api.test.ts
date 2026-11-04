@@ -43,6 +43,7 @@ const methods = [
   "retryTeam",
   "cancel",
   "startSession",
+  "startSetupSession",
   "cancelSession",
   "rerunReview",
   "diff",

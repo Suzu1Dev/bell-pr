@@ -52,6 +52,10 @@ interface OverviewTabProps {
   /** Checks the run's premise against its code; absent while it cannot run. */
   onCheckPremise?: () => void;
   checkingPremise?: boolean;
+  /** Hands chosen setup to a Full access collaboration turn; absent while it cannot run. */
+  onSetupTurn?: (commands: string[]) => Promise<void>;
+  /** Why such a turn cannot start now. */
+  setupTurnBlock?: string;
 }
 
 /** The workspace's first tab: the project overview and why this change. */
@@ -66,6 +70,8 @@ export function OverviewTab({
   updatingRepo,
   onCheckPremise,
   checkingPremise,
+  onSetupTurn,
+  setupTurnBlock,
 }: OverviewTabProps) {
   const t = useT("workspace");
   const [locale] = useLocale();
@@ -103,6 +109,8 @@ export function OverviewTab({
       updatingRepo={updatingRepo}
       onCheckPremise={onCheckPremise}
       checkingPremise={checkingPremise}
+      onSetupTurn={onSetupTurn}
+      setupTurnBlock={setupTurnBlock}
     />
     </Suspense>
     </ErrorBoundary>

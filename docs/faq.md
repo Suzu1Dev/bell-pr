@@ -195,8 +195,10 @@ full user rights, and those runs are marked. The
 In the default Working directory mode, agents are also told not to change the
 machine: no `sudo` and no global or user-level installs. When a check needs a
 tool the machine lacks, the run's overview lists it with a suggested command,
-for you to check against the project's documentation and run yourself; BELL PR
-never runs it from that checklist. Explicit **Full access** lets writable
+for you to check against the project's documentation and run yourself. BELL PR
+never runs a command from that checklist on its own; on a Full access run you
+can tick commands and confirm, and one Collaborate turn runs them without its
+sandbox, with your account, and reports each item. Explicit **Full access** lets writable
 agents run outside their sandbox, install tools and use available sudo
 privileges:
 

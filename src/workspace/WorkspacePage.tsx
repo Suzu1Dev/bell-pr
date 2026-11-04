@@ -31,7 +31,8 @@ import type { useProjectInsights } from "../mission/useProjectInsights";
 import type { ContributionRecommendation } from "../../shared/insights";
 import type { Tab } from "../app/AppShell";
 import type { DraftEditor } from "../app/hooks/useDraftEditor";
-import type { RunActions } from "../app/hooks/useRunActions";
+import { runPath, type RunActions } from "../app/hooks/useRunActions";
+import { api, send } from "../api";
 import type { RunRounds } from "../app/hooks/useRunRounds";
 import type { Walkthroughs } from "../app/hooks/useWalkthroughs";
 import { useRunRecords } from "../app/hooks/useRunRecords";
@@ -48,7 +49,7 @@ import { OverviewTab } from "./OverviewTab";
 import { RunNotices, showsCheckOff, UnderstandingOffBadge, UnsandboxedBadge } from "./RunNotices";
 import "./workspace.css";
 import { limitationsRequest } from "../session/limitations";
-import { sessionAwaitsAnswer, showSessionTab } from "../session/state";
+import { sessionAwaitsAnswer, sessionTurnBlock, setupHandOffShown, showSessionTab } from "../session/state";
 import "../session/session.css";
 
 const SessionPanel = lazy(() =>
@@ -510,6 +511,22 @@ export function WorkspacePage({
                   : undefined
               }
               checkingPremise={premise.checkingPremise}
+              onSetupTurn={
+                // The Collaborate tab it opens needs both.
+                setupHandOffShown(run, demo) && onSessionRun && onSessionDraftChange
+                  ? async (commands) => {
+                      const { run: updated } = await api<{ run: Run }>(
+                        `${runPath(run.id)}/session/setup`,
+                        send("POST", { commands }),
+                      );
+                      onSessionRun(updated);
+                      setTab("session");
+                    }
+                  : undefined
+              }
+              setupTurnBlock={
+                premise.checkingPremise ? sessionMessages.blocks.active : sessionTurnBlock(run, sessionMessages.blocks)
+              }
             />
           )}
           {historical && (

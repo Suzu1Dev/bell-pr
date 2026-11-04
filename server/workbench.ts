@@ -433,7 +433,12 @@ export class Workbench {
   }
 
   async startSession(id: string, content: string) {
-    return sessions.startSession(this.context, id, content);
+    return sessions.startSession(this.context, id, { content });
+  }
+
+  /** Hands the ticked setup commands of a Full access run to one collaboration turn (session-runs.ts). */
+  async startSetupSession(id: string, commands: string[]) {
+    return sessions.startSession(this.context, id, { setupCommands: commands });
   }
 
   async cancelSession(id: string) {

@@ -307,7 +307,10 @@ the run is finished you can check it again, also on a run made before
 these checks. With default **Working directory (default)** access, agents are told not to change
 your machine: no `sudo` and no global installs. When a check needs something
 the machine lacks, the overview lists it with a suggested command, for you
-to verify and run yourself. Explicit **Full access** in model settings lets
+to verify and run yourself. On a Full access run you can instead tick those
+commands and confirm, and one Collaborate turn installs them without the
+sandbox and with your account, reruns the blocked checks and reports each
+item; stopping it does not undo installs. Explicit **Full access** in model settings lets
 writable roles install tools outside the checkout and use available sudo
 privileges; read-only roles keep their restrictions. Linux also offers an
 optional passwordless sudo setup. See the [security model](docs/security-model.md#explicit-full-access).
@@ -321,7 +324,8 @@ gives hints without code and reviews your change when you are ready. BELL PR
 runs your tests, and its agents cannot edit your files in these runs.
 
 Before publishing an agent contribution, **Collaborate** lets you ask an agent
-to fix checks, add tests or work through the draft's Limitations. Each turn
+to fix checks, add tests, work through the draft's Limitations or, on Full
+access runs, set up what the checklist lists. Each turn
 records changed files, observed commands, missing checks and questions. Edits
 invalidate the affected review marks. Completed checks go in Validation;
 Limitations keeps remaining gaps and constraints. Updates to these sections show
