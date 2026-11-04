@@ -7,6 +7,57 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- **Antigravity's models are listed once each, with their thinking levels
+  as reasoning efforts**, as Claude Code's and Codex's are. The Antigravity
+  CLI lists every level as a model of its own (Gemini 4 Argon Low, Medium
+  and High), so the model picker showed each model up to three times. agy
+  still receives the model IDs it listed. A model saved with its level, as
+  1.1.0-beta.1 saved it, reads as that model and effort.
+
+## [1.1.0-beta.1] - 2026-11-04
+
+A prerelease on npm's `next` tag, to try the Antigravity provider before
+it is released. The tag v1.1.0-beta.0 was never published: its release
+stalled, and this version also gives the Antigravity sign-in check the
+time `agy models` needs.
+
+### Added
+
+- **Antigravity as a third AI provider.** Agents can run through Google's
+  Antigravity CLI (`agy`, checked with 1.5.0), which serves Gemini models,
+  signed in with a Google account, a Gemini API key or Google Cloud
+  credentials. The doctor, the setup checklist, onboarding, the settings and
+  the model picker list it next to the Codex CLI and Claude Code; `agy models`
+  gives the model list and is the sign-in check. Each turn gets permission
+  rules for its role: read-only roles may not write, run commands or read
+  the home directory off the way to their checkout, and no role may read
+  credential files, the Antigravity CLI's own files or BELL PR's data
+  outside its checkout, use MCP tools or the browser, or read pages unless
+  web access is on. Writing roles run their commands in the Antigravity
+  CLI's terminal sandbox, or without it only when you allowed unsandboxed
+  agents. Four error codes have their own troubleshooting sections:
+  `antigravity_missing`, `antigravity_unauthenticated`,
+  `antigravity_sandbox_unavailable` and `antigravity_workspace_config`.
+
+### Known limitations
+
+- The Antigravity CLI cannot skip a project's customizations, so BELL PR
+  does not start it in a project with Antigravity hooks, MCP servers,
+  plugins, agents or skills. It still reads the project's `AGENTS.md` and
+  `GEMINI.md`.
+- Its web search cannot be turned off: with Antigravity, every agent can
+  search the web, project analysis and discovery included.
+- On Ubuntu 24.04 and later its sandbox cannot start
+  (`kernel.apparmor_restrict_unprivileged_userns`), so writing roles are
+  refused there unless unsandboxed agents are allowed.
+- It saves every conversation under `~/.gemini/antigravity-cli/`.
+- After you chose Antigravity, a 1.0.x version reports the model settings,
+  the analyses Antigravity made and the discovery results as unreadable;
+  [Upgrading](docs/upgrading.md#going-back-to-an-older-version) says how to
+  recover.
+
 ## [1.0.1] - 2026-10-31
 
 ### Added

@@ -6,7 +6,7 @@ import { existsSync } from "node:fs";
 import { lstat, readdir, readFile, realpath } from "node:fs/promises";
 import path from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
-import type { AgentProvider } from "../shared/models.js";
+import { agentProviders, providerExecutables, type AgentProvider } from "../shared/models.js";
 import { physicalPath } from "../shared/physical-path.js";
 import { log } from "./log.js";
 import { redact } from "./secrets.js";
@@ -145,8 +145,24 @@ const claudeEnvironment = [
 ];
 
 /**
+ * The ways the Antigravity CLI signs in besides its own saved Google sign-in:
+ * a Gemini API key (with `"modelProvider": "gemini"` in its settings), an
+ * endpoint that replaces the Gemini API, and Application Default
+ * Credentials with their optional quota project and location.
+ */
+const antigravityEnvironment = [
+  "GEMINI_API_KEY",
+  "GOOGLE_GEMINI_BASE_URL",
+  "AGY_ADC_AUTH",
+  "GOOGLE_APPLICATION_CREDENTIALS",
+  "CLOUDSDK_CONFIG",
+  "GOOGLE_CLOUD_QUOTA_PROJECT",
+  "GOOGLE_CLOUD_LOCATION",
+];
+
+/**
  * Usage-data opt-outs the person set, passed through unchanged so their
- * choice reaches the agents: the cross-tool DO_NOT_TRACK for both CLIs, and
+ * choice reaches the agents: the cross-tool DO_NOT_TRACK for every CLI, and
  * the variables Claude Code documents for its telemetry, error reports, bug
  * reports, feedback surveys and all non-essential traffic. BELL PR never
  * sets them itself.
@@ -164,16 +180,18 @@ const claudeOptOutEnvironment = [
  * The environment an agent CLI runs with: nothing from the server's own
  * environment except what that CLI needs and the usage-data opt-outs the
  * person set. Claude Code receives every authentication method it supports;
- * BELL never restricts or reads them. Codex gets only its own keys and
- * Claude Code only its own. Without a provider the result holds both sets,
- * for callers that have not said which CLI they start.
+ * BELL never restricts or reads them. Each CLI gets only its own keys.
+ * Without a provider the result holds every set, for callers that have not
+ * said which CLI they start.
  */
 export function agentEnvironment(provider?: AgentProvider): NodeJS.ProcessEnv {
+  const starts = (cli: AgentProvider) => provider === undefined || provider === cli;
   const keys = [
     ...baseEnvironment,
     ...optOutEnvironment,
-    ...(provider === "claude" ? [] : codexEnvironment),
-    ...(provider === "codex" ? [] : [...claudeEnvironment, ...claudeOptOutEnvironment]),
+    ...(starts("codex") ? codexEnvironment : []),
+    ...(starts("claude") ? [...claudeEnvironment, ...claudeOptOutEnvironment] : []),
+    ...(starts("antigravity") ? antigravityEnvironment : []),
   ];
   const env: NodeJS.ProcessEnv = {};
   for (const key of keys) {
@@ -187,7 +205,7 @@ export function agentEnvironment(provider?: AgentProvider): NodeJS.ProcessEnv {
 }
 
 /**
- * Environment for one Claude Code or Codex child. With no explicit env,
+ * Environment for one agent CLI child. With no explicit env,
  * this is agentEnvironment. With an explicit env, every variable is kept
  * except `GH_TOKEN` and `GITHUB_TOKEN`, which are removed here, at spawn,
  * whether or not the sandbox is on. Does not mutate `explicit`.
@@ -203,12 +221,10 @@ export function agentChildEnvironment(
   return child;
 }
 
-/** `claude` or `codex`, including a path and a Windows `.exe` / `.cmd` name. */
+/** `claude`, `codex` or `agy`, including a path and a Windows `.exe` / `.cmd` name. */
 export function agentProviderOf(executable: string): AgentProvider | undefined {
   const base = executable.split(/[/\\]/).pop()?.toLowerCase().replace(/\.(?:exe|cmd)$/i, "");
-  if (base === "claude") return "claude";
-  if (base === "codex") return "codex";
-  return undefined;
+  return agentProviders.find((provider) => providerExecutables[provider] === base);
 }
 
 interface CommandOptions {
@@ -253,8 +269,8 @@ const stderrTailLength = 4000;
  * used. A failure rejects with an AppError: a process that could not start
  * keeps the spawn error as `cause`, and one that exited with a code outside
  * `allowedCodes` carries `details.stderr` (the redacted end of its raw
- * stderr) and `details.exitCode`. Known failures of git, gh, codex and
- * claude get a setup code and fixes (cli-errors.ts).
+ * stderr) and `details.exitCode`. Known failures of git, gh, codex,
+ * claude and agy get a setup code and fixes (cli-errors.ts).
  *
  * Claude and Codex get agentChildEnvironment, so `GH_TOKEN` and
  * `GITHUB_TOKEN` are removed before the process is spawned. `git` gets

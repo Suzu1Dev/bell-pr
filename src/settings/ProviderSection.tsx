@@ -35,6 +35,7 @@ export type CliState =
 const checkIds = {
   codex: { tool: "codex", auth: "codex-auth" },
   claude: { tool: "claude", auth: "claude-auth" },
+  antigravity: { tool: "antigravity", auth: "antigravity-auth" },
 } as const satisfies Record<AgentProvider, { tool: string; auth: string }>;
 
 /** The state of `provider`'s CLI and the checks it comes from. */
@@ -239,8 +240,8 @@ function ModelSettingsForm({
 }
 
 /**
- * AI provider: whether the Codex CLI and Claude Code are installed and
- * signed in (at least one must be), and the models every project shares,
+ * AI provider: whether the Codex CLI, Claude Code and the Antigravity CLI
+ * are installed and signed in (at least one must be), and the models every project shares,
  * edited here instead of in a dialog.
  */
 export function ProviderSection({

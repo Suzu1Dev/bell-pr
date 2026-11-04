@@ -354,7 +354,7 @@ test("the readiness notice explains the requirement with fixes, and renders noth
     createElement(ReadinessNotice, { requires: ["provider", "gh"], doctor: doctor(notReady), maskUser: () => "you" }),
   );
   assertNoHan(html);
-  assert.match(html, /This needs an AI provider: install and sign in to the Codex CLI or Claude Code\./);
+  assert.match(html, /This needs an AI provider: install and sign in to the Codex CLI, Claude Code or the Antigravity CLI\./);
   assert.match(html, /This needs the GitHub CLI, installed and signed in\./);
   assert.match(html, /Unavailable until this is fixed\./);
   assert.match(html, /AI provider: Install and sign in to the Codex CLI or Claude Code\./);

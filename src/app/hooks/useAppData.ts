@@ -9,6 +9,8 @@ export type Status = {
   codexAuthenticated?: boolean;
   claude?: boolean;
   claudeAuthenticated?: boolean;
+  antigravity?: boolean;
+  antigravityAuthenticated?: boolean;
   github: boolean;
   githubUser?: string;
   /** No required environment check fails. */

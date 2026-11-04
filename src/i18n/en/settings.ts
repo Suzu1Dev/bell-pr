@@ -88,9 +88,9 @@ const settings = {
   provider: {
     title: "AI provider",
     intro:
-      "Agents work through an AI coding CLI on this computer: the Codex CLI or Claude Code, installed and signed in.",
+      "Agents work through an AI coding CLI on this computer: the Codex CLI, Claude Code or the Antigravity CLI, installed and signed in.",
     needOne:
-      "You need at least one provider. Install and sign in to the Codex CLI or Claude Code; the commands are below.",
+      "You need at least one provider. Install and sign in to the Codex CLI, Claude Code or the Antigravity CLI; the commands are below.",
     readyWith: ({ providers }: { providers: string[] }) =>
       `Ready to work with ${fmt.list(providers)}.`,
     description: {
@@ -98,6 +98,8 @@ const settings = {
         "Uses the Codex CLI you installed and signed in to. Usage counts against your own account.",
       claude:
         "Uses the Claude Code CLI you installed and signed in to (Claude plan or Anthropic API key). Usage counts against your own account.",
+      antigravity:
+        "Uses the Antigravity CLI (agy) you installed and signed in to (Google account, Gemini API key or Google Cloud credentials). Usage counts against your own account.",
     },
     fixesTitle: "To set it up, run:",
     models: {
@@ -114,14 +116,14 @@ const settings = {
       "Agents run the project's code on this computer. These settings decide what they may reach.",
     sandbox: {
       title: "Claude Code sandbox",
-      text: "Claude Code agents that edit files run every command in the operating-system sandbox: writes stay in the run's checkout and Claude Code's temporary folders, and the network is closed. Your own Claude Code user settings can widen it (proxy ports, allowed domains or paths, excluded commands, plugin language servers). The Codex CLI uses its own sandbox.",
+      text: "Claude Code agents that edit files run every command in the operating-system sandbox: writes stay in the run's checkout and Claude Code's temporary folders, and the network is closed. Your own Claude Code user settings can widen it (proxy ports, allowed domains or paths, excluded commands, plugin language servers). The Codex CLI uses its own sandbox. Antigravity agents that edit files run their commands in the Antigravity CLI's terminal sandbox, which keeps writes in the checkout and closes the network.",
     },
     unsandboxed: {
-      label: "Allow unsandboxed Claude Code agents",
+      label: "Allow unsandboxed Claude Code and Antigravity agents",
       help: "Used only when the sandbox is unavailable. While this is off, a run that would need it is refused instead.",
       confirmTitle: "Allow agents without the sandbox?",
       confirmText:
-        "When the sandbox is unavailable, Claude Code agents that edit files will run without it. They can then read and change anything your user account can, such as other projects, your SSH keys and the sign-ins of your tools. Allow it only for projects you trust.",
+        "When the sandbox is unavailable, Claude Code and Antigravity agents that edit files will run without it. They can then read and change anything your user account can, such as other projects, your SSH keys and the sign-ins of your tools. Allow it only for projects you trust.",
       confirmBadge:
         "Every run where an agent worked without the sandbox carries a badge in the workspace, and its log says so.",
       confirm: "Allow unsandboxed agents",
@@ -230,7 +232,7 @@ const settings = {
         BELLPR_AGENT_TIMEOUT_SCALE:
           "Agent timeout multiplier: 0.5 to 10, default 1.",
         BELLPR_ALLOW_UNSANDBOXED_AGENTS:
-          "1 allows unsandboxed Claude Code agents.",
+          "1 allows unsandboxed Claude Code and Antigravity agents.",
         BELLPR_REQUIRE_UNDERSTANDING_CHECK:
           "1 keeps the understanding check on and locks the setting. No value turns it off.",
         BELLPR_RETENTION_DAYS:

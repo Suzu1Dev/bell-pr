@@ -29,8 +29,8 @@ const m: Translation<typeof en> = {
     title: "你的 AI 服務",
     text: "Agent 執行工作與分析專案時會使用你在這裡選擇的服務。之後可以在模型設定中變更。",
     auto: ({ provider }) => `${provider} 已安裝並登入，你的 Agent 會使用它。`,
-    choose: "兩個服務都已就緒。你的 Agent 要使用哪一個？",
-    none: "目前還沒有就緒的 AI 服務。請安裝並登入 Codex CLI 或 Claude Code（見上一步），再重新檢查。你仍可以先看範例導覽。",
+    choose: "有不只一個服務已就緒。你的 Agent 要使用哪一個？",
+    none: "目前還沒有就緒的 AI 服務。請安裝並登入 Codex CLI、Claude Code 或 Antigravity CLI（見上一步），再重新檢查。你仍可以先看範例導覽。",
     checking: "正在檢查哪些服務已就緒…",
     saving: "儲存中…",
     saved: ({ provider }) => `你的 Agent 會使用 ${provider}。`,
@@ -38,6 +38,8 @@ const m: Translation<typeof en> = {
     codexNote: "使用你已安裝並登入的 Codex CLI。用量計入你自己的帳號。",
     claudeNote:
       "使用你已安裝並登入的 Claude Code CLI（Claude 方案或 Anthropic API 金鑰）。用量計入你自己的帳號。",
+    antigravityNote:
+      "使用你已安裝並登入的 Antigravity CLI（agy；Google 帳號、Gemini API 金鑰或 Google Cloud 憑證）。用量計入你自己的帳號。",
   },
   start: {
     title: "你想從哪裡開始？",

@@ -44,7 +44,7 @@ const m: Translation<typeof en> = {
       },
     },
     noteTitle: "Agent 負責開發，你保有最後決定權。",
-    noteText: `使用本機 ${providerLabels.codex} 或 ${providerLabels.claude} CLI 登入狀態。每個任務有獨立分支，完成後進入審查，不會自動建立 PR。`,
+    noteText: `使用本機 ${providerLabels.codex}、${providerLabels.claude} 或 ${providerLabels.antigravity} CLI 登入狀態。每個任務有獨立分支，完成後進入審查，不會自動建立 PR。`,
   },
 };
 

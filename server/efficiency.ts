@@ -81,9 +81,25 @@ export function emptyEfficiency(mode: PonytailMode): EfficiencyMetrics {
 const tokenCount = (n: unknown): n is number =>
   typeof n === "number" && Number.isSafeInteger(n) && n >= 0;
 
-/** Codex reports cached input inside input; Claude Code reports uncached, cache-write and cache-read input separately. */
+/**
+ * Codex reports cached input inside input; Claude Code reports uncached,
+ * cache-write and cache-read input separately. Antigravity's result has
+ * input_tokens and cache_read_tokens (agy 1.5.0; total_tokens is input
+ * plus output there), read like Codex's: a cached count above the input is
+ * not a measurement.
+ */
 function reportedUsage(event: unknown) {
   if (!event || typeof event !== "object") return;
+  const antigravity = event as { event?: unknown; result?: { usage?: unknown } };
+  if (antigravity.event === "result") {
+    const usage = antigravity.result?.usage;
+    if (!usage || typeof usage !== "object") return;
+    const value = usage as Record<string, unknown>;
+    const counts = [value.input_tokens, value.cache_read_tokens, value.output_tokens];
+    if (!counts.every(tokenCount)) return;
+    const [input, cached, output] = counts;
+    return { input, cached, output };
+  }
   const { type, usage } = event as { type?: unknown; usage?: unknown };
   if (!usage || typeof usage !== "object") return;
   const value = usage as Record<string, unknown>;

@@ -13,7 +13,12 @@ const m: Translation<typeof en> = {
     installFix: "安裝 bubblewrap 與 socat（Debian、Ubuntu）",
     dockerFix: "在 Docker 中，把這些選項加到 docker run（見 docs/docker.md）",
     codexFix: "或登入 Codex，並在「設定 → 模型」選用它",
-    allowFix: `或在「設定 → Agent 安全」允許不使用沙箱的 Claude Agent，或用這個變數啟動 ${product.name}（Agent 會以你的完整使用者權限執行）`,
+    allowFix: `或在「設定 → Agent 安全」允許不使用沙箱的 Agent，或用這個變數啟動 ${product.name}（Agent 會以你的完整使用者權限執行）`,
+    antigravityUnavailable: `會修改檔案與執行指令的 Antigravity Agent 需要 Antigravity CLI 的終端機沙箱，但這台電腦無法使用（Linux 需要 user namespace；macOS 需要 sandbox-exec）。請在「設定 → 模型」改選 Claude Code 或 Codex，或在「設定 → Agent 安全」允許不使用沙箱的 Agent。`,
+    antigravityRestricted: `會修改檔案與執行指令的 Antigravity Agent 需要 Antigravity CLI 的終端機沙箱，但這個 Linux 系統不允許程式建立 user namespace（kernel.apparmor_restrict_unprivileged_userns，Ubuntu 24.04 起的預設）。docs/troubleshooting.md 說明如何允許它。否則請在「設定 → 模型」改選 Claude Code 或 Codex，或在「設定 → Agent 安全」允許不使用沙箱的 Agent。`,
+    claudeFix: "或登入 Claude Code，並在「設定 → 模型」選用它",
+    antigravityWorkspaceConfig: ({ paths }) =>
+      `這個專案含有 Antigravity 自訂設定（${list(paths)}）。Antigravity CLI 會為每個 Agent 載入它們，其中的 hooks 與 MCP 伺服器在任何沙箱之外執行，因此 ${product.name} 不會在其中啟動 Antigravity。要處理這個專案，請在「設定 → 模型」改選 Claude Code 或 Codex。`,
   },
   invalidOrigins:
     "BELLPR_ALLOWED_ORIGINS 必須是以逗號分隔的來源（origin），不可含帳號密碼、路徑、查詢字串、片段或萬用字元；只有本機回送位址可以使用純 HTTP。",

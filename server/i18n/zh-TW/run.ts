@@ -47,6 +47,9 @@ const m: Translation<typeof en> = {
     claudeSignedOut: "Claude Code 尚未登入。請先在終端機執行 claude auth login。",
     codexMissing: "尚未安裝 Codex CLI。請先安裝並執行 codex login。",
     codexSignedOut: "Codex 尚未登入。請先在終端機執行 codex login。",
+    antigravityMissing:
+      "尚未安裝 Antigravity CLI（agy）。請先安裝，再在終端機執行一次 agy 完成登入。",
+    antigravitySignedOut: "Antigravity CLI 尚未登入。請先在終端機執行 agy 並登入。",
     full: ({ max }) => `最多可同時排入 ${max} 個工作；請等待現有工作完成。`,
     teamStopped: "團隊已停止工作，請使用程式碼追問功能。",
     noPlanToApprove: "目前沒有等待核准的團隊計畫。",
@@ -116,11 +119,15 @@ const m: Translation<typeof en> = {
   agentCli: {
     commandSucceeded: "成功",
     commandFailed: "失敗",
+    commandUnreported: "已結束，未回報結束代碼",
     commandUnverified: ({ outcome }) =>
       `${outcome}，未經確認：一起執行的其他指令可能掩蓋失敗`,
     codexTurnFailed: "Codex 工作回合失敗。",
     codexError: "Codex 回報執行錯誤。",
     claudeTurnFailed: ({ subtype }) => `Claude Code 工作回合失敗（${subtype}）。`,
+    antigravityTurnFailed: ({ status }) => `Antigravity 工作回合失敗（${status}）。`,
+    antigravityEndedOnDenial:
+      "Antigravity 拒絕了這個回合不允許的動作，接著在沒有回答的情況下結束了回合。",
     apiRetry: ({ attempt, maxRetries, reason, delaySeconds }) => {
       const details = [
         attempt === undefined

@@ -6,7 +6,7 @@ AI Agent 團隊負責跑腿；你理解每一處改動、用自己的話講一�
 
 [English](README.md) · 繁體中文
 
-BELL PR 是自架、以本機為主的開源貢獻工作台。它在你的電腦上執行，搭配你已在使用的 AI 程式設計 CLI（OpenAI Codex CLI 或 Claude Code）與 GitHub CLI：先分析專案、建議可以貢獻的方向，再讓一支小型 Agent 團隊在獨立的 Git worktree 中完成修改。接著，它讓你做真正讓自己進步的那部分：理解你送出的每一行、在真實的程式碼裡練出品味，並尊重維護者的時間。它用白話解說每一個變更的檔案，在你核准前請你用自己的話把改動講一遍，並依照該專案自己的規範擬好 Pull Request 草稿。送出之前，它會確認專案接受你的 PR、issue 仍然開著而且沒人在做，以及改動審得完、測試也誠實。
+BELL PR 是自架、以本機為主的開源貢獻工作台。它在你的電腦上執行，搭配你已在使用的 AI 程式設計 CLI（OpenAI Codex CLI、Claude Code 或 Google 的 Antigravity CLI）與 GitHub CLI：先分析專案、建議可以貢獻的方向，再讓一支小型 Agent 團隊在獨立的 Git worktree 中完成修改。接著，它讓你做真正讓自己進步的那部分：理解你送出的每一行、在真實的程式碼裡練出品味，並尊重維護者的時間。它用白話解說每一個變更的檔案，在你核准前請你用自己的話把改動講一遍，並依照該專案自己的規範擬好 Pull Request 草稿。送出之前，它會確認專案接受你的 PR、issue 仍然開著而且沒人在做，以及改動審得完、測試也誠實。
 
 **邊貢獻邊學習，絕不是自動產生 PR。** 在你逐一審閱每個檔案、用自己的話把改動講一遍（預設開啟；你可以關閉，而工作會標示出來），並親自核准 Pull Request 之前，不會發佈任何內容。發佈時會確認專案歡迎這個 PR。沒有 BELL PR 雲端服務、沒有遙測，也不需要帳號。
 
@@ -50,6 +50,8 @@ BELL PR 是本機工作台。請先裝好並登入下列工具，再跑快速開
   - Codex CLI：`npm install -g @openai/codex`，再 `codex login`
   - Claude Code：`npm install -g @anthropic-ai/claude-code`，再
     `claude auth login`
+  - Antigravity CLI：`curl -fsSL https://antigravity.google/cli/install.sh | bash`，
+    再執行一次 `agy` 登入
 - **Linux** 另需 `bubblewrap` 與 `socat`（Claude Code 改檔沙箱；Debian/Ubuntu：
   `sudo apt-get install bubblewrap socat`）。macOS 使用內建沙箱。
 
@@ -132,7 +134,7 @@ bell-pr
 擋下剛發佈的套件，因此這次安裝明確選用 npm：
 
 ```sh
-MISE_NPM_PACKAGE_MANAGER=npm mise use -g node@24 npm:bell-pr@1.0.1
+MISE_NPM_PACKAGE_MANAGER=npm mise use -g node@24 npm:bell-pr@1.1.0-beta.1
 mise exec -- bell-pr
 ```
 
@@ -172,9 +174,10 @@ WSL 終端機執行 `bell-pr open --print --print-token`，自行開啟印出的
 - **Node.js 22 以上。**
 - **Git。** 把工作同步到最新的目標分支需要 Git 2.40 以上；提交前需要在 Git 設定你的名字與電子郵件地址。
 - **GitHub CLI**（`gh`），並以 `gh auth login` 登入，用於從 GitHub 匯入、發佈 Pull Request 與尋找專案。
-- **Codex CLI 或 Claude Code**，以執行 BELL PR 的同一個使用者安裝並登入。兩者擇一即可。
+- **Codex CLI、Claude Code 或 Antigravity CLI**，以執行 BELL PR 的同一個使用者安裝並登入。擇一即可。
   - Codex CLI：`npm install -g @openai/codex`，再執行 `codex login`。使用你已安裝並登入的 Codex CLI，用量計入你自己的帳戶。
   - Claude Code：`npm install -g @anthropic-ai/claude-code`，再執行 `claude auth login`。使用你已安裝並登入的 Claude Code CLI（Claude 方案或 Anthropic API 金鑰），用量計入你自己的帳戶。
+  - Antigravity CLI：`curl -fsSL https://antigravity.google/cli/install.sh | bash`，再執行 `agy` 登入。使用你已安裝並登入的 Antigravity CLI（Google 帳號、Gemini API 金鑰或 Google Cloud 憑證），用量計入你自己的帳戶。專案若附帶 Antigravity 的 hooks、MCP 伺服器、外掛、Agent 或技能，它就不會在其中啟動；它的 Agent 一律可以搜尋網路（見[安全模型](docs/security-model.md#antigravity)，英文）。
 - **Linux 需要 bubblewrap 與 socat**，Claude Code Agent 才能在沙箱中修改檔案（`sudo apt-get install bubblewrap socat`）。
 
 `bell-pr doctor` 會檢查以上所有項目，並為每個問題印出修正指令。請見[開始之前](#開始之前)。
@@ -183,12 +186,12 @@ WSL 終端機執行 `bell-pr open --print --print-token`，自行開啟印出的
 必要的「AI 服務」檢查標為失敗。`bell-pr start` 會在監聽前以非零結束代碼結束，
 並印出該清單與每一項失敗檢查的修正指令。`bell-pr start --force` 仍會啟動，
 並警告已略過檢查。歡迎畫面可繼續；你可以先走**範例導覽**（不呼叫 AI）。在
-至少一套 Codex CLI 或 Claude Code 安裝並登入之前，無法開始真實的 Agent 工作；
+至少一套 Codex CLI、Claude Code 或 Antigravity CLI 安裝並登入之前，無法開始真實的 Agent 工作；
 探索功能另需已登入的 GitHub CLI。
 
 ### 一次範例執行的費用
 
-Agent 用量由**你自己的** Codex／Claude 帳戶計費。BELL PR 不定價。典型第一次
+Agent 用量由**你自己的** Codex／Claude／Antigravity 帳戶計費。BELL PR 不定價。典型第一次
 貢獻的精確 token 與費用**尚未公布**——待實際量測後補上。
 
 ## 支援平台
@@ -275,15 +278,15 @@ BELL PR 會閱讀專案的貢獻指南、AI 政策、PR 範本、Agent 指南與
 
 ### 你的工具、你的帳號、你的語言
 
-選擇 Codex CLI 或 Claude Code、模型、該模型提供的思考強度（從 none 到 ultra），以及效率模式（輕量、完整或關閉）。每個工作都會顯示服務商回報的用量。CLI 失敗時會先顯示它回報的錯誤，原始輸出則收合起來。介面與 Agent 的解說可以使用英文或繁體中文（台灣）；除非專案另有要求，Pull Request 一律使用英文。
+選擇 Codex CLI、Claude Code 或 Antigravity CLI、模型、該模型提供的思考強度（從 none 到 ultra），以及效率模式（輕量、完整或關閉）。每個工作都會顯示服務商回報的用量。CLI 失敗時會先顯示它回報的錯誤，原始輸出則收合起來。介面與 Agent 的解說可以使用英文或繁體中文（台灣）；除非專案另有要求，Pull Request 一律使用英文。
 
-**Agent 的網路存取**是一項設定，在你開啟之前都是關閉的。開啟後，Claude Code 只能開啟 GitHub 自家網站的頁面；Codex CLI 使用 OpenAI 的網路搜尋。專案分析與探索永遠不會有網路存取。
+**Agent 的網路存取**是一項設定，在你開啟之前都是關閉的。開啟後，Claude Code 只能開啟 GitHub 自家網站的頁面；Codex CLI 使用 OpenAI 的網路搜尋。專案分析與探索永遠不會有網路存取，但 Antigravity CLI 例外：它的網路搜尋無法關閉，每個 Antigravity Agent 都能搜尋網路，只有開啟這項設定時才能讀取 GitHub 網站的頁面。
 
 ## 隱私
 
 - BELL PR 在你的電腦上執行，所有資料都放在同一個資料目錄。沒有 BELL PR 雲端、帳號、遙測或分析。
 - 你的程式碼與提問只會送到你自己設定的服務：你選擇的 AI CLI 背後的服務商，以及 GitHub，都使用你自己的帳號。
-- Agent 的網路存取預設關閉，只有你開啟時才會使用。
+- Agent 的網路存取預設關閉，只有你開啟時才會使用（Antigravity CLI 的網路搜尋一律開啟）。
 - 你可以在應用程式中釋放某個工作的檔案、刪除工作或專案，或刪除所有資料。
 
 詳情請見[隱私與資料](docs/privacy-and-data.md)（英文）。
@@ -291,9 +294,9 @@ BELL PR 會閱讀專案的貢獻指南、AI 政策、PR 範本、Agent 指南與
 ## 安全模型
 
 - **在沙箱中執行的 Agent。** 在預設的「工作目錄」模式下，會寫程式的 Agent 在各自 CLI 的作業系統沙箱中執行：寫入限制在該工作自己的 worktree 與 CLI 的暫存資料夾，網路也會關閉。你自己的 Claude Code 使用者設定可能放寬 Claude Code 的沙箱（proxy 連接埠、允許的網域或路徑、排除的指令、外掛的語言伺服器；請見[你自己的 Claude Code 設定](docs/security-model.md#your-own-claude-code-settings)，英文）。Claude Code 無法讀取 GitHub CLI 的設定檔、`~/.git-credentials` 與 credential-store 檔案、`~/.netrc` 與 `~/.ssh/`。`GH_TOKEN`/`GITHUB_TOKEN` 會從 agent 的環境變數中移除。系統 keyring 裡的 token 不在保護範圍內：agent 仍可透過 `gh auth token` 讀到你的 GitHub token。主要防線是改用權限最小的 fine-grained token。Claude Code 另外無法讀取自己 checkout 以外的 BELL PR 資料。「完整權限」預設關閉。開啟後會對寫入檔案的角色關掉 OS sandbox 和 credential deny 規則，這些 agent 可以讀 `~/.git-credentials` 和 `~/.ssh`，也能執行 `gh`、`git push`、`curl`；唯讀角色維持原本限制。只剩 `GH_TOKEN`/`GITHUB_TOKEN` 從環境變數移除這一項還有效。「免密碼 sudo」（僅 Linux）預設關閉。開啟後這個使用者帳號底下所有 process（包括 agent）都能不用密碼以 root 執行任何指令，讀得到那台機器上所有檔案，包括 token 和 SSH key。兩者都只在用完即丟的 VM 或 container 裡開。
-- **匯入的專案不受信任。** 專案的程式碼、文件與 Agent 指示（`AGENTS.md`、`CLAUDE.md`、`.claude/`）都只被當成資料：CLI 不會載入專案自己的設定、hooks 或指示；Git 設定可能執行其他程式的 repository 會被拒絕。BELL PR 自己執行的 git 也會關掉這些程式；只有會連到 GitHub 的 git 才會拿到 `GH_TOKEN`。Agent 仍會執行專案的程式碼，請只匯入你願意在這台電腦上執行的專案。
+- **匯入的專案不受信任。** 專案的程式碼、文件與 Agent 指示（`AGENTS.md`、`CLAUDE.md`、`.claude/`）都只被當成資料：CLI 不會載入專案自己的設定、hooks 或指示；Git 設定可能執行其他程式的 repository 會被拒絕。Antigravity CLI 是例外：它會讀取專案的 `AGENTS.md` 與 `GEMINI.md`，因此專案若有 Antigravity 的 hooks、MCP 伺服器、外掛、Agent 或技能，BELL PR 就不會在其中啟動它。BELL PR 自己執行的 git 也會關掉這些程式；只有會連到 GitHub 的 git 才會拿到 `GH_TOKEN`。Agent 仍會執行專案的程式碼，請只匯入你願意在這台電腦上執行的專案。
 - **API 權杖。** 每次安裝都會在資料目錄保存一枚權杖，沒有送出權杖的 API 請求會被拒絕。預設只在 `127.0.0.1` 上監聽。其他網站可以連結到它的頁面，但無法呼叫它的 API，也無法以框架嵌入它。
-- **在沙箱外執行必須明確開啟。** 沒有沙箱時（例如使用預設設定的 Docker），會修改檔案的 Claude Code Agent 會被拒絕。你可以在**設定 → Agent 安全**或用 `BELLPR_ALLOW_UNSANDBOXED_AGENTS=1` 允許；這類 Agent 擁有你完整的使用者權限，用過它的每個工作都會顯示「**未使用沙箱執行**」標記。
+- **在沙箱外執行必須明確開啟。** 沒有沙箱時（例如使用預設設定的 Docker，或 Ubuntu 24.04 以後的 Antigravity CLI），會修改檔案的 Claude Code 或 Antigravity Agent 會被拒絕。你可以在**設定 → Agent 安全**或用 `BELLPR_ALLOW_UNSANDBOXED_AGENTS=1` 允許；這類 Agent 擁有你完整的使用者權限，用過它的每個工作都會顯示「**未使用沙箱執行**」標記。
 - **由你發佈。** 在你逐檔審閱並核准之前，不會有任何內容送到 GitHub，而且 commit 只包含你審閱過的檔案。
 
 詳情與限制請見[安全模型](docs/security-model.md)（英文）。回報安全性漏洞請見 [SECURITY.md](SECURITY.md)。
@@ -333,7 +336,7 @@ BELL PR 不需要任何設定就能啟動。下列設定都是啟動時讀取的
 | `BELLPR_MAX_AGENT_PROCESSES` | `3` | 同時執行的 Agent CLI 行程數（1 到 32） |
 | `BELLPR_MAX_ACTIVE_RUNS` | `2` | 同時執行的貢獻工作數（1 到 8） |
 | `BELLPR_AGENT_TIMEOUT_SCALE` | `1` | Agent 逾時時間的倍率（0.5 到 10） |
-| `BELLPR_ALLOW_UNSANDBOXED_AGENTS` | 未設定 | `1` 允許 Claude Code Agent 在沙箱外修改檔案 |
+| `BELLPR_ALLOW_UNSANDBOXED_AGENTS` | 未設定 | `1` 允許 Claude Code 與 Antigravity Agent 在沙箱外修改檔案 |
 | `BELLPR_REQUIRE_UNDERSTANDING_CHECK` | 未設定 | `1` 保持理解檢查開啟並鎖定這項設定；沒有任何值能關閉它 |
 | `BELLPR_RETENTION_DAYS` | `14` | 已取消與失敗工作的檔案保留天數（1 到 365） |
 | `BELLPR_DEV` | 未設定 | 開發模式，只用於開發 BELL PR 本身 |
@@ -359,7 +362,7 @@ docker exec bell-pr bell-pr open --print --print-token
 bell-pr doctor
 ```
 
-會檢查 Node.js、Git、GitHub CLI 與其權限、Agent CLI 與其登入狀態、Claude Code 沙箱以及資料目錄，並為每個問題印出修正指令。`bell-pr doctor --json` 以 JSON 輸出同一份報告。所有必要檢查都通過時，結束代碼為 0。
+會檢查 Node.js、Git、GitHub CLI 與其權限、Agent CLI 與其登入狀態、Claude Code 與 Antigravity 沙箱以及資料目錄，並為每個問題印出修正指令。`bell-pr doctor --json` 以 JSON 輸出同一份報告。所有必要檢查都通過時，結束代碼為 0。
 
 [疑難排解](docs/troubleshooting.md)（英文）列出[每個錯誤代碼](docs/troubleshooting.md#error-codes)與修正方式、說明 [BELL PR 為什麼擋下發佈](docs/troubleshooting.md#publishing-was-blocked-by-a-project-rule-an-issue-or-pacing)、BELL PR 無法啟動時該怎麼辦，以及如何收集支援所需的資訊。
 
@@ -418,7 +421,7 @@ BELL PR 是開源軟體，依 [Apache License 2.0](LICENSE) 授權（另見 [NOT
 
 BELL PR 的名稱與標誌不在 Apache 授權範圍內；你可以如何使用它們，請見 [TRADEMARKS.md](TRADEMARKS.md)。
 
-BELL PR 是獨立專案，與 GitHub, Inc.、OpenAI 及 Anthropic PBC 皆無關聯，也未獲其認可或贊助。GitHub、OpenAI、Codex、Anthropic、Claude 與 Claude Code 均為其各自擁有者的商標；BELL PR 提及這些名稱，僅為說明可搭配使用的工具。
+BELL PR 是獨立專案，與 GitHub, Inc.、OpenAI、Anthropic PBC 及 Google LLC 皆無關聯，也未獲其認可或贊助。GitHub、OpenAI、Codex、Anthropic、Claude、Claude Code、Google、Gemini 與 Antigravity 均為其各自擁有者的商標；BELL PR 提及這些名稱，僅為說明可搭配使用的工具。
 
 含權杖的網址請視同密碼。SSH 或無桌面、無法配對時，可備援執行
 `bell-pr open --print --print-token`；能開 `/pair` 時請優先 `bell-pr pair`。

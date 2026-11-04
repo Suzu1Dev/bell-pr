@@ -88,3 +88,19 @@ From 1.0.0 on, a data directory that a newer version used still opens in an
 older one: the older version ignores what it does not know. Features the
 older version lacks are simply not shown. Keep the backup from before the
 update anyway, in case you need to return to exactly that state.
+
+One exception: Antigravity, the third AI provider, is a value 1.0.x does
+not know, and 1.0.x refuses a file that names it instead of ignoring the
+value. After you chose Antigravity, a 1.0.x version:
+
+- reports the model settings as unreadable. Choose a provider again in
+  **Settings → AI provider**, which replaces `model-settings.json`;
+- reports the analysis of each project that Antigravity analyzed as
+  unreadable. The files in the data directory's `insights` folder are
+  named after a hash of the project, so delete the whole folder, then
+  analyze the projects again;
+- cannot open the discovery results when Antigravity made the last search.
+  Delete `discovery.json` in the data directory.
+
+Runs that Antigravity worked on still open, but 1.0.x shows them as Codex
+runs and would continue them with Codex.

@@ -253,7 +253,7 @@ export async function runAgent(
       const read = agentEventReader(modelExecution.provider);
       const spawned = agentSpawn(run, role, cli.executable, timeoutMs);
       await execute(cli.executable, cli.args, {
-        input: fullPrompt,
+        input: cli.stdin?.(fullPrompt) ?? fullPrompt,
         cwd,
         signal: canary.signal,
         timeoutMs,

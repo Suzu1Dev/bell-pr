@@ -29,7 +29,7 @@ test("About reads in English with no Chinese left", () => {
   assert.match(html, />Copy diagnostics<\/button>/);
   assert.match(html, /community-maintained open-source software, licensed under the Apache License 2\.0 and provided &quot;as is&quot;, without warranty\./);
   assert.match(html, /name and logo are marks of the project and are not covered by that license\./);
-  assert.match(html, /is an independent product and is not affiliated with, endorsed by, or sponsored by GitHub, Inc\., OpenAI, or Anthropic PBC\./);
+  assert.match(html, /is an independent product and is not affiliated with, endorsed by, or sponsored by GitHub, Inc\., OpenAI, Anthropic PBC, or Google LLC\./);
   assert.match(html, /Efficiency mode is based on Ponytail by DietrichGebert \(MIT\)\./);
   assertNoHan(html);
   assert.match(renderZh(element()), /<h2 id="modal-title">關於 BELL PR<\/h2>/);

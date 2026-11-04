@@ -204,7 +204,8 @@ codex login
 ```
 
 See the [Codex CLI](https://github.com/openai/codex) for other ways to
-install it. You need the Codex CLI or Claude Code, not both.
+install it. You need one of the Codex CLI, Claude Code or the Antigravity
+CLI, not all of them.
 
 ### `codex_unauthenticated`
 
@@ -263,6 +264,83 @@ the agent starts (HTTP 503). Pick one:
 
 `bell-pr doctor` shows whether the sandbox works ("Claude Code sandbox").
 See the [security model](security-model.md) for what the sandbox allows.
+
+### `antigravity_missing`
+
+"The Antigravity CLI (agy) is not installed, or BELL PR cannot find it on
+its PATH." Google's installer puts `agy` in `~/.local/bin`; add that folder
+to the PATH BELL PR starts with if `agy --version` is not found.
+
+```sh
+curl -fsSL https://antigravity.google/cli/install.sh | bash
+agy
+```
+
+On Windows, PowerShell: `irm https://antigravity.google/cli/install.ps1 | iex`.
+Started without arguments, `agy` signs you in. BELL PR uses the Antigravity
+CLI you installed and signed in to (Google account, Gemini API key or Google
+Cloud credentials); usage counts against your own account.
+
+### `antigravity_unauthenticated`
+
+"The Antigravity CLI is not signed in, or its sign-in expired." Start it
+once in a terminal and sign in:
+
+```sh
+agy
+```
+
+BELL PR checks the sign-in with `agy models`, which lists models without
+starting a model turn. A Gemini API key (`GEMINI_API_KEY` with
+`"modelProvider": "gemini"` in `~/.gemini/antigravity-cli/settings.json`)
+and Application Default Credentials (`AGY_ADC_AUTH=true`) reach the CLI
+when they are set in the environment BELL PR starts with. A sign-in that
+the CLI keeps only in the system keyring may not reach agents, because
+BELL PR does not pass the desktop session's variables to them; `agy models`
+then fails in `bell-pr doctor` too.
+
+### `antigravity_sandbox_unavailable`
+
+An Antigravity agent that edits files and runs commands needs the
+Antigravity CLI's terminal sandbox, and it cannot start here, so the run
+stops before the agent starts (HTTP 503). On Linux that sandbox needs user
+namespaces. Ubuntu 24.04 and later withhold them from programs without an
+AppArmor profile (`kernel.apparmor_restrict_unprivileged_userns = 1`), and
+the Antigravity CLI then reports "Terminal sandbox unavailable" in its own
+log. BELL PR reads the same settings. Pick one:
+
+- **Allow user namespaces** for every program, which lowers a protection
+  Ubuntu turned on for the whole system:
+  `sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0` (until
+  the next restart; a file in `/etc/sysctl.d/` keeps it). Then press
+  **Re-check** in **Settings → Environment**.
+- **Use Claude Code or Codex** for this work: choose it in the model
+  settings. Claude Code's bubblewrap has its own AppArmor profile on
+  Ubuntu, and Codex brings its own sandbox.
+- **Allow unsandboxed agents** under **Settings → Agent safety**, or start
+  BELL PR with `BELLPR_ALLOW_UNSANDBOXED_AGENTS=1`. Antigravity's commands
+  then run with your full user rights, as described for
+  `claude_sandbox_unavailable` above, and every such run carries a "Ran
+  without sandbox" badge.
+
+`bell-pr doctor` shows the state as "Antigravity sandbox". macOS needs
+`sandbox-exec`, which it has built in; other platforms have no sandbox for
+Antigravity.
+
+### `antigravity_workspace_config`
+
+The project contains Antigravity customizations: a `hooks.json`,
+`mcp_config.json`, `plugins`, `plugins.json`, `agents`, `skills` or
+`skills.json` in an `.agents`, `.agent`, `_agents` or `_agent` folder,
+in the working folder or a folder above it up to the repository root. The
+Antigravity CLI has no setting that skips them: it would load them for
+every agent, run their hooks and start their MCP servers outside any
+sandbox, also in a folder it was never asked to trust. So BELL PR does not
+start Antigravity there (HTTP 422); the error names what it found. Choose
+Claude Code or Codex in the model settings for this project. An agent that
+creates such a file during a run stops the run's next Antigravity turn the
+same way. See the [security model](security-model.md#antigravity) for
+what else the Antigravity CLI loads.
 
 ### `clone_timeout`
 
@@ -477,7 +555,8 @@ there, then publish again.
   is the doctor's checklist: each failed check and the command that fixes
   it, then how to start anyway. `bell-pr start --force` starts and prints a
   warning. The sample tour needs no AI provider; a real agent run still
-  waits until Codex CLI or Claude Code is installed and signed in.
+  waits until Codex CLI, Claude Code or the Antigravity CLI is installed
+  and signed in.
 - **"BELL PR needs Node.js 22 or later"**: install the current Node.js LTS
   from [nodejs.org](https://nodejs.org/en) (or `nvm install 22`).
 - **"Port 4311 is already in use by another program"**: start on a free

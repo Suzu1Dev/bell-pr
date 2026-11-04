@@ -233,7 +233,7 @@ access “safe by itself”; keep it on a private network.
 ### Which platforms does it run on?
 
 macOS, Linux, and Windows through WSL2. It needs Node.js 22 or later, Git,
-the GitHub CLI and the Codex CLI or Claude Code. There is also a Docker
+the GitHub CLI and the Codex CLI, Claude Code or the Antigravity CLI. There is also a Docker
 image, in beta: [Docker](docker.md).
 
 ### Does it work with GitLab or Bitbucket?
@@ -339,6 +339,6 @@ everything. See [Privacy and your data](privacy-and-data.md#deleting-data).
 ### Does BELL PR change my Git or CLI configuration?
 
 No. BELL PR never changes the global configuration of Git, the GitHub CLI,
-the Codex CLI or Claude Code. It runs them with its own options for each
+the Codex CLI, Claude Code or the Antigravity CLI. It runs them with its own options for each
 command. The fix commands it suggests (for example `git config --global
 user.email …`) are for you to run.
