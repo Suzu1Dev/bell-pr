@@ -5,6 +5,17 @@ All notable changes to BELL PR are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **npmjs.com shows the English README.** `npm publish` takes any root
+  file named `README` or `README.*` as the package's README, in no fixed
+  order, so npmjs.com showed the Traditional Chinese README for 1.0.0 and
+  1.1.0. It is now `README-zh-TW.md`, in the repository and in the package,
+  and `node scripts/check-pack.mjs` fails when npm could send another README
+  than `README.md`.
+
 ## [1.1.0] - 2026-11-04
 
 The first release on npm's `latest` tag since 1.0.0. It also contains two
