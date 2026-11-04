@@ -278,6 +278,18 @@ function recordPartOrder(
 }
 
 /**
+ * The most parts a new part, or a run built on `source`, would build on
+ * after splitting `source` into `count` (recordPartOrder).
+ */
+function widestOrder(runs: readonly Run[], source: Run, count: number) {
+  const others = count - 1;
+  return Math.max(
+    (source.group?.after?.length ?? 0) + others,
+    ...runs.map((run) => (run.group?.after?.includes(source.id) ? run.group.after.length + others : 0)),
+  );
+}
+
+/**
  * POST /api/runs/:id/split. All of it or none of it: a contribution that
  * fails to come out the same as the files it was made from is removed
  * together with the ones made before it, and the original is not touched.
@@ -303,16 +315,8 @@ export async function splitRun(
     await assertConflictsResolved(source);
     const files = assertRequest(input, await ctx.diff(id));
     const repo = ctx.repo(source.repoId);
-    // What a new part, or a run built on the source, would build on afterwards (recordPartOrder).
-    const others = input.contributions.length - 1;
-    const widest = Math.max(
-      (source.group?.after?.length ?? 0) + others,
-      ...ctx.store.data.runs.map((run) =>
-        run.group?.after?.includes(source.id) ? run.group.after.length + others : 0,
-      ),
-    );
-    if (widest > groupAfterLimit)
-      throw new AppError((m) => m.run.split.tooManyEdges({ limit: groupAfterLimit }), 422);
+    const tooMany = () => new AppError((m) => m.run.split.tooManyEdges({ limit: groupAfterLimit }), 422);
+    if (widestOrder(ctx.store.data.runs, source, input.contributions.length) > groupAfterLimit) throw tooMany();
 
     const created: Run[] = [];
     try {
@@ -329,6 +333,13 @@ export async function splitRun(
       throw error;
     }
 
+    // Checked again with no await before the rewrite: another split may have widened a shared dependent meanwhile.
+    if (widestOrder(ctx.store.data.runs, source, created.length) > groupAfterLimit) {
+      await ctx.lock(`repository:${repo.id}`, async () => {
+        for (const run of created) await discardCheckout(repo, run.branch, run.worktreePath);
+      });
+      throw tooMany();
+    }
     recordPartOrder(ctx.store.data.runs, source, input, created, files);
     const refs: SplitRef[] = created.map((run) => ({ runId: run.id, title: run.title }));
     source.splitInto = refs;
