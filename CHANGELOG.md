@@ -5,7 +5,47 @@ All notable changes to BELL PR are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.1.0] - 2026-11-04
+
+The first release on npm's `latest` tag since 1.0.0. Besides the changes
+below, it contains everything listed under 1.1.0-beta.1 and 1.0.1:
+1.1.0-beta.1 was a prerelease on the `next` tag, and 1.0.1 was prepared
+but never published. The known limitations listed under 1.1.0-beta.1
+still apply to Antigravity.
+
+### Added
+
+- **A warning when two of your contributions to one project change the
+  same files.** Before a plan is approved, BELL PR compares the files it
+  covers with your other unfinished contributions to that project: their
+  plans while still to be carried out, what their checkouts changed, and
+  what their pull requests change until that change is in the base. The
+  plan board then shows "Overlap with your other contributions" and marks
+  each task, and approving needs the tick "I know these overlap; approve
+  anyway". A plan that would start on its own waits for your approval
+  instead, and "This is my plan" in Learn by hand asks for the same tick.
+  The check reads only BELL PR's own records and checkouts on this
+  computer and sends nothing.
+- **The parts of a split keep their order.** Each part records the parts
+  its tasks build on; splitting a part again passes this on, and deleting
+  parts points what built on them back at their source. A split that would
+  make a part build on more than 64 others is refused.
+- **Two publish confirms under "Your other contributions here"**: one when
+  another of your contributions to the project changes some of the same
+  files, and one when a part of a split builds on parts that are not
+  merged yet.
+- **Let the agent set this up.** On a Full access run in review or
+  approved, the "Setup this machine needs from you" checklist hands the
+  commands you tick, at most 10 per turn, to one Collaborate turn. A dialog
+  shows them word for word first, and nothing starts until you confirm.
+  The turn runs without the sandbox and with your account, reruns the
+  checks the commands blocked and reports each item as installed, already
+  present, failed or needs you. The agent is told to run only the ticked
+  commands, adding at most non-interactive flags, `sudo -n` and a
+  package-index refresh, and not to change code. BELL PR never hands over
+  a command that downloads something and runs or chains it, or pipes into
+  a shell or another interpreter. sudo works only when it needs no
+  password, and stopping the turn does not undo installs.
 
 ### Changed
 
@@ -15,6 +55,15 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   and High), so the model picker showed each model up to three times. agy
   still receives the model IDs it listed. A model saved with its level, as
   1.1.0-beta.1 saved it, reads as that model and effort.
+
+### Fixed
+
+- A plan scope that names a directory of the base commit without its
+  trailing slash (`src`) is read as that directory (`src/`), so the plan
+  covers the files inside.
+- On a Full access run, Antigravity's writing roles were told that curl,
+  wget, the GitHub CLI and pushing are denied, which is not so there; the
+  note no longer says it.
 
 ## [1.1.0-beta.1] - 2026-11-04
 
