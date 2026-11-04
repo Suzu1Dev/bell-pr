@@ -503,12 +503,16 @@ test("splitting a part again keeps the order: the new parts build on what it bui
   assert.deepEqual(outside.group, { after: [b.id, c.id] });
 
   // Deleting the new parts undoes it: what built on them builds on the part they came from again.
-  while (again.created.some((run) => run.draftPreparation?.status !== "failed"))
+  while ([a, ...again.created].some((run) => run.draftPreparation?.status !== "failed"))
     await new Promise((resolve) => setTimeout(resolve, 10));
+  // Deleting the part they build on never makes them build on their own original instead.
+  await f.workbench.removeRun(a.id);
+  assert.equal("group" in b, false);
+  assert.deepEqual(c.group, { after: [b.id] });
   await f.workbench.removeRun(b.id);
   assert.deepEqual(outside.group, { after: [bc.id, c.id] });
   // c came from bc, so it does not build on bc.
-  assert.deepEqual(c.group, { after: [a.id] });
+  assert.equal("group" in c, false);
   await f.workbench.removeRun(c.id);
   assert.deepEqual(outside.group, { after: [bc.id] });
 });

@@ -280,8 +280,9 @@ Start the run with **Generate the team plan** (with plan approval) or
   started without plan approval waits for your approval instead, also after
   **Stop** and a retry. A Learn by hand plan's files are checked the same
   way at **This is my plan**. BELL PR only reads its own records and
-  working copies for this, without changing them; nothing is written or
-  sent.
+  working copies for this, without changing them; nothing is saved or
+  sent, and the temporary copy of a working copy's Git index it reads
+  through is deleted right after.
 - A file scope the Lead writes without a trailing `/` that is a directory
   in the base commit, such as `src`, is read as `src/`, so it covers the
   files inside; the activity log says so.

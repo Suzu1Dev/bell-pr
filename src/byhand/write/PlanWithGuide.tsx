@@ -111,7 +111,7 @@ export function PlanWithGuide(props: PlanWithGuideProps) {
   // The steps' files against the person's other contributions, as for an agent plan.
   // Read again after each "This is my plan": a refused one may come from overlaps that changed.
   const [attempts, setAttempts] = useState(0);
-  const { read: overlapRead, reading: readingOverlaps } = usePlanOverlaps(
+  const { read: overlapRead, refresh: readOverlaps } = usePlanOverlaps(
     run,
     run.status === "awaiting_plan" && !confirmed,
     busy,
@@ -209,12 +209,19 @@ export function PlanWithGuide(props: PlanWithGuideProps) {
           <button
             type="button"
             className="button primary"
-            disabled={busy || !drafted || overlapPending || readingOverlaps}
-            onClick={action(() =>
-              onConfirm(overlapRead?.overlaps.length ? { overlapDigest: overlapRead.digest } : {})
-                .then(focusAfterPlan)
-                .finally(() => setAttempts((count) => count + 1)),
-            )}
+            disabled={busy || !drafted || overlapPending}
+            // The steps a click's blur just saved are read again here, so the click is not lost to a
+            // pending read: new overlaps stop it for the tick, and a ticked one goes with its digest.
+            onClick={action(async () => {
+              try {
+                const latest = await readOverlaps();
+                if (latest?.overlaps.length && latest.digest !== confirmedOverlap) return;
+                await onConfirm(latest?.overlaps.length ? { overlapDigest: latest.digest } : {});
+                focusAfterPlan();
+              } finally {
+                setAttempts((count) => count + 1);
+              }
+            })}
           >
             {busy ? <Loader2 size={15} className="spin" /> : <Play size={15} aria-hidden="true" />}
             {t.confirm}

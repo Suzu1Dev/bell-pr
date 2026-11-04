@@ -18,8 +18,8 @@ export interface PlanOverlaps {
  * `attempt` changes (after each approval attempt) and whenever the plan's
  * files change. `read` is undefined while unread, when the read failed and
  * for a plan other than the one read; `reading` is true until this plan was
- * read once, so approving waits for it. After a failed read, approving
- * checks on the server.
+ * read once, so approving waits for it. `refresh` reads them now, for a
+ * plan just saved. After a failed read, approving checks on the server.
  */
 export function usePlanOverlaps(
   run: Pick<Run, "id" | "team" | "byHand">,
@@ -44,7 +44,9 @@ export function usePlanOverlaps(
     };
   }, [run.id, active, busy, plan, attempt]);
   const fresh = active && read?.plan === plan;
-  return { read: fresh ? read.result : undefined, reading: active && !fresh };
+  const refresh = () =>
+    api<PlanOverlaps>(`/runs/${encodeURIComponent(run.id)}/overlaps`).catch(() => undefined);
+  return { read: fresh ? read.result : undefined, reading: active && !fresh, refresh };
 }
 
 /**

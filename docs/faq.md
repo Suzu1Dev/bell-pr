@@ -287,7 +287,8 @@ for the overlap it was given on; a run started without plan approval waits
 for it. The publish dialog asks you to confirm the overlap for the files you
 changed (`group-own-overlap`), because whichever is merged second may need
 its conflicts resolved. BELL PR only reads its own records and working
-copies for this, and nothing is written or sent. The parts of one split
+copies for this, and nothing is saved or sent (a temporary copy of a working
+copy's Git index is deleted right after it is read). The parts of one split
 never count against each other or the original, and an original that was
 split counts only for the files none of its parts holds.
 

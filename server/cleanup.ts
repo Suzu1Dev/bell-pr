@@ -280,6 +280,16 @@ export async function archiveRunWorkspace(
   });
 }
 
+/** The runs `run` was split from, up to the first original. */
+function splitAncestors(runs: readonly Run[], run: Run) {
+  const ancestors = new Set<string>();
+  for (let parent = run.splitFrom?.runId; parent && !ancestors.has(parent); ) {
+    ancestors.add(parent);
+    parent = runs.find((other) => other.id === parent)?.splitFrom?.runId;
+  }
+  return ancestors;
+}
+
 /** Deletes a run that is not working: its files first, then its record. */
 export async function removeRun(ctx: WorkbenchContext, id: string) {
   const run = ctx.run(id);
@@ -292,9 +302,11 @@ export async function removeRun(ctx: WorkbenchContext, id: string) {
     const index = ctx.store.data.runs.indexOf(run);
     if (index >= 0) ctx.store.data.runs.splice(index, 1);
     // No banner links to a deleted run, and an original whose parts are all gone can be split again.
-    // A part that built on a deleted part builds on what that part was split from, if it is still there.
+    // A part that built on a deleted part builds on what that part was split from, if it is still
+    // there and is not one of its own originals, which hold its files too.
     const source = ctx.store.data.runs.find((other) => other.id === run.splitFrom?.runId)?.id;
-    for (const other of ctx.store.data.runs) dropSplitLinks(other, id, source);
+    for (const other of ctx.store.data.runs)
+      dropSplitLinks(other, id, source && !splitAncestors(ctx.store.data.runs, other).has(source) ? source : undefined);
     log.info("run.removed", { runId: id });
     invalidateStorageReport(ctx);
     await ctx.store.save();
