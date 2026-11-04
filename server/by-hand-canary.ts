@@ -1,9 +1,10 @@
 /**
  * The write canary of a Learn-by-hand run (DESIGN v1.2 F2): BELL's own
  * reading of an agent turn's events (server/agent-cli.ts) is checked on
- * every turn. A file change from either CLI, or a command from Claude Code
- * (whose read turns have only Read, Grep and Glob), is a hit; a Codex
- * command is a read in its read-only sandbox and is not. A hit stops the
+ * every turn. A file change from any CLI, or a command from Claude Code
+ * (whose read turns have only Read, Grep and Glob) or Antigravity (whose
+ * read turns deny every command, so one that ran is a hit), is a hit; a
+ * Codex command is a read in its read-only sandbox and is not. A hit stops the
  * turn, is counted in `run.byHand.agentWrites` and withdraws the claim for
  * good (`byHandClean`). Because the reader counts every completed Codex
  * file change, a patch the sandbox refused is a hit too: the canary errs
@@ -18,7 +19,7 @@ import type { WorkbenchContext } from "./workbench.js";
 
 /** Whether one event of a Learn-by-hand turn is a write. */
 export function canaryHit(item: AgentEvent, provider: AgentProvider | undefined) {
-  return item.kind === "file-change" || (item.kind === "command" && provider === "claude");
+  return item.kind === "file-change" || (item.kind === "command" && (provider ?? "codex") !== "codex");
 }
 
 /** Counts a hit, logs it on the run and stops the turn; later events of a stopped turn count nothing. */

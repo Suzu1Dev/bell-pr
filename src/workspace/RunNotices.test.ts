@@ -63,7 +63,7 @@ test("the unsandboxed badge links to the safety settings and explains itself", (
   assert.match(html, /Ran without sandbox/);
   assert.match(
     html,
-    /<span id="unsandboxed-help" class="unsandboxed-help" role="tooltip">You allowed Claude agents to run without the operating system&#x27;s sandbox/,
+    /<span id="unsandboxed-help" class="unsandboxed-help" role="tooltip">You allowed agents to run without the operating system&#x27;s sandbox/,
   );
   assertNoHan(html);
   assert.match(renderZh(createElement(UnsandboxedBadge)), /未使用沙箱執行/);

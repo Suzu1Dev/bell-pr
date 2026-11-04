@@ -189,7 +189,7 @@ test("a run waits for a ready AI provider and shows the fix; the sample does not
 
   const unready = renderEn(element({ prompt }, { doctor: doctor(report("fail")) }));
   assert.match(unready, /<div class="readiness-notice" role="status">/);
-  assert.match(unready, /This needs an AI provider: install and sign in to the Codex CLI or Claude Code\./);
+  assert.match(unready, /This needs an AI provider: install and sign in to the Codex CLI, Claude Code or the Antigravity CLI\./);
   assert.match(unready, /<code>codex login<\/code>/);
   assert.match(submit(unready), /disabled=""/);
   assertNoHan(unready);

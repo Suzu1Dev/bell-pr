@@ -33,6 +33,9 @@ export default {
       claude: "Claude Code",
       "claude-auth": "Claude Code sign-in",
       "claude-sandbox": "Claude Code sandbox",
+      antigravity: "Antigravity CLI",
+      "antigravity-auth": "Antigravity sign-in",
+      "antigravity-sandbox": "Antigravity sandbox",
       "provider-ready": "AI provider",
       "data-dir": "Data directory",
       app: product.name,
@@ -75,7 +78,7 @@ export default {
   readiness: {
     checking: "Checking your environment…",
     provider:
-      "This needs an AI provider: install and sign in to the Codex CLI or Claude Code.",
+      "This needs an AI provider: install and sign in to the Codex CLI, Claude Code or the Antigravity CLI.",
     gh: "This needs the GitHub CLI, installed and signed in.",
     "git-identity":
       "This needs your Git name and e-mail address, which every commit carries.",

@@ -286,6 +286,8 @@ const m: Translation<typeof en> = {
         codex: "使用你已安裝並登入的 Codex CLI。",
         claude:
           "使用你已安裝並登入的 Claude Code CLI（Claude 方案或 Anthropic API 金鑰皆可）。用量計入你自己的帳號，可用模型依你的方案而定。",
+        antigravity:
+          "使用你已安裝並登入的 Antigravity CLI（agy；Google 帳號、Gemini API 金鑰或 Google Cloud 憑證皆可）。用量計入你自己的帳號，列出的模型也依帳號而定。它的 Agent 一律可以搜尋網路；專案若附帶 Antigravity 的 hooks、MCP 伺服器、外掛、Agent 或技能，就不會在其中啟動。",
       },
       providerOption: ({ provider, state }) => `${provider}（${state}）`,
       providerStates: {
@@ -306,10 +308,10 @@ const m: Translation<typeof en> = {
       defaultEffortNote: "「模型預設」會使用模型本身的預設強度。",
       modelDefault: ({ effort }) => `模型預設${effort ? ` · ${effort}` : ""}`,
       unknownEffort: "已儲存的強度未在此模型的清單中，請重新選擇。",
-      effortHelp: `只列出所選模型支援的強度；較高的強度每回合需要更久、用量也較多，${product.name} 會為 Claude Code 以及 xhigh、max 強度延長等待時間。`,
+      effortHelp: `只列出所選模型支援的強度；較高的強度每回合需要更久、用量也較多，${product.name} 會為 Claude Code、Antigravity 以及 xhigh、max 強度延長等待時間。`,
       webAccess: "允許 Agent 上網搜尋與讀取網頁",
       webAccessHelp:
-        "套用到 Lead、Teammates、Reviewer、Test analyst 與追問導師；專案分析與探索貢獻維持離線。網頁內容視為不可信資料；Claude Code 的 curl、wget 仍被拒絕（完整權限的可寫入角色除外）。",
+        "套用到 Lead、Teammates、Reviewer、Test analyst 與追問導師；專案分析與探索貢獻維持離線。網頁內容視為不可信資料；Claude Code 的 curl、wget 仍被拒絕（完整權限的可寫入角色除外）。Antigravity CLI 的網路搜尋無法關閉：使用 Antigravity 時，不論這裡怎麼設定，每個 Agent（包括專案分析與探索貢獻）都能搜尋網路；只有開啟這項設定時才能讀取網頁。",
       error: ({ message }) => `${message} 已儲存的選擇會保留。`,
       loadFailed: ({ provider }) => `暫時無法讀取 ${provider} 模型清單。`,
       reload: "重新載入",
