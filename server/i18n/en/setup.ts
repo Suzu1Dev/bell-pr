@@ -34,6 +34,9 @@ const labels: Record<DoctorCheckId, string> = {
   claude: "Claude Code",
   "claude-auth": "Claude Code sign-in",
   "claude-sandbox": "Claude Code sandbox",
+  antigravity: "Antigravity CLI",
+  "antigravity-auth": "Antigravity sign-in",
+  "antigravity-sandbox": "Antigravity sandbox",
   "provider-ready": "AI provider",
   "data-dir": "Data directory",
   app: product.name,
@@ -51,7 +54,7 @@ export default {
       maxActiveRuns: "Runs at a time",
       maxAgentProcesses: "Agent processes at a time",
       agentTimeoutScale: "Agent time limit scale",
-      allowUnsandboxedAgents: "Allow unsandboxed Claude Code agents",
+      allowUnsandboxedAgents: "Allow unsandboxed Claude Code and Antigravity agents",
       retentionDays: "Days to keep a finished run's files",
     },
     locked: ({ setting, variable }: { setting: string; variable: string }) =>
@@ -70,6 +73,7 @@ export default {
     ghMissing: `The GitHub CLI (gh) is not installed, or ${product.name} cannot find it on its PATH.`,
     codexMissing: `The Codex CLI is not installed, or ${product.name} cannot find it on its PATH.`,
     claudeMissing: `Claude Code is not installed, or ${product.name} cannot find it on its PATH.`,
+    antigravityMissing: `The Antigravity CLI (agy) is not installed, or ${product.name} cannot find it on its PATH.`,
     ghUnauthenticated:
       "The GitHub CLI is not signed in, or its sign-in expired. Sign in again, then retry.",
     githubAuthRequired:
@@ -82,6 +86,8 @@ export default {
       "Codex is not signed in, or its sign-in expired. Sign in again, then retry.",
     claudeUnauthenticated:
       "Claude Code is not signed in, or its sign-in expired. Sign in again, then retry.",
+    antigravityUnauthenticated:
+      "The Antigravity CLI is not signed in, or its sign-in expired. Run agy in a terminal to sign in, then retry.",
     cloneTimeout:
       "Cloning took longer than 10 minutes, so it was stopped. Clone the repository yourself, then import the path of your clone.",
   },
@@ -97,6 +103,8 @@ export default {
     signInCodex: "Sign in to Codex",
     installClaude: "Install Claude Code",
     signInClaude: "Sign in to Claude Code",
+    installAntigravity: "Install the Antigravity CLI",
+    signInAntigravity: "Start the Antigravity CLI once to sign in",
     setGitName: "Set your name",
     setGitEmail: "Set your e-mail address",
     setNoreplyEmail: "Use your private GitHub no-reply address",
@@ -157,6 +165,14 @@ export default {
       "Not available on this platform, so Claude Code agents cannot edit files.",
     sandboxAllowed:
       "Not available. Claude Code agents may edit files without it because you allowed that; such runs are marked.",
+    antigravitySandboxReady:
+      "Available: Antigravity agents that edit files run their commands in its terminal sandbox.",
+    antigravitySandboxRestricted:
+      "Not available: this Linux system does not let the Antigravity CLI create user namespaces (kernel.apparmor_restrict_unprivileged_userns), so Antigravity agents cannot edit files. docs/troubleshooting.md explains the options.",
+    antigravitySandboxUnsupported:
+      "Not available on this platform, so Antigravity agents cannot edit files.",
+    antigravitySandboxAllowed:
+      "Not available. Antigravity agents may edit files and run commands without it because you allowed that; such runs are marked.",
     fullAccessDisclosure,
     sudoDisclosure,
     passwordlessSudoInstalled: `BELL PR's passwordless sudo rule is installed. ${sudoDisclosure}`,
@@ -164,7 +180,7 @@ export default {
     providersReady: ({ providers }: { providers: string[] }) =>
       `Ready: ${fmt.list(providers)}.`,
     noProvider:
-      `Install and sign in to the Codex CLI or Claude Code: ${product.name} needs at least one.`,
+      `Install and sign in to the Codex CLI, Claude Code or the Antigravity CLI: ${product.name} needs at least one.`,
     savedProviderNotReady: ({ provider }: { provider: string }) =>
       `${provider} is chosen in the model settings but is not ready.`,
     /** Codex when the release switch `codexEnabled` is false. Not a failure. */

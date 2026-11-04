@@ -32,9 +32,9 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { parseArgs } from "node:util";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const providers = ["codex", "claude"];
+const providers = ["codex", "claude", "antigravity"];
 const usage = `Usage:
-  node scripts/eval-guide.mjs --real [--provider codex|claude]... [--runs 2] [--model <id>] [--out <directory>]
+  node scripts/eval-guide.mjs --real [--provider codex|claude|antigravity]... [--runs 2] [--model <id>] [--out <directory>]
   node scripts/eval-guide.mjs --score <review-sheet.md> [--baseline <last accepted sheet>]`;
 
 let options;
@@ -82,7 +82,8 @@ if (options.score) {
   process.exit(score.pass ? 0 : 1);
 }
 
-const selected = options.provider ?? providers;
+// Antigravity runs only when asked for, so a run without --provider costs what it did before.
+const selected = options.provider ?? ["codex", "claude"];
 const runs = Number(options.runs ?? 2);
 if (selected.some((provider) => !providers.includes(provider)) || !Number.isInteger(runs) || runs < 1) {
   console.error(usage);
@@ -96,9 +97,9 @@ const { withSchemaFile } = await load("server/by-hand-schemas.ts");
 
 /**
  * One read-only CLI turn under the turn's JSON Schema, as BELL starts a
- * guide turn; the final message is the answer. A file change from either
- * CLI, or a command from Claude Code (whose read turns have no shell), ends
- * the turn as a failure.
+ * guide turn; the final message is the answer. A file change from any CLI,
+ * or a command from Claude Code or Antigravity (whose read turns run no
+ * commands), ends the turn as a failure.
  */
 async function runner(call) {
   return withSchemaFile(call.schema, async (outputSchema) => {
@@ -110,7 +111,7 @@ async function runner(call) {
     let answer = "";
     let wrote = false;
     await command(cli.executable, cli.args, {
-      input: call.prompt,
+      input: cli.stdin?.(call.prompt) ?? call.prompt,
       cwd: call.cwd,
       timeoutMs: 10 * 60_000,
       maxBytes: 8_000_000,
@@ -119,7 +120,7 @@ async function runner(call) {
         if (stream !== "stdout") return;
         try {
           for (const item of read(JSON.parse(line))) {
-            if (item.kind === "file-change" || (item.kind === "command" && call.provider === "claude")) wrote = true;
+            if (item.kind === "file-change" || (item.kind === "command" && call.provider !== "codex")) wrote = true;
             if (item.kind === "message" || item.kind === "final") answer = item.text;
           }
         } catch {

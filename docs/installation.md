@@ -4,8 +4,8 @@ BELL PR runs on macOS and Linux with Node.js 22 or later. Windows uses WSL2;
 native Windows is not supported. Choose one installation method below.
 
 For real work, you also need Git, a configured Git identity, the GitHub CLI
-signed in with `gh auth login`, and either Codex CLI or Claude Code signed in
-as the same user that runs BELL PR. On Linux, Claude Code's sandbox also needs
+signed in with `gh auth login`, and one of Codex CLI, Claude Code or the
+Antigravity CLI signed in as the same user that runs BELL PR. On Linux, Claude Code's sandbox also needs
 `bubblewrap` and `socat`. See the full [requirements](getting-started.md#before-you-start).
 The Windows helper installs these tools, but sign-in stays manual.
 

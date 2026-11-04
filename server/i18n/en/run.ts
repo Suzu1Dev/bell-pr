@@ -45,6 +45,10 @@ export default {
       "Claude Code is not signed in. Run claude auth login in a terminal first.",
     codexMissing: "Codex CLI is not installed. Install it, then run codex login.",
     codexSignedOut: "Codex is not signed in. Run codex login in a terminal first.",
+    antigravityMissing:
+      "The Antigravity CLI (agy) is not installed. Install it, then run agy once in a terminal to sign in.",
+    antigravitySignedOut:
+      "The Antigravity CLI is not signed in. Run agy in a terminal and sign in first.",
     full: ({ max }: { max: number }) =>
       `Up to ${max} runs can be queued or in progress at once; wait for one to finish.`,
     teamStopped:
@@ -162,6 +166,8 @@ export default {
     /** The outcome of a shell command Claude Code ran, kept with the task's checks. */
     commandSucceeded: "succeeded",
     commandFailed: "failed",
+    /** An Antigravity command whose output did not start with its exit code. */
+    commandUnreported: "finished, exit code not reported",
     /**
      * A success that does not show the commands in the line succeeded, as in
      * `npm test | tail` (tail's status) or `npm test || true`; outcome is
@@ -173,6 +179,12 @@ export default {
     codexError: "Codex reported an error.",
     claudeTurnFailed: ({ subtype }: { subtype: string }) =>
       `The Claude Code turn failed (${subtype}).`,
+    /** status is agy's own id, such as ERROR or CANCELED. */
+    antigravityTurnFailed: ({ status }: { status: string }) =>
+      `The Antigravity turn failed (${status}).`,
+    /** agy ends a print-mode turn without an answer once it refused an action. */
+    antigravityEndedOnDenial:
+      "Antigravity refused an action this turn may not take and then ended the turn without an answer.",
     /** Each detail is left out when the CLI did not report it. */
     apiRetry: ({
       attempt,

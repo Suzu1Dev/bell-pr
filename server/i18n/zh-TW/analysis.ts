@@ -240,6 +240,9 @@ const m: Translation<typeof en> = {
   models: {
     catalogUnavailable:
       "暫時無法讀取 Codex 模型目錄。請確認 CLI 已安裝並登入，稍後再試。",
+    antigravityCatalogUnavailable:
+      "暫時無法讀取 Antigravity 模型目錄。請確認 agy CLI 已安裝並登入，稍後再試。",
+    antigravityModel: "由 Antigravity CLI 依你的帳號列出；名稱標示它的思考強度。",
     claudeOpus: "適合複雜的程式修改、審查與多步驟推理。",
     claudeSonnet: "速度與能力較平衡，適合日常開發與分析。",
     claudeFable: "能力最強，單次工作可能較久；需方案支援。",

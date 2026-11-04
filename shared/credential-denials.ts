@@ -1,7 +1,8 @@
 /**
- * Paths both agent CLIs are told not to read. Claude maps each entry to a
- * Read deny rule; Codex maps the same entries into its permission profile.
- * One function, so the two lists cannot drift.
+ * Paths every agent CLI is told not to read. Claude maps each entry to a
+ * Read deny rule, Codex maps the same entries into its permission profile
+ * and Antigravity into `read_file` deny rules. One function, so the lists
+ * cannot drift.
  *
  * The operating-system sandbox is what applies this list to shell commands.
  * The person can turn that sandbox off.
@@ -12,7 +13,7 @@ import os from "node:os";
 import path from "node:path";
 import { physicalPath } from "./physical-path.js";
 
-/** Home paths denied for both agents, plus the files that were already denied. */
+/** Home paths denied for every agent, plus the files that were already denied. */
 const staticPaths = [
   "~/.config/gh/**",
   "~/.git-credentials",
@@ -23,6 +24,9 @@ const staticPaths = [
   "~/.npmrc",
   "~/.claude/.credentials.json",
   "~/.codex/auth.json",
+  // The Antigravity CLI's saved Google sign-in and its plugins' secrets.
+  "~/.gemini/antigravity-cli/antigravity-oauth-token",
+  "~/.config/antigravity/plugin-secrets.json",
 ];
 
 function resolved(value: string) {

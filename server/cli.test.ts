@@ -428,7 +428,7 @@ test("bell-pr doctor exits 1 when no provider is ready and prints the fix comman
     assert.equal(result.code, 1, result.stderr);
     assert.match(result.stdout, /^BELL PR environment check\n/);
     assert.match(result.stdout, /✓ Git +2\.45\.1/);
-    assert.match(result.stdout, /✗ AI provider +Install and sign in to the Codex CLI or Claude Code/);
+    assert.match(result.stdout, /✗ AI provider +Install and sign in to the Codex CLI, Claude Code or the Antigravity CLI/);
     for (const command of [
       "npm install -g @openai/codex",
       "codex login",

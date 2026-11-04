@@ -18,7 +18,13 @@ import { product } from "../shared/product.js";
 import { version } from "./build-info.js";
 import { sm } from "./i18n/index.js";
 import { assertCodexProviderAllowed } from "./codex-guard.js";
-import { agentChildEnvironment, observeChild, processSpawn } from "./process.js";
+import {
+  agentChildEnvironment,
+  agentEnvironment,
+  command,
+  observeChild,
+  processSpawn,
+} from "./process.js";
 import { AppError } from "./types.js";
 
 export const modelId = z
@@ -98,9 +104,11 @@ export function parseModelPage(value: unknown) {
   return { models, nextCursor: page.nextCursor || undefined };
 }
 
-/** The only error a Codex catalog read reports, in the locale in effect. */
-function catalogError() {
-  return sm().analysis.models.catalogUnavailable;
+/** The only error a catalog read reports, in the locale in effect. */
+function catalogError(source: AgentProvider = "codex") {
+  return source === "antigravity"
+    ? sm().analysis.models.antigravityCatalogUnavailable
+    : sm().analysis.models.catalogUnavailable;
 }
 
 /** Read model metadata only: this connection never creates a thread or inference turn. */
@@ -297,30 +305,84 @@ export function claudeModelCatalog(): ModelCatalog {
   };
 }
 
-/** A cached catalog with its error in the locale of this read, not of the read that filled the cache. */
-function localized(catalog: ModelCatalog): ModelCatalog {
-  return catalog.error ? { ...catalog, error: catalogError() } : catalog;
+/**
+ * The Antigravity CLI's models from `agy models` (agy 1.5.0): after a
+ * "Fetching available models..." line, one model per line as its ID, a tab
+ * and its name. Each ID names a thinking level (gemini-4-argon-high), so no
+ * model offers a separate reasoning effort, and none is marked as the
+ * default: without a choice agy uses its own. Other lines are skipped; a
+ * repeated ID or more than 200 models make the list unusable.
+ */
+export function parseAntigravityModels(stdout: string): ModelOption[] {
+  const description = sm().analysis.models.antigravityModel;
+  const models: ModelOption[] = stdout.split(/\r?\n/).flatMap((line) => {
+    const fields = line.split("\t");
+    const id = modelId.safeParse(fields[0]);
+    if (fields.length !== 2 || !id.success) return [];
+    return [
+      {
+        id: id.data,
+        name: fields[1].trim().slice(0, 300) || id.data,
+        description,
+        isDefault: false,
+        reasoningEfforts: [],
+      },
+    ];
+  });
+  if (models.length > 200 || new Set(models.map((item) => item.id)).size !== models.length)
+    throw new Error("Unusable Antigravity model list.");
+  return models;
 }
 
-let cached: { value: ModelCatalog; expires: number } | undefined;
-let pending: Promise<ModelCatalog> | undefined;
+/** Lists models only: `agy models` starts no model turn. Run in an empty folder, like the Codex read. */
+export async function readAntigravityModelCatalog(
+  exec: typeof command = command,
+): Promise<ModelCatalog> {
+  const error = catalogError("antigravity");
+  let cwd: string | undefined;
+  try {
+    cwd = await mkdtemp(path.join(tmpdir(), "bell-models-"));
+    const { stdout } = await exec("agy", ["models"], {
+      cwd,
+      timeoutMs: 15_000,
+      maxBytes: 200_000,
+      env: agentEnvironment("antigravity"),
+    });
+    const models = parseAntigravityModels(stdout);
+    return { source: "antigravity", models, ...(models.length ? {} : { error }) };
+  } catch {
+    return { source: "antigravity", models: [], error };
+  } finally {
+    if (cwd) await rm(cwd, { recursive: true, force: true }).catch(() => {});
+  }
+}
+
+/** A cached catalog with its error in the locale of this read, not of the read that filled the cache. */
+function localized(catalog: ModelCatalog): ModelCatalog {
+  return catalog.error ? { ...catalog, error: catalogError(catalog.source) } : catalog;
+}
+
+const cached = new Map<AgentProvider, { value: ModelCatalog; expires: number }>();
+const pending = new Map<AgentProvider, Promise<ModelCatalog>>();
 export function getModelCatalog(
   provider: AgentProvider = "codex",
 ): Promise<ModelCatalog> {
   if (provider === "claude") return Promise.resolve(claudeModelCatalog());
   assertCodexProviderAllowed(provider);
-  if (cached && cached.expires > Date.now())
-    return Promise.resolve(localized(cached.value));
-  if (pending) return pending.then(localized);
-  pending = readModelCatalog()
+  const hit = cached.get(provider);
+  if (hit && hit.expires > Date.now()) return Promise.resolve(localized(hit.value));
+  const reading = pending.get(provider);
+  if (reading) return reading.then(localized);
+  const read = (provider === "antigravity" ? readAntigravityModelCatalog() : readModelCatalog())
     .then((value) => {
-      cached = { value, expires: Date.now() + (value.error ? 10_000 : 60_000) };
+      cached.set(provider, { value, expires: Date.now() + (value.error ? 10_000 : 60_000) });
       return value;
     })
     .finally(() => {
-      pending = undefined;
+      pending.delete(provider);
     });
-  return pending;
+  pending.set(provider, read);
+  return read;
 }
 
 export function resolveModelExecution(
@@ -364,6 +426,7 @@ export function resolveModelExecution(
   };
 }
 
+/** Codex's model arguments; Claude Code and Antigravity get theirs in agentCommand. */
 export function modelArguments(execution: ModelExecution): string[] {
   const value = modelExecutionSchema.parse(execution);
   return [

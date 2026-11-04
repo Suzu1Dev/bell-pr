@@ -48,7 +48,8 @@ problem.
 ### With no AI provider
 
 `bell-pr start` does not listen until every required check passes. With
-neither the Codex CLI nor Claude Code installed and signed in, it exits
+none of the Codex CLI, Claude Code and the Antigravity CLI installed and
+signed in, it exits
 and prints **Not ready**, then this line, before the commands that fix
 each check:
 

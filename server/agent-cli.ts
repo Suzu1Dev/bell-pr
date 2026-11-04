@@ -4,7 +4,7 @@ import path from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { expandHome, sharedCredentialDenials } from "../shared/credential-denials.js";
 import { physicalPath } from "../shared/physical-path.js";
-import { codexEnabled } from "../shared/codex-switch.js";
+import { codexEnabled, startsCodex } from "../shared/codex-switch.js";
 export { setCodexEnabledForTests } from "../shared/codex-switch.js";
 import {
   providerLabels,
@@ -16,20 +16,26 @@ import { modelArguments, modelExecutionSchema, modelId } from "./models.js";
 import { AppError } from "./types.js";
 import { redact } from "./secrets.js";
 import { exitStatusCanHideFailure } from "./exit-status.js";
+import { git } from "./process.js";
 import {
   agentGitWriteDenials,
   agentReadDenials,
   agentSandboxReadPaths,
+  antigravityCloneGitRead,
+  antigravityGitWriteDenials,
+  antigravityReadDenials,
+  assertNoAntigravityWorkspaceConfig,
   enforceAgentSandbox,
   inside,
 } from "./sandbox.js";
 import { cancelled, currentLocale, sm } from "./i18n/index.js";
+import { antigravityTurnNote } from "./prompts/setup.js";
 
 /** none: answer from the prompt only; read: inspect files; write: edit the working directory and run commands. */
 export type AgentAccess = "none" | "read" | "write";
 
 export interface AgentCommandOptions {
-  /** Codex receives it as -C; Claude Code uses the spawned process cwd, so callers must also pass it to command(). */
+  /** Codex receives it as -C; Claude Code and Antigravity use the spawned process cwd, so callers must also pass it to command(). */
   cwd: string;
   access: AgentAccess;
   /** JSON Schema file the final answer must match. */
@@ -379,33 +385,183 @@ export function claudeSettings(options: {
   };
 }
 
+/** Commands a write turn may not run, unless the person allowed full access. */
+const deniedWriteCommands = ["git push", "gh", "curl", "wget"];
+
+/**
+ * The `--settings` value for one Antigravity CLI turn: settings.json keys
+ * for this session only, laid over the person's own (agy 1.5.0 logged the
+ * permissions and toolPermission given here as the ones in effect). agy
+ * offers every tool to every turn and cannot narrow the list, so each turn
+ * denies what its access level does not allow, and deny rules win over the
+ * person's allow and ask rules. Every turn denies reading credential files
+ * and BELL's data outside its checkout (antigravityReadDenials), MCP tools
+ * and the browser (`execute_url`), and fetching pages unless web access is
+ * on, when only GitHub's pages are allowed. Its web search cannot be denied
+ * (docs/security-model.md).
+ *
+ * A read turn also denies writing and terminal commands; a "none" turn
+ * denies reading too. A sandboxed write turn runs its commands in agy's
+ * terminal sandbox without asking (`proceed-in-sandbox`); when the sandbox
+ * cannot start after all, agy treats that like `request-review`, so its
+ * commands are refused instead of running outside it. An unsandboxed write
+ * turn, which the person allowed, gets an allow rule for every command
+ * instead. Either kind denies pushing, the GitHub CLI and raw downloads,
+ * and writing the checkout's Git metadata, unless full access lifts them,
+ * and may read the clone's Git directory, which the sandbox mounts only
+ * when a rule allows it.
+ *
+ * Nothing in print mode can answer a permission request, so agy refuses
+ * every action that needs one; it then ends the turn without an answer
+ * (agy 1.5.0), which the event reader reports as a failure.
+ */
+export function antigravitySettings(options: {
+  cwd: string;
+  access: AgentAccess;
+  web: boolean;
+  sandbox: boolean;
+  full?: boolean;
+}): {
+  toolPermission: "proceed-in-sandbox" | "request-review";
+  enableTerminalSandbox: boolean;
+  allowNonWorkspaceAccess: false;
+  permissions: { allow: string[]; ask: []; deny: string[] };
+} {
+  const { access, cwd, web, sandbox } = options;
+  const full = options.full === true && access === "write";
+  const allow: string[] = [];
+  const deny = [
+    ...antigravityReadDenials(cwd),
+    "execute_url(*)",
+    "mcp(*)",
+    ...(web && access !== "none" ? [] : ["read_url(*)"]),
+  ];
+  if (access === "none") deny.push("read_file(*)", "write_file(*)", "command(*)");
+  if (access === "read") deny.push("write_file(*)", "command(*)");
+  if (access === "write") {
+    if (!full)
+      deny.push(
+        ...deniedWriteCommands.map((name) => `command(${name})`),
+        ...antigravityGitWriteDenials(cwd),
+      );
+    if (!sandbox && !full) allow.push("command(*)");
+    const gitRead = antigravityCloneGitRead(cwd);
+    if (gitRead) allow.push(gitRead);
+  }
+  if (web && access !== "none")
+    allow.push(...claudeWebFetchDomains.map((domain) => `read_url(${domain})`));
+  return {
+    toolPermission: access === "write" && sandbox ? "proceed-in-sandbox" : "request-review",
+    enableTerminalSandbox: sandbox,
+    allowNonWorkspaceAccess: false,
+    permissions: { allow, ask: [], deny: [...new Set(deny)] },
+  };
+}
+
+/**
+ * One Antigravity prompt on stdin: in print mode agy takes its prompt as an
+ * argument or, with `--input-format stream-json`, as NDJSON lines on stdin.
+ * BELL never passes a prompt as an argument, so it sends one `user` event,
+ * with the turn's tool note first (antigravityTurnNote).
+ */
+export function antigravityInput(
+  prompt: string,
+  access: AgentAccess,
+  web: boolean,
+  files: string[] = [],
+): string {
+  const content = `${antigravityTurnNote(access, web, files)}\n\n${prompt}`;
+  return `${JSON.stringify({ event: "user", message: { content } })}\n`;
+}
+
+/**
+ * The files of a read-only Antigravity turn's checkout: tracked ones, and
+ * new ones Git does not ignore, such as a teammate's. agy 1.5.0 gives its
+ * print-mode agent no tool to list a folder or search text (its model
+ * named read_file, write_file, edit_file, run_command and the subagent
+ * tools as all it had), and such a turn may run no command, so the paths
+ * are the way it finds what to read. Empty outside a repository.
+ */
+async function antigravityTrackedFiles(cwd: string): Promise<string[]> {
+  try {
+    const { stdout } = await git(cwd, ["ls-files", "-z", "--cached", "--others", "--exclude-standard"], {
+      timeoutMs: 15_000,
+      maxBytes: 8_000_000,
+    });
+    return stdout.split("\0").filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
 /** How to start one agent CLI turn. */
 export interface AgentCommand {
   executable: string;
   args: string[];
   /**
-   * True when a write-role Claude agent runs without the OS sandbox because
-   * the person allowed it; runAgent records it on the run (run.unsandboxed)
-   * with one notice line.
+   * True when a write-role Claude or Antigravity agent runs without the OS
+   * sandbox because the person allowed it; runAgent records it on the run
+   * (run.unsandboxed) with one notice line.
    */
   unsandboxed?: boolean;
+  /** What to write to stdin for a prompt; absent means the prompt as it is. */
+  stdin?: (prompt: string) => string;
 }
 
 /**
- * The prompt is always written to stdin; a shell is never used. A
- * write-role Claude agent needs the OS sandbox (see sandbox.ts): without it
- * this throws 503 `claude_sandbox_unavailable`, unless the person allowed
- * unsandboxed agents, which the result reports as `unsandboxed: true`.
+ * The prompt is always written to stdin (through `stdin` when the result
+ * has one); a shell is never used. A write-role Claude or Antigravity agent
+ * needs the OS sandbox (see sandbox.ts): without it this throws 503
+ * `claude_sandbox_unavailable` or `antigravity_sandbox_unavailable`, unless
+ * the person allowed unsandboxed agents, which the result reports as
+ * `unsandboxed: true`. An Antigravity turn is refused with 422
+ * `antigravity_workspace_config` in a folder whose customizations agy
+ * would load.
  */
 export async function agentCommand(
   execution: ModelExecution,
   options: AgentCommandOptions,
 ): Promise<AgentCommand> {
-  // Omitted provider means Codex. While the switch is off, neither starts.
-  if (!codexEnabled && execution.provider !== "claude")
+  // Omitted provider means Codex. While the switch is off, it does not start.
+  if (!codexEnabled && startsCodex(execution.provider))
     throw new AppError((m) => m.setup.doctor.codexDisabled, 422);
   const full = (options.full ?? execution.agentAccess === "full") && options.access === "write";
   const web = options.web === true && options.access !== "none";
+  if (execution.provider === "antigravity") {
+    assertNoAntigravityWorkspaceConfig(options.cwd);
+    const value = modelExecutionSchema.parse(execution);
+    const files = options.access === "read" ? await antigravityTrackedFiles(options.cwd) : [];
+    const { sandbox, unsandboxed } = full
+      ? { sandbox: false, unsandboxed: true }
+      : await enforceAgentSandbox("antigravity", options.access);
+    return {
+      executable: "agy",
+      args: [
+        "--input-format",
+        "stream-json",
+        "--output-format",
+        "stream-json",
+        // A prompt that starts with / stays a prompt, and skills are not expanded.
+        "--disable-slash-commands",
+        // Never the person's default `auto` mode, whose reviewer may run a command outside the sandbox.
+        "--mode",
+        "accept-edits",
+        ...(sandbox ? ["--sandbox"] : []),
+        ...(full ? ["--dangerously-skip-permissions"] : []),
+        "--settings",
+        JSON.stringify(
+          antigravitySettings({ cwd: options.cwd, access: options.access, web, sandbox, full }),
+        ),
+        // agy's model IDs name their thinking level, so no --effort is passed.
+        ...(value.model ? ["--model", value.model] : []),
+        ...(options.outputSchema
+          ? ["--json-schema", await readFile(options.outputSchema, "utf8")]
+          : []),
+      ],
+      stdin: (prompt) => antigravityInput(prompt, options.access, web, files),
+      ...(unsandboxed ? { unsandboxed: true } : {}),
+    };
+  }
   if (execution.provider === "claude") {
     const value = modelExecutionSchema.parse(execution);
     const { sandbox, unsandboxed } = full
@@ -470,8 +626,14 @@ export async function agentCommand(
   };
 }
 
-/** Exits successfully only when the CLI is installed and signed in. */
+/**
+ * Exits successfully only when the CLI is installed and signed in. agy has
+ * no status command; listing its models needs a sign-in (agy 1.5.0 exits 1
+ * with "Please sign in to view available models." without one) and starts
+ * no model turn.
+ */
 export function agentLoginCheck(provider: AgentProvider = "codex") {
+  if (provider === "antigravity") return { executable: "agy", args: ["models"] };
   return provider === "claude"
     ? { executable: "claude", args: ["auth", "status"] }
     : { executable: "codex", args: ["login", "status"] };
@@ -480,7 +642,7 @@ export function agentLoginCheck(provider: AgentProvider = "codex") {
 export type AgentEvent =
   /** Agent text; the last one is the answer unless a final event follows. */
   | { kind: "message"; text: string }
-  /** Claude Code's terminal answer, including validated structured output. */
+  /** Claude Code's or Antigravity's terminal answer, including validated structured output. */
   | { kind: "final"; text: string }
   /** command is the first line the agent ran, redacted and cut to 300 characters; absent when the CLI gave none. */
   | { kind: "command"; outcome: string; command?: string }
@@ -490,7 +652,7 @@ export type AgentEvent =
   | { kind: "notice"; message: string }
   /** detail is the search query or the fetched URL, redacted and cut to 200 characters. */
   | { kind: "web"; action: "search" | "fetch"; detail: string }
-  /** Claude Code's system/init: the resolved model and the CLI version. */
+  /** Claude Code's system/init (the resolved model and the CLI version) or Antigravity's init (the model BELL asked for). */
   | { kind: "session"; model: string; cliVersion?: string }
   /** Model IDs present in result.modelUsage; the first entry is not necessarily the main model. */
   | { kind: "usage-by-model"; models: string[] }
@@ -610,12 +772,157 @@ function systemNotice(value: Json): AgentEvent[] {
   return [];
 }
 
+/** agy's tools that edit files, as its step updates name them (write_file and edit_file seen with 1.5.0). */
+const antigravityEditTools = new Set([
+  "write_file",
+  "edit_file",
+  "write_to_file",
+  "replace_file_content",
+  "multi_replace_file_content",
+  "sed_file",
+  "notebook_edit",
+]);
+
+/** agy's own words for an action that no rule allowed or a rule denied (1.5.0). */
+const antigravityDenial = /permission check failed|denied permission/i;
+
+/** The first string among a tool's parameters under one of `keys`. */
+function parameter(parameters: unknown, keys: string[]): unknown {
+  if (!parameters || typeof parameters !== "object") return undefined;
+  const value = parameters as Json;
+  return keys.map((key) => value[key]).find((item) => typeof item === "string");
+}
+
+/**
+ * The Antigravity CLI's stream-json events (agy 1.5.0): `init`, then
+ * `step_update` for each step and `result` at the end. A command's outcome
+ * is the exit code agy puts first in its output ("Command exited with code
+ * 1."); nothing else of a tool's output is read. Text arrives as
+ * `text_delta` and is returned when its step is done. The result repeats
+ * the last text as the answer; a final answer with the same content keeps
+ * that text, so it is logged once. A denied action fails its step and is
+ * listed again in the result, which adds a notice only when no step
+ * showed it.
+ */
+function antigravityEventReader() {
+  const texts = new Map<unknown, string>();
+  let last: string | undefined;
+  let stepDenials = 0;
+  const finished = (text: string | undefined): AgentEvent[] => {
+    const trimmed = text?.trim();
+    if (!trimmed) return [];
+    last = trimmed;
+    return [{ kind: "message", text: trimmed }];
+  };
+  return (value: Json): AgentEvent[] => {
+    if (value.event === "init") {
+      const model = value.init?.model;
+      return isModelId(model) ? [{ kind: "session", model }] : [];
+    }
+    if (value.event === "step_update") {
+      const step = value.step_update;
+      if (!step || typeof step !== "object") return [];
+      if (typeof step.text_delta === "string" && step.text_delta)
+        texts.set(step.step_index, (texts.get(step.step_index) ?? "") + step.text_delta);
+      if (step.state !== "DONE" && step.state !== "ERROR") return [];
+      const events = finished(texts.get(step.step_index));
+      texts.delete(step.step_index);
+      if (step.step_type !== "tool") return events;
+      const name = String(step.tool_name ?? step.tool_info?.name ?? "");
+      const info = step.tool_info && typeof step.tool_info === "object" ? step.tool_info : {};
+      const failure =
+        step.state === "ERROR"
+          ? String(info.error?.message ?? sm().run.agentCli.commandFailed)
+          : undefined;
+      if (failure && antigravityDenial.test(failure)) {
+        stepDenials += 1;
+        events.push({
+          kind: "notice",
+          message: sm().run.agentCli.deniedTool({ tool: name, reason: summarize(failure) }),
+        });
+        return events;
+      }
+      if (name === "run_command") {
+        const command = parameter(info.parameters, ["CommandLine", "command"]);
+        const exit = /^Command exited with code (-?\d+)\./.exec(
+          typeof info.output === "string" ? info.output : "",
+        )?.[1];
+        events.push({
+          kind: "command",
+          outcome: failure
+            ? sm().run.agentCli.commandFailed
+            : exit === undefined
+              ? sm().run.agentCli.commandUnreported
+              : exit === "0" && typeof command === "string" && exitStatusCanHideFailure(command)
+                ? sm().run.agentCli.commandUnverified({ outcome: "exit 0" })
+                : `exit ${exit}`,
+          ...withField("command", summarize(command)),
+        });
+      } else if (antigravityEditTools.has(name) && !failure) {
+        events.push({
+          kind: "file-change",
+          ...withField("path", summarize(parameter(info.parameters, ["Path", "TargetFile", "AbsolutePath", "path"]))),
+        });
+      } else if (name === "search_web") {
+        events.push(...webEvent("search", parameter(info.parameters, ["query", "Query"])));
+      } else if (name === "read_url" || name === "read_url_content") {
+        events.push(...webEvent("fetch", parameter(info.parameters, ["Url", "url", "URL"])));
+      }
+      return events;
+    }
+    if (value.event === "result") {
+      const result = value.result && typeof value.result === "object" ? value.result : {};
+      const denied: Json[] = (Array.isArray(result.denied_actions) ? result.denied_actions : [])
+        .filter((item: unknown): item is Json => !!item && typeof item === "object")
+        .slice(0, 20);
+      const events: AgentEvent[] = stepDenials
+        ? []
+        : denied.flatMap((item) => {
+            const tool = item.display_name || item.action;
+            return typeof tool === "string" && tool
+              ? [{ kind: "notice" as const, message: sm().run.agentCli.deniedTool({ tool }) }]
+              : [];
+          });
+      for (const text of texts.values()) events.push(...finished(text));
+      texts.clear();
+      if (result.status !== "SUCCESS") {
+        events.push({
+          kind: "error",
+          terminal: true,
+          message:
+            typeof result.error === "string" && result.error
+              ? result.error
+              : sm().run.agentCli.antigravityTurnFailed({ status: String(result.status ?? "unknown") }),
+        });
+        return events;
+      }
+      const response = String(result.response ?? "").trim();
+      const text =
+        result.structured_output === undefined
+          ? response
+          : response && response === last
+            ? last
+            : JSON.stringify(result.structured_output);
+      if (text) events.push({ kind: "final", text });
+      else if (denied.length && !last)
+        events.push({
+          kind: "error",
+          terminal: true,
+          message: sm().run.agentCli.antigravityEndedOnDenial,
+        });
+      return events;
+    }
+    return [];
+  };
+}
+
 /**
  * Maps one parsed JSONL event to the documented events BELL uses. Command
  * strings and edited paths are kept (summarized); raw tool output, Codex
  * aggregated_output and tool_result content are never returned.
  */
 export function agentEventReader(provider: AgentProvider = "codex") {
+  const antigravity = provider === "antigravity" ? antigravityEventReader() : undefined;
   // Claude Code reports a tool's input on tool_use and its outcome on a later tool_result, keyed by id.
   const tools = new Map<
     string,
@@ -624,6 +931,7 @@ export function agentEventReader(provider: AgentProvider = "codex") {
   return (event: unknown): AgentEvent[] => {
     if (!event || typeof event !== "object") return [];
     const value = event as Json;
+    if (antigravity) return antigravity(value);
     if (provider === "codex") {
       const item = value.item;
       if (value.type === "item.completed" && item?.type === "agent_message")
@@ -799,7 +1107,7 @@ export function agentEventReader(provider: AgentProvider = "codex") {
 }
 
 /**
- * Records what Claude Code reported into execution.reported. Returns true when the main
+ * Records what Claude Code or Antigravity reported into execution.reported. Returns true when the main
  * model is new, so callers log it once. modelsUsed is a union: a second model is more
  * likely a Claude Code helper call than a fallback, since BELL never passes --fallback-model.
  */

@@ -1,6 +1,6 @@
 /**
- * Turns the failures of the tools BELL PR runs (git, gh, codex, claude)
- * into errors with a stable code and the commands that fix them: a tool
+ * Turns the failures of the tools BELL PR runs (git, gh, codex, claude,
+ * agy) into errors with a stable code and the commands that fix them: a tool
  * that is not installed, a sign-in that is missing or rejected, a Git
  * identity that is not set, or a GitHub token without the `workflow`
  * permission.
@@ -11,7 +11,11 @@
  */
 import path from "node:path";
 import type { ErrorCode, Fix } from "../shared/errors.js";
-import { agentProviders, type AgentProvider } from "../shared/models.js";
+import {
+  agentProviders,
+  providerExecutables,
+  type AgentProvider,
+} from "../shared/models.js";
 import { sm } from "./i18n/index.js";
 import { AppError, type AppErrorOptions } from "./types.js";
 
@@ -24,6 +28,7 @@ const missingCodes: Record<Tool, ErrorCode> = {
   gh: "gh_missing",
   codex: "codex_missing",
   claude: "claude_missing",
+  antigravity: "antigravity_missing",
 };
 
 /** The error codes this module gives fixes and messages for. */
@@ -32,12 +37,14 @@ export type SetupErrorCode =
   | "gh_missing"
   | "codex_missing"
   | "claude_missing"
+  | "antigravity_missing"
   | "gh_unauthenticated"
   | "github_auth_required"
   | "git_identity_missing"
   | "gh_workflow_scope"
   | "codex_unauthenticated"
   | "claude_unauthenticated"
+  | "antigravity_unauthenticated"
   | "clone_timeout";
 
 /** The tool an executable (a name or a path, also with .exe/.cmd) is. */
@@ -46,9 +53,13 @@ function toolOf(executable: string): Tool | undefined {
     .basename(executable)
     .replace(/\.(?:exe|cmd|bat)$/i, "")
     .toLowerCase();
-  return name === "git" || name === "gh" || (agentProviders as readonly string[]).includes(name)
-    ? (name as Tool)
-    : undefined;
+  if (name === "git" || name === "gh") return name;
+  return agentProviders.find((provider) => providerExecutables[provider] === name);
+}
+
+/** The code for an agent CLI that is installed but not signed in. */
+export function unauthenticatedCode(provider: AgentProvider): SetupErrorCode {
+  return `${provider}_unauthenticated`;
 }
 
 function errnoCode(value: unknown): string | undefined {
@@ -90,6 +101,13 @@ function classify(error: Error, tool: Tool): SetupErrorCode | undefined {
       return /\b401\b|Unauthorized/.test(stderr)
         ? "codex_unauthenticated"
         : undefined;
+    // agy 1.5.0 without a sign-in: "Error: authentication required. Run 'agy'
+    // to log in, then retry." for a turn, "Please sign in to view available
+    // models." for `agy models`.
+    case "antigravity":
+      return /authentication required|Please sign in/i.test(stderr)
+        ? "antigravity_unauthenticated"
+        : undefined;
   }
 }
 
@@ -126,6 +144,25 @@ export function installFixes(tool: Tool): Fix[] {
           command: "npm install -g @anthropic-ai/claude-code",
         },
       ];
+    // Google's installers; both place agy in ~/.local/bin.
+    case "antigravity":
+      return [
+        {
+          label: f.installAntigravity,
+          command: "curl -fsSL https://antigravity.google/cli/install.sh | bash",
+          platform: "darwin",
+        },
+        {
+          label: f.installAntigravity,
+          command: "curl -fsSL https://antigravity.google/cli/install.sh | bash",
+          platform: "linux",
+        },
+        {
+          label: f.installAntigravity,
+          command: "irm https://antigravity.google/cli/install.ps1 | iex",
+          platform: "win32",
+        },
+      ];
   }
 }
 
@@ -139,6 +176,9 @@ export function signInFixes(tool: Exclude<Tool, "git">): Fix[] {
       return [{ label: f.signInCodex, command: "codex login" }];
     case "claude":
       return [{ label: f.signInClaude, command: "claude auth login" }];
+    // agy has no login subcommand: started without arguments, it signs in.
+    case "antigravity":
+      return [{ label: f.signInAntigravity, command: "agy" }];
   }
 }
 
@@ -197,6 +237,8 @@ export function setupFixes(
       return [...installFixes("codex"), ...signInFixes("codex")];
     case "claude_missing":
       return [...installFixes("claude"), ...signInFixes("claude")];
+    case "antigravity_missing":
+      return [...fixesFor(installFixes("antigravity")), ...signInFixes("antigravity")];
     case "gh_unauthenticated":
     case "github_auth_required":
       return signInFixes("gh");
@@ -204,6 +246,8 @@ export function setupFixes(
       return signInFixes("codex");
     case "claude_unauthenticated":
       return signInFixes("claude");
+    case "antigravity_unauthenticated":
+      return signInFixes("antigravity");
     case "git_identity_missing":
       return identityFixes();
     case "gh_workflow_scope":
@@ -231,12 +275,14 @@ function setupMessage(code: SetupErrorCode): string {
     gh_missing: e.ghMissing,
     codex_missing: e.codexMissing,
     claude_missing: e.claudeMissing,
+    antigravity_missing: e.antigravityMissing,
     gh_unauthenticated: e.ghUnauthenticated,
     github_auth_required: e.githubAuthRequired,
     git_identity_missing: e.gitIdentityMissing,
     gh_workflow_scope: e.ghWorkflowScope,
     codex_unauthenticated: e.codexUnauthenticated,
     claude_unauthenticated: e.claudeUnauthenticated,
+    antigravity_unauthenticated: e.antigravityUnauthenticated,
     clone_timeout: e.cloneTimeout,
   };
   return messages[code];
@@ -261,7 +307,7 @@ export function setupError(
 
 /**
  * Returns `error` with a setup code and fixes when it is a known failure of
- * `executable` (git, gh, codex or claude); anything else, and an error that
+ * `executable` (git, gh, codex, claude or agy); anything else, and an error that
  * already has a code, is returned unchanged. The original error is kept as
  * the cause, and its status and details (the redacted stderr tail and the
  * exit code) stay.

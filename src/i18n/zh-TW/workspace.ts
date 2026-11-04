@@ -31,7 +31,7 @@ const m: Translation<typeof en> = {
   unsandboxed: {
     label: "未使用沙箱執行",
     tooltip:
-      "你允許 Claude agent 不經作業系統沙箱執行，因此這次任務的 agent 可能讀取或修改工作資料夾以外的檔案。請更仔細地檢查它的變更。可在安全設定中為之後的任務關閉這個選項。",
+      "你允許 agent 不經作業系統沙箱執行，因此這次任務的 agent 可能讀取或修改工作資料夾以外的檔案。請更仔細地檢查它的變更。可在安全設定中為之後的任務關閉這個選項。",
   },
   checkOff: {
     label: "理解檢查已關閉",

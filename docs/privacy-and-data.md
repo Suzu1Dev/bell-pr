@@ -18,8 +18,9 @@ BELL PR works through tools you installed and signed in to yourself. They
 send data to their providers under your own accounts, and each provider's
 privacy policy decides what it keeps and for how long.
 
-**The AI coding CLI you choose** (the Codex CLI, or Claude Code with the
-provider you set it up for). It receives:
+**The AI coding CLI you choose** (the Codex CLI, Claude Code with the
+provider you set it up for, or the Antigravity CLI with your Google account,
+Gemini API key or Google Cloud project). It receives:
 
 - the instructions BELL PR writes for each task, including the
   contribution direction you describe and the plan you approved;
@@ -89,13 +90,13 @@ off for confidential code.
 
 ### The AI CLIs' own usage data
 
-The Codex CLI and Claude Code may send their own usage data, such as
-telemetry and error reports, to their providers. BELL PR neither adds to it
+The Codex CLI, Claude Code and the Antigravity CLI may send their own usage
+data, such as telemetry and error reports, to their providers. BELL PR neither adds to it
 nor turns it off. It starts each agent with only the environment variables
 that CLI needs, plus these opt-outs when they are set in the environment
 BELL PR runs in:
 
-- `DO_NOT_TRACK`, passed to both CLIs;
+- `DO_NOT_TRACK`, passed to every CLI;
 - for Claude Code, the variables it documents: `DISABLE_TELEMETRY`,
   `DISABLE_ERROR_REPORTING`, `DISABLE_BUG_COMMAND`,
   `CLAUDE_CODE_DISABLE_FEEDBACK_SURVEY`, and
@@ -119,6 +120,16 @@ and the other settings that still apply. With auto memory off, Claude Code
 keeps no notes about the projects you imported in `~/.claude/projects/`.
 Earlier BELL PR versions left it on, so such notes may already exist there;
 see [Deleting data](#deleting-data).
+
+Antigravity agents load your Antigravity CLI settings
+(`~/.gemini/antigravity-cli/settings.json`), with BELL PR's permission
+rules for each turn laid over them, and your customizations in
+`~/.gemini/config`. The Antigravity CLI has no option to keep a conversation
+from being saved: every agent turn BELL PR starts is kept as a conversation
+under `~/.gemini/antigravity-cli/` (its `conversations` folder and the
+summaries next to it), with the prompts, the files the agent read and the
+command output in it. Its telemetry setting is saved with your account
+(`/config` in the CLI). See [Deleting data](#deleting-data).
 
 ## What BELL PR stores
 
@@ -169,6 +180,7 @@ this reaches the server's data directory.
 | Everything | **Settings → Data & privacy → Delete all data**, then type `ERASE`. Every project, run, analysis, discovery result, log and backup is deleted; your settings stay. Stop running work first. |
 | The sample project's progress | **Settings → General → Reset sample project** (this browser only). |
 | BELL PR itself | Stop it, delete the data directory (`~/.bellpr` by default), and uninstall with `npm uninstall -g bell-pr`. A copy run through `npx` sits in npm's cache. |
+| Antigravity conversations of BELL PR's agents | BELL PR never deletes them, and deleting its data directory does not remove them. Delete them in the Antigravity CLI (`agy`, then `/resume`), or remove the files under `~/.gemini/antigravity-cli/conversations`. |
 | Claude Code memory notes from earlier BELL PR versions | BELL PR never deletes them, and deleting its data directory does not remove them. In `~/.claude/projects/` (or `projects/` in the folder `CLAUDE_CONFIG_DIR` names), delete the folders named after BELL PR's checkouts and clones: the path with each `/` and `.` written as `-`, so for `~/.bellpr` the name contains `--bellpr-`. |
 
 Data you sent to GitHub or to your AI provider is under that service's

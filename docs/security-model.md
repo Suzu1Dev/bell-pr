@@ -1,7 +1,7 @@
 # BELL PR security model
 
 BELL PR runs on your own computer. It starts the agent CLIs you installed and
-signed in to (OpenAI Codex CLI or Claude Code) on projects you import, and it
+signed in to (OpenAI Codex CLI, Claude Code or Google's Antigravity CLI) on projects you import, and it
 publishes to GitHub only what you reviewed and approved. This page describes
 what BELL PR trusts, what it does not, and the limits of each protection.
 
@@ -38,7 +38,7 @@ what BELL PR trusts, what it does not, and the limits of each protection.
   token or a paired device credential. A missing or wrong value is rejected
   and changes nothing. Whoever holds a valid credential can use what that
   credential allows: the install token can do everything BELL PR can do
-  (start agents with your Codex or Claude Code account and publish with
+  (start agents with your Codex, Claude Code or Antigravity account and publish with
   your `gh` login). Pair with `bell-pr pair`. Manage devices from the
   device list in Settings; on the host use `bell-pr devices list` and
   `bell-pr devices revoke <id>`. Browser auth is the install token handoff
@@ -83,8 +83,11 @@ its own sign-in variables. Claude Code receives every authentication method
 it supports (a Claude subscription login, `ANTHROPIC_API_KEY` or
 `ANTHROPIC_AUTH_TOKEN`, a gateway, Amazon Bedrock, Google Vertex AI and
 Microsoft Foundry); BELL PR never restricts or reads them. Codex receives
-`CODEX_HOME`, `OPENAI_API_KEY` and `CODEX_API_KEY`. Neither receives the
-other's keys. `GH_TOKEN` and `GITHUB_TOKEN` are removed from the agent
+`CODEX_HOME`, `OPENAI_API_KEY` and `CODEX_API_KEY`. The Antigravity CLI
+receives `GEMINI_API_KEY`, `GOOGLE_GEMINI_BASE_URL`, `AGY_ADC_AUTH`,
+`GOOGLE_APPLICATION_CREDENTIALS`, `CLOUDSDK_CONFIG`,
+`GOOGLE_CLOUD_QUOTA_PROJECT` and `GOOGLE_CLOUD_LOCATION`. None receives
+another's keys. `GH_TOKEN` and `GITHUB_TOKEN` are removed from the agent
 child's environment when the process is spawned (`agentChildEnvironment`
 in `server/process.ts`), including when the sandbox is off. Other
 variables passed to that child are left in place. BELL PR's own `gh`
@@ -92,7 +95,7 @@ calls and git commands that talk to GitHub (`gitNetwork`) still receive
 the tokens. Every other server git command gets an allowlist
 (`gitChildEnv`) and does not.
 Usage-data opt-outs that you set also pass through, unchanged: `DO_NOT_TRACK`
-to both CLIs, and `DISABLE_TELEMETRY`, `DISABLE_ERROR_REPORTING`,
+to every CLI, and `DISABLE_TELEMETRY`, `DISABLE_ERROR_REPORTING`,
 `DISABLE_BUG_COMMAND`, `CLAUDE_CODE_DISABLE_FEEDBACK_SURVEY` and
 `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` to Claude Code (see
 [Privacy and your data](privacy-and-data.md#the-ai-clis-own-usage-data)).
@@ -106,6 +109,10 @@ to both CLIs, and `DISABLE_TELEMETRY`, `DISABLE_ERROR_REPORTING`,
 - Codex runs with `--ignore-user-config`, `--ignore-rules` (no execpolicy
   `.rules` files) and `-c project_doc_max_bytes=0`, so the target
   repository's `AGENTS.md` is never loaded as instructions.
+- The Antigravity CLI has no such options. BELL PR refuses to start it in a
+  project with Antigravity hooks, MCP servers, plugins, custom agents or
+  skills, and it still reads the project's `AGENTS.md`, `GEMINI.md` and
+  `.agents/rules` as instructions (see [Antigravity](#antigravity)).
 - Prompts mark repository text, reports and feedback as untrusted data.
 
 ### Your own Claude Code settings
@@ -347,13 +354,108 @@ Full access changes writable roles as described [below](#explicit-full-access).
   allowed. The profile does not name the system keyring (Secret Service,
   D-Bus, or Keychain).
 
+### Antigravity
+
+BELL PR starts the Antigravity CLI (`agy`) in print mode with
+`--input-format stream-json` (the prompt goes to stdin as one `user`
+event, never as an argument), `--output-format stream-json`,
+`--disable-slash-commands`, `--mode accept-edits` (never the CLI's `auto`
+mode, whose reviewer may let a command leave the sandbox) and a
+`--settings` value for that turn only (`antigravitySettings` in
+`server/agent-cli.ts`). What follows was checked with agy 1.5.0 on Linux
+against BELL PR's own test folders; the [canary](#agent-sandbox-canary)
+does not cover Antigravity yet.
+
+- **What cannot be turned off.** agy offers every tool to every turn
+  (files, terminal, web, browser, subagents, scheduling, image generation
+  and its own knowledge store) and has no option to narrow that list or to
+  skip a project's customizations. So:
+  - BELL PR refuses to start it in a folder whose `.agents`, `.agent`,
+    `_agents` or `_agent` folder, in the working folder or above it up to
+    the repository root, has hooks, MCP servers, plugins, custom agents or
+    skills (`antigravity_workspace_config`). agy 1.5.0 ran a repository's
+    `SessionStart` and `PreInvocation` hooks in print mode, outside any
+    sandbox, in a folder that was not in its `trustedWorkspaces`. The check
+    runs before every turn, so a file an agent created stops the next one.
+  - It still reads the project's `AGENTS.md`, `GEMINI.md` and
+    `.agents/rules/*.md` as instructions. Prompts mark repository text as
+    untrusted data.
+  - Its web search (`search_web`) cannot be denied: it ran with
+    `read_url(*)` and every other action denied. With Antigravity, every
+    agent, project analysis and discovery included, may search the web.
+    Each turn's note asks agents without web access not to, and every
+    search is logged.
+  - Your own customizations in `~/.gemini/config` (hooks, MCP servers,
+    plugins, skills) still load. Your hooks run; MCP tools are denied
+    (`mcp(*)`), but their servers start.
+- **Deny rules** win over your own allow and ask rules, in every mode.
+  Every turn denies `read_file` on the shared credential list (expanded
+  to absolute paths, a `X/**` entry as the directory X; agy refused a file
+  inside a denied directory) and on BELL PR's data directory outside the
+  checkout. Globs are not part of agy's rule syntax, so the data directory
+  is denied by name: every other entry on the way down to the checkout,
+  and `insights`. A file that appears at the data directory's top level
+  during a turn is not covered, as it is for Claude Code. MCP tools, the
+  browser (`execute_url`) and page reads (`read_url`) are denied too,
+  page reads unless web access is on, when `github.com`, `docs.github.com`
+  and `raw.githubusercontent.com` are allowed. `allowNonWorkspaceAccess`
+  is false, yet a read-only turn read `/etc/hostname` and a file in another
+  project under a folder listed in agy's own `trustedWorkspaces`: a read
+  outside the checkout that no rule denies may be allowed, as in Codex's
+  read-only sandbox. Read-only roles also deny `write_file(*)` and
+  `command(*)`; project analysis and discovery also deny `read_file(*)`.
+- **Read-only turns cannot list or search.** agy's print-mode agent has no
+  folder listing or text search of its own; it lists and searches through
+  terminal commands or subagents. So BELL PR puts the checkout's file
+  names (`git ls-files`, tracked files and new ones Git does not ignore,
+  at most 2,000) into the turn's note, marked as untrusted data, and the
+  agent reads files by path.
+- **Subagents, background tasks and schedules** have no permission rule.
+  agy 1.5.0 ended a print-mode turn while a research subagent it had
+  started was still working, without the answer, so each turn's note asks
+  the agent to work alone. A subagent inherits the turn's permission
+  rules.
+- **Write roles** run their commands in agy's terminal sandbox
+  (`--sandbox`, `toolPermission: "proceed-in-sandbox"`). Google documents
+  it as user namespaces on Linux and `sandbox-exec` on macOS, with the
+  project folder writable, temporary folders and common build caches
+  writable, system folders readable, every other path invisible unless a
+  rule allows it, and no network. BELL PR allows `read_file` on the
+  clone's Git directory, so Git works inside it, and denies `write_file`
+  on the checkout's `.git` and on the clone's hooks and configuration, as
+  well as `git push`, `gh`, `curl` and `wget`. BELL PR has not seen that
+  sandbox run: on Ubuntu 24.04 and later,
+  `kernel.apparmor_restrict_unprivileged_userns = 1` keeps it from
+  starting. BELL PR reads the same settings and refuses such a turn
+  (`antigravity_sandbox_unavailable`) unless you allowed unsandboxed
+  agents. When the sandbox fails to start anyway, agy treats
+  `proceed-in-sandbox` like `request-review` and refuses the commands
+  instead of running them outside it.
+- **Unsandboxed write roles** (Settings → Agent safety) get an allow rule
+  for every command; the deny rules above still apply, and the commands
+  run with your account. **Full access** passes
+  `--dangerously-skip-permissions` and lifts the command and Git denials;
+  the credential, data directory, MCP, browser and page denials stay.
+- **A denial ends the turn.** Nothing in print mode can answer a
+  permission request, so agy refuses the action and then ends the turn
+  without an answer. BELL PR reports that as a failed turn and logs the
+  denied action.
+- **Sign-in files.** `~/.gemini/antigravity-cli/antigravity-oauth-token`
+  and `~/.config/antigravity/plugin-secrets.json` are on the shared
+  denial list, for every agent.
+- **What the CLI keeps.** agy saves every conversation under
+  `~/.gemini/antigravity-cli/`, and nothing turns that off (see
+  [Privacy and your data](privacy-and-data.md)).
+
 ### Explicit full access
 
 Model settings offer **Full access** for roles that write files: implementation,
 collaborative sessions, follow-up fixes and conflict resolution. It is off by
 default and is recorded with the run's model settings. These roles use Codex's
-`--sandbox danger-full-access` or Claude Code's `bypassPermissions` mode without
-its Bash sandbox. Claude turns using it are marked as unsandboxed. Lead,
+`--sandbox danger-full-access`, Claude Code's `bypassPermissions` mode without
+its Bash sandbox, or the Antigravity CLI's `--dangerously-skip-permissions`
+without its terminal sandbox. Claude and Antigravity turns using it are
+marked as unsandboxed. Lead,
 reviewer, test analyst, project analysis and other read-only roles keep their
 restrictions. Learn by hand never gains a writable agent from this setting.
 

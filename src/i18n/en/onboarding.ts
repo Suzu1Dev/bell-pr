@@ -31,8 +31,8 @@ export default {
     text: "Agents use the provider you choose here for runs and project analysis. You can change it later in the model settings.",
     auto: ({ provider }: { provider: string }) =>
       `${provider} is installed and signed in, so your agents use it.`,
-    choose: "Both providers are ready. Which one should your agents use?",
-    none: "No provider is ready yet. Install and sign in to the Codex CLI or Claude Code (see the previous step), then check again. You can still take the sample tour.",
+    choose: "More than one provider is ready. Which one should your agents use?",
+    none: "No provider is ready yet. Install and sign in to the Codex CLI, Claude Code or the Antigravity CLI (see the previous step), then check again. You can still take the sample tour.",
     checking: "Checking which providers are ready…",
     saving: "Saving…",
     saved: ({ provider }: { provider: string }) => `Your agents use ${provider}.`,
@@ -42,6 +42,8 @@ export default {
       "Uses the Codex CLI you installed and signed in to. Usage counts against your own account.",
     claudeNote:
       "Uses the Claude Code CLI you installed and signed in to (Claude plan or Anthropic API key). Usage counts against your own account.",
+    antigravityNote:
+      "Uses the Antigravity CLI (agy) you installed and signed in to (Google account, Gemini API key or Google Cloud credentials). Usage counts against your own account.",
   },
   start: {
     title: "Where do you want to start?",

@@ -1,8 +1,9 @@
 /**
  * Environment checks behind `bell-pr doctor`, GET /api/doctor, GET
  * /api/status and the setup checklist: Node.js, Git and the identity
- * commits need, the GitHub CLI with its sign-in and permissions, the Codex
- * and Claude Code CLIs with their sign-ins, Claude Code's sandbox, the data
+ * commits need, the GitHub CLI with its sign-in and permissions, the Codex,
+ * Claude Code and Antigravity CLIs with their sign-ins, the Claude Code and
+ * Antigravity sandboxes, the data
  * directory, the app, the platform, saved full access, and passwordless
  * sudo (BELL PR's rule file, or another rule).
  *
@@ -25,6 +26,7 @@ import type { Fix } from "../shared/errors.js";
 import { codexEnabled } from "../shared/codex-switch.js";
 import {
   agentProviders,
+  providerExecutables,
   providerLabels,
   type AgentAccessMode,
   type AgentProvider,
@@ -48,6 +50,7 @@ import { sm } from "./i18n/index.js";
 import { agentEnvironment, command, git, gitInvocationPrefix, redact } from "./process.js";
 import {
   allowUnsandboxedAgents,
+  detectAntigravitySandbox,
   detectClaudeSandbox,
   forgetClaudeSandboxDetection,
   type SandboxDetection,
@@ -116,6 +119,9 @@ interface Facts {
   claude: ToolFacts;
   claudeAuth?: AgentAuthFacts;
   sandbox?: SandboxDetection;
+  antigravity: ToolFacts;
+  antigravityAuth?: AgentAuthFacts;
+  antigravitySandbox?: SandboxDetection;
   dataDir?: {
     path: string;
     exists: boolean;
@@ -409,6 +415,20 @@ async function probeClaudeAuth(exec: DoctorExec): Promise<AgentAuthFacts> {
   }
 }
 
+/** Signed in when `agy models` lists models (see agentLoginCheck). */
+async function probeAntigravityAuth(exec: DoctorExec): Promise<AgentAuthFacts> {
+  const login = agentLoginCheck("antigravity");
+  try {
+    await exec(login.executable, login.args, {
+      ...execOptions,
+      env: agentEnvironment("antigravity"),
+    });
+    return { signedIn: true };
+  } catch {
+    return { signedIn: false };
+  }
+}
+
 async function probeDataDir(directory: string): Promise<Facts["dataDir"]> {
   const resolved = path.resolve(directory);
   // A data directory that does not exist yet is created in its parent.
@@ -472,7 +492,7 @@ async function probe(exec: DoctorExec, dataDir?: string): Promise<Facts> {
         : args,
       options,
     );
-  const [git, gh, codex, claude, dataDirFacts] = await Promise.all([
+  const [git, gh, codex, claude, antigravity, dataDirFacts] = await Promise.all([
     probeTool(run, "git"),
     probeTool(exec, "gh"),
     // The switch off must not start Codex. Presence is a PATH check only.
@@ -480,9 +500,18 @@ async function probe(exec: DoctorExec, dataDir?: string): Promise<Facts> {
       ? probeTool(exec, "codex", agentEnvironment("codex"))
       : codexOnPath(),
     probeTool(exec, "claude", agentEnvironment("claude")),
+    probeTool(exec, "agy", agentEnvironment("antigravity")),
     dataDir ? probeDataDir(dataDir).catch(() => undefined) : undefined,
   ]);
-  const [identity, github, codexAuth, claudeAuth, sandbox] = await Promise.all([
+  const [
+    identity,
+    github,
+    codexAuth,
+    claudeAuth,
+    sandbox,
+    antigravityAuth,
+    antigravitySandbox,
+  ] = await Promise.all([
     git.state === "ok"
       ? probeGitIdentity((args, options) =>
           run("git", args, { ...options, cwd: os.tmpdir() }),
@@ -494,6 +523,10 @@ async function probe(exec: DoctorExec, dataDir?: string): Promise<Facts> {
     claude.state === "ok"
       ? detectClaudeSandbox().catch(() => undefined)
       : undefined,
+    antigravity.state === "ok" ? probeAntigravityAuth(exec) : undefined,
+    antigravity.state === "ok"
+      ? detectAntigravitySandbox().catch(() => undefined)
+      : undefined,
   ]);
   return {
     checkedAt: new Date().toISOString(),
@@ -501,11 +534,14 @@ async function probe(exec: DoctorExec, dataDir?: string): Promise<Facts> {
     gh,
     codex,
     claude,
+    antigravity,
     ...(identity ? { identity } : {}),
     ...(github ? { github } : {}),
     ...(codexAuth ? { codexAuth } : {}),
     ...(claudeAuth ? { claudeAuth } : {}),
     ...(sandbox ? { sandbox } : {}),
+    ...(antigravityAuth ? { antigravityAuth } : {}),
+    ...(antigravitySandbox ? { antigravitySandbox } : {}),
     ...(dataDirFacts ? { dataDir: dataDirFacts } : {}),
   };
 }
@@ -596,14 +632,20 @@ export function claudeVersionSupported(version?: string): boolean {
   );
 }
 
+/** What the probes found about a provider's sign-in. */
+function authFacts(facts: Facts, provider: AgentProvider) {
+  return { codex: facts.codexAuth, claude: facts.claudeAuth, antigravity: facts.antigravityAuth }[
+    provider
+  ];
+}
+
 /** The providers that are installed and signed in, Codex first. */
 function readyProviders(facts: Facts): AgentProvider[] {
-  return agentProviders.filter((provider) =>
-    provider === "codex"
-      ? codexEnabled &&
-        facts.codex.state === "ok" &&
-        facts.codexAuth?.signedIn === true
-      : facts.claude.state === "ok" && facts.claudeAuth?.signedIn === true,
+  return agentProviders.filter(
+    (provider) =>
+      (provider !== "codex" || codexEnabled) &&
+      facts[provider].state === "ok" &&
+      authFacts(facts, provider)?.signedIn === true,
   );
 }
 
@@ -667,16 +709,18 @@ function buildReport(
   const checks: DoctorCheck[] = [];
   const add = (check: DoctorCheck) => checks.push(check);
   /** A tool that is installed but failed its `--version` probe. */
-  const notWorking = (tool: "git" | "gh" | AgentProvider, probed: ToolFacts) =>
-    probed.state === "timeout"
+  const notWorking = (tool: "git" | "gh" | AgentProvider, probed: ToolFacts) => {
+    const executable = tool === "git" || tool === "gh" ? tool : providerExecutables[tool];
+    return probed.state === "timeout"
       ? { reason: "not-responding", detail: m.notResponding }
       : {
           reason: "broken",
           detail: probed.error
-            ? m.versionFailedWith({ command: `${tool} --version`, output: probed.error })
-            : m.versionFailed({ command: `${tool} --version` }),
+            ? m.versionFailedWith({ command: `${executable} --version`, output: probed.error })
+            : m.versionFailed({ command: `${executable} --version` }),
           ...fixes(installFixes(tool)),
         };
+  };
 
   const nodeMajor = Number(process.versions.node.split(".")[0]);
   add({
@@ -836,7 +880,7 @@ function buildReport(
       continue;
     }
     const tool = facts[provider];
-    const auth = provider === "codex" ? facts.codexAuth : facts.claudeAuth;
+    const auth = authFacts(facts, provider);
     add({
       id: provider,
       required: false,
@@ -863,7 +907,7 @@ function buildReport(
           : { status: "warn", ...notWorking(provider, tool) }),
     });
     add({
-      id: provider === "codex" ? "codex-auth" : "claude-auth",
+      id: `${provider}-auth`,
       required: false,
       ...(!auth
         ? { status: "skip" }
@@ -876,6 +920,26 @@ function buildReport(
               ...fixes(signInFixes(provider)),
             }),
     });
+    if (provider === "antigravity") {
+      const sandbox = facts.antigravitySandbox;
+      add({
+        id: "antigravity-sandbox",
+        required: false,
+        ...(!sandbox
+          ? { status: "skip" }
+          : sandbox.available
+            ? { status: "ok", detail: m.antigravitySandboxReady }
+            : allowUnsandboxedAgents()
+              ? { status: "warn", reason: "allowed", detail: m.antigravitySandboxAllowed }
+              : {
+                  status: "warn",
+                  reason: sandbox.reason?.split(":")[0] ?? "unavailable",
+                  detail: sandbox.reason?.startsWith("restricted:")
+                    ? m.antigravitySandboxRestricted
+                    : m.antigravitySandboxUnsupported,
+                }),
+      });
+    }
     if (provider === "claude") {
       const sandbox = facts.sandbox;
       // Read for each report, so a changed opt-in shows before the next probe.
@@ -1143,13 +1207,13 @@ export async function knownDoctorReport(
   return options.stale ? reportFrom(await entry.facts, { dataDir }) : runDoctor({ dataDir });
 }
 
-/** The default provider the report suggests: Claude Code when it is the only one ready. */
+/** The default provider the report suggests: Claude Code or Antigravity when it is the only one ready. */
 export function defaultProviderFrom(
   report: DoctorReport | undefined,
 ): AgentProvider | undefined {
   const providers = report?.checks.find((check) => check.id === "provider-ready")
     ?.params?.providers;
-  return providers === "claude" ? "claude" : undefined;
+  return providers === "claude" || providers === "antigravity" ? providers : undefined;
 }
 
 /** The legacy shape of GET /api/status and Workbench.status(). */
@@ -1158,6 +1222,9 @@ export interface CliStatus {
   codexAuthenticated: boolean;
   claude: boolean;
   claudeAuthenticated: boolean;
+  /** Added with the Antigravity provider; absent means not installed. */
+  antigravity?: boolean;
+  antigravityAuthenticated?: boolean;
   /** gh is installed and signed in, and GitHub answered. */
   github: boolean;
   githubUser?: string;
@@ -1176,6 +1243,8 @@ export function cliStatus(report: DoctorReport): CliStatus {
     codexAuthenticated: ok("codex-auth"),
     claude: toolUsable(check("claude")),
     claudeAuthenticated: ok("claude-auth"),
+    antigravity: ok("antigravity"),
+    antigravityAuthenticated: ok("antigravity-auth"),
     github: ok("gh-auth"),
     ...(typeof login === "string" ? { githubUser: login } : {}),
     ready: report.ready,

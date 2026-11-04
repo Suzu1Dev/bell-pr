@@ -303,7 +303,7 @@ function ProviderStep({
   }, [onlyOne, choose]);
 
   const note = (provider: AgentProvider) =>
-    provider === "claude" ? t.claudeNote : t.codexNote;
+    ({ codex: t.codexNote, claude: t.claudeNote, antigravity: t.antigravityNote })[provider];
 
   return (
     <div className="welcome-body">

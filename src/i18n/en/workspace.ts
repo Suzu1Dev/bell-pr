@@ -37,11 +37,11 @@ const workspace = {
     draft: "PR draft",
     commits: "Commit history",
   },
-  /** The badge of a run whose Claude Code agent ran without the OS sandbox. */
+  /** The badge of a run whose Claude Code or Antigravity agent ran without the OS sandbox. */
   unsandboxed: {
     label: "Ran without sandbox",
     tooltip:
-      "You allowed Claude agents to run without the operating system's sandbox, so an agent of this run could read or change files outside its working folder. Check its changes with extra care. The safety settings turn this off for new runs.",
+      "You allowed agents to run without the operating system's sandbox, so an agent of this run could read or change files outside its working folder. Check its changes with extra care. The safety settings turn this off for new runs.",
   },
   /**
    * The badge of a run approved without the understanding check, or one

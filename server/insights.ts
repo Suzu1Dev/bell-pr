@@ -56,9 +56,9 @@ import { respondIn } from "./prompt-language.js";
 import { AppError, type Repository } from "./types.js";
 import { lenientRead } from "./persisted-schema.js";
 import { locales, type Locale } from "../shared/i18n/locale.js";
-import { setupError, withCliSetupHint } from "./cli-errors.js";
+import { setupError, signInFixes, unauthenticatedCode, withCliSetupHint } from "./cli-errors.js";
 import {
-  codexEnabled,
+  activeProvider,
   codexSelectionBlocked,
   presentedModelSettings,
 } from "../shared/codex-switch.js";
@@ -1240,7 +1240,7 @@ export class ProjectInsightsService {
       const settings = await this.getSettings(repoId);
       if (codexSelectionBlocked(settings.provider))
         throw new AppError((m) => m.setup.doctor.codexDisabled, 422);
-      const provider = codexEnabled ? (settings.provider ?? "codex") : "claude";
+      const provider = activeProvider(settings.provider);
       const login = agentLoginCheck(provider);
       try {
         await this.execute(login.executable, login.args, {
@@ -1259,22 +1259,12 @@ export class ProjectInsightsService {
           (m) =>
             m.analysis.insights.agentUnavailable({
               agent: agentLabel(provider),
-              login:
-                login.executable === "claude"
-                  ? "claude auth login"
-                  : "codex login",
+              login: signInFixes(provider)[0].command,
             }),
           503,
           {
-            code:
-              provider === "claude"
-                ? "claude_unauthenticated"
-                : "codex_unauthenticated",
-            fixes: setupError(
-              provider === "claude"
-                ? "claude_unauthenticated"
-                : "codex_unauthenticated",
-            ).fixes,
+            code: unauthenticatedCode(provider),
+            fixes: setupError(unauthenticatedCode(provider)).fixes,
             cause: error,
           },
         );
@@ -1391,7 +1381,7 @@ export class ProjectInsightsService {
               timeoutMs,
             );
             await this.execute(cli.executable, cli.args, {
-              input,
+              input: cli.stdin?.(input) ?? input,
               cwd: temporary,
               env: agentEnvironment(modelExecution.provider ?? "codex"),
               signal,
