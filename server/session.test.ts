@@ -241,23 +241,23 @@ test("while a turn runs, other edits and publishing are refused and the person c
     );
     await assert.rejects(
       f.workbench.draft(f.run.id, { ...f.run.draft, title: "Other" }),
-      conflict(/Agent 正在修改程式碼/),
+      conflict(/Agent 正在這個工作目錄中作業/),
     );
     await assert.rejects(
       f.workbench.approve(f.run.id, { ...f.run.draft }),
-      conflict(/Agent 正在修改程式碼/),
+      conflict(/Agent 正在這個工作目錄中作業/),
     );
     await assert.rejects(
       f.workbench.publish(f.run.id, "b".repeat(64)),
-      conflict(/Agent 正在修改程式碼/),
+      conflict(/Agent 正在這個工作目錄中作業/),
     );
     await assert.rejects(
       f.workbench.rerunReview(f.run.id),
-      conflict(/Agent 正在修改程式碼/),
+      conflict(/Agent 正在這個工作目錄中作業/),
     );
     await assert.rejects(
       f.workbench.split(f.run.id, { contributions: [] }),
-      conflict(/Agent 正在修改程式碼/),
+      conflict(/Agent 正在這個工作目錄中作業/),
     );
     await assert.rejects(
       f.workbench.removeWorkspace(f.run.id),
@@ -273,11 +273,11 @@ test("while a turn runs, other edits and publishing are refused and the person c
     );
     await assert.rejects(
       f.workbench.saveNote(f.run.id, "hello.ts", "A note"),
-      conflict(/Agent 正在修改程式碼/),
+      conflict(/Agent 正在這個工作目錄中作業/),
     );
     await assert.rejects(
       f.workbench.contribution.saveTestReasons(f.run.id, {}),
-      conflict(/Agent 正在修改程式碼/),
+      conflict(/Agent 正在這個工作目錄中作業/),
     );
     await f.workbench.cancel(f.run.id);
     assert.equal(f.run.session!.running, false);

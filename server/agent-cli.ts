@@ -469,8 +469,9 @@ export function antigravityInput(
   access: AgentAccess,
   web: boolean,
   files: string[] = [],
+  full = false,
 ): string {
-  const content = `${antigravityTurnNote(access, web, files)}\n\n${prompt}`;
+  const content = `${antigravityTurnNote(access, web, files, full)}\n\n${prompt}`;
   return `${JSON.stringify({ event: "user", message: { content } })}\n`;
 }
 
@@ -562,7 +563,7 @@ export async function agentCommand(
           ? ["--json-schema", await readFile(options.outputSchema, "utf8")]
           : []),
       ],
-      stdin: (prompt) => antigravityInput(prompt, options.access, web, files),
+      stdin: (prompt) => antigravityInput(prompt, options.access, web, files, full),
       ...(unsandboxed ? { unsandboxed: true } : {}),
     };
   }

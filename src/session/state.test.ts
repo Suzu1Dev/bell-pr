@@ -7,6 +7,7 @@ import {
   sessionAwaitsAnswer,
   sessionMovedFiles,
   sessionTurnBlock,
+  setupHandOffShown,
   showSessionTab,
   type SessionRun,
 } from "./state";
@@ -45,7 +46,7 @@ test("a new agent turn is blocked with the reason the server would give", () => 
   assert.equal(sessionTurnBlock(run({ status: "approved" })), undefined);
   assert.match(
     sessionTurnBlock(run({ session: session({ running: true, startedAt: "t" }) })) ?? "",
-    /agent is editing code/,
+    /agent is working in this checkout/,
   );
   assert.match(sessionTurnBlock(run({ publishing: true })) ?? "", /PR is being submitted/);
   assert.match(sessionTurnBlock(run({ status: "published" })) ?? "", /review follow-up/);
@@ -146,4 +147,19 @@ test("Learn by hand never offers writable sessions and an ongoing review blocks 
   assert.equal(showSessionTab(run({ learnByHand: true, session: session() }), false), false);
   assert.match(sessionTurnBlock(run({ learnByHand: true })) ?? "", /Learn by hand/);
   assert.match(sessionTurnBlock(run({ agents: [{ status: "running" }] as SessionRun["agents"] })) ?? "", /still running/);
+});
+
+test("the setup hand-off is offered only on a Full access run whose collaboration turns can still run", () => {
+  const full = { source: "cli-default" as const, agentAccess: "full" as const };
+  const offered = (overrides: Partial<Parameters<typeof setupHandOffShown>[0]>, demo = false) =>
+    setupHandOffShown({ ...run(), modelExecution: full, ...overrides }, demo);
+  assert.equal(offered({}), true);
+  assert.equal(offered({ status: "approved" }), true);
+  assert.equal(offered({}, true), false);
+  assert.equal(offered({ learnByHand: true }), false);
+  assert.equal(offered({ modelExecution: { source: "cli-default" } }), false);
+  assert.equal(offered({ modelExecution: undefined }), false);
+  for (const status of ["queued", "running", "awaiting_plan", "published", "failed", "cancelled"] as const)
+    assert.equal(offered({ status }), false, status);
+  assert.equal(offered({ workspaceRemovedAt: "2026-11-01T00:00:00Z" }), false);
 });

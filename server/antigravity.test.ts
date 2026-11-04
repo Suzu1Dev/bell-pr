@@ -241,6 +241,11 @@ test("an unsandboxed write turn the person allowed gets every command but keeps 
   for (const rule of ["mcp(*)", "execute_url(*)", "read_url(*)"])
     assert.ok(fullSettings.permissions.deny.includes(rule), rule);
   assert.ok(fullSettings.permissions.deny.some((rule) => rule.endsWith(`${path.sep}.ssh)`)));
+  // The tool note says what this turn really may not do: with Full access, curl, wget, gh and push are allowed.
+  const note = (cli: { stdin?: (prompt: string) => string }) => JSON.parse(cli.stdin!("x")).message.content as string;
+  assert.match(note(unsandboxed), /^Tool note: Pushing, the GitHub CLI, curl and wget, reading credential files/);
+  assert.match(note(full), /^Tool note: Reading credential files, web pages, the browser and MCP tools are denied\./);
+  assert.doesNotMatch(note(full), /curl|wget|GitHub CLI|Pushing/);
 });
 
 test("Antigravity does not start where it would load a project's hooks, MCP servers, plugins, agents or skills", async (t) => {

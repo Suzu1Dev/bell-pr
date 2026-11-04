@@ -145,6 +145,42 @@ const m: Translation<typeof en> = {
     reportedBy: ({ names }) => `回報者：${names}`,
     round: ({ number }) => `修正第 ${number} 輪`,
     agent: ({ name, id }) => `${name}（${id}）`,
+    handOffAction: "讓 Agent 自動處理這些環境",
+    handOffNote:
+      "這個工作使用完整權限：Agent 可以在沒有沙箱的情況下用你的帳號安裝你選擇的項目，再重跑因此受阻的檢查。開始前你會先確認要交出的指令。",
+    handOffUnsafe: `這個指令會下載後執行或串接其他指令，或以 pipe 交給 shell 或其他直譯器，${product.name} 不會把它交給 Agent；請自行確認後執行。`,
+    allHandled:
+      "Agent 回報可交給它的項目都已安裝或原本就有，詳細內容在「協作」分頁；這裡剩下的項目請自行執行。",
+    outcomeLine: ({ outcome, time }) => `Agent 回報：${outcome}（${time}）`,
+    unreportedLine: ({ time }) => `${time} 的環境準備沒有回報這一項的結果。`,
+    resultsTitle: "環境準備結果（Agent 回報）",
+    agentAccount: "Agent 的說明：",
+    outcomes: {
+      installed: "已安裝",
+      present: "原本就有",
+      failed: "安裝失敗",
+      needsYou: "需要你處理",
+      unreported: "沒有結果",
+    },
+    dialog: {
+      title: "要讓 Agent 準備這台機器的環境嗎？",
+      intro:
+        "這些指令是先前的 Agent 讀專案時提出的建議，請先確認。Agent 只會執行你勾選、且與專案文件相符的指令；它可以加上 -y 等非互動參數、以 sudo -n 執行 sudo、更新套件索引，但不會換成別的指令。之後它會確認每個項目、重跑因此受阻的檢查，並逐項回報。",
+      choose: "要交給 Agent 的指令",
+      sudoTag: "使用 sudo",
+      limit: ({ limit }) => `每輪最多 ${limit} 項，其餘留在清單上，下一輪再處理。`,
+      sudoPasswordless: ({ user }) => `${user} 使用 sudo 不需要密碼，Agent 可以用 root 權限執行這些 sudo 指令。`,
+      sudoPassword: ({ user }) =>
+        `${user} 在這台機器使用 sudo 需要密碼，Agent 不會輸入密碼，因此需要 sudo 的項目會交回給你；若 sudo 規則允許某個指令免密碼執行，Agent 就會以 root 執行它。請自行執行，或在模型設定開啟「免密碼 sudo」；開啟後，你帳號下的每個程式都能以 root 執行任何指令。`,
+      sudoMissing: "這台機器沒有安裝 sudo，需要 sudo 的項目會交回給你。",
+      sudoUnknown: `${product.name} 無法確認這台機器的 sudo 是否需要密碼。Agent 只會用 sudo -n 執行，遇到密碼提示就會停下，該項目交回給你。`,
+      runs: "Agent 會在沒有沙箱的情況下用你的帳號執行；用量計入你自己的帳號。",
+      review:
+        "Agent 被要求不修改程式碼；它若改動檔案（例如安裝步驟改寫的 lockfile），該檔案會取消已審閱標記；檔案或 PR 草稿的 Validation、Limitations 有變動時，已核准的貢獻會退回審閱。",
+      stop: "可以在「協作」分頁查看進度並停止。停止不會還原已安裝的內容，已經透過 sudo 開始的安裝也可能繼續完成。",
+      confirm: ({ count }) => `開始處理（${count} 項）`,
+      starting: "正在啟動 Agent…",
+    },
   },
   guide: "嚮導",
   howItWorks: "運作方式",

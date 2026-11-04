@@ -481,6 +481,18 @@ are untrusted input: an induced command can affect anything the user account tha
 runs BELL PR can access. Permission deny lists are not an operating-system boundary for an
 unsandboxed shell.
 
+On a Full access run in review or approved, the setup checklist can hand setup
+commands to one collaborative-session turn. The commands are suggestions from
+earlier agents that read untrusted content, so you tick and confirm the exact
+commands. The server checks again that the run has Full access, accepts only
+commands stored on the run's setup lists, and refuses any that download
+something and run or chain it, or pipe into a shell or another interpreter. The commands reach the agent as labelled
+data, not as your message. The agent may only add non-interactive flags, run
+sudo as `sudo -n` and refresh the package index; it must not replace a command
+or change code, which the prompt asks and nothing enforces. sudo works only
+when it needs no password, and BELL PR never relays one. Stopping the turn does not undo installs, and a command already
+started through sudo may keep running.
+
 Choosing Full access asks for confirmation. Switching back to Working directory (default) does
 not. `bell-pr doctor` warns, and does not fail, when Full access is saved and
 when passwordless sudo is available. It tells BELL PR's rule file apart from

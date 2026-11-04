@@ -12,7 +12,7 @@ import { ArrowUp, Loader2, Square, Terminal } from "lucide-react";
 import { useLocale, useT } from "../i18n";
 import "./session.css";
 import { api, send } from "../api";
-import { SetupNeeds } from "../team/SetupNeeds";
+import { SetupNeeds, SetupResults } from "../team/SetupNeeds";
 import type { Run } from "../types";
 import type { SessionMessage } from "../../shared/session";
 import { sessionInputLimit } from "../../shared/session";
@@ -342,6 +342,7 @@ function SessionMessageView({
           </details>
         </section>
       )}
+      {!!message.setupResults?.length && <SetupResults results={message.setupResults} />}
       {!!message.setup?.length && (
         <SetupNeeds
           needs={mergeSetupNeeds([{ from: t.setupAgent, needs: message.setup }])}

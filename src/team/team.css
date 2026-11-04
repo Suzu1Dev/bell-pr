@@ -755,7 +755,8 @@
 .overlap-notice input {
   margin-top: 4px;
 }
-/* Setup the machine lacks for checks agents could not run: the person installs it. */
+/* Setup the machine lacks for checks agents could not run: the person installs it,
+   or on a Full access run hands it to an agent and sees what it reported. */
 .setup-needs {
   margin: 0 var(--space-7) var(--space-5);
   padding: var(--space-4) var(--space-5);
@@ -801,6 +802,89 @@
 .setup-needs li small {
   color: var(--color-text-muted);
   font-size: var(--text-2xs);
+}
+.setup-handoff {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  margin: 0 0 var(--space-3);
+}
+.setup-handoff .field-help {
+  flex: 1 1 260px;
+  margin: 0;
+}
+.setup-needs li .setup-outcome {
+  margin: 6px 0 0;
+  color: var(--color-text-secondary);
+  font-weight: 550;
+}
+.setup-needs li .setup-outcome[data-outcome="installed"],
+.setup-needs li .setup-outcome[data-outcome="present"] {
+  color: var(--color-success);
+}
+.setup-needs li .setup-outcome[data-outcome="failed"],
+.setup-needs li .setup-outcome[data-outcome="needsYou"] {
+  color: var(--color-warning);
+}
+.setup-handoff-choices {
+  display: grid;
+  gap: var(--space-2);
+  margin: var(--space-3) 0;
+  padding: 0;
+  border: 0;
+}
+.setup-handoff-choices legend {
+  margin-bottom: var(--space-2);
+  font-weight: 550;
+}
+.setup-handoff-choices label {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  font-size: var(--text-xs);
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+.setup-handoff-choices input {
+  margin-top: 4px;
+}
+.setup-handoff-choices small {
+  display: block;
+  color: var(--color-text-muted);
+}
+.setup-handoff-choices .setup-sudo-tag {
+  display: inline;
+  margin-left: var(--space-2);
+  color: var(--color-warning);
+  font-weight: 550;
+}
+.setup-handoff-facts {
+  margin: var(--space-2) 0;
+  padding-left: 18px;
+  font-size: var(--text-xs);
+  line-height: 1.7;
+  color: var(--color-text-secondary);
+}
+.setup-results h4 {
+  margin: 0 0 6px;
+  font-size: var(--text-sm);
+}
+.setup-results ul {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-xs);
+  overflow-wrap: anywhere;
+}
+.setup-results .setup-result-outcome {
+  font-weight: 550;
+}
+.setup-results li p {
+  margin: 2px 0 0;
+  color: var(--color-text-secondary);
 }
 @media (max-width: 1250px) {
   .team-board-content {
