@@ -394,14 +394,14 @@ const deniedWriteCommands = ["git push", "gh", "curl", "wget"];
  * permissions and toolPermission given here as the ones in effect). agy
  * offers every tool to every turn and cannot narrow the list, so each turn
  * denies what its access level does not allow, and deny rules win over the
- * person's allow and ask rules. Every turn denies reading credential files
- * and BELL's data outside its checkout (antigravityReadDenials), MCP tools
- * and the browser (`execute_url`), and fetching pages unless web access is
- * on, when only GitHub's pages are allowed. Its web search cannot be denied
- * (docs/security-model.md).
+ * person's allow and ask rules. Every turn denies reading credential files,
+ * the Antigravity CLI's own files and BELL's data outside its checkout
+ * (antigravityReadDenials), MCP tools and the browser (`execute_url`), and
+ * fetching pages unless web access is on, when only GitHub's pages are
+ * allowed. Its web search cannot be denied (docs/security-model.md).
  *
- * A read turn also denies writing and terminal commands; a "none" turn
- * denies reading too. A sandboxed write turn runs its commands in agy's
+ * A read turn also denies writing, terminal commands and the home
+ * directory off the way to its checkout; a "none" turn denies reading too. A sandboxed write turn runs its commands in agy's
  * terminal sandbox without asking (`proceed-in-sandbox`); when the sandbox
  * cannot start after all, agy treats that like `request-review`, so its
  * commands are refused instead of running outside it. An unsandboxed write
@@ -431,7 +431,7 @@ export function antigravitySettings(options: {
   const full = options.full === true && access === "write";
   const allow: string[] = [];
   const deny = [
-    ...antigravityReadDenials(cwd),
+    ...antigravityReadDenials(cwd, { outsideCheckout: access === "read" }),
     "execute_url(*)",
     "mcp(*)",
     ...(web && access !== "none" ? [] : ["read_url(*)"]),
@@ -802,7 +802,8 @@ function parameter(parameters: unknown, keys: string[]): unknown {
  * the last text as the answer; a final answer with the same content keeps
  * that text, so it is logged once. A denied action fails its step and is
  * listed again in the result, which adds a notice only when no step
- * showed it.
+ * showed it; a result without an answer after a denial is a failure, even
+ * when text came before the denial.
  */
 function antigravityEventReader() {
   const texts = new Map<unknown, string>();
@@ -898,13 +899,14 @@ function antigravityEventReader() {
       }
       const response = String(result.response ?? "").trim();
       const text =
-        result.structured_output === undefined
+        result.structured_output == null
           ? response
           : response && response === last
             ? last
             : JSON.stringify(result.structured_output);
       if (text) events.push({ kind: "final", text });
-      else if (denied.length && !last)
+      // Text written before the denial is not the answer.
+      else if (denied.length || stepDenials)
         events.push({
           kind: "error",
           terminal: true,

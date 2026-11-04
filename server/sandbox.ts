@@ -466,24 +466,76 @@ function antigravityRule(action: string, target: string): string | undefined {
 }
 
 /**
+ * The Antigravity CLI's and Google Cloud's own files that no Antigravity
+ * turn may read or write: your customizations (hooks, MCP servers,
+ * plugins), its settings and saved conversations, the Gemini CLI's sign-in
+ * next to them, plugin secrets, and the gcloud configuration and
+ * Application Default Credentials that BELL passes on for signing in. Its
+ * `brain` folder, where the agent keeps the artifacts of a conversation,
+ * stays open.
+ */
+function antigravityPrivatePaths(home: string): string[] {
+  const credentials = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+  return [
+    path.join(home, ".gemini", "config"),
+    path.join(home, ".gemini", "settings.json"),
+    path.join(home, ".gemini", "oauth_creds.json"),
+    path.join(home, ".gemini", "antigravity-cli", "settings.json"),
+    path.join(home, ".gemini", "antigravity-cli", "conversations"),
+    path.join(home, ".config", "antigravity"),
+    process.env.CLOUDSDK_CONFIG || path.join(home, ".config", "gcloud"),
+    ...(credentials ? [credentials] : []),
+  ].map((target) => path.resolve(target));
+}
+
+/**
+ * Every entry of the home directory, and of each folder below it on the way
+ * to `cwd`, that is not on that way; every entry of it when `cwd` lies
+ * outside it. A read-only Antigravity turn gets these, since agy lets its
+ * read tool open files outside the workspace (1.5.0 read one in another
+ * project under a folder it trusted).
+ */
+function homeDenials(home: string, cwd: string): string[] {
+  const root = resolved(home);
+  if (root === cwd) return [];
+  if (!inside(cwd, root)) return entries(root).map((entry) => path.join(root, entry));
+  const targets: string[] = [];
+  let directory = root;
+  for (const part of path.relative(root, cwd).split(path.sep)) {
+    for (const entry of entries(directory))
+      if (entry !== part) targets.push(path.join(directory, entry));
+    directory = path.join(directory, part);
+  }
+  return targets;
+}
+
+/**
  * The read denials of agentReadDenials as Antigravity `read_file` rules,
  * which deny a path and everything under it (agy 1.5.0 refused a file in a
- * denied directory) and also deny writing it. Globs are not part of the
- * rule syntax, so `~` entries are expanded, `X/**` becomes the directory X,
- * and the data directory's files that may appear later are denied by name:
- * its insights cache directory. A file that appears at its top level during
- * a turn is not covered, as it is for Claude Code.
+ * denied directory, also through a symbolic link in the checkout) and also
+ * deny writing it, plus the Antigravity CLI's own files
+ * (antigravityPrivatePaths). Globs are not part of the rule syntax, so `~`
+ * entries are expanded, `X/**` becomes the directory X, and the data
+ * directory's files that may appear later are denied by name: its insights
+ * cache directory. A file that appears at its top level during a turn is not
+ * covered, as it is for Claude Code. `outsideCheckout` also denies the home
+ * directory off the way to the checkout (homeDenials).
  */
-export function antigravityReadDenials(cwd: string): string[] {
+export function antigravityReadDenials(
+  cwd: string,
+  options: { outsideCheckout?: boolean } = {},
+): string[] {
   const here = resolved(cwd);
   const home = process.env.HOME || os.homedir();
   const targets = sharedCredentialDenials().map((entry) =>
     path.resolve(expandHome(entry.replace(/\/(?:\*\*)?$/, ""), home)),
   );
+  targets.push(...antigravityPrivatePaths(home));
   for (const directory of dataDirectoriesFor(here)) {
     const { root, whole, targets: denied } = dataDirectoryDenials(directory, here);
     targets.push(...(whole ? [root] : [path.join(root, "insights"), ...denied]));
   }
+  if (options.outsideCheckout) targets.push(...homeDenials(home, here));
   return [...new Set(targets)].flatMap((target) => antigravityRule("read_file", target) ?? []);
 }
 

@@ -4,6 +4,7 @@
 import test, { type TestContext } from "node:test";
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
+import { realpathSync } from "node:fs";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -122,6 +123,32 @@ test("a read-only Antigravity turn is given the checkout's files, since it canno
   // Writing turns run commands and list folders themselves.
   const write = await agentCommand({ ...antigravity, agentAccess: "full" }, { cwd, access: "write" });
   assert.doesNotMatch(JSON.parse(write.stdin!("x")).message.content, /The files in this checkout/);
+});
+
+test("a read-only turn is denied the home directory off the way to its checkout; every turn is denied agy's own files", async (t) => {
+  const home = realpathSync(await folder(t));
+  for (const directory of ["projects/other", ".gemini/antigravity-cli/brain", ".gemini/config", "work/repo/.git"])
+    await mkdir(path.join(home, directory), { recursive: true });
+  const previous = { home: process.env.HOME, credentials: process.env.GOOGLE_APPLICATION_CREDENTIALS };
+  process.env.HOME = home;
+  process.env.GOOGLE_APPLICATION_CREDENTIALS = path.join(home, "adc.json");
+  t.after(() => {
+    for (const [key, value] of [["HOME", previous.home], ["GOOGLE_APPLICATION_CREDENTIALS", previous.credentials]] as const)
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+  });
+  const cwd = path.join(home, "work", "repo");
+  const rule = (...parts: string[]) => `read_file(${path.join(home, ...parts)})`;
+  const read = settingsOf((await command(cwd, "read")).args).permissions.deny;
+  for (const denied of [rule("projects"), rule(".gemini"), rule(".gemini", "config"), rule("adc.json"), rule(".config", "gcloud")])
+    assert.ok(read.includes(denied), denied);
+  for (const open of [rule("work"), rule("work", "repo")]) assert.ok(!read.includes(open), open);
+  // A write turn keeps the rest of home readable, agy's brain folder (its artifacts) included.
+  const write = settingsOf((await command(cwd, "write", { full: true })).args).permissions.deny;
+  for (const denied of [rule(".gemini", "config"), rule(".gemini", "antigravity-cli", "conversations"), rule("adc.json")])
+    assert.ok(write.includes(denied), denied);
+  for (const open of [rule("projects"), rule(".gemini"), rule(".gemini", "antigravity-cli", "brain")])
+    assert.ok(!write.includes(open), open);
 });
 
 test("web access allows GitHub's pages and drops the search note; a model and a schema are passed on", async (t) => {
@@ -304,14 +331,25 @@ test("a turn agy ends without an answer after a denial, or with an error status,
     result: { status: "ERROR", response: "", error: "authentication failed or timed out" },
   });
   assert.deepEqual(failed, [{ kind: "error", terminal: true, message: "authentication failed or timed out" }]);
-  // Without a final answer, the last text is the answer, also after a denial.
+  // Text written before a denial is not the answer.
+  const preamble = agentEventReader("antigravity");
+  preamble({ event: "step_update", step_update: { step_index: 1, state: "DONE", step_type: "agent_response", text_delta: "I'll check the PR with gh first." } });
+  const after = withLocale("en", () =>
+    preamble({ event: "result", result: { status: "SUCCESS", response: "", denied_actions: [{ action: "command" }] } }),
+  );
+  assert.deepEqual(after.map((item) => item.kind), ["notice", "error"]);
+  // Without a final answer or a denial, the last text is the answer.
   const plain = agentEventReader("antigravity");
   assert.deepEqual(
     plain({ event: "step_update", step_update: { step_index: 1, state: "DONE", step_type: "agent_response", text_delta: "All good.\n" } }),
     [{ kind: "message", text: "All good." }],
   );
-  const after = plain({ event: "result", result: { status: "SUCCESS", response: "", denied_actions: [{ action: "command" }] } });
-  assert.deepEqual(after.map((item) => item.kind), ["notice"]);
+  assert.deepEqual(plain({ event: "result", result: { status: "SUCCESS", response: "" } }), []);
+  // A null structured output is no answer of its own.
+  assert.deepEqual(
+    agentEventReader("antigravity")({ event: "result", result: { status: "SUCCESS", response: "Done!", structured_output: null } }),
+    [{ kind: "final", text: "Done!" }],
+  );
   // A structured answer the text did not repeat is the CLI's own.
   const structured = agentEventReader("antigravity");
   structured({ event: "step_update", step_update: { step_index: 1, state: "DONE", step_type: "agent_response", text_delta: "Here it is." } });

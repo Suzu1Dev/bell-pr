@@ -510,16 +510,33 @@ test("Antigravity-only setups are ready through agy models and suggest Antigravi
   assert.equal(check(report, "antigravity-auth").status, "ok");
   assert.equal(check(report, "provider-ready").detail, "Ready: Antigravity.");
   assert.equal(defaultProviderFrom(report), "antigravity");
+  // With Codex not ready, the first ready provider is suggested.
+  const ready = (providers: string) =>
+    defaultProviderFrom({
+      checks: [{ id: "provider-ready", required: true, status: "ok", params: { providers } }],
+      ready: true,
+      checkedAt: report.checkedAt,
+      platform: "linux",
+    });
+  assert.equal(ready("claude,antigravity"), "claude");
+  assert.equal(ready("codex,antigravity"), undefined);
   assert.equal(cliStatus(report).antigravityAuthenticated, true);
   // The sign-in check lists models; it never starts a model turn.
   assert.deepEqual(
     (await f.calls()).filter((line) => line.startsWith("agy ")).sort(),
     ["agy --version", "agy models"],
   );
-  // Whether its sandbox can start depends on this machine's kernel settings.
+  // Whether its sandbox can start depends on this machine: the kernel
+  // settings on Linux, sandbox-exec on macOS (not among the stand-ins).
   const sandbox = check(report, "antigravity-sandbox");
+  const expected =
+    process.platform === "linux"
+      ? ["ok", "restricted"]
+      : process.platform === "darwin"
+        ? ["missing"]
+        : ["platform"];
   assert.ok(
-    sandbox.status === "ok" || (sandbox.status === "warn" && sandbox.reason === "restricted"),
+    expected.includes(sandbox.status === "ok" ? "ok" : String(sandbox.reason)),
     JSON.stringify(sandbox),
   );
 });

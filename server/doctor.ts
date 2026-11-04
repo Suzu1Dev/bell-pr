@@ -1207,13 +1207,19 @@ export async function knownDoctorReport(
   return options.stale ? reportFrom(await entry.facts, { dataDir }) : runDoctor({ dataDir });
 }
 
-/** The default provider the report suggests: Claude Code or Antigravity when it is the only one ready. */
+/**
+ * The default provider the report suggests when Codex, the default without
+ * one, is not ready: the first ready one, Claude Code before Antigravity.
+ */
 export function defaultProviderFrom(
   report: DoctorReport | undefined,
 ): AgentProvider | undefined {
   const providers = report?.checks.find((check) => check.id === "provider-ready")
     ?.params?.providers;
-  return providers === "claude" || providers === "antigravity" ? providers : undefined;
+  const ready = agentProviders.filter(
+    (provider) => typeof providers === "string" && providers.split(",").includes(provider),
+  );
+  return ready.includes("codex") ? undefined : ready[0];
 }
 
 /** The legacy shape of GET /api/status and Workbench.status(). */

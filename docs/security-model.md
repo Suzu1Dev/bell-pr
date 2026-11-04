@@ -387,12 +387,21 @@ does not cover Antigravity yet.
     search is logged.
   - Your own customizations in `~/.gemini/config` (hooks, MCP servers,
     plugins, skills) still load. Your hooks run; MCP tools are denied
-    (`mcp(*)`), but their servers start.
+    (`mcp(*)`), but their servers start. A workspace `.gemini` folder is
+    not a customization folder: agy did not run hooks placed in
+    `.gemini/hooks.json` or `.gemini/config/hooks.json`.
 - **Deny rules** win over your own allow and ask rules, in every mode.
   Every turn denies `read_file` on the shared credential list (expanded
   to absolute paths, a `X/**` entry as the directory X; agy refused a file
-  inside a denied directory) and on BELL PR's data directory outside the
-  checkout. Globs are not part of agy's rule syntax, so the data directory
+  inside a denied directory, also when a symbolic link in the checkout
+  pointed to it), on the Antigravity CLI's own files (your
+  `~/.gemini/config`, its settings, its saved conversations, the Gemini
+  CLI's sign-in in `~/.gemini`, `~/.config/antigravity`, and the gcloud
+  configuration and `GOOGLE_APPLICATION_CREDENTIALS` file it may sign in
+  with), and on BELL PR's data directory outside the checkout. A
+  `read_file` deny also denies writing the path. agy's `brain` folder,
+  where an agent keeps a conversation's artifacts, stays open to write
+  roles, so they can read the artifacts of other conversations there. Globs are not part of agy's rule syntax, so the data directory
   is denied by name: every other entry on the way down to the checkout,
   and `insights`. A file that appears at the data directory's top level
   during a turn is not covered, as it is for Claude Code. MCP tools, the
@@ -401,9 +410,13 @@ does not cover Antigravity yet.
   and `raw.githubusercontent.com` are allowed. `allowNonWorkspaceAccess`
   is false, yet a read-only turn read `/etc/hostname` and a file in another
   project under a folder listed in agy's own `trustedWorkspaces`: a read
-  outside the checkout that no rule denies may be allowed, as in Codex's
-  read-only sandbox. Read-only roles also deny `write_file(*)` and
-  `command(*)`; project analysis and discovery also deny `read_file(*)`.
+  outside the checkout that no rule denies may be allowed. So read-only
+  roles also deny every entry of the home directory, and of each folder
+  below it on the way to the checkout, that is not on that way (all of it
+  for a checkout outside the home directory), next to `write_file(*)` and
+  `command(*)`. Files outside the home directory, such as `/etc`, stay
+  readable, as in Codex's read-only sandbox. Project analysis and discovery
+  also deny `read_file(*)`.
 - **Read-only turns cannot list or search.** agy's print-mode agent has no
   folder listing or text search of its own; it lists and searches through
   terminal commands or subagents. So BELL PR puts the checkout's file
@@ -433,13 +446,16 @@ does not cover Antigravity yet.
   instead of running them outside it.
 - **Unsandboxed write roles** (Settings → Agent safety) get an allow rule
   for every command; the deny rules above still apply, and the commands
-  run with your account. **Full access** passes
+  run with your account. How agy matches a command deny rule against a
+  compound command, such as `true && git push`, was not checked: for an
+  unsandboxed shell the deny rules are not a boundary. **Full access** passes
   `--dangerously-skip-permissions` and lifts the command and Git denials;
   the credential, data directory, MCP, browser and page denials stay.
-- **A denial ends the turn.** Nothing in print mode can answer a
-  permission request, so agy refuses the action and then ends the turn
-  without an answer. BELL PR reports that as a failed turn and logs the
-  denied action.
+- **A denial can end the turn.** Nothing in print mode can answer a
+  permission request, so agy refuses the action, and it often ends the turn
+  without an answer. BELL PR reports a result without an answer after a
+  denial as a failed turn, also when the agent wrote some text before it,
+  and logs the denied action.
 - **Sign-in files.** `~/.gemini/antigravity-cli/antigravity-oauth-token`
   and `~/.config/antigravity/plugin-secrets.json` are on the shared
   denial list, for every agent.
