@@ -134,7 +134,7 @@ bell-pr
 擋下剛發佈的套件，因此這次安裝明確選用 npm：
 
 ```sh
-MISE_NPM_PACKAGE_MANAGER=npm mise use -g node@24 npm:bell-pr@1.1.0-beta.1
+MISE_NPM_PACKAGE_MANAGER=npm mise use -g node@24 npm:bell-pr@1.1.0
 mise exec -- bell-pr
 ```
 
@@ -373,7 +373,7 @@ BELL PR 把所有資料放在 `~/.bellpr`（或 `--data-dir`／`BELLPR_DATA_DIR`
 - **備份**時請先停止 BELL PR，再複製整個目錄。請還原到相同路徑：裡面的紀錄包含絕對路徑。
 - BELL PR 會保留 `state.json` 的最近三個版本，檔案損壞時會自動復原。
 - 同一個資料目錄一次只能有一個 BELL PR 執行。
-- **升級**不會搬動你的資料，而且從 1.0.0 起，舊版本仍能讀取新版本寫入的資料。請見[升級說明](docs/upgrading.md)（英文），其中也說明 1.0 之前版本的資料。
+- **升級**不會搬動你的資料，而且從 1.0.0 起，舊版本仍能讀取新版本寫入的資料，只有記錄了 Antigravity 的檔案會被 1.0.x 拒絕讀取。請見[升級說明](docs/upgrading.md)（英文），其中也說明如何退回舊版，以及 1.0 之前版本的資料。
 
 ## 文件
 

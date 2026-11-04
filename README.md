@@ -176,7 +176,7 @@ It uses npm for this installation because mise's default npm backend can
 reject newly published packages:
 
 ```sh
-MISE_NPM_PACKAGE_MANAGER=npm mise use -g node@24 npm:bell-pr@1.1.0-beta.1
+MISE_NPM_PACKAGE_MANAGER=npm mise use -g node@24 npm:bell-pr@1.1.0
 mise exec -- bell-pr
 ```
 
@@ -668,8 +668,9 @@ readable by your user only.
   damaged file by itself.
 - One BELL PR runs per data directory at a time.
 - **Upgrading** never moves your data, and from 1.0.0 on an older version
-  can still read what a newer one wrote. See [Upgrading](docs/upgrading.md),
-  including data from versions before 1.0.
+  can still read what a newer one wrote, except the files that name
+  Antigravity, which 1.0.x refuses. See [Upgrading](docs/upgrading.md),
+  including how to go back and data from versions before 1.0.
 
 ## Documentation
 
