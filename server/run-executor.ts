@@ -800,8 +800,10 @@ export async function executeRun(ctx: WorkbenchContext, id: string) {
         return;
       }
       // Another contribution of this project changes files the plan covers: the person decides.
-      if ((await planOverlaps(ctx, run)).overlaps.length) {
-        if (signal.aborted) throw new AppError(cancelled(), 409);
+      const { overlaps } = await planOverlaps(ctx, run);
+      // A Stop during the scans must not leave a plan marked as approved for a later retry.
+      if (signal.aborted) throw new AppError(cancelled(), 409);
+      if (overlaps.length) {
         enterPhase(run, team, "awaiting_approval");
         run.status = "awaiting_plan";
         ctx.log(run, "lead", sm().run.local.autoOverlap, { kind: "notice" });

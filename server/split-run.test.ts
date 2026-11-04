@@ -12,6 +12,7 @@ import path from "node:path";
 import type { TeamTask } from "../shared/team.js";
 import { readDiff } from "./git.js";
 import { splitOrder } from "./group-local.js";
+import { groupAfterLimit } from "../shared/split.js";
 import { git } from "./process.js";
 import { withLocale } from "./i18n/index.js";
 import { Store } from "./store.js";
@@ -510,6 +511,17 @@ test("splitting a part again keeps the order: the new parts build on what it bui
   assert.deepEqual(c.group, { after: [a.id] });
   await f.workbench.removeRun(c.id);
   assert.deepEqual(outside.group, { after: [bc.id] });
+});
+
+test("a split that would make a part build on too many others is refused before anything is made", async (t) => {
+  const f = await fixture(t);
+  f.run.group = { after: Array.from({ length: groupAfterLimit - 1 }, (_, index) => `part-${index}`) };
+  await assert.rejects(
+    en(() => f.workbench.split(f.run.id, { contributions: three })),
+    refused(422, /build on more than 64 others/),
+  );
+  assert.equal(f.store.data.runs.length, 1);
+  assert.equal(f.run.splitInto, undefined);
 });
 
 /** The branches BELL made for contributions, as `git branch` lists them without its markers. */

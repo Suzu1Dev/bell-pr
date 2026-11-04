@@ -699,6 +699,8 @@ export default {
       "The copied files did not match the originals, so nothing was split. A Git setting that rewrites files, such as line-ending conversion, can cause this.",
     startedFrom: ({ title }: { title: string }) => `Split from "${title}".`,
     wasSplit: ({ count }: { count: number }) => `Split into ${count} contributions.`,
+    tooManyEdges: ({ limit }: { limit: number }) =>
+      `This split would make a contribution build on more than ${limit} others. Split it into fewer contributions.`,
   },
   /** The person's other contributions of the same project (server/group-local.ts). */
   local: {

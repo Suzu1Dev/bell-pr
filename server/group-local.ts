@@ -144,9 +144,9 @@ async function publishedPaths(repo: Repository, run: Run, head: string | undefin
  * merge commit); otherwise each file whose published content is the
  * content at `base`, or that a first-parent commit of `base` since the
  * run's own base brought in or took out again (a squash or rebase merge,
- * maybe edited later), or deleted when the change deletes it. With `every`,
- * it stops at the first file that is not in. Anything that cannot be read
- * is not in.
+ * maybe edited later). A deletion is in only while `base` lacks the file:
+ * any commit may have deleted it once. With `every`, it stops at the first
+ * file that is not in. Anything that cannot be read is not in.
  */
 async function landedPaths(
   repo: Repository,
@@ -175,7 +175,7 @@ async function landedPaths(
     for (const [index, file] of readable.entries()) {
       const published = blob(objects[index]);
       let found = published === blob(objects[index + readable.length]);
-      if (!found && run.baseSha) {
+      if (!found && published && run.baseSha) {
         const history = await git(repo.path, [
           "--literal-pathspecs",
           "log",
@@ -183,7 +183,7 @@ async function landedPaths(
           "--first-parent",
           "--ancestry-path",
           "--max-count=1",
-          ...(published ? [`--find-object=${published}`] : ["--diff-filter=D"]),
+          `--find-object=${published}`,
           `${run.baseSha}..${base}`,
           "--",
           file,

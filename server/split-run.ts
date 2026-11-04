@@ -267,14 +267,13 @@ function recordPartOrder(
       }
     }
     const ids = [...inherited, ...[...after].sort((a, b) => a - b).map((other) => created[other].id)];
-    if (ids.length) run.group = { after: ids.slice(0, groupAfterLimit) };
+    if (ids.length) run.group = { after: ids };
   });
   const made = created.map((run) => run.id);
   for (const other of runs) {
     const after = other.group?.after;
     if (!after?.includes(source.id)) continue;
-    const redirected = [...new Set(after.flatMap((id) => (id === source.id ? made : [id])))];
-    other.group = { ...other.group, after: redirected.slice(0, groupAfterLimit) };
+    other.group = { ...other.group, after: [...new Set(after.flatMap((id) => (id === source.id ? made : [id])))] };
   }
 }
 
@@ -304,6 +303,16 @@ export async function splitRun(
     await assertConflictsResolved(source);
     const files = assertRequest(input, await ctx.diff(id));
     const repo = ctx.repo(source.repoId);
+    // What a new part, or a run built on the source, would build on afterwards (recordPartOrder).
+    const others = input.contributions.length - 1;
+    const widest = Math.max(
+      (source.group?.after?.length ?? 0) + others,
+      ...ctx.store.data.runs.map((run) =>
+        run.group?.after?.includes(source.id) ? run.group.after.length + others : 0,
+      ),
+    );
+    if (widest > groupAfterLimit)
+      throw new AppError((m) => m.run.split.tooManyEdges({ limit: groupAfterLimit }), 422);
 
     const created: Run[] = [];
     try {

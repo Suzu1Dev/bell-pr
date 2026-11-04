@@ -111,7 +111,12 @@ export function PlanWithGuide(props: PlanWithGuideProps) {
   // The steps' files against the person's other contributions, as for an agent plan.
   // Read again after each "This is my plan": a refused one may come from overlaps that changed.
   const [attempts, setAttempts] = useState(0);
-  const overlapRead = usePlanOverlaps(run, run.status === "awaiting_plan" && !confirmed, busy, attempts);
+  const { read: overlapRead, reading: readingOverlaps } = usePlanOverlaps(
+    run,
+    run.status === "awaiting_plan" && !confirmed,
+    busy,
+    attempts,
+  );
   const [confirmedOverlap, setConfirmedOverlap] = useState<string>();
   const overlapPending = !!overlapRead?.overlaps.length && confirmedOverlap !== overlapRead.digest;
   // The answers before writing stay as confirmed (as the server keeps them), so they're read-only afterwards.
@@ -204,7 +209,7 @@ export function PlanWithGuide(props: PlanWithGuideProps) {
           <button
             type="button"
             className="button primary"
-            disabled={busy || !drafted || overlapPending}
+            disabled={busy || !drafted || overlapPending || readingOverlaps}
             onClick={action(() =>
               onConfirm(overlapRead?.overlaps.length ? { overlapDigest: overlapRead.digest } : {})
                 .then(focusAfterPlan)

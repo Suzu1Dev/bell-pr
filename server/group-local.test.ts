@@ -431,6 +431,15 @@ test("a squash-merged file stays merged however often its other files change lat
   await git(f.repo.path, ["commit", "-am", "remove the guide"]);
   const after = await f.run({}, {}, { base: await f.advance({ "README.md": "# After\n" }) });
   assert.deepEqual(await localOverlaps(f.scope([after, deleting]), after, ["docs/"]), []);
+  // Added back later: any commit may have deleted it once, so the deletion counts again.
+  await writeFile(path.join(f.repo.path, "docs/guide.md"), "# Guide again\n");
+  await git(f.repo.path, ["add", "docs/guide.md"]);
+  await git(f.repo.path, ["commit", "-m", "add the guide back"]);
+  const readded = await f.run({}, {}, { base: (await git(f.repo.path, ["rev-parse", "HEAD"])).stdout.trim() });
+  assert.deepEqual(
+    (await localOverlaps(f.scope([readded, deleting]), readded, ["docs/"])).map((overlap) => overlap.paths),
+    [["docs/guide.md"]],
+  );
 });
 
 test("a run with a pull request holds what the PR changes, its own later commits included, and no longer its plan", async (t) => {

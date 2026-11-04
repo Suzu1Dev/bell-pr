@@ -99,7 +99,7 @@ export function TeamBoard({
   >({});
   const isExpanded = (task: TeamTask) =>
     toggled[task.id] ?? (task.status === "failed" && !!task.error);
-  const overlapRead = usePlanOverlaps(
+  const { read: overlapRead, reading: readingOverlaps } = usePlanOverlaps(
     run,
     run.team?.phase === "awaiting_approval" && !run.learnByHand && !demo,
     busy,
@@ -348,7 +348,7 @@ export function TeamBoard({
               <button
                 className="button primary"
                 onClick={() => onApprove(overlaps?.length ? { overlapDigest: overlapRead?.digest } : {})}
-                disabled={busy || revising || overlapPending}
+                disabled={busy || revising || overlapPending || readingOverlaps}
               >
                 {busy ? (
                   <Loader2 size={15} className="spin" />

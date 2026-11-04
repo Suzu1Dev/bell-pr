@@ -467,7 +467,8 @@ test("the English approval phase offers the approve button and says subtasks wai
   assert.match(html, /class="team-plan needs-approval"/);
   assert.match(html, /Waiting for you to approve the plan/);
   assert.match(html, /0 \/ 4 subtasks done/);
-  assert.match(html, /<button class="button primary">[\s\S]*?Approve the plan and start development<\/button>/);
+  // It waits for the read of the person's other contributions, which a first render has not done.
+  assert.match(html, /<button class="button primary" disabled="">[\s\S]*?Approve the plan and start development<\/button>/);
   assert.match(html, /<span class="is-current" aria-current="step"><svg[^>]*>[\s\S]*?<\/svg>You approve the plan<\/span>/);
   const [todo, running, done] = lanes(html);
   assert.match(todo, /^<h3>To do<span>4<\/span><\/h3>/);

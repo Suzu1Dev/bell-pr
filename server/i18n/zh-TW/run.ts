@@ -428,6 +428,7 @@ const m: Translation<typeof en> = {
       "複製出來的檔案與原檔不一致，所以沒有拆分。改寫檔案內容的 Git 設定（例如換行轉換）可能造成這種情況。",
     startedFrom: ({ title }) => `拆分自「${title}」。`,
     wasSplit: ({ count }) => `已拆成 ${count} 個貢獻。`,
+    tooManyEdges: ({ limit }) => `這樣拆分會讓一個貢獻建立在超過 ${limit} 個其他貢獻上，請拆成較少的貢獻。`,
   },
   local: {
     overlapWith: ({ title, status, paths }) => `「${title}」（${runStates[status]}）：${list(paths)}`,

@@ -72,7 +72,6 @@ const workspace = {
   },
   sampleReview: "Sample review",
   humanReview: "Human review",
-  /** The lead's check of the request's assumption, made by reading the code. */
   /** Other contributions of the same project whose files meet the plan's scopes. */
   overlap: {
     label: "Overlap with your other contributions",
@@ -90,6 +89,7 @@ const workspace = {
     /** One title in the chip's list. */
     quoted: ({ title }: { title: string }) => `“${title}”`,
   },
+  /** The lead's check of the request's assumption, made by reading the code. */
   premise: {
     label: "Premise check",
     heading: ({ verdict }: { verdict: string }) => `Premise check: ${verdict}`,
