@@ -1244,7 +1244,7 @@ export class ProjectInsightsService {
       const login = agentLoginCheck(provider);
       try {
         await this.execute(login.executable, login.args, {
-          timeoutMs: 10_000,
+          timeoutMs: login.timeoutMs ?? 10_000,
           maxBytes: 20_000,
           env: agentEnvironment(provider),
           signal,

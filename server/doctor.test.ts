@@ -503,7 +503,19 @@ test("Claude-only setups are ready and suggest Claude Code as the default provid
 
 test("Antigravity-only setups are ready through agy models and suggest Antigravity as the default", async (t) => {
   const f = await fakes(t, { git: git(), agy: agy() });
-  const report = await withLocale("en", () => runDoctor({ force: true, platform: "linux" }));
+  // agy models took about 6 seconds, longer than a probe's usual 5.
+  const limits: (number | undefined)[] = [];
+  const report = await withLocale("en", () =>
+    runDoctor({
+      force: true,
+      platform: "linux",
+      exec: (executable, args, options) => {
+        if (executable === "agy" && args[0] === "models") limits.push(options?.timeoutMs);
+        return command(executable, args, options);
+      },
+    }),
+  );
+  assert.deepEqual(limits, [20_000]);
   assert.equal(report.ready, true);
   assert.equal(check(report, "antigravity").status, "ok");
   assert.equal(check(report, "antigravity").version, "1.5.0");

@@ -7,7 +7,8 @@
  * directory, the app, the platform, saved full access, and passwordless
  * sudo (BELL PR's rule file, or another rule).
  *
- * The probes run in parallel, each with a 5-second limit. What they find is
+ * The probes run in parallel, each with a 5-second limit (the Antigravity
+ * sign-in check its own, see agentLoginCheck). What they find is
  * kept for 10 seconds per data directory and PATH, and callers in that
  * window share one probe; `force` probes again. The report itself (its
  * details and fix labels) is worded in the locale in effect for each call.
@@ -421,6 +422,7 @@ async function probeAntigravityAuth(exec: DoctorExec): Promise<AgentAuthFacts> {
   try {
     await exec(login.executable, login.args, {
       ...execOptions,
+      timeoutMs: login.timeoutMs ?? probeTimeoutMs,
       env: agentEnvironment("antigravity"),
     });
     return { signedIn: true };

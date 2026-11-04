@@ -394,7 +394,8 @@ test("agy models gives the catalog: one model per line, no separate effort, no d
   );
   assert.deepEqual(signedOut.models, []);
   assert.match(signedOut.error!, /Antigravity model list/);
-  assert.deepEqual(agentLoginCheck("antigravity"), { executable: "agy", args: ["models"] });
+  // Listing models signs in over the network (about 6 seconds), so the check gets 20.
+  assert.deepEqual(agentLoginCheck("antigravity"), { executable: "agy", args: ["models"], timeoutMs: 20_000 });
 });
 
 test("agy failures get Antigravity's setup codes and fixes", () => {

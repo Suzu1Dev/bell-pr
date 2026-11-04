@@ -630,10 +630,17 @@ export async function agentCommand(
  * Exits successfully only when the CLI is installed and signed in. agy has
  * no status command; listing its models needs a sign-in (agy 1.5.0 exits 1
  * with "Please sign in to view available models." without one) and starts
- * no model turn.
+ * no model turn. It signs in and fetches the list over the network, which
+ * took 5.9 to 6.4 seconds with agy 1.5.0, so it gets its own time limit
+ * (`timeoutMs`) instead of a probe's usual one.
  */
-export function agentLoginCheck(provider: AgentProvider = "codex") {
-  if (provider === "antigravity") return { executable: "agy", args: ["models"] };
+export function agentLoginCheck(provider: AgentProvider = "codex"): {
+  executable: string;
+  args: string[];
+  timeoutMs?: number;
+} {
+  if (provider === "antigravity")
+    return { executable: "agy", args: ["models"], timeoutMs: 20_000 };
   return provider === "claude"
     ? { executable: "claude", args: ["auth", "status"] }
     : { executable: "codex", args: ["login", "status"] };
