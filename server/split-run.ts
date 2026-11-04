@@ -17,7 +17,7 @@ import { mkdir } from "node:fs/promises";
 import path from "node:path";
 import { activeFollowUp } from "../shared/followups.js";
 import { planTaskPaths } from "../shared/reviewability.js";
-import type { SplitRef, SplitRequest } from "../shared/split.js";
+import { groupAfterLimit, type SplitRef, type SplitRequest } from "../shared/split.js";
 import { assertWorkspacePresent } from "./cleanup.js";
 import { assertRefName, readDiff } from "./git.js";
 import { shuttingDown, sm } from "./i18n/index.js";
@@ -225,6 +225,60 @@ function contributionRun(
 }
 
 /**
+ * Records, on each part, the parts it builds on (`group.after`): a task
+ * with files in this part depends, directly or through other tasks, on a
+ * task with files in that part. A part's own copy of the plan keeps only
+ * its own tasks, so this is where those dependencies stay known. When the
+ * source is itself a part, each new part also builds on what the source
+ * built on, and the parts that built on the source build on every new part.
+ */
+function recordPartOrder(
+  runs: Run[],
+  source: Run,
+  input: SplitRequest,
+  created: Run[],
+  files: ReadonlyMap<string, DiffFile>,
+) {
+  const tasks = source.team?.tasks ?? [];
+  const changed = [...files.keys()];
+  const partOfPath = new Map(
+    input.contributions.flatMap(({ paths }, part) => paths.map((filePath) => [filePath, part] as const)),
+  );
+  const partsOf = new Map(
+    tasks.map((task) => [
+      task.id,
+      new Set(planTaskPaths(changed, task).flatMap((filePath) => partOfPath.get(filePath) ?? [])),
+    ]),
+  );
+  const byId = new Map(tasks.map((task) => [task.id, task]));
+  const inherited = source.group?.after ?? [];
+  created.forEach((run, part) => {
+    const after = new Set<number>();
+    for (const task of tasks) {
+      if (!partsOf.get(task.id)?.has(part)) continue;
+      // The plan's dependencies have no cycles (parseTeamPlan), so this ends.
+      const pending = [...task.dependsOn];
+      const seen = new Set<string>();
+      for (let id = pending.pop(); id !== undefined; id = pending.pop()) {
+        if (seen.has(id)) continue;
+        seen.add(id);
+        for (const other of partsOf.get(id) ?? []) if (other !== part) after.add(other);
+        pending.push(...(byId.get(id)?.dependsOn ?? []));
+      }
+    }
+    const ids = [...inherited, ...[...after].sort((a, b) => a - b).map((other) => created[other].id)];
+    if (ids.length) run.group = { after: ids.slice(0, groupAfterLimit) };
+  });
+  const made = created.map((run) => run.id);
+  for (const other of runs) {
+    const after = other.group?.after;
+    if (!after?.includes(source.id)) continue;
+    const redirected = [...new Set(after.flatMap((id) => (id === source.id ? made : [id])))];
+    other.group = { ...other.group, after: redirected.slice(0, groupAfterLimit) };
+  }
+}
+
+/**
  * POST /api/runs/:id/split. All of it or none of it: a contribution that
  * fails to come out the same as the files it was made from is removed
  * together with the ones made before it, and the original is not touched.
@@ -266,6 +320,7 @@ export async function splitRun(
       throw error;
     }
 
+    recordPartOrder(ctx.store.data.runs, source, input, created, files);
     const refs: SplitRef[] = created.map((run) => ({ runId: run.id, title: run.title }));
     source.splitInto = refs;
     ctx.log(source, "lead", sm().run.split.wasSplit({ count: created.length }), { kind: "notice" });

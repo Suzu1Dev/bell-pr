@@ -11,6 +11,7 @@ import { ListChecks, Loader2, Play, Plus, Trash2 } from "lucide-react";
 import { focusAfterPlan, focusById, useFocusHome } from "./focus";
 import { byHandLimits, helpAllowed, type ByHandPlanInput } from "../../../shared/by-hand";
 import { PremiseNotice } from "../../team/PremiseNotice";
+import { OverlapNotice, usePlanOverlaps } from "../../team/OverlapNotice";
 import { PlanCompare } from "./PlanCompare";
 import type { Run } from "../../types";
 import { CopyRef } from "./CopyRef";
@@ -26,8 +27,11 @@ export interface PlanWithGuideProps {
   onReveal(mode: "names" | "compare"): Promise<void>;
   /** "Questions on my plan" (POST …/by-hand/plan/questions, 202). */
   onAskQuestions(): Promise<void>;
-  /** "This is my plan" (POST …/plan/approve). */
-  onConfirm(): Promise<void>;
+  /**
+   * "This is my plan" (POST …/plan/approve), with `overlapDigest` once the
+   * person ticked the overlap with their other contributions.
+   */
+  onConfirm(options?: { overlapDigest?: string }): Promise<void>;
   busy?: boolean;
   /** The server's message for a refused action, shown as it is. */
   error?: string;
@@ -104,6 +108,12 @@ export function PlanWithGuide(props: PlanWithGuideProps) {
   const planHelp = helpAllowed(run, "plan");
   const revealed = !!saved?.outlineAt;
   const action = (go: () => Promise<void>) => () => void save().then(go).catch(ignore);
+  // The steps' files against the person's other contributions, as for an agent plan.
+  // Read again after each "This is my plan": a refused one may come from overlaps that changed.
+  const [attempts, setAttempts] = useState(0);
+  const overlapRead = usePlanOverlaps(run, run.status === "awaiting_plan" && !confirmed, busy, attempts);
+  const [confirmedOverlap, setConfirmedOverlap] = useState<string>();
+  const overlapPending = !!overlapRead?.overlaps.length && confirmedOverlap !== overlapRead.digest;
   // The answers before writing stay as confirmed (as the server keeps them), so they're read-only afterwards.
   const field = (id: string, label: string, value: string, set: (value: string) => void, max: number) => (
     <label htmlFor={`${run.id}-${id}`}>
@@ -181,8 +191,26 @@ export function PlanWithGuide(props: PlanWithGuideProps) {
         </p>
       )}
       {!confirmed && (
+        <OverlapNotice
+          overlaps={overlapRead?.overlaps}
+          confirmed={!overlapPending}
+          onConfirm={(ticked) => setConfirmedOverlap(ticked ? overlapRead?.digest : undefined)}
+          disabled={busy}
+          byHand
+        />
+      )}
+      {!confirmed && (
         <div className="by-hand-row">
-          <button type="button" className="button primary" disabled={busy || !drafted} onClick={action(() => onConfirm().then(focusAfterPlan))}>
+          <button
+            type="button"
+            className="button primary"
+            disabled={busy || !drafted || overlapPending}
+            onClick={action(() =>
+              onConfirm(overlapRead?.overlaps.length ? { overlapDigest: overlapRead.digest } : {})
+                .then(focusAfterPlan)
+                .finally(() => setAttempts((count) => count + 1)),
+            )}
+          >
             {busy ? <Loader2 size={15} className="spin" /> : <Play size={15} aria-hidden="true" />}
             {t.confirm}
           </button>

@@ -292,7 +292,9 @@ export async function removeRun(ctx: WorkbenchContext, id: string) {
     const index = ctx.store.data.runs.indexOf(run);
     if (index >= 0) ctx.store.data.runs.splice(index, 1);
     // No banner links to a deleted run, and an original whose parts are all gone can be split again.
-    for (const other of ctx.store.data.runs) dropSplitLinks(other, id);
+    // A part that built on a deleted part builds on what that part was split from, if it is still there.
+    const source = ctx.store.data.runs.find((other) => other.id === run.splitFrom?.runId)?.id;
+    for (const other of ctx.store.data.runs) dropSplitLinks(other, id, source);
     log.info("run.removed", { runId: id });
     invalidateStorageReport(ctx);
     await ctx.store.save();

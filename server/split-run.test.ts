@@ -11,6 +11,7 @@ import os from "node:os";
 import path from "node:path";
 import type { TeamTask } from "../shared/team.js";
 import { readDiff } from "./git.js";
+import { splitOrder } from "./group-local.js";
 import { git } from "./process.js";
 import { withLocale } from "./i18n/index.js";
 import { Store } from "./store.js";
@@ -419,6 +420,96 @@ test("the links a split records survive a restart, and a value this build cannot
   assert.equal(original?.title, "Three fixes");
   assert.equal(original?.splitInto, undefined);
   assert.equal(damaged.recovery, undefined);
+});
+
+test("a part records the parts its tasks depend on, which survive a restart and leave with a deleted part", async (t) => {
+  const f = await fixture(t, {
+    collectDraftContext: async () => {
+      throw new Error("no draft in tests");
+    },
+  });
+  // b builds on a, and c on b: each part's own plan keeps only its own tasks.
+  f.run.team!.tasks[1].dependsOn = ["a"];
+  f.run.team!.tasks[2].dependsOn = ["b"];
+  const { created } = await en(() => f.workbench.split(f.run.id, { contributions: three }));
+  const [a, b, c] = created;
+  assert.equal(a.group, undefined);
+  assert.deepEqual(b.group, { after: [a.id] });
+  assert.deepEqual(c.group, { after: [a.id, b.id] });
+  assert.deepEqual(b.team?.tasks[0].dependsOn, []);
+  const scope = { runs: f.store.data.runs, repo: f.repo, directory: f.store.directory };
+  assert.deepEqual((await splitOrder(scope, c)).map((before) => before.title), ["Fix a", "Fix b"]);
+
+  while (created.some((run) => run.draftPreparation?.status !== "failed"))
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  await f.workbench.removeRun(a.id);
+  assert.equal("group" in b, false);
+  assert.deepEqual(c.group, { after: [b.id] });
+
+  await f.workbench.shutdown();
+  const reload = async () => {
+    const store = new Store(f.store.directory);
+    await store.initialize();
+    return store;
+  };
+  assert.deepEqual((await reload()).data.runs.find((run) => run.id === c.id)?.group, { after: [b.id] });
+  // A value this build cannot read is left out; the run stays out of quarantine.
+  const stateFile = path.join(f.store.directory, "state.json");
+  const state = JSON.parse(await readFile(stateFile, "utf8"));
+  state.runs.find((run: { id: string }) => run.id === c.id).group = { after: "not a list" };
+  await writeFile(stateFile, JSON.stringify(state));
+  const damaged = await reload();
+  const part = damaged.data.runs.find((run) => run.id === c.id);
+  assert.equal(part?.title, "Fix c");
+  assert.equal(part?.group?.after, undefined);
+  assert.equal(damaged.recovery, undefined);
+});
+
+test("splitting a part again keeps the order: the new parts build on what it built on, and the parts built on it build on them", async (t) => {
+  const f = await fixture(t, {
+    collectDraftContext: async () => {
+      throw new Error("no draft in tests");
+    },
+  });
+  // c builds on b, and b on a; b and c go to one part, which is then split again.
+  f.run.team!.tasks[1].dependsOn = ["a"];
+  f.run.team!.tasks[2].dependsOn = ["b"];
+  const { created } = await en(() =>
+    f.workbench.split(f.run.id, {
+      contributions: [
+        { title: "Fix a", paths: groups.a },
+        { title: "Fix b and c", paths: [...groups.b, ...groups.c] },
+      ],
+    }),
+  );
+  const [a, bc] = created;
+  assert.deepEqual(bc.group, { after: [a.id] });
+  const dependent = f.store.data.runs.find((run) => run.id === bc.id)!;
+  // Another part elsewhere built on the part that is split again.
+  const outside = { ...structuredClone(a), id: "outside-part", group: { after: [bc.id] } };
+  f.store.data.runs.push(outside);
+  const again = await en(() =>
+    f.workbench.split(dependent.id, {
+      contributions: [
+        { title: "Fix b", paths: groups.b },
+        { title: "Fix c", paths: groups.c },
+      ],
+    }),
+  );
+  const [b, c] = again.created;
+  assert.deepEqual(b.group, { after: [a.id] });
+  assert.deepEqual(c.group, { after: [a.id, b.id] });
+  assert.deepEqual(outside.group, { after: [b.id, c.id] });
+
+  // Deleting the new parts undoes it: what built on them builds on the part they came from again.
+  while (again.created.some((run) => run.draftPreparation?.status !== "failed"))
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  await f.workbench.removeRun(b.id);
+  assert.deepEqual(outside.group, { after: [bc.id, c.id] });
+  // c came from bc, so it does not build on bc.
+  assert.deepEqual(c.group, { after: [a.id] });
+  await f.workbench.removeRun(c.id);
+  assert.deepEqual(outside.group, { after: [bc.id] });
 });
 
 /** The branches BELL made for contributions, as `git branch` lists them without its markers. */

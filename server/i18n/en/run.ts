@@ -1,5 +1,6 @@
 import { formatters } from "../../../shared/i18n/locale.js";
 import { product } from "../../../shared/product.js";
+import type { RunStatus } from "../../../shared/types.js";
 
 const fmt = formatters("en");
 /** A number with its noun in the matching form: "1 file", "3 files". */
@@ -7,6 +8,17 @@ const count = (n: number, one: string, other: string) =>
   `${fmt.number(n)} ${fmt.plural(n) === "one" ? one : other}`;
 /** File names and similar items, separated as the locale separates a plain list. */
 const list = (items: readonly string[]) => fmt.list(items, { type: "unit" });
+/** Where another contribution is, as the overlap confirms name it. */
+const runStates: Record<RunStatus, string> = {
+  queued: "queued",
+  running: "in progress",
+  awaiting_plan: "waiting for plan approval",
+  review: "in review",
+  approved: "approved, not published",
+  published: "published, not seen merged",
+  failed: "failed",
+  cancelled: "cancelled",
+};
 const followUpAgentCommitted =
   "The agent made its own commit or switched branches; the branch is back on the pushed PR, and the edits stay in the working directory for your review.";
 
@@ -156,6 +168,9 @@ export default {
     retryIntegration:
       "Retry: every subtask is complete, so only integration and the independent review run again.",
     retryPending: "Retry: continuing with the subtasks that have not started.",
+    /** Plan scopes written without the "/" of a directory, read as the directories they are in the base commit. */
+    scopeDirectories: ({ scopes }: { scopes: string[] }) =>
+      `Read ${list(scopes)} as ${scopes.length === 1 ? "a directory" : "directories"}, as in the base commit, so the plan covers the files inside.`,
   },
   /** Agent CLI events, retries and time limits shown while an agent works. */
   agentCli: {
@@ -684,6 +699,26 @@ export default {
       "The copied files did not match the originals, so nothing was split. A Git setting that rewrites files, such as line-ending conversion, can cause this.",
     startedFrom: ({ title }: { title: string }) => `Split from "${title}".`,
     wasSplit: ({ count }: { count: number }) => `Split into ${count} contributions.`,
+  },
+  /** The person's other contributions of the same project (server/group-local.ts). */
+  local: {
+    /** One overlapping contribution: its title, where it is, and the paths it shares. */
+    overlapWith: ({ title, status, paths }: { title: string; status: RunStatus; paths: string[] }) =>
+      `"${title}" (${runStates[status]}): ${list(paths)}`,
+    planOverlap: ({ titles }: { titles: string[] }) =>
+      `Your other contributions to this project change files this plan covers: ${list(titles.map((title) => `"${title}"`))}. Look at the overlap on the plan and confirm it, then approve again.`,
+    autoOverlap:
+      "This plan covers files your other contributions to this project change, so it waits for your approval instead of starting on its own.",
+    overlapChanged:
+      "Your other contributions or this plan changed since you confirmed the overlap. Look at the overlap on the plan again and confirm it, then approve again.",
+    approvedOverlap: ({ titles }: { titles: string[] }) =>
+      `Approved although ${list(titles.map((title) => `"${title}"`))} ${titles.length === 1 ? "changes" : "change"} some of the same files.`,
+    publishOverlap:
+      "Your other contributions to this project change some of the same files, so whichever is merged second may need its conflicts resolved. Publish them in the order you want them merged, or combine them.",
+    splitOrder:
+      "This part of a split builds on other parts that are not merged yet. Publish those first, or this pull request may fail its checks until they are merged.",
+    buildsOn: ({ title, prUrl }: { title: string; prUrl?: string }) =>
+      prUrl ? `"${title}": published at ${prUrl}, not seen merged` : `"${title}": not published yet`,
   },
   /** The human review gate and publishing: draft, file reviews, approval and push. */
   publish: {

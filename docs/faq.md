@@ -269,9 +269,27 @@ check, reports or logs, so you explain and approve each part on its own. The
 original run keeps every file and stays as it was, but a banner asks you to
 publish the parts instead. A part you delete leaves that banner, and once
 every part is deleted you can split the original again. BELL PR cannot
-check that a part works on its own, so run each part's tests. The split is
-not offered for the sample run, a Learn by hand run, a published run, or a
-run whose working copy is gone.
+check that a part works on its own, so run each part's tests. When a task
+in one part depends on a task in another, publishing that part before the
+other is merged asks you to confirm, so you can publish them in order. The
+split is not offered for the sample run, a Learn by hand run, a published
+run, or a run whose working copy is gone.
+
+### What happens when two of my contributions change the same files?
+
+BELL PR tells you before you approve the plan (also a Learn by hand plan)
+and before you publish. Your other contributions to the same project count
+while they are in progress, in review or approved, and once they have a pull
+request until its change to a file is in this run's base commit or you read
+it as merged or closed. The plan lists each overlapping contribution
+with the files it shares, and approving needs your tick, which counts only
+for the overlap it was given on; a run started without plan approval waits
+for it. The publish dialog asks you to confirm the overlap for the files you
+changed (`group-own-overlap`), because whichever is merged second may need
+its conflicts resolved. BELL PR only reads its own records and working
+copies for this, and nothing is written or sent. The parts of one split
+never count against each other or the original, and an original that was
+split counts only for the files none of its parts holds.
 
 ### Can several people use one BELL PR?
 

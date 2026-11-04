@@ -1075,6 +1075,69 @@ test("out-of-scope member edits are retained in isolation and never enter the re
   }
 });
 
+test("a plan meeting another contribution's changes does not start on its own, and approving it needs the overlap confirmed", async () => {
+  const f = await fixture(async (input) => {
+    if (input.role === "lead") return makePlan([{ id: "alpha", files: ["a.ts"] }, { id: "beta", files: ["b.ts"] }]);
+    return "Not a report";
+  });
+  try {
+    // An earlier contribution of the same project, in review, changed a.ts.
+    const baseSha = (await git(f.repo.path, ["rev-parse", "HEAD"])).stdout.trim();
+    const worktreePath = path.join(f.store.directory, "worktrees", "earlier-run");
+    await mkdir(path.dirname(worktreePath), { recursive: true });
+    await git(f.repo.path, ["worktree", "add", "-b", "fix/earlier", worktreePath, baseSha]);
+    await writeFile(path.join(worktreePath, "a.ts"), 'export const value = "earlier";\n');
+    f.store.data.runs.push({
+      id: "earlier-run",
+      repoId: f.repo.id,
+      title: "Earlier fix",
+      prompt: "Fix a",
+      status: "review",
+      branch: "fix/earlier",
+      baseBranch: "main",
+      baseSha,
+      worktreePath,
+      createdAt: new Date().toISOString(),
+      agents: [],
+      logs: [],
+      draft: { title: "Earlier fix", body: "" },
+      reviewedFiles: [],
+      reviewedFingerprints: {},
+    });
+
+    const run = await withLocale("en", () =>
+      f.workbench.createRun(f.repo.id, "Improve a and b", undefined, { ...settings, requirePlanApproval: false }),
+    );
+    await waitUntil(() => run.status === "awaiting_plan", "overlap gate");
+    assert.equal(run.team!.phase, "awaiting_approval");
+    assert.equal(run.team!.approvedAt, undefined);
+    assert.ok(run.logs.some((entry) => entry.kind === "notice" && /waits for your approval/.test(entry.message)));
+    assert.deepEqual((await f.workbench.planOverlaps(run.id)).overlaps, [
+      { runId: "earlier-run", title: "Earlier fix", status: "review", paths: ["a.ts"], taskIds: ["alpha"] },
+    ]);
+    await assert.rejects(withLocale("en", () => f.workbench.approvePlan(run.id)), {
+      statusCode: 409,
+      message: /Your other contributions to this project change files this plan covers: "Earlier fix"/,
+    });
+    assert.equal(run.status, "awaiting_plan");
+
+    // Stopping and retrying does not skip the check: the plan was never approved.
+    await f.workbench.cancel(run.id);
+    await waitUntil(() => !f.workbench.store.data.runs.some((entry) => entry.id === run.id && entry.status !== "cancelled"), "stop");
+    await withLocale("en", () => f.workbench.retryTeam(run.id));
+    assert.equal(run.status, "awaiting_plan");
+    assert.equal(run.team!.phase, "awaiting_approval");
+
+    const { digest } = await f.workbench.planOverlaps(run.id);
+    await withLocale("en", () => f.workbench.approvePlan(run.id, { overlapDigest: digest }));
+    assert.ok(run.team!.approvedAt);
+    assert.ok(run.logs.some((entry) => /Approved although "Earlier fix" changes some of the same files/.test(entry.message)));
+    await waitUntil(() => ["failed", "review"].includes(run.status), "approved run");
+  } finally {
+    await f.cleanup();
+  }
+});
+
 /**
  * Team roles for the retry scenarios: beta depends on alpha, and its first
  * attempt edits c.ts outside its scope. Flip `compliant` before retrying.

@@ -487,14 +487,18 @@ export function useRunActions({
       // The open-run poll and the next action report connection problems.
     }
   }
-  async function approveTeamPlan() {
+  /** `overlapDigest` only after the person ticked the overlap with their other contributions. */
+  async function approveTeamPlan(options?: { overlapDigest?: string }) {
     if (demo) {
       playback.current?.player.approvePlan();
       return;
     }
     setBusy(true);
     try {
-      const result = await api<{ run: Run }>(`/runs/${run.id}/plan/approve`, send("POST"));
+      const result = await api<{ run: Run }>(
+        `/runs/${run.id}/plan/approve`,
+        send("POST", typeof options?.overlapDigest === "string" ? { overlapDigest: options.overlapDigest } : undefined),
+      );
       if (runIdRef.current === result.run.id) setRun(result.run);
       // Learn by hand: the person's turn to write starts in the Changes tab.
       if (runIdRef.current === result.run.id && result.run.learnByHand) setTab("changes");

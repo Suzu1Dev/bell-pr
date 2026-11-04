@@ -16,9 +16,21 @@ export function registerRunsRoutes(
   app: Express,
   { workbench, insights }: RouteDeps,
 ) {
-  app.post("/api/runs/:id/plan/approve", async (req, res) =>
-    res.json({ run: await workbench.approvePlan(req.params.id) }),
-  );
+  app.post("/api/runs/:id/plan/approve", async (req, res) => {
+    // Builds before the overlap check sent no body. The digest is the one
+    // GET …/overlaps returned with the overlaps the person confirmed.
+    const { overlapDigest } = z
+      .object({ overlapDigest: z.string().regex(/^[a-f0-9]{64}$/).optional() })
+      .strict()
+      .parse(req.body ?? {});
+    res.json({ run: await workbench.approvePlan(req.params.id, { overlapDigest }) });
+  });
+  // The person's other contributions of this project whose files meet this
+  // run's plan, and their digest; read from their records and checkouts,
+  // nothing is stored.
+  app.get("/api/runs/:id/overlaps", async (req, res) => {
+    res.json(await workbench.planOverlaps(req.params.id));
+  });
   app.post("/api/runs/:id/plan/revise", async (req, res) => {
     const input = z
       .object({ feedback: z.string().trim().min(1).max(4000) })

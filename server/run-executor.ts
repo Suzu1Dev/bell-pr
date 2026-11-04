@@ -12,9 +12,11 @@ import path from "node:path";
 import { assertRunAgentAllowed } from "./codex-guard.js";
 import { command, git, agentEnvironment, recordedGitDir, redact } from "./process.js";
 import { readDiff } from "./git.js";
+import { planOverlaps } from "./group-local.js";
 import {
   claimReadyTasks,
   consumeTeamInbox,
+  directoryScopes,
   hasTeamInbox,
   memberReportJsonSchema,
   parseMemberResult,
@@ -762,6 +764,9 @@ export async function executeRun(ctx: WorkbenchContext, id: string) {
       );
       team.planSummary = parsed.summary;
       team.tasks = parsed.tasks;
+      const directories = await directoryScopes(run.worktreePath, run.baseSha, team.tasks);
+      if (directories.length)
+        ctx.log(run, "lead", sm().run.team.scopeDirectories({ scopes: directories }));
       if (parsed.premise) team.premise = parsed.premise;
       else delete team.premise;
       if (revisions.length && parsed.revisionNotes)
@@ -792,6 +797,14 @@ export async function executeRun(ctx: WorkbenchContext, id: string) {
         enterPhase(run, team, "awaiting_approval");
         run.status = "awaiting_plan";
         ctx.log(run, "lead", sm().run.team.awaitingApproval);
+        return;
+      }
+      // Another contribution of this project changes files the plan covers: the person decides.
+      if ((await planOverlaps(ctx, run)).overlaps.length) {
+        if (signal.aborted) throw new AppError(cancelled(), 409);
+        enterPhase(run, team, "awaiting_approval");
+        run.status = "awaiting_plan";
+        ctx.log(run, "lead", sm().run.local.autoOverlap, { kind: "notice" });
         return;
       }
       team.approvedAt = now();
