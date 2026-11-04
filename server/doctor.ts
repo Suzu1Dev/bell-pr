@@ -4,7 +4,7 @@
  * commits need, the GitHub CLI with its sign-in and permissions, the Codex
  * and Claude Code CLIs with their sign-ins, Claude Code's sandbox, the data
  * directory, the app, the platform, saved full access, and passwordless
- * sudo (BELL PR's rule file, or another rule).
+ * sudo (BELL PR's rule file and its expiry, or another rule).
  *
  * The probes run in parallel, each with a 5-second limit. What they find is
  * kept for 10 seconds per data directory and PATH, and callers in that
@@ -25,8 +25,9 @@ import {
   type AgentProvider,
 } from "../shared/models.js";
 import { product } from "../shared/product.js";
-import { bellSudoersFile } from "../shared/sudo.js";
+import { bellSudoersFile, sudoersExpiryState } from "../shared/sudo.js";
 import { agentLoginCheck } from "./agent-cli.js";
+import { sudoTestOverrides } from "./sudo-test-overrides.js";
 import { defaultActiveRunLimit, defaultAgentProcessLimit } from "./agent-slots.js";
 import { AppSettingsService, withAppSettings } from "./app-settings.js";
 import { version as appVersion } from "./build-info.js";
@@ -146,7 +147,8 @@ export interface DoctorOptions {
    */
   agentAccess?: AgentAccessMode;
   /**
-   * Sudoers file the passwordless-sudo check stats. It never reads the file.
+   * Sudoers file the passwordless-sudo check inspects. It reads only the
+   * expiry line and never changes the file.
    * Default: `/etc/sudoers.d/bell-pr-agent`.
    */
   sudoersFile?: string;
@@ -523,14 +525,19 @@ async function sudoNonInteractive(exec: DoctorExec): Promise<number | "absent"> 
   }
 }
 
-/** Whether the sudoers rule file is present. A missing file is not installed. */
-async function sudoersFileExists(file: string): Promise<boolean> {
+/**
+ * Whether the sudoers rule file is present, and its expiry state. A file
+ * that cannot be found is not installed; one that cannot be read has no
+ * valid expiry.
+ */
+async function sudoersRule(file: string) {
   try {
     await stat(file);
-    return true;
   } catch {
-    return false;
+    return undefined;
   }
+  const text = await readFile(file, "utf8").catch(() => undefined);
+  return sudoersExpiryState(text, Date.now());
 }
 
 /** Saved agent access in model-settings.json, when it is a known mode. */
@@ -624,7 +631,8 @@ function sandboxFixes(detection: SandboxDetection): Fix[] {
 type PasswordlessSudoCheck =
   | { status: "skip"; reason: "platform" | "missing" }
   | { status: "ok" }
-  | { status: "warn"; reason: "installed" | "external" };
+  | { status: "warn"; reason: "installed" | "external"; expiresAt?: string }
+  | { status: "fail"; reason: "expired" | "no-expiry"; file: string; expiresAt?: string };
 
 function buildReport(
   facts: Facts,
@@ -985,6 +993,14 @@ function buildReport(
     required: false,
     ...(sudo.status === "skip"
       ? { status: "skip" as const, reason: sudo.reason }
+      : sudo.status === "fail"
+        ? {
+            status: "fail" as const,
+            reason: sudo.reason,
+            detail: sudo.reason === "expired" ? m.passwordlessSudoExpired : m.passwordlessSudoNoExpiry,
+            ...(sudo.expiresAt ? { params: { expiresAt: sudo.expiresAt } } : {}),
+            ...fixes([{ label: sm().setup.fixes.removeSudoRule, command: `sudo rm ${sudo.file}` }]),
+          }
       : sudo.status === "warn"
         ? {
             status: "warn" as const,
@@ -993,6 +1009,7 @@ function buildReport(
               sudo.reason === "installed"
                 ? m.passwordlessSudoInstalled
                 : m.passwordlessSudoExternal,
+            ...(sudo.expiresAt ? { params: { expiresAt: sudo.expiresAt } } : {}),
           }
         : { status: "ok" as const }),
   });
@@ -1057,18 +1074,22 @@ export async function runDoctor(opts: DoctorOptions = {}): Promise<DoctorReport>
   return reportFrom(await entry.facts, opts);
 }
 
-/** Linux only. Warns when `sudo -n true` succeeds, and names whose rule allows it. */
+/**
+ * Linux only. Fails when BELL's rule file is past its expiry or has none,
+ * warns when `sudo -n true` succeeds, and names whose rule allows it.
+ */
 async function passwordlessSudoCheck(opts: DoctorOptions, platform: NodeJS.Platform): Promise<PasswordlessSudoCheck> {
   if (platform !== "linux") return { status: "skip", reason: "platform" };
   const run = opts.sudoRun ?? (() => sudoNonInteractive(opts.exec ?? command));
-  const [installed, code] = await Promise.all([
-    sudoersFileExists(opts.sudoersFile ?? bellSudoersFile),
-    run(),
-  ]);
+  const file = opts.sudoersFile ?? sudoTestOverrides.doctorSudoersFile ?? bellSudoersFile;
+  const [rule, code] = await Promise.all([sudoersRule(file), run()]);
   if (code === "absent") return { status: "skip", reason: "missing" };
+  const expiresAt = rule?.expiresAt ? { expiresAt: rule.expiresAt.toISOString() } : {};
+  if (rule && rule.state !== "valid")
+    return { status: "fail", reason: rule.state === "expired" ? "expired" : "no-expiry", file, ...expiresAt };
   if (code !== 0) return { status: "ok" };
-  return installed
-    ? { status: "warn", reason: "installed" }
+  return rule
+    ? { status: "warn", reason: "installed", ...expiresAt }
     : { status: "warn", reason: "external" };
 }
 
@@ -1163,6 +1184,8 @@ export interface DoctorCliDeps {
   stdout?: { write(text: string): unknown };
   /** Runs the probes' commands; tests may replace it. */
   exec?: DoctorExec;
+  /** The sudoers file to inspect (`--sudoers-path`); read only. */
+  sudoersFile?: string;
 }
 
 const symbols: Record<DoctorCheck["status"], string> = {
@@ -1266,6 +1289,7 @@ async function loadDoctorReport(
     force: true,
     ...(deps.exec ? { exec: deps.exec } : {}),
     ...(deps.dataDir ? { dataDir: deps.dataDir } : {}),
+    ...(deps.sudoersFile ? { sudoersFile: deps.sudoersFile } : {}),
     app: {
       version: appVersion,
       ...(port !== undefined ? { port } : {}),
@@ -1316,8 +1340,11 @@ async function doctorCli(
   const out = deps.stdout ?? process.stdout;
   const m = sm().setup.cli;
   let json = false;
-  for (const argument of argv) {
+  let sudoersFile = deps.sudoersFile;
+  for (let index = 0; index < argv.length; index++) {
+    const argument = argv[index];
     if (argument === "--json") json = true;
+    else if (argument === "--sudoers-path" && argv[index + 1]) sudoersFile = argv[++index];
     else if (argument === "--help" || argument === "-h") {
       out.write(`${m.usage}\n`);
       return 0;
@@ -1326,7 +1353,7 @@ async function doctorCli(
       return 2;
     }
   }
-  const report = await loadDoctorReport(deps, saved);
+  const report = await loadDoctorReport({ ...deps, ...(sudoersFile ? { sudoersFile } : {}) }, saved);
   out.write(
     json ? `${JSON.stringify(report, null, 2)}\n` : formatDoctorReport(report, deps.dataDir),
   );

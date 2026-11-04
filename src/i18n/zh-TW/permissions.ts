@@ -21,11 +21,14 @@ const messages: Translation<typeof en> = {
   installed: ({ user }) => `已啟用：帳號 ${user} 使用 sudo 不需要密碼。這是 ${product.name} 建立的規則，可在這裡移除。`,
   external: ({ user }) => `帳號 ${user} 使用 sudo 已不需要密碼，但規則不是 ${product.name} 建立的，${product.name} 不會移除它。`,
   password: ({ user }) => `sudo 密碼（${user}）`,
+  ttl: "自動關閉時間",
+  ttlOption: ({ minutes }) => (minutes < 60 ? `${minutes} 分鐘` : `${minutes / 60} 小時`),
+  expiresAt: ({ time }) => `將於 ${time} 關閉。`,
   enable: "啟用免密碼 sudo",
   enabling: "設定中…",
   remove: `移除 ${product.name} 的 sudo 規則`,
   removing: "移除中…",
-  help: ({ user }) => `輸入一次密碼，為帳號 ${user} 建立免密碼 sudo 規則（/etc/sudoers.d/bell-pr-agent）。密碼只交給 sudo 完成這一次設定，不會被儲存或寫入記錄。這條規則讓帳號 ${user} 不需密碼就能取得 root 權限，包含以它執行的所有程式與 Agent。`,
+  help: ({ user }) => `每次啟用都要輸入密碼，為帳號 ${user} 建立免密碼 sudo 規則（/etc/sudoers.d/bell-pr-agent），在上方選擇的時間內有效（最長 8 小時），時間到 ${product.name} 會移除規則。只能在這台電腦上的 ${product.name} 操作。密碼只交給 sudo 完成這一次設定，不會被儲存或寫入記錄。這條規則讓帳號 ${user} 不需密碼就能取得 root 權限，包含以它執行的所有程式與 Agent。`,
   failed: "操作未完成，請再試一次。",
 };
 export default messages;

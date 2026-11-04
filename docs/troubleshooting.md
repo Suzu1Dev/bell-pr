@@ -17,6 +17,10 @@ other than `~/.bellpr`; when you started it with `npx`, run
 runs with that data directory, even one started with `--port`, or, while
 none runs, the port that a start would use.
 
+On Linux, the Passwordless sudo line fails when BELL PR's sudo rule is past
+its expiry time or has none; run the `sudo rm` command it prints. Add
+`--sudoers-path <file>` to inspect another file; the check only reads it.
+
 Contents:
 
 - [I lost the address](#i-lost-the-address)

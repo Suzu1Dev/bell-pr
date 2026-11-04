@@ -1,5 +1,6 @@
 export default {
   fullAccessNotice: "This Claude agent ran without the OS sandbox because full access was selected for this run.",
+  hostOnly: "Passwordless sudo can be changed only in BELL PR on this computer, signed in with the install token.",
   busy: "Passwordless sudo is being configured. Please wait.",
   invalidUser: "This account name cannot safely be written to a sudoers rule.",
   invalidRule: "The sudoers rule failed visudo validation and was not installed.",

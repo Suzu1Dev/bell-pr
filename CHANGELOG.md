@@ -645,6 +645,21 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   Files that earlier builds saved load as before, and saved files are read
   as leniently as before.
 
+## [1.0.1] - Unreleased
+
+### Changed
+
+- The sudo helper is now host-local only and enabled for a limited time.
+  sudo 輔助功能改為僅限主機本機、限時啟用。
+  Each enable asks for the sudo password and a duration from 1 minute to
+  8 hours (1 hour by default). BELL PR removes the rule when the time is up
+  and, at startup, removes a rule past its time. Only the install token,
+  from this computer at `localhost`, `127.0.0.1` or `[::1]` and without
+  proxy headers, may use it; paired devices may not. Changes are recorded
+  in `audit/sudo.jsonl` in the data directory, never with the password.
+  `bell-pr doctor` reports a rule past its time or without one, and
+  `--sudoers-path <file>` picks the file it inspects.
+
 ## [1.0.0] - 【暫定】
 
 The first public release candidate of BELL PR, open source under the
