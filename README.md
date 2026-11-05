@@ -176,7 +176,7 @@ It uses npm for this installation because mise's default npm backend can
 reject newly published packages:
 
 ```sh
-MISE_NPM_PACKAGE_MANAGER=npm mise use -g node@24 npm:bell-pr@1.1.0
+MISE_NPM_PACKAGE_MANAGER=npm mise use -g node@24 npm:bell-pr@1.1.1
 mise exec -- bell-pr
 ```
 
