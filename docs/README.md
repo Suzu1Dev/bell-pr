@@ -26,4 +26,4 @@
   source.
 
 The product overview is in the [README](../README.md)
-([繁體中文](../README.zh-TW.md)).
+([繁體中文](../README-zh-TW.md)).
