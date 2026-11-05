@@ -477,6 +477,8 @@ export function publishReadmeChoices(files) {
 export function publishReadmeProblems(contents) {
   const problems = [];
   const manifest = contents.has("package.json") ? JSON.parse(contents.get("package.json").toString("utf8")) : {};
+  // npm reads the README files only while `readme` is empty (`!data.readme`
+  // in @npmcli/package-json's normalize step), so an empty field is harmless.
   if (manifest.readme)
     problems.push("package.json has a `readme` field, which `npm publish` sends instead of README.md.");
   const choices = publishReadmeChoices([...contents.keys()]).sort();
@@ -917,6 +919,10 @@ function selfTest() {
   const english = Buffer.from("# Ready\n");
   assert.deepEqual(
     publishReadmeProblems(new Map([["package.json", manifest], ["README.md", english], ["README-zh-TW.md", english]])),
+    [],
+  );
+  assert.deepEqual(
+    publishReadmeProblems(new Map([["package.json", Buffer.from('{"readme":""}')], ["README.md", english]])),
     [],
   );
   assert.deepEqual(

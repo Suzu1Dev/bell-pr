@@ -186,10 +186,10 @@ takes as a README, which leaves `README.md` as npm's only choice. Name any
 other translated README the same way (`README-<language>.md`).
 `node scripts/check-pack.mjs` fails when npm could send another README
 than `README.md`: when the package has another root `README` or
-`README.*` file, or `package.json` a `readme` field. During the pack, any
-other root `README.*` is set aside. The originals wait in the folder
-`.README.md.orig` (gitignored) and `postpack` puts them back byte for
-byte. If a pack stops halfway, run `node scripts/npm-readme.mjs --post`
+`README.*` file, or `package.json` a non-empty `readme` field. During the
+pack, any other root `README` or `README.*` is set aside. The originals
+wait in the folder `.README.md.orig` (gitignored) and `postpack` puts
+them back byte for byte. If a pack stops halfway, run `node scripts/npm-readme.mjs --post`
 before you pack again.
 
 Official releases are published only by `.github/workflows/release.yml`,
