@@ -275,6 +275,9 @@ export class PasswordlessSudo {
       });
       if (check.code !== 0)
         throw new SudoError((m) => m.sudo.invalidRule, 500, "invalid_rule");
+      // While sudo needs no password it would not check this one either, so it must be off first.
+      if ((await this.status()).passwordless)
+        throw new SudoError((m) => m.sudo.alreadyOn, 409, "already_on");
       await this.authenticated(
         ["install", "-m", "0440", "-o", "root", "-g", this.group, file, staged],
         password,

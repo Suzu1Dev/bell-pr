@@ -519,7 +519,9 @@ with `visudo -c`, staged next to the target as mode 0440 owned by root and
 the account's group, checked again and renamed into place. Its comment line
 `# bell-pr-expires-at:` records the end time in UTC. BELL PR removes the rule
 when the time is up, and at startup removes a rule past its time or without
-one. Removal is confirmed by checking that the file is gone.
+one. Removal is confirmed by checking that the file is gone. While sudo
+already needs no password, enabling is refused with 409 before any password
+is sent; remove the rule, or wait until it ends, and enable it again.
 Only the install token may use the control, from this computer
 (a loopback address), with the host `localhost`, `127.0.0.1` or `[::1]`,
 and without `X-Forwarded-For`, `Forwarded`, `X-Forwarded-Host`,

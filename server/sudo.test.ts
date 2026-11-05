@@ -347,15 +347,33 @@ test("the rule is removed when its time is up", async () => {
   });
 });
 
-test("enabling again replaces the expiry, and disabling cancels it", async () => {
-  await withMachine({}, async ({ sudo, file, advance, entries }) => {
+test("enabling again while the rule is on is refused and keeps its expiry, and disabling cancels it", async () => {
+  await withMachine({}, async ({ machine, sudo, file, advance, entries }) => {
     await sudo.enable(correct, 60);
-    await sudo.enable(correct, 120);
-    await advance(60_000);
-    assert.equal(existsSync(file), true);
+    const calls = machine.calls.length;
+    await assert.rejects(sudo.enable(correct, 28_800), { statusCode: 409 });
+    // Only visudo on the new copy and the read-only `sudo -n true` check ran; nothing was sent a password.
+    assert.deepEqual(
+      machine.calls.slice(calls).map((call) => [call.executable, call.args[0], call.input]),
+      [["visudo", "-cf", undefined], ["sudo", "-k", undefined]],
+    );
+    assert.match(await readFile(file, "utf8"), /2026-11-04T10:01:00\.000Z/);
+    await advance(30_000);
     await sudo.disable();
     await advance(120_000);
-    assert.deepEqual((await entries()).map((entry) => entry.event), ["enable", "enable", "disable"]);
+    assert.equal(existsSync(file), false);
+    assert.deepEqual(
+      (await entries()).map((entry) => [entry.event, entry.ok, entry.reason]),
+      [["enable", true, null], ["enable", false, "already_on"], ["disable", true, null]],
+    );
+  });
+});
+
+test("enable is refused before any password is sent while another rule already allows sudo", async () => {
+  await withMachine({ passwordless: true, otherRule: true }, async ({ machine, sudo, file }) => {
+    await assert.rejects(sudo.enable("any-other-text"), { statusCode: 409 });
+    assert.equal(existsSync(file), false);
+    assert.equal(machine.calls.some((call) => call.input !== undefined), false);
   });
 });
 

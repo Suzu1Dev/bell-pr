@@ -13,7 +13,8 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   sudo 輔助功能改為僅限主機本機、限時啟用。
   Each enable asks for the sudo password and a duration from 1 minute to
   8 hours (1 hour by default). BELL PR removes the rule when the time is up
-  and, at startup, removes a rule past its time. Only the install token,
+  and, at startup, removes a rule past its time. While it is on, it cannot
+  be enabled again to move its end time; remove it first. Only the install token,
   from this computer at `localhost`, `127.0.0.1` or `[::1]` and without
   proxy headers, may use it; paired devices may not. Changes are recorded
   in `audit/sudo.jsonl` in the data directory, never with the password.

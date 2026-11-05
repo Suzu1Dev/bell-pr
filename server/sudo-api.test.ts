@@ -225,6 +225,31 @@ test("the install token from this computer may use every method at localhost, 12
   );
 });
 
+test("while the rule is on, the install token from this computer cannot extend it, with any password", async (t) => {
+  const { api, audit, state, directory } = await rig(t);
+  const enabled = await api("POST", { password: correct, ttlSeconds: 60 }, { Host: "localhost:4311" });
+  assert.equal(enabled.status, 200);
+  const { expiresAt } = (enabled.body as { sudo: { expiresAt: string } }).sudo;
+  const privileged = state.privileged;
+  for (const password of [correct, "not-the-password"]) {
+    const again = await api("POST", { password, ttlSeconds: 28_800 }, { Host: "localhost:4311" });
+    assert.equal(again.status, 409);
+    assert.equal(again.text.includes(password), false);
+  }
+  assert.equal(state.privileged, privileged);
+  assert.equal((await readFile(path.join(directory, "bell-pr-agent"), "utf8")).includes(expiresAt), true);
+  const status = await api("GET");
+  assert.equal((status.body as { sudo: { expiresAt: string } }).sudo.expiresAt, expiresAt);
+  assert.deepEqual(
+    (await audit()).map((entry) => [entry.event, entry.ok, entry.reason, entry.tokenType]),
+    [
+      ["enable", true, null, "host"],
+      ["enable", false, "already_on", "host"],
+      ["enable", false, "already_on", "host"],
+    ],
+  );
+});
+
 test("a paired device token is refused for every method and sub-path, even from this computer", async (t) => {
   const { each, api, audit, state, directory } = await rig(t);
   const device = await new DeviceTokens(directory).add("phone", installToken);
@@ -293,8 +318,10 @@ test("enable takes ttlSeconds from 60 to 28800, one hour when missing, and nothi
   assert.equal(enabled.status, 200);
   const expiresAt = Date.parse((enabled.body as { sudo: { expiresAt: string } }).sudo.expiresAt);
   assert.ok(expiresAt >= before + 3_600_000 - 1000 && expiresAt <= Date.now() + 3_600_000);
-  for (const ttlSeconds of [60, 120, 28_800])
+  for (const ttlSeconds of [60, 120, 28_800]) {
+    assert.equal((await api("DELETE", {})).status, 200);
     assert.equal((await api("POST", { password: correct, ttlSeconds })).status, 200, String(ttlSeconds));
+  }
   for (const ttlSeconds of [0, -1, 59, 28_801, 90.5, null, "3600", "permanent", 1e12])
     assert.equal((await api("POST", { password: correct, ttlSeconds })).status, 400, String(ttlSeconds));
 });
