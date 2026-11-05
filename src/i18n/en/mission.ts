@@ -393,6 +393,8 @@ const mission = {
         codex: "Uses the Codex CLI you installed and signed in to.",
         claude:
           "Uses the Claude Code CLI you installed and signed in to (Claude plan or Anthropic API key). Usage counts against your own account. Available models depend on your plan.",
+        antigravity:
+          "Uses the Antigravity CLI (agy) you installed and signed in to (Google account, Gemini API key or Google Cloud credentials). Usage counts against your own account, and the models listed depend on it. Its agents can always search the web, and it does not start in a project that ships Antigravity hooks, MCP servers, plugins, agents or skills.",
       } satisfies Record<AgentProvider, string>,
       /** A provider in the list with its state, for example "Codex — not signed in". */
       providerOption: ({ provider, state }: { provider: string; state: string }) =>
@@ -423,10 +425,10 @@ const mission = {
         `Model default${effort ? ` · ${effort}` : ""}`,
       unknownEffort:
         "The saved effort is not in this model's list. Choose again.",
-      effortHelp: `Only the efforts the selected model supports are listed. Higher efforts take longer per turn and use more of your account's usage; ${product.name} waits longer for Claude Code and for the xhigh and max efforts.`,
+      effortHelp: `Only the efforts the selected model supports are listed. Higher efforts take longer per turn and use more of your account's usage; ${product.name} waits longer for Claude Code, Antigravity and the xhigh and max efforts.`,
       webAccess: "Let Agents search the web and read pages",
       webAccessHelp:
-        "Applies to the Lead, Teammates, Reviewer, Test analyst and the follow-up tutor; project analysis and discovery stay offline. Web content is treated as untrusted data, and Claude Code's curl and wget stay blocked except for writable roles with full access.",
+        "Applies to the Lead, Teammates, Reviewer, Test analyst and the follow-up tutor; project analysis and discovery stay offline. Web content is treated as untrusted data, and Claude Code's curl and wget stay blocked except for writable roles with full access. The Antigravity CLI's web search cannot be turned off: with Antigravity, every Agent, analysis and discovery included, can search the web whatever this says; it may only read pages when this is on.",
       /** `message` is the reason the list could not be loaded. */
       error: ({ message }: { message: string }) =>
         `${message} Your saved choice is kept.`,

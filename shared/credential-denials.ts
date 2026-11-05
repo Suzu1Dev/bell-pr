@@ -1,7 +1,8 @@
 /**
- * Paths both agent CLIs are told not to read. Claude maps each entry to a
- * Read deny rule; Codex maps the same entries into its permission profile.
- * One function, so the two lists cannot drift.
+ * Paths every agent CLI is told not to read. Claude maps each entry to a
+ * Read deny rule, Codex maps the same entries into its permission profile
+ * and Antigravity into `read_file` deny rules. One function, so the lists
+ * cannot drift.
  *
  * The operating-system sandbox is what applies this list to shell commands.
  * The person can turn that sandbox off.
@@ -10,8 +11,9 @@ import { spawnSync } from "node:child_process";
 import { realpathSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { physicalPath } from "./physical-path.js";
 
-/** Home paths denied for both agents, plus the files that were already denied. */
+/** Home paths denied for every agent, plus the files that were already denied. */
 const staticPaths = [
   "~/.config/gh/**",
   "~/.git-credentials",
@@ -22,6 +24,9 @@ const staticPaths = [
   "~/.npmrc",
   "~/.claude/.credentials.json",
   "~/.codex/auth.json",
+  // The Antigravity CLI's saved Google sign-in and its plugins' secrets.
+  "~/.gemini/antigravity-cli/antigravity-oauth-token",
+  "~/.config/antigravity/plugin-secrets.json",
 ];
 
 function resolved(value: string) {
@@ -34,22 +39,13 @@ function resolved(value: string) {
 
 /**
  * The absolute path as given, plus its physical path when a symbolic link
- * makes them differ. A missing leaf uses the parent's physical path.
- * Denying only the physical path misses the path a CLI opens on macOS,
- * where `/var` is `/private/var`.
+ * makes them differ. A missing path uses its nearest existing ancestor's
+ * physical path. Denying only the physical path misses the path a CLI opens
+ * on macOS, where `/var` is `/private/var`.
  */
 function pathForms(value: string): string[] {
   const given = path.resolve(value);
-  let physical = given;
-  try {
-    physical = realpathSync(value);
-  } catch {
-    try {
-      physical = path.join(realpathSync(path.dirname(given)), path.basename(given));
-    } catch {
-      physical = given;
-    }
-  }
+  const physical = physicalPath(value);
   return physical === given ? [given] : [given, physical];
 }
 
@@ -85,7 +81,7 @@ function tokenize(value: string): string[] {
   return out;
 }
 
-function expandHome(file: string, home: string) {
+export function expandHome(file: string, home: string) {
   if (file === "~") return home;
   if (file.startsWith("~/") || file.startsWith("~\\"))
     return path.join(home, file.slice(2));

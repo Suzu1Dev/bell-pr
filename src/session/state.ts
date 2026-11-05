@@ -23,6 +23,23 @@ export function showSessionTab(run: SessionRun, demo: boolean) {
   return !demo && !run.learnByHand && (!!run.session || sessionTabStatuses.includes(run.status));
 }
 
+/**
+ * Whether the setup checklist offers to hand its commands to an agent: a
+ * Full access run whose collaboration turns can still run (in review or
+ * approved, with its checkout). The server checks the same again.
+ */
+export function setupHandOffShown(
+  run: SessionRun & Pick<Run, "modelExecution" | "workspaceRemovedAt">,
+  demo: boolean,
+) {
+  return (
+    showSessionTab(run, demo) &&
+    run.modelExecution?.agentAccess === "full" &&
+    (run.status === "review" || run.status === "approved") &&
+    !run.workspaceRemovedAt
+  );
+}
+
 /** Why a new agent turn cannot start now, or undefined when it can. Mirrors the server's checks. */
 export function sessionTurnBlock(
   run: SessionRun,

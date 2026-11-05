@@ -420,6 +420,11 @@ export default {
   models: {
     catalogUnavailable:
       "The Codex model list cannot be read right now. Check that the CLI is installed and signed in, then try again later.",
+    antigravityCatalogUnavailable:
+      "The Antigravity model list cannot be read right now. Check that the agy CLI is installed and signed in, then try again later.",
+    /** The description of every model the Antigravity CLI lists. */
+    antigravityModel:
+      "Listed by the Antigravity CLI for your account, with the thinking levels it offers as reasoning efforts.",
     /** Descriptions of the Claude Code model aliases. */
     claudeOpus:
       "Suited to complex code changes, reviews and multi-step reasoning.",

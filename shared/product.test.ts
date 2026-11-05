@@ -20,25 +20,30 @@ test("the product is BELL PR, installed as bell-pr with two commands", () => {
   assert.deepEqual([...product.binNames], ["bell-pr", "bellpr"]);
 });
 
-test("every URL and email is a string, the repository is decided and the rest stay empty", () => {
+test("every URL and email is a string, the website and repository are decided and the rest stay empty", () => {
   for (const key of [...linkKeys, ...emailKeys]) {
     assert.equal(typeof product[key], "string", key);
     // Nothing is invented: a value stays "" until the project decides it.
     // Update this expectation together with the value when that happens.
-    if (key === "publicRepoUrl") assert.equal(product[key], "https://github.com/Suzu1Dev/bell-pr", key);
+    if (key === "homepageUrl") assert.equal(product[key], "https://bell-pr.suzu.tw", key);
+    else if (key === "publicRepoUrl") assert.equal(product[key], "https://github.com/Suzu1Dev/bell-pr", key);
     else assert.equal(product[key], "", key);
   }
 });
 
 test("productLink and productEmail return undefined for empty values and the value once decided", () => {
   for (const key of linkKeys)
-    assert.equal(productLink(key), key === "publicRepoUrl" ? product.publicRepoUrl : undefined, key);
+    assert.equal(productLink(key), key === "publicRepoUrl" || key === "homepageUrl" ? product[key] : undefined, key);
   for (const key of emailKeys) assert.equal(productEmail(key), undefined, key);
 });
 
-test("productLink and productEmail return a value once it is set", () => {
+test("productLink and productEmail hide explicitly empty metadata and expose configured values", () => {
   const saved = { ...product };
   try {
+    product.homepageUrl = "";
+    product.supportEmail = "";
+    assert.equal(productLink("homepageUrl"), undefined);
+    assert.equal(productEmail("supportEmail"), undefined);
     product.homepageUrl = "https://example.test/bell-pr";
     product.supportEmail = "support@example.test";
     assert.equal(productLink("homepageUrl"), "https://example.test/bell-pr");
@@ -46,5 +51,5 @@ test("productLink and productEmail return a value once it is set", () => {
   } finally {
     Object.assign(product, saved);
   }
-  assert.equal(productLink("homepageUrl"), undefined);
+  assert.equal(productLink("homepageUrl"), saved.homepageUrl);
 });

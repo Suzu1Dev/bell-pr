@@ -75,13 +75,15 @@ const m: Translation<typeof en> = {
   },
   provider: {
     title: "AI 服務",
-    intro: "Agent 透過這台電腦上的 AI 程式開發 CLI 工作：已安裝並登入的 Codex CLI 或 Claude Code。",
-    needOne: "你至少需要一個 AI 服務。請安裝並登入 Codex CLI 或 Claude Code，指令列在下方。",
+    intro: "Agent 透過這台電腦上的 AI 程式開發 CLI 工作：已安裝並登入的 Codex CLI、Claude Code 或 Antigravity CLI。",
+    needOne: "你至少需要一個 AI 服務。請安裝並登入 Codex CLI、Claude Code 或 Antigravity CLI，指令列在下方。",
     readyWith: ({ providers }) => `已可使用 ${fmt.list(providers)}。`,
     description: {
       codex: "使用你已安裝並登入的 Codex CLI，用量計入你自己的帳戶。",
       claude:
         "使用你已安裝並登入的 Claude Code CLI（Claude 方案或 Anthropic API 金鑰），用量計入你自己的帳戶。",
+      antigravity:
+        "使用你已安裝並登入的 Antigravity CLI（agy；Google 帳號、Gemini API 金鑰或 Google Cloud 憑證），用量計入你自己的帳戶。",
     },
     fixesTitle: "請執行以下指令完成設定：",
     models: {
@@ -97,14 +99,14 @@ const m: Translation<typeof en> = {
     intro: "Agent 會在這台電腦上執行專案的程式碼，這些設定決定它們能接觸到哪些東西。",
     sandbox: {
       title: "Claude Code 沙箱",
-      text: "會修改檔案的 Claude Code Agent 在作業系統沙箱裡執行每個指令：寫入只限於該工作的 checkout，網路也是關閉的。Codex CLI 使用它自己的沙箱。",
+      text: "會修改檔案的 Claude Code Agent 在作業系統沙箱裡執行每個指令：寫入只限於該工作的 checkout 與 Claude Code 的暫存資料夾，網路也是關閉的。你自己的 Claude Code 使用者設定可能放寬沙箱（proxy 連接埠、允許的網域或路徑、排除的指令、外掛的語言伺服器）。Codex CLI 使用它自己的沙箱。會修改檔案的 Antigravity Agent 在 Antigravity CLI 的終端機沙箱裡執行指令，寫入限於 checkout，網路也是關閉的。",
     },
     unsandboxed: {
-      label: "允許 Claude Code Agent 在沙箱外執行",
+      label: "允許 Claude Code 與 Antigravity Agent 在沙箱外執行",
       help: "只在沙箱無法使用時才會用到。關閉時，需要它的工作會被拒絕。",
       confirmTitle: "要允許 Agent 在沙箱外執行嗎？",
       confirmText:
-        "沙箱無法使用時，會修改檔案的 Claude Code Agent 將在沙箱外執行，因此能讀取與修改你的使用者帳號可以存取的一切，例如其他專案、你的 SSH 金鑰與各個工具的登入資訊。請只對你信任的專案這樣做。",
+        "沙箱無法使用時，會修改檔案的 Claude Code 與 Antigravity Agent 將在沙箱外執行，因此能讀取與修改你的使用者帳號可以存取的一切，例如其他專案、你的 SSH 金鑰與各個工具的登入資訊。請只對你信任的專案這樣做。",
       confirmBadge: "只要有 Agent 在沙箱外工作過，該工作在工作區會帶有標記，紀錄中也會註明。",
       confirm: "允許在沙箱外執行",
       cancel: "維持使用沙箱",
@@ -193,7 +195,7 @@ const m: Translation<typeof en> = {
         BELLPR_MAX_ACTIVE_RUNS: "同時執行的工作數：1 到 8，預設 2。",
         BELLPR_MAX_AGENT_PROCESSES: "同時執行的 Agent CLI 行程數：1 到 32，預設 3。",
         BELLPR_AGENT_TIMEOUT_SCALE: "Agent 逾時倍數：0.5 到 10，預設 1。",
-        BELLPR_ALLOW_UNSANDBOXED_AGENTS: "設為 1 允許 Claude Code Agent 在沙箱外執行。",
+        BELLPR_ALLOW_UNSANDBOXED_AGENTS: "設為 1 允許 Claude Code 與 Antigravity Agent 在沙箱外執行。",
         BELLPR_REQUIRE_UNDERSTANDING_CHECK: "設為 1 會保持理解檢查開啟並鎖定這項設定。沒有任何值能關閉它。",
         BELLPR_RETENTION_DAYS: "保留已停止與失敗工作檔案的天數：1 到 365，預設 14。",
         BELLPR_LOG_LEVEL: "伺服器紀錄的詳細程度：debug、info（預設）、warn 或 error。",

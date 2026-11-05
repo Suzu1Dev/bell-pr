@@ -37,11 +37,11 @@ const workspace = {
     draft: "PR draft",
     commits: "Commit history",
   },
-  /** The badge of a run whose Claude Code agent ran without the OS sandbox. */
+  /** The badge of a run whose Claude Code or Antigravity agent ran without the OS sandbox. */
   unsandboxed: {
     label: "Ran without sandbox",
     tooltip:
-      "You allowed Claude agents to run without the operating system's sandbox, so an agent of this run could read or change files outside its working folder. Check its changes with extra care. The safety settings turn this off for new runs.",
+      "You allowed agents to run without the operating system's sandbox, so an agent of this run could read or change files outside its working folder. Check its changes with extra care. The safety settings turn this off for new runs.",
   },
   /**
    * The badge of a run approved without the understanding check, or one
@@ -72,6 +72,23 @@ const workspace = {
   },
   sampleReview: "Sample review",
   humanReview: "Human review",
+  /** Other contributions of the same project whose files meet the plan's scopes. */
+  overlap: {
+    label: "Overlap with your other contributions",
+    heading: ({ count }: { count: number }) =>
+      count === 1
+        ? "Another contribution of yours to this project changes files this plan covers"
+        : `${count} other contributions of yours to this project change files this plan covers`,
+    item: ({ title, status }: { title: string; status: string }) => `“${title}” (${status}):`,
+    hint: "Whichever is merged second may need its conflicts resolved. Send the plan back to keep away from these files, or approve it anyway.",
+    confirm: "I know these overlap; approve anyway",
+    /** A Learn-by-hand plan: the person changes their own steps. */
+    hintByHand: "Whichever is merged second may need its conflicts resolved. Change your steps to keep away from these files, or confirm your plan anyway.",
+    confirmByHand: "I know these overlap; confirm my plan anyway",
+    chip: ({ titles }: { titles: string }) => `Also changed in ${titles}`,
+    /** One title in the chip's list. */
+    quoted: ({ title }: { title: string }) => `“${title}”`,
+  },
   /** The lead's check of the request's assumption, made by reading the code. */
   premise: {
     label: "Premise check",
@@ -544,6 +561,7 @@ const workspace = {
       rules: "The project's rules",
       issue: "The issue",
       pacing: "Your pace here",
+      others: "Your other contributions here",
       words: "Your words and reviewability",
       safety: "Safety",
     },

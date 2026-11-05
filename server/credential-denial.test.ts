@@ -120,6 +120,10 @@ test("a config directory under a symlinked parent is denied as given and at its 
   await mkdir(gh);
   const xdg = path.join(link, "xdg");
   await mkdir(xdg);
+  const claude = path.join(link, "claude-config");
+  await mkdir(claude);
+  const codex = path.join(link, "codex-home");
+  await mkdir(codex);
   const denials = sharedCredentialDenials({
     env: {
       PATH: process.env.PATH,
@@ -128,6 +132,8 @@ test("a config directory under a symlinked parent is denied as given and at its 
       GIT_CONFIG_NOSYSTEM: "1",
       GH_CONFIG_DIR: gh,
       XDG_CONFIG_HOME: xdg,
+      CLAUDE_CONFIG_DIR: claude,
+      CODEX_HOME: codex,
     },
     home: path.join(root, "home"),
   });
@@ -137,6 +143,43 @@ test("a config directory under a symlinked parent is denied as given and at its 
   assert.ok(denials.includes(`${realGh}/**`), "physical GH_CONFIG_DIR");
   assert.ok(denials.includes(`${path.join(xdg, "gh")}/**`), "given XDG gh");
   assert.ok(denials.includes(`${path.join(await realpath(xdg), "gh")}/**`), "physical XDG gh");
+  // The credential files themselves do not exist yet: their directories give the physical path.
+  assert.ok(denials.includes(path.join(claude, ".credentials.json")), "given CLAUDE_CONFIG_DIR");
+  assert.ok(denials.includes(path.join(await realpath(claude), ".credentials.json")), "physical CLAUDE_CONFIG_DIR");
+  assert.ok(denials.includes(path.join(codex, "auth.json")), "given CODEX_HOME");
+  assert.ok(denials.includes(path.join(await realpath(codex), "auth.json")), "physical CODEX_HOME");
+});
+
+test("a moved config directory that does not exist yet is denied at its physical path too", { skip: process.platform === "win32" }, async (t) => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "bell-credential-missing-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const physical = path.join(root, "physical");
+  const link = path.join(root, "link");
+  await mkdir(physical);
+  await symlink(physical, link, "dir");
+  const realPhysical = await realpath(physical);
+  // Several levels below the link are missing, as with a fresh macOS /var path.
+  const gh = path.join(link, "new", "deeper", "gh-config");
+  const xdg = path.join(link, "new-xdg");
+  const codex = path.join(link, "new", "codex-home");
+  const denials = sharedCredentialDenials({
+    env: {
+      PATH: process.env.PATH,
+      HOME: path.join(root, "home"),
+      GIT_CONFIG_GLOBAL: path.join(root, "missing.gitconfig"),
+      GIT_CONFIG_NOSYSTEM: "1",
+      GH_CONFIG_DIR: gh,
+      XDG_CONFIG_HOME: xdg,
+      CODEX_HOME: codex,
+    },
+    home: path.join(root, "home"),
+  });
+  assert.ok(denials.includes(`${gh}/**`), "given GH_CONFIG_DIR");
+  assert.ok(denials.includes(`${path.join(realPhysical, "new", "deeper", "gh-config")}/**`), "physical GH_CONFIG_DIR");
+  assert.ok(denials.includes(`${path.join(xdg, "gh")}/**`), "given XDG gh");
+  assert.ok(denials.includes(`${path.join(realPhysical, "new-xdg", "gh")}/**`), "physical XDG gh");
+  assert.ok(denials.includes(path.join(codex, "auth.json")), "given CODEX_HOME");
+  assert.ok(denials.includes(path.join(realPhysical, "new", "codex-home", "auth.json")), "physical CODEX_HOME");
 });
 
 test("Claude and Codex are given the same shared credential denials", async (t) => {
@@ -181,7 +224,12 @@ test("Claude and Codex are given the same shared credential denials", async (t) 
     "~/.npmrc",
   ]) {
     assert.ok(settings.permissions.deny.includes(`Read(${entry})`), entry);
-    assert.ok(table!.includes(`"${entry}"="deny"`), entry);
+    // Codex gets each X/** as the directory X/, because it skips symbolic
+    // links when it expands **. ~/.ssh/** then repeats ~/.ssh/ and is left
+    // out; both together stop bubblewrap.
+    assert.equal(table!.includes(`"${entry}"="deny"`), !entry.endsWith("/**"), entry);
+    if (entry.endsWith("/**") && entry !== "~/.ssh/**")
+      assert.ok(table!.includes(`"${entry.slice(0, -2)}"="deny"`), entry);
   }
   const custom = path.join(os.homedir(), ".bell-pr-custom-credentials");
   assert.ok(settings.permissions.deny.some((rule) => rule.includes(custom)));

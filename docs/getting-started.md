@@ -4,11 +4,16 @@ This guide takes you from installing BELL PR to your first Draft PR. It
 takes a few minutes to set up, and the sample project lets you try every
 step before you touch a real project.
 
+Choose an [installation method](installation.md): npm, the shell installer,
+Homebrew, Bun or mise. On Windows, the [PowerShell setup](installation.md#windows-with-wsl2)
+prepares the tools inside WSL2; finish the sign-in steps there before continuing.
+
 ## Before you start
 
 You need:
 
-- **Node.js 22 or later** ([nodejs.org](https://nodejs.org/en)).
+- **Node.js 22 or later** ([nodejs.org](https://nodejs.org/en)). The shell
+  installer can prepare Node.js 24 when needed.
 - **Git**. Syncing a run onto the latest target branch needs Git 2.40 or
   later. Set your name and e-mail address once:
   `git config --global user.name "Your Name"` and
@@ -32,9 +37,10 @@ You need:
   run in the operating-system sandbox (`sudo apt-get install bubblewrap
   socat` on Debian and Ubuntu). macOS has its sandbox built in.
 
-BELL PR runs on macOS and Linux, and on Windows inside WSL2
-([install WSL](https://learn.microsoft.com/windows/wsl/install), then
-install everything above inside your WSL distribution).
+BELL PR runs on macOS and Linux. Windows uses WSL2, with every tool above
+installed and signed in inside the same distribution; native Windows is not
+supported. The WSL2 setup has not been verified on a real Windows host.
+See [Windows setup](installation.md#windows-with-wsl2).
 
 `bell-pr doctor` checks all of this and prints the command that fixes each
 problem.
@@ -42,7 +48,8 @@ problem.
 ### With no AI provider
 
 `bell-pr start` does not listen until every required check passes. With
-neither the Codex CLI nor Claude Code installed and signed in, it exits
+none of the Codex CLI, Claude Code and the Antigravity CLI installed and
+signed in, it exits
 and prints **Not ready**, then this line, before the commands that fix
 each check:
 
@@ -74,11 +81,19 @@ npm install -g bell-pr
 bell-pr
 ```
 
+If you used another [installation method](installation.md), start with `bell-pr`
+(`mise exec -- bell-pr` for mise). After Windows setup, you can launch it from
+PowerShell each time with:
+
+```powershell
+wsl -d Ubuntu -- bash -lc '$HOME/.local/bin/bell-pr'
+```
+
 BELL PR starts on your computer, prints its address and opens BELL PR in your
 browser:
 
 ```text
-BELL PR 1.0.0-rc.1 → http://127.0.0.1:4311
+BELL PR <version> → http://127.0.0.1:4311
 ```
 
 Keep the terminal open: BELL PR runs until you stop it with Ctrl+C. The API
@@ -91,6 +106,11 @@ only this computer can reach it; see [Security model](security-model.md).
 > computer. It prints the address again, without the API token, and opens it.
 > More in
 > [Troubleshooting](troubleshooting.md#i-lost-the-address).
+
+In WSL2, browser launch depends on your Windows/WSL setup. If no browser opens,
+run `bell-pr open --print --print-token` in another terminal in the same WSL
+distribution and open that link in your Windows browser. The link contains a
+credential; keep it private.
 
 BELL PR listens on `127.0.0.1:4311`, so only this computer can reach it.
 `bell-pr start --port <port>` picks another port. To run it as a service or
@@ -134,8 +154,9 @@ On **Repositories**, import a project in any of these forms:
 - a GitHub link, such as `https://github.com/owner/repo`;
 - the path of a Git folder on your computer, such as
   `~/projects/repository` (`~/` is your home directory). On Windows, use
-  the path inside WSL2, where BELL PR runs; a Windows folder is under
-  `/mnt/c/`, for example `/mnt/c/projects/repository`.
+  the path inside WSL2, where BELL PR runs. Keep projects in the Linux filesystem
+  such as `~/projects`; an existing Windows folder is mounted under `/mnt/c/`,
+  for example `/mnt/c/projects/repository`. Do not enter a `C:\…` path.
 
 BELL PR makes its own full clone in its data directory. Your own folder is
 never changed: runs never add branches or worktrees to it. A clone that
@@ -241,6 +262,31 @@ Start the run with **Generate the team plan** (with plan approval) or
 - With plan approval on, you read the plan first. **Approve the plan and
   start development**, or **Send back with feedback** for a new plan (up
   to 3 times).
+- When your other contributions to the same project change files the plan
+  covers, the plan lists each of them with its status and the files it
+  shares, and each task that touches those files says **Also changed in**
+  and names them. This counts contributions in progress, in review or
+  approved (their plan while it is still to be carried out, and what their
+  working copy changed), and ones with a pull request for what it changes,
+  until their change to a file is in this run's base commit, also after a
+  squash merge. A pull request you read as merged or closed (**Read
+  feedback**) no longer counts, nor does a contribution whose working copy
+  was removed before it was published. The parts of one split never count
+  against each other or the original, and an original that was split counts
+  only for the files none of its parts holds.
+  Whichever of two overlapping changes is merged second may need its
+  conflicts resolved, so approving needs the tick **I know these overlap;
+  approve anyway**. The tick counts only for what it was given on: when the
+  overlap or the plan changes before you approve, you confirm again. A run
+  started without plan approval waits for your approval instead, also after
+  **Stop** and a retry. A Learn by hand plan's files are checked the same
+  way at **This is my plan**. BELL PR only reads its own records and
+  working copies for this, without changing them; nothing is saved or
+  sent, and the temporary copy of a working copy's Git index it reads
+  through is deleted right after.
+- A file scope the Lead writes without a trailing `/` that is a directory
+  in the base commit, such as `src`, is read as `src/`, so it covers the
+  files inside; the activity log says so.
 - **Teammates** work at the same time, each in its own Git worktree, and
   share findings through the team inbox. You can message the Lead, one
   task or everyone.
@@ -259,10 +305,20 @@ Start the run with **Generate the team plan** (with plan approval) or
   teammate reports it, and **Overview & motivation** lists it under "Setup
   this machine needs from you" with a suggested command and who reported
   it. Check the command against the project's documentation before you run
-  it; the setup checklist never runs it. Explicit **Full access** in the model
+  it; the checklist itself never runs a command. Explicit **Full access** in the model
   settings lets writable agents install required tools and use available sudo
   privileges outside the checkout. Read the [access settings](security-model.md#explicit-full-access)
-  before enabling it; read-only roles keep their restrictions.
+  before enabling it; read-only roles keep their restrictions. On a Full
+  access run in review or approved, **Let the agent set this up** opens the commands for
+  you to tick and confirm, at most 10 per turn, then hands them to one
+  Collaborate turn, which runs without the sandbox and with your account.
+  The agent is told to run only the ticked commands that match the
+  project's documentation, adding at most non-interactive flags, `sudo -n`
+  and a package-index refresh. It verifies them, reruns the checks they
+  blocked and reports each item as installed, already present, failed or
+  needs you; an item it does not report shows as no result, and a turn
+  that is stopped or fails reports none. sudo works only when it needs no
+  password, and stopping the turn does not undo installs.
 - **Run details** folds the model and the AI usage: its line names the
   agent, the model, the calls and the input and output tokens, marks
   partial reports and says when usage was not reported, never 0.
@@ -281,7 +337,10 @@ layout from before you entered it.
 Before publishing an agent contribution, the **Collaborate** tab lets you ask
 an agent to finish missing checks, add tests or fix failures in the run's working
 copy. The draft's Limitations shortcut fills the message box for you to review
-and send. Each message starts a fresh agent call with recent conversation and
+and send. The setup checklist's **Let the agent set this up** (Full access runs
+only) starts its turn once you confirm the commands; the agent is told not to
+change code in that turn, and when the turn finishes, its per-item results
+appear in the conversation and on the checklist. Each message starts a fresh agent call with recent conversation and
 the existing reports as context; it uses your own CLI account.
 
 The conversation lists changed files, commands BELL actually observed, checks
@@ -505,7 +564,14 @@ or approved that is not published, is not a Learn-by-hand run and still has
 its working copy; it is not offered on the sample run. Conflicts a sync left
 must be resolved before the split, as before approval. BELL PR cannot check
 that a part works on its own, because one part's tests may need another
-part, so run each part's tests.
+part, so run each part's tests. When a plan task of one part depends on a
+task with files in another part, the part remembers that it builds on the
+other. Publishing it while the other is not merged asks you to confirm
+(`split-order`): publish that part first. A part counts as merged when you
+read its pull request as merged or when its change is in this part's base
+commit. Deleting a part removes it from the parts that build on it, and
+splitting a part again passes what it builds on to its new parts; deleting
+those new parts makes the parts that built on them build on that part again.
 
 **The maintainer checklist** shows, row by row, the project's rules,
 whether pull requests are open to you, the linked issue, your pace in this

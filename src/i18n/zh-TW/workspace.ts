@@ -31,7 +31,7 @@ const m: Translation<typeof en> = {
   unsandboxed: {
     label: "未使用沙箱執行",
     tooltip:
-      "你允許 Claude agent 不經作業系統沙箱執行，因此這次任務的 agent 可能讀取或修改工作資料夾以外的檔案。請更仔細地檢查它的變更。可在安全設定中為之後的任務關閉這個選項。",
+      "你允許 agent 不經作業系統沙箱執行，因此這次任務的 agent 可能讀取或修改工作資料夾以外的檔案。請更仔細地檢查它的變更。可在安全設定中為之後的任務關閉這個選項。",
   },
   checkOff: {
     label: "理解檢查已關閉",
@@ -53,6 +53,20 @@ const m: Translation<typeof en> = {
   },
   sampleReview: "範例審查",
   humanReview: "人工審查",
+  overlap: {
+    label: "與你其他貢獻的重疊",
+    heading: ({ count }) =>
+      count === 1
+        ? "你在這個專案的另一個貢獻也改了這個計畫涵蓋的檔案"
+        : `你在這個專案的其他 ${count} 個貢獻也改了這個計畫涵蓋的檔案`,
+    item: ({ title, status }) => `「${title}」（${status}）：`,
+    hint: "較晚合併的那一個可能需要解決衝突。你可以退回計畫、請 Lead 避開這些檔案，或仍然核准。",
+    confirm: "我知道這些檔案重疊，仍然核准",
+    hintByHand: "較晚合併的那一個可能需要解決衝突。你可以調整步驟、避開這些檔案，或仍然確認你的計畫。",
+    confirmByHand: "我知道這些檔案重疊，仍然確認我的計畫",
+    chip: ({ titles }) => `也在${titles}中修改`,
+    quoted: ({ title }) => `「${title}」`,
+  },
   premise: {
     label: "前提查核",
     heading: ({ verdict }) => `前提查核：${verdict}`,
@@ -423,6 +437,7 @@ const m: Translation<typeof en> = {
       rules: "專案規範",
       issue: "Issue",
       pacing: "你在這裡的步調",
+      others: "你在這裡的其他貢獻",
       words: "你的文字與可審閱性",
       safety: "安全",
     },

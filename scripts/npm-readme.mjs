@@ -5,29 +5,29 @@
  *
  *   node scripts/npm-readme.mjs --pre          prepack: ready README.md for npm
  *   node scripts/npm-readme.mjs --post         postpack: restore the READMEs
- *   node scripts/npm-readme.mjs --check-docs   links, anchors and error codes
+ *   node scripts/npm-readme.mjs --check-docs   links, anchors, error codes, pins
  *   node scripts/npm-readme.mjs --self-test    this script, on fixtures
  *
  * npmjs.com shows the package's README but cannot resolve a relative path
  * in it: the package leaves docs/ out (the `files` list in package.json),
  * and it names no repository while `publicRepoUrl` in shared/product.ts is
  * empty. Screenshots would show as broken images. And npm packs every
- * README.* at the root, whatever `files` says, then takes the first Markdown
- * README its file search returns as the package's README, which can be
- * README.zh-TW.md.
+ * README.* at the root, whatever `files` says, then `npm publish` takes the
+ * first Markdown README its file search returns as the package's README.
+ * That search has no fixed order, and bell-pr 1.0.0 got README.zh-TW.md.
  *
- * --pre keeps the original README.md in .README.md.orig (gitignored, and
- * never packed) and moves other root README.* files there, except
- * README.zh-TW.md which `files` ships in the package. It then
- * rewrites every relative image and link in README.md:
+ * --pre keeps the originals of README.md and README.zh-TW.md (which `files`
+ * ships in the package) in .README.md.orig (gitignored, and never packed),
+ * and moves the other root README.* files there. Either README can become
+ * the package's, so it rewrites every relative image and link in both:
  *   - to the absolute `<homepageUrl>/<site path>` when `homepageUrl` in
  *     shared/product.ts is set and the website serves the file. The website
  *     is site/ deployed as site/README.md ("Hosting") says: it serves any
  *     file of which site/ holds a byte-identical copy (the screenshots in
  *     assets/screenshots/);
- *   - otherwise an image becomes the text "Screenshot: <alt>" and a link
- *     keeps its text without the link, so npmjs.com never shows a broken
- *     image or a dead link.
+ *   - otherwise an image becomes the text "Screenshot: <alt>" ("截圖：<alt>"
+ *     in README.zh-TW.md) and a link keeps its text without the link, so
+ *     npmjs.com never shows a broken image or a dead link.
  * Links within the page (#…), absolute URLs and everything in code stay as
  * they are. --pre refuses to run while .README.md.orig exists: it holds the
  * originals from a pack that did not finish, so run --post first.
@@ -49,9 +49,12 @@
  *     (scripts/render-generated-regions.ts), which this check skips;
  *   - an ErrorCode of shared/errors.ts has no heading in
  *     docs/troubleshooting.md;
- *   - README.md, rewritten as --pre would, still has a relative path, or,
- *     rewritten with the current or a stand-in `homepageUrl`, links to a
- *     path that site/ does not serve.
+ *   - a document pins the package to another version than package.json's
+ *     (`npm:bell-pr@1.0.0` in the mise command while the release is
+ *     1.0.1), code included: the packed READMEs keep the pin;
+ *   - README.md or README.zh-TW.md, rewritten as --pre would, still has a
+ *     relative path, or, rewritten with the current or a stand-in
+ *     `homepageUrl`, links to a path that site/ does not serve.
  *
  * Messages go to stderr and findings to stdout, so `npm pack --json` keeps
  * its report readable.
@@ -122,7 +125,8 @@ export function proseOnly(text, { regions = false } = {}) {
   const lines = text.split("\n");
   let fence;
   for (let index = 0; index < lines.length; index++) {
-    const match = /^ {0,3}(`{3,}|~{3,})/.exec(lines[index]);
+    // A backtick fence has no backtick in its info string; such a line is prose.
+    const match = /^ {0,3}(`{3,}(?=[^`]*$)|~{3,})/.exec(lines[index]);
     if (fence) {
       if (
         match &&
@@ -361,22 +365,30 @@ export function siteServing(root) {
   };
 }
 
+/** An image the package cannot show, as text in the language of the README `name`. */
+const screenshotText = {
+  [readmeName]: (alt) => `Screenshot: ${alt || "untitled"}`,
+  [translatedReadme]: (alt) => `截圖：${alt || "未命名"}`,
+};
+
 /**
- * README.md for the npm package: every relative image and link that the
- * website serves (`sitePath`, see siteServing) made absolute against
- * `homepageUrl`; every other one, and all of them while `homepageUrl` is
- * empty, images as text and links as their text. Returns the text, what
- * changed, and the references that now point at the website.
+ * A README (README.md unless `name` says otherwise) for the npm package:
+ * every relative image and link that the website serves (`sitePath`, see
+ * siteServing) made absolute against `homepageUrl`; every other one, and
+ * all of them while `homepageUrl` is empty, images as text and links as
+ * their text. Returns the text, what changed, and the references that now
+ * point at the website.
  */
-export function npmReadme(text, { homepageUrl = "", sitePath = () => undefined } = {}) {
+export function npmReadme(text, { homepageUrl = "", sitePath = () => undefined, name = readmeName } = {}) {
   const base = homepageUrl.trim().replace(/\/+$/, "");
+  const screenshot = (reference) => (screenshotText[name] ?? screenshotText[readmeName])(plainText(reference.text));
   const changed = { images: 0, links: 0, site: 0 };
   const linked = [];
   let output = "";
   let cursor = 0;
   for (const reference of references(text)) {
     if (!isRelative(reference.dest)) continue;
-    const where = `README.md:${reference.line}`;
+    const where = `${name}:${reference.line}`;
     const target = reference.dest.replace(/^(\.\/)+/, "").replace(/^\/+/, "");
     if (target.split(/[/?#]/).includes(".."))
       throw new ReadmeError(`${where}: "${reference.dest}" leaves the repository root.`);
@@ -395,10 +407,8 @@ export function npmReadme(text, { homepageUrl = "", sitePath = () => undefined }
         text.slice(reference.start, reference.destStart) +
         `${base}/${destination}` +
         text.slice(reference.destEnd, reference.end);
-    } else if (reference.kind === "image")
-      replacement = `*Screenshot: ${plainText(reference.text) || "untitled"}*`;
-    else if (reference.kind === "html-image")
-      replacement = `<em>Screenshot: ${escapeHtml(plainText(reference.text) || "untitled")}</em>`;
+    } else if (reference.kind === "image") replacement = `*${screenshot(reference)}*`;
+    else if (reference.kind === "html-image") replacement = `<em>${escapeHtml(screenshot(reference))}</em>`;
     else if (reference.kind === "link") replacement = reference.text;
     else if (reference.kind === "html-link")
       // An <a> without href is text, so its closing tag can stay.
@@ -415,6 +425,52 @@ export function npmReadme(text, { homepageUrl = "", sitePath = () => undefined }
   return { text: output + text.slice(cursor), changed, linked };
 }
 
+/**
+ * What still keeps a README from showing on npmjs.com after npmReadme: each
+ * relative link or image left in `text`. Empty for a README ready for npm.
+ * The search for "](docs/" reads the raw text on purpose, code and HTML
+ * comments included: proseOnly is a heuristic, and a fence, code span or
+ * comment it misreads would otherwise hide a link from both npmReadme and
+ * this check. A code example with such a link fails the check; reword it.
+ */
+export function relativeReferencesLeft(text) {
+  const found = [];
+  for (const reference of references(text))
+    if (isRelative(reference.dest)) found.push(`line ${reference.line} still links to "${reference.dest}".`);
+  if (/\]\((?:\.\/)?docs\//.test(text)) found.push("still contains ](docs/.");
+  return found;
+}
+
+/**
+ * A root file that npm packs as a README whatever `files` says
+ * (npm-packlist's `/readme{,.*[^~$]}` rule); `file` is a path from the
+ * root. `npm publish` takes the package's README from these.
+ */
+export function isReadme(file) {
+  return /^readme(?:\.[^/]*[^~$/])?$/i.test(file);
+}
+
+/**
+ * What keeps the READMEs of a packed package from showing on npmjs.com.
+ * `contents` maps each path in the package (as under package/ in the
+ * tarball) to its bytes. `npm publish` takes the first Markdown README its
+ * file search returns, in no fixed order, so every root README must be
+ * ready. Empty when they are. scripts/check-pack.mjs --tarball runs it.
+ */
+export function packageReadmeProblems(contents) {
+  const problems = [];
+  for (const name of [...contents.keys()].filter(isReadme).sort()) {
+    const left = relativeReferencesLeft(contents.get(name).toString("utf8"));
+    if (left.length === 0) continue;
+    problems.push(
+      `${name} is not the one prepack (\`${command} --pre\`) writes for npmjs.com; pack with a plain \`npm pack\`.`,
+      ...left.slice(0, 5).map((problem) => `${name}: ${problem}`),
+    );
+    if (left.length > 5) problems.push(`${name}: ${left.length - 5} more like these.`);
+  }
+  return problems;
+}
+
 function readProduct(root) {
   const file = path.join(root, "shared", "product.ts");
   let source;
@@ -426,23 +482,19 @@ function readProduct(root) {
   return productValues(source);
 }
 
-/**
- * The root files besides README.md that npm would pack as READMEs, as
- * npm-packlist's `/readme{,.*[^~$]}` rule matches them.
- */
+/** The root files besides README.md that npm would pack as READMEs (isReadme). */
 function otherReadmes(root) {
   return fs
     .readdirSync(root, { withFileTypes: true })
-    .filter(
-      (entry) =>
-        entry.isFile() && entry.name !== readmeName && /^readme(?:\..*[^~$])?$/i.test(entry.name),
-    )
+    .filter((entry) => entry.isFile() && entry.name !== readmeName && isReadme(entry.name))
     .map((entry) => entry.name)
     .sort();
 }
 
+/** The READMEs the package ships (package.json `files`); --pre rewrites them in place. */
+const shippedReadmes = [readmeName, translatedReadme];
+
 function pre(root, log) {
-  const readme = path.join(root, readmeName);
   const backup = path.join(root, backupName);
   if (fs.existsSync(backup)) {
     log(
@@ -451,50 +503,58 @@ function pre(root, log) {
     return 1;
   }
   const product = readProduct(root);
-  const original = fs.readFileSync(readme);
-  const { text, changed } = npmReadme(original.toString("utf8"), {
-    homepageUrl: product.homepageUrl,
-    sitePath: siteServing(root),
-  });
-  // Ship README.zh-TW.md (listed in package.json files). Set other README.*
-  // aside so npmjs.com keeps English README.md as the package readme.
-  const others = otherReadmes(root).filter((name) => name !== translatedReadme);
+  const sitePath = siteServing(root);
+  // npm publish may take either README as the package's, so both are
+  // rewritten. Both rewrites run before anything changes on disk.
+  const rewritten = shippedReadmes
+    .filter((name) => name === readmeName || fs.existsSync(path.join(root, name)))
+    .map((name) => {
+      const original = fs.readFileSync(path.join(root, name));
+      const result = npmReadme(original.toString("utf8"), { homepageUrl: product.homepageUrl, sitePath, name });
+      return { name, original, ...result };
+    });
+  // Set the other README.* aside: the package ships the two above alone.
+  const others = otherReadmes(root).filter((name) => !shippedReadmes.includes(name));
   // mkdir without `recursive` fails if the folder appeared since the check.
   fs.mkdirSync(backup);
-  fs.writeFileSync(path.join(backup, readmeName), original, { flag: "wx" });
+  for (const { name, original } of rewritten) fs.writeFileSync(path.join(backup, name), original, { flag: "wx" });
   for (const name of others) fs.renameSync(path.join(root, name), path.join(backup, name));
-  fs.writeFileSync(readme, text);
-  log(
-    `npm-readme: README.md rewritten for the package (${changed.images} image(s), ${changed.links} link(s): ${
+  for (const { name, text } of rewritten) fs.writeFileSync(path.join(root, name), text);
+  const summary = ({ name, changed }) =>
+    `${name} (${changed.images} image(s), ${changed.links} link(s): ${
       product.homepageUrl.trim()
         ? `${changed.site} to the website, ${changed.images + changed.links - changed.site} as text where site/ does not serve the file`
         : "as text: homepageUrl is empty"
-    })${others.length ? `; ${others.join(", ")} set aside` : ""}; ${translatedReadme} kept for the package. ${backupName} keeps the originals until postpack.`,
+    })`;
+  log(
+    `npm-readme: rewritten for the package: ${rewritten.map(summary).join(", ")}${
+      others.length ? `; ${others.join(", ")} set aside` : ""
+    }. ${backupName} keeps the originals until postpack.`,
   );
   return 0;
 }
 
 function post(root, log) {
-  const readme = path.join(root, readmeName);
   const backup = path.join(root, backupName);
   if (!fs.existsSync(backup)) {
     log(`npm-readme: no ${backupName}, so no README was changed; nothing to restore.`);
     return 0;
   }
   const saved = fs.readdirSync(backup);
-  const taken = saved.filter((name) => name !== readmeName && fs.existsSync(path.join(root, name)));
+  // The shipped READMEs were rewritten in place; the other files were moved.
+  const moved = saved.filter((name) => !shippedReadmes.includes(name));
+  const taken = moved.filter((name) => fs.existsSync(path.join(root, name)));
   if (taken.length) {
     log(
       `npm-readme: ${taken.join(", ")} exist again at the root, so nothing was restored. Compare them with the copies in ${backupName}, keep one of each, then run ${command} --post again.`,
     );
     return 1;
   }
-  for (const name of saved)
-    if (name !== readmeName) fs.renameSync(path.join(backup, name), path.join(root, name));
-  if (saved.includes(readmeName)) {
-    // Writing over README.md keeps its file mode; the bytes are the original's.
-    fs.writeFileSync(readme, fs.readFileSync(path.join(backup, readmeName)));
-    fs.rmSync(path.join(backup, readmeName));
+  for (const name of moved) fs.renameSync(path.join(backup, name), path.join(root, name));
+  for (const name of saved.filter((file) => shippedReadmes.includes(file))) {
+    // Writing over the README keeps its file mode; the bytes are the original's.
+    fs.writeFileSync(path.join(root, name), fs.readFileSync(path.join(backup, name)));
+    fs.rmSync(path.join(backup, name));
   }
   fs.rmdirSync(backup);
   log("npm-readme: the READMEs are restored.");
@@ -532,6 +592,34 @@ export function errorCodesOf(source) {
   return codes;
 }
 
+/**
+ * The exact versions a text pins the package to, such as the mise command's
+ * `npm:bell-pr@1.0.1`: `<name>@<semver>`, wherever it is written, code
+ * included. `<name>@latest` and `<name>@<version>` are no pins.
+ */
+export function versionPins(text, name) {
+  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const part = "[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*";
+  const pin = new RegExp(`(?<![\\w@/.-])${escaped}@(\\d+\\.\\d+\\.\\d+(?:-${part})?(?:\\+${part})?)`, "g");
+  return [...text.matchAll(pin)].map((match) => ({
+    line: text.slice(0, match.index).split("\n").length,
+    version: match[1],
+  }));
+}
+
+/** The package's name and version, from package.json at the root. */
+function packageVersion(root) {
+  let manifest;
+  try {
+    manifest = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8"));
+  } catch (error) {
+    throw new SetupError(`cannot read package.json: ${error.message}`);
+  }
+  if (typeof manifest.name !== "string" || typeof manifest.version !== "string")
+    throw new SetupError("package.json has no name or version.");
+  return { name: manifest.name, version: manifest.version };
+}
+
 /** The Markdown files --check-docs reads, relative to the root. */
 function documents(root, files) {
   return [...files]
@@ -567,6 +655,7 @@ export function checkDocs(root, env = process.env) {
     if (!anchorCache.has(file)) anchorCache.set(file, anchors(read(file)));
     return anchorCache.get(file);
   };
+  const manifest = packageVersion(root);
   for (const name of documents(root, files)) {
     const text = read(name);
     for (const reference of references(text, proseOnly(text, { regions: true }))) {
@@ -609,6 +698,13 @@ export function checkDocs(root, env = process.env) {
         }
       }
     }
+    // A pin is written by hand (the mise command), and the packed READMEs
+    // keep it: it must name the version being released, not the last one.
+    for (const pin of versionPins(text, manifest.name))
+      if (pin.version !== manifest.version)
+        problems.push(
+          `${name}:${pin.line}: pins ${manifest.name}@${pin.version}, but package.json is version ${manifest.version}.`,
+        );
   }
   // Every error code has its own heading in the troubleshooting guide.
   const codes = errorCodesOf(fs.readFileSync(path.join(root, "shared", "errors.ts"), "utf8"));
@@ -624,29 +720,30 @@ export function checkDocs(root, env = process.env) {
       if (!headings.some((heading) => heading.includes(`\`${code}\``)))
         problems.push(`${troubleshootingName}: no heading names the error code \`${code}\`.`);
   }
-  // README.md as the package will carry it, with the current homepageUrl
+  // The READMEs as the package will carry them, with the current homepageUrl
   // and with a stand-in one: no relative path left, and every link to the
   // website names a file that site/ serves.
-  if (files.has(readmeName)) {
+  const shipped = shippedReadmes.filter((name) => files.has(name));
+  if (shipped.length) {
     const sitePath = siteServing(root);
     const deployed = new Set(siteFiles(root));
-    const found = new Set();
-    for (const homepageUrl of new Set([readProduct(root).homepageUrl, "https://homepage.invalid"])) {
-      try {
-        const { text: packed, linked } = npmReadme(read(readmeName), { homepageUrl, sitePath });
-        for (const reference of references(packed))
-          if (isRelative(reference.dest))
-            found.add(`README.md (npm): line ${reference.line} still links to "${reference.dest}".`);
-        if (/\]\((?:\.\/)?docs\//.test(packed)) found.add("README.md (npm): still contains ](docs/.");
-        for (const link of linked)
-          if (!deployed.has(link.sitePath))
-            found.add(`README.md (npm): line ${link.line} links "${link.target}" to ${link.sitePath}, which site/ does not serve.`);
-      } catch (error) {
-        if (!(error instanceof ReadmeError)) throw error;
-        found.add(`README.md (npm): ${error.message}`);
+    const homepages = new Set([readProduct(root).homepageUrl, "https://homepage.invalid"]);
+    for (const name of shipped) {
+      const found = new Set();
+      for (const homepageUrl of homepages) {
+        try {
+          const { text: packed, linked } = npmReadme(read(name), { homepageUrl, sitePath, name });
+          for (const problem of relativeReferencesLeft(packed)) found.add(`${name} (npm): ${problem}`);
+          for (const link of linked)
+            if (!deployed.has(link.sitePath))
+              found.add(`${name} (npm): line ${link.line} links "${link.target}" to ${link.sitePath}, which site/ does not serve.`);
+        } catch (error) {
+          if (!(error instanceof ReadmeError)) throw error;
+          found.add(`${name} (npm): ${error.message}`);
+        }
       }
+      problems.push(...found);
     }
-    problems.push(...found);
   }
   return problems;
 }
@@ -658,7 +755,7 @@ function checkDocsCommand(root, log, out) {
     log(`npm-readme --check-docs: ${problems.length} problem(s).`);
     return 1;
   }
-  log("npm-readme --check-docs: links, anchors and error codes are fine.");
+  log("npm-readme --check-docs: links, anchors, error codes and version pins are fine.");
   return 0;
 }
 
@@ -746,6 +843,56 @@ function selfTest() {
     assert.ok(output.includes("<!-- a comment with [a link](docs/c.md) -->"));
     assert.deepEqual(references(output).filter((reference) => isRelative(reference.dest)), []);
   }
+  // What is left in a README that --pre did not rewrite.
+  assert.deepEqual(relativeReferencesLeft(readme), [
+    'line 3 still links to "README.zh-TW.md".',
+    'line 5 still links to "docs/images/en/run-changes-1280.png".',
+    'line 7 still links to "./docs/images/en/home-1280.png".',
+    'line 9 still links to "docs/getting-started.md#requirements".',
+    'line 9 still links to ".env.example".',
+    'line 10 still links to "CONTRIBUTING.md".',
+    'line 13 still links to "docs/images/en/team-390.png".',
+    'line 13 still links to "docs/faq.md".',
+    "still contains ](docs/.",
+  ]);
+  assert.deepEqual(relativeReferencesLeft("# Ready\n\n[Node](https://nodejs.org/en) and [Features](#features).\n"), []);
+  // The ](docs/ search reads code and comments too: here an escaped
+  // backtick makes proseOnly mask a real link as a code span.
+  assert.deepEqual(relativeReferencesLeft("Type \\`[Guide](docs/guide.md)\\` here.\n"), ["still contains ](docs/."]);
+  assert.deepEqual(relativeReferencesLeft("```md\n[Guide](docs/guide.md)\n```\n"), ["still contains ](docs/."]);
+  // A backtick fence has no backtick in its info string, so this line is
+  // prose and does not hide the rest of the file.
+  assert.deepEqual(relativeReferencesLeft("```npm install``` is the command.\n\n[Guide](docs/guide.md)\n"), [
+    'line 3 still links to "docs/guide.md".',
+    "still contains ](docs/.",
+  ]);
+  // check-pack --tarball checks every root README of the package, since
+  // npm publish may take any of them. Here README.md is ready and the
+  // translation is not, as in a pack where --pre left it alone.
+  for (const name of ["README.md", "README.zh-TW.md", "readme", "Readme.markdown"]) assert.ok(isReadme(name), name);
+  for (const name of ["README.md~", "README.md$", "READMEX.md", "docs/README.md", "README.d/notes.md"])
+    assert.equal(isReadme(name), false, name);
+  const translatedFixture = "# 範例\n\n[English](README.md)\n![圖](docs/images/zh-TW/a.png)\n";
+  const packed = new Map([
+    ["README.md", Buffer.from("# Ready\n\n![Shot](https://bell.example.test/shot.png) [Features](#features)\n")],
+    ["README.zh-TW.md", Buffer.from(translatedFixture)],
+    ["docs/README.md", Buffer.from("[Not the package's README](start.md)\n")],
+  ]);
+  assert.deepEqual(packageReadmeProblems(packed), [
+    "README.zh-TW.md is not the one prepack (`node scripts/npm-readme.mjs --pre`) writes for npmjs.com; pack with a plain `npm pack`.",
+    'README.zh-TW.md: line 3 still links to "README.md".',
+    'README.zh-TW.md: line 4 still links to "docs/images/zh-TW/a.png".',
+    "README.zh-TW.md: still contains ](docs/.",
+  ]);
+  const translatedForNpm = npmReadme(translatedFixture, { name: "README.zh-TW.md" }).text;
+  assert.equal(translatedForNpm, "# 範例\n\nEnglish\n*截圖：圖*\n", "a screenshot as text in the README's language");
+  packed.set("README.zh-TW.md", Buffer.from(translatedForNpm));
+  assert.deepEqual(packageReadmeProblems(packed), []);
+  packed.set("readme", Buffer.from("[1](1.md) [2](2.md) [3](3.md) [4](4.md) [5](5.md) [6](6.md) [7](7.md)\n"));
+  assert.deepEqual(packageReadmeProblems(packed).slice(-2), [
+    'readme: line 1 still links to "5.md".',
+    "readme: 2 more like these.",
+  ]);
   // The rewrite keeps line endings, and a text without paths stays as it is.
   const crlf = readme.replace(/\n/g, "\r\n");
   assert.equal(npmReadme(crlf, site).text, a.replace(/\n/g, "\r\n"));
@@ -768,6 +915,19 @@ function selfTest() {
   assert.equal(real.name, "BELL PR");
   assert.equal(typeof real.homepageUrl, "string");
   assert.ok(errorCodesOf(fs.readFileSync(path.join(repoRoot, "shared", "errors.ts"), "utf8")).includes("server_unreachable"));
+
+  // Version pins: exact versions only, in code too, not another package's.
+  assert.deepEqual(
+    versionPins(
+      "mise use -g npm:bell-pr@1.0.0\n`npx bell-pr@latest` or bell-pr@<version>,\n" +
+        "npm i bell-pr@2.0.0-rc.1+build.5. Not @scope/bell-pr@9.9.9, my-bell-pr@9.9.9 or bell-pr@1.\n",
+      "bell-pr",
+    ),
+    [
+      { line: 1, version: "1.0.0" },
+      { line: 3, version: "2.0.0-rc.1+build.5" },
+    ],
+  );
 
   // Anchors as GitHub makes them.
   const headings = anchors(
@@ -793,7 +953,7 @@ function selfTest() {
 
     // --pre and --post: the originals come back byte for byte.
     const original = Buffer.from("# Fixture\r\n\r\n![Shot](docs/images/a.png)\r\n[Docs](docs/a.md)", "utf8");
-    const translated = Buffer.from("# 範例\n\n![圖](docs/images/b.png)\n", "utf8");
+    const translated = Buffer.from("# 範例\n\n![圖](docs/images/a.png)\n[English](README.md)\n", "utf8");
     const at = (...parts) => path.join(temp, ...parts);
     write("README.md", original);
     write("README.zh-TW.md", translated);
@@ -804,9 +964,13 @@ function selfTest() {
     assert.deepEqual(otherReadmes(temp), ["README.zh-TW.md", "readme.txt"]);
     assert.equal(pre(temp, quiet), 0);
     assert.deepEqual(fs.readFileSync(at(backupName, "README.md")), original);
-    assert.equal(fs.existsSync(at(backupName, "README.zh-TW.md")), false, "zh-TW stays in the package");
-    assert.deepEqual(fs.readdirSync(at(backupName)).sort(), ["README.md", "readme.txt"]);
-    assert.deepEqual(fs.readFileSync(at("README.zh-TW.md")), translated, "the package keeps README.zh-TW.md");
+    assert.deepEqual(fs.readFileSync(at(backupName, "README.zh-TW.md")), translated);
+    assert.deepEqual(fs.readdirSync(at(backupName)).sort(), ["README.md", "README.zh-TW.md", "readme.txt"]);
+    assert.equal(
+      fs.readFileSync(at("README.zh-TW.md"), "utf8"),
+      "# 範例\n\n*截圖：圖*\nEnglish\n",
+      "the package ships README.zh-TW.md, rewritten as well",
+    );
     assert.equal(fs.existsSync(at("readme.txt")), false);
     assert.ok(fs.existsSync(at("README.md~")) && fs.existsSync(at("docs", "README.md")));
     assert.equal(fs.readFileSync(at("README.md"), "utf8"), "# Fixture\r\n\r\n*Screenshot: Shot*\r\nDocs");
@@ -829,11 +993,22 @@ function selfTest() {
     assert.equal(post(temp, quiet), 0);
     assert.equal(fs.readFileSync(at("readme.txt"), "utf8"), "plain");
     assert.deepEqual(fs.readFileSync(at("README.zh-TW.md")), translated);
+    // A backup from an older --pre, which set README.zh-TW.md aside, comes back too.
+    fs.mkdirSync(at(backupName));
+    fs.renameSync(at("README.zh-TW.md"), at(backupName, "README.zh-TW.md"));
+    assert.equal(post(temp, quiet), 0);
+    assert.deepEqual(fs.readFileSync(at("README.zh-TW.md")), translated);
     // A README that cannot become text stops --pre before anything moves.
     write("README.md", "[x][r]\n\n[r]: docs/a.md\n");
-    assert.throws(() => pre(temp, quiet), /inline link/);
+    assert.throws(() => pre(temp, quiet), /README\.md:3: .*inline link/);
     assert.equal(fs.existsSync(at(backupName)), false);
     assert.ok(fs.existsSync(at("README.zh-TW.md")));
+    write("README.md", original);
+    write("README.zh-TW.md", "[x][r]\n\n[r]: docs/a.md\n");
+    assert.throws(() => pre(temp, quiet), /README\.zh-TW\.md:3: .*inline link/);
+    assert.equal(fs.existsSync(at(backupName)), false);
+    assert.deepEqual(fs.readFileSync(at("README.md")), original, "README.md is not rewritten either");
+    write("README.zh-TW.md", translated);
     // The website: site/ without its development files.
     write("docs/images/a.png", "png");
     write("docs/a.md", "# A\n");
@@ -853,11 +1028,17 @@ function selfTest() {
       fs.readFileSync(at("README.md"), "utf8"),
       "# Fixture\r\n\r\n![Shot](https://bell.example.test/shots/a.png)\r\nDocs",
     );
+    assert.equal(
+      fs.readFileSync(at("README.zh-TW.md"), "utf8"),
+      "# 範例\n\n![圖](https://bell.example.test/shots/a.png)\nEnglish\n",
+    );
     assert.equal(post(temp, quiet), 0);
     assert.deepEqual(fs.readFileSync(at("README.md")), original);
+    assert.deepEqual(fs.readFileSync(at("README.zh-TW.md")), translated);
     for (const name of ["readme.txt", "README.md~", "docs/README.md"]) fs.rmSync(at(name));
 
     // --check-docs on a small repository.
+    write("package.json", JSON.stringify({ name: "bell-pr", version: "1.2.3" }));
     write("shared/product.ts", source(""));
     write("shared/errors.ts", 'export const errorCodes = [\n  "server_unreachable",\n  "git_missing",\n] as const;\n');
     write(
@@ -876,7 +1057,11 @@ function selfTest() {
         "",
       ].join("\n"),
     );
-    write("README.zh-TW.md", "# 範例\n\n[English](README.md) [Ignored](ignored.md)\n");
+    write(
+      "README.zh-TW.md",
+      "# 範例\n\n[English](README.md) [Ignored](ignored.md)\n\n```sh\nmise use -g npm:bell-pr@1.2.2\n```\n",
+    );
+    write("docs/installation.md", "# Install\n\n```sh\nmise use -g npm:bell-pr@1.2.3\nnpx bell-pr@latest\n```\n");
     write(
       "docs/start.md",
       "# Start\n\n## Install\n\n[Back](../README.md#fixture) [Up](../../x.md)\n[Bad escape](#100%) [Bad file](../README.md#%zz)\n",
@@ -897,20 +1082,24 @@ function selfTest() {
       "README.md:5: write e-mail addresses only through a generated product-link region (mailto:help@example.test).",
       "README.md:6: https://bell.example.test/ is neither a file of the repository nor on the list of public URLs in scripts/npm-readme.mjs; product URLs belong in generated product-link regions.",
       'README.zh-TW.md:3: "ignored.md" names no file or folder of the repository.',
+      "README.zh-TW.md:6: pins bell-pr@1.2.2, but package.json is version 1.2.3.",
       'docs/start.md:5: "../../x.md" leaves the repository.',
       'docs/start.md:6: no heading in docs/start.md has the anchor "#100%".',
       'docs/start.md:6: no heading in README.md has the anchor "#%zz".',
       "docs/troubleshooting.md: no heading names the error code `git_missing`.",
     ]);
     write("README.md", "# Fixture\n\n[Ref][r]\n\n[r]: docs/start.md\n");
-    write("README.zh-TW.md", "# 範例\n\n[English](README.md)\n");
+    write("README.zh-TW.md", "# 範例\n\n[English][en]\n\n[en]: README.md\n");
     assert.deepEqual(checkDocs(temp, env), [
       'docs/start.md:5: "../../x.md" leaves the repository.',
       'docs/start.md:6: no heading in docs/start.md has the anchor "#100%".',
       'docs/start.md:6: no heading in README.md has the anchor "#%zz".',
       "docs/troubleshooting.md: no heading names the error code `git_missing`.",
       'README.md (npm): README.md:5: write "docs/start.md" as an inline link; a reference definition cannot become text.',
+      'README.zh-TW.md (npm): README.zh-TW.md:5: write "README.md" as an inline link; a reference definition cannot become text.',
     ]);
+    fs.rmSync(at("package.json"));
+    assert.throws(() => checkDocs(temp, env), /cannot read package\.json/);
   } finally {
     fs.rmSync(temp, { recursive: true, force: true });
   }

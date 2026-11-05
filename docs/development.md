@@ -85,7 +85,8 @@ scripts first on `PATH`; the tests do the same.
 ## Checks
 
 Run these before you send a change. CI (`.github/workflows/ci.yml`) runs
-most of them on Linux and macOS with Node.js 22 and 24.
+most of them on Linux and macOS with Node.js 24; the release workflow also
+builds, tests and packs on Linux with Node.js 22.
 
 | Command | What it checks |
 | --- | --- |
@@ -96,13 +97,16 @@ most of them on Linux and macOS with Node.js 22 and 24.
 | `node scripts/check-i18n.mjs` | No user-facing text outside the translation dictionaries |
 | `node scripts/check-personal-info.mjs` (and `--pack`) | No personal details (a real person's home path, tailnet host names, private keys, access tokens) in the repository or the package |
 | `npx tsx scripts/render-generated-regions.ts --check` | The generated product links are current |
-| `node scripts/npm-readme.mjs --check-docs` | Every link in the READMEs and `docs/` resolves, and every error code is in the troubleshooting guide |
+| `node scripts/npm-readme.mjs --check-docs` | Every link in the READMEs and `docs/` resolves, every error code is in the troubleshooting guide, and every `bell-pr@<version>` pin (such as the mise command's) names the version in `package.json` |
 | `node site/check-site.mjs` | The landing site's links and resources, and its size |
+| `node scripts/sync-installers.mjs --check` | Standalone installer identity and the published Homebrew formula |
+| `node --test scripts/install.test.mjs scripts/install-wsl.test.mjs` | Installer argument, failure and environment behavior with isolated tool fixtures |
+| `node --test scripts/install-powershell.test.mjs` | PowerShell installer behavior with WSL fixtures; needs PowerShell (Windows CI uses 5.1) |
 | `node scripts/sync-package-meta.mjs --check` | `package.json` links match `shared/product.ts` |
 | `node scripts/tokenize-css.mjs --check` | The CSS uses the design tokens |
 | `node scripts/generate-third-party-notices.mjs --check` | The third-party notices are current |
 | `node scripts/audit.mjs` | No high or critical advisories outside the allowlist |
-| `node scripts/check-pack.mjs` | The package's size, contents and bundle budgets |
+| `node scripts/check-pack.mjs` (and `--tarball <file>`) | The package's size, contents and bundle budgets; `--tarball` checks a packed tarball as it is, including that no README in it has a relative link left |
 
 Most scripts also have a `--self-test`.
 
@@ -122,6 +126,40 @@ empty, so write the text around it so that it reads well without the link.
 Links to other sites must start with one of the `publicUrls` in
 `scripts/npm-readme.mjs`, which `--check-docs` enforces.
 
+## Installer maintenance
+
+The standalone shell and PowerShell scripts carry generated product metadata
+from `shared/product.ts`. Update their metadata with:
+
+```sh
+node scripts/sync-installers.mjs --write
+npx tsx scripts/render-generated-regions.ts --write
+```
+
+The `install-commands` regions generate Markdown or HTML commands for all seven
+installation methods. Short installer URLs use the product's homepage when set,
+otherwise GitHub. Shell installer messages have embedded
+English and Traditional Chinese dictionaries so a downloaded script needs no
+other files. The PowerShell installer downloads `install-wsl.sh` from the same
+website (or `scripts/install-wsl.sh` from GitHub when no homepage is set).
+`sync-installers.mjs` also keeps the three scripts in `site/` byte-identical to
+their sources. Use `-LocalHelper` explicitly to select the
+adjacent helper in a source checkout for local validation.
+
+After publishing a new version to npm, refresh the Homebrew formula and commit
+it to the tap's main branch:
+
+```sh
+node scripts/sync-installers.mjs --refresh-formula
+```
+
+This downloads the published version from `package.json`, verifies npm's SHA-512
+integrity, and records the tarball's SHA-256 in `Formula/bell-pr.rb`. Do not hash a
+local repack: npm's published bytes are what Homebrew downloads. Normal `--check`
+is offline and keeps the last published formula version while a new release is
+being prepared. The formula installs Node.js, Git and GitHub CLI; AI CLIs and
+account sign-in remain user setup steps.
+
 ## Packaging
 
 ```sh
@@ -129,26 +167,35 @@ npm pack
 ```
 
 `prepack` builds the product and runs `node scripts/npm-readme.mjs --pre`,
-which readies `README.md` for npmjs.com. The package does not contain
-`docs/`, so a relative screenshot or link becomes an absolute URL under
-`homepageUrl` from `shared/product.ts` when the website (`site/`) holds a
-byte-identical copy of the file. Everything else, and everything while
-`homepageUrl` is empty, becomes plain text.
-npm packs every `README.*` at the root and takes the first one it finds as
-the package's README, so `README.zh-TW.md` is set aside during the pack.
-The originals wait in the folder `.README.md.orig` (gitignored) and
-`postpack` puts them back byte for byte. If a pack stops halfway, run
-`node scripts/npm-readme.mjs --post` before you pack again.
+which readies `README.md` and `README.zh-TW.md` for npmjs.com. The package
+does not contain `docs/`, so a relative screenshot or link becomes an
+absolute URL under `homepageUrl` from `shared/product.ts` when the website
+(`site/`) holds a byte-identical copy of the file. Everything else, and
+everything while `homepageUrl` is empty, becomes plain text (`截圖：` marks
+a screenshot in the Chinese README).
+npm packs every `README.*` at the root, and `npm publish` takes the first
+Markdown one its file search returns as the package's README. That order is
+not fixed, and npmjs.com shows `README.zh-TW.md` for bell-pr 1.0.0, so both
+READMEs the package ships are readied. Any other root `README.*` is set
+aside during the pack. The originals wait in the folder `.README.md.orig`
+(gitignored) and `postpack` puts them back byte for byte. If a pack stops
+halfway, run `node scripts/npm-readme.mjs --post` before you pack again.
 
-Publish the packed tarball (`npm publish bell-pr-<version>.tgz`), as the
-release workflow does. `npm publish` from the folder reads the README again
-after `postpack` has restored the originals, so npmjs.com would show the
-unprocessed README, possibly the Chinese one.
+Official releases are published only by `.github/workflows/release.yml`,
+from a pushed `v*` tag that names the version in `package.json`; never run
+`npm publish` by hand. The workflow packs once with `npm pack`, checks that
+tarball as it is with `node scripts/check-pack.mjs --tarball`, and
+checksums, uploads and publishes that same file. It publishes the tarball,
+not the folder: `npm publish` from the folder reads the README again after
+`postpack` has restored the originals, so npmjs.com would show the
+unprocessed README, possibly the Chinese one. The Docker image is pushed
+only after npm publish succeeded. Started by hand, the workflow only runs
+its dry run, and turning `dry_run` off makes it fail.
 
 Try the result without installing it:
 
 ```sh
-npx ./bell-pr-1.0.0-rc.1.tgz start --no-open --port 4400 --data-dir /tmp/bellpr-try
+npx ./bell-pr-<version>.tgz start --no-open --port 4400 --data-dir ~/bellpr-try
 ```
 
 `node scripts/release-dry-run.mjs` runs the whole release locally (build,
@@ -158,15 +205,16 @@ a Docker build) and publishes nothing.
 ## Size limits
 
 Two files have a line cap, and `node scripts/check-pack.mjs` (run it after
-`npm run build`) holds the web bundle to gzip budgets. Do not raise a
-budget; make room instead.
+`npm run build`) holds the web bundle to gzip budgets. Make room before you
+raise a budget; when a raise cannot be avoided, give the reason in the
+commit message body.
 
 | What | Limit |
 | --- | --- |
 | `server/workbench.ts` | 700 lines |
 | `server/run-executor.ts` | 900 lines |
-| Largest JS chunk (the startup chunk) | 116 kB gzip |
-| All JS | 460 kB gzip |
+| Largest JS chunk | 116 kB gzip |
+| All JS, lazily loaded chunks included | 480 kB gzip |
 | All CSS | 45 kB gzip |
 
 How the code stays within them:

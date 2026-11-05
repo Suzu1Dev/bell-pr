@@ -1,11 +1,11 @@
-import { codexEnabled } from "../shared/codex-switch.js";
+import { codexEnabled, startsCodex } from "../shared/codex-switch.js";
 export { setCodexEnabledForTests } from "../shared/codex-switch.js";
 import type { ModelExecution } from "../shared/models.js";
 import { AppError } from "./types.js";
 
-/** 422 when this build must not start Codex. Claude Code is unchanged. */
+/** 422 when this build must not start Codex. Claude Code and Antigravity are unchanged. */
 export function assertCodexProviderAllowed(provider: string | undefined): void {
-  if (!codexEnabled && provider !== "claude")
+  if (!codexEnabled && startsCodex(provider))
     throw new AppError((m) => m.setup.doctor.codexDisabled, 422);
 }
 

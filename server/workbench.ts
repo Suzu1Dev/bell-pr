@@ -68,6 +68,7 @@ import { byHandFacade, type ByHandFacade } from "./by-hand.js";
 import type { GuardOverride } from "../shared/contribution.js";
 import type { SplitRequest } from "../shared/split.js";
 import type { WorkbenchContext } from "./workbench-context.js";
+import { planOverlaps } from "./group-local.js";
 
 export type { WorkbenchContext };
 
@@ -413,8 +414,13 @@ export class Workbench {
     return teamPlan.sendTeamMessage(this.context, id, input);
   }
 
-  async approvePlan(id: string) {
-    return teamPlan.approvePlan(this.context, id);
+  async approvePlan(id: string, options: { overlapDigest?: string } = {}) {
+    return teamPlan.approvePlan(this.context, id, options);
+  }
+
+  /** The person's other contributions whose files meet this run's plan (group-local.ts). */
+  async planOverlaps(id: string) {
+    return planOverlaps(this.context, this.run(id));
   }
 
   /** Sends a plan back to the lead with the person's feedback (team-plan.ts). */
@@ -427,7 +433,12 @@ export class Workbench {
   }
 
   async startSession(id: string, content: string) {
-    return sessions.startSession(this.context, id, content);
+    return sessions.startSession(this.context, id, { content });
+  }
+
+  /** Hands the ticked setup commands of a Full access run to one collaboration turn (session-runs.ts). */
+  async startSetupSession(id: string, commands: string[]) {
+    return sessions.startSession(this.context, id, { setupCommands: commands });
   }
 
   async cancelSession(id: string) {

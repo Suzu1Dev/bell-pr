@@ -769,7 +769,7 @@ export class DiscoveryService {
             );
             await this.execute(cli.executable, cli.args, {
               cwd: temporary,
-              input,
+              input: cli.stdin?.(input) ?? input,
               signal,
               env: agentEnvironment(job.modelExecution?.provider ?? "codex"),
               timeoutMs,

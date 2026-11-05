@@ -19,8 +19,9 @@ import {
 } from "./types.js";
 import { activeFollowUp } from "../shared/followups.js";
 import { withStoredReach } from "../shared/project-policy.js";
-import { splitLimits } from "../shared/split.js";
+import { groupAfterLimit, splitLimits } from "../shared/split.js";
 import { sessionMessageLimit, sessionContentLimit } from "../shared/session.js";
+import { setupTurnLimit } from "../shared/setup-needs.js";
 import { sm } from "./i18n/index.js";
 import { writeDurable } from "./fs-atomic.js";
 import { initLog, log } from "./log.js";
@@ -486,6 +487,12 @@ const sessionSchema = loose({
     checks: later(z.array(loose({ command: text, outcome: text }))),
     notRun: later(z.array(loose({ check: text.max(300), reason: text.max(600) })).max(10)),
     setup: later(setupNeedsSchema),
+    // A setup turn's results; the outcome is plain text, so a later build's value still loads.
+    setupResults: later(
+      z
+        .array(loose({ need: text.max(120), command: text.max(300), outcome: text.max(20), detail: text.max(800) }))
+        .max(setupTurnLimit),
+    ),
     failed: later(z.boolean()),
     draftUpdate: later(loose({ before: text, after: text })),
   })).max(sessionMessageLimit),
@@ -645,6 +652,8 @@ export const runReadSchema = loose({
     // Splitting a contribution, optional in the same way.
     splitFrom: later(splitRefSchema),
     splitInto: later(z.array(splitRefSchema).max(splitLimits.maxContributions)),
+    // Group mode Phase 0 (server/group-local.ts), optional in the same way.
+    group: later(loose({ after: later(z.array(text).max(groupAfterLimit)) })),
 });
 
 const runSchema = lenientRead(runReadSchema);

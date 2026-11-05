@@ -29,8 +29,26 @@ function recordRequests(page: Page) {
   return requests;
 }
 
-/** Fails on serious or critical axe issues, color contrast included. */
+/**
+ * Fails on serious or critical axe issues, color contrast included, once the
+ * page has stopped moving: a button that was just enabled fades in from its
+ * disabled color, and mid-fade axe reads its text as low contrast. A hover
+ * change can cut a fade short and start another, so the wait repeats until
+ * no finite animation runs. Endless ones (a spinner) are not waited for.
+ */
 async function expectAccessible(page: Page, include?: string) {
+  await page.evaluate(async () => {
+    const moving = () =>
+      document
+        .getAnimations()
+        .filter(
+          (animation) =>
+            animation.playState === "running" &&
+            animation.effect?.getComputedTiming().endTime !== Infinity,
+        );
+    for (let running = moving(); running.length > 0; running = moving())
+      await Promise.allSettled(running.map((animation) => animation.finished));
+  });
   const builder = new AxeBuilder({ page }).options({
     rules: { "color-contrast": { enabled: true } },
   });
@@ -280,6 +298,9 @@ test.describe("a real project", () => {
       await expect(confirm).toHaveCount(0);
       // The same link again is not read again.
       expect(checks()).toHaveLength(1);
+      // The second request has ended: Start is back, under the same error.
+      await expect(start).toBeEnabled();
+      await expect(dialog.locator(".inline-error")).toHaveText("Stopped by the test.");
       await expectAccessible(page, ".modal");
     } finally {
       await close();

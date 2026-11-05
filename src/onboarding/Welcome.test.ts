@@ -101,13 +101,21 @@ test("the provider step picks the only ready provider and lets the person choose
   assert.deepEqual(readyProviders(both), ["codex", "claude"]);
   assert.deepEqual(readyProviders(none), []);
   assert.deepEqual(readyProviders(null), []);
+  // A Claude Code release outside the supported versions only warns.
+  const untested: DoctorReport = {
+    ...claudeOnly,
+    checks: claudeOnly.checks.map((value) =>
+      value.id === "claude" ? { ...value, status: "warn", reason: "unsupported-version" } : value,
+    ),
+  };
+  assert.deepEqual(readyProviders(untested), ["claude"]);
   const only = renderEn(welcome("provider"));
   assert.match(only, /Claude Code is installed and signed in, so your agents use it\./);
   // Neutral wording about the person's own Claude Code sign-in.
   assert.match(only, /Uses the Claude Code CLI you installed and signed in to \(Claude plan or Anthropic API key\)\. Usage counts against your own account\./);
   assert.doesNotMatch(only, /subscription|API billing/i);
   const choice = renderEn(welcome("provider", { doctor: doctor(both) }));
-  assert.match(choice, /<legend>Both providers are ready\. Which one should your agents use\?<\/legend>/);
+  assert.match(choice, /<legend>More than one provider is ready\. Which one should your agents use\?<\/legend>/);
   assert.equal(choice.match(/type="radio" name="welcome-provider"/g)?.length, 2);
   const empty = renderEn(welcome("provider", { doctor: doctor(none) }));
   assert.match(empty, /No provider is ready yet\./);

@@ -5,6 +5,7 @@
  * lets the person move each part into a contribution of its own. A file
  * belongs to one contribution; it is never cut into hunks.
  */
+import type { RunGroup } from "./types.js";
 
 /** A contribution a split started from or made, as the run lists it. */
 export interface SplitRef {
@@ -21,15 +22,37 @@ export const splitLimits = {
 } as const;
 
 /**
+ * The most parts one part may build on (`Run.group.after`). A split makes
+ * at most 7 others, and splitting a part again replaces it with its parts,
+ * so more than this is not reached in practice.
+ */
+export const groupAfterLimit = 64;
+
+/**
  * Drops what `run` links to a deleted contribution, in place: the original it
- * was split from, or the part from its list. A list left empty goes, so the
- * original can be split again. Returns whether anything changed.
+ * was split from, the part from its list, or the part it builds on. A list
+ * left empty goes, so the original can be split again. A part it built on
+ * becomes `builtOn` when given: the original that part was split from,
+ * which holds its files again. Returns whether anything changed.
  */
 export function dropSplitLinks(
-  run: { splitFrom?: SplitRef; splitInto?: SplitRef[] },
+  run: { id?: string; splitFrom?: SplitRef; splitInto?: SplitRef[]; group?: RunGroup },
   removedId: string,
+  builtOn?: string,
 ) {
   let changed = false;
+  const after = run.group?.after?.flatMap((id) =>
+    // A part never builds on itself or on the original it came from.
+    id !== removedId ? [id] : builtOn && builtOn !== run.id && builtOn !== run.splitFrom?.runId ? [builtOn] : [],
+  );
+  if (after && after.join("\0") !== run.group?.after?.join("\0")) {
+    // A new object: the client passes a shallow copy of its open run.
+    const { after: _removed, ...rest } = run.group!;
+    const group = after.length ? { ...rest, after: [...new Set(after)] } : rest;
+    if (Object.keys(group).length) run.group = group;
+    else delete run.group;
+    changed = true;
+  }
   if (run.splitFrom?.runId === removedId) {
     delete run.splitFrom;
     changed = true;

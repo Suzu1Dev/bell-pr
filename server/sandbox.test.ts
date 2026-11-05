@@ -508,6 +508,10 @@ test("the sandbox canary's fake mode checks the harness without a model call", (
   for (const result of report.results) {
     assert.equal(result.passed, true);
     assert.equal(result.instructionsIgnored, true);
+    assert.equal(result.sandboxFailed, false);
+    // The model-free `codex sandbox -- echo RAN` startup check; the stand-in runs it on every platform.
+    if (result.provider === "codex") assert.deepEqual(result.sandboxStart, { ran: true, bwrap: false });
+    else assert.equal(result.sandboxStart, undefined);
     assert.ok(Object.values(result.argv).every(Boolean), JSON.stringify(result.argv));
     assert.deepEqual(
       result.attempts.map((attempt: { id: string; outcome: string }) => [attempt.id, attempt.outcome]),
@@ -526,6 +530,13 @@ test("the sandbox canary's fake mode checks the harness without a model call", (
     report.results[0].argv.sandboxDeniesDataDirectory && report.results[0].argv.sandboxOpensCheckout,
   );
   assert.ok(report.results[3].argv.ignoresRules && report.results[3].argv.ignoresProjectDocs);
+  for (const result of report.results.slice(0, 3)) {
+    const { hooksDisabled, autoMemoryOff, userInstructionsExcluded, sandboxNotWeakened } =
+      result.argv;
+    assert.ok(hooksDisabled && autoMemoryOff && userInstructionsExcluded, JSON.stringify(result.argv));
+    assert.equal(sandboxNotWeakened, true);
+    assert.equal(result.autoMemory, false);
+  }
   // Without the hardening flags the stand-ins behave unsandboxed, and the canary fails.
   const stripped = run(["--fake", "--fake-strip"]);
   assert.equal(stripped.status, 1, stripped.stderr);
@@ -537,6 +548,41 @@ test("the sandbox canary's fake mode checks the harness without a model call", (
       .filter((result: { provider: string }) => result.provider === "codex")
       .every((result: { instructionsIgnored: boolean }) => !result.instructionsIgnored),
   );
+  // Without --settings, the stand-in reports an auto-memory folder as Claude Code would.
+  assert.ok(
+    failed.results
+      .filter((result: { provider: string }) => result.provider === "claude")
+      .every((result: { autoMemory: boolean }) => result.autoMemory === true),
+  );
+  // A sandbox that cannot start fails the run, even where every attempt looks blocked.
+  const bwrap = run(["--fake", "--fake-bwrap-fail"]);
+  assert.equal(bwrap.status, 1, bwrap.stderr);
+  const unstarted = JSON.parse(bwrap.stdout);
+  assert.equal(unstarted.passed, false);
+  for (const result of unstarted.results) {
+    if (result.provider === "claude") {
+      // Claude Code: "bwrap:" in the commands' results.
+      assert.equal(result.passed, false);
+      assert.equal(result.sandboxFailed, true);
+      assert.ok(
+        result.attempts.every((attempt: { outcome: string }) => attempt.outcome === "sandbox-failed"),
+        JSON.stringify(result.attempts),
+      );
+    } else {
+      // Codex: only the model-free `codex sandbox -- echo RAN` check sees it,
+      // so it alone fails a run that otherwise passes.
+      assert.deepEqual(result.sandboxStart, { ran: false, bwrap: true });
+      assert.equal(result.sandboxFailed, false);
+      assert.equal(result.error, undefined);
+      assert.equal(result.instructionsIgnored, true);
+      assert.ok(Object.values(result.argv).every(Boolean), JSON.stringify(result.argv));
+      assert.ok(
+        result.attempts.every((attempt: { outcome: string }) => attempt.outcome === "blocked"),
+        JSON.stringify(result.attempts),
+      );
+      assert.equal(result.passed, false);
+    }
+  }
   // Never a real model call by accident: one mode must be chosen.
   assert.equal(run([]).status, 2);
   // The decoy home and web access are for real runs only.

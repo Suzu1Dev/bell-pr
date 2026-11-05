@@ -94,7 +94,7 @@ export function registerReviewRoutes(app: Express, { workbench }: RouteDeps) {
       files,
       workbench.store.directory,
       currentLocale(),
-      { repo },
+      { repo, runs: workbench.store.data.runs },
     );
     // After an attempt that pushed but recorded no PR, GitHub's open count
     // may include the PR that attempt opened. publish() records that PR

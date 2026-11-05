@@ -19,7 +19,7 @@ import type {
   ContributionDirection,
   ContributionSettings,
 } from "../../shared/insights";
-import { codexEnabled } from "../../shared/codex-switch";
+import { activeProvider, codexEnabled } from "../../shared/codex-switch";
 import {
   agentProviders,
   providerLabels,
@@ -180,8 +180,7 @@ export function DirectionSettings({
     report?.platform ??
     (typeof process === "undefined" ? undefined : process.platform);
   const linux = platform === "linux";
-  const provider =
-    !codexEnabled && value.provider !== "claude" ? "claude" : (value.provider ?? "codex");
+  const provider = activeProvider(value.provider);
   const providerLabel = providerLabels[provider];
   useEffect(() => {
     const controller = new AbortController();

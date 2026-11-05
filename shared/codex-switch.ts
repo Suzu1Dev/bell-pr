@@ -15,13 +15,18 @@ export function setCodexEnabledForTests(value: boolean): void {
   codexEnabled = value;
 }
 
+/** True for Codex, which an omitted or unknown provider also means. */
+export function startsCodex(provider: unknown): boolean {
+  return provider !== "claude" && provider !== "antigravity";
+}
+
 /**
  * The provider a saved or omitted choice actually runs.
  * With the switch off, Codex falls back to Claude Code.
  * With the switch on, an omitted provider stays Codex, as before.
  */
 export function activeProvider(provider?: AgentProvider): AgentProvider {
-  if (!codexEnabled) return "claude";
+  if (!codexEnabled && startsCodex(provider)) return "claude";
   return provider ?? "codex";
 }
 
@@ -38,6 +43,6 @@ export function codexSelectionBlocked(provider: unknown): boolean {
 export function presentedModelSettings<
   T extends { provider?: AgentProvider; model?: string; reasoningEffort?: string },
 >(settings: T): T & { provider?: AgentProvider } {
-  if (codexEnabled || settings.provider === "claude") return settings;
+  if (codexEnabled || !startsCodex(settings.provider)) return settings;
   return { ...settings, provider: "claude", model: "", reasoningEffort: "" };
 }

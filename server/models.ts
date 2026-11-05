@@ -18,7 +18,13 @@ import { product } from "../shared/product.js";
 import { version } from "./build-info.js";
 import { sm } from "./i18n/index.js";
 import { assertCodexProviderAllowed } from "./codex-guard.js";
-import { agentChildEnvironment, observeChild, processSpawn } from "./process.js";
+import {
+  agentChildEnvironment,
+  agentEnvironment,
+  command,
+  observeChild,
+  processSpawn,
+} from "./process.js";
 import { AppError } from "./types.js";
 
 export const modelId = z
@@ -98,9 +104,11 @@ export function parseModelPage(value: unknown) {
   return { models, nextCursor: page.nextCursor || undefined };
 }
 
-/** The only error a Codex catalog read reports, in the locale in effect. */
-function catalogError() {
-  return sm().analysis.models.catalogUnavailable;
+/** The only error a catalog read reports, in the locale in effect. */
+function catalogError(source: AgentProvider = "codex") {
+  return source === "antigravity"
+    ? sm().analysis.models.antigravityCatalogUnavailable
+    : sm().analysis.models.catalogUnavailable;
 }
 
 /** Read model metadata only: this connection never creates a thread or inference turn. */
@@ -297,30 +305,145 @@ export function claudeModelCatalog(): ModelCatalog {
   };
 }
 
-/** A cached catalog with its error in the locale of this read, not of the read that filled the cache. */
-function localized(catalog: ModelCatalog): ModelCatalog {
-  return catalog.error ? { ...catalog, error: catalogError() } : catalog;
+/**
+ * The thinking level at the end of an Antigravity model ID, such as `high`
+ * in gemini-4-argon-high, and the ID without it; undefined for an ID that
+ * names none.
+ */
+export function antigravityEffort(id: string): { model: string; effort: ReasoningEffort } | undefined {
+  const match = /^(.+)-([a-z]+)$/.exec(id);
+  const parsed = effort.safeParse(match?.[2]);
+  return match && parsed.success ? { model: match[1], effort: parsed.data } : undefined;
 }
 
-let cached: { value: ModelCatalog; expires: number } | undefined;
-let pending: Promise<ModelCatalog> | undefined;
+/**
+ * The Antigravity CLI's models from `agy models` (agy 1.5.0): after a
+ * "Fetching available models..." line, one model per line as its ID, a tab
+ * and its name. agy lists each thinking level as a model of its own
+ * (gemini-4-argon-low, -medium and -high, named "Gemini 4 Argon (Low)" and
+ * so on), so the IDs that differ only in a level become one model with
+ * those levels as its reasoning efforts, medium by default when it has one,
+ * as Claude Code's and Codex's models offer theirs. agentCommand puts the ID
+ * together again, so agy only ever receives an ID it listed. An ID without
+ * a level stays as it is, without efforts, and so does a level of a model
+ * that agy also lists without one. None is marked as the default: without a
+ * choice agy uses its own. Other lines are skipped; a repeated ID or more
+ * than 200 models make the list unusable.
+ */
+export function parseAntigravityModels(stdout: string): ModelOption[] {
+  const description = sm().analysis.models.antigravityModel;
+  const listed = stdout.split(/\r?\n/).flatMap((line) => {
+    const fields = line.split("\t");
+    const id = modelId.safeParse(fields[0]);
+    if (fields.length !== 2 || !id.success) return [];
+    return [{ id: id.data, name: fields[1].trim().slice(0, 300) || id.data }];
+  });
+  if (listed.length > 200 || new Set(listed.map((item) => item.id)).size !== listed.length)
+    throw new Error("Unusable Antigravity model list.");
+  const plain = new Set(listed.map((item) => item.id));
+  const models = new Map<string, ModelOption>();
+  for (const { id, name } of listed) {
+    const level = antigravityEffort(id);
+    if (!level || plain.has(level.model)) {
+      models.set(id, { id, name, description, isDefault: false, reasoningEfforts: [] });
+      continue;
+    }
+    const model = models.get(level.model) ?? {
+      id: level.model,
+      // "Gemini 4 Argon (High)" without the level it names.
+      name: name.replace(new RegExp(`\\s*\\(${level.effort}\\)$`, "i"), "") || level.model,
+      description,
+      isDefault: false,
+      reasoningEfforts: [],
+    };
+    model.reasoningEfforts = reasoningEfforts.filter(
+      (value) => value === level.effort || model.reasoningEfforts.includes(value),
+    );
+    models.set(level.model, model);
+  }
+  return [...models.values()].map((model) =>
+    model.reasoningEfforts.length
+      ? {
+          ...model,
+          defaultReasoningEffort: model.reasoningEfforts.includes("medium")
+            ? "medium"
+            : model.reasoningEfforts[0],
+        }
+      : model,
+  );
+}
+
+/** Lists models only: `agy models` starts no model turn. Run in an empty folder, like the Codex read. */
+export async function readAntigravityModelCatalog(
+  exec: typeof command = command,
+): Promise<ModelCatalog> {
+  const error = catalogError("antigravity");
+  let cwd: string | undefined;
+  try {
+    cwd = await mkdtemp(path.join(tmpdir(), "bell-models-"));
+    const { stdout } = await exec("agy", ["models"], {
+      cwd,
+      timeoutMs: 15_000,
+      maxBytes: 200_000,
+      env: agentEnvironment("antigravity"),
+    });
+    const models = parseAntigravityModels(stdout);
+    return { source: "antigravity", models, ...(models.length ? {} : { error }) };
+  } catch {
+    return { source: "antigravity", models: [], error };
+  } finally {
+    if (cwd) await rm(cwd, { recursive: true, force: true }).catch(() => {});
+  }
+}
+
+/** A cached catalog with its error in the locale of this read, not of the read that filled the cache. */
+function localized(catalog: ModelCatalog): ModelCatalog {
+  return catalog.error ? { ...catalog, error: catalogError(catalog.source) } : catalog;
+}
+
+const cached = new Map<AgentProvider, { value: ModelCatalog; expires: number }>();
+const pending = new Map<AgentProvider, Promise<ModelCatalog>>();
 export function getModelCatalog(
   provider: AgentProvider = "codex",
 ): Promise<ModelCatalog> {
   if (provider === "claude") return Promise.resolve(claudeModelCatalog());
   assertCodexProviderAllowed(provider);
-  if (cached && cached.expires > Date.now())
-    return Promise.resolve(localized(cached.value));
-  if (pending) return pending.then(localized);
-  pending = readModelCatalog()
+  const hit = cached.get(provider);
+  if (hit && hit.expires > Date.now()) return Promise.resolve(localized(hit.value));
+  const reading = pending.get(provider);
+  if (reading) return reading.then(localized);
+  const read = (provider === "antigravity" ? readAntigravityModelCatalog() : readModelCatalog())
     .then((value) => {
-      cached = { value, expires: Date.now() + (value.error ? 10_000 : 60_000) };
+      cached.set(provider, { value, expires: Date.now() + (value.error ? 10_000 : 60_000) });
       return value;
     })
     .finally(() => {
-      pending = undefined;
+      pending.delete(provider);
     });
-  return pending;
+  pending.set(provider, read);
+  return read;
+}
+
+/**
+ * An Antigravity choice saved while each thinking level was a model of its
+ * own (1.1.0-beta.1 saved gemini-4-argon-high without an effort), as the
+ * model and effort the catalog lists now. With a catalog, only a model it
+ * lists with that effort is split; without one, the ID's ending decides, as
+ * for the settings the UI is shown. Any other choice is returned as it is.
+ */
+export function splitAntigravityModel<
+  T extends { provider?: AgentProvider; model?: string; reasoningEffort?: string },
+>(settings: T, catalog?: ModelCatalog): T {
+  if (settings.provider !== "antigravity" || !settings.model || settings.reasoningEffort)
+    return settings;
+  if (catalog?.models.some((item) => item.id === settings.model)) return settings;
+  const level = antigravityEffort(settings.model);
+  const listed =
+    !catalog ||
+    catalog.models.some(
+      (item) => item.id === level?.model && item.reasoningEfforts.includes(level.effort),
+    );
+  return level && listed ? { ...settings, model: level.model, reasoningEffort: level.effort } : settings;
 }
 
 export function resolveModelExecution(
@@ -330,7 +453,7 @@ export function resolveModelExecution(
   const parsed = z.object(modelSettingsSchema).safeParse(settings);
   if (!parsed.success)
     throw new AppError((m) => m.analysis.models.invalidSettings, 400);
-  const selected = parsed.data;
+  const selected = splitAntigravityModel(parsed.data, catalog);
   if ((selected.provider ?? "codex") !== catalog.source)
     throw new AppError((m) => m.analysis.models.providerMismatch, 400);
   const recordedProvider = {
@@ -364,6 +487,7 @@ export function resolveModelExecution(
   };
 }
 
+/** Codex's model arguments; Claude Code and Antigravity get theirs in agentCommand. */
 export function modelArguments(execution: ModelExecution): string[] {
   const value = modelExecutionSchema.parse(execution);
   return [

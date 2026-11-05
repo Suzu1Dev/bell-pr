@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="utf-8">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; base-uri 'none'; form-action 'none'">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; media-src 'self'; base-uri 'none'; form-action 'none'">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="referrer" content="no-referrer">
     <title>BELL PR: from vibe coding to knowing why</title>
@@ -16,11 +16,16 @@
     <meta property="og:title" content="BELL PR: from vibe coding to knowing why">
     <meta property="og:description" content="Free, open-source and local-first. Your AI agent team does the legwork. You understand every change, explain it back, and send only what a maintainer is glad to review.">
     <!-- generated:product-meta key=homepageUrl property="og:url" -->
+    <meta property="og:url" content="https://bell-pr.suzu.tw">
     <!-- /generated:product-meta -->
     <!-- generated:product-meta key=homepageUrl property="og:image" path="assets/brand/og-image.png" -->
+    <meta property="og:image" content="https://bell-pr.suzu.tw/assets/brand/og-image.png">
     <!-- /generated:product-meta -->
     <meta property="og:image" content="assets/brand/og-image.png">
     <meta name="twitter:card" content="summary_large_image">
+    <link rel="alternate" hreflang="en" href="https://bell-pr.suzu.tw/">
+    <link rel="alternate" hreflang="zh-Hant-TW" href="https://bell-pr.suzu.tw/zh-tw/">
+    <link rel="alternate" hreflang="x-default" href="https://bell-pr.suzu.tw/">
     <link rel="stylesheet" href="site.css">
     <script src="site.js" defer></script>
   </head>
@@ -31,9 +36,15 @@
         <a class="brand" href="index.html"><img src="assets/brand/logo-wordmark.svg" alt="BELL PR" width="104" height="34"></a>
         <nav class="site-nav" aria-label="Main">
           <ul>
+            <li><a href="#demo">Demo</a></li>
             <li><a href="#how-it-works">How it works</a></li>
             <li><a href="install.html">Install</a></li>
           </ul>
+        </nav>
+        <nav class="lang-switch" aria-label="Language">
+          <a href="index.html" hreflang="en" lang="en" aria-current="true">English</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="zh-tw/" hreflang="zh-Hant-TW" lang="zh-Hant-TW">中文</a>
         </nav>
       </div>
     </header>
@@ -45,10 +56,142 @@
           <h1>From vibe coding to knowing why.</h1>
           <p class="lead">Your AI agent team does the legwork. You understand every change, explain it back, and send only what a maintainer is glad to review. BELL PR runs on your own machine with the AI coding CLI and the GitHub CLI you already use, and it only ever opens Draft pull requests that you approved.</p>
           <div class="hero-actions">
-            <div class="command"><code id="start-command">npx bell-pr</code><button class="copy-button" type="button" data-copy="start-command" hidden>Copy</button></div>
-            <a class="button" href="install.html">Install guide</a>
+            <div class="install-widget" data-install>
+              <div class="install-header">
+                <div>
+                  <p class="install-eyebrow">GET STARTED</p>
+                  <p class="install-title">Your workbench, one command away.</p>
+                </div>
+                <a class="install-guide" href="install.html">Install guide<span aria-hidden="true"> ↗</span></a>
+              </div>
+              <div class="install-toolbar">
+                <div class="install-tabs" data-install-tabs aria-label="Installation method" hidden>
+                  <button class="install-tab" type="button" id="install-tab-npx" data-install-target="install-panel-npx">npx</button>
+                  <button class="install-tab" type="button" id="install-tab-npm" data-install-target="install-panel-npm">npm</button>
+                  <button class="install-tab" type="button" id="install-tab-curl" data-install-target="install-panel-curl">curl</button>
+                  <button class="install-tab" type="button" id="install-tab-brew" data-install-target="install-panel-brew">brew</button>
+                  <button class="install-tab" type="button" id="install-tab-bun" data-install-target="install-panel-bun">bun</button>
+                  <button class="install-tab" type="button" id="install-tab-powershell" data-install-target="install-panel-powershell">ps1</button>
+                  <button class="install-tab" type="button" id="install-tab-mise" data-install-target="install-panel-mise">mise</button>
+                </div>
+                <span class="install-platform" data-install-platform hidden></span>
+              </div>
+              <section class="install-panel" id="install-panel-npx" data-platform="macOS · Linux" aria-labelledby="install-heading-npx">
+                <h2 class="install-method-title" id="install-heading-npx">npx</h2>
+                <p class="install-platform">macOS · Linux</p>
+                <div class="command install-command">
+                  <div class="install-command-heading">
+                    <span class="install-terminal-label"><span aria-hidden="true">›_</span> Terminal</span>
+                    <button class="copy-button" type="button" data-copy="install-command-npx" aria-label="Copy npx installation commands" hidden>Copy</button>
+                  </div>
+                  <code id="install-command-npx" tabindex="0"><!-- generated:install-commands method=npx lang=en -->npx bell-pr<!-- /generated:install-commands --></code>
+                </div>
+                <p class="install-note">Requires Node.js 22 or later and npm. Starts BELL PR without a global install.</p>
+                <p class="install-next">Sign in to your GitHub and AI tools first; keep this terminal open while you work.</p>
+              </section>
+              <section class="install-panel" id="install-panel-npm" data-platform="macOS · Linux" aria-labelledby="install-heading-npm">
+                <h2 class="install-method-title" id="install-heading-npm">npm</h2>
+                <p class="install-platform">macOS · Linux</p>
+                <div class="command install-command">
+                  <div class="install-command-heading">
+                    <span class="install-terminal-label"><span aria-hidden="true">›_</span> Terminal</span>
+                    <button class="copy-button" type="button" data-copy="install-command-npm" aria-label="Copy npm installation commands" hidden>Copy</button>
+                  </div>
+                  <code id="install-command-npm" tabindex="0"><!-- generated:install-commands method=npm lang=en -->npm install -g bell-pr<!-- /generated:install-commands --></code>
+                </div>
+                <p class="install-note">Requires Node.js 22 or later and npm. Installs the bell-pr command.</p>
+                <p class="install-next">After signing in to your tools, run <code>bell-pr</code>.</p>
+              </section>
+              <section class="install-panel" id="install-panel-curl" data-platform="macOS · Linux" aria-labelledby="install-heading-curl">
+                <h2 class="install-method-title" id="install-heading-curl">curl</h2>
+                <p class="install-platform">macOS · Linux</p>
+                <div class="command install-command">
+                  <div class="install-command-heading">
+                    <span class="install-terminal-label"><span aria-hidden="true">›_</span> Terminal</span>
+                    <button class="copy-button" type="button" data-copy="install-command-curl" aria-label="Copy curl installation commands" hidden>Copy</button>
+                  </div>
+                  <code id="install-command-curl" tabindex="0"><!-- generated:install-commands method=curl lang=en -->curl -fsSL https://bell-pr.suzu.tw/install | sh<!-- /generated:install-commands --></code>
+                </div>
+                <p class="install-note">Installs for your user. Prepares Node.js 24 when needed.</p>
+                <p class="install-next">Use the launch command or PATH setting printed by the installer.</p>
+              </section>
+              <section class="install-panel" id="install-panel-brew" data-platform="macOS · Linux" aria-labelledby="install-heading-brew">
+                <h2 class="install-method-title" id="install-heading-brew">brew</h2>
+                <p class="install-platform">macOS · Linux</p>
+                <div class="command install-command">
+                  <div class="install-command-heading">
+                    <span class="install-terminal-label"><span aria-hidden="true">›_</span> Terminal</span>
+                    <button class="copy-button" type="button" data-copy="install-command-brew" aria-label="Copy brew installation commands" hidden>Copy</button>
+                  </div>
+                  <code id="install-command-brew" tabindex="0"><!-- generated:install-commands method=brew lang=en -->brew tap suzu1dev/bell-pr https://github.com/Suzu1Dev/bell-pr
+brew install suzu1dev/bell-pr/bell-pr<!-- /generated:install-commands --></code>
+                </div>
+                <p class="install-note">Requires Homebrew. Includes Node.js, Git and GitHub CLI.</p>
+                <p class="install-next">After signing in to your tools, run <code>bell-pr</code>.</p>
+              </section>
+              <section class="install-panel" id="install-panel-bun" data-platform="macOS · Linux" aria-labelledby="install-heading-bun">
+                <h2 class="install-method-title" id="install-heading-bun">bun</h2>
+                <p class="install-platform">macOS · Linux</p>
+                <div class="command install-command">
+                  <div class="install-command-heading">
+                    <span class="install-terminal-label"><span aria-hidden="true">›_</span> Terminal</span>
+                    <button class="copy-button" type="button" data-copy="install-command-bun" aria-label="Copy bun installation commands" hidden>Copy</button>
+                  </div>
+                  <code id="install-command-bun" tabindex="0"><!-- generated:install-commands method=bun lang=en -->bun add --global bell-pr<!-- /generated:install-commands --></code>
+                </div>
+                <p class="install-note">Requires Bun and Node.js 22 or later.</p>
+                <p class="install-next">After signing in to your tools, run <code>bell-pr</code>.</p>
+              </section>
+              <section class="install-panel" id="install-panel-powershell" data-platform="Windows · WSL2" aria-labelledby="install-heading-powershell">
+                <h2 class="install-method-title" id="install-heading-powershell">ps1</h2>
+                <p class="install-platform">Windows · WSL2</p>
+                <div class="command install-command">
+                  <div class="install-command-heading">
+                    <span class="install-terminal-label"><span aria-hidden="true">›_</span> PowerShell</span>
+                    <button class="copy-button" type="button" data-copy="install-command-powershell" aria-label="Copy PowerShell installation commands" hidden>Copy</button>
+                  </div>
+                  <code id="install-command-powershell" tabindex="0"><!-- generated:install-commands method=powershell lang=en -->&amp; {
+  Invoke-RestMethod &#39;https://bell-pr.suzu.tw/install.ps1&#39; -OutFile install.ps1 -ErrorAction Stop
+  powershell -NoProfile -ExecutionPolicy Bypass -File .\install.ps1
+}<!-- /generated:install-commands --></code>
+                </div>
+                <p class="install-note">Prepares tools and Codex CLI inside WSL2 Ubuntu. Prints setup steps if WSL is missing.</p>
+                <p class="install-next">Sign in inside Ubuntu, then start BELL PR. <a href="install.html#windows">Windows setup</a></p>
+              </section>
+              <section class="install-panel" id="install-panel-mise" data-platform="macOS · Linux" aria-labelledby="install-heading-mise">
+                <h2 class="install-method-title" id="install-heading-mise">mise</h2>
+                <p class="install-platform">macOS · Linux</p>
+                <div class="command install-command">
+                  <div class="install-command-heading">
+                    <span class="install-terminal-label"><span aria-hidden="true">›_</span> Terminal</span>
+                    <button class="copy-button" type="button" data-copy="install-command-mise" aria-label="Copy mise installation commands" hidden>Copy</button>
+                  </div>
+                  <code id="install-command-mise" tabindex="0"><!-- generated:install-commands method=mise lang=en -->MISE_NPM_PACKAGE_MANAGER=npm mise use -g node@24 npm:bell-pr@1.0.0<!-- /generated:install-commands --></code>
+                </div>
+                <p class="install-note">Installs Node.js 24 and pins BELL PR 1.0.0, using npm for this installation.</p>
+                <p class="install-next">Start with <code>mise exec -- bell-pr</code>.</p>
+              </section>
+            </div>
           </div>
-          <p class="hero-note">Free and open source under the Apache License 2.0, with no account. Needs Node.js 22 or later, Git, the GitHub CLI, and the Codex CLI or Claude Code.</p>
+          <p class="hero-note">Free and open source under Apache-2.0, with no BELL PR account. Real contributions need Git and a signed-in GitHub CLI plus Codex CLI or Claude Code.</p>
+        </div>
+      </section>
+
+      <section class="section" id="demo" aria-labelledby="demo-title">
+        <div class="wrap">
+          <div class="section-head">
+            <p class="eyebrow">Demo</p>
+            <h2 id="demo-title">Watch the 90-second demo</h2>
+            <p>See the flow from reading the project&#39;s rules to a Draft PR you understand.</p>
+          </div>
+          <figure class="promo-video">
+            <video controls preload="none" playsinline poster="assets/video/poster.jpg" width="1920" height="1080">
+              <source src="assets/video/bell-pr-promo-en-1080p.webm" type="video/webm">
+              <source src="assets/video/bell-pr-promo-en-1080p.mp4" type="video/mp4">
+              <track kind="captions" srclang="en" label="English" src="assets/video/captions.en.vtt" default>
+            </video>
+            <figcaption>About 90 seconds · English captions · Plays only when you press play</figcaption>
+          </figure>
         </div>
       </section>
 

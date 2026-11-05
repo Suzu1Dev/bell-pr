@@ -14,6 +14,7 @@ import { bellSudoersFile, sudoersExpiryPrefix } from "../shared/sudo.js";
 import type { DoctorCheck, DoctorReport } from "../shared/doctor.js";
 import {
   claudeAuthDetail,
+  claudeVersionSupported,
   cliStatus,
   defaultProviderFrom,
   formatDoctorReport,
@@ -107,12 +108,22 @@ const codex = (signedIn = true) => `case "$1" in
   *) exit 1 ;;
 esac`;
 
-const claude = (signedIn = true) => `case "$1" in
-  --version) echo "2.1.292 (Claude Code)" ;;
+const claude = (signedIn = true, version = "2.1.292") => `case "$1" in
+  --version) echo "${version} (Claude Code)" ;;
   auth) ${
     signedIn
       ? `echo '{"loggedIn": true, "authMethod": "claude.ai", "apiProvider": "firstParty", "email": "me@example.com", "subscriptionType": "pro"}'`
       : `echo '{"loggedIn": false, "authMethod": "none"}'; exit 1`
+  } ;;
+  *) exit 1 ;;
+esac`;
+
+const agy = (signedIn = true) => `case "$1" in
+  --version) echo "1.5.0" ;;
+  models) ${
+    signedIn
+      ? `echo "Fetching available models..."; printf 'gemini-4-argon-medium\\tGemini 4 Argon (Medium)\\n'`
+      : `echo "Fetching available models..."; echo "Error: Please sign in to view available models. Launch the CLI without arguments to sign in." >&2; exit 1`
   } ;;
   *) exit 1 ;;
 esac`;
@@ -136,8 +147,9 @@ test("nothing installed: Git and a provider are required, with install fixes", a
     report.checks.map((value) => value.id),
     [
       "node", "git", "git-identity", "gh", "gh-auth", "gh-scopes", "codex", "codex-auth",
-      "claude", "claude-auth", "claude-sandbox", "provider-ready", "data-dir", "app", "platform",
-      "full-access", "passwordless-sudo",
+      "claude", "claude-auth", "claude-sandbox", "antigravity", "antigravity-auth",
+      "antigravity-sandbox", "provider-ready", "data-dir", "app", "platform", "full-access",
+      "passwordless-sudo",
     ],
   );
   assert.deepEqual(statuses(report), {
@@ -152,6 +164,9 @@ test("nothing installed: Git and a provider are required, with install fixes", a
     claude: "skip",
     "claude-auth": "skip",
     "claude-sandbox": "skip",
+    antigravity: "skip",
+    "antigravity-auth": "skip",
+    "antigravity-sandbox": "skip",
     "provider-ready": "fail",
     "data-dir": "skip",
     app: "ok",
@@ -172,6 +187,8 @@ test("nothing installed: Git and a provider are required, with install fixes", a
     "codex login",
     "npm install -g @anthropic-ai/claude-code",
     "claude auth login",
+    "curl -fsSL https://antigravity.google/cli/install.sh | bash",
+    "agy",
   ]);
   // On macOS the same checks offer the macOS commands.
   const mac = await withLocale("en", () => runDoctor({ platform: "darwin" }));
@@ -234,6 +251,8 @@ test("everything ready: versions, the GitHub account, scopes and the Claude plan
     codexAuthenticated: true,
     claude: true,
     claudeAuthenticated: true,
+    antigravity: false,
+    antigravityAuthenticated: false,
     github: true,
     githubUser: "octocat",
     ready: true,
@@ -242,13 +261,20 @@ test("everything ready: versions, the GitHub account, scopes and the Claude plan
 });
 
 test("signed out: each CLI says so with its sign-in command, and no provider is ready", async (t) => {
-  await fakes(t, { git: git(), gh: gh("signed-out"), codex: codex(false), claude: claude(false) });
+  await fakes(t, {
+    git: git(),
+    gh: gh("signed-out"),
+    codex: codex(false),
+    claude: claude(false),
+    agy: agy(false),
+  });
   const report = await withLocale("en", () => runDoctor({ force: true, platform: "linux" }));
   assert.equal(report.ready, false);
   for (const [id, command] of [
     ["gh-auth", "gh auth login"],
     ["codex-auth", "codex login"],
     ["claude-auth", "claude auth login"],
+    ["antigravity-auth", "agy"],
   ] as const) {
     assert.equal(check(report, id).status, "warn", id);
     assert.equal(check(report, id).reason, "signed-out", id);
@@ -259,12 +285,15 @@ test("signed out: each CLI says so with its sign-in command, and no provider is 
   assert.deepEqual(check(report, "provider-ready").fixes?.map((fix) => fix.command), [
     "codex login",
     "claude auth login",
+    "agy",
   ]);
   assert.deepEqual(cliStatus(report), {
     codex: true,
     codexAuthenticated: false,
     claude: true,
     claudeAuthenticated: false,
+    antigravity: true,
+    antigravityAuthenticated: false,
     github: false,
     ready: false,
   });
@@ -352,6 +381,46 @@ test("token scopes: workflow missing warns, repo missing fails, fine-grained is 
   assert.equal(check(fineGrained, "gh-auth").detail, "octocat");
 });
 
+test("Claude Code outside the supported versions works with a warning", async (t) => {
+  const f = await fakes(t, { git: git(), claude: claude(true, "2.2.0") });
+  const report = await withLocale("en", () => runDoctor({ force: true, platform: "linux" }));
+  const tool = check(report, "claude");
+  assert.equal(tool.status, "warn");
+  assert.equal(tool.reason, "unsupported-version");
+  assert.equal(tool.version, "2.2.0");
+  assert.equal(
+    tool.detail,
+    "Claude Code 2.2.0 is outside the versions BELL PR supports (2.1.292 or later, before 2.2). Agents still start, but BELL PR has not checked that this release applies its sandbox and hook settings.",
+  );
+  // Only a warning: Claude Code still counts as ready and runs are not refused.
+  assert.equal(check(report, "provider-ready").status, "ok");
+  assert.equal(report.ready, true);
+  assert.equal(cliStatus(report).claude, true);
+  const zh = await withLocale("zh-TW", () => runDoctor({ platform: "linux" }));
+  assert.match(check(zh, "claude").detail!, /2\.1\.292 以上、2\.2 之前/);
+  for (const [version, status] of [
+    ["2.1.291", "warn"],
+    ["2.1.292", "ok"],
+    ["2.1.316", "ok"],
+  ] as const) {
+    await writeFile(path.join(f.directory, "bin", "claude"), `#!/bin/sh\n${claude(true, version)}\n`);
+    const again = await withLocale("en", () => runDoctor({ force: true, platform: "linux" }));
+    assert.equal(check(again, "claude").status, status, version);
+  }
+});
+
+test("the supported Claude Code range compares numbers; an unknown version is not flagged", () => {
+  assert.equal(claudeVersionSupported("2.1.292"), true);
+  assert.equal(claudeVersionSupported("2.1.1000"), true);
+  assert.equal(claudeVersionSupported("2.1.300-beta.1"), true);
+  assert.equal(claudeVersionSupported("2.1.29"), false);
+  assert.equal(claudeVersionSupported("2.2"), false);
+  assert.equal(claudeVersionSupported("10.0.0"), false);
+  assert.equal(claudeVersionSupported("1.9.999"), false);
+  assert.equal(claudeVersionSupported(undefined), true);
+  assert.equal(claudeVersionSupported("unknown"), true);
+});
+
 test("Git older than 2.40 works with a warning that syncing needs a newer one", async (t) => {
   await fakes(t, { git: git("2.39.5"), codex: codex() });
   const report = await withLocale("en", () => runDoctor({ force: true }));
@@ -363,7 +432,7 @@ test("Git older than 2.40 works with a warning that syncing needs a newer one", 
 
 test("a CLI that fails tells its error, offers a reinstall and is told apart from one that times out", async (t) => {
   const failing = `[ "$1" = --version ] && { echo 'error while loading shared libraries: libfoo.so' >&2; exit 1; }; exit 1`;
-  await fakes(t, { git: git(), gh: failing, codex: failing, claude: failing });
+  await fakes(t, { git: git(), gh: failing, codex: failing, claude: failing, agy: failing });
   const report = await withLocale("en", () => runDoctor({ force: true, platform: "linux" }));
   for (const [id, install] of [
     ["gh", "sudo apt install gh"],
@@ -378,10 +447,16 @@ test("a CLI that fails tells its error, offers a reinstall and is told apart fro
     );
     assert.deepEqual(row.fixes?.map((fix) => fix.command), [install]);
   }
+  // Antigravity's check names its executable, agy.
+  assert.equal(
+    check(report, "antigravity").detail,
+    "Installed, but `agy --version` failed: error while loading shared libraries: libfoo.so",
+  );
   // Signing in cannot help a CLI that fails, so only reinstalling is offered.
   assert.deepEqual(check(report, "provider-ready").fixes?.map((fix) => fix.command), [
     "npm install -g @openai/codex",
     "npm install -g @anthropic-ai/claude-code",
+    "curl -fsSL https://antigravity.google/cli/install.sh | bash",
   ]);
   const zh = await withLocale("zh-TW", () => runDoctor({ platform: "linux" }));
   assert.match(check(zh, "gh").detail!, /^已安裝，但執行 `gh --version` 失敗：/);
@@ -427,6 +502,58 @@ test("Claude-only setups are ready and suggest Claude Code as the default provid
   ]);
   assert.equal(check(chosen, "data-dir").status, "ok");
   assert.match(check(chosen, "data-dir").detail!, /^Writable, .+ free\.$/);
+});
+
+test("Antigravity-only setups are ready through agy models and suggest Antigravity as the default", async (t) => {
+  const f = await fakes(t, { git: git(), agy: agy() });
+  // agy models took about 6 seconds, longer than a probe's usual 5.
+  const limits: (number | undefined)[] = [];
+  const report = await withLocale("en", () =>
+    runDoctor({
+      force: true,
+      platform: "linux",
+      exec: (executable, args, options) => {
+        if (executable === "agy" && args[0] === "models") limits.push(options?.timeoutMs);
+        return command(executable, args, options);
+      },
+    }),
+  );
+  assert.deepEqual(limits, [20_000]);
+  assert.equal(report.ready, true);
+  assert.equal(check(report, "antigravity").status, "ok");
+  assert.equal(check(report, "antigravity").version, "1.5.0");
+  assert.equal(check(report, "antigravity-auth").status, "ok");
+  assert.equal(check(report, "provider-ready").detail, "Ready: Antigravity.");
+  assert.equal(defaultProviderFrom(report), "antigravity");
+  // With Codex not ready, the first ready provider is suggested.
+  const ready = (providers: string) =>
+    defaultProviderFrom({
+      checks: [{ id: "provider-ready", required: true, status: "ok", params: { providers } }],
+      ready: true,
+      checkedAt: report.checkedAt,
+      platform: "linux",
+    });
+  assert.equal(ready("claude,antigravity"), "claude");
+  assert.equal(ready("codex,antigravity"), undefined);
+  assert.equal(cliStatus(report).antigravityAuthenticated, true);
+  // The sign-in check lists models; it never starts a model turn.
+  assert.deepEqual(
+    (await f.calls()).filter((line) => line.startsWith("agy ")).sort(),
+    ["agy --version", "agy models"],
+  );
+  // Whether its sandbox can start depends on this machine: the kernel
+  // settings on Linux, sandbox-exec on macOS (not among the stand-ins).
+  const sandbox = check(report, "antigravity-sandbox");
+  const expected =
+    process.platform === "linux"
+      ? ["ok", "restricted"]
+      : process.platform === "darwin"
+        ? ["missing"]
+        : ["platform"];
+  assert.ok(
+    expected.includes(sandbox.status === "ok" ? "ok" : String(sandbox.reason)),
+    JSON.stringify(sandbox),
+  );
 });
 
 test("probes are cached for 10 seconds and shared; force probes again; the wording follows the locale", async (t) => {
@@ -488,7 +615,7 @@ test("bell-pr doctor prints the checklist with fix commands and exits by readine
   );
   assert.equal(code, 1);
   assert.match(text, /^BELL PR environment check\n/);
-  assert.match(text, /✗ AI provider +Install and sign in to the Codex CLI or Claude Code/);
+  assert.match(text, /✗ AI provider +Install and sign in to the Codex CLI, Claude Code or the Antigravity CLI/);
   assert.match(text, /\n {8}npm install -g @openai\/codex\n/);
   assert.match(text, /\n {8}gh auth login\n/);
   assert.match(text, /Not ready: fix the required check marked ✗ \(AI provider\), then run the check again\./);

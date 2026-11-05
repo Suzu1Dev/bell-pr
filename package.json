@@ -1,6 +1,6 @@
 {
   "name": "bell-pr",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "From vibe coding to knowing why. A local workbench for AI-assisted open-source contributions: an agent team builds the change in isolated git worktrees, you learn every change, explain it back and send one Draft PR that follows the project's rules.",
   "keywords": [
     "open-source",
@@ -13,6 +13,7 @@
     "local-first",
     "learning"
   ],
+  "homepage": "https://bell-pr.suzu.tw",
   "bugs": {
     "url": "https://github.com/Suzu1Dev/bell-pr/issues"
   },
@@ -73,7 +74,7 @@
     "access": "public"
   },
   "bellpr": {
-    "releaseDate": "2026-10-20"
+    "releaseDate": "2026-11-04"
   },
   "dependencies": {
     "express": "^5.1.0",

@@ -367,7 +367,11 @@ export interface DraftCheck {
     // never an override, never a typed reason.
     | "by-hand-rules"
     // Headroom item 2 (DESIGN v1.2 F13): a line that says no AI helped.
-    | "disclosure-accuracy";
+    | "disclosure-accuracy"
+    // The person's other contributions (server/group-local.ts): another one
+    // changes the same files, or a split part this one builds on is not merged.
+    | "group-own-overlap"
+    | "split-order";
   /** block stops approval and publishing; confirm needs the person's acknowledgement before publishing. */
   kind: "block" | "confirm";
   message: string;

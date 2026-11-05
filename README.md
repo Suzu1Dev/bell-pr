@@ -9,7 +9,7 @@ English · [繁體中文](README.zh-TW.md)
 
 BELL PR is a self-hosted, local-first workbench for open-source
 contributions. It runs on your computer with the AI coding CLI you already
-use (the OpenAI Codex CLI or Claude Code) and the GitHub CLI. It analyzes a
+use (the OpenAI Codex CLI, Claude Code or Google's Antigravity CLI) and the GitHub CLI. It analyzes a
 project, suggests where to contribute and lets a small agent team build the
 change in isolated Git worktrees. Then it has you do the part that makes
 you better: understand every line you send, train your taste on real code,
@@ -33,12 +33,22 @@ BELL PR is free and open-source software under
 
 [Try the sample project](#try-the-sample-project) ·
 [Before you start](#before-you-start) · [Quickstart](#quickstart) ·
+[Installation options](#installation-options) ·
 [Requirements](#requirements) ·
 [Features](#features) · [Privacy](#privacy) ·
 [Security](#security-model) · [Local API](#local-api) ·
 [Configuration](#configuration) ·
 [Troubleshooting](#troubleshooting) · [Documentation](#documentation) ·
 [Contributing](#contributing) · [License](#license-and-trademarks)
+
+
+## Watch the 90-second demo
+
+![From vibe coding to knowing why — BELL PR promo](site/assets/video/poster.jpg)
+
+<!-- generated:product-link key=homepageUrl path=#demo text="Watch the 90-second demo" -->
+[Watch the 90-second demo](https://bell-pr.suzu.tw/#demo)
+<!-- /generated:product-link --> on the site (English captions, plays when you press play).
 
 ## Try the sample project
 
@@ -56,7 +66,8 @@ tour can open. A real agent run still waits for a signed-in AI provider.
 BELL PR is a local workbench. Install and sign in to these tools **before**
 the Quickstart; `bell-pr doctor` prints a fix command for each miss.
 
-- **Node.js 22 or later** ([nodejs.org](https://nodejs.org/en)).
+- **Node.js 22 or later** ([nodejs.org](https://nodejs.org/en)); the shell
+  installer can prepare Node.js 24 for you.
 - `engines` states the minimum supported Node.js; CI pins Node.js 24.22.1 (and npm 11.21.1).
 - **Git**, with your name and e-mail set
   (`git config --global user.name` / `user.email`). Syncing a run onto the
@@ -64,17 +75,20 @@ the Quickstart; `bell-pr doctor` prints a fix command for each miss.
 - **GitHub CLI** (`gh`), signed in with `gh auth login`
   ([cli.github.com](https://cli.github.com/)).
 - **One AI coding CLI**, installed and signed in as the same user that runs
-  BELL PR (either is enough). Usage counts against **your own** provider
+  BELL PR (any one is enough). Usage counts against **your own** provider
   account (a paid plan or API credits, depending on the provider):
   - Codex CLI: `npm install -g @openai/codex`, then `codex login`
   - Claude Code: `npm install -g @anthropic-ai/claude-code`, then
     `claude auth login`
+  - Antigravity CLI: `curl -fsSL https://antigravity.google/cli/install.sh | bash`,
+    then run `agy` once to sign in
 - **On Linux:** `bubblewrap` and `socat` for the Claude Code file-edit
   sandbox (`sudo apt-get install bubblewrap socat` on Debian/Ubuntu).
   macOS uses its built-in sandbox.
 
 Supported today: **macOS**, **Linux**. **Windows via WSL2 (untested):** install
-everything above inside your WSL distribution.
+everything above inside your WSL distribution. The [Windows installer](#windows-wsl2)
+can prepare the tools there; sign in afterward. Native Windows is not supported.
 
 When `bell-pr doctor` reports every required check green, continue.
 `bell-pr start` exits before it listens until then. With no AI provider
@@ -92,7 +106,7 @@ sample tour; agent runs and publishing wait until a provider is ready.
 2. It prints its address and opens BELL PR in your browser:
 
    ```text
-   BELL PR 1.0.0-rc.1 → http://127.0.0.1:4311
+   BELL PR <version> → http://127.0.0.1:4311
    ```
 
 3. Walk through Welcome: choose your **language**, check your
@@ -113,6 +127,93 @@ To keep BELL PR installed, run `npm install -g bell-pr`, then start it with
 `bell-pr`. The [getting started guide](docs/getting-started.md) walks
 through a whole contribution.
 
+## Installation options
+
+Choose one method. Git, GitHub sign-in and an AI CLI remain prerequisites for
+real work; the sample tour can run with `bell-pr start --force`.
+See the [installation guide](docs/installation.md) for options and PATH setup.
+
+### macOS and Linux
+
+**Shell installer** — installs BELL PR under `~/.local` and prepares Node.js 24
+if a suitable Node.js/npm is missing. Automatic Node.js downloads are available
+for macOS/Linux x64 and arm64; no sudo or shell-profile changes:
+
+<!-- generated:install-commands method=curl -->
+```sh
+curl -fsSL https://bell-pr.suzu.tw/install | sh
+```
+<!-- /generated:install-commands -->
+
+Then use the launch command or PATH setting printed by the installer.
+
+**Homebrew** — uses this repository as the tap:
+
+<!-- generated:install-commands method=brew -->
+```sh
+brew tap suzu1dev/bell-pr https://github.com/Suzu1Dev/bell-pr
+brew install suzu1dev/bell-pr/bell-pr
+```
+<!-- /generated:install-commands -->
+
+**npm or Bun** — choose one; Bun installation still needs Node.js 22+ to run
+BELL PR:
+
+```sh
+npm install -g bell-pr
+bell-pr
+```
+
+Or:
+
+```sh
+bun add --global bell-pr
+bell-pr
+```
+
+**mise** — installs Node.js 24 and pins BELL PR to the version in the command.
+It uses npm for this installation because mise's default npm backend can
+reject newly published packages:
+
+```sh
+MISE_NPM_PACKAGE_MANAGER=npm mise use -g node@24 npm:bell-pr@1.1.0
+mise exec -- bell-pr
+```
+
+`mise exec` works without shell activation. The npm selection applies only to
+that command; for upgrades, repeat the prefix and choose the desired version.
+
+### Windows (WSL2)
+
+Run the following in PowerShell. It prepares an existing WSL2 Ubuntu
+distribution with Git, GitHub CLI, Node.js, BELL PR and Codex CLI. Claude Code
+or no AI CLI can be selected instead. If WSL2 is missing, it prints the setup
+steps; complete them, create your Linux user and rerun the installer.
+
+<!-- generated:install-commands method=powershell -->
+```powershell
+& {
+  Invoke-RestMethod 'https://bell-pr.suzu.tw/install.ps1' -OutFile install.ps1 -ErrorAction Stop
+  powershell -NoProfile -ExecutionPolicy Bypass -File .\install.ps1
+}
+```
+<!-- /generated:install-commands -->
+
+Then enter Ubuntu with `wsl -d Ubuntu`. Inside WSL, configure your Git identity,
+run `gh auth login` and `codex login` (or `claude auth login` if selected), then
+start BELL PR. For later launches from PowerShell:
+
+```powershell
+wsl -d Ubuntu -- bash -lc '$HOME/.local/bin/bell-pr'
+```
+
+Keep projects inside WSL, for example `~/projects`. If the Windows browser
+does not open, run `bell-pr open --print --print-token` in another WSL terminal
+and open the printed link yourself; it contains a credential, so keep it private.
+See [Windows setup and options](docs/installation.md#windows-with-wsl2).
+Native Windows is unsupported; this WSL2 setup has not been verified on a real
+Windows host.
+
 ## Requirements
 
 - **Node.js 22 or later.**
@@ -120,8 +221,8 @@ through a whole contribution.
   later, and commits need your name and e-mail address in Git.
 - **The GitHub CLI** (`gh`), signed in with `gh auth login`, to import
   from GitHub, publish pull requests and find projects.
-- **The Codex CLI or Claude Code**, installed and signed in as the same
-  user that runs BELL PR. One of them is enough.
+- **The Codex CLI, Claude Code or the Antigravity CLI**, installed and
+  signed in as the same user that runs BELL PR. One of them is enough.
   - Codex CLI: `npm install -g @openai/codex`, then `codex login`. BELL PR
     uses the Codex CLI you installed and signed in to. Usage counts
     against your own account.
@@ -129,6 +230,13 @@ through a whole contribution.
     `claude auth login`. BELL PR uses the Claude Code CLI you installed and
     signed in to (Claude plan or Anthropic API key). Usage counts against
     your own account.
+  - Antigravity CLI: `curl -fsSL https://antigravity.google/cli/install.sh | bash`,
+    then `agy` to sign in. BELL PR uses the Antigravity CLI you installed
+    and signed in to (Google account, Gemini API key or Google Cloud
+    credentials). Usage counts against your own account. It does not start
+    in a project that ships Antigravity hooks, MCP servers, plugins,
+    agents or skills, and its agents can always search the web (see the
+    [security model](docs/security-model.md#antigravity)).
 - **On Linux, bubblewrap and socat** for the sandbox that Claude Code
   agents edit files in (`sudo apt-get install bubblewrap socat`).
 
@@ -141,12 +249,12 @@ start` then exits non-zero before it listens, and prints that checklist
 with the command that fixes each failed check. `bell-pr start --force`
 starts anyway and warns that the check was skipped. Welcome lets you
 continue; you can take the **sample tour** (no AI call). Starting a real
-agent run is refused until at least one of Codex CLI or Claude Code is
-installed and signed in; Discovery also needs a signed-in GitHub CLI.
+agent run is refused until at least one of Codex CLI, Claude Code or the
+Antigravity CLI is installed and signed in; Discovery also needs a signed-in GitHub CLI.
 
 ### Cost of a sample run
 
-Agent usage is billed by **your** Codex / Claude account. BELL PR does not
+Agent usage is billed by **your** Codex / Claude / Antigravity account. BELL PR does not
 set prices. Exact tokens and cost for a typical first contribution are
 **not published yet** — they will be added here after one measured run.
 
@@ -156,13 +264,14 @@ set prices. Exact tokens and cost for a typical first contribution are
 - **Linux**
 - **Windows through WSL2 (untested):** install and run BELL PR, Git, the
   GitHub CLI and your AI CLI inside your WSL distribution. Browser tests and
-  real agent runs for 1.0.0-rc.1 were done on Linux only.
+  real agent runs were done on Linux only.
 
-The 1.0.0-rc.1 release candidate's unit tests, build and package check run
-on Linux and macOS with Node.js 22 and 24 (see the CI workflow). The browser
-tests and the real agent runs were done on Linux only, and WSL2 has not been
-tested (see the [changelog](CHANGELOG.md)). A Docker image is available in
-beta.
+CI runs the unit tests and the build on Linux and macOS with Node.js 24,
+and the package check, the browser tests and a Docker build on Linux; the
+release workflow also builds, tests and packs on Linux with Node.js 22 (see
+the CI and release workflows). The real agent runs were done on Linux only,
+and WSL2 has not been tested (see the [changelog](CHANGELOG.md)). A Docker
+image is available in beta.
 
 ## Features
 
@@ -198,7 +307,10 @@ the run is finished you can check it again, also on a run made before
 these checks. With default **Working directory (default)** access, agents are told not to change
 your machine: no `sudo` and no global installs. When a check needs something
 the machine lacks, the overview lists it with a suggested command, for you
-to verify and run yourself. Explicit **Full access** in model settings lets
+to verify and run yourself. On a Full access run you can instead tick those
+commands and confirm, and one Collaborate turn installs them without the
+sandbox and with your account, reruns the blocked checks and reports each
+item; stopping it does not undo installs. Explicit **Full access** in model settings lets
 writable roles install tools outside the checkout and use available sudo
 privileges; read-only roles keep their restrictions. Linux also offers an
 optional passwordless sudo setup. See the [security model](docs/security-model.md#explicit-full-access).
@@ -212,7 +324,8 @@ gives hints without code and reviews your change when you are ready. BELL PR
 runs your tests, and its agents cannot edit your files in these runs.
 
 Before publishing an agent contribution, **Collaborate** lets you ask an agent
-to fix checks, add tests or work through the draft's Limitations. Each turn
+to fix checks, add tests, work through the draft's Limitations or, on Full
+access runs, set up what the checklist lists. Each turn
 records changed files, observed commands, missing checks and questions. Edits
 invalidate the affected review marks. Completed checks go in Validation;
 Limitations keeps remaining gaps and constraints. Updates to these sections show
@@ -270,6 +383,9 @@ reason before you publish. When the plan has parts that do not depend on one
 another, the confirm before publishing lists them, and **Split into
 contributions** on the Draft tab can turn each part into its own contribution,
 by file. A part is a group of files, not always one fix, so check the grouping.
+Publishing a part that builds on another asks you to confirm until that other
+part is merged, and when two of your contributions to a project change the
+same files, approving the plan and publishing ask you to confirm the overlap.
 
 It checks the text before anything is sent. Blocks common token formats and private keys before publishing.
 Unfinished placeholders block it, and a local path, a CI change or a public commit
@@ -367,7 +483,7 @@ contribution's complete learning record as Markdown.
 
 ### Your tools, your accounts, your language
 
-Choose the Codex CLI or Claude Code, the model, the reasoning effort the
+Choose the Codex CLI, Claude Code or the Antigravity CLI, the model, the reasoning effort the
 model offers (from none to ultra) and an efficiency mode (Lean, Full or
 Off). Each run shows the usage the provider reported. When a CLI fails, the
 error it reported shows first and its raw output folds away. The interface
@@ -378,7 +494,9 @@ unless the project asks otherwise.
 **Web access for agents** is a setting that stays off until you turn it on.
 Claude Code may then open pages on GitHub's own sites only; the Codex CLI
 uses OpenAI's web search. Project analysis and discovery never get web
-access.
+access, except with the Antigravity CLI, whose web search cannot be turned
+off: every Antigravity agent can search the web, and only reads pages on
+GitHub's sites when this setting is on.
 
 ## Privacy
 
@@ -386,7 +504,8 @@ access.
   directory. There is no BELL PR cloud, account, telemetry or analytics.
 - Your code and your questions go only to the services you set up: the
   provider of the AI CLI you chose, and GitHub, under your own accounts.
-- Web access for agents is off unless you turn it on.
+- Web access for agents is off unless you turn it on (the Antigravity CLI's
+  web search is always on).
 - In the app you can free a run's files, delete a run or a project, or
   delete all data.
 
@@ -394,11 +513,14 @@ Details: [Privacy and your data](docs/privacy-and-data.md).
 
 ## Security model
 
-- **Sandboxed agents.** In the default Working directory mode, agents that write code run in their CLI's operating-system sandbox: writes stay in the run's own worktree and the network is closed. Claude Code is denied the GitHub CLI config files, `~/.git-credentials` and credential-store files, `~/.netrc`, and `~/.ssh/`. `GH_TOKEN`/`GITHUB_TOKEN` are removed from the agent's environment. Tokens in your system keyring are not covered: the agent can still read your GitHub token via `gh auth token`. Your main protection is a fine-grained token with the minimum permissions you need. Claude Code is also denied BELL PR's own data outside its checkout. "Full access" is off by default. It turns off the OS sandbox and the credential deny rules for roles that write files, so those agents can read `~/.git-credentials` and `~/.ssh` and run `gh`, `git push`, and `curl`. Read-only roles keep their limits. Only the removal of `GH_TOKEN`/`GITHUB_TOKEN` from the environment still applies. "Passwordless sudo" (Linux only) is off by default. It lets every process under your user account, including the agent, run any command as root without a password and read every file on that machine, including tokens and SSH keys. Use either only in a throwaway VM or container.
+- **Sandboxed agents.** In the default Working directory mode, agents that write code run in their CLI's operating-system sandbox: writes stay in the run's own worktree and the CLI's temporary folders, and the network is closed. Your own Claude Code user settings can widen Claude Code's sandbox (proxy ports, allowed domains or paths, excluded commands, plugin language servers; see [Your own Claude Code settings](docs/security-model.md#your-own-claude-code-settings)). Claude Code is denied the GitHub CLI config files, `~/.git-credentials` and credential-store files, `~/.netrc`, and `~/.ssh/`. `GH_TOKEN`/`GITHUB_TOKEN` are removed from the agent's environment. Tokens in your system keyring are not covered: the agent can still read your GitHub token via `gh auth token`. Your main protection is a fine-grained token with the minimum permissions you need. Claude Code is also denied BELL PR's own data outside its checkout. "Full access" is off by default. It turns off the OS sandbox and the credential deny rules for roles that write files, so those agents can read `~/.git-credentials` and `~/.ssh` and run `gh`, `git push`, and `curl`. Read-only roles keep their limits. Only the removal of `GH_TOKEN`/`GITHUB_TOKEN` from the environment still applies. "Passwordless sudo" (Linux only) is off by default. It lets every process under your user account, including the agent, run any command as root without a password and read every file on that machine, including tokens and SSH keys. Use either only in a throwaway VM or container.
 - **Imported projects are untrusted.** Their code, documents and agent
   instructions (`AGENTS.md`, `CLAUDE.md`, `.claude/`) are treated as data:
   the CLIs never load the project's own settings, hooks or instructions,
   and a repository whose Git configuration could run programs is refused.
+  The Antigravity CLI is the exception: it reads a project's `AGENTS.md`
+  and `GEMINI.md`, so BELL PR refuses to start it in a project with
+  Antigravity hooks, MCP servers, plugins, agents or skills.
   Git commands BELL PR itself runs also turn those programs off. Only a
   git command that talks to GitHub receives `GH_TOKEN`.
   Agents still run the project's code, so import only projects you are
@@ -408,7 +530,8 @@ Details: [Privacy and your data](docs/privacy-and-data.md).
   `127.0.0.1` by default. Other sites may link to its page, but cannot
   call its API or frame it.
 - **Unsandboxed agents are an explicit opt-in.** Without the sandbox (for
-  example in Docker with default settings), a Claude Code agent that edits
+  example in Docker with default settings, or the Antigravity CLI on
+  Ubuntu 24.04 and later), a Claude Code or Antigravity agent that edits
   files is refused. You can allow it under **Settings → Agent safety** or
   with `BELLPR_ALLOW_UNSANDBOXED_AGENTS=1`; such agents have your full user
   rights, and every run that used one carries a **Ran without sandbox**
@@ -482,7 +605,7 @@ Settings are used unless a variable sets them.
 | `BELLPR_MAX_AGENT_PROCESSES` | `3` | Agent CLI processes at the same time (1 to 32) |
 | `BELLPR_MAX_ACTIVE_RUNS` | `2` | Runs executing at the same time (1 to 8) |
 | `BELLPR_AGENT_TIMEOUT_SCALE` | `1` | Multiplier for agent time limits (0.5 to 10) |
-| `BELLPR_ALLOW_UNSANDBOXED_AGENTS` | not set | `1` lets Claude Code agents edit files without the sandbox |
+| `BELLPR_ALLOW_UNSANDBOXED_AGENTS` | not set | `1` lets Claude Code and Antigravity agents edit files without the sandbox |
 | `BELLPR_REQUIRE_UNDERSTANDING_CHECK` | not set | `1` keeps the understanding check on and locks the setting; no value turns it off |
 | `BELLPR_RETENTION_DAYS` | `14` | Days before the files of cancelled and failed runs are removed (1 to 365) |
 | `BELLPR_DEV` | not set | Development mode, for working on BELL PR itself |
@@ -521,7 +644,7 @@ bell-pr doctor
 ```
 
 checks Node.js, Git, the GitHub CLI and its permissions, the agent CLIs and
-their sign-ins, the Claude Code sandbox and the data directory, and prints
+their sign-ins, the Claude Code and Antigravity sandboxes and the data directory, and prints
 the command that fixes each problem. `bell-pr doctor --json` gives the same
 report as JSON. It exits with 0 when every required check passes.
 
@@ -545,8 +668,9 @@ readable by your user only.
   damaged file by itself.
 - One BELL PR runs per data directory at a time.
 - **Upgrading** never moves your data, and from 1.0.0 on an older version
-  can still read what a newer one wrote. See [Upgrading](docs/upgrading.md),
-  including data from versions before 1.0.
+  can still read what a newer one wrote, except the files that name
+  Antigravity, which 1.0.x refuses. See [Upgrading](docs/upgrading.md),
+  including how to go back and data from versions before 1.0.
 
 ## Documentation
 
@@ -589,6 +713,7 @@ To report a security vulnerability privately, follow
 [SECURITY.md](SECURITY.md). Do not open a public issue.
 
 <!-- generated:product-link key=homepageUrl text="Website" -->
+[Website](https://bell-pr.suzu.tw)
 <!-- /generated:product-link -->
 <!-- generated:product-link key=supportEmail text="Contact support by e-mail" -->
 <!-- /generated:product-link -->
@@ -610,9 +735,9 @@ The BELL PR name and logo are not under the Apache license.
 [TRADEMARKS.md](TRADEMARKS.md) says what you may do with them.
 
 BELL PR is an independent project and is not affiliated with, endorsed by,
-or sponsored by GitHub, Inc., OpenAI, or Anthropic PBC. GitHub, OpenAI,
-Codex, Anthropic, Claude and Claude Code are trademarks of their
-respective owners; BELL PR names them only to say which tools it works
+or sponsored by GitHub, Inc., OpenAI, Anthropic PBC, or Google LLC.
+GitHub, OpenAI, Codex, Anthropic, Claude, Claude Code, Google, Gemini and
+Antigravity are trademarks of their respective owners; BELL PR names them only to say which tools it works
 with.
 
 Interactive SSH and headless starts may hint

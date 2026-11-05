@@ -28,7 +28,7 @@ export const product: ProductInfo = {
   name: "BELL PR",
   npmPackage: "bell-pr",
   binNames: ["bell-pr", "bellpr"],
-  homepageUrl: "",
+  homepageUrl: "https://bell-pr.suzu.tw",
   docsUrl: "",
   supportEmail: "",
   securityEmail: "",

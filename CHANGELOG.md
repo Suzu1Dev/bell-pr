@@ -9,6 +9,276 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- The sudo helper is now host-local only and enabled for a limited time.
+  sudo 輔助功能改為僅限主機本機、限時啟用。
+  Each enable asks for the sudo password and a duration from 1 minute to
+  8 hours (1 hour by default). BELL PR removes the rule when the time is up
+  and, at startup, removes a rule past its time. Only the install token,
+  from this computer at `localhost`, `127.0.0.1` or `[::1]` and without
+  proxy headers, may use it; paired devices may not. Changes are recorded
+  in `audit/sudo.jsonl` in the data directory, never with the password.
+  `bell-pr doctor` reports a rule past its time or without one, and
+  `--sudoers-path <file>` picks the file it inspects.
+
+## [1.1.0] - 2026-11-04
+
+The first release on npm's `latest` tag since 1.0.0. It also contains two
+versions that never reached `latest`; CHANGELOG.md, in the package and the
+repository, lists them in full:
+
+- **1.1.0-beta.1**, a prerelease on the `next` tag, added Antigravity
+  (Google's Antigravity CLI, `agy`) as a third AI provider, next to the
+  Codex CLI and Claude Code. Its known limitations are repeated below.
+- **1.0.1**, prepared but never published, added installation with a
+  user-local shell script, a Homebrew formula, Bun or mise, and a warning
+  when the installed Claude Code is outside the supported versions. It
+  fixed Codex commands on Linux when `~/.ssh` holds files. It also stopped
+  your Claude Code hooks from running in BELL PR's agent turns, and kept
+  Codex from reading credential files that are symbolic links in `~/.aws`
+  or the GitHub CLI config directory.
+
+### Added
+
+- **A warning when two of your contributions to one project change the
+  same files.** Before a plan is approved, BELL PR compares the files it
+  covers with your other unfinished contributions to that project: their
+  plans while still to be carried out, what their checkouts changed, and
+  what their pull requests change until that change is in this run's base
+  commit or you read the pull request as merged or closed. Parts of one
+  split never count against each other. The plan board then says which
+  contributions change files this plan covers, and marks each task that
+  touches those files with "Also changed in" and the other contribution's
+  title. Approving needs the tick "I know these overlap; approve anyway".
+  A plan that would start on its own waits for your approval instead, and
+  so does a retried plan that was never approved. "This is my plan" in
+  Learn by hand asks for a similar tick, "I know these overlap; confirm
+  my plan anyway". The check reads only BELL PR's own records and
+  checkouts on this computer and sends nothing.
+- **The parts of a split keep their order.** Each part records the parts
+  its tasks build on; splitting a part again passes this on, and deleting
+  parts points what built on them back at their source. A split that would
+  make a part build on more than 64 others is refused.
+- **Two publish confirms under "Your other contributions here"**: one when
+  another of your contributions to the project changes some of the same
+  files, and one when a part of a split builds on parts that are not
+  merged yet.
+- **Let the agent set this up.** On a Full access run in review or
+  approved, the "Setup this machine needs from you" checklist hands the
+  commands you tick, at most 10 per turn, to one Collaborate turn. A dialog
+  shows them word for word first, and nothing starts until you confirm.
+  The turn runs without the sandbox and with your account. The agent is
+  told to run only the ticked commands that match the project's
+  documentation, changing them at most by adding non-interactive flags,
+  running sudo as `sudo -n` and refreshing the package index, and not to
+  change code or tests. It is told to rerun the checks the commands
+  blocked and to report each item as installed, already present, failed
+  or needs you; an item it does not report shows no result, and a turn
+  that is stopped or fails reports none. A file the turn changes, such as
+  a lockfile an install step rewrites, loses its review mark, and a change
+  to the files or to the PR draft's Validation and Limitations returns an
+  approved contribution to review. BELL PR refuses to hand over the
+  command shapes it knows run fetched code: a downloader (curl, wget,
+  aria2c, axel, fetch) that pipes, chains or substitutes, and a pipe into a
+  shell or another interpreter. Any other command reaches the dialog as
+  written, so read it before you tick it. sudo works only when it needs no
+  password, and stopping the turn does not undo installs.
+
+### Changed
+
+- **Antigravity's models are listed once each, with their thinking levels
+  as reasoning efforts**, as Claude Code's and Codex's are. The Antigravity
+  CLI lists every level as a model of its own (Gemini 4 Argon Low, Medium
+  and High), so the model picker showed each model up to three times. agy
+  still receives the model IDs it listed. A model saved with its level, as
+  1.1.0-beta.1 saved it, reads as that model and effort.
+
+### Fixed
+
+- A plan scope that names a directory of the base commit without its
+  trailing slash (`src`) is read as that directory (`src/`), so the plan
+  covers the files inside.
+- On a Full access run, Antigravity's writing roles were told that curl,
+  wget, the GitHub CLI and pushing are denied, though Full access lifts
+  those denials; the note now names only what stays denied.
+
+### Known limitations
+
+These are 1.1.0-beta.1's limitations of Antigravity, which still apply:
+
+- The Antigravity CLI cannot skip a project's customizations, so BELL PR
+  does not start it in a project with Antigravity hooks, MCP servers,
+  plugins, agents or skills. It still reads the project's `AGENTS.md` and
+  `GEMINI.md`.
+- Its web search cannot be turned off: with Antigravity, every agent can
+  search the web, project analysis and discovery included.
+- On Ubuntu 24.04 and later its sandbox cannot start
+  (`kernel.apparmor_restrict_unprivileged_userns`), so writing roles are
+  refused there unless unsandboxed agents are allowed.
+- It saves every conversation under `~/.gemini/antigravity-cli/`.
+- After you chose Antigravity, a 1.0.x version reports the model settings,
+  the analyses Antigravity made and the discovery results as unreadable;
+  [Upgrading](docs/upgrading.md#going-back-to-an-older-version) says how to
+  recover. 1.1.0-beta.1 reports an Antigravity model chosen in 1.1.0 as
+  unknown until you choose it again.
+
+## [1.1.0-beta.1] - 2026-11-04
+
+A prerelease on npm's `next` tag, to try the Antigravity provider before
+it is released. The tag v1.1.0-beta.0 was never published: its release
+stalled, and this version also gives the Antigravity sign-in check the
+time `agy models` needs.
+
+### Added
+
+- **Antigravity as a third AI provider.** Agents can run through Google's
+  Antigravity CLI (`agy`, checked with 1.5.0), which serves Gemini models,
+  signed in with a Google account, a Gemini API key or Google Cloud
+  credentials. The doctor, the setup checklist, onboarding, the settings and
+  the model picker list it next to the Codex CLI and Claude Code; `agy models`
+  gives the model list and is the sign-in check. Each turn gets permission
+  rules for its role: read-only roles may not write, run commands or read
+  the home directory off the way to their checkout, and no role may read
+  credential files, the Antigravity CLI's own files or BELL PR's data
+  outside its checkout, use MCP tools or the browser, or read pages unless
+  web access is on. Writing roles run their commands in the Antigravity
+  CLI's terminal sandbox, or without it only when you allowed unsandboxed
+  agents. Four error codes have their own troubleshooting sections:
+  `antigravity_missing`, `antigravity_unauthenticated`,
+  `antigravity_sandbox_unavailable` and `antigravity_workspace_config`.
+
+### Known limitations
+
+- The Antigravity CLI cannot skip a project's customizations, so BELL PR
+  does not start it in a project with Antigravity hooks, MCP servers,
+  plugins, agents or skills. It still reads the project's `AGENTS.md` and
+  `GEMINI.md`.
+- Its web search cannot be turned off: with Antigravity, every agent can
+  search the web, project analysis and discovery included.
+- On Ubuntu 24.04 and later its sandbox cannot start
+  (`kernel.apparmor_restrict_unprivileged_userns`), so writing roles are
+  refused there unless unsandboxed agents are allowed.
+- It saves every conversation under `~/.gemini/antigravity-cli/`.
+- After you chose Antigravity, a 1.0.x version reports the model settings,
+  the analyses Antigravity made and the discovery results as unreadable;
+  [Upgrading](docs/upgrading.md#going-back-to-an-older-version) says how to
+  recover.
+
+## [1.0.1] - 2026-10-31
+
+### Added
+
+- Install BELL PR with a user-local shell script, a repository-hosted Homebrew
+  formula, Bun or mise. A PowerShell helper prepares Ubuntu/Debian on WSL2;
+  English and Traditional Chinese READMEs include setup and repeat-launch commands.
+- English and Traditional Chinese landing pages offer npx, npm, curl, brew, Bun,
+  PowerShell and mise installation tabs with keyboard navigation and copy buttons.
+  The website serves matching shell, PowerShell and WSL helper scripts at short URLs.
+- Settings → About links to the BELL PR website, which is also the npm
+  package's homepage.
+- `bell-pr doctor` and the setup checklist warn when the installed Claude
+  Code is outside the supported versions (2.1.292 or later, before 2.2).
+  Agents still start; the security model says why the version matters.
+
+### Fixed
+
+- **Codex commands start on Linux when `~/.ssh` holds files.** Codex's
+  sandbox profile denied both `~/.ssh/` and `~/.ssh/**`. With any file in
+  `~/.ssh`, such as `known_hosts` or `authorized_keys`, bubblewrap failed to
+  start, so no shell command of a Codex agent ran, in read-only or writable
+  roles. The profile now leaves out an entry that repeats another or lies
+  inside a denied directory, such as a `credential.helper store --file` path
+  inside `~/.ssh`. `~/.ssh` stays denied, file names included. Claude Code's
+  rules are unchanged. The sandbox canary now fails a run whose output
+  contains `bwrap:`, and checks without a model call that Codex's sandbox
+  starts.
+
+- **The npm package keeps the READMEs written for npmjs.com.** The package
+  check in CI and in the release workflow packed the package again without
+  `prepack`, over the tarball the workflow had just made, so a release would
+  have checksummed, uploaded and published a package whose README still had
+  links and screenshots npmjs.com cannot show. And `npm publish` may take
+  either README as the package's (npmjs.com shows the Chinese one for
+  1.0.0, with links into `docs/` that do not work there), while prepack
+  readied only `README.md`; it now readies `README.zh-TW.md` the same way.
+  `node scripts/check-pack.mjs` now packs into a temporary folder that it
+  removes, and with `--tarball` checks the tarball that CI and the release
+  workflow packed, as it is, including that no README in it has a relative
+  link or image left. A release now publishes only from a pushed `v*` tag
+  that matches `package.json`; started by hand, the release workflow only
+  runs its dry run. The Docker image is pushed only after npm publish
+  succeeded, and the GitHub release is created on the commit that was built.
+
+### Security
+
+- **Codex no longer reads credential files that are symbolic links in
+  `~/.aws` or the GitHub CLI config directory.** On Linux, Codex leaves
+  out symbolic links when it expands `**`, so a `~/.aws/credentials` or
+  `~/.config/gh/hosts.yml` that a dotfile manager or vault links into
+  place stayed readable: in every role with Codex CLI 0.159, and in
+  read-only roles with 0.166, whose writable roles failed to start
+  instead. Codex's profile now denies these directories themselves
+  (`~/.aws/`, `~/.config/gh/`, and the directory `GH_CONFIG_DIR` or
+  `XDG_CONFIG_HOME` moves gh to), as it already did for `~/.ssh`, so
+  their file names are hidden as well and both roles start. A link's
+  target outside the directory is still readable at its own path.
+  Claude Code's rules are unchanged.
+- **Symbolic links in the data directory and moved config directories.**
+  When the data directory is reached through a symbolic link (macOS `/var`
+  is `/private/var`), run and teammate checkouts keep the Git directory
+  BELL PR recorded for them instead of being refused (`worktreeForged`).
+  The lookup resolves the checkout and the directories above it, never the
+  checkout's own `.git` entry. The credential paths that `GH_CONFIG_DIR`,
+  `XDG_CONFIG_HOME`, `CLAUDE_CONFIG_DIR` or `CODEX_HOME` move are denied
+  to Claude Code both as given and at their physical path, also before that
+  directory exists. Codex keeps getting the physical path only: on Linux,
+  its sandbox does not start with a deny path that passes through a
+  symbolic link.
+- **Your Claude Code hooks no longer run in BELL PR's agent turns, and auto
+  memory is off.** Hooks from your user settings and plugins ran outside the
+  sandbox during every Claude turn, and auto memory kept notes about imported
+  projects in `~/.claude/projects/` from one run to the next. Each turn now
+  also leaves out your own `CLAUDE.md`, rules, output style and language
+  setting, and a main-thread `agent` from your settings or a plugin's, which
+  would replace BELL PR's system prompt and tools; BELL PR's prompt sets the
+  output language. An output style that one of your plugins forces still
+  applies to every turn. Your sign-in, `env` and default model still
+  apply. BELL PR does not delete notes that earlier versions let Claude
+  Code save; Privacy and your data says where to find them. In sandboxed
+  turns, single sandbox values in your user settings that would weaken the
+  sandbox, such as
+  `sandbox.filesystem.disabled`, `sandbox.enableWeakerNestedSandbox` and
+  `sandbox.network.allowAllUnixSockets`, are set back to their defaults.
+  So is `sandbox.allowNestedUserNamespaces`, which Claude Code 2.1.305 added:
+  on Linux it lets sandboxed commands create user namespaces and with them
+  undo the sandbox's write denials, such as those on the checkout's `.git`.
+  The security model lists the user settings that still widen what agents
+  may do, such as `permissions.additionalDirectories`,
+  `sandbox.excludedCommands` and your own proxy in
+  `sandbox.network.httpProxyPort`. Your plugins' language servers and a
+  `sandbox.ripgrep` command in your user settings still run outside the
+  sandbox when a writable role works; disable plugins that bring language
+  servers or force an output style on a computer that runs BELL PR. The
+  sandbox canary checks that hooks and auto memory stay off, that a user
+  `agent` is reset and that those sandbox values are set back, and its
+  `--decoy-home` links only Claude Code's login file instead of your whole
+  `~/.claude`.
+- **Where sandboxed commands may also write, now documented.** Besides the
+  run's checkout, commands of writable roles may write to the CLI's
+  temporary folders: `/tmp` and `$TMPDIR` for Codex (its `:workspace`
+  profile), and `/tmp/claude`, `~/.npm/_logs` and `~/.claude/debug` for
+  Claude Code 2.1.292. This is not new in 1.0.1. Codex's profile does not
+  deny BELL PR's data directory, so keep the data directory out of `/tmp`
+  and `$TMPDIR` when Codex agents write code (the security model and the
+  configuration guide say so). The READMEs, the FAQ and Settings → Agent
+  safety now mention the temporary folders, and that your own Claude Code
+  user settings can widen Claude Code's sandbox.
+
+## [1.0.0] - 2026-10-30
+
+Published to npm by hand, without provenance.
+
+### Changed
+
 - Desktop launches pass a private temporary file URL to the browser opener,
   keeping the API token out of opener arguments. Interactive headless starts
   show only `bell-pr open --print --print-token` as an explicit next step.
@@ -645,22 +915,10 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   Files that earlier builds saved load as before, and saved files are read
   as leniently as before.
 
-## [1.0.1] - Unreleased
+## [1.0.0-rc.1] - 2026-10-20
 
-### Changed
-
-- The sudo helper is now host-local only and enabled for a limited time.
-  sudo 輔助功能改為僅限主機本機、限時啟用。
-  Each enable asks for the sudo password and a duration from 1 minute to
-  8 hours (1 hour by default). BELL PR removes the rule when the time is up
-  and, at startup, removes a rule past its time. Only the install token,
-  from this computer at `localhost`, `127.0.0.1` or `[::1]` and without
-  proxy headers, may use it; paired devices may not. Changes are recorded
-  in `audit/sudo.jsonl` in the data directory, never with the password.
-  `bell-pr doctor` reports a rule past its time or without one, and
-  `--sudoers-path <file>` picks the file it inspects.
-
-## [1.0.0] - 【暫定】
+This release candidate was never published to npm; its changes reached npm in
+1.0.0.
 
 The first public release candidate of BELL PR, open source under the
 Apache License 2.0. BELL PR is a self-hosted, local-first workbench for

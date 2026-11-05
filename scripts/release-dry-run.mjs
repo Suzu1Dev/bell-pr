@@ -5,7 +5,7 @@
 //   2. npm test
 //   3. npm pack into the output directory (prepack builds once more, as in
 //      the workflow)
-//   4. node scripts/check-pack.mjs
+//   4. node scripts/check-pack.mjs --tarball <that tarball>
 //   5. SHA256SUMS for the tarball
 //   6. release-notes.md: the CHANGELOG.md section of this version
 //   7. npm publish <tarball> --dry-run (--tag next for a prerelease)
@@ -27,6 +27,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
+import { shellArg } from "./npm-pack-report.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const windows = process.platform === "win32";
@@ -124,10 +125,10 @@ function main() {
   if (!values["skip-tests"])
     run("test", "npm", ["test"], { env: { TSX_DISABLE_CACHE: process.env.TSX_DISABLE_CACHE ?? "1" } });
   const packed = packReport(
-    run("pack", "npm", ["pack", "--json", "--pack-destination", out], { capture: true }),
+    run("pack", "npm", ["pack", "--json", "--pack-destination", shellArg(out)], { capture: true }),
   );
   const tarball = path.join(out, packed.filename);
-  run("check-pack", process.execPath, ["scripts/check-pack.mjs"]);
+  run("check-pack", process.execPath, ["scripts/check-pack.mjs", "--tarball", tarball]);
 
   const sum = createHash("sha256").update(readFileSync(tarball)).digest("hex");
   writeFileSync(path.join(out, "SHA256SUMS"), `${sum}  ${path.basename(tarball)}\n`);
@@ -136,7 +137,7 @@ function main() {
 
   run("npm publish --dry-run", "npm", [
     "publish",
-    tarball,
+    shellArg(tarball),
     "--dry-run",
     ...(prerelease ? ["--tag", "next"] : []),
   ], { env: { npm_config_dry_run: "true" } });

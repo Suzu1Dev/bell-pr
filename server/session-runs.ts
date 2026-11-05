@@ -26,7 +26,11 @@ import {
   parseSessionResult,
   sessionJsonSchema,
   sessionPrompt,
+  setupSessionJsonSchema,
 } from "./session.js";
+import { setupTurnRequest } from "./prompts/setup.js";
+import { setupHandOffNeeds } from "./setup-needs.js";
+import type { SetupNeed } from "../shared/setup-needs.js";
 import type { WorkbenchContext } from "./workbench-context.js";
 
 const now = () => new Date().toISOString();
@@ -62,16 +66,18 @@ function addSessionMessage(
  * unpublished checkout. The turn runs in the background; the page follows
  * it through run.session and the run log. Questions the agent has come back
  * in its reply, and the answer goes into the next turn: the CLIs keep no
- * conversation between invocations.
+ * conversation between invocations. With `setupCommands`, the turn is a
+ * setup turn on a Full access run: the agent installs the stored setup
+ * needs the person ticked, and BELL's own sentence stands as their message.
  */
 export async function startSession(
   ctx: WorkbenchContext,
   id: string,
-  content: string,
+  request: { content: string } | { setupCommands: string[] },
 ) {
   if (ctx.stopping()) throw new AppError(shuttingDown(), 503);
-  const text = content.trim();
-  if (!text) throw new AppError(sm().session.emptyMessage, 422);
+  const text = "content" in request ? request.content.trim() : "";
+  if ("content" in request && !text) throw new AppError(sm().session.emptyMessage, 422);
   return ctx.lock(id, async () => {
     const run = ctx.run(id);
     if (run.learnByHand)
@@ -81,6 +87,9 @@ export async function startSession(
       throw new AppError(sm().session.notAllowed, 409);
     if (activeFollowUp(run.followUps))
       throw new AppError(sm().session.followUpRunning, 409);
+    // Read under the lock: a selection made from an older page is refused.
+    const setup = "setupCommands" in request ? setupHandOffNeeds(run, request.setupCommands) : undefined;
+    const display = setup ? sm().session.setupRequested({ count: setup.length }) : text;
     // Never wait for a turn that is still running: that would hold the run lock.
     // A turn that just ended may still be cleaning up outside it.
     if (!sessionRunning(ctx, id))
@@ -104,7 +113,7 @@ export async function startSession(
       throw new AppError(sm().session.busy, 409);
     if (ctx.stopping()) throw new AppError(shuttingDown(), 503);
     const history = [...(run.session?.messages ?? [])];
-    addSessionMessage(run, { role: "user", content: text });
+    addSessionMessage(run, { role: "user", content: display });
     const session = run.session!;
     session.running = true;
     session.startedAt = now();
@@ -117,11 +126,11 @@ export async function startSession(
         status: "waiting",
         detail: sm().session.description,
       });
-    ctx.log(run, "user", sm().session.requested({ text: text.slice(0, 200) }));
+    ctx.log(run, "user", sm().session.requested({ text: display.slice(0, 200) }));
     const controller = new AbortController();
     ctx.controllers.set(`session:${id}`, controller);
     const job = withRunLocale(run, () =>
-      runSessionTurn(ctx, run, text, history, before, head, controller),
+      runSessionTurn(ctx, run, setup ? setupTurnRequest : text, history, before, head, controller, setup),
     )
       .catch((error) => {
         // A final persistence failure is reported without taking down the server.
@@ -207,6 +216,7 @@ async function runSessionTurn(
   before: DiffFile[],
   head: string,
   controller: AbortController,
+  setup?: SetupNeed[],
 ) {
   let temporary: string | undefined;
   let refreshDraft = false;
@@ -216,7 +226,7 @@ async function runSessionTurn(
   try {
     temporary = await mkdtemp(path.join(os.tmpdir(), "bell-session-"));
     const outputSchema = path.join(temporary, "session-schema.json");
-    await writeFile(outputSchema, JSON.stringify(sessionJsonSchema), {
+    await writeFile(outputSchema, JSON.stringify(setup ? setupSessionJsonSchema : sessionJsonSchema), {
       mode: 0o600,
     });
     const answer = await runAgent(
@@ -245,12 +255,13 @@ async function runSessionTurn(
         message,
         provider: run.modelExecution?.provider,
         agentAccess: run.modelExecution?.agentAccess,
+        ...(setup ? { setup } : {}),
       }),
       controller.signal,
       false,
       { outputSchema, checks },
     );
-    const result = parseSessionResult(answer);
+    const result = parseSessionResult(answer, setup);
     await ctx.lock(run.id, async () => {
       await restoreAgentHead(run, head);
       // Before the diff is re-read, so an approval of the old text is withdrawn with it.
@@ -266,6 +277,7 @@ async function runSessionTurn(
         ...(checks.length ? { checks } : {}),
         ...(result.notRun.length ? { notRun: result.notRun } : {}),
         ...(result.setup.length ? { setup: result.setup } : {}),
+        ...(result.setupResults?.length ? { setupResults: result.setupResults } : {}),
         ...(draftUpdate ? { draftUpdate } : {}),
       });
       if (changedFiles.length || checks.length || draftUpdate) {

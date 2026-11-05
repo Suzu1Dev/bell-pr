@@ -16,6 +16,9 @@ export const doctorCheckIds = [
   "claude",
   "claude-auth",
   "claude-sandbox",
+  "antigravity",
+  "antigravity-auth",
+  "antigravity-sandbox",
   "provider-ready",
   "data-dir",
   "app",
@@ -60,4 +63,16 @@ export interface DoctorReport {
   /** ISO time of the check. */
   checkedAt: string;
   platform: NodeJS.Platform | string;
+}
+
+/**
+ * Whether the CLI behind a tool check (such as "claude") can be used: the
+ * check passed, or it only warns that the version is outside the range
+ * BELL PR supports, which does not stop agents from starting.
+ */
+export function toolUsable(check: DoctorCheck | undefined): boolean {
+  return (
+    check?.status === "ok" ||
+    (check?.status === "warn" && check.reason === "unsupported-version")
+  );
 }
