@@ -5,6 +5,18 @@ All notable changes to BELL PR are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **Other requests no longer wait while the server starts Git.** Before each
+  Git command, the server read the repository's driver settings with a
+  synchronous `git config`, so no other request was served until it
+  finished. A keep-alive connection whose idle timeout passed during that
+  wait was closed with the next request already on it, and a client that
+  reuses connections without retrying, such as Playwright's request
+  context, got `ECONNRESET`. The read now runs without blocking the server.
+
 ## [1.1.0] - 2026-11-04
 
 The first release on npm's `latest` tag since 1.0.0. It also contains two

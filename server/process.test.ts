@@ -1,6 +1,7 @@
 import test, { type TestContext } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { existsSync } from "node:fs";
 import { mkdir, mkdtemp, readFile, rename, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -198,6 +199,40 @@ test("network Git commands use gh credentials, HTTPS or SSH only, and never prom
   assert.ok(config.indexOf("credential.helper=") < config.indexOf("credential.helper=!gh auth git-credential"));
   assert.ok(config.includes("core.hooksPath=/dev/null"));
   assert.equal(call.prompt, "0");
+});
+
+test("the driver read before a Git command leaves the event loop free", async (t) => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "bell-git-driver-read-"));
+  const started = path.join(directory, "started");
+  const answer = path.join(directory, "answer");
+  const result = path.join(directory, "result");
+  // `git config` waits up to 3 s for an answer that only this process's event loop writes.
+  await writeFile(
+    path.join(directory, "git"),
+    `#!${process.execPath}
+const fs = require('node:fs');
+if (process.argv.includes('config')) {
+  fs.writeFileSync(${JSON.stringify(started)}, '');
+  const until = Date.now() + 3000;
+  while (!fs.existsSync(${JSON.stringify(answer)}) && Date.now() < until)
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 20);
+  fs.writeFileSync(${JSON.stringify(result)}, fs.existsSync(${JSON.stringify(answer)}) ? 'answered' : 'not answered');
+  process.exit(1);
+}
+`,
+    { mode: 0o755 },
+  );
+  withEnv(t, { PATH: `${directory}${path.delimiter}${process.env.PATH}` });
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const answering = setInterval(() => {
+    if (existsSync(started)) void writeFile(answer, "");
+  }, 10);
+  try {
+    await git(os.tmpdir(), ["status"]);
+  } finally {
+    clearInterval(answering);
+  }
+  assert.equal(await readFile(result, "utf8"), "answered");
 });
 
 test("git children do not see GH_TOKEN; gitNetwork and gh do", async (t) => {
