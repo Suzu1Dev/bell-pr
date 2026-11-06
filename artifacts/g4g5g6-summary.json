@@ -1,0 +1,79 @@
+{
+  "head": "224770997c8540d31048061d1557795da80c8281",
+  "tree": "02fbde5a0152bd21697beb73707064ac24a048ad",
+  "packageVersion": "1.1.0",
+  "packageVersionNote": "INFO",
+  "startedAt": "2026-11-06 10:36:26 Asia/Taipei",
+  "finishedAt": "2026-11-06 10:39:05 Asia/Taipei",
+  "G4": "GREEN",
+  "G5-VM": "GREEN",
+  "G6": "GREEN",
+  "p0": [],
+  "p1": [],
+  "verdict": "GREEN",
+  "visudo": {
+    "version": "1.9.15p5",
+    "whileRuleInstalled": {
+      "exit": 1,
+      "message": "/etc/sudoers.d/bell-pr-agent: wrong owner (uid, gid) should be (0, 0)",
+      "otherFiles": "parsed OK",
+      "file": { "mode": "0440", "owner": "root", "group": "service-account" }
+    },
+    "afterDelete": { "exit": 0, "result": "parsed OK" }
+  },
+  "http": {
+    "wrongPassword": 401,
+    "emptyPassword": 400,
+    "missingPassword": 400,
+    "deviceToken": 403,
+    "enableLocalhost": 200,
+    "enable127": 200,
+    "enableIpv6Host": 200,
+    "ttl60": 200,
+    "ttl90": 200,
+    "delete": 200
+  },
+  "sudoSpawnOn400": { "emptyPassword": 0, "missingPassword": 0 },
+  "secretHits": {
+    "fakePasswordAudit": 0,
+    "realPasswordAudit": 0,
+    "fakePasswordServerLog": 0,
+    "realPasswordServerLog": 0,
+    "fakePasswordDataDir": 0,
+    "realPasswordDataDir": 0,
+    "hostTokenServerLog": 0,
+    "deviceTokenServerLog": 0,
+    "hostTokenAudit": 0,
+    "deviceTokenAudit": 0
+  },
+  "tokens": {
+    "host": { "len": 64, "sha256": "e46c0cad727de9c7d94a4ba53c571c23fcaf3eb370c5112ce685bb317d76405d" },
+    "device": { "len": 68, "sha256": "633ab2deaee87ebbc52e4a3994d00d9021d8c219c1b13ddab5eed24fe1b1b35b" }
+  },
+  "auditEvents": ["enable", "disable", "expire", "startup_cleanup", "denied"],
+  "auditCount": 14,
+  "bellPrAgentSha256": {
+    "localhost": "4eeb4b658d5ef0bee3a034df9d61da30d3bf72b99ac3a9951327a10a99259ac8",
+    "127.0.0.1": "1f28f1a5e8a3db7f225c1993f7509f8eca6b78219e37f7739a68a98b40591048",
+    "ipv6Host": "98e1de11b8d24399e286e30116b7bcad33576492e2b2fd3b638198fa8b4804aa",
+    "ttl60": "2f0786abcd8c07613c0736658c089b635b20ceea031f51ce77b529f2ed768c1c",
+    "ttl90": "1c5738c0312058d1b8dfddacbe476501c03a2c2da65923e52c19a55d24403077",
+    "g6": "7a887724e3ae83491121bf9b37f2cf80341ea029d96de0dea54673abbc4b0b91"
+  },
+  "survivingSudoersSha256": {
+    "before": {
+      "/etc/sudoers": "5bac27ce5ff1a78ace8f3ef81bfd60cbd44810ac3f3d280da9d7649fe90c18f8",
+      "/etc/sudoers.d/README": "b428c9b673c3c806370f2aa28a98293a9cb578c70c3a8a2d1a39031861b3dbd8",
+      "/etc/sudoers.d/ubuntu": "1b0eff132ae8496fc12ce011a26c6692130d52b3ea39eb3d7fbd091ef23a47b4",
+      "/etc/sudoers.d/ubuntu-no-lecture": "33dfba40684c21e569bfd6ba90f4a2668cea82ae1446b07f60ffe00d340ad910"
+    },
+    "after": {
+      "/etc/sudoers": "5bac27ce5ff1a78ace8f3ef81bfd60cbd44810ac3f3d280da9d7649fe90c18f8",
+      "/etc/sudoers.d/README": "b428c9b673c3c806370f2aa28a98293a9cb578c70c3a8a2d1a39031861b3dbd8",
+      "/etc/sudoers.d/ubuntu": "1b0eff132ae8496fc12ce011a26c6692130d52b3ea39eb3d7fbd091ef23a47b4",
+      "/etc/sudoers.d/ubuntu-no-lecture": "33dfba40684c21e569bfd6ba90f4a2668cea82ae1446b07f60ffe00d340ad910"
+    },
+    "bell-pr-agent": "absent",
+    "match": true
+  }
+}
