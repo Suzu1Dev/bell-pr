@@ -121,6 +121,8 @@ export function dataPaths(dataDir: string) {
     pairCode: path.join(dataDir, "pair-code.json"),
     /** Pairing failures and lock; survives restarts (mode 0600). */
     pairLock: path.join(dataDir, "pair-lock.json"),
+    /** Sudo helper events, one JSON object per line; never a password. */
+    sudoAudit: path.join(dataDir, "audit", "sudo.jsonl"),
   };
 }
 
