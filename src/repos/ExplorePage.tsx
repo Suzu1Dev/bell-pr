@@ -43,6 +43,11 @@ export function ExplorePage({
           <span className="eyebrow">{t.eyebrow}</span>
           <h1 tabIndex={-1}>{exploreRepo.fullName}</h1>
           <p>{t.intro}</p>
+          {exploreRepo.originNotice && (
+            <p className="callout" role="alert">
+              {exploreRepo.originNotice}
+            </p>
+          )}
         </div>
         <button
           className="button primary"

@@ -46,6 +46,11 @@ export interface Repository {
   defaultBranch: string;
   url: string;
   language?: string;
+  /**
+   * The checkout's saved origin had userinfo, so it was not used as a
+   * GitHub source and the project is local. The address is not stored.
+   */
+  originUserinfoIgnored?: boolean;
   /** When the person last updated BELL's clone to the latest default branch. */
   updatedAt?: string;
   /**
