@@ -19,10 +19,14 @@ export default {
   installed: ({ user }: { user: string }) => `Enabled: ${user} can use sudo without a password. ${product.name} created this rule; you can remove it here.`,
   external: ({ user }: { user: string }) => `${user} already has passwordless sudo through another rule. ${product.name} will not remove that rule.`,
   password: ({ user }: { user: string }) => `sudo password (${user})`,
+  ttl: "Turn off after",
+  ttlOption: ({ minutes }: { minutes: number }) =>
+    minutes < 60 ? `${minutes} minutes` : minutes === 60 ? "1 hour" : `${minutes / 60} hours`,
+  expiresAt: ({ time }: { time: string }) => `It turns off at ${time}.`,
   enable: "Enable passwordless sudo",
   enabling: "Configuring…",
   remove: `Remove ${product.name}'s sudo rule`,
   removing: "Removing…",
-  help: ({ user }: { user: string }) => `Enter the password once to create /etc/sudoers.d/bell-pr-agent for ${user}. The password is sent only to sudo for this setup and is never saved or logged. This rule grants ${user} root privileges without a password, including every program and agent running as that account.`,
+  help: ({ user }: { user: string }) => `Enter the password each time to create /etc/sudoers.d/bell-pr-agent for ${user}, for the time chosen above (8 hours at most). ${product.name} removes the rule when that time is up. This works only in ${product.name} on this computer. The password is sent only to sudo for this setup and is never saved or logged. This rule grants ${user} root privileges without a password, including every program and agent running as that account.`,
   failed: "The operation did not finish. Please try again.",
 };

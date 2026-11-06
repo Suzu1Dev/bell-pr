@@ -17,6 +17,32 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   reuses connections without retrying, such as Playwright's request
   context, got `ECONNRESET`. The read now runs without blocking the server.
 
+## [1.1.1] - 2026-11-06
+
+### Changed
+
+- The sudo helper is now host-local only and enabled for a limited time.
+  sudo 輔助功能改為僅限主機本機、限時啟用。
+  Each enable asks for the sudo password and a duration from 1 minute to
+  8 hours (1 hour by default). BELL PR removes the rule when the time is up
+  and, at startup, removes a rule past its time. While it is on, it cannot
+  be enabled again to move its end time; remove it first. Only the install token,
+  from this computer at `localhost`, `127.0.0.1` or `[::1]` and without
+  proxy headers, may use it; paired devices may not. Changes are recorded
+  in `audit/sudo.jsonl` in the data directory, never with the password.
+  `bell-pr doctor` reports a rule past its time or without one, and
+  `--sudoers-path <file>` picks the file it inspects.
+
+### Upgrading from 1.0.0 or 1.1.0
+
+- A sudo rule that 1.0.0 or 1.1.0 installed has no end time. 1.1.1 removes
+  it when it starts and records that in `audit/sudo.jsonl`; if it cannot,
+  `bell-pr doctor` reports the rule with the `sudo rm` command that removes
+  it. To use passwordless sudo again, enable it in BELL PR on the computer
+  it runs on, with the password and a time limit.
+- Saved data needs no change, and 1.0.0 and 1.1.0 still read the data
+  directory that 1.1.1 used.
+
 ## [1.1.0] - 2026-11-04
 
 The first release on npm's `latest` tag since 1.0.0. It also contains two
