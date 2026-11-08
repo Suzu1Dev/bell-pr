@@ -301,6 +301,21 @@ delete a test. A **Reviewer** and a **Test analyst** then check the
 integrated result, each adding only what the Lead's summary does not say.
 Failed subtasks can be retried.
 
+The task board has three lanes: To do, In progress and Done. Done holds only
+integrated subtasks; a failed or blocked subtask stays in To do with its
+status, so it does not look finished. Each subtask names the subtasks it
+depends on, with their current status; a task the plan does not list shows
+as unknown and never counts as finished. When a subtask fails, the team
+starts no further subtask, and each subtask that has not started and depends
+on the failed one, directly or through others, is marked **Blocked**,
+whatever order the plan lists them in. Subtasks after one that a restart of
+BELL PR stopped are blocked the same way. Once a run has failed or been
+cancelled, a subtask whose dependencies are integrated shows **Ready after
+retry**: nothing starts it until you retry. Retrying schedules the unfinished
+subtasks again and keeps integrated work; each one still starts only when its
+dependencies, its files and the team's free places allow, so a retry does not
+promise that all of them run.
+
 Before it plans, the Lead checks any assumption the request states against
 the code, and every role is told the verdict. The brief shows it, and once
 the run is finished you can check it again, also on a run made before

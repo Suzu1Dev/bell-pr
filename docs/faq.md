@@ -253,6 +253,39 @@ Edit the files in your own editor (do not commit; BELL PR does that when
 you publish), then choose **Refresh the diff**. Changed files get new
 explanations and need another review.
 
+### How do I know what a subtask is waiting for?
+
+Each subtask on the task board names the subtasks it depends on, with their
+current status. **Waiting on dependencies** means at least one of them is not
+integrated yet. **Ready to claim** means all of them are; while the run is
+going, a teammate takes it once no subtask in progress has the same owner or
+overlapping files and the team has a free place. **Ready after retry** means
+the same, but the run has failed or was cancelled, so nothing starts it until
+you choose **Retry failed subtasks**. **Blocked** means a subtask it depends
+on, directly or through others, failed or is blocked itself. Only a subtask
+that has not started is blocked this way, and after a failure the team starts
+no further subtask. A blocked subtask stays in To do and does not start until
+you retry. A dependency shown as unknown names a task the plan does not
+list and never counts as integrated: its subtask keeps waiting, or is blocked
+if it also depends on a failed or blocked subtask. Once nothing else can
+start, the run stops with "Task dependencies or file assignments stop the
+team from continuing". BELL PR rejects such a plan from the Lead, so only an
+edited data file can hold one.
+
+### What happens to a team run when BELL PR restarts?
+
+A restart stops the agents. When BELL PR starts again, the run and each
+subtask that was in progress are marked failed, with a note that the service
+restarted; their isolated working directories are kept. Subtasks that have
+not started and depend on them, directly or through others, are marked
+**Blocked**, as when a subtask fails during the run, and integrated subtasks
+stay integrated. A subtask whose dependencies are all integrated shows
+**Ready after retry**. **Retry failed subtasks** on the task board schedules
+the unfinished subtasks again: the failed and blocked ones start from a fresh
+snapshot, and integrated work is kept. Each one still starts only when its
+dependencies, its files and the team's free places allow, so a retry does not
+promise that all of them run.
+
 ### Can I split a contribution that holds several fixes?
 
 Yes, by file. When the plan has parts that do not depend on one another,
