@@ -422,6 +422,45 @@ test("an origin with userinfo is imported as local, and that address is not stor
   assert.equal(returned.includes(marker), false);
 });
 
+test("an http origin with userinfo is imported as local, and that address is not stored", async (t) => {
+  const directory = await realpath(await mkdtemp(path.join(os.tmpdir(), "bell-security-http-userinfo-")));
+  const store = new Store(path.join(directory, "state"));
+  await store.initialize();
+  const workbench = new Workbench(store);
+  t.after(async () => {
+    await workbench.shutdown();
+    await rm(directory, { recursive: true, force: true });
+  });
+  const checkout = path.join(directory, "checkout");
+  await repository(checkout, { "lib.ts": "lib\n" });
+  await git(checkout, [
+    "remote",
+    "add",
+    "origin",
+    "http://user@github.com/test-owner/example.git",
+  ]);
+  const repo = await workbench.importRepository(checkout);
+  assert.equal(repo.url, "");
+  assert.equal(repo.owner, "local");
+  assert.equal(workbench.managedClone(repo), false);
+  const lines = await recentLogLines(store.directory);
+  const warn = lines
+    .map((line) => JSON.parse(line) as Record<string, unknown>)
+    .find((entry) => entry.msg === "repo.origin_userinfo");
+  assert.ok(warn);
+  assert.deepEqual(
+    Object.fromEntries(Object.entries(warn).filter(([key]) => key !== "ts")),
+    { level: "warn", msg: "repo.origin_userinfo", repoId: repo.id },
+  );
+  const stored = JSON.stringify({
+    repo,
+    saved: await readFile(path.join(store.directory, "state.json"), "utf8"),
+    cloneConfig: await readFile(path.join(repo.path, ".git", "config"), "utf8"),
+    logs: lines.join("\n"),
+  });
+  assert.equal(stored.includes("user@"), false);
+});
+
 test("a project an earlier build worked on in place moves to a clone once none of its runs works there", async (t) => {
   const directory = await realpath(await mkdtemp(path.join(os.tmpdir(), "bell-security-legacy-")));
   const legacy = path.join(directory, "legacy");

@@ -36,8 +36,9 @@ function localClonePrefix(sourcePath: string) {
 }
 
 /**
- * True when `url` is a GitHub repository address with userinfo. Stripping
- * the userinfo is only a check: that address is not used as a GitHub source.
+ * True when `url` is an http or https GitHub repository address with
+ * userinfo. Stripping the userinfo, and reading http as https, is only a
+ * check: that address is not used as a GitHub source.
  */
 function githubUserinfoOrigin(url: string): boolean {
   let parsed: URL;
@@ -46,10 +47,15 @@ function githubUserinfoOrigin(url: string): boolean {
   } catch {
     return false;
   }
-  if (parsed.protocol !== "https:" || parsed.hostname !== "github.com") return false;
+  if (
+    (parsed.protocol !== "https:" && parsed.protocol !== "http:") ||
+    parsed.hostname !== "github.com"
+  )
+    return false;
   if (parsed.username === "" && parsed.password === "") return false;
   parsed.username = "";
   parsed.password = "";
+  parsed.protocol = "https:";
   return parseGitHubSource(parsed.href) !== null;
 }
 
