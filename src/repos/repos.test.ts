@@ -18,8 +18,6 @@ const repo: Repo = {
 
 test("a local import whose origin was not used shows that notice without the address", () => {
   const marker = "synthetic-userinfo-marker";
-  const notice =
-    "This checkout's origin URL contains embedded credentials or userinfo, so it was not used as a GitHub source. The project is treated as a local project. Run git remote set-url origin https://github.com/OWNER/REPO, then remove the project here and import it again. Use a credential helper for authentication; don't put a GitHub token in .git/config. Sign in for push with a git credential helper or gh auth login instead of putting credentials in the remote URL. Credentials stored in .git/config are readable by anything that can read the repository.";
   const element = createElement(ReposPage, {
     repos: [
       {
@@ -28,7 +26,6 @@ test("a local import whose origin was not used shows that notice without the add
         owner: "local",
         fullName: "local/widgets",
         originUserinfoIgnored: true,
-        originNotice: notice,
       },
     ],
     openModal() {},
@@ -39,14 +36,20 @@ test("a local import whose origin was not used shows that notice without the add
     setExploreRepoId() {},
   });
   const html = renderEn(element);
+  const zh = renderZh(element);
+  const command = "git remote set-url origin https://github.com/OWNER/REPO";
   assert.match(html, /role="alert"/);
   assert.match(html, /not used as a GitHub source/);
-  assert.ok(html.includes("git remote set-url origin https://github.com/OWNER/REPO"));
+  assert.ok(html.includes(command));
   assert.match(
     html,
     /Use a credential helper for authentication; don(?:'|&#39;|&#x27;)t put a GitHub token in \.git\/config\./,
   );
+  assert.match(zh, /使用者資訊/);
+  assert.ok(zh.includes(command));
+  assert.match(zh, /驗證請使用 credential helper，不要把 GitHub token 寫進 \.git\/config。/);
   assert.equal(html.includes(marker), false);
+  assert.equal(zh.includes(marker), false);
 });
 
 test("the repository list reads in English with no Chinese left", () => {

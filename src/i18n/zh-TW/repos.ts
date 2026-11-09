@@ -4,6 +4,8 @@ import { product } from "../../../shared/product";
 import type en from "../en/repos";
 
 const m: Translation<typeof en> = {
+  originUserinfo:
+    "這個工作目錄的 origin URL 含有內嵌的憑證或使用者資訊，所以沒有當作 GitHub 來源。這個專案會當作本機專案。請執行 git remote set-url origin https://github.com/OWNER/REPO，然後在這裡移除專案並重新匯入。驗證請使用 credential helper，不要把 GitHub token 寫進 .git/config。推送時請用 git credential helper 或 gh auth login 登入，不要把憑證寫進 remote URL。寫在 .git/config 裡的憑證，任何讀得到這個 repository 的程式都讀得到。",
   list: {
     eyebrow: "你的專案",
     title: "下一個貢獻，從這裡開始。",

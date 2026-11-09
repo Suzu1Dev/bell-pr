@@ -35,7 +35,8 @@ export function ExplorePage({
   onUpdateRepo,
   updatingRepo,
 }: ExplorePageProps) {
-  const t = useT("repos").explore;
+  const messages = useT("repos");
+  const t = messages.explore;
   return (
     <section className="page-content explore-page">
       <div className="page-title">
@@ -43,9 +44,9 @@ export function ExplorePage({
           <span className="eyebrow">{t.eyebrow}</span>
           <h1 tabIndex={-1}>{exploreRepo.fullName}</h1>
           <p>{t.intro}</p>
-          {exploreRepo.originNotice && (
+          {exploreRepo.originUserinfoIgnored && (
             <p className="callout" role="alert">
-              {exploreRepo.originNotice}
+              {messages.originUserinfo}
             </p>
           )}
         </div>

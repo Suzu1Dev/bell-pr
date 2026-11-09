@@ -324,6 +324,7 @@ export function useRunActions({
     followUp,
   } = draft;
   const t = useT("workspace").notices;
+  const originUserinfo = useT("repos").originUserinfo;
   const [locale] = useLocale();
   const demoContent = getDemo(locale);
   const {
@@ -676,7 +677,7 @@ export function useRunActions({
       closeModal();
       setExploreRepoId(repo.id);
       navigate("explore");
-      if (repo.originNotice) notify(repo.originNotice, "error");
+      if (repo.originUserinfoIgnored) notify(originUserinfo, "error");
       else notify(t.imported({ name: repo.fullName }));
     } catch (error) {
       setFormError((error as Error).message);

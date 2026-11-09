@@ -26,7 +26,7 @@ import { fakeGitHub } from "../test/fake-github.js";
 import { createApp } from "./index.js";
 import { git } from "./process.js";
 import { recentLogLines } from "./log.js";
-import { sm, withLocale } from "./i18n/index.js";
+import { withLocale } from "./i18n/index.js";
 import { readDiff, reviewFingerprint } from "./git.js";
 import { adoptLegacyCheckout, createRunWorktree } from "./repositories.js";
 import { publishChecks } from "./publish.js";
@@ -361,7 +361,35 @@ test("a global insteadOf rewrite does not hide a GitHub origin on a local import
   );
 });
 
-test("an origin with userinfo is imported as local, and the message leaves that userinfo out", async (t) => {
+test("a local import uses the first saved origin when several are configured", async (t) => {
+  const directory = await realpath(await mkdtemp(path.join(os.tmpdir(), "bell-security-origins-")));
+  const store = new Store(path.join(directory, "state"));
+  await store.initialize();
+  const workbench = new Workbench(store);
+  t.after(async () => {
+    await workbench.shutdown();
+    await rm(directory, { recursive: true, force: true });
+  });
+  const checkout = path.join(directory, "checkout");
+  await repository(checkout, { "lib.ts": "lib\n" });
+  await git(checkout, ["remote", "add", "origin", "https://github.com/test-owner/example.git"]);
+  await git(checkout, [
+    "config",
+    "--local",
+    "--add",
+    "remote.origin.url",
+    "https://github.com/test-owner/other.git",
+  ]);
+  const repo = await workbench.importRepository(checkout);
+  assert.equal(repo.url, "https://github.com/test-owner/example");
+  assert.equal(repo.fullName, "test-owner/example");
+  assert.equal(
+    (await git(repo.path, ["config", "--local", "--get", "remote.origin.url"])).stdout.trim(),
+    "https://github.com/test-owner/example.git",
+  );
+});
+
+test("an origin with userinfo is imported as local, and that address is not stored", async (t) => {
   const marker = "synthetic-userinfo-marker";
   const directory = await realpath(await mkdtemp(path.join(os.tmpdir(), "bell-security-userinfo-")));
   const store = new Store(path.join(directory, "state"));
@@ -379,30 +407,15 @@ test("an origin with userinfo is imported as local, and the message leaves that 
     "origin",
     `https://${marker}@github.com/test-owner/example.git`,
   ]);
-  const repo = await withLocale("en", () => workbench.importRepository(checkout));
-  const message = withLocale("en", () => sm().run.repos.originUserinfo);
-  const zh = withLocale("zh-TW", () => sm().run.repos.originUserinfo);
+  const repo = await workbench.importRepository(checkout);
   assert.equal(repo.url, "");
   assert.equal(repo.owner, "local");
   assert.equal(repo.originUserinfoIgnored, true);
   assert.equal(workbench.managedClone(repo), false);
-  const command = "git remote set-url origin https://github.com/OWNER/REPO";
-  const helperLine = "Use a credential helper for authentication; don't put a GitHub token in .git/config.";
-  assert.match(message, /embedded credentials or userinfo/);
-  assert.match(message, /not used as a GitHub source/);
-  assert.match(message, /treated as a local project/);
-  assert.ok(message.includes(command));
-  assert.ok(message.includes(helperLine));
-  assert.match(zh, /使用者資訊/);
-  assert.ok(zh.includes(command));
-  assert.match(zh, /驗證請使用 credential helper，不要把 GitHub token 寫進 \.git\/config。/);
   const logs = (await recentLogLines(store.directory)).join("\n");
   assert.match(logs, /repo\.origin_userinfo/);
   const returned = JSON.stringify({
     repo,
-    message,
-    zh,
-    originNotice: message,
     saved: await readFile(path.join(store.directory, "state.json"), "utf8"),
     cloneConfig: await readFile(path.join(repo.path, ".git", "config"), "utf8"),
     logs,

@@ -42,7 +42,8 @@ export function ReposPage({
   maskPath = (path) => path,
   deleteRepository,
 }: ReposPageProps) {
-  const t = useT("repos").list;
+  const messages = useT("repos");
+  const t = messages.list;
   const [locale] = useLocale();
   const { repo: demoRepo, run: demoRun } = getDemo(locale);
   const [asked, setAsked] = useState("");
@@ -126,9 +127,9 @@ export function ReposPage({
                   <span>{maskPath(repo.path)}</span>
                 </p>
               )}
-              {repo.originNotice && (
+              {repo.originUserinfoIgnored && (
                 <p className="callout" role="alert">
-                  {repo.originNotice}
+                  {messages.originUserinfo}
                 </p>
               )}
               <div className="repository-meta">
