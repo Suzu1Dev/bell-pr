@@ -2,8 +2,8 @@
  * Renders the generated regions of Markdown and HTML files, so the product
  * links are never maintained by hand.
  *
- *   npx tsx scripts/render-generated-regions.ts --check [--targets <file>...]
- *   npx tsx scripts/render-generated-regions.ts --write [--targets <file>...]
+ *   npx tsx scripts/render-generated-regions.ts --check [--version <semver>] [--targets <file>...]
+ *   npx tsx scripts/render-generated-regions.ts --write [--version <semver>] [--targets <file>...]
  *   npx tsx scripts/render-generated-regions.ts --self-test
  *
  * A region is a pair of HTML comments. Everything between them belongs to
@@ -28,6 +28,8 @@
  *   Fenced Markdown or escaped HTML command text. Installers use homepageUrl
  *   when set, otherwise the public GitHub repository. Empty publicRepoUrl
  *   hides the block. HTML callers provide the surrounding <code> element.
+ *   npx, npm, bun and mise pin `publishedInstallVersion` (`--version` overrides
+ *   it). That pin can be ahead of package.json while a release is still open.
  *
  * Layout: when the opening comment stands alone on its line, the content
  * goes on the lines between the comments, at the comment's indentation.
@@ -57,9 +59,18 @@ import {
 
 type Format = "html" | "md";
 
+/**
+ * npm release pinned by npx, npm, bun and mise commands.
+ * package.json and the Homebrew formula can lag a release already on npm.
+ */
+export const publishedInstallVersion = "1.1.1";
+const installVersionPattern = /^[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?$/;
+
 /** Everything a region renders from; the self-test swaps in fixtures. */
 export interface RenderContext {
   product: ProductInfo;
+  /** Overrides {@link publishedInstallVersion} for this render. */
+  installVersion?: string;
 }
 
 const defaultContext: RenderContext = { product: productInfo };
@@ -312,24 +323,24 @@ function installCommands(region: Region, format: Format, where: string, context:
   const homepage = context.product.homepageUrl.replace(/\/+$/, "");
   if (homepage && !/^https:\/\/[A-Za-z0-9.-]+(?::[0-9]+)?(?:\/[A-Za-z0-9._~-]+)*$/.test(homepage))
     throw new RegionError(`${where}: installation commands need a safe HTTPS homepage URL.`);
+  const version = context.installVersion ?? publishedInstallVersion;
+  if (!installVersionPattern.test(version))
+    throw new RegionError(`${where}: install version "${version}" is not a semver.`);
+  const spec = `${pkg}@${version}`;
   let lines: string[];
   if (method === "npx") {
-    lines = [`npx ${pkg}`];
+    lines = [`npx ${spec}`];
   } else if (method === "npm") {
-    lines = [`npm install -g ${pkg}`];
+    lines = [`npm install -g ${spec}`];
   } else if (method === "curl") {
     lines = [`curl -fsSL ${homepage ? `${homepage}/install` : `${raw}/install.sh`} | sh${lang === "zh-TW" ? " -s -- --lang zh-TW" : ""}`];
   } else if (method === "brew") {
     const tap = `${repo[1]}/${repo[2]}`.toLowerCase();
     lines = [`brew tap ${tap} ${url}`, `brew install ${tap}/${bin}`];
   } else if (method === "bun") {
-    lines = [`bun add --global ${pkg}`];
+    lines = [`bun add --global ${spec}`];
   } else if (method === "mise") {
-    // Use the formula's published release, not a package version still being prepared.
-    const formula = fs.readFileSync(path.join(repoRoot, "Formula", `${productInfo.npmPackage}.rb`), "utf8");
-    const version = /^ {2}version "([0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?)"$/m.exec(formula)?.[1];
-    if (!version) throw new RegionError(`${where}: Homebrew formula has no published version.`);
-    lines = [`MISE_NPM_PACKAGE_MANAGER=npm mise use -g node@24 npm:${pkg}@${version}`];
+    lines = [`MISE_NPM_PACKAGE_MANAGER=npm mise use -g node@24 npm:${spec}`];
   } else {
     lines = [
       "& {",
@@ -431,16 +442,35 @@ export interface MainOptions {
   error?: (line: string) => void;
 }
 
-const usage = `Usage: ${command} --check|--write [--targets <file>...]
+const usage = `Usage: ${command} --check|--write [--version <semver>] [--targets <file>...]
        ${command} --self-test`;
+
+/** Pulls `--version <semver>` out of argv. The value overrides {@link publishedInstallVersion}. */
+function splitVersion(args: string[]): { args: string[]; version?: string; error?: string } {
+  const index = args.indexOf("--version");
+  if (index === -1) return { args };
+  const version = args[index + 1];
+  if (!version || !installVersionPattern.test(version))
+    return { args, error: "--version needs a semver such as 1.1.1." };
+  return { args: [...args.slice(0, index), ...args.slice(index + 2)], version };
+}
 
 export function main(args: string[], options: MainOptions = {}): number {
   const root = options.root ?? repoRoot;
   const cwd = options.cwd ?? process.cwd();
   const log = options.log ?? ((line) => console.log(line));
   const error = options.error ?? ((line) => console.error(line));
-  const mode = args[0];
-  const rest = args.slice(1);
+  const versionArgs = splitVersion(args);
+  if (versionArgs.error) {
+    error(`render-generated-regions: ${versionArgs.error}`);
+    return 2;
+  }
+  const mode = versionArgs.args[0];
+  const rest = versionArgs.args.slice(1);
+  const context: RenderContext = {
+    ...(options.context ?? defaultContext),
+    ...(versionArgs.version ? { installVersion: versionArgs.version } : {}),
+  };
   if (mode === "--self-test" && rest.length === 0) return selfTest();
   const targetsGiven = rest[0] === "--targets";
   if ((mode !== "--check" && mode !== "--write") || (rest.length > 0 && (!targetsGiven || rest.length < 2))) {
@@ -461,7 +491,7 @@ export function main(args: string[], options: MainOptions = {}): number {
     let updated = 0;
     for (const { full, name } of files) {
       const text = fs.readFileSync(full, "utf8");
-      const result = renderText(text, name, options.context);
+      const result = renderText(text, name, context);
       regions += result.regions;
       if (result.stale.length === 0) continue;
       if (mode === "--write") {
@@ -612,9 +642,17 @@ function selfTest(): number {
     assert.deepEqual(renderText(html.text, "install.html", installerContext).stale, []);
     if (method === "brew") assert.match(html.text, /workbench\nbrew install/);
     if (method === "powershell") assert.match(html.text, /&amp; \{/);
-    if (method === "npx") assert.ok(html.text.includes(`npx ${product.npmPackage}`));
-    if (method === "npm") assert.ok(html.text.includes(`npm install -g ${product.npmPackage}`));
+    if (method === "npx") assert.ok(html.text.includes(`npx ${product.npmPackage}@${publishedInstallVersion}`));
+    if (method === "npm") assert.ok(html.text.includes(`npm install -g ${product.npmPackage}@${publishedInstallVersion}`));
+    if (method === "bun") assert.ok(html.text.includes(`bun add --global ${product.npmPackage}@${publishedInstallVersion}`));
+    if (method === "mise") assert.ok(html.text.includes(`npm:${product.npmPackage}@${publishedInstallVersion}`));
   }
+  const overridden = renderText(install("npx"), "install.md", { ...installerContext, installVersion: "9.9.9" });
+  assert.match(overridden.text, /npx bell-pr@9\.9\.9/);
+  assert.match(
+    errorOf(() => renderText(install("npm"), "install.md", { ...installerContext, installVersion: "latest" })),
+    /install version/,
+  );
   const hostedInstaller = { product: { ...installerContext.product, homepageUrl: "https://install.example.test" } };
   assert.match(renderText(install("curl"), "install.md", hostedInstaller).text, /https:\/\/install\.example\.test\/install \| sh/);
   assert.match(renderText(install("powershell"), "install.md", hostedInstaller).text, /https:\/\/install\.example\.test\/install\.ps1/);
@@ -689,6 +727,19 @@ function selfTest(): number {
     assert.equal(run("--check", "--targets", "missing.md"), 2);
     assert.equal(run("--check", "--targets"), 2);
     assert.equal(run("--fix"), 2);
+    assert.equal(main(["--check", "--version"], { root: temp, cwd: temp, context, env, ...quiet }), 2);
+    assert.equal(main(["--check", "--version", "nope"], { root: temp, cwd: temp, context, env, ...quiet }), 2);
+    write("pin.md", install("npm"));
+    const pin = (...args: string[]) =>
+      main(args, { root: temp, cwd: temp, context: installerContext, env, ...quiet });
+    assert.equal(pin("--write", "--version", "9.9.9", "--targets", "pin.md"), 0);
+    assert.match(fs.readFileSync(path.join(temp, "pin.md"), "utf8"), /npm install -g bell-pr@9\.9\.9/);
+    assert.equal(pin("--check", "--targets", "pin.md"), 1);
+    assert.equal(pin("--write", "--targets", "pin.md"), 0);
+    assert.match(
+      fs.readFileSync(path.join(temp, "pin.md"), "utf8"),
+      new RegExp(`npm install -g bell-pr@${publishedInstallVersion.replaceAll(".", "\\.")}`),
+    );
     assert.equal(run("--check", "--targets", "notes.txt"), 2);
     write("site/index.html", "<!-- generated:product-link key=docsUrl text=Docs -->\n");
     git("add", "site/index.html");
