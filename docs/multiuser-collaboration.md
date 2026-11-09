@@ -241,7 +241,8 @@ with the group-mode overlap check.
 - **Settlements are kept as a window, not a permanent audit log.** Each
   project keeps its latest 10; the next one drops the oldest, so settling
   is never refused for room.
-- **Other files in the repository's directory are still trusted.** Every
+- **The repository's files on the coordinator host are trusted.** They
+  are assumed to be controlled only by whoever runs that host. Every
   coordination Git command ignores replace refs (`--no-replace-objects`),
   graft files (`GIT_GRAFT_FILE` set to the null device, so `info/grafts`
   is never read) and commit-graph files (`-c core.commitGraph=false`,
@@ -249,13 +250,16 @@ with the group-mode overlap check.
   sees each commit's own parents. A shallow history shows a commit without
   its parent, which is refused. In the tests, a commit-graph Git wrote and
   that was then edited, as one file (`objects/info/commit-graph`) or a
-  split chain (`objects/info/commit-graphs/`), to hide a commit outside
-  the claim, a merge's second parent or a non-fast-forward, or to give
-  the base another tree, is refused with the branch, the claims and the
-  file left as they were. Writing these files takes write access to the
-  repository's own directory, which a push does not give. The same access
-  can change other files there, such as object files, packs or
-  `objects/info/alternates`; what that changes has not been tested.
+  split chain of one layer (`objects/info/commit-graphs/`), to hide a
+  commit outside the claim, a merge's second parent or a non-fast-forward,
+  or to give the base another tree, is refused with the branch, the claims
+  and the file left as they were; a chain of several layers is not
+  tested. Writing these files takes write access to the repository's own
+  directory, which a push does not give. Nothing here protects against a
+  process that can change files there directly, such as object files,
+  packs or `objects/info/alternates`, and what such changes do to the
+  checks has not been tested. Mounting coordination in the product has to
+  keep that directory out of reach of everyone but the host.
 - **Names shown inexactly.** Scopes are printable ASCII and a path's ASCII
   parts decide every rule, so decisions are exact. A name that is not
   UTF-8, or a multibyte name split between two reads of Git's output, can
@@ -373,8 +377,8 @@ directories and repositories, and cover:
 - each limit refusing the next addition without changing anything, while
   held claims still end, integrate and recover, and the file reopens;
 - replace refs, graft files, shallow lists and commit-graph files (one
-  file or a split chain, even with the repository's config turning them
-  on) that would hide a file, a merge or a non-fast-forward;
+  file or a split chain of one layer, even with the repository's config
+  turning them on) that would hide a file, a merge or a non-fast-forward;
 - a paused host keeping its lock however old it looks, against starts in
   its own and in another (simulated) PID namespace, and giving it up when
   closed;
