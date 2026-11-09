@@ -102,7 +102,8 @@ with the group-mode overlap check.
   with 20,000 scopes together, each task keeps at most 100 reopenings, and
   each project keeps its latest 10 settlements. One participant holds at
   most 100 claims at once across all projects, with 2,000 scopes together.
-  The whole file is at most 8 MiB.
+  An addition leaves the whole file at most 8 MiB with the room below
+  still free.
   - An addition (a participant, project, task, claim, scope or
     reopening) must also leave room for every held claim to end, every
     open task to close and every project to save an integration intent
@@ -114,6 +115,13 @@ with the group-mode overlap check.
     dropped.
   - Releasing, revoking, failing a task, integrating, recovering and
     settling only spend that room, so they still work at the limit.
+  - 8 MiB holds for a file whose additions all kept that room. A file an
+    earlier build wrote kept none for settlements, so one near 8 MiB
+    takes no additions after the upgrade until the room is free, and
+    settling there can take it past 8 MiB by the settlement room (about
+    5 KB a project). That still stays within the reader's limit (32 MiB,
+    see [File format](#file-format)); nothing is written past it, and no
+    rule about unknown keys or newer versions is loosened.
   - Every write is first read back by the same reader `open()` uses. An
     integration also checks that its outcome can be written before it
     moves the branch.
@@ -125,6 +133,7 @@ with the group-mode overlap check.
 - **Fails closed.** These stop the coordinator, and it refuses everything
   until it opens again:
   - a failed write or a lost lock;
+  - an integration whose branch update it cannot account for;
   - a missing, unreadable or newer file;
   - a file that breaks an invariant, such as overlapping held claims or an
     unknown holder.
@@ -143,6 +152,12 @@ with the group-mode overlap check.
   participant can still read the project, which shows the intent as
   `undecided`. Other projects keep working. The failures above still stop
   every project.
+
+  Only opening closes a single project. While the coordinator runs, an
+  integration whose branch update it cannot account for, or a write that
+  fails, still stops every project, as above; nothing is closed one
+  project at a time then. Opening again settles or closes each project
+  from its own intent.
 - **An admin settles it from the branch.** `settleRecovery()` (on the
   router, `POST /projects/:project/recovery/settle`) takes the intent as
   the project shows it, `{ claimId, fence, from, to, startedAt }`, and the
@@ -214,8 +229,16 @@ with the group-mode overlap check.
   coordination repairs it: a person puts it back at the base or the change
   by hand, and then an admin settles it. Until then that project stays
   closed. Whether the repair was the right one is that person's call.
-- **Settlements are kept as a window.** Each project keeps its latest 10;
-  the next one drops the oldest, so settling is never refused for room.
+  - A change to the ref made outside coordination is not ordered with
+    its own steps. Finish the repair first, then settle; never settle
+    while the repair is under way.
+  - Settling, like opening, reads the branch and then writes. That read
+    is a check, not a fence: a push or `update-ref` landing in between is
+    not stopped, and the settlement then records a head the branch has
+    already left.
+- **Settlements are kept as a window, not a permanent audit log.** Each
+  project keeps its latest 10; the next one drops the oldest, so settling
+  is never refused for room.
 - **Commit-graph files are still read.** Every coordination Git command
   ignores replace refs (`--no-replace-objects`) and graft files
   (`GIT_GRAFT_FILE` set to the null device, so `info/grafts` is never
