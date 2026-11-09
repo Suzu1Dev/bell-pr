@@ -5,12 +5,9 @@
 import { product } from "../../../shared/product";
 
 const repos = {
-  /**
-   * A local import whose saved origin had userinfo. The words never include
-   * that address. `originIgnoredCommand` is the command to run.
-   */
+  /** Shown when a saved origin had credentials. The words never include that address. */
   originIgnored:
-    "This project's origin contained a username or token, so it was imported as a local project; run this command and use a credential helper.",
+    "The origin URL includes credentials, so this was imported as a local project. Remove them and use a credential helper:",
   originIgnoredCommand: "git remote set-url origin https://github.com/OWNER/REPO",
   list: {
     eyebrow: "YOUR REPOSITORIES",

@@ -5,7 +5,7 @@ import type en from "../en/repos";
 
 const m: Translation<typeof en> = {
   originIgnored:
-    "這個專案的 origin 含有使用者名稱或權杖，所以已匯入為本機專案，請執行這個指令並使用 credential helper。",
+    "origin 網址含有帳號或權杖，因此以本機專案匯入。請移除並改用 credential helper：",
   originIgnoredCommand: "git remote set-url origin https://github.com/OWNER/REPO",
   list: {
     eyebrow: "你的專案",

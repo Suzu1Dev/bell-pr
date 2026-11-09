@@ -52,29 +52,30 @@ const list = (repos: Repo[]) =>
 test("the origin notice shows only when that origin was imported as local", () => {
   const command = "git remote set-url origin https://github.com/OWNER/REPO";
   const html = renderEn(list([repo, localRepo, ignoredRepo]));
-  assert.equal(html.match(/role="alert"/g)?.length, 1);
-  assert.match(html, /imported as a local project/);
-  assert.match(html, /use a credential helper/);
+  assert.equal(html.match(/role="note"/g)?.length, 1);
+  assert.equal(html.includes('role="alert"'), false);
+  assert.match(html, /The origin URL includes credentials, so this was imported as a local project\./);
+  assert.match(html, /Remove them and use a credential helper:/);
   assert.ok(html.includes(`<code>${command}</code>`));
   assert.equal(html.includes(secretOrigin), false);
   assert.equal(html.includes("user:token"), false);
   assertNoHan(html);
   const zh = renderZh(list([ignoredRepo]));
-  assert.match(zh, /使用者名稱或權杖/);
-  assert.match(zh, /請執行這個指令並使用 credential helper/);
+  assert.match(zh, /origin 網址含有帳號或權杖，因此以本機專案匯入。請移除並改用 credential helper：/);
   assert.ok(zh.includes(`<code>${command}</code>`));
   assert.equal(zh.includes(secretOrigin), false);
   assert.equal(zh.includes("user:token"), false);
   for (const repos of [[repo], [localRepo]]) {
     const plain = renderEn(list(repos));
-    assert.equal(plain.includes('role="alert"'), false);
+    assert.equal(plain.includes('role="note"'), false);
     assert.equal(plain.includes(command), false);
   }
   const project = renderEn(
     createElement(ExploreHeading, { repo: ignoredRepo, onChooseDirection() {} }),
   );
   assert.match(project, /<h1 tabindex="-1">local\/widgets<\/h1>/);
-  assert.equal(project.match(/role="alert"/g)?.length, 1);
+  assert.equal(project.match(/role="note"/g)?.length, 1);
+  assert.equal(project.includes('role="alert"'), false);
   assert.ok(project.includes(`<code>${command}</code>`));
   assert.equal(project.includes(secretOrigin), false);
   assert.equal(project.includes("user:token"), false);
@@ -82,13 +83,13 @@ test("the origin notice shows only when that origin was imported as local", () =
   const projectZh = renderZh(
     createElement(ExploreHeading, { repo: ignoredRepo, onChooseDirection() {} }),
   );
-  assert.match(projectZh, /使用者名稱或權杖/);
+  assert.match(projectZh, /帳號或權杖/);
   assert.equal(projectZh.includes("user:token"), false);
   for (const plainRepo of [repo, localRepo]) {
     const plain = renderEn(
       createElement(ExploreHeading, { repo: plainRepo, onChooseDirection() {} }),
     );
-    assert.equal(plain.includes('role="alert"'), false);
+    assert.equal(plain.includes('role="note"'), false);
     assert.equal(plain.includes(command), false);
   }
 });
