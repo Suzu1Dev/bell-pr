@@ -717,6 +717,22 @@ test("long runs of carriage returns or digits in the output keep BELL responsive
   assert.ok(gap < 1_500, `BELL's event loop stood still for ${gap} ms`);
 });
 
+test("once the run is no longer busy, a reload reads the result a slow save just wrote", async (t) => {
+  const f = await fixture(t);
+  await f.confirm(`node -e "console.log('3 passing')"`);
+  // The disk write is the slow part. Busy must stay set until it finishes,
+  // or a reload in that gap reads a state with no result.
+  const save = f.store.save.bind(f.store);
+  f.store.save = async () => {
+    await sleep(200);
+    return save();
+  };
+  const result = await f.runOnce();
+  const reloaded = new Store(f.store.directory);
+  await reloaded.initialize();
+  assert.deepEqual(reloaded.data.runs.find((run) => run.id === f.run.id)?.byHand?.tests?.at(-1), result);
+});
+
 test("a new run starts at once when the last one shows its result and the run is no longer busy", async (t) => {
   const f = await fixture(t);
   await f.confirm(`node -e "process.exit(1)"`);
