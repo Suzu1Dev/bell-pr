@@ -6,7 +6,9 @@
  * and repository.
  */
 import assert from "node:assert/strict";
-import { type ChildProcess, spawn } from "node:child_process";
+import { type ChildProcess, spawn, spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
+import { readlinkSync } from "node:fs";
 import { mkdir, mkdtemp, readdir, readFile, rm, utimes, writeFile } from "node:fs/promises";
 import { createServer, type AddressInfo } from "node:net";
 import os from "node:os";
@@ -14,21 +16,24 @@ import path from "node:path";
 import { createInterface } from "node:readline";
 import { setTimeout as sleep } from "node:timers/promises";
 import { after, test } from "node:test";
-import { makeRepo, type TestRepo } from "../test/coordination-fixtures.js";
+import { makeRepo, type TestRepo, type UpdateRefBarrier, updateRefBarrier } from "../test/coordination-fixtures.js";
 import { dataPaths, resolveConfig } from "./config.js";
 import type { ClaimView, ProjectView, TaskView } from "./coordination.js";
-import { acquireWriterLock, startServer, StartupError } from "./index.js";
+import { sm } from "./i18n/index.js";
+import { acquireWriterLock, type LockInfo, startServer, StartupError } from "./index.js";
 import { pathsMeet } from "./scope-paths.js";
 
 const repoRoot = path.resolve(import.meta.dirname, "..");
 const children = new Set<ChildProcess>();
 const roots: string[] = [];
+const barriers: UpdateRefBarrier[] = [];
 after(async () => {
+  for (const barrier of barriers) barrier.close();
   for (const child of children) child.kill("SIGKILL");
   await Promise.all(roots.map((root) => rm(root, { recursive: true, force: true })));
 });
 
-/** A child node process running `entry`, read line by line. */
+/** A child node process running `entry`, read line by line; `wrap` is the command it runs under. */
 class Child {
   readonly process: ChildProcess;
   readonly exited: Promise<number | string | null>;
@@ -37,9 +42,16 @@ class Child {
   #waiting: ((line: string | undefined) => void)[] = [];
   #done = false;
 
-  constructor(entry: string, args: string[], env: Record<string, string> = {}, preload: string[] = []) {
+  constructor(
+    entry: string,
+    args: string[],
+    env: Record<string, string> = {},
+    preload: string[] = [],
+    wrap: string[] = [],
+  ) {
     const imports = [...preload, "tsx"].flatMap((module) => ["--import", module]);
-    this.process = spawn(process.execPath, [...imports, entry, ...args], {
+    const [command, ...prefix] = [...wrap, process.execPath];
+    this.process = spawn(command, [...prefix, ...imports, entry, ...args], {
       cwd: repoRoot,
       env: { ...process.env, ...env },
       stdio: ["pipe", "pipe", "pipe"],
@@ -108,12 +120,13 @@ interface Hosted {
   /**
    * Starts a host on the data directory (it sets coordination up the
    * first time), with what it printed first: { port } or { error, reason }.
-   * `preload` modules run in it first.
+   * `preload` modules run in it first; `wrap` is the command it runs under.
    */
   start(
     env?: Record<string, string>,
     preload?: string[],
-  ): Promise<Child & { first: { port?: number; reason?: string } }>;
+    wrap?: string[],
+  ): Promise<Child & { first: { port?: number; error?: string; reason?: string } }>;
   /** Kills the host and waits until its process is gone. */
   kill(): Promise<void>;
   /** Client processes that start together on "go"; one reply list per plan. */
@@ -156,8 +169,8 @@ async function hosted(env: Record<string, string> = {}, more: { lib?: boolean } 
     dataDir,
     repo,
     lib,
-    async start(more: Record<string, string> = {}, preload: string[] = []) {
-      const host = new Child("test/coordination-host.ts", [dataDir, setupFile], more, preload);
+    async start(more: Record<string, string> = {}, preload: string[] = [], wrap: string[] = []) {
+      const host = new Child("test/coordination-host.ts", [dataDir, setupFile], more, preload, wrap);
       const first = JSON.parse(await host.line());
       if (first.port) {
         world.host = host;
@@ -214,7 +227,7 @@ async function defineTasks(world: Hosted, ids: string[]) {
 /**
  * Preloaded into a host, it gives that process another host name, so its
  * locks read as written in another PID namespace (a container elsewhere):
- * a simulation, as these tests cannot make a real namespace.
+ * a simulation. The tests at the end make a real namespace where they can.
  */
 const elsewhere = `data:text/javascript,${encodeURIComponent('import os from "node:os"; os.hostname = () => "elsewhere";')}`;
 
@@ -242,7 +255,7 @@ async function startHere(dataDir: string) {
   });
 }
 
-/** A start refused at once, without waiting out a lease (30 s). */
+/** A start refused at once, without waiting out a lease (30 s); the refusal. */
 async function refused(start: Promise<{ shutdown?: () => Promise<void>; release?: () => void }>) {
   const begun = Date.now();
   const outcome = await start.then(
@@ -255,6 +268,19 @@ async function refused(start: Promise<{ shutdown?: () => Promise<void>; release?
   );
   assert.ok(outcome instanceof StartupError, String(outcome));
   assert.ok(Date.now() - begun < 10_000, `refused after ${Date.now() - begun} ms`);
+  return outcome;
+}
+
+/** The refusal of a start that cannot show the lock's holder stopped. */
+const unconfirmed = (world: Hosted) =>
+  sm().cli.start.dataDirHolderUnconfirmed({ dataDir: world.dataDir, file: lockFile(world) });
+
+/** A host started on the data directory, which must be refused with `message`. */
+async function hostRefused(world: Hosted, message: string, wrap: string[] = []) {
+  const contender = await world.start({}, [], wrap);
+  // One that took the directory over is stopped, so the test fails at once.
+  if (contender.first.port) contender.process.kill("SIGKILL");
+  assert.deepEqual([contender.first.error, await contender.exited], [message, 1], contender.stderr);
 }
 
 function assertDisjoint(claims: { scopes: string[] }[]) {
@@ -822,3 +848,382 @@ test("hosts racing for the lock a killed host left: exactly one starts", { timeo
     assert.equal((await world.ask({ method: "GET", path: "/projects/app" })).status, 200);
   }
 });
+
+/** The update-ref barrier is a shell script on FIFOs, run and checked on Linux only. */
+const linuxOnly = process.platform !== "linux" && "the update-ref barrier is checked on Linux only";
+
+/**
+ * Restarts the host with `git` behind an update-ref barrier, then starts an
+ * integration of a change to src that the barrier holds after
+ * coordination's last lock check, before the branch moves: Git runs with
+ * hooks off, so a command in front of it on PATH is the one place a test
+ * can stop there.
+ */
+async function heldIntegration(world: Hosted) {
+  await defineTasks(world, ["one"]);
+  const claim = (await world.ask(post("/claims", { taskId: "one", scopes: ["src"] }), world.tokens.alice)).body
+    .claim!;
+  const change = await world.repo.commit(world.repo.base, { "src/a.ts": "changed\n" });
+  const barrier = await updateRefBarrier(path.join(world.root, "barrier"));
+  barriers.push(barrier);
+  world.host.process.kill("SIGTERM");
+  assert.equal(await world.host.exited, 0, world.host.stderr);
+  const host = await world.start({ PATH: `${barrier.bin}${path.delimiter}${process.env.PATH}` });
+  assert.ok(host.first.port, host.stderr);
+  const integrate = post(`/claims/${claim.id}/integrate`, {
+    fence: claim.fence,
+    base: world.repo.base,
+    commit: change,
+  });
+  await barrier.arm();
+  const reply = world.ask(integrate, world.tokens.alice);
+  reply.catch(() => {});
+  const argv = await barrier.reached();
+  assert.deepEqual(argv.slice(argv.indexOf("update-ref")), [
+    "update-ref",
+    "-m",
+    "bell-pr: integrate one",
+    "refs/heads/integration",
+    change,
+    world.repo.base,
+  ]);
+  // The intent is saved; the branch has not moved.
+  const onDisk = JSON.parse(await readFile(dataPaths(world.dataDir).coordination, "utf8"));
+  assert.deepEqual(
+    { ...onDisk.projects[0].pending, startedAt: "" },
+    { claimId: claim.id, fence: claim.fence, from: world.repo.base, to: change, startedAt: "" },
+  );
+  assert.equal(await world.repo.head(), world.repo.base);
+  return { claim, change, integrate, reply, barrier, host };
+}
+
+const authorize = (claim: ClaimView) =>
+  post(`/claims/${claim.id}/authorize`, { fence: claim.fence, paths: ["src/a.ts"] });
+
+test(
+  "an integration held between its last lock check and update-ref keeps the lock from every start, running or paused, then lands",
+  { timeout: 120_000, skip: linuxOnly },
+  async (t) => {
+    const world = await hosted();
+    const { claim, change, integrate, reply, barrier, host } = await heldIntegration(world);
+    const file = lockFile(world);
+    const lock = await readFile(file, "utf8");
+    assert.deepEqual([JSON.parse(lock).pid, JSON.parse(lock).strict], [host.process.pid, true]);
+    const inUse = sm().cli.start.dataDirInUse({ dataDir: world.dataDir, pid: host.process.pid! });
+    const contend = async () => {
+      await hostRefused(world, inUse);
+      assert.equal((await refused(acquireWriterLock(world.dataDir))).message, inUse);
+      assert.equal((await refused(startHere(world.dataDir))).message, inUse);
+      assert.equal(await readFile(file, "utf8"), lock);
+      assert.deepEqual(await lockLitter(world), []);
+      assert.equal(await world.repo.head(), world.repo.base);
+    };
+    await contend();
+    host.process.kill("SIGSTOP");
+    try {
+      // Not renewed for an hour, as when its machine slept or its clock is behind.
+      const hourAgo = new Date(Date.now() - 3_600_000);
+      await utimes(file, hourAgo, hourAgo);
+      await contend();
+    } finally {
+      host.process.kill("SIGCONT");
+    }
+    barrier.release();
+    const done = await reply;
+    assert.equal(done.status, 200, JSON.stringify(done.body));
+    assert.equal(await world.repo.head(), change);
+    const after = await project(world);
+    assert.deepEqual(
+      [after.branch.sha, after.claims[0].status, after.tasks[0].status, after.tasks[0].integratedSha],
+      [change, "integrated", "integrated", change],
+    );
+    // Closed, it gives the lock up; a restart reads the same, and the fence is spent.
+    host.process.kill("SIGTERM");
+    assert.equal(await host.exited, 0, host.stderr);
+    await assert.rejects(readFile(file), { code: "ENOENT" });
+    assert.ok((await world.start()).first.port);
+    assert.deepEqual(await project(world), after);
+    const onDisk = JSON.parse(await readFile(dataPaths(world.dataDir).coordination, "utf8"));
+    assert.equal(onDisk.projects[0].pending, undefined);
+    for (const request of [authorize(claim), integrate]) {
+      const spent = await world.ask(request, world.tokens.alice);
+      assert.deepEqual([spent.status, spent.body.reason], [409, "ended"], request.path);
+    }
+    t.diagnostic(
+      JSON.stringify({
+        held: "update-ref after the last lock check",
+        contenders: "a strict host, acquireWriterLock, an ordinary start: refused, running and paused with the lock an hour old",
+        integrate: done.status,
+        head: "change",
+        restart: "integrated, pending cleared, fence ended",
+      }),
+    );
+  },
+);
+
+test(
+  "outside the rule: a lock removed by hand while an integration is held lets its update-ref land under a second host's records",
+  { timeout: 120_000, skip: linuxOnly },
+  async (t) => {
+    const world = await hosted();
+    const { claim, change, integrate, reply, barrier, host } = await heldIntegration(world);
+    // By hand, which only a person who knows the host has stopped should do; it has not.
+    await rm(lockFile(world));
+    const second = await world.start();
+    assert.ok(second.first.port, second.stderr);
+    // Opening, it found the intent with the branch still at the base: nothing integrated.
+    const opened = await project(world);
+    assert.deepEqual(
+      [opened.branch.sha, opened.claims[0].status, opened.tasks[0].status, opened.undecided],
+      [world.repo.base, "held", "open", undefined],
+    );
+    barrier.release();
+    const late = await reply;
+    assert.deepEqual([late.status, late.body.reason], [503, "notSingleWriter"]);
+    // The check before update-ref is no fence: the branch moved all the same.
+    assert.equal(await world.repo.head(), change);
+    // The second host's records never say so: to them the claim is still held, its fence
+    // still authorizes, and the branch moved outside coordination.
+    assert.deepEqual(await project(world), opened);
+    const authorized = await world.ask(authorize(claim), world.tokens.alice);
+    assert.equal(authorized.status, 200, JSON.stringify(authorized.body));
+    const again = await world.ask(integrate, world.tokens.alice);
+    assert.deepEqual([again.status, again.body.reason], [409, "baselineMoved"]);
+    // The first host, closed, leaves the second one's lock; a restart reads the same.
+    const lock = await readFile(lockFile(world), "utf8");
+    host.process.kill("SIGTERM");
+    assert.equal(await host.exited, 0, host.stderr);
+    assert.equal(await readFile(lockFile(world), "utf8"), lock);
+    second.process.kill("SIGTERM");
+    assert.equal(await second.exited, 0, second.stderr);
+    assert.ok((await world.start()).first.port);
+    assert.deepEqual(await project(world), opened);
+    const restarted = await world.ask(integrate, world.tokens.alice);
+    assert.deepEqual([restarted.status, restarted.body.reason], [409, "baselineMoved"]);
+    t.diagnostic(
+      JSON.stringify({
+        late: [late.status, late.body.reason],
+        head: "change",
+        records: { branch: "base", claim: opened.claims[0].status, task: opened.tasks[0].status },
+        authorize: [authorized.status, authorized.body.reason ?? ""],
+        integrate: [again.status, again.body.reason],
+        restart: [restarted.status, restarted.body.reason],
+      }),
+    );
+  },
+);
+
+test(
+  "outside the rule: a lock replaced by hand while an integration is held: its update-ref lands and the next opening records it",
+  { timeout: 120_000, skip: linuxOnly },
+  async (t) => {
+    const world = await hosted();
+    const { claim, change, integrate, reply, barrier, host } = await heldIntegration(world);
+    const file = lockFile(world);
+    // As after a person removed its lock and a start in another container wrote one.
+    const theirs = `${JSON.stringify({ ...JSON.parse(await readFile(file, "utf8")), pidNamespace: "elsewhere pid:[1]" })}\n`;
+    await writeFile(file, theirs);
+    const revision = await world.revision();
+    barrier.release();
+    const late = await reply;
+    assert.deepEqual([late.status, late.body.reason], [503, "notSingleWriter"]);
+    assert.equal(await world.repo.head(), change);
+    // Its outcome was never written: the intent stays.
+    assert.equal(await world.revision(), revision);
+    const pending = JSON.parse(await readFile(dataPaths(world.dataDir).coordination, "utf8")).projects[0].pending;
+    assert.deepEqual([pending.from, pending.to], [world.repo.base, change]);
+    host.process.kill("SIGTERM");
+    assert.equal(await host.exited, 0, host.stderr);
+    assert.equal(await readFile(file, "utf8"), theirs);
+    // No start takes the replaced lock over, until a person removes it.
+    await hostRefused(world, unconfirmed(world));
+    await rm(file);
+    assert.ok((await world.start()).first.port);
+    // Opening finds the branch at the change and records the integration.
+    const after = await project(world);
+    assert.deepEqual(
+      [after.branch.sha, after.claims[0].status, after.tasks[0].status, after.tasks[0].integratedSha, after.undecided],
+      [change, "integrated", "integrated", change, undefined],
+    );
+    for (const request of [authorize(claim), integrate]) {
+      const spent = await world.ask(request, world.tokens.alice);
+      assert.deepEqual([spent.status, spent.body.reason], [409, "ended"], request.path);
+    }
+    t.diagnostic(
+      JSON.stringify({
+        late: [late.status, late.body.reason],
+        head: "change",
+        intent: "kept",
+        reopened: { branch: "change", claim: after.claims[0].status, task: after.tasks[0].status },
+      }),
+    );
+  },
+);
+
+/** How kill(pid, 0) answers here: "alive", or its error code. */
+function signalable(pid: number) {
+  try {
+    process.kill(pid, 0);
+    return "alive";
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code;
+  }
+}
+
+/** Linux: this process's PID namespace, as a lock records it after the host name. */
+const pidNamespaceHere = process.platform === "linux" ? readlinkSync("/proc/self/ns/pid") : undefined;
+/** bwrap's arguments for a new PID namespace that sees this machine's files, with a /proc of its own. */
+const unsharePid = ["--unshare-pid", "--dev-bind", "/", "/", "--proc", "/proc", "--die-with-parent", "--"];
+/**
+ * A command that runs one in a new PID namespace after `burn` processes
+ * there (bwrap is pid 1 in it and the shell 2), so that its pid is past
+ * theirs; the shell forks it and exits with its status.
+ */
+const inNewPidNamespace = (burn = 0) => [
+  "bwrap",
+  ...unsharePid,
+  "/bin/sh",
+  "-c",
+  'i=0; while [ "$i" -lt "$0" ]; do /bin/true; i=$((i + 1)); done; "$@"; exit $?',
+  String(burn),
+];
+/** Why these tests cannot make a real PID namespace here, or false. Nothing simulates one instead. */
+const noPidNamespace = (() => {
+  if (process.platform !== "linux") return "PID namespaces are Linux only";
+  const probe = spawnSync("bwrap", [...unsharePid, "readlink", "/proc/self/ns/pid"], { encoding: "utf8" });
+  if (probe.error) return `bwrap does not run: ${probe.error.message}`;
+  if (probe.status !== 0) return `bwrap made no PID namespace (exit ${probe.status}): ${probe.stderr.trim()}`;
+  if (probe.stdout.trim() === pidNamespaceHere) return "bwrap stayed in this PID namespace";
+  return false;
+})();
+
+/** The pid here of the process whose pid is `pid` in PID namespace `namespace`. */
+async function pidHere(namespace: string, pid: number) {
+  for (const entry of await readdir("/proc")) {
+    if (!/^\d+$/.test(entry)) continue;
+    try {
+      if (readlinkSync(`/proc/${entry}/ns/pid`) !== namespace) continue;
+      const nspid = /^NSpid:\s+(.+)$/m.exec(await readFile(`/proc/${entry}/status`, "utf8"))?.[1].split(/\s+/);
+      if (nspid?.at(-1) === String(pid)) return Number(entry);
+    } catch {
+      // Gone, or another user's.
+    }
+  }
+  return undefined;
+}
+
+/** A sha-256 prefix, to tell values apart in a test's output without printing them. */
+const digest = (text: string) => createHash("sha256").update(text).digest("hex").slice(0, 12);
+
+test(
+  "a lock written in a real other PID namespace, its pid no process here, is never taken over: running, paused, expired or killed",
+  { timeout: 180_000, skip: noPidNamespace },
+  async (t) => {
+    const world = await hosted();
+    await defineTasks(world, ["one"]);
+    world.host.process.kill("SIGTERM");
+    assert.equal(await world.host.exited, 0, world.host.stderr);
+    // The lowest pid from 300 that names no process here: Linux gives out pids from 300 again when they wrap.
+    let free = 300;
+    while (free < 5000 && signalable(free) !== "ESRCH") free += 1;
+    assert.ok(free < 5000, "no pid below 5000 is free here");
+    const holder = await world.start({}, [], inNewPidNamespace(free - 3));
+    assert.ok(holder.first.port, holder.stderr);
+    const file = lockFile(world);
+    const lock = await readFile(file, "utf8");
+    const info = JSON.parse(lock) as LockInfo;
+    const namespace = info.pidNamespace!.slice(info.pidNamespace!.lastIndexOf(" ") + 1);
+    assert.notEqual(namespace, pidNamespaceHere);
+    assert.equal(info.strict, true);
+    const holderHere = await pidHere(namespace, info.pid);
+    assert.ok(holderHere !== undefined && holderHere !== info.pid, String(holderHere));
+    const contend = async (when: string) => {
+      // To a start here, the lock's pid names no process at all.
+      const lockPidHere = signalable(info.pid);
+      assert.equal(lockPidHere, "ESRCH");
+      await hostRefused(world, unconfirmed(world));
+      assert.equal((await refused(acquireWriterLock(world.dataDir))).message, unconfirmed(world));
+      assert.equal((await refused(startHere(world.dataDir))).message, unconfirmed(world));
+      assert.equal(await readFile(file, "utf8"), lock);
+      assert.deepEqual(await lockLitter(world), []);
+      t.diagnostic(JSON.stringify({ when, lockPidHere, strictHost: "refused", acquireWriterLock: "refused", ordinary: "refused" }));
+    };
+    t.diagnostic(
+      JSON.stringify({
+        here: pidNamespaceHere,
+        holder: namespace,
+        lockPid: info.pid,
+        holderPidHere: holderHere,
+        hostName: digest(info.pidNamespace!.slice(0, info.pidNamespace!.lastIndexOf(" "))),
+      }),
+    );
+    await contend("running");
+    process.kill(holderHere, "SIGSTOP");
+    try {
+      const hourAgo = new Date(Date.now() - 3_600_000);
+      await utimes(file, hourAgo, hourAgo);
+      await contend("paused, lock an hour old");
+    } finally {
+      process.kill(holderHere, "SIGCONT");
+    }
+    // Resumed, it still writes.
+    const claimed = await world.ask(post("/claims", { taskId: "one", scopes: ["src"] }), world.tokens.alice);
+    assert.equal(claimed.status, 201, JSON.stringify(claimed.body));
+    // Killed, it leaves its lock, and nothing here can tell that it stopped.
+    process.kill(holderHere, "SIGKILL");
+    const exit = await holder.exited;
+    assert.equal(exit, 137, holder.stderr);
+    assert.equal(signalable(holderHere), "ESRCH");
+    t.diagnostic(JSON.stringify({ killed: holderHere, exit }));
+    await contend("killed");
+    // Once a person removes it, a start here opens with the claim.
+    await rm(file);
+    assert.ok((await world.start()).first.port);
+    assert.deepEqual((await heldClaims(world)).map((claim) => claim.id), [claimed.body.claim!.id]);
+  },
+);
+
+test(
+  "starts in a real other PID namespace, which cannot see the holder's pid, never take its lock: running, paused, expired or killed",
+  { timeout: 180_000, skip: noPidNamespace },
+  async (t) => {
+    const world = await hosted();
+    await defineTasks(world, ["one"]);
+    const file = lockFile(world);
+    const lock = await readFile(file, "utf8");
+    const holderPid = (JSON.parse(lock) as LockInfo).pid;
+    const contend = async (when: string) => {
+      const contender = new Child("test/lock-contender.ts", [world.dataDir], {}, [], inNewPidNamespace());
+      const report = JSON.parse(await contender.line());
+      const exit = await contender.exited;
+      const said = (message: string) => (message === unconfirmed(world) ? "dataDirHolderUnconfirmed" : message);
+      t.diagnostic(
+        JSON.stringify({ when, ...report, strict: said(report.strict), ordinary: said(report.ordinary), exit }),
+      );
+      assert.notEqual(report.pidNamespace, pidNamespaceHere);
+      assert.deepEqual(
+        [report.holderPid, report.holderHere, report.strict, report.ordinary, exit],
+        [holderPid, "ESRCH", unconfirmed(world), unconfirmed(world), 1],
+        contender.stderr,
+      );
+      assert.equal(await readFile(file, "utf8"), lock);
+      assert.deepEqual(await lockLitter(world), []);
+    };
+    await contend("running");
+    world.host.process.kill("SIGSTOP");
+    try {
+      const hourAgo = new Date(Date.now() - 3_600_000);
+      await utimes(file, hourAgo, hourAgo);
+      await contend("paused, lock an hour old");
+    } finally {
+      world.host.process.kill("SIGCONT");
+    }
+    const claimed = await world.ask(post("/claims", { taskId: "one", scopes: ["src"] }), world.tokens.alice);
+    assert.equal(claimed.status, 201, JSON.stringify(claimed.body));
+    await world.kill();
+    await contend("killed");
+    // In the holder's own namespace a start sees that it stopped, and opens with the claim.
+    assert.ok((await world.start()).first.port);
+    assert.deepEqual((await heldClaims(world)).map((claim) => claim.id), [claimed.body.claim!.id]);
+  },
+);

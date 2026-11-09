@@ -3,8 +3,11 @@
  * repository whose `integration` branch starts at one commit of `files`,
  * and a clone that makes participants' commits and pushes them to it.
  */
+import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
+import { accessSync, closeSync, constants, openSync, writeSync } from "node:fs";
 import { chmod, mkdir, readFile, rename, rm, symlink, writeFile } from "node:fs/promises";
+import { Socket } from "node:net";
 import path from "node:path";
 import { git } from "../server/process.js";
 
@@ -188,4 +191,99 @@ function forgedGraph(graph: Buffer, commit: string, change: { parents?: string[]
   }
   createHash("sha1").update(out.subarray(0, -20)).digest().copy(out, out.length - 20);
   return out;
+}
+
+/**
+ * Holds one integration between coordination's last lock check and the
+ * branch moving: a `git` for the front of a host's PATH that runs the real
+ * one, except that the first `update-ref` after arm() reports its
+ * arguments and waits, before it starts, until release(). Both directions
+ * go through FIFOs, so neither side sleeps or polls. Checked on Linux.
+ */
+export interface UpdateRefBarrier {
+  /** The directory to put first on the host's PATH. */
+  bin: string;
+  /** Holds the next `update-ref`. */
+  arm(): Promise<void>;
+  /** The held command's arguments, once it waits. */
+  reached(): Promise<string[]>;
+  /** Lets the held command go on to the real Git; fails if none waits. */
+  release(): void;
+  /** Lets a command still held go, and stops listening. */
+  close(): void;
+}
+
+export async function updateRefBarrier(dir: string): Promise<UpdateRefBarrier> {
+  const realGit = (process.env.PATH ?? "")
+    .split(path.delimiter)
+    .map((entry) => path.join(entry, "git"))
+    .find((candidate) => {
+      try {
+        accessSync(candidate, constants.X_OK);
+        return true;
+      } catch {
+        return false;
+      }
+    });
+  if (!realGit) throw new Error("git is not on PATH");
+  const bin = path.join(dir, "bin");
+  const armed = path.join(dir, "armed");
+  const reachedFifo = path.join(dir, "reached");
+  const goFifo = path.join(dir, "go");
+  await mkdir(bin, { recursive: true });
+  execFileSync("mkfifo", [reachedFifo, goFifo]);
+  const quote = (value: string) => `'${value.replaceAll("'", `'\\''`)}'`;
+  await writeFile(
+    path.join(bin, "git"),
+    [
+      "#!/bin/sh",
+      "for arg do",
+      // Only the first update-ref after arm(): rm succeeds once.
+      `  if [ "$arg" = update-ref ] && rm ${quote(armed)} 2>/dev/null; then`,
+      // Opened read-write, so it never waits for the test to open its end.
+      `    exec 3<>${quote(goFifo)}`,
+      `    (IFS='\t'; printf '%s\\n' "$*") > ${quote(reachedFifo)}`,
+      "    read -r go <&3",
+      "    exec 3<&-",
+      "    break",
+      "  fi",
+      "done",
+      `exec ${quote(realGit)} "$@"`,
+      "",
+    ].join("\n"),
+    { mode: 0o755 },
+  );
+  // Read-write as well: the shim's write never waits, and nothing here blocks a thread.
+  const reader = new Socket({ fd: openSync(reachedFifo, constants.O_RDWR | constants.O_NONBLOCK), readable: true, writable: false });
+  let text = "";
+  const reached = new Promise<string[]>((resolve) => {
+    reader.on("data", (chunk: Buffer) => {
+      text += chunk;
+      const end = text.indexOf("\n");
+      if (end >= 0) resolve(text.slice(0, end).split("\t"));
+    });
+  });
+  const release = () => {
+    // O_NONBLOCK: refused (ENXIO) unless the shim has the FIFO open, that is, waits.
+    const fd = openSync(goFifo, constants.O_WRONLY | constants.O_NONBLOCK);
+    try {
+      writeSync(fd, "go\n");
+    } finally {
+      closeSync(fd);
+    }
+  };
+  return {
+    bin,
+    arm: () => writeFile(armed, ""),
+    reached: () => reached,
+    release,
+    close() {
+      try {
+        release();
+      } catch {
+        // Nothing was held.
+      }
+      reader.destroy();
+    },
+  };
 }

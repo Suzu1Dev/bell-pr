@@ -48,7 +48,12 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   only after a start claims it, so two starts that find the same stale
   lock cannot remove the lock either of them then writes. A lock taken
   for coordination is never replaced until its holder is shown to have
-  stopped; nothing takes one yet.
+  stopped; nothing takes one yet. Tests now hold an integration after its
+  last lock check, and put holders and starts in real separate PID
+  namespaces where bubblewrap can make them: no start of this version
+  takes such a lock, running, paused or expired. A lock a person removes
+  or replaces while its holder runs is still outside that rule: an
+  integration already past its last lock check still moves the branch.
 
 ### Fixed
 
