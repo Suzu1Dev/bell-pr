@@ -21,6 +21,13 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   it and when. Members cannot reopen a task, and an integrated task never
   reopens. Like the rest of the coordination core, nothing in the app, the
   CLI or any listener reaches it yet.
+- **An interrupted integration the branch cannot settle closes only its
+  own project, in the core only.** Other projects keep working; the closed
+  one refuses every change, keeps its claims and fences, and shows the
+  interrupted integration to anyone who reads it. An admin settles it once
+  the branch is back at its base or its change; settling never moves the
+  branch, and each settlement records who, when and what. Nothing in the
+  app, the CLI or any listener reaches it yet.
 
 ### Changed
 

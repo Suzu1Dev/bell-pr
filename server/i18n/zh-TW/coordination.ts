@@ -12,8 +12,15 @@ const m: Translation<typeof en> = {
     damaged: "協調檔無法讀取或內容不一致，修好之前不會核發任何 claim。",
     unavailable: "寫入失敗後協調已停止。請重新啟動 BELL PR，讓它從磁碟重新讀回 claim。",
     full: "協調資料已沒有空間容納這項變更。已持有的 claim 仍可釋放、撤銷與整合。",
-    recoveryUndecided: ({ project }) =>
-      `${project} 的一次整合被中斷，而整合分支已看不出它是否完成；在有人檢查分支之前，協調維持停止。`,
+  },
+  recovery: {
+    undecided: ({ project }) =>
+      `${project} 的一次整合被中斷，而整合分支已看不出它是否完成；在管理者結案之前，${project} 不接受任何變更。其他專案不受影響。`,
+    nothingToSettle: "這個專案沒有等待結案的中斷整合。",
+    stalePending: "這個專案等待結案的中斷整合與指定的不同。請重新讀取專案。",
+    branchElsewhere: ({ current }) =>
+      `整合分支位於 ${current}，既不是中斷整合的基底，也不是它的變更，因此無法結案。請先手動修復分支。`,
+    branchUnreadable: "無法讀取整合分支，因此無法結案這次中斷的整合。",
   },
   participant: {
     unauthenticated: "這個請求沒有有效的參與者 token。",

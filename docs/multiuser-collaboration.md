@@ -99,20 +99,21 @@ with the group-mode overlap check.
 - **Refuses what does not fit before anything changes.** One file holds
   at most 1,000 participants and 100 projects. Each project holds at most
   10,000 tasks and 100,000 claims, of which at most 1,000 are held at once,
-  with 20,000 scopes together, and each task keeps at most 100
-  reopenings. One participant holds at most 100 claims at once across all
-  projects, with 2,000 scopes together. The whole file is at most 8 MiB.
+  with 20,000 scopes together, each task keeps at most 100 reopenings, and
+  each project keeps its latest 10 settlements. One participant holds at
+  most 100 claims at once across all projects, with 2,000 scopes together.
+  The whole file is at most 8 MiB.
   - An addition (a participant, project, task, claim, scope or
     reopening) must also leave room for every held claim to end, every
-    open task to close and every project to save an integration intent,
-    each at its longest.
+    open task to close and every project to save an integration intent
+    and keep 10 settlements, each at its longest.
   - Past a limit the addition is refused with `409` and
     `details.reason: "full"`. Memory, the file and the branch stay as they
     were, and the coordinator keeps answering. A task's 101st reopening is
     refused this way (`details.limit: "reopenings"`); no earlier one is
     dropped.
-  - Releasing, revoking, failing a task, integrating and recovering only
-    spend that room, so they still work at the limit.
+  - Releasing, revoking, failing a task, integrating, recovering and
+    settling only spend that room, so they still work at the limit.
   - Every write is first read back by the same reader `open()` uses. An
     integration also checks that its outcome can be written before it
     moves the branch.
@@ -130,7 +131,36 @@ with the group-mode overlap check.
 
   An integration that was cut off settles when the coordinator reopens. If
   the branch is at the change, the integration happened; if it is at the
-  base, it did not. Anything else keeps the coordinator closed.
+  base, it did not.
+- **An integration the branch cannot settle closes only its project.** If
+  the branch is at any other commit, or cannot be read, when the
+  coordinator opens, the intent stays in the file as it was, and that
+  project refuses every change with `409` and
+  `details.reason: "recoveryUndecided"`: defining, claiming, widening,
+  releasing, revoking, failing and reopening tasks, authorizing,
+  integrating and adopting a baseline. Its claims stay held, no fence is
+  given out again, and nothing counts the integration as done. Any
+  participant can still read the project, which shows the intent as
+  `undecided`. Other projects keep working. The failures above still stop
+  every project.
+- **An admin settles it from the branch.** `settleRecovery()` (on the
+  router, `POST /projects/:project/recovery/settle`) takes the intent as
+  the project shows it, `{ claimId, fence, from, to, startedAt }`, and the
+  `head` the admin saw. It runs in the same order as that project's
+  integrations and writes the same durable way. It checks, in order:
+  - the participant is an admin (`403` `adminOnly`);
+  - the project is waiting on that exact intent (`409` `nothingToSettle`,
+    or `409` `stalePending` with `details.pending`);
+  - the branch, read again now: unreadable is `503` `branchUnreadable`;
+    neither `from` nor `to` is `409` `branchElsewhere` with
+    `details.current`; anything other than `head` is `409` `staleBase`.
+
+  At `to`, the integration is completed as reopening would complete it. At
+  `from`, the intent is cleared and its claim stays held under the same
+  fence, so it authorizes and integrates again. Settling never chooses a
+  commit, moves or deletes a ref, releases or revokes a claim, or adopts a
+  baseline. Each settlement is kept on the project as
+  `{ by, at, claimId, fence, from, to, startedAt, outcome }`.
 
 ## What it does not guarantee
 
@@ -179,10 +209,13 @@ with the group-mode overlap check.
     compare, so every lock counts as written on this machine.
 - **No idempotency key.** A client whose reply was lost reads the project to
   learn the outcome.
-- **Manual repair after an undecided recovery.** If a branch was moved
-  elsewhere mid-integration, an admin must put it back at the base or the
-  change. There is no override yet, and one undecided project keeps every
-  project closed.
+- **Manual repair before a branch at a third commit is settled.** If a
+  branch was moved elsewhere mid-integration, or cannot be read, nothing in
+  coordination repairs it: a person puts it back at the base or the change
+  by hand, and then an admin settles it. Until then that project stays
+  closed. Whether the repair was the right one is that person's call.
+- **Settlements are kept as a window.** Each project keeps its latest 10;
+  the next one drops the oldest, so settling is never refused for room.
 - **Commit-graph files are still read.** Every coordination Git command
   ignores replace refs (`--no-replace-objects`) and graft files
   (`GIT_GRAFT_FILE` set to the null device, so `info/grafts` is never
@@ -220,6 +253,15 @@ with the group-mode overlap check.
   `{ by, at, reason? }`. The key is optional: a file without it reads as
   before, and an older build keeps it on the task when it writes. An
   older build has nothing to enforce about it, so `version` stays 1.
+- A project may have `recoveries`, oldest first, at most 10, each
+  `{ by, at, claimId, fence, from, to, startedAt, outcome }` with
+  `outcome` `integrated` or `notIntegrated`. The key is optional and an
+  older build keeps it when it writes.
+- An undecided project is not written down as such: it is a project
+  whose `pending` intent the branch cannot settle when the file opens. An
+  older build that opens such a file finds the same intent and refuses
+  to open at all, as before, so it skips no protection, and `version`
+  stays 1.
 - An unknown status, role or version refuses to open.
 - A newer build that adds a field this build would have to enforce must
   raise `version`.
@@ -244,10 +286,11 @@ with the group-mode overlap check.
        failed task reopens only through an admin's step, an integrated
        task never reopens, and a reopen keeps the task's history and
        fences. Like the rest of the core, nothing reaches it yet.
-     - An undecided recovery closes only its own project. An admin settles
-       it through an audited step, while other projects stay available.
-       The undecided project stays closed until then. Nothing resets a
-       branch or clears an intent on its own.
+     - An undecided recovery closes only its own project. Done in the
+       core: an admin settles it through an audited step, while other
+       projects stay available, and the undecided project stays closed
+       until then. Nothing resets a branch or clears an intent on its own.
+       Like the rest of the core, nothing reaches it yet.
      - The process that mounts the router takes the lock with
        `acquireWriterLock` itself and gives that lock to the coordinator.
        Today nothing outside the tests calls either, and an ordinary
@@ -287,6 +330,15 @@ directories and repositories, and cover:
   limits and a restart;
 - one winner when two integrations start from the same base;
 - recovery at each integration step;
+- an integration the branch cannot settle on one of two projects, across a
+  killed host: every change to that project refused without changing
+  anything while the other project claims, authorizes and integrates; a
+  settlement refused for members, forged identities, extra fields, stale
+  intents, a third commit and an unreadable branch without changing
+  anything; two admins racing to settle with one winner; the claim kept
+  under its fence or the integration completed; a failed write and a lost
+  lock; the latest settlements kept up to their limit, with room for them
+  kept free, within the byte limit; and both kept across restarts;
 - each limit refusing the next addition without changing anything, while
   held claims still end, integrate and recover, and the file reopens;
 - replace refs, graft files and shallow lists that would hide a file, a
