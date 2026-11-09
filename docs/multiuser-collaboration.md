@@ -225,6 +225,18 @@ with the group-mode overlap check.
        it through an audited step, while other projects stay available.
        The undecided project stays closed until then. Nothing resets a
        branch or clears an intent on its own.
+     - The process that mounts the router takes the lock with
+       `acquireWriterLock` itself and gives that lock to the coordinator.
+       Today nothing outside the tests calls either, and an ordinary
+       start's lock is refused.
+     - Tests cover the window between the last lock check and
+       `update-ref`, a forged commit-graph file, and a lock written in a
+       real other PID namespace, not only a simulated one.
+     - Large files are handled: on one Linux machine a write took about
+       0.3 seconds at 8 MiB and an integration about 0.6, and near the
+       reader's 32 MiB about 1.1 and 2.4 seconds with about 900 MB of
+       memory. Each write runs in the BELL PR process without yielding.
+   - Until phase 5, nothing describes writing together as protected.
 3. **Show it in the interface** in both languages: claims, conflicts,
    dependency state and the integration queue.
 4. **Reach it from other machines** through a reviewed remote listener.
