@@ -277,6 +277,7 @@ test("a local import is cloned, so runs never add worktrees or branches to the p
   assert.ok(repo.path.startsWith(path.join(store.directory, "repositories") + path.sep));
   assert.equal(repo.url, "");
   assert.equal(repo.fullName, "local/own");
+  assert.equal(repo.originUserinfoIgnored, undefined);
   assert.equal(repo.defaultBranch, "main");
   assert.equal(workbench.managedClone(repo), false);
   // Every branch came along; the clone keeps no remote pointing at the checkout.
@@ -307,6 +308,7 @@ test("a local import is cloned, so runs never add worktrees or branches to the p
   const cloned = await workbench.importRepository(github);
   assert.equal(cloned.url, "https://github.com/test-owner/example");
   assert.equal(cloned.fullName, "test-owner/example");
+  assert.equal(cloned.originUserinfoIgnored, undefined);
   assert.equal(workbench.managedClone(cloned), true);
   // The URL stored on the clone. `remote get-url` applies insteadOf.
   assert.equal(
@@ -390,7 +392,7 @@ test("a local import uses the first saved origin when several are configured", a
 });
 
 test("an origin with userinfo is imported as local, and that address is not stored", async (t) => {
-  const marker = "synthetic-userinfo-marker";
+  const secret = "https://user:token@github.com/o/r.git";
   const directory = await realpath(await mkdtemp(path.join(os.tmpdir(), "bell-security-userinfo-")));
   const store = new Store(path.join(directory, "state"));
   await store.initialize();
@@ -401,25 +403,24 @@ test("an origin with userinfo is imported as local, and that address is not stor
   });
   const checkout = path.join(directory, "checkout");
   await repository(checkout, { "lib.ts": "lib\n" });
-  await git(checkout, [
-    "remote",
-    "add",
-    "origin",
-    `https://${marker}@github.com/test-owner/example.git`,
-  ]);
+  await git(checkout, ["remote", "add", "origin", secret]);
   const repo = await workbench.importRepository(checkout);
   assert.equal(repo.url, "");
   assert.equal(repo.owner, "local");
+  assert.equal(repo.originUserinfoIgnored, true);
   assert.equal(workbench.managedClone(repo), false);
   const logs = (await recentLogLines(store.directory)).join("\n");
   assert.match(logs, /repo\.origin_userinfo/);
+  const saved = await readFile(path.join(store.directory, "state.json"), "utf8");
+  assert.equal(JSON.parse(saved).repos[0].originUserinfoIgnored, true);
   const returned = JSON.stringify({
     repo,
-    saved: await readFile(path.join(store.directory, "state.json"), "utf8"),
+    saved,
     cloneConfig: await readFile(path.join(repo.path, ".git", "config"), "utf8"),
     logs,
   });
-  assert.equal(returned.includes(marker), false);
+  assert.equal(returned.includes(secret), false);
+  assert.equal(returned.includes("user:token"), false);
 });
 
 test("a project an earlier build worked on in place moves to a clone once none of its runs works there", async (t) => {

@@ -4,6 +4,7 @@ import { createElement } from "react";
 import { assertNoHan, renderEn, renderZh } from "../test-utils/render";
 import type { Repo } from "../types";
 import { ImportRepoModal, isWindowsPlatform, localPathExample, namesSample } from "./ImportRepoModal";
+import { ExploreHeading } from "./ExplorePage";
 import { ReposPage } from "./ReposPage";
 
 const repo: Repo = {
@@ -15,6 +16,82 @@ const repo: Repo = {
   defaultBranch: "main",
   url: "https://github.com/octo/widgets",
 };
+
+const localRepo: Repo = {
+  id: "local-1",
+  name: "notes",
+  owner: "local",
+  fullName: "local/notes",
+  path: "/tmp/notes",
+  defaultBranch: "main",
+  url: "",
+};
+
+/** An origin that must never appear in the notice or in stored data. */
+const secretOrigin = "https://user:token@github.com/o/r.git";
+
+const ignoredRepo: Repo = {
+  ...localRepo,
+  id: "ignored-1",
+  name: "widgets",
+  fullName: "local/widgets",
+  originUserinfoIgnored: true,
+};
+
+const list = (repos: Repo[]) =>
+  createElement(ReposPage, {
+    repos,
+    openModal() {},
+    navigate() {},
+    async chooseRun() {
+      return true;
+    },
+    setExploreRepoId() {},
+  });
+
+test("the origin notice shows only when that origin was imported as local", () => {
+  const command = "git remote set-url origin https://github.com/OWNER/REPO";
+  const html = renderEn(list([repo, localRepo, ignoredRepo]));
+  assert.equal(html.match(/role="alert"/g)?.length, 1);
+  assert.match(html, /imported as a local project/);
+  assert.match(html, /use a credential helper/);
+  assert.ok(html.includes(`<code>${command}</code>`));
+  assert.equal(html.includes(secretOrigin), false);
+  assert.equal(html.includes("user:token"), false);
+  assertNoHan(html);
+  const zh = renderZh(list([ignoredRepo]));
+  assert.match(zh, /使用者名稱或權杖/);
+  assert.match(zh, /請執行這個指令並使用 credential helper/);
+  assert.ok(zh.includes(`<code>${command}</code>`));
+  assert.equal(zh.includes(secretOrigin), false);
+  assert.equal(zh.includes("user:token"), false);
+  for (const repos of [[repo], [localRepo]]) {
+    const plain = renderEn(list(repos));
+    assert.equal(plain.includes('role="alert"'), false);
+    assert.equal(plain.includes(command), false);
+  }
+  const project = renderEn(
+    createElement(ExploreHeading, { repo: ignoredRepo, onChooseDirection() {} }),
+  );
+  assert.match(project, /<h1 tabindex="-1">local\/widgets<\/h1>/);
+  assert.equal(project.match(/role="alert"/g)?.length, 1);
+  assert.ok(project.includes(`<code>${command}</code>`));
+  assert.equal(project.includes(secretOrigin), false);
+  assert.equal(project.includes("user:token"), false);
+  assertNoHan(project);
+  const projectZh = renderZh(
+    createElement(ExploreHeading, { repo: ignoredRepo, onChooseDirection() {} }),
+  );
+  assert.match(projectZh, /使用者名稱或權杖/);
+  assert.equal(projectZh.includes("user:token"), false);
+  for (const plainRepo of [repo, localRepo]) {
+    const plain = renderEn(
+      createElement(ExploreHeading, { repo: plainRepo, onChooseDirection() {} }),
+    );
+    assert.equal(plain.includes('role="alert"'), false);
+    assert.equal(plain.includes(command), false);
+  }
+});
 
 test("the repository list reads in English with no Chinese left", () => {
   const element = createElement(ReposPage, {

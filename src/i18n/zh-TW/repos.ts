@@ -4,6 +4,9 @@ import { product } from "../../../shared/product";
 import type en from "../en/repos";
 
 const m: Translation<typeof en> = {
+  originIgnored:
+    "這個專案的 origin 含有使用者名稱或權杖，所以已匯入為本機專案，請執行這個指令並使用 credential helper。",
+  originIgnoredCommand: "git remote set-url origin https://github.com/OWNER/REPO",
   list: {
     eyebrow: "你的專案",
     title: "下一個貢獻，從這裡開始。",

@@ -1404,6 +1404,25 @@ const v12RepositorySchemas: Record<string, z.ZodTypeAny> = {
   "contributionRules.findings[].allows": withoutFindingField("allows"),
 };
 
+test("a repository without an origin-ignored flag still loads, and the flag keeps no address", () => {
+  const secret = "https://user:token@github.com/o/r.git";
+  const older = lenientRead(repositoryReadSchema).parse(repository);
+  assert.equal(older.originUserinfoIgnored, undefined);
+  const flagged = lenientRead(repositoryReadSchema).parse({
+    ...repository,
+    originUserinfoIgnored: true,
+  });
+  assert.equal(flagged.originUserinfoIgnored, true);
+  const saved = JSON.stringify(flagged);
+  assert.equal(saved.includes(secret), false);
+  assert.equal(saved.includes("user:token"), false);
+  const predates = lenientRead(repositoryReadSchema.omit({ originUserinfoIgnored: true })).parse({
+    ...repository,
+    originUserinfoIgnored: true,
+  });
+  assert.equal(predates.originUserinfoIgnored, true);
+});
+
 for (const [field, older] of Object.entries(v12RepositorySchemas))
   test(`a build that predates the repository's ${field} (v1.2) still reads a repository that has it`, () => {
     const written = JSON.parse(JSON.stringify(repositoryWithV12Fields()));
