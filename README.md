@@ -7,6 +7,38 @@ it back, and send only what a maintainer is glad to review.
 
 English · [繁體中文](README-zh-TW.md)
 
+## Quickstart
+
+1. Start BELL PR:
+
+   ```sh
+   npx bell-pr
+   ```
+
+2. It prints its address and opens BELL PR in your browser:
+
+   ```text
+   BELL PR <version> → http://127.0.0.1:4311
+   ```
+
+3. Walk through Welcome: choose your **language**, check your
+   **environment** (every missing tool comes with the command that fixes
+   it) and pick the AI **provider** your agents use.
+4. Take the sample tour, import a repository, or find a project to
+   contribute to.
+
+`npx bell-pr` is `bell-pr start`. It listens only when `bell-pr doctor` is
+ready; otherwise it exits and prints the fix for each failed check. `npx
+bell-pr start --force` opens the sample tour anyway.
+
+**Lost the address? Run `bell-pr open`** (or `npx bell-pr open` if you
+started with `npx`). It prints the address again, without the API token,
+and opens it. The browser receives the token.
+
+To keep BELL PR installed, run `npm install -g bell-pr`, then start it with
+`bell-pr`. The [getting started guide](docs/getting-started.md) walks
+through a whole contribution.
+
 BELL PR is a self-hosted, local-first workbench for open-source
 contributions. It runs on your computer with the AI coding CLI you already
 use (the OpenAI Codex CLI, Claude Code or Google's Antigravity CLI) and the GitHub CLI. It analyzes a
@@ -31,8 +63,9 @@ BELL PR is free and open-source software under
 
 ![The Code changes tab: a diff with a plain-language explanation of the change beside it](docs/images/en/run-changes-1280.png)
 
+[Quickstart](#quickstart) ·
 [Try the sample project](#try-the-sample-project) ·
-[Before you start](#before-you-start) · [Quickstart](#quickstart) ·
+[Before you start](#before-you-start) ·
 [Installation options](#installation-options) ·
 [Requirements](#requirements) ·
 [Features](#features) · [Privacy](#privacy) ·
@@ -94,38 +127,6 @@ When `bell-pr doctor` reports every required check green, continue.
 `bell-pr start` exits before it listens until then. With no AI provider
 signed in, `bell-pr start --force` still opens BELL PR so you can take the
 sample tour; agent runs and publishing wait until a provider is ready.
-
-## Quickstart
-
-1. Start BELL PR:
-
-   ```sh
-   npx bell-pr
-   ```
-
-2. It prints its address and opens BELL PR in your browser:
-
-   ```text
-   BELL PR <version> → http://127.0.0.1:4311
-   ```
-
-3. Walk through Welcome: choose your **language**, check your
-   **environment** (every missing tool comes with the command that fixes
-   it) and pick the AI **provider** your agents use.
-4. Take the sample tour, import a repository, or find a project to
-   contribute to.
-
-`npx bell-pr` is `bell-pr start`. It listens only when `bell-pr doctor` is
-ready; otherwise it exits and prints the fix for each failed check. `npx
-bell-pr start --force` opens the sample tour anyway.
-
-**Lost the address? Run `bell-pr open`** (or `npx bell-pr open` if you
-started with `npx`). It prints the address again, without the API token,
-and opens it. The browser receives the token.
-
-To keep BELL PR installed, run `npm install -g bell-pr`, then start it with
-`bell-pr`. The [getting started guide](docs/getting-started.md) walks
-through a whole contribution.
 
 ## Installation options
 
