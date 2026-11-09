@@ -353,11 +353,11 @@ export async function importRepository(
       if (isBare === "true") throw new AppError((m) => m.run.repos.bare);
       await git(checkout, ["rev-parse", "--verify", "HEAD"]);
       try {
-        // The URL saved in the checkout. `remote get-url` applies
-        // `url.<base>.insteadOf`, so a global rewrite would hide a GitHub origin.
+        // The first URL saved for origin. `--get` returns the last, and
+        // `remote get-url` applies `url.<base>.insteadOf`.
         const saved = (
-          await git(checkout, ["config", "--local", "--get", "remote.origin.url"])
-        ).stdout.trim();
+          await git(checkout, ["config", "--local", "--get-all", "remote.origin.url"])
+        ).stdout.split("\n")[0].trim();
         // Userinfo is not a GitHub source. The address itself is not kept.
         if (githubUserinfoOrigin(saved)) ignoredUserinfo = true;
         else remote = parseGitHubSource(saved);
@@ -412,7 +412,6 @@ export async function importRepository(
       defaultBranch,
       url: remote?.url ?? "",
       language: metadata?.primaryLanguage?.name,
-      ...(ignoredUserinfo ? { originUserinfoIgnored: true } : {}),
     };
     if (ignoredUserinfo) log.warn("repo.origin_userinfo", { repoId: repo.id });
     // The project's own rules from its files; GitHub's facts (the door)

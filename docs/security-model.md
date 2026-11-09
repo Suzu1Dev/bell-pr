@@ -558,14 +558,12 @@ The sudo panel and the doctor warning for that file show:
   local checkout is cloned there as well (`--no-hardlinks`, no submodules):
   runs never add worktrees or branches to your own repository. If the
   checkout's origin is on GitHub, BELL PR's clone points at GitHub and runs
-  fetch from there. That origin is the URL saved in the checkout, so a global
-  `url.*.insteadOf` rewrite does not change which project it is. An origin
-  whose URL contains userinfo is not used as a GitHub source: the project is
-  imported as a local one. The message includes
-  `git remote set-url origin https://github.com/OWNER/REPO`, and says to use
-  a credential helper for authentication and not to put a GitHub token in
-  `.git/config`. That message never includes the address that was refused.
-  Otherwise the clone keeps no remote and runs start from its own branches.
+  fetch from there. That origin is the first URL saved in the checkout, so a
+  global `url.*.insteadOf` rewrite does not change which project it is. An
+  origin whose URL contains userinfo is not used as a GitHub source: the
+  project is imported as a local one, and that address is not stored or
+  logged. Otherwise the clone keeps no remote and runs start from its own
+  branches.
   A project that an earlier version imported in place
   moves to such a clone when its next run starts, once none of its runs
   still has a worktree in your repository; until then its runs, new ones
