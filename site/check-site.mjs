@@ -333,6 +333,7 @@ async function checkBrowser(files, { port, screenshots }) {
       expect(command, `${method} has a readable install command`).not.toBe("");
       if (method === "npx") expect(command).toBe(`npx ${packageName}`);
       if (method === "npm") expect(command).toBe(`npm install -g ${packageName}`);
+      if (method === "bun") expect(command).toBe(`bun add --global ${packageName}`);
       if (method === "mise") expect(command).toBe(`MISE_NPM_PACKAGE_MANAGER=npm mise use -g node@24 npm:${packageName}@${miseVersion}`);
       if (method === "brew" || method === "powershell") expect(command).toContain("\n");
       if (!noScript) {
