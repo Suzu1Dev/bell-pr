@@ -9,6 +9,10 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **A local import uses the origin URL saved in the checkout.** A global
+  `url.*.insteadOf` rewrite no longer hides a GitHub project, and an origin
+  whose URL contains userinfo is imported as a local project. That address
+  is not stored or logged.
 - **Other requests no longer wait while the server starts Git.** Before each
   Git command, the server read the repository's driver settings with a
   synchronous `git config`, so no other request was served until it
