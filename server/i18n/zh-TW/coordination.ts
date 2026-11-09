@@ -37,6 +37,7 @@ const m: Translation<typeof en> = {
     dependencyFailed: ({ task }) => `這個任務相依的 ${task} 已失敗，因此不能開始。`,
     dependencyPending: ({ task }) => `這個任務相依的 ${task} 還沒整合。`,
     notFailable: "只有持有該任務 claim 的人或管理者可以把它標為失敗。",
+    notFailed: ({ task }) => `任務 ${task} 並未失敗，因此沒有可重開的內容：進行中的任務本來就是開啟的，已整合的任務則不會重開。`,
     tooManyDependencies: "一個任務最多依賴 50 個其他任務。",
   },
   claim: {

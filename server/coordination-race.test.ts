@@ -16,7 +16,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 import { after, test } from "node:test";
 import { makeRepo, type TestRepo } from "../test/coordination-fixtures.js";
 import { dataPaths, resolveConfig } from "./config.js";
-import type { ClaimView, ProjectView } from "./coordination.js";
+import type { ClaimView, ProjectView, TaskView } from "./coordination.js";
 import { acquireWriterLock, startServer, StartupError } from "./index.js";
 import { pathsMeet } from "./scope-paths.js";
 
@@ -75,6 +75,7 @@ class Child {
 
 /** A reply body: a view, or a refusal's reason and message. */
 interface Body {
+  task?: TaskView;
   claim?: ClaimView;
   project?: ProjectView;
   reason?: string;
@@ -299,6 +300,117 @@ test(
     await world.kill();
     await world.start();
     assert.deepEqual(await heldClaims(world), held);
+  },
+);
+
+test(
+  "only an admin reopens a failed task over HTTP; clients racing for it then get one claim each, and a restart keeps it all",
+  { timeout: 120_000 },
+  async () => {
+    const world = await hosted();
+    const rounds = 8;
+    await defineTasks(world, [...Array(rounds)].flatMap((_, i) => [`r${i}`, `s${i}`]));
+    const old: ClaimView[] = [];
+    for (let i = 0; i < rounds; i += 1) {
+      const claimed = await world.ask(post("/claims", { taskId: `r${i}`, scopes: [`src/${i}`] }), world.tokens.alice);
+      assert.equal(claimed.status, 201);
+      old.push(claimed.body.claim!);
+      const failed = await world.ask(post(`/tasks/r${i}/fail`, { reason: "broken build" }), world.tokens.alice);
+      assert.equal(failed.status, 200);
+    }
+    const before = await project(world);
+    const revision = await world.revision();
+    const refusals: [string, string, unknown, number, string][] = [
+      // The task's creator and holder, another member, no one, and a token nobody was given.
+      ["r0", world.tokens.alice, {}, 403, "adminOnly"],
+      ["r0", world.tokens.bob, {}, 403, "adminOnly"],
+      ["r0", "", {}, 401, "unauthenticated"],
+      ["r0", `bpc_${"A".repeat(43)}`, {}, 401, "unauthenticated"],
+      // A body never says who is asking, and a reason has a limit.
+      ["r0", world.tokens.admin, { by: "alice" }, 400, "invalidRequest"],
+      ["r0", world.tokens.admin, { actor: "admin", reason: "retry" }, 400, "invalidRequest"],
+      ["r0", world.tokens.admin, { owner: "admin" }, 400, "invalidRequest"],
+      ["r0", world.tokens.admin, { reason: "x".repeat(501) }, 400, "invalidRequest"],
+      // A task that has not failed, or does not exist.
+      ["s0", world.tokens.admin, {}, 409, "notFailed"],
+      ["nope", world.tokens.admin, {}, 404, "unknownTask"],
+    ];
+    for (const [task, token, body, status, reason] of refusals) {
+      const reply = await world.ask(post(`/tasks/${task}/reopen`, body), token);
+      assert.deepEqual([reply.status, reply.body.reason], [status, reason], JSON.stringify(body));
+    }
+    assert.deepEqual(await project(world), before);
+    assert.equal(await world.revision(), revision);
+
+    // Two clients reopen each task at once: exactly one reopening is kept.
+    const reopen = [...Array(rounds)].map((_, i) => post(`/tasks/r${i}/reopen`, { reason: "retry" }));
+    const [first, second] = await world.race([
+      { token: world.tokens.admin, parallel: true, requests: reopen },
+      { token: world.tokens.admin, parallel: true, requests: reopen },
+    ]);
+    for (let i = 0; i < rounds; i += 1) {
+      const pair = [first[i], second[i]] as Answer[];
+      assert.deepEqual(pair.map((reply) => reply.status).sort(), [200, 409], JSON.stringify(pair));
+      assert.equal(pair.find((reply) => reply.status === 409)!.body.reason, "notFailed");
+    }
+
+    // Two clients claim each reopened task at once, and other tasks on other files alongside.
+    const half = rounds / 2;
+    const [alice, bob] = await world.race([
+      {
+        token: world.tokens.alice,
+        parallel: true,
+        requests: [
+          ...[...Array(rounds)].map((_, i) => post("/claims", { taskId: `r${i}`, scopes: [`src/${i}`] })),
+          ...[...Array(half)].map((_, i) => post("/claims", { taskId: `s${i}`, scopes: [`docs/${i}`] })),
+        ],
+      },
+      {
+        token: world.tokens.bob,
+        parallel: true,
+        requests: [
+          ...[...Array(rounds)].map((_, i) => post("/claims", { taskId: `r${i}`, scopes: [`lib/${i}`] })),
+          ...[...Array(half)].map((_, i) => post("/claims", { taskId: `s${i + half}`, scopes: [`docs/${i + half}`] })),
+        ],
+      },
+    ]);
+    for (let i = 0; i < rounds; i += 1) {
+      const pair = [alice[i], bob[i]] as Answer[];
+      assert.deepEqual(pair.map((reply) => reply.status).sort(), [201, 409], `task r${i}: ${JSON.stringify(pair)}`);
+      assert.equal(pair.find((reply) => reply.status === 409)!.body.reason, "taskClaimed");
+      assert.ok(pair.find((reply) => reply.status === 201)!.body.claim!.fence > old[i].fence);
+    }
+    for (const reply of [...alice.slice(rounds), ...bob.slice(rounds)])
+      assert.equal((reply as Answer).status, 201, JSON.stringify(reply));
+    const held = await heldClaims(world);
+    assert.equal(held.length, rounds * 2);
+    assertDisjoint(held);
+
+    // The old fences authorise nothing, before a restart and after it.
+    const ended = async () => {
+      for (const claim of old) {
+        const reply = await world.ask(
+          post(`/claims/${claim.id}/authorize`, { fence: claim.fence, paths: [`src/${claim.taskId.slice(1)}/a.ts`] }),
+          world.tokens.alice,
+        );
+        assert.deepEqual([reply.status, reply.body.reason], [409, "ended"]);
+      }
+    };
+    await ended();
+    const after = await project(world);
+    await world.kill();
+    await world.start();
+    assert.deepEqual(await project(world), after);
+    await ended();
+    for (let i = 0; i < rounds; i += 1) {
+      const task = after.tasks.find((candidate) => candidate.id === `r${i}`)!;
+      assert.deepEqual(
+        [task.status, task.createdBy, task.reopenings?.map(({ by, reason }) => [by, reason])],
+        ["open", "admin", [["admin", "retry"]]],
+      );
+      const claim = after.claims.find((candidate) => candidate.id === old[i].id)!;
+      assert.deepEqual([claim.status, claim.endedBy, claim.reason, claim.fence], ["released", "alice", "broken build", old[i].fence]);
+    }
   },
 );
 

@@ -15,7 +15,9 @@
  *   file. A claim is granted or widened whole or not at all, and is
  *   reported only once it is on disk.
  * - A task takes no claim, and integrates nothing, until each task it
- *   depends on is integrated; a failed dependency stops it for good.
+ *   depends on is integrated; a failed dependency stops it until an admin
+ *   reopens that task. A reopened task keeps its history: its ended claims
+ *   stay ended, and its next claim takes a new, higher fence.
  * - Only its holder (release, failing the task), an admin (revoke) or its
  *   integration ends a claim; time and disconnects never do. Each grant
  *   takes the project's next fence, and an ended claim authorises nothing.
@@ -75,6 +77,8 @@ export interface CoordinationLimits {
   participantHeldScopes: number;
   /** Bytes of the file as written. */
   bytes: number;
+  /** Reopenings one task keeps, each with who reopened it and when. */
+  reopenings: number;
 }
 export const coordinationLimits: Readonly<CoordinationLimits> = Object.freeze({
   participants: 1000,
@@ -86,6 +90,7 @@ export const coordinationLimits: Readonly<CoordinationLimits> = Object.freeze({
   participantHeldClaims: 100,
   participantHeldScopes: 2000,
   bytes: 8 * 1024 * 1024,
+  reopenings: 100,
 });
 /**
  * The reader takes files up to this many times the writer's limit (32 MiB
@@ -119,6 +124,11 @@ const taskSchema = z.looseObject({
   createdBy: id,
   createdAt: timestamp,
   integratedSha: sha.optional(),
+  /** Each time an admin opened the task again after it failed, oldest first. */
+  reopenings: z
+    .array(z.looseObject({ by: id, at: timestamp, reason: z.string().max(maxReason).optional() }))
+    .max(coordinationLimits.reopenings)
+    .optional(),
 });
 const claimSchema = z.looseObject({
   id: claimId,
@@ -209,6 +219,7 @@ export interface TaskView {
   status: Task["status"];
   createdBy: string;
   integratedSha?: string;
+  reopenings?: { by: string; at: string; reason?: string }[];
 }
 
 export interface ProjectView {
@@ -346,6 +357,8 @@ function problemIn(state: CoordinationState): string | undefined {
       if (task.dependsOn.some((dependency) => !tasks.has(dependency)))
         return `task ${task.id} dependency`;
       if (!participants.has(task.createdBy)) return `task ${task.id} creator`;
+      if (task.reopenings?.some((reopening) => !participants.has(reopening.by)))
+        return `task ${task.id} reopening`;
       if ((task.status === "integrated") !== (task.integratedSha !== undefined))
         return `task ${task.id} integration`;
       tasks.set(task.id, task);
@@ -610,6 +623,15 @@ function taskView(task: Task): TaskView {
     status: task.status,
     createdBy: task.createdBy,
     ...(task.integratedSha === undefined ? {} : { integratedSha: task.integratedSha }),
+    ...(task.reopenings === undefined
+      ? {}
+      : {
+          reopenings: task.reopenings.map(({ by, at, reason }) => ({
+            by,
+            at,
+            ...(reason === undefined ? {} : { reason }),
+          })),
+        }),
   };
 }
 
@@ -1154,6 +1176,36 @@ export class Coordinator {
         return taskView(task);
       }),
     );
+  }
+
+  /**
+   * An admin opens a failed task again. Its id, creator, dependencies and
+   * every claim it had stay as they were: an ended claim stays ended, and
+   * the next claim takes a fence higher than all of them. Reopening claims
+   * nothing and reopens no task that depends on it; a new claim still
+   * needs integrated dependencies and free scopes. Each reopening is kept
+   * with who and when, and once a task has as many as the limit allows,
+   * the next is refused rather than an old one dropped.
+   */
+  async reopenTask(actor: Actor, projectId: string, taskId: string, input: { reason?: string }) {
+    const reason = input.reason === undefined ? undefined : String(input.reason).slice(0, maxReason);
+    return await this.#mutate((draft, now) => {
+      const who = this.#who(actor, draft);
+      if (who.role !== "admin")
+        throw refuse(403, "adminOnly", (m) => m.coordination.participant.adminOnly);
+      const task = taskIn(projectIn(draft, projectId), taskId);
+      if (task.status !== "failed")
+        throw refuse(409, "notFailed", (m) => m.coordination.task.notFailed({ task: task.id }));
+      const reopenings = task.reopenings ?? [];
+      if (reopenings.length >= this.#limits.reopenings)
+        throw full("reopenings", this.#limits.reopenings);
+      task.status = "open";
+      task.reopenings = [
+        ...reopenings,
+        { by: who.id, at: now, ...(reason === undefined ? {} : { reason }) },
+      ];
+      return taskView(task);
+    }, { grows: true });
   }
 
   /**

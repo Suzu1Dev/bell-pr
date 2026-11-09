@@ -42,6 +42,8 @@ export default {
     dependencyPending: ({ task }: { task: string }) =>
       `This task depends on ${task}, which is not integrated yet.`,
     notFailable: "Only the holder of the task's claim or an admin can mark it failed.",
+    notFailed: ({ task }: { task: string }) =>
+      `Task ${task} has not failed, so there is nothing to reopen: an open task is already open, and an integrated task never reopens.`,
     tooManyDependencies: "A task depends on at most 50 other tasks.",
   },
   claim: {

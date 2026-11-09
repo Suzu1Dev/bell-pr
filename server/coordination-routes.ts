@@ -30,6 +30,7 @@ const bodies = {
     dependsOn: z.array(z.string().max(64)).max(50).optional(),
   }),
   fail: z.strictObject({ reason }),
+  reopen: z.strictObject({ reason }),
   claim: z.strictObject({ taskId: z.string().max(64), scopes }),
   expand: z.strictObject({ fence, scopes }),
   release: z.strictObject({ fence }),
@@ -60,6 +61,12 @@ export function coordinationRouter(coordinator: Coordinator) {
     const body = bodies.fail.parse(req.body ?? {});
     res.json({
       task: await coordinator.failTask(actorOf(res), req.params.project, req.params.task, body),
+    });
+  });
+  router.post("/projects/:project/tasks/:task/reopen", async (req, res) => {
+    const body = bodies.reopen.parse(req.body ?? {});
+    res.json({
+      task: await coordinator.reopenTask(actorOf(res), req.params.project, req.params.task, body),
     });
   });
   router.post("/projects/:project/claims", async (req, res) => {
