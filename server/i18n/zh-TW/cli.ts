@@ -86,6 +86,8 @@ const m: Translation<typeof en> = {
       `埠 ${port} 已被其他程式使用。請用 \`${bin} start --port <埠>\` 在可用的埠啟動 ${name}。`,
     dataDirInUse: ({ dataDir, pid }) =>
       `${name} 已使用資料目錄 ${dataDir} 執行中（行程 ${pid}）。執行 \`${bin} open\` 即可開啟，或先停止該行程。`,
+    dataDirHolderUnconfirmed: ({ dataDir, file }) =>
+      `${name} 無法確認持有資料目錄 ${dataDir} 的行程是否已停止：它的鎖 ${file} 來自其他容器、其他電腦或舊版本，或無法讀取。協作不會自行取代這種鎖。請先確認已沒有任何程式使用此資料目錄，再刪除 ${file} 後重新啟動。`,
     listenFailed: ({ address, reason }) =>
       `${name} 無法在 ${address} 監聽：${reason}`,
     failed: ({ reason }) => `${name} 未能啟動：${reason}`,

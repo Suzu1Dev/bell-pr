@@ -206,6 +206,7 @@ test("every server namespace is registered for both locales", () => {
     "cli",
     "common",
     "contribution",
+    "coordination",
     "run",
     "security",
     "session",

@@ -111,6 +111,9 @@ export default {
       `Port ${port} is already in use by another program. Start ${name} on a free port with \`${bin} start --port <port>\`.`,
     dataDirInUse: ({ dataDir, pid }: { dataDir: string; pid: number }) =>
       `${name} is already running with the data directory ${dataDir} (process ${pid}). Run \`${bin} open\` to open it, or stop that process first.`,
+    /** Strict rule (coordination): a lock whose holder cannot be shown to have stopped. */
+    dataDirHolderUnconfirmed: ({ dataDir, file }: { dataDir: string; file: string }) =>
+      `${name} cannot tell whether the process holding the data directory ${dataDir} has stopped: its lock ${file} comes from another container, another machine or an older version, or cannot be read. Coordination never replaces such a lock by itself. Make sure nothing uses this data directory any more, then remove ${file} and start again.`,
     listenFailed: ({ address, reason }: { address: string; reason: string }) =>
       `${name} could not listen on ${address}: ${reason}`,
     failed: ({ reason }: { reason: string }) =>

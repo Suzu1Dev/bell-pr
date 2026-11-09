@@ -1,11 +1,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { spawn, type ChildProcess } from "node:child_process";
+import { createHash } from "node:crypto";
 import { once } from "node:events";
 import {
   cpSync,
   existsSync,
   mkdirSync,
+  readdirSync,
   readFileSync,
   statSync,
   symlinkSync,
@@ -20,7 +22,7 @@ import path from "node:path";
 import { baseUrl, resolveConfig, ConfigError, defaultStaticDir } from "./config.js";
 import { createApp } from "./app.js";
 import { version } from "./build-info.js";
-import { lockHolderRunning, startServer, StartupError } from "./index.js";
+import { acquireWriterLock, lockHolderRunning, startServer, StartupError } from "./index.js";
 import { withLocale } from "./i18n/index.js";
 import { Store } from "./store.js";
 import { Workbench } from "./workbench.js";
@@ -632,6 +634,218 @@ test("the running instance renews its lock and leaves one that another PID names
     }
     assert.equal(JSON.parse(readFileSync(file, "utf8")).pidNamespace, otherContainer);
   } finally {
+    await box.cleanup();
+  }
+});
+
+/** A pid that existed and exited. */
+async function gonePid() {
+  const gone = spawn(process.execPath, ["-e", ""]);
+  await once(gone, "exit");
+  return gone.pid!;
+}
+
+/** What the data directory holds besides its lock: claims and temp files a start left. */
+const lockLitter = (data: string) =>
+  readdirSync(data).filter((name) => name.startsWith("bellpr.lock."));
+
+/** A start refused without waiting for a lease, naming `names` (the lock, or its directory). */
+async function refusedQuickly(start: Promise<unknown>, names: string) {
+  const begun = Date.now();
+  await assert.rejects(start, (error: unknown) => {
+    assert.ok(error instanceof StartupError, String(error));
+    assert.ok(error.message.includes(names), error.message);
+    return true;
+  });
+  assert.ok(Date.now() - begun < 10_000, `refused after ${Date.now() - begun} ms`);
+}
+
+test("a strict lock from another PID namespace is never taken over, however long ago it was renewed", async () => {
+  const box = await sandbox();
+  try {
+    mkdirSync(box.data, { recursive: true });
+    const file = path.join(box.data, "bellpr.lock");
+    for (const pid of [process.pid, await gonePid()]) {
+      const lock = { pid, port: 0, version, pidNamespace: otherContainer, strict: true };
+      const text = JSON.stringify(lock);
+      writeFileSync(file, text);
+      // Its holder was paused, or its clock is behind: not renewed for an hour.
+      const old = new Date(Date.now() - 3_600_000);
+      utimesSync(file, old, old);
+      assert.equal(lockHolderRunning(box.data, lock), true, String(pid));
+      // An ordinary start of this version honours it as well as coordination does.
+      const config = resolveConfig({ port: await freePort(), dataDir: box.data }, box.env);
+      await refusedQuickly(startServer({ config, handleExit: false, print: () => {} }), file);
+      await refusedQuickly(acquireWriterLock(box.data), file);
+      assert.equal(readFileSync(file, "utf8"), text);
+      assert.deepEqual(lockLitter(box.data), []);
+    }
+  } finally {
+    await box.cleanup();
+  }
+});
+
+test("under the strict rule a lock whose holder cannot be shown to have stopped stays, though an ordinary start replaces it", async () => {
+  const box = await sandbox();
+  try {
+    mkdirSync(box.data, { recursive: true });
+    const file = path.join(box.data, "bellpr.lock");
+    const lapsed = new Date(Date.now() - 31_000);
+    const cases: Array<[string, string, Date?]> = [
+      [
+        "another namespace, not renewed for longer than the lease",
+        JSON.stringify({ pid: process.pid, port: 4311, version, pidNamespace: otherContainer }),
+        lapsed,
+      ],
+      ["unreadable", "{ not a lock"],
+    ];
+    // Elsewhere there is no namespace to tell an older build's lock apart.
+    if (process.platform === "linux")
+      cases.push([
+        "an older build's, whose pid is gone",
+        JSON.stringify({ pid: await gonePid(), port: 1234, version: "0.9.0" }),
+      ]);
+    for (const [name, text, renewed] of cases) {
+      writeFileSync(file, text);
+      if (renewed) utimesSync(file, renewed, renewed);
+      await refusedQuickly(acquireWriterLock(box.data), file);
+      assert.equal(readFileSync(file, "utf8"), text, name);
+      assert.deepEqual(lockLitter(box.data), [], name);
+      const running = await startServer({
+        config: resolveConfig({ port: await freePort(), dataDir: box.data }, box.env),
+        handleExit: false,
+        print: () => {},
+      });
+      try {
+        assert.equal(JSON.parse(readFileSync(file, "utf8")).pid, process.pid, name);
+      } finally {
+        await running.shutdown();
+      }
+    }
+  } finally {
+    await box.cleanup();
+  }
+});
+
+test("a held lock is renewed only while it is still the one this start wrote", async (t) => {
+  const box = await sandbox();
+  try {
+    mkdirSync(box.data, { recursive: true });
+    const file = path.join(box.data, "bellpr.lock");
+    const hourAgo = new Date(Date.now() - 3_600_000);
+    const modified = () => statSync(file).mtimeMs;
+    t.mock.timers.enable({ apis: ["setInterval"] });
+    const lock = await acquireWriterLock(box.data);
+    utimesSync(file, hourAgo, hourAgo);
+    t.mock.timers.tick(10_000);
+    assert.ok(modified() > hourAgo.getTime() + 60_000, "its own lock was renewed");
+    // Another start's lock lies there now, as after a person removed this one.
+    const theirs = JSON.stringify({ pid: await gonePid(), port: 0, version, pidNamespace: otherContainer });
+    writeFileSync(file, theirs);
+    utimesSync(file, hourAgo, hourAgo);
+    t.mock.timers.tick(30_000);
+    assert.ok(Math.abs(modified() - hourAgo.getTime()) < 1, "another start's lock was renewed");
+    assert.equal(lock.holds(), false);
+    lock.release();
+    assert.equal(readFileSync(file, "utf8"), theirs);
+  } finally {
+    t.mock.timers.reset();
+    await rm(box.directory, { recursive: true, force: true });
+  }
+});
+
+test("a strict lock is replaced once its holder is shown to have stopped here, and refuses every start while held", async () => {
+  const box = await sandbox();
+  try {
+    mkdirSync(box.data, { recursive: true });
+    const file = path.join(box.data, "bellpr.lock");
+    const held = await acquireWriterLock(box.data);
+    const text = readFileSync(file, "utf8");
+    assert.equal(JSON.parse(text).strict, true);
+    // Held: neither a second coordination nor an ordinary start gets it.
+    const config = resolveConfig({ port: await freePort(), dataDir: box.data }, box.env);
+    await refusedQuickly(acquireWriterLock(box.data), box.data);
+    await assert.rejects(startServer({ config, handleExit: false, print: () => {} }), StartupError);
+    assert.equal(held.holds(), true);
+    assert.equal(readFileSync(file, "utf8"), text);
+    // Given up on purpose: the file goes with it.
+    held.release();
+    assert.equal(held.holds(), false);
+    assert.equal(existsSync(file), false);
+    // Left by a process here that is gone, as after a crash: both replace it.
+    const crashed = JSON.stringify({ ...JSON.parse(text), pid: await gonePid() });
+    writeFileSync(file, crashed);
+    const again = await acquireWriterLock(box.data);
+    assert.deepEqual(
+      [JSON.parse(readFileSync(file, "utf8")).pid, again.holds()],
+      [process.pid, true],
+    );
+    again.release();
+    writeFileSync(file, crashed);
+    const running = await startServer({
+      config: resolveConfig({ port: await freePort(), dataDir: box.data }, box.env),
+      handleExit: false,
+      print: () => {},
+    });
+    try {
+      const lock = JSON.parse(readFileSync(file, "utf8"));
+      assert.deepEqual([lock.pid, lock.strict], [process.pid, undefined]);
+    } finally {
+      await running.shutdown();
+    }
+    assert.deepEqual(lockLitter(box.data), []);
+  } finally {
+    await box.cleanup();
+  }
+});
+
+test("a takeover claim left by a start that stopped is cleared; one whose start still runs keeps the stale lock", async () => {
+  const box = await sandbox();
+  // A live Node.js process stands in for a start that is removing the lock.
+  const claimer = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], { stdio: "ignore" });
+  try {
+    await once(claimer, "spawn");
+    mkdirSync(box.data, { recursive: true });
+    const file = path.join(box.data, "bellpr.lock");
+    const probe = await acquireWriterLock(box.data);
+    const here = JSON.parse(readFileSync(file, "utf8"));
+    probe.release();
+    const crashed = { ...here, pid: await gonePid() };
+    const starts = {
+      strict: async () => {
+        const lock = await acquireWriterLock(box.data);
+        return () => lock.release();
+      },
+      ordinary: async () => {
+        const running = await startServer({
+          config: resolveConfig({ port: await freePort(), dataDir: box.data }, box.env),
+          handleExit: false,
+          print: () => {},
+        });
+        return () => running.shutdown();
+      },
+    };
+    for (const [name, start] of Object.entries(starts)) {
+      // A crashed holder's lock, strict or not, that another start was removing.
+      const stale = JSON.stringify(name === "strict" ? crashed : { ...crashed, strict: undefined });
+      const claim = `${file}.takeover-${createHash("sha256").update(stale).digest("hex").slice(0, 16)}`;
+      writeFileSync(file, stale);
+      writeFileSync(claim, JSON.stringify({ ...here, port: 0, pid: claimer.pid }));
+      await assert.rejects(start(), StartupError);
+      assert.equal(readFileSync(file, "utf8"), stale, name);
+      assert.ok(existsSync(claim), name);
+      // That start crashed too.
+      writeFileSync(claim, JSON.stringify({ ...here, port: 0, pid: await gonePid() }));
+      const stop = await start();
+      try {
+        assert.equal(JSON.parse(readFileSync(file, "utf8")).pid, process.pid, name);
+        assert.deepEqual(lockLitter(box.data), [], name);
+      } finally {
+        await stop();
+      }
+    }
+  } finally {
+    claimer.kill("SIGKILL");
     await box.cleanup();
   }
 });

@@ -1,0 +1,267 @@
+# Multi-person collaboration: the coordination core
+
+Status: design, and its first phase in code. The core is not reachable from
+the app, the CLI or any listener yet, so BELL PR still has no protection
+between people working on one project. Overlap warnings for one person's own
+contributions (group mode) are unchanged.
+
+## Decision
+
+- **One coordinator per data directory** owns every participant's tasks,
+  claims and the project's integration branch. It runs in the BELL PR
+  process that holds the data-directory lock, so it is the only writer of
+  its file. Participants never write coordination state themselves: no
+  shared directory that each person's account writes to, and no link-file
+  ledger. Several people, and later several machines, reach the same
+  coordinator.
+- **Identity comes from a token.** Each participant has a random `bpc_`
+  token; only its SHA-256 is stored. Requests carry it in
+  `x-bell-participant`, and the coordinator alone decides who is asking.
+  Request bodies are strict, so a body cannot name an owner or holder.
+- **BELL integrates into a dedicated branch.** It moves the branch forward
+  one change at a time, and a person decides when that branch merges into
+  `main`.
+
+## What phase 1 guarantees
+
+`server/coordination.ts`, with path rules in `server/scope-paths.ts` shared
+with the group-mode overlap check.
+
+- **Claims are all or nothing.** A claim names a project, task, participant
+  and normalized scopes. Arbitration and persistence run in one serial
+  queue. A claim exists only once it is written durably. Non-overlapping
+  claims coexist.
+- **Overlap** means the same path, or a directory above another path, in
+  any ASCII case. A rename counts on both sides, and so does a file that is
+  changed and then changed back.
+- **Scopes that cannot be compared reliably are refused**, never guessed at:
+  - non-ASCII text;
+  - `.` and `..` segments, backslashes, empty segments;
+  - segments with leading or trailing spaces, or ending in a dot;
+  - Windows short names (`~1`) and characters Windows cannot store;
+  - `.git` in any case, files BELL PR holds back, and the whole repository.
+- **Dependencies:** a task's dependencies must be integrated before it can be
+  claimed, authorized or integrated. A failed or unknown dependency refuses
+  outright.
+- **Widening a claim** is arbitrated in one step while the old scopes stay
+  held. A conflict changes nothing.
+- **Claims never lapse.** Time, disconnects and restarts release nothing;
+  claims come back from the file as they were.
+  - Only the holder releases a claim, and only an admin revokes one.
+  - Each grant takes a higher fence. An ended claim's fence authorizes
+    nothing, including integration.
+- **Integration** checks four things:
+  - the holder and the fence;
+  - integrated dependencies;
+  - the branch is still where coordination left it, and at the participant's
+    base;
+  - every file of every commit, as a linear series of at most 200 commits.
+
+  Each commit is compared with its parent, so a file added in one commit
+  and removed in a later one still counts, and a rename counts as the old
+  name removed and the new one added. File names are read exactly as Git
+  stores them, from its NUL-separated output, never trimmed. Output in any
+  other shape refuses with `503` and `details.reason: "unreadableChange"`.
+  A name that cannot be compared reliably refuses with `400`
+  `unreliablePath`, and one outside the claim with `403` `outOfScope`.
+  Adding, changing or removing any of these refuses with `403`
+  `needsManualHandling`, with `details.path` and `details.kind`, before
+  the branch moves:
+  - a file BELL PR holds back from publishing, such as `.env` or `*.pem`,
+    in any ASCII case (`sensitive`); the examples it allows, such as
+    `.env.example`, integrate;
+  - a symbolic link (`symlink`) or a submodule (`submodule`);
+  - any other file mode (`mode`).
+
+  Every Git command coordination runs passes `--no-replace-objects`, so
+  replace refs pushed into the repository cannot change what a commit,
+  its parents or its files are.
+
+  It saves its intent, moves the branch with `git update-ref <ref> <new>
+  <old>` (a compare-and-swap), and then saves the outcome. A stale base is
+  refused with the current head, so the participant syncs and retries.
+  Nothing is overwritten.
+- **Refuses what does not fit before anything changes.** One file holds
+  at most 1,000 participants and 100 projects. Each project holds at most
+  10,000 tasks and 100,000 claims, of which at most 1,000 are held at once,
+  with 20,000 scopes together. One participant holds at most 100 claims at
+  once across all projects, with 2,000 scopes together. The whole file is
+  at most 8 MiB.
+  - An addition (a participant, project, task, claim or scope) must also
+    leave room for every held claim to end, every open task to close and
+    every project to save an integration intent, each at its longest.
+  - Past a limit the addition is refused with `409` and
+    `details.reason: "full"`. Memory, the file and the branch stay as they
+    were, and the coordinator keeps answering.
+  - Releasing, revoking, failing a task, integrating and recovering only
+    spend that room, so they still work at the limit.
+  - Every write is first read back by the same reader `open()` uses. An
+    integration also checks that its outcome can be written before it
+    moves the branch.
+  - Overlap among held claims, and between a claim and the held ones, is
+    found by sorting their scopes once, not by comparing each pair. The
+    reader checks a file a build with higher limits wrote the same way.
+    Reading and writing still take time in proportion to the file, and a
+    write runs in the BELL PR process without yielding.
+- **Fails closed.** These stop the coordinator, and it refuses everything
+  until it opens again:
+  - a failed write or a lost lock;
+  - a missing, unreadable or newer file;
+  - a file that breaks an invariant, such as overlapping held claims or an
+    unknown holder.
+
+  An integration that was cut off settles when the coordinator reopens. If
+  the branch is at the change, the integration happened; if it is at the
+  base, it did not. Anything else keeps the coordinator closed.
+
+## What it does not guarantee
+
+- **No write-time enforcement.** `authorize()` is the check each managed
+  operation must call before it writes. Nothing stops a shell, an editor, an
+  agent's own tools or a direct push from writing outside a claim.
+  - The integration check is the only enforced guard, and it applies
+    afterwards. A diff checked afterwards is not a write guard.
+  - An authorization holds only for its moment. Guaranteeing every write
+    needs a confined execution environment that checks the fence where the
+    write lands.
+- **No semantic conflicts.** Disjoint files can still break each other.
+- **One coordinator host, on its local file system.** The lock is a local
+  lock; a network file system is not supported, and neither is a data
+  directory that several containers or machines write. People on other
+  machines are to reach that one host (phase 4), which is not the same as
+  several hosts writing its data directory.
+- **A single writer under the strict rule, not a fence.** Coordination takes
+  the data-directory lock under a strict rule (`acquireWriterLock` in
+  `server/index.ts`), and opens only with the lock that rule issued
+  (`server/writer-lock.ts`) while it is still held on the same directory.
+  - The lock is written aside and linked into place, so no start reads it
+    half written, and it is marked strict.
+  - A strict lock is never replaced because it was not renewed, however
+    long ago that was. Nor, under the strict rule, is a lock written in
+    another PID namespace (another container or machine), one with no
+    namespace (an older build) or one that cannot be read. It stays until
+    a person who knows its holder has stopped removes it; the refusal names
+    the file.
+  - In the same namespace a lock is replaced once its process is shown to
+    have stopped: gone, written before the machine last booted, or not a node
+    process. A host that crashed restarts; one that is paused, suspended or
+    blocked keeps the directory.
+  - An ordinary BELL PR start never replaces a strict lock. Its own locks
+    keep the earlier rule: one written elsewhere counts as held while it is
+    renewed (every 10 seconds, for a 30-second lease).
+  - A host whose lock was replaced or removed refuses every write with
+    `503` and `details.reason: "notSingleWriter"`, renews nothing and
+    removes nothing. It finds out by reading the lock before each write and
+    before moving the branch. That is a check, not a fence: a write already
+    past it still lands.
+  - Outside the rule: a person who removes a lock while its holder still
+    runs; builds older than this one, which still replace a lock written
+    elsewhere after its lease; two machines with the same host name and PID
+    namespace id. On systems other than Linux there is no namespace to
+    compare, so every lock counts as written on this machine.
+- **No idempotency key.** A client whose reply was lost reads the project to
+  learn the outcome.
+- **Manual repair after an undecided recovery.** If a branch was moved
+  elsewhere mid-integration, an admin must put it back at the base or the
+  change. There is no override yet, and one undecided project keeps every
+  project closed.
+- **Commit-graph files are still read.** Every coordination Git command
+  ignores replace refs (`--no-replace-objects`) and graft files
+  (`GIT_GRAFT_FILE` set to the null device, so `info/grafts` is never
+  read), and every check sees each commit's own parents. Writing a graft
+  file takes write access to the repository's own directory, which a push
+  does not give; the same access could write a commit-graph file
+  (`objects/info/commit-graph`), which Git still reads. Whether a forged one
+  changes what the checks see has not been tested. A shallow history shows
+  a commit without its parent, which is refused.
+- **Names shown inexactly.** Scopes are printable ASCII and a path's ASCII
+  parts decide every rule, so decisions are exact. A name that is not
+  UTF-8, or a multibyte name split between two reads of Git's output, can
+  still show U+FFFD in a refusal's message and in `details.path`, which is
+  then not the file's exact name.
+- **The file keeps every ended claim.** Compaction comes later. Until
+  then, a project that reaches its claim limit, or a file that reaches
+  its byte limit, takes no new additions; nothing is deleted
+  automatically. Each held claim keeps about 3 KB free so that it can end
+  with the longest reason. At 8 MiB, that allows roughly 2,200 claims
+  held at once, each with its own task and one short scope.
+- **Team runs do not share these rules yet.** Their scope check
+  (`team.ts scopeContains`) is still case-sensitive.
+
+## File format
+
+`coordination.json` in the data directory:
+`{ format: "bellpr-coordination", version: 1, revision, participants, projects }`.
+
+- It is written with `writeDurable` and read with `lenientRead`.
+- The reader takes up to four times each writer limit, the file's size
+  included (32 MiB). A file that a build with higher limits wrote still
+  opens and settles. A larger file refuses to open.
+- Keys a newer build adds survive this build's writes.
+- An unknown status, role or version refuses to open.
+- A newer build that adds a field this build would have to enforce must
+  raise `version`.
+
+## Phases
+
+1. **Core, behaviour tests, this document.** The router
+   (`server/coordination-routes.ts`) exists but is not mounted.
+2. **Wire it into the app.**
+   - Mount the router in `createApp` behind the existing app authentication.
+   - Give admins participant management in the CLI.
+   - Make each managed write call `authorize` and carry the fence:
+     - `POST /api/runs/:id/plan/approve` (agents start), `/team/retry` and
+       `/split`;
+     - `/sync`, `/sync/resolve` and `/sync/undo`;
+     - `/approve`, `/publish` and `/publish/recover`;
+     - the by-hand steps;
+     - follow-ups.
+   - Move team runs onto the shared scope rules.
+   - Before the router is mounted:
+     - Any member may claim an open task, as now. A failed task reopens
+       only through a permission-checked step. An integrated task never
+       reopens, and a reopen keeps the task's history and fences.
+     - An undecided recovery closes only its own project. An admin settles
+       it through an audited step, while other projects stay available.
+       The undecided project stays closed until then. Nothing resets a
+       branch or clears an intent on its own.
+3. **Show it in the interface** in both languages: claims, conflicts,
+   dependency state and the integration queue.
+4. **Reach it from other machines** through a reviewed remote listener.
+5. **A confined write environment** that enforces claims on every file
+   write.
+
+## Phase 1 is complete when
+
+`server/coordination.test.ts` and `server/coordination-race.test.ts` pass.
+They race real client processes against one host process, on temporary
+directories and repositories, and cover:
+
+- one winner per contested scope, while disjoint claims coexist;
+- dependency refusals;
+- a failed widening that keeps the claim;
+- holder-only release and admin-only revoke;
+- forged identities;
+- failed writes that grant nothing;
+- a host killed mid-race that never grants twice after restart;
+- revoked fences that authorize nothing;
+- one winner when two integrations start from the same base;
+- recovery at each integration step;
+- each limit refusing the next addition without changing anything, while
+  held claims still end, integrate and recover, and the file reopens;
+- replace refs, graft files and shallow lists that would hide a file, a
+  merge or a non-fast-forward;
+- a paused host keeping its lock however old it looks, against starts in
+  its own and in another (simulated) PID namespace, and giving it up when
+  closed;
+- a host whose lock was replaced refusing every write, and one start
+  winning a lock that a killed host left;
+- secrets, links, submodules and names with control characters, in any
+  commit of a change, refused while the branch and other claims stay as
+  they were, and ordinary files integrating;
+- conflicts naming exactly the held claims a pair-by-pair comparison names.
+
+`server/scope-paths.test.ts` checks that the sorted overlap check agrees
+with the pair-by-pair rule.
+
+Typecheck, lint, i18n and docs checks pass.
