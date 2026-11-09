@@ -28,9 +28,9 @@
  *   Fenced Markdown or escaped HTML command text. Installers use homepageUrl
  *   when set, otherwise the public GitHub repository. Empty publicRepoUrl
  *   hides the block. HTML callers provide the surrounding <code> element.
- *   mise pins `publishedInstallVersion`. That pin can be ahead of
- *   package.json while a release is still open. npx, npm and bun stay
- *   unpinned.
+ *   mise pins `publishedInstallVersion` from scripts/published-version.mjs.
+ *   That pin can be ahead of package.json while a release is still open.
+ *   npx, npm and bun stay unpinned.
  *
  * Layout: when the opening comment stands alone on its line, the content
  * goes on the lines between the comments, at the comment's indentation.
@@ -52,6 +52,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { publishedInstallVersion } from "./published-version.mjs";
 import {
   product as productInfo,
   type ProductInfo,
@@ -59,12 +60,6 @@ import {
 } from "../shared/product.js";
 
 type Format = "html" | "md";
-
-/**
- * npm release pinned by the mise command.
- * package.json and the Homebrew formula can lag a release already on npm.
- */
-export const publishedInstallVersion = "1.1.1";
 
 /** Everything a region renders from; the self-test swaps in fixtures. */
 export interface RenderContext {
