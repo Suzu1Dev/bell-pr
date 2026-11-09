@@ -3,7 +3,8 @@
  * repository whose `integration` branch starts at one commit of `files`,
  * and a clone that makes participants' commits and pushes them to it.
  */
-import { chmod, mkdir, rm, symlink, writeFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
+import { chmod, mkdir, readFile, rename, rm, symlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { git } from "../server/process.js";
 
@@ -30,8 +31,8 @@ export interface TestRepo {
       submodules?: Record<string, string>;
     },
   ): Promise<string>;
-  /** A merge of `other` into `parent`, pushed like commit(). */
-  merge(parent: string, other: string): Promise<string>;
+  /** A merge of `other` into `parent`, pushed like commit(); `ours` keeps `parent`'s files. */
+  merge(parent: string, other: string, strategy?: "ours"): Promise<string>;
   /** Where a branch of the bare repository points. */
   head(branch?: string): Promise<string>;
   /** Moves a branch of the bare repository directly, as a push around coordination would. */
@@ -103,9 +104,9 @@ export async function makeRepo(root: string): Promise<TestRepo> {
       await git(work, ["commit", "-q", "-m", options.message ?? "change"]);
       return await publish();
     },
-    async merge(parent, other) {
+    async merge(parent, other, strategy) {
       await git(work, ["checkout", "-q", "--detach", parent]);
-      await git(work, ["merge", "-q", "--no-ff", "-m", "merge", other]);
+      await git(work, ["merge", "-q", "--no-ff", ...(strategy ? ["-s", strategy] : []), "-m", "merge", other]);
       return await publish();
     },
     head: (branch = "integration") => headOf(bare, `refs/heads/${branch}`),
@@ -113,4 +114,78 @@ export async function makeRepo(root: string): Promise<TestRepo> {
       await git(bare, ["update-ref", `refs/heads/${branch}`, sha]);
     },
   };
+}
+
+/**
+ * Writes the commit-graph of every commit the bare repository reaches, as
+ * Git makes it: one file, or a split chain of one layer. Any graph already
+ * there goes first, because Git writes a graph from the commits it reads
+ * through the old one.
+ */
+export async function writeCommitGraph(bare: string, layout: "single" | "split") {
+  const info = path.join(bare, "objects", "info");
+  await rm(path.join(info, "commit-graph"), { force: true });
+  await rm(path.join(info, "commit-graphs"), { recursive: true, force: true });
+  await git(bare, ["commit-graph", "write", "--reachable", ...(layout === "split" ? ["--split=no-merge"] : [])]);
+}
+
+/**
+ * Rewrites one commit's parents or tree in the graph writeCommitGraph wrote,
+ * with a checksum that matches, so Git loads it like one it wrote. Git
+ * writes the files read-only; write access to the repository directory
+ * replaces them, which a push does not give.
+ */
+export async function forgeCommitGraph(
+  bare: string,
+  layout: "single" | "split",
+  commit: string,
+  change: { parents?: string[]; tree?: string },
+) {
+  const replace = async (file: string, data: Buffer | string) => {
+    await writeFile(`${file}.tmp`, data);
+    await rename(`${file}.tmp`, file);
+  };
+  const info = path.join(bare, "objects", "info");
+  if (layout === "single") {
+    const file = path.join(info, "commit-graph");
+    return await replace(file, forgedGraph(await readFile(file), commit, change));
+  }
+  const dir = path.join(info, "commit-graphs");
+  const chain = path.join(dir, "commit-graph-chain");
+  const layers = (await readFile(chain, "utf8")).trim().split("\n");
+  if (layers.length !== 1) throw new Error("forgeCommitGraph expects one layer");
+  const data = forgedGraph(await readFile(path.join(dir, `graph-${layers[0]}.graph`)), commit, change);
+  const hash = data.subarray(-20).toString("hex");
+  await writeFile(path.join(dir, `graph-${hash}.graph`), data);
+  await replace(chain, `${hash}\n`);
+}
+
+/** A SHA-1 commit-graph layer with one commit's CDAT row changed and its checksum redone. */
+function forgedGraph(graph: Buffer, commit: string, change: { parents?: string[]; tree?: string }) {
+  const out = Buffer.from(graph);
+  if (out.toString("latin1", 0, 4) !== "CGPH" || out[5] !== 1) throw new Error("not a SHA-1 commit-graph");
+  const chunks: Record<string, number> = {};
+  for (let i = 0; i < out[6]; i++) {
+    const at = 8 + i * 12;
+    chunks[out.toString("latin1", at, at + 4)] = Number(out.readBigUInt64BE(at + 4));
+  }
+  if (chunks.BASE !== undefined) throw new Error("forgeCommitGraph expects one layer");
+  const count = out.readUInt32BE(chunks.OIDF + 255 * 4);
+  const position = (sha: string) => {
+    for (let i = 0; i < count; i++)
+      if (out.toString("hex", chunks.OIDL + i * 20, chunks.OIDL + (i + 1) * 20) === sha) return i;
+    throw new Error(`${sha} is not in the commit-graph`);
+  };
+  // Each row: tree id, first and second parent positions, generation and date.
+  const row = chunks.CDAT + position(commit) * 36;
+  if (change.tree) Buffer.from(change.tree, "hex").copy(out, row);
+  if (change.parents) {
+    if (change.parents.length > 2) throw new Error("forgeCommitGraph takes at most two parents");
+    const none = 0x70000000;
+    const [first, second] = change.parents.map(position);
+    out.writeUInt32BE(first ?? none, row + 20);
+    out.writeUInt32BE(second ?? none, row + 24);
+  }
+  createHash("sha1").update(out.subarray(0, -20)).digest().copy(out, out.length - 20);
+  return out;
 }
