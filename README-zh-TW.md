@@ -41,6 +41,12 @@ BELL PR 是以 [Apache-2.0](LICENSE) 授權的免費開源軟體。沒有付費�
 
 [快速開始](#快速開始) · [用範例專案試試看](#用範例專案試試看) · [開始之前](#開始之前) · [安裝方式](#安裝方式) · [系統需求](#系統需求) · [功能](#功能) · [隱私](#隱私) · [安全模型](#安全模型) · [本機 API](#本機-api) · [設定](#設定) · [疑難排解](#疑難排解) · [文件](#文件) · [參與貢獻](#參與貢獻) · [授權條款](#授權條款與商標)
 
+## 觀看 90 秒示範
+
+![從 vibe coding 到真正搞懂為什麼 — BELL PR 示範](site/assets/video/poster.jpg)
+
+在網站上<!-- generated:product-link key=homepageUrl path=zh-tw/#demo text="觀看 90 秒示範" -->[觀看 90 秒示範](https://bell-pr.suzu.tw/zh-tw/#demo)<!-- /generated:product-link -->（英文字幕，需自行按下播放）。
+
 ## 用範例專案試試看
 
 這是一次已完成的範例貢獻（專案規範、計畫、diff、解說、理解檢查、PR 草稿），
@@ -51,12 +57,6 @@ BELL PR 是以 [Apache-2.0](LICENSE) 授權的免費開源軟體。沒有付費�
 `bell-pr start --force` 啟動，範例導覽才能開啟。真實的 Agent 工作仍要等到
 有已登入的 AI 服務。
 
-
-## 觀看 90 秒示範
-
-![從 vibe coding 到真正搞懂為什麼 — BELL PR 示範](site/assets/video/poster.jpg)
-
-在網站上<!-- generated:product-link key=homepageUrl path=zh-tw/#demo text="觀看 90 秒示範" -->[觀看 90 秒示範](https://bell-pr.suzu.tw/zh-tw/#demo)<!-- /generated:product-link -->（英文字幕，需自行按下播放）。
 
 ## 開始之前
 
