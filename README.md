@@ -5,7 +5,7 @@
 Your AI agent team does the legwork. You understand every change, explain
 it back, and send only what a maintainer is glad to review.
 
-English · [繁體中文](README.zh-TW.md)
+English · [繁體中文](README-zh-TW.md)
 
 BELL PR is a self-hosted, local-first workbench for open-source
 contributions. It runs on your computer with the AI coding CLI you already
