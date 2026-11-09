@@ -299,7 +299,7 @@ async function checkBrowser(files, { port, screenshots }) {
   const methods = ["npx", "npm", "curl", "brew", "bun", "powershell", "mise"];
   const packageName = JSON.parse(fs.readFileSync(path.join(repoDir, "package.json"), "utf8")).name;
   // Same pin as publishedInstallVersion in scripts/render-generated-regions.ts.
-  const installVersion = "1.1.1";
+  const miseVersion = "1.1.1";
   async function checkInstaller(page, noScript = false) {
     const widget = page.locator("[data-install]");
     await expect(widget).toHaveCount(1);
@@ -331,10 +331,9 @@ async function checkBrowser(files, { port, screenshots }) {
       await expect(code).toBeVisible();
       const command = (await code.textContent()).trim();
       expect(command, `${method} has a readable install command`).not.toBe("");
-      if (method === "npx") expect(command).toBe(`npx ${packageName}@${installVersion}`);
-      if (method === "npm") expect(command).toBe(`npm install -g ${packageName}@${installVersion}`);
-      if (method === "bun") expect(command).toBe(`bun add --global ${packageName}@${installVersion}`);
-      if (method === "mise") expect(command).toBe(`MISE_NPM_PACKAGE_MANAGER=npm mise use -g node@24 npm:${packageName}@${installVersion}`);
+      if (method === "npx") expect(command).toBe(`npx ${packageName}`);
+      if (method === "npm") expect(command).toBe(`npm install -g ${packageName}`);
+      if (method === "mise") expect(command).toBe(`MISE_NPM_PACKAGE_MANAGER=npm mise use -g node@24 npm:${packageName}@${miseVersion}`);
       if (method === "brew" || method === "powershell") expect(command).toContain("\n");
       if (!noScript) {
         const button = widget.locator(`button[data-copy="install-command-${method}"]`);
