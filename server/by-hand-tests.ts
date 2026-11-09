@@ -375,9 +375,15 @@ async function execute(
       if (note) ctx.log(run, "system", note);
       log.info("by-hand.tests.finished", { runId: run.id, outcome, ms });
     } finally {
-      if (run.byHand?.busy?.kind === "tests") delete run.byHand.busy;
-      release();
-      await ctx.store.save();
+      // Busy stays until the write finishes. The run lock already waits
+      // for that; an unlocked read (the tests poll the run) must not see
+      // the result and no busy mark before state.json has it.
+      try {
+        await ctx.store.save();
+      } finally {
+        if (run.byHand?.busy?.kind === "tests") delete run.byHand.busy;
+        release();
+      }
     }
   });
 }
