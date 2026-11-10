@@ -14,6 +14,7 @@ import path from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import type { CollabBoard, CollabHold } from "../shared/collab.js";
 import { collabFixture, outcome, type Headers, type Reply } from "../test/collab-fixture.js";
+import type { CollabHost } from "./collab-host.js";
 import { CollabHub } from "./collab-hub.js";
 import { participantHeader } from "./coordination-routes.js";
 import { Coordinator, coordinationLimits } from "./coordination.js";
@@ -440,10 +441,24 @@ test("dependsOn: work is held only once each task it names is done; a task not d
       unknown: dependsOn.filter((id) => id !== api.taskId),
     }], dependsOn.join());
   }
-  // Not a list of at most 50 ids of at most 64 characters: the body's shape.
-  const fifty = Array.from({ length: 51 }, (_, index) => `t-${index}`);
-  for (const dependsOn of [api.taskId, [7], fifty, ["t".repeat(65)]])
-    assert.equal((await ui(dependsOn)).status, 400, JSON.stringify(dependsOn).slice(0, 40));
+  // Not a list of ids: the body's shape.
+  for (const dependsOn of [api.taskId, [7]])
+    assert.equal((await ui(dependsOn)).status, 400, JSON.stringify(dependsOn));
+  // More than 50 ids, in the person's language; an id longer than a task's is no task.
+  const fiftyOne = Array.from({ length: 51 }, (_, index) => `t-${index}`);
+  const tooMany = await ui(fiftyOne, en(who.dee));
+  assert.deepEqual([tooMany.status, tooMany.json], [400, {
+    reason: "tooManyDependencies",
+    error: "One work request depends on at most 50 tasks.",
+  }]);
+  const inChineseTooMany = await ui(fiftyOne, { ...who.dee, "x-bell-locale": "zh-TW" });
+  assert.equal(inChineseTooMany.json.error, "一項工作最多相依 50 個任務。");
+  const long = "t".repeat(65);
+  assert.deepEqual((await ui([long, api.taskId], en(who.dee))).json, {
+    reason: "dependencyUnknown",
+    error: "This work depends on a task this repository does not have. Nothing was held.",
+    unknown: [long],
+  });
 
   // Blocked: API is held and not done. Nothing is made, nothing is held.
   const blocked = await ui([api.taskId], en(who.dee));
@@ -549,6 +564,110 @@ test("dependsOn on the board: a hold names the tasks it waited for, the feed wak
     dependsOn: [api.taskId],
   });
   assert.deepEqual(docs.dependsOn, [{ taskId: api.taskId, title: "API" }]);
+});
+
+/**
+ * Holds up the host's next side-file write, which fails when `fails`.
+ * `meanwhile` runs `steps` once the write is on its way, then lets it on,
+ * also when a step fails: a write held up for good would hold up the end
+ * of the test.
+ */
+function writeHeldUp(t: TestContext, host: CollabHost, { fails = false } = {}) {
+  const saveSide = host.saveSide;
+  let reached = false;
+  let go = () => {};
+  const gate = new Promise<void>((resolve) => (go = resolve));
+  t.mock.method(host, "saveSide", async (change: Parameters<CollabHost["saveSide"]>[0]) => {
+    if (!reached) {
+      reached = true;
+      await gate;
+      if (fails) throw new Error("EIO: i/o error, write");
+    }
+    return saveSide(change);
+  });
+  return {
+    async meanwhile<T>(steps: () => Promise<T>): Promise<T> {
+      try {
+        await until(() => reached);
+        return await steps();
+      } finally {
+        go();
+      }
+    },
+  };
+}
+
+test("dependsOn during a done release: the work waits for the done write and is held, instead of reading the task as ended and never done", async (t) => {
+  const g = await group(t);
+  const { f, who } = g;
+  const project = await g.add("widgets");
+  const other = await g.add("gadgets");
+  const api = await g.hold(who.member, project, { title: "API", scopes: ["src/api"] });
+  const runs = t.mock.method(f.collab, "run");
+
+  const write = writeHeldUp(t, f.collab);
+  const released = f.post(`/projects/${project}/holds/${api.claimId}/release`, who.member, {
+    fence: api.fence,
+    done: true,
+  });
+  const { waited, docs, early } = await write.meanwhile(async () => {
+    // The hold has ended, and the side file does not say done yet.
+    assert.deepEqual((await g.board(project)).held, []);
+    // The work that waits for API is with the host, after the release.
+    const before = runs.mock.callCount();
+    let answered = false;
+    const waited = g.work(who.dee, project, { title: "UI", scopes: ["web"], dependsOn: [api.taskId] });
+    void waited.then(() => (answered = true));
+    await until(() => runs.mock.callCount() > before);
+    // Work that names no task, and work in another repository, do not wait.
+    const docs = await g.hold(who.admin, project, { title: "Docs", scopes: ["docs"] });
+    await g.hold(who.admin, other, { title: "Elsewhere", scopes: ["lib"], dependsOn: [] });
+    return { waited, docs, early: answered };
+  });
+  assert.equal(early, false, "answered while the done write was on its way");
+  assert.deepEqual((await released).json, { ok: true });
+  const ui = await waited;
+  assert.equal(ui.status, 201, ui.body);
+  assert.deepEqual(ui.json.hold.dependsOn, [{ taskId: api.taskId, title: "API" }]);
+  assert.deepEqual((await g.board(project)).held, [docs, ui.json.hold]);
+});
+
+test("a done write that fails: the release says the hold ended and cannot be done now, and the work that waited for it is told so", async (t) => {
+  const g = await group(t);
+  const { f, who } = g;
+  const project = await g.add("widgets");
+  const api = await g.hold(who.member, project, { title: "API", scopes: ["src/api"] });
+  const runs = t.mock.method(f.collab, "run");
+  const finish = (asWho: Headers) =>
+    f.post(`/projects/${project}/holds/${api.claimId}/release`, asWho, {
+      fence: api.fence,
+      done: true,
+    });
+
+  const write = writeHeldUp(t, f.collab, { fails: true });
+  const released = finish({ ...who.member, "x-bell-locale": "en" });
+  const waited = write.meanwhile(async () => {
+    const before = runs.mock.callCount();
+    const waited = g.work(who.dee, project, { title: "UI", scopes: ["web"], dependsOn: [api.taskId] });
+    await until(() => runs.mock.callCount() > before);
+    return { waited };
+  });
+
+  const failed = await released;
+  assert.deepEqual([failed.status, failed.json], [500, {
+    reason: "doneNotSaved",
+    error:
+      "The hold has ended, but its task could not be marked done, and now it never can be. Work that waits for it has to name another task. The log on the host has the details.",
+  }]);
+  assert.ok(f.logged.some((line) => line.includes("could not save that a task is done")));
+  // The work after it in the queue is answered, with what is true now.
+  const ui = await (await waited).waited;
+  assert.equal(outcome(ui), "409 dependencyPending");
+  assert.deepEqual(ui.json.pending, [{ taskId: api.taskId, title: "API", held: false }]);
+  assert.equal(outcome(await finish(who.member)), "409 ended");
+  // Group work goes on.
+  const next = await g.work(who.dee, project, { title: "UI", scopes: ["web"] });
+  assert.equal(next.status, 201, next.body);
 });
 
 test("the board: what is held, oldest first, and the people; a hold that ended or was refused is not on it", async (t) => {

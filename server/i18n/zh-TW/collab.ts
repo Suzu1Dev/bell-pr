@@ -30,9 +30,12 @@ const m: Translation<typeof en> = {
   conflict: "已經有人佔用了會互相衝突的路徑，所以這次沒有佔用任何路徑。",
   dependencyUnknown: "這項工作相依的任務不在這個儲存庫裡，所以這次沒有佔用任何路徑。",
   dependencyPending: "這項工作相依的任務還沒完成，所以這次沒有佔用任何路徑。",
+  tooManyDependencies: ({ max }) => `一項工作最多相依 ${max} 個任務。`,
   full: "小組的紀錄已滿。請主機的使用者重設小組的儲存空間。",
   unknownClaim: "這個儲存庫沒有這個 id 的佔用。",
   ended: "這項佔用已經結束。",
+  doneNotSaved:
+    "這項佔用已經結束，但它的任務無法標記為完成，之後也不能再標記。相依它的工作需要改為相依其他任務。詳細原因記錄在主機的日誌裡。",
   notHolder: "只有佔用這些路徑的人可以釋出它們。",
   staleFence: "這項佔用在看板讀取之後有了變更。請重新載入看板再試。",
   refused: "小組協作拒絕了這個請求。",

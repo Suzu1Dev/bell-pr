@@ -30,9 +30,12 @@ export default {
   conflict: "Someone already holds a path that is in the way. Nothing was held.",
   dependencyUnknown: "This work depends on a task this repository does not have. Nothing was held.",
   dependencyPending: "This work depends on a task that is not done yet. Nothing was held.",
+  tooManyDependencies: ({ max }: { max: number }) => `One work request depends on at most ${max} tasks.`,
   full: "The group's record is full. Ask the host to reset group storage.",
   unknownClaim: "This repository has no hold with this id.",
   ended: "This hold has already ended.",
+  doneNotSaved:
+    "The hold has ended, but its task could not be marked done, and now it never can be. Work that waits for it has to name another task. The log on the host has the details.",
   notHolder: "Only the person who holds these paths can release them.",
   staleFence: "This hold has changed since the board was read. Reload the board, then try again.",
   refused: "Group work refused this request.",
