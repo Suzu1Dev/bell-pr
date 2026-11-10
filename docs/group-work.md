@@ -108,8 +108,10 @@ group that is set up already, it only adds you as one more admin. Then
 choose the group's first repository under **Add a repository**, among the
 ones this BELL PR has ([the group's repositories](#the-groups-repositories)
 says what adding does); an admin adds further ones from the picker at the
-top. A paired device cannot set the group up, and its page says where
-that is done.
+top. While the group has no repository, the page says so and asks again
+every 10 seconds. A repository that someone else adds after that shows in
+the picker once the page is loaded again. A paired device cannot set the
+group up, and its page says where that is done.
 
 **Invite.** The **Invite** button is there for an admin, and for anyone
 who has joined in a browser that uses the install token. Type the person's
@@ -132,7 +134,8 @@ the box under the paths updates by itself:
 - "Nothing in the way, in what BELL checked": at the time shown, no hold
   met the paths typed. That is an answer and not a hold: someone can take
   a path a moment later. **Take hold** then takes the hold, or it is
-  refused whole and the box says "Not taken" and who holds what.
+  refused whole and the box says who holds what, after "Not taken" when
+  the refusal reaches the page before the board with that hold does.
 - "**Ada** holds `src/api` — Fix pagination, since 13:40": that hold is in
   the way. A hold of your own is in the way too ("You hold …"). **Take
   hold** is off until the paths change or the hold ends.
@@ -142,7 +145,8 @@ the box under the paths updates by itself:
   the board it shows now, as right after a key or a change of the board,
   and while it is reconnecting. **Take hold** is off then, and while the
   title is empty. A refusal of another kind (`slowDown`, for example)
-  shows as the server's sentence.
+  shows as the server's sentence, and a check that got no answer says that
+  BELL PR cannot be reached.
 
 **The chip's three words.** The chip next to the repository says how the
 board on the page is kept current, and "as of" says when it was last

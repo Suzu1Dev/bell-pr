@@ -63,7 +63,7 @@ const collab = {
   },
   host: {
     title: "Start group work here",
-    body: `This is the computer that runs ${product.name}. You become the first admin and can invite the others.`,
+    body: `This is the computer that runs ${product.name}. You join as an admin and can invite the others.`,
     name: "Your name",
     submit: "Start group work",
   },

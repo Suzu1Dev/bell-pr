@@ -591,9 +591,9 @@ function Board(props: BoardProps) {
         });
       } catch (error) {
         if (request.signal.aborted) return;
-        // No answer, so no box; a refusal says why.
+        // No answer, so no box; the sentence says why.
         setAnswered(undefined);
-        setRefusal(reasonOf(error) ? sentenceOf(error) : "");
+        setRefusal(sentenceOf(error));
       }
     }, 400);
     return () => {

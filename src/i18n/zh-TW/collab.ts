@@ -55,7 +55,7 @@ const m: Translation<typeof en> = {
   },
   host: {
     title: "在這裡開始小組協作",
-    body: `這是執行 ${product.name} 的電腦。你會成為第一位管理員，之後可以邀請其他人。`,
+    body: `這是執行 ${product.name} 的電腦。你會以管理員身分加入，之後可以邀請其他人。`,
     name: "你的名稱",
     submit: "開始小組協作",
   },

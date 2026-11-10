@@ -98,6 +98,8 @@ export function createGroupStore() {
   let state: GroupState = { people: [], present: [], added: [], ended: [], link: "live" };
   const listeners = new Set<() => void>();
   let loop: AbortController | undefined;
+  /** The page has left: a request of its that ends later starts nothing again. */
+  let closed = false;
   /** Where the feed stands for the board in hand. */
   let cursor: Pick<CollabFeedResponse, "epoch" | "version" | "seen"> | undefined;
 
@@ -160,10 +162,21 @@ export function createGroupStore() {
     // Requests left that do not wait, after the server had no place for one that does.
     let polls = 0;
     const fail = () => pause(backoff[Math.min(failures++, 3)] * 1000, signal);
+    /** The server answers within 25 s: a request still open after 40 is given up, as a failure. */
+    const ask = <T>(path: string) => {
+      const request = new AbortController();
+      const giveUp = () => request.abort();
+      const limit = setTimeout(giveUp, 40_000);
+      signal.addEventListener("abort", giveUp);
+      return call<T>(path, { signal: request.signal }).finally(() => {
+        clearTimeout(limit);
+        signal.removeEventListener("abort", giveUp);
+      });
+    };
     while (!signal.aborted) {
       try {
         if (!state.info?.me) {
-          const info = await call<CollabInfo>("", { signal });
+          const info = await ask<CollabInfo>("");
           if (signal.aborted) return;
           if (info.state !== "ready") {
             drop({ info });
@@ -175,12 +188,15 @@ export function createGroupStore() {
           if (!info.me) return;
         }
         if (!state.projects?.some((project) => project.id === state.project)) {
-          const { projects, addable } = await call<CollabProjectsResponse>("/projects", { signal });
+          const { projects, addable } = await ask<CollabProjectsResponse>("/projects");
           if (signal.aborted) return;
           const chosen = projects.find((project) => project.id === state.project) ?? projects[0];
           drop({ projects, addable, project: chosen?.id });
-          // The card that adds one: `add` starts this again.
-          if (!chosen) return;
+          if (!chosen) {
+            // None yet: asked again, for the one an admin adds meanwhile.
+            await pause(10_000, signal);
+            continue;
+          }
         }
         const query = new URLSearchParams({ wait: polls ? "0" : "25" });
         if (cursor) {
@@ -188,18 +204,9 @@ export function createGroupStore() {
           query.set("version", String(cursor.version));
           query.set("seen", String(cursor.seen));
         }
-        // The server answers within 25 s: a request still open after 40 is given up, as a failure.
-        const request = new AbortController();
-        const giveUp = () => request.abort();
-        const limit = setTimeout(giveUp, 40_000);
-        signal.addEventListener("abort", giveUp);
-        const answer = await call<CollabFeedResponse | undefined>(
+        const answer = await ask<CollabFeedResponse | undefined>(
           `/projects/${encodeURIComponent(state.project!)}/feed?${query}`,
-          { signal: request.signal },
-        ).finally(() => {
-          clearTimeout(limit);
-          signal.removeEventListener("abort", giveUp);
-        });
+        );
         if (signal.aborted) return;
         failures = 0;
         set({ ...(answer ? took(answer) : { asOf: Date.now() }), link: polls ? "polling" : "live" });
@@ -233,8 +240,10 @@ export function createGroupStore() {
     }
   }
 
-  function open() {
+  /** Starts the requests again, unless the page has left. */
+  function restart() {
     loop?.abort();
+    if (closed) return;
     loop = new AbortController();
     void follow(loop.signal);
   }
@@ -242,9 +251,10 @@ export function createGroupStore() {
   async function join(code: string) {
     const { token } = await api<CollabJoinResponse>("/collab/join", send("POST", { code }));
     keepToken(token);
-    // Maybe as another person: the repositories, and which ones can be added, are asked for again.
-    set({ refused: undefined, projects: undefined, addable: undefined });
-    open();
+    // The card goes at once, so a second press cannot send the used code again. Maybe as
+    // another person: the repositories, and which ones can be added, are asked for again.
+    set({ info: undefined, refused: undefined, projects: undefined, addable: undefined });
+    restart();
   }
 
   return {
@@ -254,18 +264,22 @@ export function createGroupStore() {
     },
     get: () => state,
     call,
-    open,
+    open() {
+      closed = false;
+      restart();
+    },
     close() {
+      closed = true;
       loop?.abort();
     },
     choose(project: string) {
       drop({ project });
-      open();
+      restart();
     },
     /** Asks for the whole board again. */
     reload() {
       cursor = undefined;
-      open();
+      restart();
     },
     join,
     /** At the host: sets group work up when it is not, then joins as its admin. */
@@ -288,7 +302,7 @@ export function createGroupStore() {
         addable: state.addable?.filter((repo) => repo.repoId !== repoId),
         project: project.id,
       });
-      open();
+      restart();
     },
   };
 }

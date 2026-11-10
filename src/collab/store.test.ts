@@ -33,7 +33,13 @@ async function settle() {
  * A store that has joined and waits for the board of p1, with a server whose
  * answers the test gives one at a time and a clock the test moves.
  */
-async function joined(t: TestContext) {
+async function joined(
+  t: TestContext,
+  projects = [
+    { id: "p1", name: "shop" },
+    { id: "p2", name: "site" },
+  ],
+) {
   const asked: { path: string; token: string | null; answer(response: Response): void }[] = [];
   const realFetch = globalThis.fetch;
   globalThis.fetch = ((input: RequestInfo | URL, init?: RequestInit) =>
@@ -71,12 +77,7 @@ async function joined(t: TestContext) {
   await answer("/join", { token: "first" });
   await joining;
   await answer("", { state: "ready", host: false, me });
-  await answer("/projects", {
-    projects: [
-      { id: "p1", name: "shop" },
-      { id: "p2", name: "site" },
-    ],
-  });
+  await answer("/projects", { projects });
   return {
     store,
     answer,
@@ -182,6 +183,28 @@ test("a feed request that is not answered in 40 seconds is given up, and the pag
   assert.deepEqual(waiting(), [next, next]);
 });
 
+test("a request before the board is given up after 40 seconds too", async (t) => {
+  const { store, answer, waiting, pass } = await joined(t);
+  // The repository is gone: the list is asked for again, and gets no answer.
+  await answer(first, { reason: "unknownProject", error: "No such repository." }, 404);
+  await pass(1000);
+  assert.deepEqual(waiting(), ["/projects"]);
+  await pass(40_000);
+  assert.equal(store.get().link, "reconnecting");
+  await pass(2000);
+  assert.deepEqual(waiting(), ["/projects", "/projects"]);
+});
+
+test("a group without a repository is asked for its list every 10 seconds", async (t) => {
+  const { store, answer, waiting, pass } = await joined(t, []);
+  assert.deepEqual([store.get().projects, waiting()], [[], []]);
+  await pass(10_000);
+  // An admin added one meanwhile: its board follows without a reload.
+  await answer("/projects", { projects: [{ id: "p1", name: "shop" }] });
+  await answer(first, feed(1, [hold("a")]));
+  assert.deepEqual([store.get().project, ids(store.get().held)], ["p1", ["a"]]);
+});
+
 test("when group work stops the board goes, and the page asks where group work stands", async (t) => {
   const { store, answer, pass } = await joined(t);
   await answer(first, feed(1, [hold("a")]));
@@ -216,6 +239,10 @@ test("an answer that comes after another repository was chosen, or after the pag
   await answer("/projects/p2/feed?wait=25", feed(1, [hold("b")]));
   assert.equal(store.get().held, undefined);
   assert.deepEqual(waiting(), []);
+  // What ends after the page left (an add, a join, a stale fence) starts nothing again.
+  store.reload();
+  await settle();
+  assert.deepEqual(waiting(), []);
 });
 
 test("a person the server no longer knows gets its sentence, and keeps the token until a join gives another", async (t) => {
@@ -235,7 +262,8 @@ test("a person the server no longer knows gets its sentence, and keeps the token
   await settle();
   assert.equal(await answer("/join", { token: "second" }), null);
   await joining;
-  assert.equal(store.get().refused, undefined);
+  // The join card is gone before the next answer: a second press cannot send the code again.
+  assert.deepEqual([store.get().refused, store.get().info], [undefined, undefined]);
   assert.equal(await answer("", { state: "ready", host: false, me }), "second");
   // They may be another person now: the repositories are asked for again.
   assert.deepEqual(waiting(), ["/projects"]);
