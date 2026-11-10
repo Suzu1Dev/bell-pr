@@ -226,6 +226,13 @@ release).
      for held paths is unverified and gets only paths that exist.
    - At most 200 paths (`maxHeldWriteTargets`); a path below another one
      in the list, `.git`, and `..` are left out.
+   - Renaming a folder above a held path is not refused: the rename needs
+     write access only to the folder that contains it, and making that
+     read-only would refuse other people's files there too. Each command
+     gets a fresh sandbox, so after `mv a a2` the next one no longer
+     guards `a2/held.txt` and can change it (found in QA, F-7). The check
+     after the turn is the only protection here: `a/held.txt` is gone from
+     its held path, so the turn stops.
 
 ## What cannot be guarded, and how to detect it
 

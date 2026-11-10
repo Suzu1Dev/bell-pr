@@ -414,7 +414,8 @@ everyone else:
   inside the sandbox, and only for paths that already exist. Left to the
   check after the turn: a held path that goes through a symbolic link or
   whose folder does not exist yet, a spelling the checkout does not have
-  yet, Codex with full access, and Antigravity.
+  yet, a renamed folder above a held path (the held file can be changed
+  at its new place), Codex with full access, and Antigravity.
 - **A plan over someone else's hold waits.** A plan that would start on
   its own waits for approval instead, with a notice that it covers files
   someone else holds. Approving a plan that covers such a file is

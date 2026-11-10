@@ -9,7 +9,7 @@
  */
 import test, { after, before, type TestContext } from "node:test";
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rename, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
@@ -408,6 +408,20 @@ test("a write turn is told the held paths without names or titles, goes on when 
   assert.ok(draft.includes(`src/api/users.ts\\n- ${told}\\n`));
   for (const turn of s.turns)
     for (const secret of ["Ada", "Secret plan"]) assert.equal(turn.prompt.includes(secret), false, `${turn.role}: ${secret}`);
+});
+
+test("a turn that renames the folder above a held file, which the sandbox allows, is stopped after it", async (t) => {
+  const s = await scene(t, async (input) => {
+    if (input.role !== "session") return "Not used";
+    await rename(path.join(input.cwd, "src/api"), path.join(input.cwd, "src/api2"));
+    await write(input.cwd, "src/api2/users.ts", "export const users = ['ben'];\n");
+    return "Done.";
+  });
+  await s.hold(s.who.admin, ["src/api/users.ts"], "Secret plan");
+  const id = await s.inReview([s.ben.id]);
+  const stopped = await s.session(id, "Move the API");
+  assert.equal(stopped.failed, true, stopped.content);
+  assert.deepEqual(stopped.heldPaths, ["src/api/users.ts"]);
 });
 
 test("a run nobody owns respects every hold, its starter's own too", async (t) => {

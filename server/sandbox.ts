@@ -689,6 +689,12 @@ export const maxHeldWriteTargets = 200;
  * - a path below another one in the list, and paths past
  *   maxHeldWriteTargets.
  *
+ * Not covered either: renaming a folder above a held path. That needs write
+ * access only to the folder that contains it, which stays writable for the
+ * files of other people in it, and the next command's fresh sandbox no
+ * longer guards the file at its new place; the check after the turn stops
+ * the turn, since the held path changed.
+ *
  * Each sandbox may leave out more (codexSandboxConfig: glob characters;
  * heldSandboxWriteDenials: paths that do not exist).
  *
