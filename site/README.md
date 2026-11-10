@@ -85,10 +85,10 @@ and runs `render-generated-regions.ts --write`.
 
 | Value | Where | What appears |
 | --- | --- | --- |
-| `publicRepoUrl` | Footer of every page | "Source" (`<publicRepoUrl>`), "Apache-2.0 license" (`<publicRepoUrl>/blob/main/LICENSE`) and "Report an issue" (`<publicRepoUrl>/issues`) |
-| `supportEmail` | Footer of every page | "Support" (mailto) |
-| `securityEmail` | Footer of every page | "Report a vulnerability" (mailto) |
-| `docsUrl` | Footer of every page | "Documentation" |
+| `publicRepoUrl` | Footer of every page | "Source" / "原始碼" (`<publicRepoUrl>`), "Apache-2.0 license" / "Apache-2.0 授權" (`<publicRepoUrl>/blob/main/LICENSE`) and "Report an issue" / "回報問題" (`<publicRepoUrl>/issues`) |
+| `supportEmail` | Footer of every page | "Support" / "支援" (mailto) |
+| `securityEmail` | Footer of every page | "Report a vulnerability" / "回報安全性漏洞" (mailto) |
+| `docsUrl` | Footer of every page | "Documentation" / "說明文件" |
 | `homepageUrl` | `<head>` of every page | `og:url` and an absolute `og:image` (social networks need absolute URLs) |
 
 While every link of a footer column is empty, the footer hides the whole

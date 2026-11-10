@@ -162,6 +162,23 @@ pre {
   background: var(--muted);
   color: var(--text);
 }
+/* Arguments stay whole: a hyphen or slash would otherwise be a break.
+   The one path that is wider than a 320px line is set slightly smaller
+   so it stays on one line. */
+html[lang="zh-Hant-TW"] :not(.command) > code .keep {
+  white-space: nowrap;
+}
+@media (max-width: 360px) {
+  html[lang="zh-Hant-TW"] :not(.command) > code.wide {
+    font-size: 0.76em;
+    white-space: nowrap;
+  }
+}
+@media (max-width: 420px) {
+  html[lang="zh-Hant-TW"] .prose :is(ul, ol) {
+    padding-left: 1.15em;
+  }
+}
 
 .skip-link {
   position: absolute;
