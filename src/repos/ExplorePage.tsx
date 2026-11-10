@@ -41,12 +41,7 @@ export function ExploreHeading({
         <span className="eyebrow">{t.eyebrow}</span>
         <h1 tabIndex={-1}>{repo.fullName}</h1>
         <p>{t.intro}</p>
-        <OriginIgnoredNotice
-          ignored={repo.originUserinfoIgnored}
-          origin={repo.url}
-          owner={repo.owner}
-          name={repo.name}
-        />
+        <OriginIgnoredNotice ignored={repo.originUserinfoIgnored} />
       </div>
       <button className="button primary" onClick={onChooseDirection}>
         <Target size={16} />

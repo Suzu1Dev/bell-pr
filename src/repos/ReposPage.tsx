@@ -127,12 +127,7 @@ export function ReposPage({
                   <span>{maskPath(repo.path)}</span>
                 </p>
               )}
-              <OriginIgnoredNotice
-                ignored={repo.originUserinfoIgnored}
-                origin={repo.url}
-                owner={repo.owner}
-                name={repo.name}
-              />
+              <OriginIgnoredNotice ignored={repo.originUserinfoIgnored} />
               <div className="repository-meta">
                 <span>
                   <span className="language-dot" />

@@ -9,7 +9,6 @@ const repos = {
   originIgnored:
     "The origin URL includes credentials, so this was imported as a local project. Remove them and use a credential helper:",
   originIgnoredCommand: "git remote set-url origin https://github.com/OWNER/REPO",
-  /** Shown with originIgnoredCommand when the owner and repository are not known. */
   originIgnoredReplace: "Replace OWNER and REPO.",
   originIgnoredReplaceLabel: ({ command }: { command: string }) =>
     `Copy the command. Replace OWNER and REPO: ${command}`,

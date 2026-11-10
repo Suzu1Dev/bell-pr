@@ -147,46 +147,6 @@ test("the origin notice's copy button copies the command and says so", async () 
         await view.unmount();
       }
     }
-    const secret = "https://user:token@github.com/o/r.git";
-    const runnable = "git remote set-url origin https://github.com/o/r";
-    written.length = 0;
-    const stripped = await mount(
-      createElement(OriginIgnoredNotice, {
-        ignored: true,
-        origin: secret,
-        owner: "local",
-        name: "notes",
-      }),
-    );
-    try {
-      const button = stripped.container.querySelectorAll(
-        (element) => element.getAttribute("aria-label") === `Copy the command: ${runnable}`,
-      )[0];
-      assert.ok(button);
-      await click(button);
-      assert.deepEqual(written, [runnable]);
-      assert.equal(stripped.text().includes(secret), false);
-      assert.equal(stripped.text().includes("user:token"), false);
-      assert.equal(stripped.text().includes("Replace OWNER and REPO"), false);
-    } finally {
-      await stripped.unmount();
-    }
-    written.length = 0;
-    const named = await mount(
-      createElement(OriginIgnoredNotice, { ignored: true, owner: "octo", name: "widgets" }),
-    );
-    try {
-      const button = named.container.querySelectorAll(
-        (element) =>
-          element.getAttribute("aria-label") ===
-          "Copy the command: git remote set-url origin https://github.com/octo/widgets",
-      )[0];
-      assert.ok(button);
-      await click(button);
-      assert.deepEqual(written, ["git remote set-url origin https://github.com/octo/widgets"]);
-    } finally {
-      await named.unmount();
-    }
     const hidden = await mount(createElement(OriginIgnoredNotice, {}));
     try {
       assert.equal(
