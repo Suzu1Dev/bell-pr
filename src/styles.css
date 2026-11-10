@@ -1432,6 +1432,14 @@ button {
   line-height: 1.8;
   color: var(--color-accent-600);
 }
+.origin-ignored {
+  flex-direction: column;
+  min-width: 0;
+  max-width: 100%;
+}
+.origin-ignored .copy-command {
+  min-width: 0;
+}
 .draft-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 268px;
@@ -1805,6 +1813,10 @@ button {
   margin-top: auto;
   white-space: normal;
   text-align: center;
+}
+.repository-card .copy-command-button {
+  width: auto;
+  margin-top: 0;
 }
 .repository-add {
   border: 1px dashed var(--color-accent-200);
@@ -2808,6 +2820,10 @@ button {
   .page-title {
     align-items: flex-start;
     flex-direction: column;
+  }
+  .page-title > div:has(.origin-ignored) {
+    width: 100%;
+    min-width: 0;
   }
 }
 @media (max-width: 760px) {

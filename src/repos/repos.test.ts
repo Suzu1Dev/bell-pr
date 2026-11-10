@@ -1,10 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createElement } from "react";
+import { act, createElement } from "react";
+import { mount, type FakeElement } from "../mission/test-dom";
 import { assertNoHan, renderEn, renderZh } from "../test-utils/render";
 import type { Repo } from "../types";
 import { ImportRepoModal, isWindowsPlatform, localPathExample, namesSample } from "./ImportRepoModal";
 import { ExploreHeading } from "./ExplorePage";
+import { OriginIgnoredNotice } from "./OriginIgnoredNotice";
 import { ReposPage } from "./ReposPage";
 
 const repo: Repo = {
@@ -54,21 +56,26 @@ test("the origin notice shows only when that origin was imported as local", () =
   const html = renderEn(list([repo, localRepo, ignoredRepo]));
   assert.equal(html.match(/role="note"/g)?.length, 1);
   assert.equal(html.includes('role="alert"'), false);
+  const copyLabel = `Copy the command: ${command}`;
   assert.match(html, /The origin URL includes credentials, so this was imported as a local project\./);
   assert.match(html, /Remove them and use a credential helper:/);
   assert.ok(html.includes(`<code>${command}</code>`));
+  assert.equal(html.match(/copy-command-button/g)?.length, 1);
+  assert.ok(html.includes(`aria-label="${copyLabel}"`));
   assert.equal(html.includes(secretOrigin), false);
   assert.equal(html.includes("user:token"), false);
   assertNoHan(html);
   const zh = renderZh(list([ignoredRepo]));
   assert.match(zh, /origin 網址含有帳號或權杖，因此以本機專案匯入。請移除並改用 credential helper：/);
   assert.ok(zh.includes(`<code>${command}</code>`));
+  assert.ok(zh.includes(`aria-label="複製指令：${command}"`));
   assert.equal(zh.includes(secretOrigin), false);
   assert.equal(zh.includes("user:token"), false);
   for (const repos of [[repo], [localRepo]]) {
     const plain = renderEn(list(repos));
     assert.equal(plain.includes('role="note"'), false);
     assert.equal(plain.includes(command), false);
+    assert.equal(plain.includes("copy-command-button"), false);
   }
   const project = renderEn(
     createElement(ExploreHeading, { repo: ignoredRepo, onChooseDirection() {} }),
@@ -77,6 +84,7 @@ test("the origin notice shows only when that origin was imported as local", () =
   assert.equal(project.match(/role="note"/g)?.length, 1);
   assert.equal(project.includes('role="alert"'), false);
   assert.ok(project.includes(`<code>${command}</code>`));
+  assert.ok(project.includes(`aria-label="${copyLabel}"`));
   assert.equal(project.includes(secretOrigin), false);
   assert.equal(project.includes("user:token"), false);
   assertNoHan(project);
@@ -84,6 +92,7 @@ test("the origin notice shows only when that origin was imported as local", () =
     createElement(ExploreHeading, { repo: ignoredRepo, onChooseDirection() {} }),
   );
   assert.match(projectZh, /帳號或權杖/);
+  assert.ok(projectZh.includes(`aria-label="複製指令：${command}"`));
   assert.equal(projectZh.includes("user:token"), false);
   for (const plainRepo of [repo, localRepo]) {
     const plain = renderEn(
@@ -91,6 +100,63 @@ test("the origin notice shows only when that origin was imported as local", () =
     );
     assert.equal(plain.includes('role="note"'), false);
     assert.equal(plain.includes(command), false);
+    assert.equal(plain.includes("copy-command-button"), false);
+  }
+});
+
+test("the origin notice's copy button copies the command and says so", async () => {
+  const command = "git remote set-url origin https://github.com/OWNER/REPO";
+  const written: string[] = [];
+  const navigator = globalThis.navigator;
+  const previous = Object.getOwnPropertyDescriptor(navigator, "clipboard");
+  Object.defineProperty(navigator, "clipboard", {
+    configurable: true,
+    value: {
+      writeText: async (text: string) => {
+        written.push(text);
+      },
+    },
+  });
+  const click = async (element: FakeElement) => {
+    const props = Object.entries(element).find(([name]) => name.startsWith("__reactProps$"))?.[1] as {
+      onClick(): void;
+    };
+    await act(async () => {
+      props.onClick();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+  };
+  try {
+    for (const [locale, feedback, label] of [
+      ["en", "Copied", `Copy the command: ${command}`],
+      ["zh-TW", "已複製", `複製指令：${command}`],
+    ] as const) {
+      written.length = 0;
+      const view = await mount(createElement(OriginIgnoredNotice, { ignored: true }), locale);
+      try {
+        const button = view.container.querySelectorAll(
+          (element) => element.getAttribute("aria-label") === label,
+        )[0];
+        assert.ok(button, locale);
+        await click(button);
+        assert.deepEqual(written, [command]);
+        assert.ok(view.text().includes(feedback), locale);
+      } finally {
+        await view.unmount();
+      }
+    }
+    const hidden = await mount(createElement(OriginIgnoredNotice, {}));
+    try {
+      assert.equal(
+        hidden.container.querySelectorAll((element) => element.nodeName === "BUTTON").length,
+        0,
+      );
+    } finally {
+      await hidden.unmount();
+    }
+  } finally {
+    if (previous) Object.defineProperty(navigator, "clipboard", previous);
+    else Reflect.deleteProperty(navigator, "clipboard");
   }
 });
 

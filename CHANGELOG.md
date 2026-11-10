@@ -7,6 +7,12 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- **The origin hint's command can be copied.** When a local import ignored
+  an origin that contained credentials, the command in that hint has a
+  copy button.
+
 ### Fixed
 
 - **A local import uses the origin URL saved in the checkout.** A global
