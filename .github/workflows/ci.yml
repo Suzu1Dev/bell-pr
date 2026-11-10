@@ -229,6 +229,8 @@ jobs:
             npx playwright install chromium
           fi
           wait "$deps"
+          # Root and _apt own these files; the cache save must be able to read them.
+          chmod -R a+rX "$HOME/.cache/apt-archives"
       - name: Run the end-to-end tests (builds, then starts bell-pr on port 4599)
         env:
           BELLPR_E2E_PORT: "4599"
