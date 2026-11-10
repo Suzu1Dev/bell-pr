@@ -701,6 +701,7 @@ export async function startServer(
       agentSlots,
       readApiToken: () => readApiToken(paths.apiToken),
       apiTokenFile: paths.apiToken,
+      suiteLinks: config.suiteLinks,
     });
     handler = app;
 

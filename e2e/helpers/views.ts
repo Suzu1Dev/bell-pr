@@ -4,10 +4,10 @@
 // check-off dialog open, the Practice view, the rules card, the Draft
 // tab's maintainer checklist, the sample's code walkthrough with a range
 // marked in the diff, its commit history with a commit open on a file's
-// diff, the brief of a real run whose premise was refuted, and the publish
-// dialog's groups of checks on a real run. Each view opens its route, then
-// drive() takes it to the state; `include` names the part of the page the
-// view is about.
+// diff, the product switcher's dialog, the brief of a real run whose premise
+// was refuted, and the publish dialog's groups of checks on a real run. Each
+// view opens its route, then drive() takes it to the state; `include` names
+// the part of the page the view is about.
 import { expect, type Page } from "@playwright/test";
 import type { Locale } from "../../shared/i18n/locale";
 import { getDemo } from "../../src/demo/all";
@@ -159,6 +159,23 @@ export const stateViews: StateView[] = [
       await review.getByRole("button", { name: t.show }).click();
       await review.locator(".commit-files .file-item").first().click();
       await expect(review.locator(".rv-line").first()).toBeVisible();
+    },
+  },
+  {
+    // The product switcher, open. The shared server links no other BELL
+    // product, so the manifest is answered here: one link shows a linked
+    // row, a row that is not linked and this product's own row.
+    name: "suite-switcher",
+    route: "#/home",
+    include: ".suite-switcher",
+    async drive(page, locale) {
+      const t = messages[locale].app.suite;
+      await page.route("**/api/suite/manifest", (route) =>
+        route.fulfill({ json: { links: { explain: "http://localhost:5173" } } }),
+      );
+      await page.reload();
+      await page.getByRole("button", { name: t.open }).click();
+      await expect(page.getByRole("dialog", { name: t.title })).toBeVisible();
     },
   },
   {
