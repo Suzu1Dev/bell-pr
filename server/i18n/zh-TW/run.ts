@@ -451,8 +451,17 @@ const m: Translation<typeof en> = {
       "這個拆分出來的部分建立在同一次拆分中尚未合併的其他部分上。請先發佈那些部分，否則這個 PR 在它們合併前可能無法通過檢查。",
     buildsOn: ({ title, prUrl }) =>
       prUrl ? `「${title}」：已發佈於 ${prUrl}，尚未看到合併` : `「${title}」：尚未發佈`,
+    heldByOther:
+      "小組裡有人佔用了這次變更動到的檔案。請對方釋出、請小組管理員收回佔用，或先把這些檔案移出這次變更再發佈。",
+    heldByOtherItem: ({ path, holder, title, since }) => `${path}：由 ${holder} 為「${title}」佔用（${since} 起）`,
+    holdsUnknown: ({ name }) =>
+      `小組協作已停止，無法確認檔案佔用狀態。發佈前請先在主機修復小組協作並重新啟動 ${name}。`,
   },
   publish: {
+    heldByOther: ({ items }) =>
+      `這次變更動到別人佔用的檔案，所以沒有發佈。${items.join("；")}。請對方釋出，或請小組管理員收回這項佔用。`,
+    holdsUnknown: ({ name }) =>
+      `小組協作已停止，無法確認檔案佔用狀態，所以沒有發佈。請先在主機修復小組協作並重新啟動 ${name}，或改以不帶 --group 的方式啟動 ${name}。`,
     recoveryStale: "未完成的發佈記錄已變更；請重新載入後再恢復。",
     recoveryNotAllowed: "只能恢復尚未記錄推送目標或 PR 的未完成發佈。",
     recoveryBusy: "這個工作仍有作業進行中；請等完成後再恢復發佈。",

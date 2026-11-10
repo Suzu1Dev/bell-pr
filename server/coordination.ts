@@ -1119,6 +1119,17 @@ export class Coordinator {
     return this.#projectView(projectIn(this.#state, projectId), this.#state.revision);
   }
 
+  /**
+   * The project's claims as project() shows them, for a check the host
+   * makes itself with no participant behind it (hold-guard.ts): a publish
+   * from a device whose people sent no participant token. Never answered
+   * to a request as it is.
+   */
+  claimsForHost(projectId: string): ClaimView[] {
+    this.#assertUsable();
+    return projectIn(this.#state, projectId).claims.map(claimView);
+  }
+
   /** Adds a task. Its dependencies must exist already, so they never form a cycle. */
   async defineTask(actor: Actor, projectId: string, input: { id: string; dependsOn?: string[] }) {
     const taskId = validId(input.id);

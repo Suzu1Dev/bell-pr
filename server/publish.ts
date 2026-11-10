@@ -612,11 +612,22 @@ export async function recoverPublish(
 }
 
 /**
+ * Refuses a change that meets a file someone else in the group holds
+ * (hold-guard.ts). Given only when BELL PR runs with --group.
+ */
+export type HoldCheck = (
+  run: Run,
+  files: readonly DiffFile[],
+  acknowledged: readonly string[],
+) => void;
+
+/**
  * `acknowledged` lists the preflight items the person confirmed in the
  * publish dialog. They are recomputed here from the saved draft, so a stale
  * or partial list is rejected before anything is pushed. The quoted
  * confirm's tick counts only with `rulesDigest`, the digest of the words
  * the dialog showed, when it matches the words the server shows now.
+ * `holds` is the group's write guard, when BELL PR runs with --group.
  */
 export async function publish(
   ctx: WorkbenchContext,
@@ -625,6 +636,7 @@ export async function publish(
   acknowledged: string[] = [],
   overrides: Pick<GuardOverride, "id" | "reason">[] = [],
   rulesDigest?: string,
+  holds?: HoldCheck,
 ) {
   return ctx.lock(id, async () => {
     const run = ctx.run(id);
@@ -661,6 +673,8 @@ export async function publish(
     // The current setting applies, also to runs approved while it was off
     // and to runs approved by builds before the check existed.
     assertUnderstood(run, files, repo);
+    // Before the follow-up branch, so a follow-up round is held to it too.
+    holds?.(run, files, acknowledged);
     const round = activeFollowUp(run.followUps);
     if (round) return publishFollowUp(ctx, run, round, files);
     if (run.prUrl)

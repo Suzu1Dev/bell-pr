@@ -733,9 +733,21 @@ export default {
       "This part of a split builds on other parts that are not merged yet. Publish those first, or this pull request may fail its checks until they are merged.",
     buildsOn: ({ title, prUrl }: { title: string; prUrl?: string }) =>
       prUrl ? `"${title}": published at ${prUrl}, not seen merged` : `"${title}": not published yet`,
+    /** The publish dialog's block when the change meets someone else's hold (server/hold-guard.ts). */
+    heldByOther:
+      "Someone else in the group holds files this change touches. Ask them to release the hold, ask a group admin to revoke it, or remove these files from the change before publishing.",
+    /** One changed file and the hold it meets, in the dialog and in the publish refusal. */
+    heldByOtherItem: ({ path, holder, title, since }: { path: string; holder: string; title: string; since: string }) =>
+      `${path} — held by ${holder} for “${title}” (since ${since})`,
+    holdsUnknown: ({ name }: { name: string }) =>
+      `Can't check file holds because group work has stopped. Fix group work on the host and restart ${name} before publishing.`,
   },
   /** The human review gate and publishing: draft, file reviews, approval and push. */
   publish: {
+    heldByOther: ({ items }: { items: readonly string[] }) =>
+      `Someone else holds files this change touches, so nothing was published. ${items.join("; ")}. Ask them to release the hold, or ask a group admin to revoke it.`,
+    holdsUnknown: ({ name }: { name: string }) =>
+      `Can't check file holds because group work has stopped, so nothing was published. Fix group work on the host and restart ${name}, or start ${name} without --group.`,
     recoveryStale: "The unfinished publish changed. Reload before recovering it.",
     recoveryNotAllowed: "Only an unfinished publish with no recorded push target or pull request can be recovered here.",
     recoveryBusy: "Work is still running for this contribution. Wait for it to finish before recovering the publish.",

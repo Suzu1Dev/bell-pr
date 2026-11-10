@@ -1,7 +1,9 @@
 # Design: holds that stop writes (group work gap G1)
 
-Status: draft for review. No code yet. Written against
-`feat/collab-work-depends-on` at 9272696.
+Status: draft for review. Written against
+`feat/collab-work-depends-on` at 9272696. S1 is implemented on
+`feat/collab-write-guard` (`server/hold-guard.ts`, tests in
+`server/hold-guard.test.ts`).
 
 ## The gap
 
