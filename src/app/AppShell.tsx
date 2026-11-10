@@ -74,6 +74,7 @@ export type Page =
   | "explore"
   | "discovery"
   | "team"
+  | "group"
   | "learning"
   | "settings";
 export type Tab = "overview" | "changes" | "activity" | "session" | "draft" | "commits";
@@ -119,6 +120,11 @@ const CommandPalette = lazy(() =>
 const LearningPage = lazy(() =>
   withMessages(import("../pages/LearningPage")).then((module) => ({
     default: module.LearningPage,
+  })),
+);
+const GroupPage = lazy(() =>
+  withMessages(import("../collab/GroupPage")).then((module) => ({
+    default: module.GroupPage,
   })),
 );
 // The task and model dialogs carry the direction and model pickers, which
@@ -311,6 +317,8 @@ function pageFor(route: Route | null, knownRepo: boolean): Page {
       return "discovery";
     case "team":
       return "team";
+    case "group":
+      return "group";
     case "learning":
       return "learning";
     case "settings":
@@ -336,6 +344,7 @@ const pageRoutes = {
   repos: "repos",
   discovery: "discover",
   team: "team",
+  group: "group",
   learning: "learning",
   settings: "settings",
 } as const satisfies Record<
@@ -1215,6 +1224,12 @@ function AppShell({
           />
         ) : page === "team" ? (
           <TeamPage beginContribution={beginContribution} />
+        ) : page === "group" ? (
+          <ErrorBoundary>
+          <Suspense fallback={null}>
+            <GroupPage status={status} />
+          </Suspense>
+          </ErrorBoundary>
         ) : page === "learning" ? (
           <ErrorBoundary>
           <Suspense fallback={null}>

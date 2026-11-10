@@ -18,11 +18,11 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   with the code through `POST /api/collab/join` and gets a participant
   token, sent in `x-bell-participant` next to the app token; an admin can
   remove a person and, when asked, unpair the device they joined from.
-  There is no Group page yet, and group work keeps nobody from writing
-  anything: admin and member only decide who may invite and remove people,
-  add repositories and revoke a hold (next entry). Without the switch
-  nothing changes, except that a participant token is masked (under
-  Changed). `docs/group-work.md` describes it.
+  Group work keeps nobody from writing anything: admin and member only
+  decide who may invite and remove people, add repositories and revoke a
+  hold (next entry). Without the switch nothing changes, except that a
+  participant token is masked (under Changed). `docs/group-work.md`
+  describes it.
 - **The group's repositories, holds on files and folders, and a live feed,
   through the API.** A group admin adds a repository this BELL PR has
   (`POST /api/collab/projects`), and the group gets its own bare copy of
@@ -48,6 +48,22 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   removes the lock file. `bell-pr start --group` never reuses a BELL PR
   that runs without group work: it says to stop that one first and exits
   with 1.
+- **The Group page: who holds what, in the app.** With group work on, the
+  sidebar has a **Group** item (`#/group`). The page shows one repository
+  of the group: its people and who is looking at the board now, and each
+  hold with its holder, title, paths and time, kept current from the feed
+  without a reload. Under **Start work** you type a title and paths, and
+  the page says before you take the hold whether another one is in the way
+  and whose; the answer updates by itself when the board changes. You
+  release your own holds, and an admin revokes someone else's after one
+  question. The person at the host starts group work and adds a repository
+  there, an admin invites with a one-time code, and a paired device joins
+  by typing it. A chip says whether the board is live, updated every 10
+  seconds or reconnecting. Using the same identity on another device and
+  removing a person stay API-only. The page shows holds and stops nothing:
+  a hold still does not keep a tool, an editor or a push from writing
+  outside it. Without the switch the page says how to turn group work on,
+  and the sidebar has no Group item. `docs/group-work.md` describes it.
 - **A coordination core for several people on one project, its integration
   not reachable yet.** `server/coordination.ts` grants claims on files all
   or nothing, waits for task dependencies, and moves a dedicated branch one

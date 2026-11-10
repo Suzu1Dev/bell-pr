@@ -11,9 +11,9 @@ line and the API. Once people have joined, an admin adds repositories to
 the group, and each person says which files and folders they are working on
 by taking a [hold](#holds). BELL PR refuses a hold that meets one already
 held, and everyone who follows that repository's
-[live feed](#the-live-feed) hears of each change. All of that is the API
-only. The Group page comes later: nothing in the app shows the group yet,
-and no page changes when group work is on. Group work **does not protect
+[live feed](#the-live-feed) hears of each change. The app shows it on
+[the Group page](#the-group-page), where people also set up, invite, join
+and take holds. Group work **does not protect
 anything at write time**: a hold does not stop a tool, an editor or a push
 from writing outside it.
 [What is promised and what is not](#what-is-promised-and-what-is-not) lists
@@ -79,6 +79,96 @@ directory has to be on a local file system
 why), and one that supports hard links: a strict lock is written aside and
 linked into place.
 
+## The Group page
+
+With group work on, the sidebar of the app has a **Group** item, and the
+page is at `#/group`. Without the switch the sidebar has no such item, and
+that address says that group work is off and shows the line that turns it
+on.
+
+**What it shows.** One repository of the group at a time. At the top are
+its name (a picker when the group has more than one, or when an admin can
+add another) and a circle for each person, with the first two characters
+of their name (three circles and a count when there are more than four
+people); a ring marks the people who are looking at this board now.
+**Held now** has one row for each [hold](#holds), oldest first: who holds
+it and since when, its title and its paths. Your own rows say **You** and
+have **Release**. An admin has **Revoke** on the other rows, and the page
+asks once before it revokes. A hold that ends while the pointer or the
+keyboard focus is in the list keeps its row, marked "No longer held",
+until both have left, so that no button moves under them. When
+[group work has stopped](#when-group-work-stops), the page says so and
+shows no board.
+
+**Set up.** In a browser that uses the install token (the one
+`bell-pr open` opens on the host), the page shows **Start group work
+here**. Type your name and press **Start group work**: the page sets the
+group up, as `bell-pr group setup` does, and you join as an admin. In a
+group that is set up already, it only adds you as one more admin. Then
+choose the group's first repository under **Add a repository**, among the
+ones this BELL PR has ([the group's repositories](#the-groups-repositories)
+says what adding does); an admin adds further ones from the picker at the
+top. While the group has no repository, the page says so and asks again
+every 10 seconds, so the first repository shows without a reload. Once a
+board is on the page, a repository that someone else adds shows in the
+picker after the page is loaded again. A paired device cannot set the
+group up, and its page says where that is done.
+
+**Invite.** The **Invite** button is there for an admin, and for anyone
+who has joined in a browser that uses the install token. Type the person's
+name, tick **Admin** when they are to be one, and press **Create code**.
+The code is shown once, with the time it stops working and a button that
+copies it. [Invite people](#invite-people) has the rules.
+
+**Join.** On a paired device that has not joined, the page shows **Join
+this group**: type the code and press **Join**. A refusal (a wrong or used
+code, too many wrong ones, a full group) shows under the field in the
+server's words. The browser keeps the participant token in its storage
+for this address, so the page knows you the next time. A person who has
+been removed is asked to join again.
+
+**What the form's answer means.** Under **Start work**, type a title and
+the paths, one per line. A moment after the last key the page asks
+[`check`](#check-first), and it asks again whenever the board changes, so
+the box under the paths updates by itself:
+
+- "Nothing in the way, in what BELL checked": at the time shown, no hold
+  met the paths typed. That is an answer and not a hold: someone can take
+  a path a moment later. **Take hold** then takes the hold, or it is
+  refused whole and the box says who holds what, after "Not taken" when
+  the refusal reaches the page before the board with that hold does.
+- "**Ada** holds `src/api` — Fix pagination, since 13:40": that hold is in
+  the way. A hold of your own is in the way too ("You hold …"). **Take
+  hold** is off until the paths change or the hold ends.
+- "Cannot be held: …" names the typed paths that
+  [cannot be held](#paths-that-cannot-be-held). **Take hold** is off.
+- No box: no path is typed, or the page has no answer for the paths and
+  the board it shows now, as right after a key or a change of the board,
+  and while it is reconnecting. **Take hold** is off then, and while the
+  title is empty. A refusal of another kind (`slowDown`, for example)
+  shows as the server's sentence, and a check that got no answer says that
+  BELL PR cannot be reached.
+
+**The chip's three words.** The chip next to the repository says how the
+board on the page is kept current, and "as of" says when it was last
+confirmed:
+
+- **Live**: a request of the page waits on the
+  [live feed](#the-live-feed), and the board changes as soon as the host
+  answers.
+- **Updating every 10 s**: the host had no place for one more waiting
+  request (`tooManyWaiters`). The page asks every 10 seconds instead, and
+  tries a waiting request again after a minute.
+- **Reconnecting**: the last request failed, or had no answer after 40
+  seconds. The page keeps the board it has, with its "as of" time, tries
+  again after 1, 2 and 5 seconds and then every 15, and the form gives no
+  answer until a request succeeds. A page that has no board yet says
+  "Reconnecting" in its place.
+
+**What stays API-only.**
+[Using the same identity on another device](#use-the-same-identity-on-another-device)
+and [removing a person](#remove-a-person) are not on the page.
+
 ## Set it up
 
 On the computer that runs BELL PR:
@@ -122,7 +212,7 @@ Give the code to that person over a channel you trust.
 
 ## Join
 
-There is no page for joining yet. Joining is one API request from the
+Joining is one API request from the
 device that joins, with the app token that device already uses (on the
 host, the install token in `<data dir>/api-token`):
 
@@ -552,5 +642,3 @@ Not promised:
   Admin and member only decide who may invite and remove people, add
   repositories to the group and revoke someone else's hold.
 - **One host.** If the BELL PR on the host is down, the group is down.
-- **No Group page yet.** Until it ships, the command line and the API are
-  the only way to use group work.
