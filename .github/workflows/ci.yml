@@ -202,7 +202,7 @@ jobs:
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.cache/ms-playwright
-          key: ms-playwright-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}-chromium
+          key: playwright-chromium-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}
       - name: Install packages, Chromium's libraries, and Chromium on a cache miss
         run: |
           version="${{ steps.playwright-version.outputs.version }}"
@@ -223,7 +223,7 @@ jobs:
         run: |
           set -o pipefail
           # Cut at a file boundary to balance the shards; see test-cli docs.
-          cut=e2e/real-run-journey.spec.ts
+          cut=e2e/responsive.spec.ts
           files=()
           while IFS= read -r file; do
             if [[ "$file" < "$cut" ]]; then
