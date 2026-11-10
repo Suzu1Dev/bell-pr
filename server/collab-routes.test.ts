@@ -243,11 +243,11 @@ test("before setup the group routes say so, only the person at the host sets it 
     (await f.post("/join", { ...f.install, "x-bell-locale": locale }, wrong)).json.error;
   assert.equal(
     await said("en"),
-    "Group work has stopped. Fix the cause on the host (`bell-pr group status` names it), then restart BELL PR.",
+    "Group work has stopped. Fix the cause on the host (`bell-pr group status` or the server log names it), then restart BELL PR.",
   );
   assert.equal(
     await said("zh-TW"),
-    "小組協作已停止。請先在主機上排除原因（`bell-pr group status` 會顯示原因），再重新啟動 BELL PR。",
+    "小組協作已停止。請先在主機上排除原因（`bell-pr group status` 或伺服器記錄會顯示原因），再重新啟動 BELL PR。",
   );
   assert.equal(outcome(await f.post("/setup", f.install)), "409 missing");
   assert.equal(existsSync(f.paths.coordination), false);
@@ -483,6 +483,7 @@ test("a removed admin's waiting codes add nobody and no longer count; two admins
   const fromFay: string[] = [];
   for (const body of [{ name: "Gil", admin: true }, { name: "Hal" }, { self: true }])
     fromFay.push(await f.invite(fay.who, body));
+  // At the host, with Fay's participant token riding along: still the host's code.
   const fromHost = await f.invite({ ...fay.who, ...f.install }, { name: "Ida" });
   const fromAda = await f.invite(c.who.admin, { name: "Jo" });
   assert.equal(outcome(await removeAsAda(fay.id)), "200");

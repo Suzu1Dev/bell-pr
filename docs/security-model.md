@@ -80,9 +80,10 @@ what BELL PR trusts, what it does not, and the limits of each protection.
     minutes. It never puts the token in a URL and masks it in logs. An
     invite code is kept as its SHA-256 in memory, works once and lasts 10
     minutes.
-  - A missing, unknown or removed participant token is answered 403 and
-    never signs a device out. Removing a person unpairs their device only
-    when the admin asks for that.
+  - Where a request needs a participant, a missing, unknown or removed
+    participant token is answered 403 and never signs a device out
+    (`GET /api/collab` answers 200 without `me`). Removing a person
+    unpairs their device only when the admin asks for that.
   - Roles are not a security boundary. Everyone in the group uses a paired
     device or sits at the host, and a paired device can use everything in
     that BELL PR: start agents, read every project, publish. Admin and

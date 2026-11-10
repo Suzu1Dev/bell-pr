@@ -118,7 +118,7 @@ export default {
       `${name} is already running with the data directory ${dataDir} (process ${pid}). Run \`${bin} open\` to open it, or stop that process first.`,
     /** Strict rule (coordination): a lock whose holder cannot be shown to have stopped. */
     dataDirHolderUnconfirmed: ({ dataDir, file }: { dataDir: string; file: string }) =>
-      `${name} cannot tell whether the process holding the data directory ${dataDir} has stopped: its lock ${file} comes from another container, another machine or an older version, or cannot be read. Such a lock is never replaced automatically. Make sure nothing uses this data directory any more, then remove ${file} and start again.`,
+      `${name} cannot tell whether the process holding the data directory ${dataDir} has stopped: its lock ${file} comes from another container, another machine or an older version, or cannot be read. This start does not replace such a lock by itself. Make sure nothing uses this data directory any more, then remove ${file} and start again.`,
     /** `start --group` or a `group` command: the running instance was started without group work. */
     withoutGroup: ({ url }: { url: string }) =>
       `${name} is already running at ${url} without group work. Stop it first, then start it with \`${bin} start --group\`.`,
