@@ -27,7 +27,7 @@ import type {
 import { readApiToken } from "../api-token.js";
 import { collabId, sideEntry, type CollabHost, type CollabSide } from "../collab-host.js";
 import { CollabInvites, inviteTtl, maxInvites, type Invite } from "../collab-invites.js";
-import { adminOnly, collabErrors, notJoined, refuse } from "../collab-refusal.js";
+import { adminOnly, collabErrors, notJoined, reasonOf, refuse } from "../collab-refusal.js";
 import { participantHeader } from "../coordination-routes.js";
 import type { Actor } from "../coordination.js";
 import type { DeviceTokens } from "../device-tokens.js";
@@ -243,7 +243,7 @@ export function registerCollabRoutes(
               revoked += 1;
             } catch (error) {
               // A hold that ended in the meantime is not counted.
-              if (!(error instanceof AppError) || error.statusCode >= 500) throw error;
+              if (reasonOf(error) !== "ended") throw error;
             }
           }
         return person.deviceId;

@@ -232,7 +232,10 @@ export function registerCollabBoardRoutes(
           if (sideEntry(host.side().people, actor.id)?.removedAt) {
             await coordinator
               .release(actor, projectId, claim.id, { fence: claim.fence })
-              .catch(() => undefined);
+              .catch((error) => {
+                // An admin's revoke was there first.
+                if (reasonOf(error) !== "ended") throw error;
+              });
             throw notJoined();
           }
           return holdOf(host.side(), projectId, claim);

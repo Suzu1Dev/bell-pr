@@ -520,6 +520,29 @@ test("remove: a take under way for the removed person is refused, and holds noth
   assert.deepEqual(board.people.map((person) => person.name), ["Ada", "Dee"]);
 });
 
+test("remove: a take under way whose hold cannot be released again is answered that failure", async (t) => {
+  const g = await group(t);
+  const { f, who, ben } = g;
+  const project = await g.add("widgets");
+  const first = heldUp(t);
+  t.mock.method(Coordinator.prototype, "release", () =>
+    Promise.reject(new AppError("No room", 507, { details: { reason: "full" } })),
+  );
+  const taking = g.work(who.member, project, { title: "Parser", scopes: ["src"] });
+  await until(() => first.reached);
+
+  assert.equal((await f.post(`/people/${ben.id}/remove`, who.admin)).status, 200);
+  first.go();
+  assert.equal(outcome(await taking), "507 full");
+  // The hold stayed, under his name, for an admin to end.
+  const board = await g.board(project);
+  assert.deepEqual(board.held.map((hold) => hold.title), ["Parser"]);
+  assert.deepEqual(
+    board.people.find((person) => person.id === ben.id),
+    { id: ben.id, name: "Ben", removed: true },
+  );
+});
+
 test("the feed: the board at once for who is behind; who is current waits for a change, two requests a person at most", async (t) => {
   const g = await group(t);
   const { f, who, ben } = g;
