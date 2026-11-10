@@ -42,6 +42,7 @@ async function commandsOnOneLine(page: Page, width: number) {
   await page.setViewportSize({ width, height: 800 });
   const problems = await page.evaluate(() => {
     const found: string[] = [];
+    if (!document.querySelector(".welcome-install code")) found.push("no install command");
     const range = document.createRange();
     for (const code of document.querySelectorAll(".welcome-install code")) {
       const texts = [...code.childNodes].filter(

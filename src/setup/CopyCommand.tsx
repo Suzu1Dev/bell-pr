@@ -64,6 +64,7 @@ export function CopyCommand({
           ref={code}
           className={codeClassName}
           tabIndex={codeLabel ? 0 : undefined}
+          role={codeLabel ? "region" : undefined}
           aria-label={codeLabel}
         >
           {command}

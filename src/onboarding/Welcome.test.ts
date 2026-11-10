@@ -178,7 +178,7 @@ test("with no provider ready, Welcome shows how to install one", () => {
     assert.match(
       html,
       new RegExp(
-        `<code class="welcome-command" tabindex="0" aria-label="Scroll the command: ${command.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}">${command.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}</code>`,
+        `<code class="welcome-command" tabindex="0" role="region" aria-label="Scroll the command: ${command.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}">${command.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}</code>`,
       ),
       command,
     );
@@ -190,7 +190,7 @@ test("with no provider ready, Welcome shows how to install one", () => {
   assert.match(zh, /歡迎使用 BELL PR/);
   assert.match(
     zh,
-    /<code class="welcome-command" tabindex="0" aria-label="左右捲動指令：npm install -g @openai\/codex">npm install -g @openai\/codex<\/code>/,
+    /<code class="welcome-command" tabindex="0" role="region" aria-label="左右捲動指令：npm install -g @openai\/codex">npm install -g @openai\/codex<\/code>/,
   );
   assert.match(zh, /其他安裝方式請見 <a[^>]*>Codex CLI<\/a>/);
   assert.match(zh, /href="https:\/\/github.com\/openai\/codex"/);
