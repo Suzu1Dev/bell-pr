@@ -619,7 +619,10 @@ Group requests answer 503 with `reason: "stopped"` (set-up answers 409), and
 `GET /api/collab` and `GET /api/status` carry the reason. The one request
 whose write stopped group work can answer 503 with the reason itself,
 `notSingleWriter` or `unavailable`. The server log has a "Group work
-stopped" line with the cause. The rest of BELL PR keeps working.
+stopped" line with the cause. When the lock file itself is gone,
+`bell-pr group status` finds no running BELL PR and cannot print the
+reason: read it in the log or in `GET /api/collab`. The rest of BELL PR
+keeps working.
 
 A stopped group stays stopped until BELL PR is restarted, and BELL PR
 never creates or repairs the group's files by itself. Fix the cause below,
@@ -631,7 +634,7 @@ then restart BELL PR.
 | `sideMissing` | `coordination.json` exists, but `collab.json` is missing or does not say that the group was set up. Also when set-up could not write `collab.json` | Restore both files together from one backup |
 | `missing` | `collab.json` says the group was set up, but `coordination.json` is gone | Restore both files together from one backup |
 | `damaged` | `coordination.json` cannot be read or is not consistent | Restore both files together from one backup |
-| `notSingleWriter` | The data directory's lock is no longer this process's: it was removed or replaced while BELL PR ran | Make sure only one BELL PR uses the data directory, then restart it |
+| `notSingleWriter` | The data directory's lock is no longer this process's: it was removed or replaced while BELL PR ran, or could not be read when BELL PR checked it | Make sure only one BELL PR uses the data directory, then restart it |
 | `unavailable` | Writing `coordination.json` failed, for example on a full disk | Fix what stopped the write, then restart; BELL PR reads the file back from disk |
 | `closed` | BELL PR is shutting down | Start it again |
 

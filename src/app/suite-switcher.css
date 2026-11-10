@@ -1,0 +1,79 @@
+/* The product switcher: its button at the end of the sidebar's logo row, or
+   beside the menu button where the sidebar is a drawer. */
+.breadcrumb .suite-trigger {
+  display: none;
+}
+@media (max-width: 760px) {
+  .brand-row .suite-trigger {
+    display: none;
+  }
+  .breadcrumb .suite-trigger {
+    display: inline-flex;
+  }
+}
+/* Below 390 px present=1's sample badge leaves the button no room: the top
+   bar would push the quick switch off the screen. */
+@media (max-width: 389px) {
+  .topbar:has(.presentation-sample-badge) .breadcrumb .suite-trigger {
+    display: none;
+  }
+}
+.suite-switcher {
+  width: min(360px, calc(100vw - 32px));
+  padding: 0;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 16px;
+  margin: auto;
+  background: var(--color-surface);
+  color: var(--color-text);
+  box-shadow: var(--shadow-3);
+}
+.suite-switcher::backdrop {
+  background: var(--color-overlay);
+}
+.suite-switcher header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-3) var(--space-3) var(--space-3) var(--space-5);
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+.suite-switcher h2 {
+  font-size: var(--text-md);
+  font-weight: 550;
+}
+.suite-switcher ul {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: var(--space-2);
+  list-style: none;
+}
+.suite-switcher li > * {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0 var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+}
+.suite-switcher a:hover {
+  background: var(--color-accent-50);
+  color: var(--color-accent-700);
+}
+.suite-switcher strong {
+  font-size: var(--text-sm);
+  font-weight: 550;
+}
+.suite-switcher small {
+  grid-row: 2;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+.suite-switcher em {
+  grid-row: 1 / span 2;
+  grid-column: 2;
+  font-size: var(--text-2xs);
+  font-style: normal;
+  color: var(--color-text-muted);
+}

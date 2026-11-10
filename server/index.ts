@@ -725,6 +725,7 @@ export async function startServer(
       readApiToken: () => readApiToken(paths.apiToken),
       apiTokenFile: paths.apiToken,
       ...(collab ? { collab } : {}),
+      suiteLinks: config.suiteLinks,
     });
     handler = app;
 

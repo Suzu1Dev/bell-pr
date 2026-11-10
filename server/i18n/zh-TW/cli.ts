@@ -92,7 +92,7 @@ const m: Translation<typeof en> = {
     dataDirInUse: ({ dataDir, pid }) =>
       `${name} 已使用資料目錄 ${dataDir} 執行中（行程 ${pid}）。執行 \`${bin} open\` 即可開啟，或先停止該行程。`,
     dataDirHolderUnconfirmed: ({ dataDir, file }) =>
-      `${name} 無法確認持有資料目錄 ${dataDir} 的行程是否已停止：它的鎖 ${file} 來自其他容器、其他電腦或舊版本，或無法讀取。這種鎖不會自動被取代。請先確認已沒有任何程式使用此資料目錄，再刪除 ${file} 後重新啟動。`,
+      `${name} 無法確認持有資料目錄 ${dataDir} 的行程是否已停止：它的鎖 ${file} 來自其他容器、其他電腦或舊版本，或無法讀取。這次啟動不會自行取代這種鎖。請先確認已沒有任何程式使用此資料目錄，再刪除 ${file} 後重新啟動。`,
     withoutGroup: ({ url }) =>
       `${name} 已在 ${url} 執行，但沒有開啟小組協作。請先停止它，再用 \`${bin} start --group\` 啟動。`,
     listenFailed: ({ address, reason }) =>

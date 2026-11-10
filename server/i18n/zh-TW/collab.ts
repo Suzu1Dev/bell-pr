@@ -8,7 +8,7 @@ const bin = product.binNames[0];
 /** 小組協作：共用同一個執行中 BELL PR 的人（collab-host.ts、routes/collab.ts）。 */
 const m: Translation<typeof en> = {
   notSetUp: `這個 ${name} 尚未設定小組協作。`,
-  stopped: `小組協作已停止。請先在主機上排除原因（\`${bin} group status\` 會顯示原因），再重新啟動 ${name}。`,
+  stopped: `小組協作已停止。請先在主機上排除原因（\`${bin} group status\` 或伺服器記錄會顯示原因），再重新啟動 ${name}。`,
   hostOnly: `只有執行 ${name} 的那台電腦可以設定小組協作。`,
   notJoined: "你在這台裝置上尚未加入這個小組，或已被移出。",
   adminOnly: "只有小組管理員可以執行這個動作。",

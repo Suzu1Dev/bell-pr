@@ -69,8 +69,9 @@ have one writer:
   start without `--group` is refused in the same way: no start replaces a
   strict lock it cannot confirm.
 - **A lock that is removed or replaced while its BELL PR runs stops group
-  work** in that BELL PR, with the reason `notSingleWriter`. It writes
-  nothing more to the group's files until it is restarted.
+  work** in that BELL PR, with the reason `notSingleWriter`. So does one
+  that could not be read at a moment BELL PR checked it. It writes nothing
+  more to the group's files until it is restarted.
 
 Stopping BELL PR (Ctrl+C, or a service stop) removes the lock. The data
 directory has to be on a local file system
@@ -142,8 +143,9 @@ token. `GET /api/collab` with that header answers with `me`: the id, the
 name and whether the person is an admin.
 
 A group holds at most 1000 people, removed ones included, because a
-person cannot be deleted. After that, joining answers 409 with
-`reason: "full"`.
+person cannot be deleted. After that, a join that would add a person
+answers 409 with `reason: "full"`. A code a person made for themself still
+works, because it adds nobody.
 
 Ten wrong codes in 15 minutes lock that caller (one paired device, or the
 host) out of joining for 15 minutes. Other people's codes stay valid.
@@ -164,8 +166,10 @@ A group admin sends `POST /api/collab/people/<id>/remove` with the body
 `{}`, or `{ "unpair": true }`.
 
 - The person is marked as removed, and their participant token is answered
-  403 (`notJoined`) from then on. The invite codes they gave out, and a
-  code they made for themself, stop working.
+  403 (`notJoined`) from then on. The invite codes they gave out with
+  their participant token, and a code they made for themself, stop
+  working. A code made at the host with the install token is the host's,
+  whoever typed the command, and keeps working.
 - Whatever the person holds ends, in every repository of the group: each
   [hold](#holds) is revoked in the admin's name, and its task is free to
   take again. `revoked` in the answer counts them. Their requests waiting
@@ -173,12 +177,15 @@ A group admin sends `POST /api/collab/people/<id>/remove` with the body
   is harmless: it ends whatever that person still holds.
 - Removing does not unpair anything by itself: a removed person on a
   paired device can still use everything else in that BELL PR. With
-  `"unpair": true`, the paired device the person joined from is unpaired
-  too, when one was recorded; the answer says so (`"unpaired": true`).
-  Two devices are never unpaired this way (`"unpaired": false`): the one
-  the request comes from, and one that a person still in the group joined
-  from. A device added with a code for oneself is not recorded. Revoke
-  such a device with `bell-pr devices revoke <id>`.
+  `"unpair": true`, the paired device the person first joined from is
+  unpaired too, when one was recorded; the answer says so
+  (`"unpaired": true`). Two devices are never unpaired this way
+  (`"unpaired": false`): the one the request comes from, and one that a
+  person still in the group first joined from. A device added with a code
+  for oneself is not recorded: it is not unpaired with its person, and it
+  is not kept when another person who first joined from it is removed.
+  Check with `bell-pr devices list`, and revoke a device with
+  `bell-pr devices revoke <id>`.
 - An admin cannot remove themself (409), and a removal cannot be undone.
   Invite the person again; they join as a new person with a new id.
 - A person's id is in the answer to their join, in `collab.json` on the
@@ -437,9 +444,10 @@ token, or a paired device's). The routes exist only with the switch.
   the set-up answers 503 with `reason` `notSetUp` or `stopped`. The one
   request whose write stops group work can answer 503 with the reason
   itself, `notSingleWriter` or `unavailable`.
-- A missing, unknown or removed participant token is answered 403 with
-  `reason: "notJoined"`, never 401. A 401 still means what it meant before:
-  the app token is missing or wrong.
+- Where a request needs a participant, a missing, unknown or removed
+  participant token is answered 403 with `reason: "notJoined"`, never 401
+  (`GET /api/collab` answers 200 without `me`). A 401 still means what it
+  meant before: the app token is missing or wrong.
 - A refusal is `{ reason, error }`: `reason` is the word in the table and
   `error` a sentence in the language of the request's `x-bell-locale`
   header (English or Traditional Chinese). Three refusals say more:
@@ -470,7 +478,8 @@ When it happens while a repository is added, the answer is `cloneFailed`,
 the copy is deleted and the repository is not in the group, but it counts
 toward the 100. Add it again.
 
-`bell-pr group status` prints the reason;
+`bell-pr group status` prints the reason, and the server log has it in a
+"Group work stopped" line;
 [Group work has stopped](troubleshooting.md#group-work-has-stopped) says
 what each one means and what to do.
 
@@ -482,7 +491,7 @@ All are in the data directory, only with group work: the two files from
 | File | What it holds |
 | --- | --- |
 | `coordination.json` | Each person's id, role (admin or member), the time they were added and the SHA-256 of their participant token; never the token. Each repository of the group, with the folder of its bare copy and the commit it was copied at. Each task, with who made it and when, and every hold, ended ones included: its paths, who holds it, when it was taken and when and by whom it ended, and the reason of a revoke |
-| `collab.json` | The group's id and set-up time, and for each person: name, the time they joined, whether they are an admin, the time they were removed, and the id of the paired device they joined from. For each repository: its name, its id in this BELL PR and the time it was added. For each task: its title, the id of its contribution when one was given, and the time it was made |
+| `collab.json` | The group's id and set-up time, and for each person: name, the time they joined, whether they are an admin, the time they were removed, and, when they joined from a paired device, that device's id. For each repository: its name, its id in this BELL PR and the time it was added. For each task: its title, the id of its contribution when one was given, and the time it was made |
 | `collab/<project id>.git` | The group's bare copy of a repository: the commits and files of its default branch, as they were when it was added |
 
 The lock file `bellpr.lock` also carries `"strict": true`. Back the two
