@@ -58,7 +58,9 @@ and sends nothing to GitHub. Open it from Home (**Try the sample project**) or
 **Sample** in the sidebar once BELL PR is running.
 
 Use it to learn the review flow before you import a real repository. When
-`bell-pr doctor` is not ready, start with `bell-pr start --force` so this
+the AI provider is the only required check that fails, `bell-pr` still opens
+and Welcome shows how to install one; the tour is on that screen. When
+another required check fails, start with `bell-pr start --force` so this
 tour can open. A real agent run still waits for a signed-in AI provider.
 
 ## Before you start
@@ -91,9 +93,10 @@ everything above inside your WSL distribution. The [Windows installer](#windows-
 can prepare the tools there; sign in afterward. Native Windows is not supported.
 
 When `bell-pr doctor` reports every required check green, continue.
-`bell-pr start` exits before it listens until then. With no AI provider
-signed in, `bell-pr start --force` still opens BELL PR so you can take the
-sample tour; agent runs and publishing wait until a provider is ready.
+`bell-pr start` still listens when the AI provider is the only required
+check that fails, and Welcome shows how to install one. It exits before it
+listens when any other required check fails. `bell-pr start --force` starts
+anyway. Agent runs and publishing wait until a provider is ready.
 
 ## Quickstart
 
@@ -115,9 +118,10 @@ sample tour; agent runs and publishing wait until a provider is ready.
 4. Take the sample tour, import a repository, or find a project to
    contribute to.
 
-`npx bell-pr` is `bell-pr start`. It listens only when `bell-pr doctor` is
-ready; otherwise it exits and prints the fix for each failed check. `npx
-bell-pr start --force` opens the sample tour anyway.
+`npx bell-pr` is `bell-pr start`. It listens when `bell-pr doctor` is ready,
+and also when the AI provider is the only required check that fails.
+Otherwise it exits and prints the fix for each failed check. `npx bell-pr
+start --force` opens the sample tour anyway.
 
 **Lost the address? Run `bell-pr open`** (or `npx bell-pr open` if you
 started with `npx`). It prints the address again, without the API token,
@@ -130,7 +134,9 @@ through a whole contribution.
 ## Installation options
 
 Choose one method. Git, GitHub sign-in and an AI CLI remain prerequisites for
-real work; the sample tour can run with `bell-pr start --force`.
+real work. With no AI CLI, `bell-pr` still opens Welcome, which shows how to
+install one; the sample tour is there. `bell-pr start --force` starts when
+another required check fails.
 See the [installation guide](docs/installation.md) for options and PATH setup.
 
 ### macOS and Linux
@@ -245,12 +251,24 @@ problem. See [Before you start](#before-you-start).
 
 **With no AI provider installed or signed in:** `bell-pr doctor` exits
 non-zero and marks the required **AI provider** check failed. `bell-pr
-start` then exits non-zero before it listens, and prints that checklist
-with the command that fixes each failed check. `bell-pr start --force`
-starts anyway and warns that the check was skipped. Welcome lets you
-continue; you can take the **sample tour** (no AI call). Starting a real
-agent run is refused until at least one of Codex CLI, Claude Code or the
-Antigravity CLI is installed and signed in; Discovery also needs a signed-in GitHub CLI.
+start` still listens when that is the only required failure, and Welcome
+shows how to install and sign in to one:
+
+- Codex CLI: `npm install -g @openai/codex`, then `codex login`. See the
+  [Codex CLI](https://github.com/openai/codex) for other ways to install it.
+- Claude Code: `npm install -g @anthropic-ai/claude-code`, then
+  `claude auth login`. See the
+  [Claude Code documentation](https://code.claude.com/docs/en/overview)
+  for other ways to install it.
+- Antigravity CLI: `curl -fsSL https://antigravity.google/cli/install.sh | bash`,
+  then run `agy` once to sign in.
+
+If any other required check fails, `bell-pr start` exits non-zero before it
+listens and prints that checklist. `bell-pr start --force` starts anyway
+and warns that the check was skipped. You can take the **sample tour** (no
+AI call). Starting a real agent run is refused until at least one of Codex
+CLI, Claude Code or the Antigravity CLI is installed and signed in;
+Discovery also needs a signed-in GitHub CLI.
 
 ### Cost of a sample run
 
@@ -602,9 +620,10 @@ leaked — it also invalidates every paired device.
 
 BELL PR needs no configuration. Every setting below is an environment
 variable read at start; `bell-pr start` also takes `--port`, `--host`,
-`--data-dir`, `--no-open`, `--force`, `--group` and `--env-file <file>`. `start` exits
-before it listens when a required `bell-pr doctor` check fails; `--force`
-starts anyway. Values set in the app's
+`--data-dir`, `--no-open`, `--force`, `--group` and `--env-file <file>`. `start`
+still listens when the AI provider is the only required check that fails.
+It exits before it listens when any other required `bell-pr doctor` check
+fails; `--force` starts anyway. Values set in the app's
 Settings are used unless a variable sets them.
 
 | Variable | Default | What it sets |
@@ -645,9 +664,12 @@ docker exec bell-pr bell-pr open --print --print-token
 
 The image includes Git, the GitHub CLI and the Codex CLI; you can install
 Claude Code into the container yourself. Its command is `bell-pr start`,
-which exits before it listens when `bell-pr doctor` is not ready. To open
-the sample tour before a provider is signed in, run
-`docker run ... bell-pr start --force` (that replaces the image command).
+which still listens when the AI provider is the only required check that
+fails, and exits before it listens when another required check fails. To
+open the sample tour before a provider is signed in, plain `bell-pr start`
+is enough when that is the only failure; `docker run ... bell-pr start
+--force` starts when another required check fails (that replaces the image
+command).
 Docker is **beta**: the agent
 sandbox needs three extra `--security-opt` options. Read
 [Docker](docs/docker.md) before you use it, and

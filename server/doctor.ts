@@ -1405,16 +1405,19 @@ export function formatStartRefusal(report: DoctorReport, dataDir?: string): stri
 export async function readinessChecklist(options: {
   dataDir: string;
   port?: number;
-}): Promise<{ ready: boolean; text: string }> {
+}): Promise<{ ready: boolean; providerOnly: boolean; text: string }> {
   const saved = new AppSettingsService(options.dataDir);
   return withAppSettings(saved, async () => {
     const report = await loadDoctorReport(
       { dataDir: options.dataDir, port: options.port },
       saved,
     );
+    const failed = report.checks.filter((check) => check.required && check.status === "fail");
+    const providerOnly = failed.length === 1 && failed[0].id === "provider-ready";
     return {
       ready: report.ready,
-      text: report.ready ? "" : formatStartRefusal(report, options.dataDir),
+      providerOnly,
+      text: report.ready || providerOnly ? "" : formatStartRefusal(report, options.dataDir),
     };
   });
 }

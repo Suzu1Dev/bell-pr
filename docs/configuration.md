@@ -48,13 +48,14 @@ Options of `bell-pr start`:
 | `--group` | `BELLPR_GROUP=1` | off. Turns [group work](group-work.md) on |
 | `--env-file <file>` | | none |
 
-`bell-pr start` runs the same required checks as `bell-pr doctor` and exits
-with status 1 before it listens when one fails. The message is the doctor's
-checklist (each failed check and the command that fixes it) plus how to
-start anyway. `--force` skips that gate and prints a warning. The sample
-tour needs no AI provider, so `bell-pr start --force` is how you open it
-when none is signed in. A real agent run is still refused until a provider
-is ready.
+`bell-pr start` runs the same required checks as `bell-pr doctor`. When the
+AI provider is the only required check that fails, it still listens and
+Welcome shows how to install one. When any other required check fails,
+alone or together with the provider, it exits with status 1 before it
+listens. The message is the doctor's checklist (each failed check and the
+command that fixes it) plus how to start anyway. `--force` skips that gate
+and prints a warning. The sample tour needs no AI provider. A real agent
+run is still refused until a provider is ready.
 
 `--data-dir` and `--env-file` work with every command, so `open`, `doctor`,
 `group` and `version` find the data directory of the BELL PR you mean.
