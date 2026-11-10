@@ -83,7 +83,9 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   gone, and one that names no start, outside coordination, once it is 30
   seconds old;
   a claim that stays, like a lock that cannot be read, is named in the
-  refusal. A lock taken
+  refusal. Without hard links, a start gives up a lock it wrote in place
+  when another start had claimed it empty, so both cannot run; a leftover
+  claim there can refuse a start until it is removed. A lock taken
   for coordination is never replaced until its holder is shown to have
   stopped; group work takes one. Tests now hold an integration after its
   last lock check, and put holders and starts in real separate PID

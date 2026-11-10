@@ -596,7 +596,10 @@ there, then publish again.
   process id now belongs to another running Node.js program stays, because
   a start that is only suspended looks the same. If the message keeps
   coming back and no BELL PR is starting, remove the file the message
-  names.
+  names. On a file system without hard links, the same refusal can come
+  where there is no lock, only a leftover claim, and it can leave an empty
+  `bellpr.lock` behind: once the claim is gone, the next start clears
+  that by itself.
 - **"BELL PR cannot tell whether the start that was replacing a lock left
   behind in this data directory has stopped …"**: the same claim file, on
   a data directory used with [group work](group-work.md). There a claim
