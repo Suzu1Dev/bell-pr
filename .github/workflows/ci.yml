@@ -238,8 +238,8 @@ jobs:
             fi
           done < <(LC_ALL=C find e2e -name '*.spec.ts' -type f | LC_ALL=C sort)
           [[ ${#files[@]} -gt 0 ]]
-          # Shard 2's test step is shorter, so the site check runs there before the tests.
-          if [[ "$SHARD" == 2 ]]; then
+          # Shard 1's test step is shorter in this image, so the site check runs there.
+          if [[ "$SHARD" == 1 ]]; then
             node site/check-site.mjs --browser
           fi
           npm run test:e2e -- "${files[@]}" | tee "$RUNNER_TEMP/e2e-shard.log" && status=0 || status=$?
