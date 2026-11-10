@@ -206,7 +206,9 @@ function codexDenials(): string[] {
  * delete and replace. The checkout's `.git` and `.git/**` are `read`,
  * so the file cannot be edited or replaced with a directory, and Git
  * can still read it. Credential paths stay `deny`. In a write turn, the
- * paths other people hold (`held`, from heldWriteTargets) are `read` too.
+ * paths other people hold (`held`, from heldWriteTargets) are `read` too,
+ * except a path with glob characters: Codex 0.167 takes `[` or `]` as a
+ * glob, which may only be `deny`, and refuses to start the turn.
  */
 export function codexSandboxConfig(
   access: AgentAccess,
@@ -214,10 +216,11 @@ export function codexSandboxConfig(
   held: readonly string[] = [],
 ): string[] {
   const dotGit = path.join(cwd, ".git");
+  const readOnly = access === "write" ? held.filter((entry) => !/[*?[\]]/.test(entry)) : [];
   const filesystem = [
     "glob_scan_max_depth=4",
     ...codexDenials().map((entry) => `"${entry}"="deny"`),
-    ...[dotGit, `${dotGit}/**`, ...(access === "write" ? held : [])]
+    ...[dotGit, `${dotGit}/**`, ...readOnly]
       .filter(codexProfilePath)
       .map((entry) => `"${entry}"="read"`),
   ].join(", ");

@@ -88,11 +88,16 @@ test("held paths the sandbox cannot take are left to the check after the turn", 
 
 test("Codex makes held paths read-only in write turns only", async (t) => {
   const root = await checkout(t, { "src/api/users.ts": "a\n" });
-  const held = [path.join(root, "src/api/users.ts"), path.join(root, 'src/"quoted".ts')];
+  const held = [
+    path.join(root, "src/api/users.ts"),
+    path.join(root, 'src/"quoted".ts'),
+    path.join(root, "src/[draft].ts"),
+    path.join(root, "src/x]y.ts"),
+  ];
   const write = readEntries(codexSandboxConfig("write", root, held));
-  assert.ok(write.includes(path.join(root, "src/api/users.ts")));
-  // A path the profile cannot hold as a TOML key is left out, not mangled.
-  assert.ok(!write.some((entry) => entry.includes("quoted")));
+  assert.deepEqual(write.slice(2), [path.join(root, "src/api/users.ts")]);
+  // Left out: a path the profile cannot hold as a TOML key, and one Codex
+  // would take as a glob, which it allows only as deny and so would not start.
   assert.deepEqual(readEntries(codexSandboxConfig("read", root, held)), [
     path.join(root, ".git"),
     `${path.join(root, ".git")}/**`,

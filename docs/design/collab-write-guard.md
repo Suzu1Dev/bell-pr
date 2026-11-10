@@ -211,7 +211,9 @@ release).
      could not be created either: such paths are left out. A path through
      a symbolic link, or that is one, stops the sandbox from starting
      ("cannot enforce sandbox read-only path … because it crosses
-     writable symlink"): left out.
+     writable symlink"): left out. A path with `[` or `]`, which holds
+     allow, also stops Codex from starting ("filesystem glob path … only
+     supports `deny` access"): left out of the Codex profile only.
    - Case: only spellings that exist when the turn starts are covered. A
      new file in another spelling is found by the check after the turn.
    - Claude Code 2.1.321 (one Haiku turn): the Edit tool on a file in a

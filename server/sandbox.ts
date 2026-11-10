@@ -689,6 +689,9 @@ export const maxHeldWriteTargets = 200;
  * - a path below another one in the list, and paths past
  *   maxHeldWriteTargets.
  *
+ * Each sandbox may leave out more (codexSandboxConfig: glob characters;
+ * heldSandboxWriteDenials: paths that do not exist).
+ *
  * Verified with codex-cli 0.167.0 (`codex sandbox`) on Linux with
  * bubblewrap 0.11.1: a read-only file cannot be written, deleted or
  * renamed over, a read-only folder takes no new file, and its neighbours
