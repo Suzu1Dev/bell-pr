@@ -74,7 +74,7 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
-- **Start still listens when the provider is the only required check that
+- **Start now listens when the provider is the only required check that
   fails,** on the first start and on every later one. The first time,
   Welcome shows how to install Codex CLI, Claude Code or the
   Antigravity CLI, with the same commands and documentation links as the
