@@ -49,7 +49,8 @@ without JavaScript, all seven commands are visible together.
   no-inline-script rule, the screenshot copies and the 5 MB size budget.
   It pairs each `zh-tw/` page with its English page and fails when visible
   text, or `alt`, `title`, `aria-label`, `placeholder`, `label`, the document
-  title, or a description meta tag, is still the English one. Brand and
+  title, or a `description`, `og:title`, `og:description`, `twitter:title` or
+  `twitter:description` meta tag, is still the English one. Brand and
   product names may match; text inside `code`, `pre` or `kbd` is not compared.
   In `site.js` the two sides of `isZh ? zh : en` must differ.
   Missing `.mp4`/`.webm` under `assets/video/` are allowed (deploy-only) and

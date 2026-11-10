@@ -164,11 +164,7 @@ pre {
 }
 /* A hyphen or slash would otherwise break a command. wbr still breaks. */
 html[lang="zh-Hant-TW"] :not(pre):not(.command) > code {
-  display: inline-block;
-  max-width: 100%;
-  overflow-x: auto;
   white-space: nowrap;
-  vertical-align: bottom;
 }
 
 .skip-link {

@@ -142,10 +142,14 @@ function decodeEntities(text) {
     .replace(/&amp;/g, "&");
 }
 
-/** Visible text nodes, excluding code, pre and kbd. Whitespace is collapsed. */
+/**
+ * Visible text nodes, excluding code, pre and kbd. Whitespace is collapsed.
+ * `unclosed` names a skip tag still open at the end; text after it was not checked.
+ */
 function visibleTextNodes(html) {
   const nodes = [];
   const stack = [];
+  let unclosed;
   let index = 0;
   while (index < html.length) {
     if (html.startsWith("<!--", index)) {
@@ -162,6 +166,8 @@ function visibleTextNodes(html) {
           const name = raw.slice(1).trim().split(/\s/)[0].toLowerCase();
           for (let at = stack.length - 1; at >= 0; at -= 1) {
             if (stack[at] === name) {
+              // A parent close must not hide a skip tag that was never closed.
+              unclosed ??= stack.slice(at + 1).find((tag) => skipTextTags.has(tag));
               stack.splice(at);
               break;
             }
@@ -180,7 +186,7 @@ function visibleTextNodes(html) {
     const text = decodeEntities(raw).replace(/\s+/g, " ").trim();
     if (text) nodes.push(text);
   }
-  return nodes;
+  return { texts: nodes, unclosed: unclosed ?? stack.find((tag) => skipTextTags.has(tag)) };
 }
 
 /** True when `text` is only kept names, separators and digits. */
@@ -194,30 +200,33 @@ const metaNames = new Set(["description", "og:title", "og:description", "twitter
 
 /** Visible text, plus alt, title, aria-label, placeholder, label, the document title and description metas. */
 function translatableStrings(html) {
-  const found = [];
-  for (const text of visibleTextNodes(html)) found.push(["text", text]);
+  const { texts, unclosed } = visibleTextNodes(html);
+  const found = texts.map((text) => ["text", text]);
   const title = /<title>([^<]*)<\/title>/i.exec(html);
   if (title) {
     const text = decodeEntities(title[1]).replace(/\s+/g, " ").trim();
     if (text) found.push(["title", text]);
   }
+  const attr = (raw, name) => {
+    const match = raw.match(new RegExp(`(?:^|\\s)${name}\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s"'>]+))`, "i"));
+    return match?.slice(1).find((part) => part !== undefined);
+  };
   for (const match of html.matchAll(/<(?:meta|[a-z0-9]+)\b([^>]*)>/gi)) {
     const raw = match[1];
-    const value = (name) => raw.match(new RegExp(`(?:^|\\s)${name}="([^"]*)"`, "i"))?.[1];
     for (const name of ["alt", "title", "aria-label", "placeholder", "label"]) {
-      const text = value(name);
+      const text = attr(raw, name);
       if (text === undefined) continue;
       const normalized = decodeEntities(text).replace(/\s+/g, " ").trim();
       if (normalized) found.push([name, normalized]);
     }
-    const meta = value("name") || value("property");
-    const content = value("content");
+    const meta = attr(raw, "name") || attr(raw, "property");
+    const content = attr(raw, "content");
     if (meta && content && metaNames.has(meta)) {
       const normalized = decodeEntities(content).replace(/\s+/g, " ").trim();
       if (normalized) found.push([meta, normalized]);
     }
   }
-  return found;
+  return { found, unclosed };
 }
 
 /** English copy left on a zh-tw page: the same visible text, attribute or meta text as the English page. */
@@ -229,9 +238,11 @@ function checkZhTw(problems) {
       problems.push(`${file}: no English page at ${english}`);
       continue;
     }
-    const englishText = new Set(translatableStrings(fs.readFileSync(path.join(siteDir, english), "utf8")).map((item) => item[1]));
+    const zh = translatableStrings(fs.readFileSync(path.join(siteDir, file), "utf8"));
+    if (zh.unclosed) problems.push(`${file}: <${zh.unclosed}> is never closed, so the text after it was not checked`);
+    const englishText = new Set(translatableStrings(fs.readFileSync(path.join(siteDir, english), "utf8")).found.map((item) => item[1]));
     const seen = new Set();
-    for (const [kind, text] of translatableStrings(fs.readFileSync(path.join(siteDir, file), "utf8"))) {
+    for (const [kind, text] of zh.found) {
       const key = `${kind}\0${text}`;
       if (!englishText.has(text) || seen.has(key)) continue;
       seen.add(key);
@@ -251,6 +262,7 @@ function checkSiteJs(problems) {
     const zh = match[1] ?? match[2];
     const en = match[3] ?? match[4];
     if (zh === en) problems.push(`site.js: zh and en are the same "${zh}"`);
+    else if (!onlyKeptNames(zh)) problems.push(`site.js: zh is still English "${zh}"`);
   }
   if (/textContent\s*=\s*["'][^"']+["']/.test(js)) problems.push("site.js: textContent is set from a string with no zh branch");
 }
