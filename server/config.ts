@@ -28,6 +28,8 @@ export interface StartFlags {
   dev?: boolean;
   /** false for --no-open. */
   open?: boolean;
+  /** --group: host group work for the people who share this instance. */
+  group?: boolean;
 }
 
 /** How much agent work runs at once and how long turns may take. */
@@ -62,6 +64,8 @@ export interface Config {
   /** Open the address in a browser: not --no-open, BELLPR_NO_OPEN, CI or dev. */
   open: boolean;
   limits: Limits;
+  /** --group or BELLPR_GROUP=1: this instance hosts group work (collab-host.ts). */
+  collab?: true;
   /**
    * ./.bellpr in the working directory when it holds data from an older
    * version and is not the data directory in use. Only a hint is printed.
@@ -127,6 +131,8 @@ export function dataPaths(dataDir: string) {
     pairLock: path.join(dataDir, "pair-lock.json"),
     /** Project coordination: participants, tasks, claims (coordination.ts). */
     coordination: path.join(dataDir, "coordination.json"),
+    /** Group work beside coordination.json: the group's id and people's names (collab-host.ts). */
+    collab: path.join(dataDir, "collab.json"),
   };
 }
 
@@ -325,6 +331,7 @@ export function resolveConfig(
       !envFlag(env.BELLPR_NO_OPEN) &&
       !envFlag(env.CI),
     limits,
+    ...(flags.group === true || envFlag(env.BELLPR_GROUP) ? { collab: true as const } : {}),
     ...(legacyDataDir ? { legacyDataDir } : {}),
   };
 }
