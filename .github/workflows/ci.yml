@@ -205,9 +205,7 @@ jobs:
       - name: Install packages, Chromium's libraries, and Chromium on a cache miss
         run: |
           version="${{ steps.playwright-version.outputs.version }}"
-          # Chromium only. Libraries start before npm ci so a slow apt
-          # download overlaps the install. A cache hit skips the browser
-          # download and still installs the libraries.
+          # Overlap Chromium's apt libraries with npm ci; a hit still installs them and skips the browser download.
           npx --yes "playwright@${version}" install-deps chromium &
           deps=$!
           npm ci
@@ -222,10 +220,7 @@ jobs:
           BELLPR_E2E_PORT: "4599"
           SHARD: ${{ matrix.shard }}
         run: |
-          # Equal --shard runs put the long serial files on shard 1 (10.7 min).
-          # PWTEST_SHARD_WEIGHTS is not a documented Playwright 1.64 option.
-          # Pass the files on either side of this cut instead:
-          # https://playwright.dev/docs/test-cli
+          # Cut at a file boundary to balance the shards; see test-cli docs.
           cut=e2e/real-run-journey.spec.ts
           files=()
           while IFS= read -r file; do
@@ -236,18 +231,14 @@ jobs:
             fi
           done < <(LC_ALL=C find e2e -name '*.spec.ts' -type f | LC_ALL=C sort)
           [[ ${#files[@]} -gt 0 ]]
-          echo "shard ${SHARD}: ${#files[@]} files"
-          # The site check uses its own port. Run it during the suite.
-          node site/check-site.mjs --browser &
-          site=$!
-          set +e
-          npm run test:e2e -- "${files[@]}"
-          tests=$?
-          wait "$site"
-          site_status=$?
-          set -e
-          test "$tests" = 0
-          test "$site_status" = 0
+          # Shard 1's suite is shorter, so the site check runs there before the tests.
+          if [[ "$SHARD" == 1 ]]; then
+            node site/check-site.mjs --browser
+          fi
+          npm run test:e2e -- "${files[@]}" | tee "$RUNNER_TEMP/e2e-shard.log" && status=0 || status=$?
+          summary=$(grep -E '^[[:space:]]+[0-9]+ (passed|failed|flaky|skipped)' "$RUNNER_TEMP/e2e-shard.log" | sed 's/^[[:space:]]*//' | paste -sd ' ' - || true)
+          echo "shard ${SHARD}: ${#files[@]} files; ${summary}"
+          exit "$status"
       - name: Upload the traces and the report
         if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
