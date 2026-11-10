@@ -48,6 +48,7 @@ async function expectNoticeFits(
     baseURL: server.baseURL,
     locale: "en-US",
     viewport: { width, height: width < 760 ? 812 : 900 },
+    permissions: ["clipboard-read", "clipboard-write"],
   });
   try {
     const page = await context.newPage();
@@ -80,6 +81,11 @@ async function expectNoticeFits(
       expect(part.bottom, detail).toBeLessThanOrEqual(frame.bottom + 1);
     }
     expect(fit.scrollWidth, detail).toBeLessThanOrEqual(fit.clientWidth + 1);
+    await expect(notice.locator("code")).toHaveText(command);
+    if (width === 761 && locale === "en" && hash === "#/repos") {
+      await notice.getByRole("button", { name: label }).click();
+      await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe(command);
+    }
     if (width >= 761) {
       expect(fit.prefixClipped, detail).toBe(false);
       expect(fit.widestPrefixLine + 1, detail).toBeGreaterThanOrEqual(fit.prefixWidth * 0.45);
