@@ -693,6 +693,28 @@ test("a host that stops answers 503 on every route, frees nothing, and does not 
   assert.deepEqual((await g.board(project)).held, [held]);
 });
 
+test("group work that stops while BELL PR runs answers a request that waits, once a request finds out", async (t) => {
+  const g = await group(t);
+  const { f, who } = g;
+  const project = await g.add("widgets");
+  const waiting = await g.park(who.dee, project);
+  // The coordinator breaks. Nothing changes a board; the next request of anyone finds out.
+  t.mock.method(Coordinator.prototype, "authenticate", () => {
+    throw new AppError("Broken", 503, { details: { reason: "damaged" } });
+  });
+  const started = Date.now();
+  assert.deepEqual((await f.info(who.install)).json, {
+    state: "stopped",
+    reason: "damaged",
+    groupId: g.groupId,
+    host: true,
+  });
+  const ended = await waiting.reply;
+  // Well before the 25 seconds the request was willing to wait.
+  assert.ok(Date.now() - started < 10_000);
+  assert.deepEqual([ended.status, ended.body, ended.headers.connection], [204, "", "close"]);
+});
+
 test("what a person may send: 50 paths of 300 characters, a title of 120, and so many calls in a while", async (t) => {
   const g = await group(t);
   const { f, who } = g;

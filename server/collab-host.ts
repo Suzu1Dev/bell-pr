@@ -73,7 +73,10 @@ export interface CollabHost {
   setUp(): Promise<void>;
   /** Runs a change; close() waits for it, and listeners hear of it once it has landed. */
   run<T>(work: () => Promise<T>, projectId?: string): Promise<T>;
-  /** Called after each change, with its project when it has one. Returns how to stop listening. */
+  /**
+   * Called after each change, with its project when it has one, and once
+   * when group work stops. Returns how to stop listening.
+   */
   onChange(listener: (projectId?: string) => void): () => void;
   /** Refuses new work, tells the listeners, and waits for the work in flight. */
   close(): Promise<void>;
@@ -119,10 +122,22 @@ export async function openCollabHost(options: CoordinatorOptions): Promise<Colla
   const inFlight = new Set<Promise<void>>();
   const listeners = new Set<(projectId?: string) => void>();
 
+  const notify = (projectId?: string) => {
+    for (const listener of listeners) {
+      try {
+        listener(projectId);
+      } catch (error) {
+        log.warn("A group work listener failed", { error });
+      }
+    }
+  };
+
   const stop = (reason: string, error?: unknown) => {
     if (stopped !== undefined) return;
     stopped = reason;
     log.warn("Group work stopped", { reason, error });
+    // Once whoever found out is done: a listener asks for the state itself.
+    queueMicrotask(() => notify());
   };
 
   const read = await readSide(paths.collab);
@@ -173,16 +188,6 @@ export async function openCollabHost(options: CoordinatorOptions): Promise<Colla
     }
     await writeDurable(paths.collab, text);
     side = next;
-  };
-
-  const notify = (projectId?: string) => {
-    for (const listener of listeners) {
-      try {
-        listener(projectId);
-      } catch (error) {
-        log.warn("A group work listener failed", { error });
-      }
-    }
   };
 
   return {
