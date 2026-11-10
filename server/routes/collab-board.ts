@@ -4,6 +4,11 @@
  * POST check, POST work, POST holds/:claim/release and POST
  * holds/:claim/revoke. Registered by routes/collab.ts.
  *
+ * Work can name tasks it depends on. It is held only once each of them is
+ * done: its holder released it with `done`. The coordinator's own
+ * dependencies wait for an integration, which group work does not make,
+ * so these are kept in the side file and checked here.
+ *
  * Every route is a participant's. What changes something runs inside
  * host.run with its project, so the requests waiting on that board hear of
  * it. A path, a title or an id from a request is never the key of a plain
@@ -19,7 +24,15 @@ import type {
   CollabProjectsResponse,
   CollabWorkResponse,
 } from "../../shared/collab.js";
-import { boardOf, holdOf, inTheWay, nameOf, taskKey } from "../collab-board.js";
+import {
+  boardOf,
+  dependencyOf,
+  holdOf,
+  inTheWay,
+  nameOf,
+  taskKey,
+  taskOf,
+} from "../collab-board.js";
 import { collabId, sideEntry, type CollabHost } from "../collab-host.js";
 import { CollabHub } from "../collab-hub.js";
 import { PersonLimit } from "../collab-limits.js";
@@ -33,6 +46,8 @@ import type { Store } from "../store.js";
 export const maxPaths = 50;
 export const maxPathLength = 300;
 export const maxTitle = 120;
+/** As many as the coordinator lets a task depend on. */
+export const maxDependencies = 50;
 /** Per person: 30 calls of `work` in 10 minutes, 120 of `check` in a minute. */
 export const workLimit = { max: 30, windowMs: 10 * 60_000 };
 export const checkLimit = { max: 120, windowMs: 60_000 };
@@ -56,8 +71,15 @@ const feedSchema = z.object({
   wait: z.coerce.number().int().min(0).max(25).default(0),
 });
 const checkSchema = z.strictObject({ scopes });
-const workSchema = z.strictObject({ title: line.pipe(z.string().min(1).max(maxTitle)), scopes });
-const releaseSchema = z.strictObject({ fence: z.number().int().min(0) });
+const workSchema = z.strictObject({
+  title: line.pipe(z.string().min(1).max(maxTitle)),
+  scopes,
+  dependsOn: z.array(z.string().max(64)).max(maxDependencies).optional(),
+});
+const releaseSchema = z.strictObject({
+  fence: z.number().int().min(0),
+  done: z.boolean().optional(),
+});
 const revokeSchema = z.strictObject({});
 
 const invalidScope = (invalid: string[] = []) =>
@@ -202,8 +224,31 @@ export function registerCollabBoardRoutes(
       projectOf(projectId);
       const { held, invalid } = heldScopes(body.scopes);
       if (invalid.length || !held.length) throw invalidScope(invalid);
+      const dependsOn = [...new Set(body.dependsOn ?? [])];
       const hold = await host.run(async () => {
         const coordinator = host.coordinator();
+        /**
+         * 400 `dependencyUnknown` for a named task this repository does not
+         * have, 409 `dependencyPending` while one is not done. A task can
+         * name only tasks made before it, and what it names never changes,
+         * so dependencies never form a cycle; a task that is done stays done.
+         */
+        const refuseWaiting = () => {
+          if (!dependsOn.length) return;
+          const view = coordinator.project(actor, projectId);
+          const unknown = dependsOn.filter((id) => !view.tasks.some((task) => task.id === id));
+          if (unknown.length)
+            throw refuse(400, "dependencyUnknown", (m) => m.collab.dependencyUnknown, { unknown });
+          const side = host.side();
+          const pending = dependsOn
+            .filter((id) => !taskOf(side, projectId, id)?.doneAt)
+            .map((id) => ({
+              ...dependencyOf(side, projectId, id),
+              held: view.claims.some((claim) => claim.status === "held" && claim.taskId === id),
+            }));
+          if (pending.length)
+            throw refuse(409, "dependencyPending", (m) => m.collab.dependencyPending, { pending });
+        };
         /** 409 `conflict`, with who holds what, when a held path is in the way. */
         const refuseMeeting = () => {
           const side = host.side();
@@ -220,11 +265,15 @@ export function registerCollabBoardRoutes(
             throw refuse(409, "conflict", (m) => m.collab.conflict, { conflicts });
         };
         // Asked first, so a refusal makes nothing.
+        refuseWaiting();
         refuseMeeting();
         const taskId = collabId("t");
         await coordinator.defineTask(actor, projectId, { id: taskId });
         await host.saveSide((draft) => {
-          (draft.tasks ??= {})[taskKey(projectId, taskId)] = { title: body.title };
+          (draft.tasks ??= {})[taskKey(projectId, taskId)] = {
+            title: body.title,
+            ...(dependsOn.length ? { dependsOn } : {}),
+          };
         });
         try {
           const claim = await coordinator.claim(actor, projectId, { taskId, scopes: held });
@@ -252,11 +301,20 @@ export function registerCollabBoardRoutes(
     "/api/collab/projects/:project/holds/:claim/release",
     participant,
     async (req, res) => {
-      const { fence } = releaseSchema.parse(req.body);
+      const { fence, done } = releaseSchema.parse(req.body);
       const { project, claim } = req.params;
       projectOf(project);
       const actor = res.locals.actor as Actor;
-      await host.run(() => host.coordinator().release(actor, project, claim, { fence }), project);
+      await host.run(async () => {
+        const ended = await host.coordinator().release(actor, project, claim, { fence });
+        // After the release: a write that fails leaves the task not done, never done and held.
+        if (done)
+          await host.saveSide((draft) => {
+            const tasks = (draft.tasks ??= {});
+            const key = taskKey(project, ended.taskId);
+            tasks[key] = { ...sideEntry(tasks, key), doneAt: ended.updatedAt };
+          });
+      }, project);
       const answer: CollabOkResponse = { ok: true };
       res.json(answer);
     },

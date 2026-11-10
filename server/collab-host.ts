@@ -53,9 +53,19 @@ const sideSchema = z.strictObject({
       }),
     )
     .optional(),
-  /** What the coordinator does not keep of a task, by "<project id>/<task id>". */
+  /**
+   * What the coordinator does not keep of a task, by "<project id>/<task id>":
+   * its title, the tasks it waited for, and when its holder said it is done.
+   */
   tasks: z
-    .record(z.string().max(140), z.strictObject({ title: z.string().max(120).optional() }))
+    .record(
+      z.string().max(140),
+      z.strictObject({
+        title: z.string().max(120).optional(),
+        dependsOn: z.array(z.string().max(64)).max(50).optional(),
+        doneAt: stamp,
+      }),
+    )
     .optional(),
 });
 const sideReadSchema = lenientRead(sideSchema);

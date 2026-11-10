@@ -10,7 +10,9 @@ Today it is switched on, set up, and people are invited from the command
 line and the API. Once people have joined, an admin adds repositories to
 the group, and each person says which files and folders they are working on
 by taking a [hold](#holds). BELL PR refuses a hold that meets one already
-held, and everyone who follows that repository's
+held, and one whose work
+[waits for other work](#work-that-waits-for-other-work) that is not done
+yet. Everyone who follows that repository's
 [live feed](#the-live-feed) hears of each change. All of that is the API
 only. The Group page comes later: nothing in the app shows the group yet,
 and no page changes when group work is on. Group work **does not protect
@@ -266,11 +268,16 @@ curl -X POST http://127.0.0.1:4311/api/collab/projects/<project id>/work \
   characters. A leading `./` and one trailing `/` are dropped.
   [Paths that cannot be held](#paths-that-cannot-be-held) lists what is
   refused.
+- `dependsOn` is optional: the tasks of this repository that must be done
+  before this work starts, at most 50 task ids (each the `taskId` of an
+  earlier hold). [Work that waits for other work](#work-that-waits-for-other-work)
+  says when it is refused.
 
 The answer (201) is
-`{ "hold": { claimId, taskId, title, holder, scopes, fence, since } }`.
+`{ "hold": { claimId, taskId, title, holder, scopes, fence, since, dependsOn? } }`.
 Keep `claimId` and `fence`: releasing the hold needs both. Each hold makes
-its own task, and `taskId` names it.
+its own task, and `taskId` names it. `dependsOn` is there only when the
+work named tasks: each as `{ taskId, title }`.
 
 **A folder holds everything inside it.** A hold of `src/api` meets a hold
 of `src/api/users.ts`, of `src/api` and of `src`. **Letter case is
@@ -307,13 +314,46 @@ can take a path a moment later.
   `POST /api/collab/projects/<project id>/holds/<claimId>/release` with
   `{ "fence": <fence> }`. Someone else's hold is answered 403 `notHolder`,
   a fence that is not this hold's 409 `staleFence`, and a hold that has
-  already ended 409 `ended`.
+  already ended 409 `ended`. With `"done": true` as well, the release also
+  says that the hold's task is done, so work that
+  [waits for it](#work-that-waits-for-other-work) can start. A refused
+  release marks nothing done.
 - **Revoke.** An admin ends anyone's hold with
   `POST /api/collab/projects/<project id>/holds/<claimId>/revoke` and the
   body `{}`. A member is answered 403 `adminOnly`.
 
 A hold that ended is no longer on the board, and neither is its task: the
 board shows only what is held now. Its paths are free for a new hold.
+
+### Work that waits for other work
+
+A `work` request can name, in `dependsOn`, tasks of the same repository
+that must be done before its work starts. A task is done once the person
+who held it released it with `"done": true`. A hold released without it,
+or revoked, leaves its task not done for good: a task is never held again,
+and nothing else marks it done. Releasing a hold to take a wider one makes
+a new task too. Work that waits for such a task has to name the new one.
+
+- An id that is not a task of this repository (a task of another
+  repository, or an id nobody made) is refused with 400
+  `dependencyUnknown`, and `unknown` lists those ids.
+- A task that is not done yet is refused with 409 `dependencyPending`, and
+  `pending` lists each one with its `taskId`, its `title` and `held`:
+  whether someone holds it now.
+- Both are asked after the paths' shape and before a `conflict`. When
+  either refuses, nothing is made or held, and the request still counts
+  toward the `work` limit.
+- An id named twice counts once.
+
+Once every task it names is done, the same request is taken. Nothing tells
+the person who waits, but the [live feed](#the-live-feed) changes when the
+hold they wait for ends.
+
+Tasks cannot wait for each other in a cycle. Each hold makes a new task,
+it can name only tasks made before it, and what a task waits for never
+changes. Done is what the task's holder said, nothing more: BELL PR does
+not check that the work was merged, pushed or integrated. A hold that was
+taken stays held when something it waited for changes.
 
 ### What a hold does not do
 
@@ -380,6 +420,7 @@ one file always meet, on every file system a person in the group may use.
 | Paths in one hold, or in one `check` | 50 | 400 `tooManyScopes` |
 | Length of a path | 300 characters | 400 `invalidScope` |
 | Title of a task | 120 characters | 400 |
+| Tasks one `work` request names in `dependsOn` | 50, each id at most 64 characters | 400 |
 | `work` requests of one person | 30 in 10 minutes, taken or refused | 429 `slowDown`; `retryAfter` is the seconds to wait |
 | `check` requests of one person | 120 in a minute | 429 `slowDown`, the same way |
 | Feed requests waiting | 2 for one person, 64 for the group, over all repositories | 429 `tooManyWaiters` |
@@ -436,8 +477,8 @@ token, or a paired device's). The routes exist only with the switch.
 | `POST /api/collab/projects` with `{ repoId }` | an admin | 201 `{ project: { id, name } }`; 403 `adminOnly`; 400 `unknownRepository`; 409 `alreadyAdded`, `full`; 500 or 504 `cloneFailed` |
 | `GET /api/collab/projects/<project id>/feed?epoch=&version=&seen=&wait=` | anyone who joined | 200 `{ epoch, version, seen, asOf, board?, present }`; 204 when nothing changed; 404 `unknownProject`; 429 `tooManyWaiters` |
 | `POST /api/collab/projects/<project id>/check` with `{ scopes }` | anyone who joined | 200 `{ asOf, invalid, meets }`; 400 `tooManyScopes`, `invalidScope`; 404 `unknownProject`; 429 `slowDown` |
-| `POST /api/collab/projects/<project id>/work` with `{ title, scopes }` | anyone who joined | 201 `{ hold }`; 400 `invalidScope`, `tooManyScopes`; 404 `unknownProject`; 409 `conflict`, `full`; 429 `slowDown` |
-| `POST /api/collab/projects/<project id>/holds/<claimId>/release` with `{ fence }` | the person who holds it | 200 `{ ok: true }`; 403 `notHolder`; 404 `unknownProject`, `unknownClaim`; 409 `staleFence`, `ended` |
+| `POST /api/collab/projects/<project id>/work` with `{ title, scopes, dependsOn? }` | anyone who joined | 201 `{ hold }`; 400 `invalidScope`, `tooManyScopes`, `dependencyUnknown`; 404 `unknownProject`; 409 `conflict`, `dependencyPending`, `full`; 429 `slowDown` |
+| `POST /api/collab/projects/<project id>/holds/<claimId>/release` with `{ fence, done? }` | the person who holds it | 200 `{ ok: true }`; 403 `notHolder`; 404 `unknownProject`, `unknownClaim`; 409 `staleFence`, `ended` |
 | `POST /api/collab/projects/<project id>/holds/<claimId>/revoke` with `{}` | an admin | 200 `{ ok: true }`; 403 `adminOnly`; 404 `unknownProject`, `unknownClaim`; 409 `ended` |
 
 - `state` is `notSetUp`, `ready` or `stopped`. `GET /api/status` carries
@@ -452,9 +493,10 @@ token, or a paired device's). The routes exist only with the switch.
   meant before: the app token is missing or wrong.
 - A refusal is `{ reason, error }`: `reason` is the word in the table and
   `error` a sentence in the language of the request's `x-bell-locale`
-  header (English or Traditional Chinese). Three refusals say more:
-  `conflict` carries `conflicts`, `invalidScope` carries `invalid`, and
-  `slowDown` carries `retryAfter`, in seconds.
+  header (English or Traditional Chinese). Five refusals say more:
+  `conflict` carries `conflicts`, `invalidScope` carries `invalid`,
+  `dependencyUnknown` carries `unknown`, `dependencyPending` carries
+  `pending`, and `slowDown` carries `retryAfter`, in seconds.
 - A body of the wrong shape (a missing or unknown field, a wrong type, a
   title that is too long) is answered 400 with `error` only.
 
@@ -478,7 +520,9 @@ join, the invite code is spent and the person is not in the group (no
 token was given out), but they count toward the 1000. Invite them again.
 When it happens while a repository is added, the answer is `cloneFailed`,
 the copy is deleted and the repository is not in the group, but it counts
-toward the 100. Add it again.
+toward the 100. Add it again. When it happens in a release with
+`"done": true`, the hold has ended but its task is not done, and it cannot
+be marked done any more: work that waits for it has to name another task.
 
 `bell-pr group status` prints the reason, and the server log has it in a
 "Group work stopped" line;
@@ -493,7 +537,7 @@ All are in the data directory, only with group work: the two files from
 | File | What it holds |
 | --- | --- |
 | `coordination.json` | Each person's id, role (admin or member), the time they were added and the SHA-256 of their participant token; never the token. Each repository of the group, with the folder of its bare copy and the commit it was copied at. Each task, with who made it and when, and every hold, ended ones included: its paths, who holds it, when it was taken and when and by whom it ended |
-| `collab.json` | The group's id and set-up time, and for each person: name, the time they joined, whether they are an admin, the time they were removed, and, when they joined from a paired device, that device's id. For each repository: its name, its id in this BELL PR and the time it was added. For each task: its title |
+| `collab.json` | The group's id and set-up time, and for each person: name, the time they joined, whether they are an admin, the time they were removed, and, when they joined from a paired device, that device's id. For each repository: its name, its id in this BELL PR and the time it was added. For each task: its title, the tasks its work waited for, and when its holder said it is done |
 | `collab/<project id>.git` | The group's bare copy of a repository: the commits and files of its default branch, as they were when it was added |
 
 The lock file `bellpr.lock` also carries `"strict": true`. Back the two
@@ -506,7 +550,11 @@ Do not start a build of BELL PR from before the group had repositories
 with `--group` on this data directory. The first time such a build saves
 `collab.json` (a join or a removal), it writes the file without the
 repositories' names and the tasks' titles, and the group's repositories
-are gone from the group.
+are gone from the group. A build from before tasks could wait for other
+work drops, the first time it saves `collab.json`, what each task waited
+for and when it was done: from then on a done task is not done, work that
+waits for it is refused, and the holds already taken stay held but no
+longer list `dependsOn`.
 
 ## What is promised and what is not
 
@@ -520,6 +568,8 @@ Promised:
 - Invite codes work once and are short-lived.
 - Two holds that are held at the same time in one repository never meet:
   BELL PR refuses the second. A hold is taken whole or refused whole.
+- Work that names tasks in `dependsOn` is held only once each of them is
+  done. Otherwise nothing is made or held.
 - No participant token and no invite code is put in a URL or written to a
   log.
 - Group work adds no listener, no dependency, no account, no cloud call and
@@ -531,8 +581,10 @@ Not promised:
   files: an agent, an editor or a push can still change any file, held or
   not. Holds are not compared with what a contribution changes, and
   BELL PR's agents do not read them.
-- **A hold covers only the paths it names.** Two people who hold different
-  files can still make changes that do not work together.
+- **A hold covers only the paths and the tasks it names.** Two people who
+  hold different files can still make changes that do not work together,
+  and work waits only for the tasks it names. A task is done when its
+  holder says so: BELL PR does not check the work.
 - **Who is looking at a board (`present`) is best effort.** It is kept in
   memory, and a person stays listed for up to 40 seconds after they left.
 - **Nothing is cleaned up.** The record keeps every ended hold

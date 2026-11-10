@@ -139,7 +139,7 @@ async function group(t: TestContext, options?: Parameters<typeof collabFixture>[
 }
 
 /** The fields a refusal of group work may have. */
-const refusalFields = ["reason", "error", "conflicts", "retryAfter", "invalid"];
+const refusalFields = ["reason", "error", "conflicts", "retryAfter", "invalid", "unknown", "pending"];
 const fieldsOf = (reply: Reply) => Object.keys(reply.json).sort();
 
 /**
@@ -411,6 +411,144 @@ test("work: a path that someone took in between is refused as a held path is", a
     { scope: "src", holder: "Dee", title: "Sources", since: hers.since },
   ]);
   assert.deepEqual((await g.board(project)).held, [hers]);
+});
+
+test("dependsOn: work is held only once each task it names is done; a task not done, or not the repository's, is refused and nothing is made", async (t) => {
+  const g = await group(t);
+  const { f, who } = g;
+  const project = await g.add("widgets");
+  const other = await g.add("gadgets");
+  const en = (asWho: Headers): Headers => ({ ...asWho, "x-bell-locale": "en" });
+  const ui = (dependsOn: unknown, asWho = who.dee) =>
+    g.work(asWho, project, { title: "UI", scopes: ["web"], dependsOn });
+  const finish = (held: CollabHold, asWho: Headers, body: unknown) =>
+    f.post(`/projects/${project}/holds/${held.claimId}/release`, asWho, body);
+  const savedTask = async (taskId: string) =>
+    JSON.parse((await f.files())[0]).tasks[`${project}/${taskId}`];
+
+  const api = await g.hold(who.member, project, { title: "API", scopes: ["src/api"] });
+  const elsewhere = await g.hold(who.dee, other, { title: "Elsewhere", scopes: ["lib"] });
+  const kept = await f.files();
+
+  // Not a task of this repository: an id nobody made, another repository's
+  // task, and an id that is no task at all. Only those are named back.
+  for (const dependsOn of [["t-0000000000"], [elsewhere.taskId], [api.taskId, "__proto__"]]) {
+    const refused = await ui(dependsOn, en(who.dee));
+    assert.deepEqual([refused.status, refused.json], [400, {
+      reason: "dependencyUnknown",
+      error: "This work depends on a task this repository does not have. Nothing was held.",
+      unknown: dependsOn.filter((id) => id !== api.taskId),
+    }], dependsOn.join());
+  }
+  // Not a list of at most 50 ids of at most 64 characters: the body's shape.
+  const fifty = Array.from({ length: 51 }, (_, index) => `t-${index}`);
+  for (const dependsOn of [api.taskId, [7], fifty, ["t".repeat(65)]])
+    assert.equal((await ui(dependsOn)).status, 400, JSON.stringify(dependsOn).slice(0, 40));
+
+  // Blocked: API is held and not done. Nothing is made, nothing is held.
+  const blocked = await ui([api.taskId], en(who.dee));
+  assert.deepEqual([blocked.status, blocked.json], [409, {
+    reason: "dependencyPending",
+    error: "This work depends on a task that is not done yet. Nothing was held.",
+    pending: [{ taskId: api.taskId, title: "API", held: true }],
+  }]);
+  const inChinese = await ui([api.taskId], { ...who.dee, "x-bell-locale": "zh-TW" });
+  assert.equal(inChinese.json.error, "這項工作相依的任務還沒完成，所以這次沒有佔用任何路徑。");
+  // Blocked comes first: the paths are free, and would be in the way of nobody.
+  assert.deepEqual(await f.files(), kept);
+  assert.deepEqual((await g.board(project)).held, [api]);
+
+  // Released without `done`, or revoked: not done, and never now, since
+  // that task is not held again.
+  assert.equal((await g.release(who.member, project, api)).status, 200);
+  assert.deepEqual((await ui([api.taskId])).json.pending, [
+    { taskId: api.taskId, title: "API", held: false },
+  ]);
+  const second = await g.hold(who.member, project, { title: "API 2", scopes: ["src/api"] });
+  assert.equal((await g.revoke(who.admin, project, second.claimId)).status, 200);
+  assert.equal(outcome(await ui([second.taskId])), "409 dependencyPending");
+  assert.deepEqual(await savedTask(second.taskId), { title: "API 2" });
+
+  // Only its holder says it is done, and only in a release that is taken.
+  const third = await g.hold(who.member, project, { title: "API 3", scopes: ["src/api"] });
+  assert.equal(outcome(await finish(third, who.dee, { fence: third.fence, done: true })), "403 notHolder");
+  const stale = await finish(third, who.member, { fence: third.fence + 1, done: true });
+  assert.equal(outcome(stale), "409 staleFence");
+  assert.equal((await finish(third, who.member, { fence: third.fence, done: "yes" })).status, 400);
+  assert.equal(outcome(await ui([third.taskId])), "409 dependencyPending");
+  assert.deepEqual(await savedTask(third.taskId), { title: "API 3" });
+
+  // Done: the hold ends, the side file says when, and the work that waited is held.
+  const done = await finish(third, who.member, { fence: third.fence, done: true });
+  assert.deepEqual([done.status, done.json], [200, { ok: true }]);
+  const finished = await savedTask(third.taskId);
+  assert.deepEqual(Object.keys(finished), ["title", "doneAt"]);
+  assert.ok(Date.parse(finished.doneAt) > 0);
+  assert.equal(outcome(await finish(third, who.member, { fence: third.fence, done: true })), "409 ended");
+  const waited = await ui([third.taskId, third.taskId]);
+  assert.equal(waited.status, 201, waited.body);
+  const held: CollabHold = waited.json.hold;
+  // Named twice is named once.
+  assert.deepEqual(held.dependsOn, [{ taskId: third.taskId, title: "API 3" }]);
+  assert.deepEqual(await savedTask(held.taskId), { title: "UI", dependsOn: [third.taskId] });
+  // The coordinator's task names none: its own rule would wait for an integration.
+  const coordinator = f.collab.coordinator();
+  const view = coordinator.project(coordinator.authenticate(g.dee.token), project);
+  assert.deepEqual(view.tasks.find((task) => task.id === held.taskId)?.dependsOn, []);
+
+  // One done and one not: waiting for that one alone.
+  const docs = await g.work(who.member, project, {
+    title: "Docs",
+    scopes: ["docs"],
+    dependsOn: [third.taskId, held.taskId],
+  });
+  assert.equal(outcome(docs), "409 dependencyPending");
+  assert.deepEqual(docs.json.pending, [{ taskId: held.taskId, title: "UI", held: true }]);
+  // No cycle can form: work makes a new task each time, it names only tasks
+  // made before it, and what a task names never changes.
+  assert.deepEqual(await savedTask(third.taskId), finished);
+  await f.nothingLeaked();
+});
+
+test("dependsOn on the board: a hold names the tasks it waited for, the feed wakes for a task done, and done stays done after a restart", async (t) => {
+  const g = await group(t);
+  const { f, who } = g;
+  const project = await g.add("widgets");
+  const api = await g.hold(who.member, project, { title: "API", scopes: ["src/api"] });
+
+  const first = await g.park(who.dee, project);
+  const released = await f.post(`/projects/${project}/holds/${api.claimId}/release`, who.member, {
+    fence: api.fence,
+    done: true,
+  });
+  assert.equal(released.status, 200, released.body);
+  assert.deepEqual((await first.reply).json.board.held, []);
+
+  const second = await g.park(who.dee, project);
+  const ui = await g.hold(who.admin, project, { title: "UI", scopes: ["web"], dependsOn: [api.taskId] });
+  assert.deepEqual(Object.keys(ui), [
+    "claimId",
+    "taskId",
+    "title",
+    "holder",
+    "scopes",
+    "fence",
+    "since",
+    "dependsOn",
+  ]);
+  const told = await second.reply;
+  assert.equal(told.status, 200, told.body);
+  assert.deepEqual(told.json.board.held, [ui]);
+  assert.deepEqual(told.json.board.held[0].dependsOn, [{ taskId: api.taskId, title: "API" }]);
+
+  await f.start();
+  assert.deepEqual((await g.board(project)).held, [ui]);
+  const docs = await g.hold(who.dee, project, {
+    title: "Docs",
+    scopes: ["docs"],
+    dependsOn: [api.taskId],
+  });
+  assert.deepEqual(docs.dependsOn, [{ taskId: api.taskId, title: "API" }]);
 });
 
 test("the board: what is held, oldest first, and the people; a hold that ended or was refused is not on it", async (t) => {

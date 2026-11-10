@@ -28,6 +28,8 @@ export default {
     `Name at least one file or folder of the repository, each as a path of at most ${max} characters. Some paths cannot be held, such as one outside the repository or one with special characters.`,
   tooManyScopes: ({ max }: { max: number }) => `One hold takes at most ${max} paths.`,
   conflict: "Someone already holds a path that is in the way. Nothing was held.",
+  dependencyUnknown: "This work depends on a task this repository does not have. Nothing was held.",
+  dependencyPending: "This work depends on a task that is not done yet. Nothing was held.",
   full: "The group's record is full. Ask the host to reset group storage.",
   unknownClaim: "This repository has no hold with this id.",
   ended: "This hold has already ended.",

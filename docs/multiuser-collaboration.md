@@ -6,7 +6,10 @@ strict lock, creates the coordination file at set-up, adds a participant
 for each person who joins and a project for each repository an admin adds
 to the group. Through group work's API a person defines a task and claims
 paths for it, the holder releases the claim and an admin revokes it; group
-work calls a claim a hold. Dependencies, widening, failing and reopening a
+work calls a claim a hold. Group work keeps its own dependencies between
+tasks: the holder says a task is done, and work that waits for a task not
+done is refused before any task is made. The core's dependencies, which
+wait for an integration, are not used. Widening, failing and reopening a
 task, `authorize` and integration are still not reachable from the app,
 the CLI or any listener, and no write is checked against a claim, so
 BELL PR still has no protection between people working on one project.

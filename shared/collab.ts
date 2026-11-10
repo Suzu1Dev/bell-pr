@@ -91,6 +91,14 @@ export interface CollabHold {
   fence: number;
   /** ISO 8601. */
   since: string;
+  /** The tasks this work waited for, all done when it was held; absent when none. */
+  dependsOn?: CollabDependency[];
+}
+
+/** A task that other work depends on. */
+export interface CollabDependency {
+  taskId: string;
+  title: string;
 }
 
 /** One repository's board: who holds what. */
@@ -151,6 +159,8 @@ export interface CollabCheckResponse {
 export interface CollabWorkRequest {
   title: string;
   scopes: string[];
+  /** Tasks of this repository that must be done first: at most 50 ids. */
+  dependsOn?: string[];
 }
 
 /** POST /api/collab/projects/:project/work → 201. */
@@ -171,6 +181,8 @@ export interface CollabConflict {
 /** POST /api/collab/projects/:project/holds/:claim/release. */
 export interface CollabReleaseRequest {
   fence: number;
+  /** The task is finished: work that depends on it may start. */
+  done?: boolean;
 }
 
 /** POST …/release and …/revoke → 200. */
@@ -191,4 +203,11 @@ export interface CollabRefusal {
   retryAfter?: number;
   /** With 400 `invalidScope`: the paths that cannot be held. */
   invalid?: string[];
+  /** With 400 `dependencyUnknown`: the asked ids that are no task of this repository. */
+  unknown?: string[];
+  /**
+   * With 409 `dependencyPending`: the tasks not done yet. `held` is false
+   * for one whose hold ended without being done, which is never done now.
+   */
+  pending?: (CollabDependency & { held: boolean })[];
 }
