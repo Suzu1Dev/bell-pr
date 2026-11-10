@@ -9,8 +9,9 @@ and BELL PR works the same without it.
 
 ## Link the other products
 
-Set `BELLPR_SUITE_LINKS` in BELL PR's environment or `.env` file and
-restart BELL PR:
+Set `BELLPR_SUITE_LINKS` in BELL PR's environment, or in a file you load
+with `bell-pr start --env-file <file>` (BELL PR never loads a `.env` file
+by itself, see [Configuration](configuration.md)), and restart BELL PR:
 
 ```sh
 BELLPR_SUITE_LINKS=explain=http://127.0.0.1:<port>,personal=http://127.0.0.1:<port>
@@ -24,7 +25,7 @@ BELLPR_SUITE_LINKS=explain=http://127.0.0.1:<port>,personal=http://127.0.0.1:<po
   `BELLPR_ALLOWED_ORIGINS`, for example `personal=https://<your-url>`.
 - It is never BELL PR's own address.
 
-BELL PR does not start with a value that breaks one of these rules. The
+BELL PR refuses to start with a value that breaks one of these rules. The
 message names the variable and never repeats the value.
 
 ## The product switcher
@@ -35,8 +36,8 @@ screen). It lists the three products: a linked one is a link that opens
 in the same tab, BELL PR is marked as the current one, and the rest read
 "Not linked". The link is the address you set and nothing more. BELL PR
 adds no token, run or other data to it. On a screen narrower than 390 px
-the button makes room for the "Sample project" badge of presentation mode
-(`present=1`) while that badge shows.
+the button is hidden while the "Sample project" badge of presentation
+mode (`present=1`) shows, because there is no room for both.
 
 Your browser keeps each product's sign-in under that product's own
 address, and `localhost` and `127.0.0.1` count as different addresses.

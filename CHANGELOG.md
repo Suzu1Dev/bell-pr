@@ -43,11 +43,13 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   where BELL Explain and BELL Personal are, on the same computer or tailnet,
   and a switcher between the BELL products shows once a link is set.
   `GET /api/suite/manifest` and `GET /api/suite/today` describe BELL PR and
-  the runs that wait for you or for BELL PR: a run's id, title, state and
-  time, and nothing else. Both stay behind the access token like the rest
-  of the API, and no existing protection changes. No other BELL product can
-  read the feed yet, because BELL PR has no read-only credential to give
-  one. [BELL Suite link](docs/bell-suite.md) has the details.
+  the runs that wait for you or for BELL PR: two counts and, for each run
+  listed, its id and route, title, state with a fixed phrase, and time.
+  Nothing else about a run is sent. Both stay behind the access token like
+  the rest of the API, and no existing protection changes. No other BELL
+  product can read the feed yet, because BELL PR has no read-only
+  credential to give one. [BELL Suite link](docs/bell-suite.md) has the
+  details.
 
 ### Changed
 
