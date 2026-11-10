@@ -50,12 +50,17 @@ without JavaScript, all seven commands are visible together.
   On each `zh-tw/` page it checks visible text, and `alt`, `title`,
   `aria-label`, `placeholder`, `label`, the document title, and
   `description`, `og:title`, `og:description`, `twitter:title` and
-  `twitter:description`. Text inside `code`, `pre` or `kbd` is skipped.
+  `twitter:description`. The Latin-letter check skips text inside `code`,
+  `pre` or `kbd`. An unclosed `code`, `pre`, `kbd`, `script`, `style` or
+  `title` tag fails the check, because the text after it would not be read.
   After the kept English names in `check-site.mjs` are removed, any remaining
   Latin letter fails, whether or not the English page contains that string.
-  A CJK character and a Latin letter or digit need a space between them;
-  tags in between do not count, and full-width punctuation needs no space.
-  In `site.js` the zh side of `isZh ? zh : en` must not be English.
+  A CJK character and a Latin letter or digit need a space between them,
+  including in those attributes and inside `code`, `pre` and `kbd`. Inline
+  tags in between do not count, a new block does, and full-width punctuation
+  needs no space. In `site.js` the zh side of `isZh ? zh : en` must not be
+  English. The mutation test is `test/check-site.test.mjs`; it is not part of
+  the site.
   Missing `.mp4`/`.webm` under `assets/video/` are allowed (deploy-only) and
   those extensions do not count toward the size budget.
   `node site/check-site.mjs --browser --port <port>` also loads every page in

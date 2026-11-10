@@ -269,13 +269,20 @@ function translatableStrings(html) {
   return { found, unclosed };
 }
 
-const isCjk = (ch) => /[\u3400-\u9fff]/.test(ch);
-const isLatinOrDigit = (ch) => /[A-Za-z0-9]/.test(ch);
+const isCjk = (ch) => /\p{Script=Han}/u.test(ch);
+const isLatinOrDigit = (ch) => /[A-Za-z0-9]/u.test(ch);
+/** A new block starts a new run of text, so a heading is not glued to the next paragraph. */
+const blockTags = new Set([
+  "address", "article", "aside", "blockquote", "body", "br", "dd", "details", "div", "dl", "dt",
+  "figcaption", "figure", "footer", "h1", "h2", "h3", "h4", "h5", "h6", "header", "hr", "li",
+  "main", "nav", "ol", "p", "section", "summary", "table", "tbody", "td", "tfoot", "th", "thead", "tr", "ul",
+]);
 
 /**
- * Visible characters in order, tags ignored, so a boundary can sit on either
- * side of an element. script and style are omitted. code, pre and kbd stay,
- * because the space rule is about what a reader sees.
+ * Visible characters in order. Inline tags are ignored, so a boundary can sit
+ * on either side of them. A block tag inserts a space. script and style are
+ * omitted. code, pre and kbd stay, because the space rule is about what a
+ * reader sees.
  */
 function visibleFlow(html) {
   let flow = "";
@@ -305,6 +312,7 @@ function visibleFlow(html) {
         continue;
       }
       const tag = raw.split(/[\s/>]/)[0].toLowerCase();
+      if (blockTags.has(tag)) flow += " ";
       if (!raw.endsWith("/") && !voidTags.has(tag)) stack.push(tag);
       continue;
     }
@@ -317,15 +325,16 @@ function visibleFlow(html) {
   return flow;
 }
 
-/** CJK and a Latin letter or digit with nothing between them (tags do not count). */
+/** CJK and a Latin letter or digit with nothing between them (inline tags do not count). */
 function cjkLatinGaps(flow) {
   const gaps = [];
   const seen = new Set();
-  for (let i = 0; i < flow.length - 1; i += 1) {
-    const left = flow[i];
-    const right = flow[i + 1];
+  const chars = [...flow];
+  for (let i = 0; i < chars.length - 1; i += 1) {
+    const left = chars[i];
+    const right = chars[i + 1];
     if (!((isCjk(left) && isLatinOrDigit(right)) || (isLatinOrDigit(left) && isCjk(right)))) continue;
-    const snippet = flow.slice(Math.max(0, i - 12), i + 14).replace(/\s+/g, " ");
+    const snippet = chars.slice(Math.max(0, i - 12), i + 14).join("").replace(/\s+/g, " ");
     if (seen.has(snippet)) continue;
     seen.add(snippet);
     gaps.push(snippet);
@@ -348,7 +357,12 @@ function checkZhTw(problems) {
       seen.add(text);
       problems.push(`${file}: untranslated ${kind} "${text}"`);
     }
-    for (const gap of cjkLatinGaps(visibleFlow(html))) problems.push(`${file}: missing space "${gap}"`);
+    const gaps = new Set(cjkLatinGaps(visibleFlow(html)));
+    for (const [kind, text] of zh.found) {
+      if (kind === "text") continue;
+      for (const gap of cjkLatinGaps(text)) gaps.add(gap);
+    }
+    for (const gap of gaps) problems.push(`${file}: missing space "${gap}"`);
   }
 }
 
