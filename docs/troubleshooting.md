@@ -583,8 +583,9 @@ there, then publish again.
   sure no BELL PR is starting on this data directory, then remove the file
   the message names and start again.
 - **"BELL PR cannot read the lock file …"**: a lock is there that this
-  user may not read, as after BELL PR ran here once as another user, or a
-  directory lies in its place. The message gives the system's reason. A
+  user may not read (its owner or mode was changed, or a start as another
+  user was killed before it removed its lock), or a directory lies in its
+  place. The message gives the system's reason. A
   lock that cannot be read is never replaced: it may belong to a BELL PR
   that is still running. Make sure none runs with this data directory,
   remove it yourself, then start again.

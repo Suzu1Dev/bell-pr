@@ -1090,7 +1090,8 @@ test("no start replaces a lock file it cannot read, and the refusal names the fi
     const file = path.join(box.data, "bellpr.lock");
     const starts = lockStarts(box);
     const hourAgo = new Date(Date.now() - 3_600_000);
-    // As after BELL PR ran here once as another user.
+    // As after its mode or owner was changed, or a start as another user was
+    // killed before it removed its lock.
     const left = JSON.stringify({ pid: await gonePid(), port: 4311, version });
     writeFileSync(file, left);
     chmodSync(file, 0);
