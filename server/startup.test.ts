@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { spawn, type ChildProcess } from "node:child_process";
 import { createHash } from "node:crypto";
 import { once } from "node:events";
-import {
+import fs, {
   chmodSync,
   cpSync,
   existsSync,
@@ -18,6 +18,7 @@ import {
 } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { request } from "node:http";
+import { syncBuiltinESMExports } from "node:module";
 import { createServer, type AddressInfo } from "node:net";
 import { tmpdir, uptime } from "node:os";
 import path from "node:path";
@@ -1118,6 +1119,62 @@ test("no start replaces a lock file it cannot read, and the refusal names the fi
     held.release();
     assert.deepEqual(lockLitter(box.data), []);
   } finally {
+    await box.cleanup();
+  }
+});
+
+test("an ordinary start reads the lock again after a read that failed; a lock that stays unreadable is refused and left", async (t) => {
+  const box = await sandbox();
+  try {
+    mkdirSync(box.data, { recursive: true });
+    const file = path.join(box.data, "bellpr.lock");
+    const starts = lockStarts(box);
+    const probe = await acquireWriterLock(box.data);
+    const here = { ...JSON.parse(readFileSync(file, "utf8")), strict: undefined };
+    probe.release();
+    // A crashed holder's lock: a start that reads it replaces it.
+    const stale = JSON.stringify({ ...here, pid: await gonePid() });
+    writeFileSync(file, stale);
+    // The next `failing` reads of the lock fail, as over a network file system.
+    let failing = 0;
+    const read = fs.readFileSync;
+    const failingRead = (...args: Parameters<typeof read>) => {
+      if (args[0] === file && failing > 0) {
+        failing -= 1;
+        throw Object.assign(new Error(`ESTALE: stale file handle, open '${file}'`), {
+          code: "ESTALE",
+        });
+      }
+      return read(...args);
+    };
+    t.mock.method(fs, "readFileSync", failingRead as typeof read);
+    syncBuiltinESMExports();
+    // Every read fails: the start gives up after its last attempt.
+    failing = Infinity;
+    const message = await refusedWith(starts.ordinary);
+    failing = 0;
+    assert.ok(message.includes(file) && message.includes("ESTALE"), message);
+    assert.equal(readFileSync(file, "utf8"), stale);
+    assert.deepEqual(lockLitter(box.data), []);
+    // Under the strict rule the first read that fails is enough.
+    failing = 3;
+    assert.ok((await refusedWith(starts.strict)).includes(file));
+    assert.equal(failing, 2);
+    failing = 0;
+    assert.equal(readFileSync(file, "utf8"), stale);
+    // One read fails: the next attempt reads the stale lock and replaces it.
+    failing = 1;
+    const stop = await starts.ordinary();
+    try {
+      assert.equal(failing, 0);
+      assert.equal(JSON.parse(readFileSync(file, "utf8")).pid, process.pid);
+      assert.deepEqual(lockLitter(box.data), []);
+    } finally {
+      await stop();
+    }
+  } finally {
+    t.mock.restoreAll();
+    syncBuiltinESMExports();
     await box.cleanup();
   }
 });

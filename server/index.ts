@@ -481,7 +481,9 @@ function lockInUse(file: string, dataDir: string, holder: LockInfo | undefined, 
  * it is held. A strict lock (`info.strict`), or a strict holder, puts the
  * start under the strict rule: it does not wait for a lease. No start
  * replaces a lock it cannot read: nothing shows that it is not a strict
- * one, or that its holder has stopped.
+ * one, or that its holder has stopped. A read can fail in passing, as on a
+ * network file system, so a start that is not strict reads it again on
+ * its next attempts before it gives up.
  */
 async function acquireLock(
   file: string,
@@ -492,11 +494,12 @@ async function acquireLock(
   const text = `${JSON.stringify(info)}\n`;
   // A lock from elsewhere lapses at most a lease after its last renewal.
   const deadline = Date.now() + lockLeaseMs + 1000;
-  // What the last attempt has to say when a takeover claim stopped it.
-  let claimed: StartupError | undefined;
+  // What the last attempt has to say when a takeover claim, or a lock it
+  // could not read, stopped it.
+  let refused: StartupError | undefined;
   for (let attempt = 0; attempt < 5; attempt += 1) {
     if (createExclusive(file, text, strict)) return holdLock(file, text);
-    claimed = undefined;
+    refused = undefined;
     let current = readLockText(file);
     let holder = parseLock(current);
     // Its holder may have just stopped: wait for the lease to run out.
@@ -516,14 +519,13 @@ async function acquireLock(
     if (current === undefined) continue;
     if (holder ? lockHolderAlive(holder, file, strict) : strict)
       throw lockInUse(file, dataDir, holder, strict);
-    if (typeof current !== "string")
-      throw new StartupError(
-        sm().cli.start.lockUnreadable({ file, reason: current.message }),
-      );
-    claimed = removeStale(file, current, strict || holder?.strict === true);
-    if (claimed) await new Promise((resolve) => setTimeout(resolve, 100));
+    refused =
+      typeof current === "string"
+        ? removeStale(file, current, strict || holder?.strict === true)
+        : new StartupError(sm().cli.start.lockUnreadable({ file, reason: current.message }));
+    if (refused) await new Promise((resolve) => setTimeout(resolve, 100));
   }
-  throw claimed ?? lockInUse(file, dataDir, readLockFile(file), strict);
+  throw refused ?? lockInUse(file, dataDir, readLockFile(file), strict);
 }
 
 /** GET /api/health on `host:port`: whether BELL PR answers there. */
