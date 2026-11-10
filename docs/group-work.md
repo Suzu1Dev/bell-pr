@@ -222,7 +222,12 @@ every later request names the repository by that `id` (`p-…`).
 - A copy that fails, or takes more than 3 minutes, is answered
   `cloneFailed` (500, or 504 when it took too long). Git's own words go to
   the log on the host only, the folder is deleted again, and the
-  repository is not in the group.
+  repository is not in the group. Two cases leave something behind: BELL
+  PR stopped by force in the middle of a copy can leave a half-made folder
+  under `collab/` in the data directory (disk space only; the repository
+  can be added again), and when the copy was made but the group's own file
+  could not be written, the repository's entry stays in the group's record
+  and counts towards the 100.
 - A repository cannot be taken out of the group again, and it keeps the
   name it had when it was added (its first 200 characters). Deleting it
   from BELL PR (**Delete repository**, or **Delete all data**) leaves it
@@ -234,11 +239,11 @@ What cannot be added:
   it first;
 - a repository that is already the group's, or is being copied right now
   (409 `alreadyAdded`);
-- a repository whose default branch is not in BELL PR's clone, or has a
-  name the group's record does not take (more than 200 characters, a first
-  character that is not a letter or a digit, or any character but letters,
-  digits, `.`, `_`, `/` and `-`): it is not in `addable`, and adding it is
-  answered `cloneFailed`;
+- a repository whose default branch is not in BELL PR's clone, or whose
+  default branch has a name the group's record does not take (more than
+  200 characters, a first character that is not a letter or a digit, or
+  any character but letters, digits, `.`, `_`, `/` and `-`): it is not in
+  `addable`, and adding it is answered `cloneFailed`;
 - a repository beyond the 100 a group can have (409 `full`).
 
 ## Holds
@@ -338,10 +343,11 @@ while a request of theirs waits and for 40 seconds after their last one;
 presence is best effort. One person can have 2 requests waiting, over all
 repositories, and the group 64; one more is answered 429 `tooManyWaiters`,
 while a request with `wait=0` is still answered. BELL PR also keeps at
-most 8 feed answers that one person's connections have not taken yet:
-until one is read or its connection closes, every further feed request of
-that person is answered 429 `tooManyWaiters`, with `wait=0` too. A caller
-that reads each answer before it asks again never meets that limit. After
+most 8 feed answers of one person that have not left it yet, because
+their connections do not take them: until one leaves or its connection
+closes, every further feed request of that person is answered 429
+`tooManyWaiters`, with `wait=0` too. A caller that reads each answer
+before it asks again never meets that limit. After
 BELL PR restarts the `epoch` is another one, and the next answer has the
 whole board again.
 
