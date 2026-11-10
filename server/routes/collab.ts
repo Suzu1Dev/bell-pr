@@ -224,12 +224,14 @@ export function registerCollabRoutes(
       const deviceId = await host.run(async () => {
         const person = personOf(host, id);
         if (!person) throw refuse(404, "unknownPerson", (m) => m.collab.unknownPerson);
-        if (!person.removedAt)
+        if (!person.removedAt) {
           await host.saveSide((draft) => {
             // One removal at a time: an admin removed a moment ago removes nobody.
             if (draft.people![actor.id]?.removedAt) throw notJoined();
             draft.people![id].removedAt = new Date().toISOString();
           });
+          log.info(`group: ${id} removed by ${actor.id}`);
+        }
         hub.forget(id);
         // What they hold goes with them, in every repository of the group.
         const coordinator = host.coordinator();
@@ -261,7 +263,6 @@ export function registerCollabRoutes(
         const installToken = readApiToken(tokenFile);
         if (installToken) unpaired = await devices.revoke(deviceId, installToken);
       }
-      log.info(`group: ${id} removed by ${actor.id}`);
       const body: CollabRemoveResponse = { revoked, unpaired };
       res.json(body);
     },

@@ -239,6 +239,8 @@ test("remove: the person leaves the group; their device is unpaired only when as
   // Asked again with the tick box: the device they joined from goes, the date stays.
   assert.deepEqual((await remove(c.ben.id, { unpair: true })).json, { revoked: 0, unpaired: true });
   assert.equal(await removedAt(), first);
+  // The log has the removal once: the second request removed nobody.
+  assert.equal(f.logged.filter((line) => line.includes(`group: ${c.ben.id} removed by`)).length, 1);
   assert.equal((await f.info(c.who.member)).status, 401);
   assert.equal((await f.info(c.who.admin)).status, 200);
   // Nothing to unpair for someone who joined at the host.
