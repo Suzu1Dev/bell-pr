@@ -21,7 +21,7 @@ import type {
 } from "../../shared/collab.js";
 import { readApiToken } from "../api-token.js";
 import { collabId, type CollabHost, type CollabSide } from "../collab-host.js";
-import { CollabInvites, type Invite } from "../collab-invites.js";
+import { CollabInvites, inviteTtl, maxInvites, type Invite } from "../collab-invites.js";
 import { participantHeader } from "../coordination-routes.js";
 import type { Actor } from "../coordination.js";
 import type { DeviceTokens } from "../device-tokens.js";
@@ -142,14 +142,19 @@ export function registerCollabRoutes(
       invite = { self: { id: found.actor.id, token } };
     } else {
       // The person at the host can always invite: that is how the first admin joins.
+      let by: string | undefined;
       if (!atHost(res)) {
         if (!found) throw notJoined();
         if (found.actor.role !== "admin") throw adminOnly();
+        by = found.actor.id;
       }
-      invite = { name: body.name, ...(body.admin ? { admin: true } : {}) };
+      invite = { name: body.name, ...(body.admin ? { admin: true } : {}), ...(by ? { by } : {}) };
     }
     const created = invites.create(invite);
-    if (!created) throw refuse(429, "tooManyInvites", (m) => m.collab.tooManyInvites);
+    if (!created)
+      throw refuse(429, "tooManyInvites", (m) =>
+        m.collab.tooManyInvites({ max: maxInvites, minutes: inviteTtl / 60_000 }),
+      );
     const answer: CollabInviteResponse = {
       code: created.code,
       expiresAt: new Date(created.expiresAt).toISOString(),
@@ -178,6 +183,11 @@ export function registerCollabRoutes(
       const body: CollabJoinResponse = { groupId, ...identity(found), token: invite.self.token };
       res.status(201).json(body);
       return;
+    }
+    // A code from an admin who was removed since is worth as little as their token.
+    if (invite.by !== undefined) {
+      const inviter = personOf(host, invite.by);
+      if (!inviter || inviter.removedAt) throw invalidCode();
     }
     const body: CollabJoinResponse = await host.run(async () => {
       const { id, token } = await host
@@ -212,13 +222,23 @@ export function registerCollabRoutes(
         if (!person) throw refuse(404, "unknownPerson", (m) => m.collab.unknownPerson);
         if (!person.removedAt)
           await host.saveSide((draft) => {
+            // One removal at a time: an admin removed a moment ago removes nobody.
+            if (draft.people![actor.id]?.removedAt) throw notJoined();
             draft.people![id].removedAt = new Date().toISOString();
           });
         return person.deviceId;
       });
+      // What they left waiting goes with them: the codes they gave out and their own.
+      invites.drop(id);
+      // Removing never unpairs by itself: only when asked, through pairing's own code,
+      // and never the device this request comes from or one a current person joined from.
+      const shared =
+        deviceId === res.locals.deviceId ||
+        Object.values(host.side().people ?? {}).some(
+          (other) => !other.removedAt && other.deviceId === deviceId,
+        );
       let unpaired = false;
-      if (unpair && deviceId && devices && tokenFile) {
-        // Removing never unpairs by itself: only when asked, through pairing's own code.
+      if (unpair && deviceId && !shared && devices && tokenFile) {
         const installToken = readApiToken(tokenFile);
         if (installToken) unpaired = await devices.revoke(deviceId, installToken);
       }

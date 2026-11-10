@@ -20,10 +20,14 @@ export const inviteTtl = 10 * 60_000;
 export const maxInvites = 20;
 
 /**
- * What a code stands for: a named person to add, or ("Use on another
- * device") the inviter's own id and token, kept only while the code lives.
+ * What a code stands for: a named person to add, with the id of the admin
+ * who invites them unless it is the person at the host; or ("Use on
+ * another device") the inviter's own id and token, kept only while the
+ * code lives.
  */
-export type Invite = { name: string; admin?: true } | { self: { id: string; token: string } };
+export type Invite =
+  | { name: string; admin?: true; by?: string }
+  | { self: { id: string; token: string } };
 
 export type InviteRedeemed =
   | { status: "ok"; invite: Invite }
@@ -33,24 +37,45 @@ export type InviteRedeemed =
 
 export class CollabInvites {
   /** By the sha256 of the code. */
-  private readonly waiting = new Map<string, { invite: Invite; expiresAt: number }>();
+  private readonly waiting = new Map<
+    string,
+    { invite: Invite; expiresAt: number; timer: NodeJS.Timeout }
+  >();
   private readonly failures = new Map<string, { at: number[]; lockedUntil?: number }>();
 
   constructor(private readonly now: () => number = Date.now) {}
 
+  private forget(hash: string) {
+    clearTimeout(this.waiting.get(hash)?.timer);
+    this.waiting.delete(hash);
+  }
+
   private prune(now: number) {
-    for (const [hash, { expiresAt }] of this.waiting) if (expiresAt <= now) this.waiting.delete(hash);
+    for (const [hash, { expiresAt }] of this.waiting) if (expiresAt <= now) this.forget(hash);
   }
 
   /** A new code, or undefined while 20 are still waiting. */
   create(invite: Invite): { code: string; expiresAt: number } | undefined {
     const now = this.now();
     this.prune(now);
+    // One code for oneself at a time: a new one replaces the old, so nobody fills the 20 alone.
+    if ("self" in invite)
+      for (const [hash, { invite: other }] of this.waiting)
+        if ("self" in other && other.self.id === invite.self.id) this.forget(hash);
     if (this.waiting.size >= maxInvites) return undefined;
     const code = generatePairCode();
-    const expiresAt = now + inviteTtl;
-    this.waiting.set(sha256Hex(normalizePairCode(code)!), { invite, expiresAt });
-    return { code, expiresAt };
+    const hash = sha256Hex(normalizePairCode(code)!);
+    // Gone when its time is up, with no later call: a self invite holds a token.
+    const timer = setTimeout(() => this.waiting.delete(hash), inviteTtl);
+    timer.unref();
+    this.waiting.set(hash, { invite, expiresAt: now + inviteTtl, timer });
+    return { code, expiresAt: now + inviteTtl };
+  }
+
+  /** Voids what a removed person left waiting: the codes they gave out and their own. */
+  drop(id: string) {
+    for (const [hash, { invite }] of this.waiting)
+      if ("self" in invite ? invite.self.id === id : invite.by === id) this.forget(hash);
   }
 
   /** Uses a code up, or counts a wrong one against `caller`. */
@@ -67,8 +92,9 @@ export class CollabInvites {
     for (const hash of this.waiting.keys()) if (digestsMatch(digest, hash)) found = hash;
     if (found !== undefined) {
       const { invite } = this.waiting.get(found)!;
-      this.waiting.delete(found);
-      this.failures.delete(caller);
+      this.forget(found);
+      // A code for oneself costs nothing to make, so it does not clear the count.
+      if (!("self" in invite)) this.failures.delete(caller);
       return { status: "ok", invite };
     }
     const at = [...(record?.at ?? []).filter((time) => now - time < failureWindow), now];

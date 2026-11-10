@@ -91,16 +91,56 @@ test("wrong codes spread over more than 15 minutes, or followed by a right one, 
   }
 });
 
-test("a self invite keeps the caller's own token only while the code lives", () => {
-  const { invites: box, advance } = invites();
+test("a self invite keeps the caller's own token only while the code lives", (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const { invites: box } = invites();
   const self = { id: "m-0123456789", token: `bpc_${"t".repeat(43)}` };
   const used = box.create({ self })!;
   assert.deepEqual(box.redeem(used.code, "dev_phone"), { status: "ok", invite: { self } });
   assert.equal(kept(box).includes(self.token), false);
   box.create({ self });
+  t.mock.timers.tick(inviteTtl - 1);
   assert.equal(kept(box).includes(self.token), true);
-  advance(inviteTtl);
-  // Any later call drops what expired.
-  box.redeem(wrong, "install");
+  // Gone when the 10 minutes are up, with no later call to drop it.
+  t.mock.timers.tick(1);
   assert.equal(kept(box).includes(self.token), false);
+});
+
+test("one code for oneself at a time, and it does not clear the wrong-code count", () => {
+  const { invites: box } = invites();
+  const self = { id: "m-0123456789", token: `bpc_${"t".repeat(43)}` };
+  // A new one replaces the old, so one person never fills the 20.
+  const first = box.create({ self })!;
+  for (let count = 0; count < maxInvites * 2; count++) assert.ok(box.create({ self }));
+  assert.deepEqual(box.redeem(first.code, "install"), { status: "invalid" });
+  for (let count = 1; count < maxInvites; count++) assert.ok(box.create({ name: `P${count}` }));
+  assert.equal(box.create({ name: "One too many" }), undefined);
+  // Full of other people's codes: no new one, and the waiting one still works.
+  const other = { id: "m-0000000002", token: `bpc_${"u".repeat(43)}` };
+  assert.equal(box.create({ self: other }), undefined);
+  const last = box.create({ self })!;
+
+  for (let attempt = 2; attempt < failureLimit; attempt++) box.redeem(wrong, "install");
+  assert.deepEqual(box.redeem(last.code, "install"), { status: "ok", invite: { self } });
+  assert.equal(box.redeem(wrong, "install").status, "locked");
+});
+
+test("dropping a person voids the codes they gave out and their own, and nobody else's", () => {
+  const { invites: box } = invites();
+  const self = { id: "m-0123456789", token: `bpc_${"t".repeat(43)}` };
+  const theirs = [
+    box.create({ name: "Ben", admin: true, by: self.id })!,
+    box.create({ name: "Cy", by: self.id })!,
+    box.create({ self })!,
+  ];
+  const fromHost = box.create({ name: "Dee" })!;
+  const fromOther = box.create({ name: "Eve", by: "m-0000000002" })!;
+  box.drop(self.id);
+  assert.equal(kept(box).includes(self.token), false);
+  for (const { code } of theirs) assert.deepEqual(box.redeem(code, "install"), { status: "invalid" });
+  assert.equal(box.redeem(fromHost.code, "install").status, "ok");
+  assert.deepEqual(box.redeem(fromOther.code, "install"), {
+    status: "ok",
+    invite: { name: "Eve", by: "m-0000000002" },
+  });
 });

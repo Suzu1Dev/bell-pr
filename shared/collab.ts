@@ -37,7 +37,7 @@ export interface CollabInviteResponse {
   expiresAt: string;
 }
 
-/** POST /api/collab/join → 201. The token is shown only here, once. */
+/** POST /api/collab/join → 201. The token is given only here, again for a code made for oneself. */
 export interface CollabJoinResponse {
   groupId: string;
   id: string;

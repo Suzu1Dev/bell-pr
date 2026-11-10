@@ -18,7 +18,7 @@ import type { CollabJoinResponse } from "../shared/collab.js";
 import { loadOrCreateApiToken } from "./api-token.js";
 import { createApp } from "./app.js";
 import { openCollabHost } from "./collab-host.js";
-import { maxInvites } from "./collab-invites.js";
+import { CollabInvites, inviteTtl, maxInvites } from "./collab-invites.js";
 import { dataPaths } from "./config.js";
 import { participantHeader } from "./coordination-routes.js";
 import { acquireWriterLock } from "./index.js";
@@ -238,6 +238,17 @@ test("before setup the group routes say so, only the person at the host sets it 
     host: true,
   });
   await expectNotReady("stopped");
+  // A restart alone did not bring it back: both languages say to fix the cause first.
+  const said = async (locale: string) =>
+    (await f.post("/join", { ...f.install, "x-bell-locale": locale }, wrong)).json.error;
+  assert.equal(
+    await said("en"),
+    "Group work has stopped. Fix the cause on the host (`bell-pr group status` names it), then restart BELL PR.",
+  );
+  assert.equal(
+    await said("zh-TW"),
+    "小組協作已停止。請先在主機上排除原因（`bell-pr group status` 會顯示原因），再重新啟動 BELL PR。",
+  );
   assert.equal(outcome(await f.post("/setup", f.install)), "409 missing");
   assert.equal(existsSync(f.paths.coordination), false);
   // Asking while group work is not ready is no failure worth a log line.
@@ -345,7 +356,13 @@ test("an invite code works once, 20 wait at most, a restart voids them; wrong co
 
   // forLocked still waits, so 19 more fit.
   for (let more = 1; more < maxInvites; more++) await f.invite(f.install, { name: `More ${more}` });
-  assert.equal(outcome(await f.post("/invites", f.install, { name: "One too many" })), "429 tooManyInvites");
+  const full = await f.post("/invites", { ...f.install, "x-bell-locale": "en" }, { name: "One too many" });
+  assert.equal(outcome(full), "429 tooManyInvites");
+  // The message takes its numbers from the limits themselves.
+  assert.equal(
+    full.json.error,
+    `${maxInvites} invite codes are already waiting. Wait until one is used or expires (${inviteTtl / 60_000} minutes).`,
+  );
   assert.equal(outcome(await f.post("/invites", c.who.member, { self: true })), "429 tooManyInvites");
 
   await f.start();
@@ -415,6 +432,77 @@ test("remove: the person leaves the group; their device is unpaired only when as
     outcome(await f.post(`/people/${c.ada.id}/remove`, { ...f.install, [participantHeader]: host.token })),
     "403 notJoined",
   );
+  await f.nothingLeaked();
+});
+
+test("remove with the tick box never unpairs the asking device or one a current person joined from", async (t) => {
+  const f = await fixture(t);
+  const c = await f.cast();
+  const remove = (who: Headers, id: string) => f.post(`/people/${id}/remove`, who, { unpair: true });
+  // Two people joined from one paired device: it stays while either is in the group.
+  const shared = await f.device("Shared laptop");
+  const gil = await f.join(shared, await f.invite(c.who.admin, { name: "Gil" }));
+  const hal = await f.join(shared, await f.invite(c.who.admin, { name: "Hal" }));
+  assert.deepEqual((await remove(c.who.admin, gil.id)).json, { revoked: 0, unpaired: false });
+  assert.equal((await f.info(shared)).status, 200);
+  assert.deepEqual((await remove(c.who.admin, hal.id)).json, { revoked: 0, unpaired: true });
+  assert.equal((await f.info(shared)).status, 401);
+
+  // The admin also uses the tablet Ivy joined from: asked from it, it stays paired.
+  const tablet = await f.device("Tablet");
+  const ivy = await f.join(tablet, await f.invite(c.who.admin, { name: "Ivy" }));
+  const onTablet = { ...tablet, [participantHeader]: c.ada.token };
+  assert.deepEqual((await remove(onTablet, ivy.id)).json, { revoked: 0, unpaired: false });
+  assert.equal((await f.info(onTablet)).status, 200);
+  assert.deepEqual((await remove(c.who.admin, ivy.id)).json, { revoked: 0, unpaired: true });
+  assert.equal((await f.info(onTablet)).status, 401);
+});
+
+test("a removed admin's waiting codes add nobody and no longer count; two admins cannot remove each other", async (t) => {
+  const f = await fixture(t);
+  const c = await f.cast();
+  const admin = async (name: string) => {
+    const phone = await f.device(`Phone ${name}`);
+    const joined = await f.join(phone, await f.invite(f.install, { name, admin: true }));
+    return { id: joined.id, who: { ...phone, [participantHeader]: joined.token } };
+  };
+  const removeAsAda = (id: string) => f.post(`/people/${id}/remove`, c.who.admin);
+
+  // Even a code the removal did not reach is refused when it is used.
+  const dee = await admin("Dee");
+  const unreached = t.mock.method(CollabInvites.prototype, "drop", () => {});
+  const outlived = await f.invite(dee.who, { name: "Eve", admin: true });
+  assert.equal(outcome(await removeAsAda(dee.id)), "200");
+  unreached.mock.restore();
+  const before = await f.files();
+  assert.equal(outcome(await f.post("/join", c.who.device, { code: outlived })), "400 invalidCode");
+  assert.deepEqual(await f.files(), before);
+
+  // The removal voids what the person left waiting, and only that.
+  const fay = await admin("Fay");
+  const fromFay: string[] = [];
+  for (const body of [{ name: "Gil", admin: true }, { name: "Hal" }, { self: true }])
+    fromFay.push(await f.invite(fay.who, body));
+  const fromHost = await f.invite({ ...fay.who, ...f.install }, { name: "Ida" });
+  const fromAda = await f.invite(c.who.admin, { name: "Jo" });
+  assert.equal(outcome(await removeAsAda(fay.id)), "200");
+  // Two still wait, so 18 more fit.
+  for (let more = 2; more < maxInvites; more++) await f.invite(f.install, { name: `More ${more}` });
+  assert.equal(outcome(await f.post("/invites", f.install, { name: "One too many" })), "429 tooManyInvites");
+  for (const code of fromFay)
+    assert.equal(outcome(await f.post("/join", c.who.device, { code })), "400 invalidCode");
+  assert.equal((await f.join(c.who.device, fromHost)).name, "Ida");
+  assert.equal((await f.join(c.who.device, fromAda)).name, "Jo");
+
+  // Removals land one at a time: the admin removed first removes nobody.
+  const gus = await admin("Gus");
+  const both = await Promise.all([
+    removeAsAda(gus.id),
+    f.post(`/people/${c.ada.id}/remove`, gus.who),
+  ]);
+  assert.deepEqual(both.map(outcome).sort(), ["200", "403 notJoined"]);
+  const { people } = JSON.parse((await f.files())[0]);
+  assert.equal([c.ada.id, gus.id].filter((id) => people[id].removedAt).length, 1);
   await f.nothingLeaked();
 });
 
