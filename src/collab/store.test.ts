@@ -198,11 +198,27 @@ test("a request before the board is given up after 40 seconds too", async (t) =>
 test("a group without a repository is asked for its list every 10 seconds", async (t) => {
   const { store, answer, waiting, pass } = await joined(t, []);
   assert.deepEqual([store.get().projects, waiting()], [[], []]);
+  const card = store.get();
+  await pass(10_000);
+  // Still none, and a repository this page is adding is left out of the list: the card stays as it is.
+  await answer("/projects", { projects: [], addable: [] });
+  assert.equal(store.get(), card);
   await pass(10_000);
   // An admin added one meanwhile: its board follows without a reload.
   await answer("/projects", { projects: [{ id: "p1", name: "shop" }] });
   await answer(first, feed(1, [hold("a")]));
   assert.deepEqual([store.get().project, ids(store.get().held)], ["p1", ["a"]]);
+});
+
+test("a repository that the list brought before its add was answered is listed once", async (t) => {
+  const { store, answer, pass } = await joined(t, []);
+  await pass(10_000);
+  const adding = store.add("r1");
+  await settle();
+  await answer("/projects", { projects: [{ id: "p1", name: "shop" }] });
+  await answer("/projects", { project: { id: "p1", name: "shop" } }, 201);
+  await adding;
+  assert.deepEqual(store.get().projects, [{ id: "p1", name: "shop" }]);
 });
 
 test("when group work stops the board goes, and the page asks where group work stands", async (t) => {

@@ -191,12 +191,14 @@ export function createGroupStore() {
           const { projects, addable } = await ask<CollabProjectsResponse>("/projects");
           if (signal.aborted) return;
           const chosen = projects.find((project) => project.id === state.project) ?? projects[0];
-          drop({ projects, addable, project: chosen?.id });
           if (!chosen) {
-            // None yet: asked again, for the one an admin adds meanwhile.
+            // None yet: asked again, for the one an admin adds meanwhile. A list that is still
+            // empty changes nothing: it leaves out the repository that this page is adding.
+            if (state.projects?.length !== 0) drop({ projects, addable, project: undefined });
             await pause(10_000, signal);
             continue;
           }
+          drop({ projects, addable, project: chosen.id });
         }
         const query = new URLSearchParams({ wait: polls ? "0" : "25" });
         if (cursor) {
@@ -298,7 +300,8 @@ export function createGroupStore() {
     async add(repoId: string) {
       const { project } = await call<CollabAddProjectResponse>("/projects", send("POST", { repoId }));
       drop({
-        projects: [...(state.projects ?? []), project],
+        // Not twice, when the list brought it before this answer.
+        projects: [...(state.projects ?? []).filter((item) => item.id !== project.id), project],
         addable: state.addable?.filter((repo) => repo.repoId !== repoId),
         project: project.id,
       });
