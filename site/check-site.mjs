@@ -17,10 +17,14 @@
  * - every image in assets/screenshots/ is a byte-identical copy of the one
  *   in docs/images/en/;
  * - the site's files total at most 5 MB;
- * - each zh-tw page is paired with its English page. Visible text, and the
- *   translatable attributes and meta text listed below, fail when identical,
- *   except brand and product names (the list in this file) and text inside
- *   code, pre or kbd. In site.js the two sides of `isZh ? zh : en` must differ.
+ * - on each zh-tw page, visible text and the translatable attributes and
+ *   meta text below are checked. Text inside code, pre or kbd is skipped.
+ *   After the kept English names in this file are removed, any remaining
+ *   Latin letter fails, whether or not the English page has that string.
+ *   A CJK character and a Latin letter or digit also need a space between
+ *   them (tags in between do not count; full-width punctuation does not
+ *   need a space). In site.js the zh side of `isZh ? zh : en` must not be
+ *   English.
  *
  * Browser checks (--browser), with the pages served from a static server on
  * 127.0.0.1, at 1440 x 900, 390 x 844 and 320 x 740:
@@ -48,8 +52,10 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { publishedInstallVersion } from "../scripts/published-version.mjs";
 
-const siteDir = path.dirname(fileURLToPath(import.meta.url));
-const repoDir = path.dirname(siteDir);
+const scriptDir = path.dirname(fileURLToPath(import.meta.url));
+/** CHECK_SITE_DIR points the static checks at a copy of site/, for tests. */
+const siteDir = process.env.CHECK_SITE_DIR ? path.resolve(process.env.CHECK_SITE_DIR) : scriptDir;
+const repoDir = path.dirname(scriptDir);
 const readme = fs.readFileSync(path.join(siteDir, "README.md"), "utf8");
 /** The site's size budget. */
 const maxSiteBytes = 5 * 1024 * 1024;
@@ -83,14 +89,14 @@ const ids = (html) => new Set([...html.matchAll(/\sid="([^"]+)"/g)].map((match) 
 const listedInReadme = (value) => readme.includes(value);
 
 /**
- * Brand, product, tool and platform names that stay in English, plus the
- * Apache License's own name. Longest first, so "Claude Code" is removed
- * before "Claude" and "WSL2" before "WSL".
+ * Names that stay English on zh-tw pages. Longest first, so "Claude Code"
+ * is removed before "Claude", "agents" before "agent", and "BELL PR" before
+ * "BELL". A checked string fails when any Latin letter remains after these
+ * are removed. "macOS · Linux" passes. "Deploy now" does not.
  *
- * A zh-tw text node may match an English one only when removing these names
- * leaves no letters. "macOS · Linux" passes (both words are names, the dot
- * is not a letter). "Apache-2.0 license" does not: "license" is still there.
- * A node that never had a letter — 中文, the slash, ›_, ↗, + — is not English.
+ * Brand, product and tool names, plus terms the Traditional Chinese pages
+ * keep on purpose (issue, pull request, vibe coding, Draft PR, the role
+ * names, CLI, API, AI). Not a list of phrases copied from the pages.
  */
 const keptInEnglish = [
   "Apache License",
@@ -99,11 +105,24 @@ const keptInEnglish = [
   "PowerShell",
   "Homebrew",
   "Node.js",
+  "Google Cloud",
+  "vibe coding",
+  "git worktree",
+  "pull request",
+  "Pull request",
+  "Draft PR",
+  "Test analyst",
+  "bubblewrap",
+  "Teammates",
+  "teammates",
+  "teammate",
   "BELL PR",
   "bell-pr",
+  "worktree",
   "GitHub",
   "OpenAI",
   "Anthropic",
+  "Reviewer",
   "Gemini",
   "Google",
   "Claude",
@@ -111,20 +130,41 @@ const keptInEnglish = [
   "Docker",
   "Ubuntu",
   "Debian",
+  "agents",
   "macOS",
   "Linux",
   "Windows",
+  "issue",
+  "Shell",
   "WSL2",
+  "Draft",
   "WSL",
+  "Apache",
+  "Agent",
+  "agent",
+  "PATH",
   "npm",
   "npx",
   "mise",
+  "Markdown",
+  "socat",
+  "sudo",
+  "beta",
   "Bun",
   "bun",
   "curl",
   "brew",
   "ps1",
   "Git",
+  "BELL",
+  "Lead",
+  "CLI",
+  "API",
+  "Inc.",
+  "LLC",
+  "PBC",
+  "PR",
+  "AI",
 ].sort((a, b) => b.length - a.length);
 
 const skipTextTags = new Set(["script", "style", "code", "pre", "kbd", "title"]);
@@ -229,26 +269,86 @@ function translatableStrings(html) {
   return { found, unclosed };
 }
 
-/** English copy left on a zh-tw page: the same visible text, attribute or meta text as the English page. */
+const isCjk = (ch) => /[\u3400-\u9fff]/.test(ch);
+const isLatinOrDigit = (ch) => /[A-Za-z0-9]/.test(ch);
+
+/**
+ * Visible characters in order, tags ignored, so a boundary can sit on either
+ * side of an element. script and style are omitted. code, pre and kbd stay,
+ * because the space rule is about what a reader sees.
+ */
+function visibleFlow(html) {
+  let flow = "";
+  const stack = [];
+  const skip = new Set(["script", "style"]);
+  let index = 0;
+  while (index < html.length) {
+    if (html.startsWith("<!--", index)) {
+      const end = html.indexOf("-->", index);
+      index = end === -1 ? html.length : end + 3;
+      continue;
+    }
+    if (html[index] === "<") {
+      const end = html.indexOf(">", index);
+      const raw = html.slice(index + 1, end === -1 ? html.length : end);
+      index = end === -1 ? html.length : end + 1;
+      if (raw.startsWith("/") || raw.startsWith("!") || raw.startsWith("?")) {
+        if (raw.startsWith("/")) {
+          const name = raw.slice(1).trim().split(/\s/)[0].toLowerCase();
+          for (let at = stack.length - 1; at >= 0; at -= 1) {
+            if (stack[at] === name) {
+              stack.splice(at);
+              break;
+            }
+          }
+        }
+        continue;
+      }
+      const tag = raw.split(/[\s/>]/)[0].toLowerCase();
+      if (!raw.endsWith("/") && !voidTags.has(tag)) stack.push(tag);
+      continue;
+    }
+    const end = html.indexOf("<", index);
+    const raw = html.slice(index, end === -1 ? html.length : end);
+    index = end === -1 ? html.length : end;
+    if (stack.some((tag) => skip.has(tag))) continue;
+    flow += decodeEntities(raw);
+  }
+  return flow;
+}
+
+/** CJK and a Latin letter or digit with nothing between them (tags do not count). */
+function cjkLatinGaps(flow) {
+  const gaps = [];
+  const seen = new Set();
+  for (let i = 0; i < flow.length - 1; i += 1) {
+    const left = flow[i];
+    const right = flow[i + 1];
+    if (!((isCjk(left) && isLatinOrDigit(right)) || (isLatinOrDigit(left) && isCjk(right)))) continue;
+    const snippet = flow.slice(Math.max(0, i - 12), i + 14).replace(/\s+/g, " ");
+    if (seen.has(snippet)) continue;
+    seen.add(snippet);
+    gaps.push(snippet);
+  }
+  return gaps;
+}
+
+/** English left on a zh-tw page: Latin letters that are not kept names, and a missing space at a CJK/Latin boundary. */
 function checkZhTw(problems) {
   for (const file of pages()) {
     if (!file.startsWith("zh-tw/") || !file.endsWith(".html")) continue;
     const english = file.slice("zh-tw/".length);
-    if (!fs.existsSync(path.join(siteDir, english))) {
-      problems.push(`${file}: no English page at ${english}`);
-      continue;
-    }
-    const zh = translatableStrings(fs.readFileSync(path.join(siteDir, file), "utf8"));
+    if (!fs.existsSync(path.join(siteDir, english))) problems.push(`${file}: no English page at ${english}`);
+    const html = fs.readFileSync(path.join(siteDir, file), "utf8");
+    const zh = translatableStrings(html);
     if (zh.unclosed) problems.push(`${file}: <${zh.unclosed}> is never closed, so the text after it was not checked`);
-    const englishText = new Set(translatableStrings(fs.readFileSync(path.join(siteDir, english), "utf8")).found.map((item) => item[1]));
     const seen = new Set();
     for (const [kind, text] of zh.found) {
-      const key = `${kind}\0${text}`;
-      if (!englishText.has(text) || seen.has(key)) continue;
-      seen.add(key);
-      if (onlyKeptNames(text)) continue;
+      if (seen.has(text) || onlyKeptNames(text)) continue;
+      seen.add(text);
       problems.push(`${file}: untranslated ${kind} "${text}"`);
     }
+    for (const gap of cjkLatinGaps(visibleFlow(html))) problems.push(`${file}: missing space "${gap}"`);
   }
 }
 

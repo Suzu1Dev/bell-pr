@@ -47,12 +47,15 @@ without JavaScript, all seven commands are visible together.
   the brand copies drift from `public/`. See `docs/brand.md`.
 - **Checks.** `node site/check-site.mjs` checks links, resources, the
   no-inline-script rule, the screenshot copies and the 5 MB size budget.
-  It pairs each `zh-tw/` page with its English page and fails when visible
-  text, or `alt`, `title`, `aria-label`, `placeholder`, `label`, the document
-  title, or a `description`, `og:title`, `og:description`, `twitter:title` or
-  `twitter:description` meta tag, is still the English one. Brand and
-  product names may match; text inside `code`, `pre` or `kbd` is not compared.
-  In `site.js` the two sides of `isZh ? zh : en` must differ.
+  On each `zh-tw/` page it checks visible text, and `alt`, `title`,
+  `aria-label`, `placeholder`, `label`, the document title, and
+  `description`, `og:title`, `og:description`, `twitter:title` and
+  `twitter:description`. Text inside `code`, `pre` or `kbd` is skipped.
+  After the kept English names in `check-site.mjs` are removed, any remaining
+  Latin letter fails, whether or not the English page contains that string.
+  A CJK character and a Latin letter or digit need a space between them;
+  tags in between do not count, and full-width punctuation needs no space.
+  In `site.js` the zh side of `isZh ? zh : en` must not be English.
   Missing `.mp4`/`.webm` under `assets/video/` are allowed (deploy-only) and
   those extensions do not count toward the size budget.
   `node site/check-site.mjs --browser --port <port>` also loads every page in
