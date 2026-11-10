@@ -602,7 +602,7 @@ leaked — it also invalidates every paired device.
 
 BELL PR needs no configuration. Every setting below is an environment
 variable read at start; `bell-pr start` also takes `--port`, `--host`,
-`--data-dir`, `--no-open`, `--force` and `--env-file <file>`. `start` exits
+`--data-dir`, `--no-open`, `--force`, `--group` and `--env-file <file>`. `start` exits
 before it listens when a required `bell-pr doctor` check fails; `--force`
 starts anyway. Values set in the app's
 Settings are used unless a variable sets them.
@@ -616,6 +616,7 @@ Settings are used unless a variable sets them.
 | `BELLPR_SUITE_LINKS` | none | Where BELL Explain and BELL Personal are (`explain=<origin>,personal=<origin>`); shows the product switcher. See [BELL Suite link](docs/bell-suite.md) |
 | `BELLPR_DATA_DIR` | `~/.bellpr` | The data directory |
 | `BELLPR_NO_OPEN` | not set | `1` never opens a browser |
+| `BELLPR_GROUP` | not set | `1` turns [group work](docs/group-work.md) on for the people who share this BELL PR (also `--group`); set up and invite with `bell-pr group setup` and `bell-pr group invite <name>` |
 | `BELLPR_LOCALE` | `en` | Default language of server and CLI messages (`en` or `zh-TW`) |
 | `BELLPR_LOG_LEVEL` | `info` | `debug`, `info`, `warn` or `error` |
 | `BELLPR_MAX_AGENT_PROCESSES` | `3` | Agent CLI processes at the same time (1 to 32) |
@@ -698,6 +699,7 @@ readable by your user only.
 - [Upgrading](docs/upgrading.md)
 - [FAQ](docs/faq.md)
 - [Self-hosting](docs/self-hosting.md) and [Docker](docs/docker.md)
+- [Group work](docs/group-work.md)
 - [Security model](docs/security-model.md)
 - [Development](docs/development.md): building and checking BELL PR from
   its source

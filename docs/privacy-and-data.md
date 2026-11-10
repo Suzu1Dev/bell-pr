@@ -152,6 +152,7 @@ with mode 0600.
 | `author-emails.json` | SHA-256 digests of the commit e-mail addresses you confirmed when publishing, never the addresses themselves. |
 | `logs/` | Daily log files, at most 7 files and 50 MB, with secrets redacted. Prompts and page contents are never logged. |
 | `children.json`, `bellpr.lock` | The agent processes that are running (so a crash leaves none behind), and the running instance's process id and port, with the computer's uptime (on Linux also its host name, PID namespace and boot id). |
+| `coordination.json`, `collab.json` | Only with [group work](group-work.md), from set-up on (a set-up that fails halfway can leave `coordination.json` alone). `coordination.json`: each person's id, role (admin or member), when they were added and the SHA-256 of their participant token, never the token. `collab.json`: the group's id and set-up time, and for each person the name they were invited under, when they joined, whether they are an admin, when they were removed, and, when they joined from a paired device, that device's id. Invite codes are kept in memory only, as their SHA-256. |
 
 Your browser keeps, for this local site only: the language you chose,
 layout preferences such as the code font size and the collapsed sidebar,

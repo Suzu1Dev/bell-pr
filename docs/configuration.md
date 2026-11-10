@@ -32,6 +32,7 @@ the settings in the app.
 | `bell-pr open` | Prints the address of the running BELL PR without the API token, and opens the browser with the token. `--print` only prints that address. `--print-token` includes the token in the printed address |
 | `bell-pr token rotate` | Replaces `<data dir>/api-token`. A running BELL PR uses the new token on the next request. The new token is not printed |
 | `bell-pr doctor` | Checks Node.js, Git, the GitHub CLI, the agent CLIs, the sandbox and the data directory; `--json` for scripts. The report does not include the API token |
+| `bell-pr group status`, `bell-pr group setup`, `bell-pr group invite <name> [--admin]` | [Group work](group-work.md) on a BELL PR started with `--group`: shows whether it is set up, sets it up, and prints a one-time invite code for a person (`--admin` for a group admin) |
 | `bell-pr version` | Shows the version, its release date, Node.js, the platform and the data directory |
 | `bell-pr help` | Lists the commands and options |
 
@@ -44,6 +45,7 @@ Options of `bell-pr start`:
 | `--data-dir <dir>` | `BELLPR_DATA_DIR` | `~/.bellpr` |
 | `--no-open` | `BELLPR_NO_OPEN=1` | opens the browser when it can |
 | `--force` | | off. Start even when `bell-pr doctor` reports Not ready |
+| `--group` | `BELLPR_GROUP=1` | off. Turns [group work](group-work.md) on |
 | `--env-file <file>` | | none |
 
 `bell-pr start` runs the same required checks as `bell-pr doctor` and exits
@@ -54,8 +56,8 @@ tour needs no AI provider, so `bell-pr start --force` is how you open it
 when none is signed in. A real agent run is still refused until a provider
 is ready.
 
-`--data-dir` and `--env-file` work with every command, so `open`, `doctor`
-and `version` find the data directory of the BELL PR you mean.
+`--data-dir` and `--env-file` work with every command, so `open`, `doctor`,
+`group` and `version` find the data directory of the BELL PR you mean.
 
 ## Environment variables
 
@@ -68,6 +70,7 @@ and `version` find the data directory of the BELL PR you mean.
 | `BELLPR_SUITE_LINKS` | none | Where the other BELL products are: `explain=<origin>` and `personal=<origin>`, separated by commas. An origin is on this computer, or an `https` `*.ts.net` name in the same tailnet as `BELLPR_PUBLIC_URL` or `BELLPR_ALLOWED_ORIGINS`. Shows the product switcher; BELL PR refuses to start with an invalid value. See [BELL Suite link](bell-suite.md). |
 | `BELLPR_DATA_DIR` | `~/.bellpr` | Where repositories, worktrees, run records and settings live. Also `--data-dir`. An absolute path is safest. Not under `/tmp` or `$TMPDIR` when Codex agents write code: their sandbox lets commands write there ([security model](security-model.md#codex)). |
 | `BELLPR_NO_OPEN` | not set | Any value other than `0` or `false` stops BELL PR from opening a browser at start and for `bell-pr open`. It also stays closed in CI, in containers and when the output is not a terminal. Also `--no-open`. |
+| `BELLPR_GROUP` | not set | Any value other than `0` or `false` turns [group work](group-work.md) on for the people who share this BELL PR. The data directory's lock is then strict: it is never replaced because of its age, and a start after a crash can be refused until you remove the lock file. Also `--group`. |
 | `BELLPR_LOCALE` | `en` | Language of server and command-line messages when nothing else decides: `en` or `zh-TW`. The language chosen in the app wins. |
 | `BELLPR_LOG_LEVEL` | `info` | How much the server logs: `debug`, `info`, `warn` or `error`. |
 | `BELLPR_MAX_AGENT_PROCESSES` | `3` | Agent CLI processes at the same time across all runs, analyses and discovery, 1 to 32. Lower it when your AI provider's usage limits are tight. Locks **Settings → Performance**. |

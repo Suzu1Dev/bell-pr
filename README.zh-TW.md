@@ -323,7 +323,7 @@ Authorization: Bearer <token>
 
 ## 設定
 
-BELL PR 不需要任何設定就能啟動。下列設定都是啟動時讀取的環境變數；`bell-pr start` 另外接受 `--port`、`--host`、`--data-dir`、`--no-open`、`--force` 與 `--env-file <file>`。必要的 `bell-pr doctor` 檢查失敗時，`start` 會在監聽前結束；`--force` 仍會啟動。在應用程式「設定」中調整的值，除非被環境變數指定，否則都會生效。
+BELL PR 不需要任何設定就能啟動。下列設定都是啟動時讀取的環境變數；`bell-pr start` 另外接受 `--port`、`--host`、`--data-dir`、`--no-open`、`--force`、`--group` 與 `--env-file <file>`。必要的 `bell-pr doctor` 檢查失敗時，`start` 會在監聽前結束；`--force` 仍會啟動。在應用程式「設定」中調整的值，除非被環境變數指定，否則都會生效。
 
 | 變數 | 預設值 | 用途 |
 | --- | --- | --- |
@@ -334,6 +334,7 @@ BELL PR 不需要任何設定就能啟動。下列設定都是啟動時讀取的
 | `BELLPR_SUITE_LINKS` | 無 | BELL Explain 與 BELL Personal 的位址（`explain=<origin>,personal=<origin>`）；設定後會顯示產品切換按鈕。見 [BELL Suite 連結說明](docs/bell-suite.md) |
 | `BELLPR_DATA_DIR` | `~/.bellpr` | 資料目錄 |
 | `BELLPR_NO_OPEN` | 未設定 | `1` 表示絕不開啟瀏覽器 |
+| `BELLPR_GROUP` | 未設定 | `1` 為共用這個 BELL PR 的人開啟[小組協作](docs/group-work.md)（也可用 `--group`）；用 `bell-pr group setup` 設定，用 `bell-pr group invite <名稱>` 邀請 |
 | `BELLPR_LOCALE` | `en` | 伺服器與 CLI 訊息的預設語言（`en` 或 `zh-TW`） |
 | `BELLPR_LOG_LEVEL` | `info` | `debug`、`info`、`warn` 或 `error` |
 | `BELLPR_MAX_AGENT_PROCESSES` | `3` | 同時執行的 Agent CLI 行程數（1 到 32） |
@@ -390,6 +391,7 @@ BELL PR 把所有資料放在 `~/.bellpr`（或 `--data-dir`／`BELLPR_DATA_DIR`
 - [升級說明](docs/upgrading.md)
 - [常見問題](docs/faq.md)
 - [自架說明](docs/self-hosting.md)與 [Docker 說明](docs/docker.md)
+- [小組協作](docs/group-work.md)
 - [安全模型](docs/security-model.md)
 - [開發說明](docs/development.md)：從原始碼建置與檢查 BELL PR
 - [變更紀錄](CHANGELOG.md)

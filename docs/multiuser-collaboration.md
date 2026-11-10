@@ -1,9 +1,12 @@
 # Multi-person collaboration: the coordination core
 
-Status: design, and its first phase in code. The core is not reachable from
-the app, the CLI or any listener yet, so BELL PR still has no protection
-between people working on one project. Overlap warnings for one person's own
-contributions (group mode) are unchanged.
+Status: design, and its first phase in code. A BELL PR started with
+`--group` ([Group work](group-work.md)) now opens the core: it takes the
+strict lock, creates the coordination file at set-up and adds a participant
+for each person who joins. Tasks, claims and integration are still not
+reachable from the app, the CLI or any listener, so BELL PR still has no
+protection between people working on one project. Overlap warnings for one
+person's own contributions (group mode) are unchanged.
 
 ## Decision
 
@@ -211,9 +214,11 @@ with the group-mode overlap check.
     have stopped: gone, written before the machine last booted, or not a node
     process. A host that crashed restarts; one that is paused, suspended or
     blocked keeps the directory.
-  - An ordinary BELL PR start never replaces a strict lock. Its own locks
-    keep the earlier rule: one written elsewhere counts as held while it is
-    renewed (every 10 seconds, for a 30-second lease).
+  - An ordinary BELL PR start replaces a strict lock only as a strict start
+    would: when the process that wrote it is shown to have stopped. It
+    never replaces one because of its age. Its own locks keep the earlier
+    rule: one written elsewhere counts as held while it is renewed (every
+    10 seconds, for a 30-second lease).
   - A host whose lock was replaced or removed refuses every write with
     `503` and `details.reason: "notSingleWriter"`, renews nothing and
     removes nothing. It finds out by reading the lock before each write and
@@ -318,7 +323,12 @@ with the group-mode overlap check.
    (`server/coordination-routes.ts`) exists but is not mounted.
 2. **Wire it into the app.**
    - Mount the router in `createApp` behind the existing app authentication.
-   - Give admins participant management in the CLI.
+     Done in part, without the router: a start with `--group` registers
+     group work's own routes under `/api/collab` behind that
+     authentication. They call the coordinator directly, so far only to
+     create its file, add participants and tell who is asking.
+   - Give admins participant management in the CLI. Done in part, for the
+     person at the host: `bell-pr group setup` and `bell-pr group invite`.
    - Make each managed write call `authorize` and carry the fence:
      - `POST /api/runs/:id/plan/approve` (agents start), `/team/retry` and
        `/split`;
@@ -331,15 +341,16 @@ with the group-mode overlap check.
      - Any member may claim an open task, as now. Done in the core: a
        failed task reopens only through an admin's step, an integrated
        task never reopens, and a reopen keeps the task's history and
-       fences. Like the rest of the core, nothing reaches it yet.
+       fences. Nothing reaches it yet.
      - An undecided recovery closes only its own project. Done in the
        core: an admin settles it through an audited step, while other
        projects stay available, and the undecided project stays closed
        until then. Nothing resets a branch or clears an intent on its own.
-       Like the rest of the core, nothing reaches it yet.
+       Nothing reaches it yet.
      - The process that mounts the router takes the lock with
        `acquireWriterLock` itself and gives that lock to the coordinator.
-       Today nothing outside the tests calls either, and an ordinary
+       A start with `--group` now does both, without mounting the router;
+       nothing else outside the tests calls either, and an ordinary
        start's lock is refused.
      - Tests cover the window between the last lock check and
        `update-ref`, and a lock written in a real other PID namespace, not
@@ -367,6 +378,8 @@ with the group-mode overlap check.
 3. **Show it in the interface** in both languages: claims, conflicts,
    dependency state and the integration queue.
 4. **Reach it from other machines** through a reviewed remote listener.
+   Group work adds no listener: a paired device reaches its routes the way
+   it reaches the rest of BELL PR.
 5. **A confined write environment** that enforces claims on every file
    write.
 
