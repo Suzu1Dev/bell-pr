@@ -741,27 +741,51 @@ test("once the run is no longer busy, a reload reads the result the save just wr
   });
   t.after(() => releaseSave());
   const save = f.store.save.bind(f.store);
+  let idleWrite: Promise<void> | undefined;
   f.store.save = async () => {
-    if ((f.run.byHand?.tests?.length ?? 0) > 0) {
+    const recording = (f.run.byHand?.tests?.length ?? 0) > 0;
+    if (recording && f.run.byHand?.busy?.kind === "tests") {
       markEntered();
       await gate;
     }
-    return save();
+    const pending = save();
+    if (recording && f.run.byHand?.busy?.kind !== "tests") idleWrite = pending;
+    return pending;
   };
   const done = f.runOnce();
+  let reachedSave = false;
+  const endedFirst = done.then(
+    () => {
+      if (!reachedSave) assert.fail("the run finished before its result was saved");
+    },
+    (error: unknown) => {
+      if (!reachedSave) throw error;
+    },
+  );
+  const onDisk = () =>
+    (
+      JSON.parse(readFileSync(path.join(f.store.directory, "state.json"), "utf8")) as {
+        runs: { id: string; byHand?: { busy?: unknown; tests?: unknown[] } }[];
+      }
+    ).runs.find((run) => run.id === f.run.id);
   try {
-    await entered;
-    const early = new Store(f.store.directory);
-    await early.initialize();
-    assert.equal(early.data.runs.find((run) => run.id === f.run.id)?.byHand?.tests, undefined);
+    await Promise.race([
+      entered.then(() => {
+        reachedSave = true;
+      }),
+      endedFirst,
+    ]);
+    // Read the file directly. Loading it through Store clears a stale busy mark and writes that back.
+    assert.equal(onDisk()?.byHand?.tests, undefined);
     assert.equal(f.run.byHand?.busy?.kind, "tests");
   } finally {
     releaseSave();
   }
   const result = await done;
-  const reloaded = new Store(f.store.directory);
-  await reloaded.initialize();
-  assert.deepEqual(reloaded.data.runs.find((run) => run.id === f.run.id)?.byHand?.tests?.at(-1), result);
+  if (idleWrite) await idleWrite;
+  const saved = onDisk();
+  assert.deepEqual(saved?.byHand?.tests?.at(-1), JSON.parse(JSON.stringify(result)));
+  assert.equal(saved?.byHand?.busy, undefined);
 });
 
 test("a new run starts at once when the last one shows its result and the run is no longer busy", async (t) => {
