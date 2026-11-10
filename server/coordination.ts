@@ -26,10 +26,11 @@
  *   compare-and-swap. The intent is saved first, so a restart can tell
  *   whether the branch moved.
  *
- * Any doubt stops it: a missing, damaged or newer file, a lost lock, a
- * failed write or an interrupted integration it cannot settle refuses
- * every request until the coordinator is opened again. No answer ever
- * stands in for "nobody holds this".
+ * Any doubt stops it: a missing, damaged or newer file, a lost lock or a
+ * failed write refuses every request until the coordinator is opened
+ * again. An interrupted integration it cannot settle from the branch
+ * closes only its own project, until an admin settles it from the branch.
+ * No answer ever stands in for "nobody holds this".
  *
  * This guards what goes through it. Writes made around it (a shell, an
  * editor, a push straight to the repository) are not stopped here; see
@@ -79,6 +80,8 @@ export interface CoordinationLimits {
   bytes: number;
   /** Reopenings one task keeps, each with who reopened it and when. */
   reopenings: number;
+  /** Settlements one project keeps; keeping another drops its oldest. */
+  recoveries: number;
 }
 export const coordinationLimits: Readonly<CoordinationLimits> = Object.freeze({
   participants: 1000,
@@ -91,6 +94,7 @@ export const coordinationLimits: Readonly<CoordinationLimits> = Object.freeze({
   participantHeldScopes: 2000,
   bytes: 8 * 1024 * 1024,
   reopenings: 100,
+  recoveries: 10,
 });
 /**
  * The reader takes files up to this many times the writer's limit (32 MiB
@@ -157,6 +161,25 @@ const projectSchema = z.looseObject({
   pending: z
     .looseObject({ claimId, fence: z.number().int().min(1), from: sha, to: sha, startedAt: timestamp })
     .optional(),
+  /**
+   * Each time an admin settled an integration that opening could not,
+   * oldest first: who, when, the intent and what the branch showed.
+   */
+  recoveries: z
+    .array(
+      z.looseObject({
+        by: id,
+        at: timestamp,
+        claimId,
+        fence: z.number().int().min(1),
+        from: sha,
+        to: sha,
+        startedAt: timestamp,
+        outcome: z.enum(["integrated", "notIntegrated"]),
+      }),
+    )
+    .max(coordinationLimits.recoveries)
+    .optional(),
 });
 const fileSchema = z.looseObject({
   format: z.literal("bellpr-coordination"),
@@ -173,6 +196,7 @@ type Participant = CoordinationState["participants"][number];
 type Project = CoordinationState["projects"][number];
 type Task = Project["tasks"][number];
 type Claim = Project["claims"][number];
+type Recovery = NonNullable<Project["recoveries"]>[number];
 export type Role = Participant["role"];
 
 /** The steps of an integration a crash can fall between. */
@@ -222,6 +246,20 @@ export interface TaskView {
   reopenings?: { by: string; at: string; reason?: string }[];
 }
 
+export interface PendingView {
+  claimId: string;
+  fence: number;
+  from: string;
+  to: string;
+  startedAt: string;
+}
+
+export interface RecoveryView extends PendingView {
+  by: string;
+  at: string;
+  outcome: Recovery["outcome"];
+}
+
 export interface ProjectView {
   id: string;
   branch: { ref: string; sha: string };
@@ -229,6 +267,9 @@ export interface ProjectView {
   revision: number;
   tasks: TaskView[];
   claims: ClaimView[];
+  /** The interrupted integration that keeps the project closed until an admin settles it. */
+  undecided?: PendingView;
+  recoveries?: RecoveryView[];
 }
 
 export interface IntegrationView {
@@ -398,6 +439,8 @@ function problemIn(state: CoordinationState): string | undefined {
       return `project ${project.id} pending`;
     if (pending && pending.from !== project.baseline.sha)
       return `project ${project.id} pending base`;
+    if (project.recoveries?.some((recovery) => !participants.has(recovery.by)))
+      return `project ${project.id} recovery`;
   }
   return undefined;
 }
@@ -543,17 +586,42 @@ const room = {
   }),
 };
 
+/** Bytes `records` take in a project, over a project without them. */
+const recoveriesSize = (records: Recovery[]) =>
+  records.length
+    ? growth((project) => {
+        project.recoveries = records;
+      })
+    : 0;
+
+/** Bytes a project's settlements take at most once it keeps `count`. */
+function recoveriesRoom(count: number) {
+  const record: Recovery = {
+    by: longest.id,
+    at: longest.time,
+    claimId: "0".repeat(36),
+    fence: Number.MAX_SAFE_INTEGER,
+    from: longest.sha,
+    to: longest.sha,
+    startedAt: longest.time,
+    outcome: "notIntegrated",
+  };
+  return recoveriesSize(Array.from({ length: count }, () => record));
+}
+
 /**
  * Bytes the file keeps free for what may happen without anything being
  * added: every held claim ending, every open task closing, an intent in
- * every project and the revision counting up. Releasing, revoking,
- * failing, integrating and recovering only spend this room, so they
- * never take the file past its limit.
+ * every project, each project's settlements growing to `recoveries`
+ * bytes (recoveriesRoom) and the revision counting up. Releasing,
+ * revoking, failing, integrating, recovering and settling only spend this
+ * room, so they never take the file past its limit.
  */
-function reserve(state: CoordinationState) {
+function reserve(state: CoordinationState, recoveries: number) {
   let bytes = Math.max(0, String(Number.MAX_SAFE_INTEGER).length - String(state.revision).length);
   for (const project of state.projects) {
     bytes += room.pending;
+    bytes += Math.max(0, recoveries - recoveriesSize(project.recoveries ?? []));
     for (const task of project.tasks) if (task.status === "open") bytes += room.task;
     for (const claim of project.claims) if (claim.status === "held") bytes += room.claim;
   }
@@ -599,6 +667,15 @@ function heldBack(file: string, modes: string[]) {
   if (modes.includes("160000")) return "submodule";
   if (modes.some((mode) => !["000000", "100644", "100755"].includes(mode))) return "mode";
   return undefined;
+}
+
+function pendingView({ claimId, fence, from, to, startedAt }: PendingView): PendingView {
+  return { claimId, fence, from, to, startedAt };
+}
+
+function recoveryView(record: Recovery): RecoveryView {
+  const { by, at, outcome } = record;
+  return { ...pendingView(record), by, at, outcome };
 }
 
 function claimView(claim: Claim): ClaimView {
@@ -710,13 +787,24 @@ export class Coordinator {
   readonly #options: CoordinatorOptions;
   readonly #write: typeof writeDurable;
   readonly #limits: CoordinationLimits;
+  /** Settlements a project keeps; at least the one just made. */
+  readonly #recoveries: number;
+  readonly #recoveriesRoom: number;
   readonly #locks = new Map<string, Promise<unknown>>();
+  /**
+   * Projects whose interrupted integration opening could not settle from
+   * the branch. Each stays closed, its intent and claims as written,
+   * while it still has that intent: until an admin settles it.
+   */
+  readonly #undecided = new Set<string>();
 
   private constructor(options: CoordinatorOptions, state: CoordinationState) {
     this.#options = options;
     this.#file = dataPaths(options.dataDir).coordination;
     this.#write = options.write ?? writeDurable;
     this.#limits = limitsFrom(options.limits);
+    this.#recoveries = Math.max(1, this.#limits.recoveries);
+    this.#recoveriesRoom = recoveriesRoom(this.#recoveries);
     this.#state = state;
   }
 
@@ -761,7 +849,8 @@ export class Coordinator {
   /**
    * An interrupted integration happened if the branch is at its change,
    * and did not if the branch is still at its base. Anything else, or a
-   * branch that cannot be read, leaves it undecided: nothing opens.
+   * branch that cannot be read, leaves it undecided: that project stays
+   * closed until an admin settles it, and the others open.
    */
   async #recover() {
     const outcomes = new Map<string, boolean>();
@@ -771,10 +860,7 @@ export class Coordinator {
       const head = await this.#branchHead(project).catch(() => undefined);
       if (head === pending.to) outcomes.set(project.id, true);
       else if (head === pending.from) outcomes.set(project.id, false);
-      else
-        throw refuse(503, "recoveryUndecided", (m) =>
-          m.coordination.store.recoveryUndecided({ project: project.id }),
-        );
+      else this.#undecided.add(project.id);
     }
     if (!outcomes.size) return;
     await this.#mutate((draft, now) => {
@@ -839,7 +925,7 @@ export class Coordinator {
     const limit = overgrown(this.#state, state, this.#limits);
     if (limit) throw full(limit, this.#limits[limit]);
     const text = serialize(state);
-    if (grows && Buffer.byteLength(text) + reserve(state) > this.#limits.bytes)
+    if (grows && Buffer.byteLength(text) + reserve(state, this.#recoveriesRoom) > this.#limits.bytes)
       throw full("bytes", this.#limits.bytes);
     try {
       parseState(text, this.#limits);
@@ -874,6 +960,17 @@ export class Coordinator {
       : undefined;
     if (!participant) throw unauthenticated();
     return participant;
+  }
+
+  /** The project, unless an integration into it is still undecided. */
+  #openProject(state: CoordinationState, projectId: string): Project {
+    const project = projectIn(state, projectId);
+    if (this.#undecided.has(project.id) && project.pending)
+      throw refuse(409, "recoveryUndecided", (m) =>
+        m.coordination.recovery.undecided({ project: project.id }),
+        { project: project.id },
+      );
+    return project;
   }
 
   /**
@@ -995,6 +1092,7 @@ export class Coordinator {
   }
 
   #projectView(project: Project, revision: number): ProjectView {
+    const { pending, recoveries } = project;
     return {
       id: project.id,
       branch: { ref: project.baseline.ref, sha: project.baseline.sha },
@@ -1002,10 +1100,15 @@ export class Coordinator {
       revision,
       tasks: project.tasks.map(taskView),
       claims: project.claims.map(claimView),
+      ...(pending && this.#undecided.has(project.id) ? { undecided: pendingView(pending) } : {}),
+      ...(recoveries ? { recoveries: recoveries.map(recoveryView) } : {}),
     };
   }
 
-  /** The project's branch, tasks and claims, as last written. */
+  /**
+   * The project's branch, tasks and claims, as last written, and the
+   * integration that keeps it closed, if any: reading never needs it open.
+   */
   project(actor: Actor, projectId: string): ProjectView {
     this.#assertUsable();
     this.#who(actor);
@@ -1022,7 +1125,7 @@ export class Coordinator {
       throw refuse(400, "tooManyDependencies", (m) => m.coordination.task.tooManyDependencies);
     return await this.#mutate((draft, now) => {
       const who = this.#who(actor, draft);
-      const project = projectIn(draft, projectId);
+      const project = this.#openProject(draft, projectId);
       if (project.tasks.some((task) => task.id === taskId))
         throw refuse(409, "taskExists", (m) => m.coordination.task.exists({ task: taskId }));
       for (const dependency of dependsOn)
@@ -1045,7 +1148,7 @@ export class Coordinator {
     const scopes = normalizeScopes(input.scopes);
     return await this.#mutate((draft, now) => {
       const who = this.#who(actor, draft);
-      const project = projectIn(draft, projectId);
+      const project = this.#openProject(draft, projectId);
       const task = taskIn(project, input.taskId);
       if (task.status !== "open")
         throw refuse(409, "taskClosed", (m) => m.coordination.task.closed({ task: task.id }));
@@ -1099,7 +1202,7 @@ export class Coordinator {
     const added = normalizeScopes(input.scopes);
     return await this.#mutate((draft, now) => {
       const who = this.#who(actor, draft);
-      const project = projectIn(draft, projectId);
+      const project = this.#openProject(draft, projectId);
       const claim = claimIn(project, id);
       assertHeldBy(claim, who, input.fence);
       const scopes = unionScopes(claim.scopes, added);
@@ -1117,7 +1220,7 @@ export class Coordinator {
     return await this.#serial(`integrate:${projectId}`, () =>
       this.#mutate((draft, now) => {
         const who = this.#who(actor, draft);
-        const claim = claimIn(projectIn(draft, projectId), id);
+        const claim = claimIn(this.#openProject(draft, projectId), id);
         assertHeldBy(claim, who, input.fence);
         Object.assign(claim, { status: "released", updatedAt: now, endedBy: who.id });
         return claimView(claim);
@@ -1133,7 +1236,7 @@ export class Coordinator {
         const who = this.#who(actor, draft);
         if (who.role !== "admin")
           throw refuse(403, "adminOnly", (m) => m.coordination.participant.adminOnly);
-        const claim = claimIn(projectIn(draft, projectId), id);
+        const claim = claimIn(this.#openProject(draft, projectId), id);
         if (claim.status !== "held")
           throw refuse(409, "ended", (m) => m.coordination.claim.ended);
         Object.assign(claim, {
@@ -1156,7 +1259,7 @@ export class Coordinator {
     return await this.#serial(`integrate:${projectId}`, () =>
       this.#mutate((draft, now) => {
         const who = this.#who(actor, draft);
-        const project = projectIn(draft, projectId);
+        const project = this.#openProject(draft, projectId);
         const task = taskIn(project, taskId);
         if (task.status !== "open")
           throw refuse(409, "taskClosed", (m) => m.coordination.task.closed({ task: task.id }));
@@ -1193,7 +1296,7 @@ export class Coordinator {
       const who = this.#who(actor, draft);
       if (who.role !== "admin")
         throw refuse(403, "adminOnly", (m) => m.coordination.participant.adminOnly);
-      const task = taskIn(projectIn(draft, projectId), taskId);
+      const task = taskIn(this.#openProject(draft, projectId), taskId);
       if (task.status !== "failed")
         throw refuse(409, "notFailed", (m) => m.coordination.task.notFailed({ task: task.id }));
       const reopenings = task.reopenings ?? [];
@@ -1217,7 +1320,7 @@ export class Coordinator {
   authorize(actor: Actor, projectId: string, input: { claimId: string; fence: number; paths: string[] }) {
     this.#assertUsable();
     const who = this.#who(actor);
-    const project = projectIn(this.#state, projectId);
+    const project = this.#openProject(this.#state, projectId);
     const claim = claimIn(project, input.claimId);
     assertHeldBy(claim, who, input.fence);
     assertDependenciesIntegrated(project, taskIn(project, claim.taskId));
@@ -1269,7 +1372,7 @@ export class Coordinator {
     return await this.#serial(`integrate:${projectId}`, async () => {
       this.#assertUsable();
       const who = this.#who(actor);
-      const project = projectIn(this.#state, projectId);
+      const project = this.#openProject(this.#state, projectId);
       const claim = claimIn(project, id);
       assertHeldBy(claim, who, input.fence);
       const task = taskIn(project, claim.taskId);
@@ -1285,7 +1388,7 @@ export class Coordinator {
       await this.#checkChange(repository, claim, base, commit);
 
       await this.#mutate((draft, now) => {
-        const current = projectIn(draft, projectId);
+        const current = this.#openProject(draft, projectId);
         assertHeldBy(claimIn(current, id), who, input.fence);
         current.pending = { claimId: id, fence: input.fence, from: base, to: commit, startedAt: now };
         // Its outcome must be writable as well, before the branch moves.
@@ -1415,16 +1518,88 @@ export class Coordinator {
     return await this.#serial(`integrate:${projectId}`, async () => {
       if (this.#who(actor).role !== "admin")
         throw refuse(403, "adminOnly", (m) => m.coordination.participant.adminOnly);
-      const head = await this.#branchHead(projectIn(this.#state, projectId));
+      const head = await this.#branchHead(this.#openProject(this.#state, projectId));
       if (head !== input.sha)
         throw refuse(409, "staleBase", (m) => m.coordination.integration.staleBase({ current: head }), {
           current: head,
         });
       return await this.#mutate((draft) => {
-        const project = projectIn(draft, projectId);
+        const project = this.#openProject(draft, projectId);
         project.baseline.sha = head;
         return this.#projectView(project, draft.revision);
       });
+    });
+  }
+
+  /**
+   * An admin settles an integration that opening could not, naming the
+   * intent the project shows and the commit the branch points at, which
+   * must be one of the intent's two ends: at its change, the integration
+   * completes; at its base, it never happened and the claim stays held
+   * under the same fence. A branch anywhere else is refused, never
+   * guessed at, moved or adopted. The settlement is kept with who made it
+   * and when; once a project keeps as many as the limit allows, the
+   * oldest is dropped, so settling is never refused for room.
+   */
+  async settleRecovery(
+    actor: Actor,
+    projectId: string,
+    input: { claimId: string; fence: number; from: string; to: string; startedAt: string; head: string },
+  ) {
+    this.#assertUsable();
+    if (
+      [input.from, input.to, input.head].some(
+        (value) => typeof value !== "string" || !shaPattern.test(value),
+      )
+    )
+      throw refuse(400, "invalidCommit", (m) => m.coordination.integration.invalidCommit);
+    return await this.#serial(`integrate:${projectId}`, async () => {
+      this.#assertUsable();
+      const who = this.#who(actor);
+      if (who.role !== "admin")
+        throw refuse(403, "adminOnly", (m) => m.coordination.participant.adminOnly);
+      const named = (project: Project) => {
+        const pending = this.#undecided.has(project.id) ? project.pending : undefined;
+        if (!pending)
+          throw refuse(409, "nothingToSettle", (m) => m.coordination.recovery.nothingToSettle);
+        if (
+          pending.claimId !== input.claimId ||
+          pending.fence !== input.fence ||
+          pending.from !== input.from ||
+          pending.to !== input.to ||
+          pending.startedAt !== input.startedAt
+        )
+          throw refuse(409, "stalePending", (m) => m.coordination.recovery.stalePending, {
+            pending: pendingView(pending),
+          });
+        return pending;
+      };
+      const project = projectIn(this.#state, projectId);
+      const pending = named(project);
+      const head = await this.#branchHead(project).catch(() => {
+        throw refuse(503, "branchUnreadable", (m) => m.coordination.recovery.branchUnreadable);
+      });
+      if (head !== pending.from && head !== pending.to)
+        throw refuse(409, "branchElsewhere", (m) =>
+          m.coordination.recovery.branchElsewhere({ current: head }),
+          { current: head },
+        );
+      if (head !== input.head)
+        throw refuse(409, "staleBase", (m) => m.coordination.integration.staleBase({ current: head }), {
+          current: head,
+        });
+      const view = await this.#mutate((draft, now) => {
+        const current = projectIn(draft, projectId);
+        const { claimId, fence, from, to, startedAt } = named(current);
+        const outcome = head === to ? "integrated" : "notIntegrated";
+        if (outcome === "integrated") completeIntegration(current, now);
+        else delete current.pending;
+        const record: Recovery = { by: who.id, at: now, claimId, fence, from, to, startedAt, outcome };
+        current.recoveries = [...(current.recoveries ?? []), record].slice(-this.#recoveries);
+        return this.#projectView(current, draft.revision);
+      });
+      this.#undecided.delete(projectId);
+      return view;
     });
   }
 }

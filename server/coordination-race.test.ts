@@ -100,6 +100,8 @@ interface Hosted {
   root: string;
   dataDir: string;
   repo: TestRepo;
+  /** A second project's repository, when asked for. */
+  lib?: TestRepo;
   tokens: Record<"alice" | "bob" | "admin", string>;
   host: Child;
   port: number;
@@ -121,11 +123,16 @@ interface Hosted {
   revision(): Promise<number>;
 }
 
-async function hosted(env: Record<string, string> = {}): Promise<Hosted> {
+async function hosted(env: Record<string, string> = {}, more: { lib?: boolean } = {}): Promise<Hosted> {
   const root = await mkdtemp(path.join(os.tmpdir(), "bellpr-coordination-race-"));
   roots.push(root);
   const dataDir = path.join(root, "data");
   const repo = await makeRepo(root);
+  let lib: TestRepo | undefined;
+  if (more.lib) {
+    await mkdir(path.join(root, "lib"));
+    lib = await makeRepo(path.join(root, "lib"));
+  }
   const setupFile = path.join(root, "setup.json");
   const tokensFile = path.join(root, "tokens.json");
   await writeFile(
@@ -136,7 +143,10 @@ async function hosted(env: Record<string, string> = {}): Promise<Hosted> {
         { id: "bob", role: "member" },
         { id: "admin", role: "admin" },
       ],
-      projects: [{ id: "app", repository: repo.bare, branch: "integration" }],
+      projects: [
+        { id: "app", repository: repo.bare, branch: "integration" },
+        ...(lib ? [{ id: "lib", repository: lib.bare, branch: "integration" }] : []),
+      ],
       tokens: tokensFile,
     }),
   );
@@ -145,6 +155,7 @@ async function hosted(env: Record<string, string> = {}): Promise<Hosted> {
     root,
     dataDir,
     repo,
+    lib,
     async start(more: Record<string, string> = {}, preload: string[] = []) {
       const host = new Child("test/coordination-host.ts", [dataDir, setupFile], more, preload);
       const first = JSON.parse(await host.line());
@@ -185,7 +196,12 @@ async function hosted(env: Record<string, string> = {}): Promise<Hosted> {
   return world;
 }
 
-const post = (path: string, body: unknown): Request => ({ method: "POST", path: `/projects/app${path}`, body });
+const postIn = (project: string, path: string, body: unknown): Request => ({
+  method: "POST",
+  path: `/projects/${project}${path}`,
+  body,
+});
+const post = (path: string, body: unknown): Request => postIn("app", path, body);
 const project = async (world: Hosted) =>
   (await world.ask({ method: "GET", path: "/projects/app" })).body.project!;
 const heldClaims = async (world: Hosted) =>
@@ -514,6 +530,136 @@ for (const step of ["intent-saved", "ref-updated"] as const)
     const onDisk = JSON.parse(await readFile(dataPaths(world.dataDir).coordination, "utf8"));
     assert.equal(onDisk.projects[0].pending, undefined);
   });
+
+test(
+  "an integration a crash cut off and the branch cannot settle closes only its project until an admin settles it",
+  { timeout: 180_000 },
+  async () => {
+    const world = await hosted({ BELLPR_TEST_COORDINATION_CRASH: "intent-saved" }, { lib: true });
+    const lib = world.lib!;
+    const { alice, bob, admin } = world.tokens;
+    await defineTasks(world, ["one", "two", "spare"]);
+    assert.equal((await world.ask(post("/tasks", { id: "after", dependsOn: ["one"] }))).status, 201);
+    for (const id of ["l1", "l2"]) assert.equal((await world.ask(postIn("lib", "/tasks", { id }))).status, 201);
+    const mine = (await world.ask(post("/claims", { taskId: "one", scopes: ["src"] }), alice)).body.claim!;
+    const theirs = (await world.ask(post("/claims", { taskId: "two", scopes: ["lib"] }), bob)).body.claim!;
+    const libClaim = (await world.ask(postIn("lib", "/claims", { taskId: "l1", scopes: ["src"] }), alice)).body.claim!;
+    const change = await world.repo.commit(world.repo.base, { "src/a.ts": "changed\n" });
+    const elsewhere = await world.repo.commit(world.repo.base, { "README.md": "pushed by hand\n" });
+    const libChange = await lib.commit(lib.base, { "src/a.ts": "lib\n" });
+    const integrate = post(`/claims/${mine.id}/integrate`, { fence: mine.fence, base: world.repo.base, commit: change });
+    const [[cut]] = await world.race([{ token: alice, requests: [integrate] }]);
+    assert.ok("error" in cut, JSON.stringify(cut));
+    assert.equal(await world.host.exited, "SIGKILL");
+    // Before coordination is back, someone pushes around it.
+    await world.repo.move(elsewhere);
+    const restarted = await world.start();
+    assert.ok(restarted.first.port && world.host === restarted, restarted.stderr);
+
+    // Any participant reads why app is closed.
+    const read = await world.ask({ method: "GET", path: "/projects/app" }, bob);
+    const pending = read.body.project!.undecided!;
+    assert.deepEqual(
+      { ...pending, startedAt: "" },
+      { claimId: mine.id, fence: mine.fence, from: world.repo.base, to: change, startedAt: "" },
+    );
+    const file = () => readFile(dataPaths(world.dataDir).coordination, "utf8");
+    const now = async () => ({ file: await file(), heads: [await world.repo.head(), await lib.head()] });
+    const before = await now();
+    assert.deepEqual(before.heads, [elsewhere, lib.base]);
+
+    const changes: [string, Request, string][] = [
+      ["define a task", post("/tasks", { id: "new" }), admin],
+      ["claim", post("/claims", { taskId: "spare", scopes: ["docs"] }), bob],
+      ["expand", post(`/claims/${mine.id}/expand`, { fence: mine.fence, scopes: ["docs"] }), alice],
+      ["release", post(`/claims/${theirs.id}/release`, { fence: theirs.fence }), bob],
+      ["revoke", post(`/claims/${mine.id}/revoke`, { reason: "stuck" }), admin],
+      ["fail", post("/tasks/one/fail", {}), alice],
+      ["reopen", post("/tasks/two/reopen", {}), admin],
+      ["authorize", post(`/claims/${mine.id}/authorize`, { fence: mine.fence, paths: ["src/a.ts"] }), alice],
+      ["integrate", integrate, alice],
+      ["adopt", post("/baseline/adopt", { sha: elsewhere }), admin],
+    ];
+    for (const [name, request, token] of changes) {
+      const reply = await world.ask(request, token);
+      assert.deepEqual([reply.status, reply.body.reason], [409, "recoveryUndecided"], name);
+    }
+    const settle = (head: string, more: object = {}) => post("/recovery/settle", { ...pending, head, ...more });
+    const refusals: [string, Request, string, number, string][] = [
+      ["a member", settle(elsewhere), alice, 403, "adminOnly"],
+      ["no participant", settle(elsewhere), "", 401, "unauthenticated"],
+      ["an owner named in the body", settle(elsewhere, { owner: "admin" }), admin, 400, "invalidRequest"],
+      ["who settled named in the body", settle(elsewhere, { by: "alice" }), admin, 400, "invalidRequest"],
+      ["a stale intent", settle(elsewhere, { startedAt: new Date(0).toISOString() }), admin, 409, "stalePending"],
+      ["a branch at a third commit", settle(elsewhere), admin, 409, "branchElsewhere"],
+      ["the change it is not at", settle(change), admin, 409, "branchElsewhere"],
+    ];
+    for (const [name, request, token, status, reason] of refusals) {
+      const reply = await world.ask(request, token);
+      assert.deepEqual([reply.status, reply.body.reason], [status, reason], `${name}: ${JSON.stringify(reply.body)}`);
+      if (reason === "branchElsewhere") assert.equal(reply.body.current, elsewhere);
+    }
+    assert.deepEqual(await now(), before);
+
+    // Lib authorizes and integrates as before.
+    const authorized = await world.ask(
+      postIn("lib", `/claims/${libClaim.id}/authorize`, { fence: libClaim.fence, paths: ["src/a.ts"] }),
+      alice,
+    );
+    assert.equal(authorized.status, 200, JSON.stringify(authorized.body));
+    const libIntegrated = await world.ask(
+      postIn("lib", `/claims/${libClaim.id}/integrate`, { fence: libClaim.fence, base: lib.base, commit: libChange }),
+      alice,
+    );
+    assert.equal(libIntegrated.status, 200, JSON.stringify(libIntegrated.body));
+    assert.deepEqual([await world.repo.head(), await lib.head()], [elsewhere, libChange]);
+
+    // A host killed and started again finds app as closed as it was.
+    const closed = await project(world);
+    await world.kill();
+    assert.ok((await world.start()).first.port);
+    assert.deepEqual(await project(world), closed);
+    assert.equal((await world.ask(changes[1][1], bob)).body.reason, "recoveryUndecided");
+
+    // The branch, repaired by hand, is back at the base. Two admins settle while others change both projects.
+    await world.repo.move(world.repo.base);
+    const [[first], [second], [libClaimed], [appClaimed]] = await world.race([
+      { token: admin, requests: [settle(world.repo.base)] },
+      { token: admin, requests: [settle(world.repo.base)] },
+      { token: bob, requests: [postIn("lib", "/claims", { taskId: "l2", scopes: ["lib"] })] },
+      { token: bob, requests: [post("/claims", { taskId: "spare", scopes: ["docs"] })] },
+    ]);
+    const settles = [first, second] as Answer[];
+    assert.deepEqual(
+      settles.map((reply) => [reply.status, reply.body.reason ?? ""]).sort(),
+      [[200, ""], [409, "nothingToSettle"]],
+      JSON.stringify(settles),
+    );
+    assert.equal((libClaimed as Answer).status, 201, JSON.stringify(libClaimed));
+    const app = appClaimed as Answer;
+    assert.ok(app.status === 201 || app.body.reason === "recoveryUndecided", JSON.stringify(app));
+    const settled = await project(world);
+    assert.equal(settled.undecided, undefined);
+    assert.deepEqual(
+      settled.recoveries?.map(({ at, ...record }) => ({ ...record, at: Date.parse(at) >= Date.parse(pending.startedAt) })),
+      [{ ...pending, by: "admin", outcome: "notIntegrated", at: true }],
+    );
+    // The claim is held under its fence, and the change integrates again; then its dependant starts.
+    assert.deepEqual(settled.claims.find((claim) => claim.id === mine.id), mine);
+    assert.deepEqual(settled.claims.find((claim) => claim.id === theirs.id), theirs);
+    const again = await world.ask(integrate, alice);
+    assert.equal(again.status, 200, JSON.stringify(again.body));
+    assert.equal(await world.repo.head(), change);
+    assert.equal((await world.ask(post("/claims", { taskId: "after", scopes: ["src"] }), bob)).status, 201);
+
+    const kept = (await project(world)).recoveries;
+    await world.kill();
+    assert.ok((await world.start()).first.port);
+    assert.deepEqual((await project(world)).recoveries, kept);
+    const onDisk = JSON.parse(await file());
+    assert.deepEqual([onDisk.projects[0].pending, onDisk.projects[0].recoveries.length], [undefined, 1]);
+  },
+);
 
 test(
   "two client processes integrating onto the same base: one moves the branch, the other is told to sync",

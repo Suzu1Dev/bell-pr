@@ -12,8 +12,18 @@ export default {
     unavailable:
       "Coordination stopped after a write failed. Restart BELL PR so it reads the claims back from disk.",
     full: "Coordination has no room for this change. Claims already held can still be released, revoked and integrated.",
-    recoveryUndecided: ({ project }: { project: string }) =>
-      `An integration into ${project} was interrupted and its branch no longer shows whether it happened, so coordination stays stopped until someone checks the branch.`,
+  },
+  /** An interrupted integration that opening could not settle from the branch. */
+  recovery: {
+    undecided: ({ project }: { project: string }) =>
+      `An integration into ${project} was interrupted and its branch no longer shows whether it happened, so ${project} takes no changes until an admin settles it. Other projects are not affected.`,
+    nothingToSettle: "This project has no interrupted integration waiting to be settled.",
+    stalePending:
+      "The project is waiting on a different interrupted integration than the one named. Read the project again.",
+    branchElsewhere: ({ current }: { current: string }) =>
+      `The integration branch is at ${current}, neither the interrupted integration's base nor its change, so it cannot be settled. Repair the branch by hand first.`,
+    branchUnreadable:
+      "The integration branch cannot be read, so the interrupted integration cannot be settled.",
   },
   participant: {
     unauthenticated: "This request carries no valid participant token.",

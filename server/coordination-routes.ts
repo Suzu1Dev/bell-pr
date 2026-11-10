@@ -38,6 +38,14 @@ const bodies = {
   authorize: z.strictObject({ fence, paths: z.array(z.string().max(4096)).max(1000) }),
   integrate: z.strictObject({ fence, base: commit, commit }),
   adopt: z.strictObject({ sha: commit }),
+  settle: z.strictObject({
+    claimId: z.string().max(64),
+    fence,
+    from: commit,
+    to: commit,
+    startedAt: z.string().max(64),
+    head: commit,
+  }),
 };
 
 const actorOf = (res: Response): Actor => res.locals.actor as Actor;
@@ -107,6 +115,10 @@ export function coordinationRouter(coordinator: Coordinator) {
   router.post("/projects/:project/baseline/adopt", async (req, res) => {
     const body = bodies.adopt.parse(req.body);
     res.json({ project: await coordinator.adoptBaseline(actorOf(res), req.params.project, body) });
+  });
+  router.post("/projects/:project/recovery/settle", async (req, res) => {
+    const body = bodies.settle.parse(req.body);
+    res.json({ project: await coordinator.settleRecovery(actorOf(res), req.params.project, body) });
   });
   router.use(errors);
   return router;

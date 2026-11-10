@@ -1277,28 +1277,6 @@ describe("integration", () => {
     );
   });
 
-  test("an interrupted integration the branch cannot settle keeps coordination stopped", async () => {
-    const w = await world({
-      onStep: (step) => {
-        if (step === "intent-saved") throw new Error("process died");
-      },
-    });
-    const mine = await claimed(w, w.alice, "one", ["src"]);
-    const change = await w.repo.commit(w.repo.base, { "src/a.ts": "1\n" });
-    const other = await w.repo.commit(w.repo.base, { "src/b.ts": "2\n" });
-    await refusal(() =>
-      w.coordinator.integrate(w.alice, "app", mine.id, { fence: mine.fence, base: w.repo.base, commit: change }),
-    );
-    await w.repo.move(other);
-    assert.deepEqual(await refusal(() => w.reopen({ onStep: undefined })), {
-      status: 503,
-      reason: "recoveryUndecided",
-    });
-    await w.repo.move(w.repo.base);
-    await w.reopen({ onStep: undefined });
-    assert.deepEqual(held(w).map((claim) => claim.id), [mine.id]);
-  });
-
   test("a stale fence or another participant cannot integrate a held claim", async () => {
     const w = await world();
     const mine = await claimed(w, w.alice, "one", ["src"]);
@@ -1316,6 +1294,417 @@ describe("integration", () => {
       { status: 409, reason: "staleFence" },
     );
     assert.equal(await w.repo.head(), w.repo.base);
+  });
+});
+
+describe("an undecided recovery", () => {
+  type Interrupted = Awaited<ReturnType<typeof interrupted>>;
+
+  /**
+   * Projects "app" and "lib" on two repositories, each with an integration
+   * a crash cut off once its intent was saved. App's branch then moves to
+   * a commit that is neither end of its intent, or stops being readable,
+   * and the coordinator opens again: lib, its branch still at its base,
+   * settles as not done, and app stays undecided.
+   */
+  async function interrupted(
+    branch: "elsewhere" | "unreadable" = "elsewhere",
+    overrides: Partial<CoordinatorOptions> = {},
+  ) {
+    let crash = true;
+    const w = await world({
+      ...overrides,
+      onStep: (step) => {
+        if (crash && step === "intent-saved") throw new Error("process died");
+      },
+    });
+    const libRoot = path.join(path.dirname(w.dataDir), "lib");
+    await mkdir(libRoot);
+    const lib = await makeRepo(libRoot);
+    await w.coordinator.defineProject("lib", lib.bare, "integration");
+    for (const id of ["one", "two", "spare", "broken"]) await w.coordinator.defineTask(w.alice, "app", { id });
+    await w.coordinator.defineTask(w.bob, "app", { id: "after", dependsOn: ["one"] });
+    for (const id of ["l1", "l2"]) await w.coordinator.defineTask(w.alice, "lib", { id });
+    await w.coordinator.failTask(w.admin, "app", "broken", {});
+    const mine = await w.coordinator.claim(w.alice, "app", { taskId: "one", scopes: ["src"] });
+    const theirs = await w.coordinator.claim(w.bob, "app", { taskId: "two", scopes: ["lib"] });
+    const libClaim = await w.coordinator.claim(w.alice, "lib", { taskId: "l1", scopes: ["src"] });
+    const change = await w.repo.commit(w.repo.base, { "src/a.ts": "1\n" });
+    const elsewhere = await w.repo.commit(w.repo.base, { "README.md": "pushed by hand\n" });
+    const libChange = await lib.commit(lib.base, { "src/a.ts": "lib\n" });
+    const integrate = () =>
+      w.coordinator.integrate(w.alice, "app", mine.id, { fence: mine.fence, base: w.repo.base, commit: change });
+    const integrateLib = () =>
+      w.coordinator.integrate(w.alice, "lib", libClaim.id, { fence: libClaim.fence, base: lib.base, commit: libChange });
+    assert.deepEqual(await refusal(integrate), { status: 503, reason: "unavailable" });
+    if (branch === "elsewhere") await w.repo.move(elsewhere);
+    else await git(w.repo.bare, ["update-ref", "-d", "refs/heads/integration"]);
+    await w.reopen();
+    assert.deepEqual(await refusal(integrateLib), { status: 503, reason: "unavailable" });
+    crash = false;
+    await w.reopen();
+    const pending = w.coordinator.project(w.admin, "app").undecided;
+    assert.ok(pending, "app opened as decided");
+    assert.equal((await w.onDisk()).projects[1].pending, undefined);
+    return {
+      w,
+      lib,
+      mine,
+      theirs,
+      libClaim,
+      change,
+      elsewhere,
+      libChange,
+      pending,
+      integrate,
+      integrateLib,
+      crashing(on: boolean) {
+        crash = on;
+      },
+    };
+  }
+
+  const settle = (t: Interrupted, actor: Actor, head: string, pending = t.pending) =>
+    t.w.coordinator.settleRecovery(actor, "app", { ...pending, head });
+
+  /** What a refusal must leave as it was: the file, both projects and both branches. */
+  async function state({ w, lib }: Interrupted) {
+    return {
+      file: await readFile(dataPaths(w.dataDir).coordination, "utf8"),
+      app: w.coordinator.project(w.admin, "app"),
+      lib: w.coordinator.project(w.admin, "lib"),
+      heads: [await w.repo.head().catch(() => "unreadable"), await lib.head()],
+    };
+  }
+
+  /** Crashes app's integration again, moves its branch elsewhere, reopens and settles it at its base. */
+  async function again(t: Interrupted, more: Partial<CoordinatorOptions> = {}) {
+    t.crashing(true);
+    assert.deepEqual(await refusal(t.integrate), { status: 503, reason: "unavailable" });
+    t.crashing(false);
+    await t.w.repo.move(t.elsewhere);
+    await t.w.reopen(more);
+    const pending = t.w.coordinator.project(t.w.admin, "app").undecided!;
+    await t.w.repo.move(t.w.repo.base);
+    return await settle(t, t.w.admin, t.w.repo.base, pending);
+  }
+
+  test("closes only its own project: every change to it is refused and nothing moves, while the other project works", async () => {
+    const t = await interrupted();
+    const { w, lib, mine, theirs, libClaim, change, elsewhere } = t;
+    assert.deepEqual(t.pending, {
+      claimId: mine.id,
+      fence: mine.fence,
+      from: w.repo.base,
+      to: change,
+      startedAt: t.pending.startedAt,
+    });
+    // Any participant reads why; reading never needs the project open.
+    assert.deepEqual(w.coordinator.project(w.bob, "app").undecided, t.pending);
+    assert.equal(w.coordinator.project(w.bob, "lib").undecided, undefined);
+    const theirChange = await w.repo.commit(elsewhere, { "lib/c.ts": "2\n" });
+    const before = await state(t);
+    const c = () => w.coordinator;
+    const changes: [string, () => unknown][] = [
+      ["define a task", () => c().defineTask(w.alice, "app", { id: "new" })],
+      ["claim", () => c().claim(w.bob, "app", { taskId: "spare", scopes: ["docs"] })],
+      ["claim the held files", () => c().claim(w.bob, "app", { taskId: "spare", scopes: ["src"] })],
+      ["expand", () => c().expand(w.alice, "app", mine.id, { fence: mine.fence, scopes: ["docs"] })],
+      ["release", () => c().release(w.alice, "app", mine.id, { fence: mine.fence })],
+      ["release another claim", () => c().release(w.bob, "app", theirs.id, { fence: theirs.fence })],
+      ["revoke", () => c().revoke(w.admin, "app", mine.id, { reason: "stuck" })],
+      ["fail as admin", () => c().failTask(w.admin, "app", "one", {})],
+      ["fail as holder", () => c().failTask(w.bob, "app", "two", {})],
+      ["reopen", () => c().reopenTask(w.admin, "app", "broken", {})],
+      ["authorize", () => c().authorize(w.alice, "app", { claimId: mine.id, fence: mine.fence, paths: ["src/a.ts"] })],
+      ["authorize another claim", () => c().authorize(w.bob, "app", { claimId: theirs.id, fence: theirs.fence, paths: ["lib/c.ts"] })],
+      ["integrate", t.integrate],
+      ["integrate onto the moved branch", () => c().integrate(w.bob, "app", theirs.id, { fence: theirs.fence, base: elsewhere, commit: theirChange })],
+      ["adopt the moved branch", () => c().adoptBaseline(w.admin, "app", { sha: elsewhere })],
+    ];
+    for (const [name, change] of changes)
+      assert.deepEqual(await refusal(change), { status: 409, reason: "recoveryUndecided" }, name);
+    assert.deepEqual(await state(t), before);
+
+    // Lib claims, authorizes and integrates as before.
+    const other = await w.coordinator.claim(w.bob, "lib", { taskId: "l2", scopes: ["lib"] });
+    assert.deepEqual(
+      w.coordinator.authorize(w.alice, "lib", { claimId: libClaim.id, fence: libClaim.fence, paths: ["src/a.ts"] }),
+      { claimId: libClaim.id, fence: libClaim.fence },
+    );
+    assert.equal((await t.integrateLib()).branch.sha, t.libChange);
+    assert.equal(await lib.head(), t.libChange);
+    await w.coordinator.addParticipant("carol", "member");
+    assert.equal(await w.repo.head(), elsewhere);
+
+    // A restart finds the same: app closed with its intent and claims as written, lib as it went on.
+    const app = w.coordinator.project(w.admin, "app");
+    assert.deepEqual(app, { ...before.app, revision: app.revision });
+    await w.reopen();
+    assert.deepEqual(w.coordinator.project(w.admin, "app"), app);
+    assert.deepEqual(await refusal(changes[1][1]), { status: 409, reason: "recoveryUndecided" });
+    const after = w.coordinator.project(w.admin, "lib");
+    assert.deepEqual(
+      [after.branch.sha, after.claims.find((claim) => claim.id === other.id)?.status],
+      [t.libChange, "held"],
+    );
+  });
+
+  test("an admin settles it at the change: the integration completes, is kept with who and when, and dependants start", async () => {
+    const t = await interrupted();
+    const { w, mine, theirs, change } = t;
+    // The branch, repaired by hand, points at the change.
+    await w.repo.move(change);
+    const fence = w.coordinator.project(w.admin, "app").fence;
+    const settled = await settle(t, w.admin, change);
+    assert.equal(settled.undecided, undefined);
+    const claim = settled.claims.find((each) => each.id === mine.id)!;
+    assert.deepEqual(
+      [settled.branch.sha, settled.fence, settled.tasks[0].status, settled.tasks[0].integratedSha, claim.status, claim.endedBy],
+      [change, fence, "integrated", change, "integrated", "alice"],
+    );
+    assert.deepEqual(settled.claims.find((each) => each.id === theirs.id), theirs);
+    const [record] = settled.recoveries!;
+    assert.deepEqual({ ...record, at: "" }, { ...t.pending, by: "admin", at: "", outcome: "integrated" });
+    assert.ok(Date.parse(record.at) >= Date.parse(t.pending.startedAt));
+    assert.equal(await w.repo.head(), change);
+    assert.equal((await w.coordinator.claim(w.bob, "app", { taskId: "after", scopes: ["src"] })).holder, "bob");
+    await w.reopen();
+    assert.deepEqual(w.coordinator.project(w.admin, "app").recoveries, settled.recoveries);
+    assert.equal((await w.onDisk()).projects[0].pending, undefined);
+    assert.deepEqual(await refusal(() => settle(t, w.admin, change)), { status: 409, reason: "nothingToSettle" });
+  });
+
+  test("an admin settles it at the base: nothing was integrated, and the claim stays held under its fence", async () => {
+    const t = await interrupted();
+    const { w, mine, change } = t;
+    await w.repo.move(w.repo.base);
+    const before = w.coordinator.project(w.admin, "app");
+    const settled = await settle(t, w.admin, w.repo.base);
+    assert.deepEqual(
+      [settled.undecided, settled.branch.sha, settled.fence, settled.tasks, settled.claims],
+      [undefined, w.repo.base, before.fence, before.tasks, before.claims],
+    );
+    assert.deepEqual(settled.recoveries?.map(({ by, outcome }) => [by, outcome]), [["admin", "notIntegrated"]]);
+    // The dependant still waits; the old fence authorizes again, and the same change integrates.
+    assert.deepEqual(
+      await refusal(() => w.coordinator.claim(w.bob, "app", { taskId: "after", scopes: ["docs"] })),
+      { status: 409, reason: "dependencyPending" },
+    );
+    w.coordinator.authorize(w.alice, "app", { claimId: mine.id, fence: mine.fence, paths: ["src/a.ts"] });
+    await t.integrate();
+    assert.equal(await w.repo.head(), change);
+    await w.reopen();
+    assert.deepEqual(w.coordinator.project(w.admin, "app").recoveries, settled.recoveries);
+  });
+
+  test("a branch at a third commit, or one that cannot be read, is never settled, and nothing changes", async () => {
+    for (const branch of ["elsewhere", "unreadable"] as const) {
+      const t = await interrupted(branch);
+      const { w, mine, change, elsewhere } = t;
+      const before = await state(t);
+      for (const head of [elsewhere, w.repo.base, change]) {
+        const error = await settle(t, w.admin, head).then(() => assert.fail("settled"), (thrown: AppError) => thrown);
+        assert.deepEqual(
+          [error.statusCode, error.details],
+          branch === "elsewhere"
+            ? [409, { reason: "branchElsewhere", current: elsewhere }]
+            : [503, { reason: "branchUnreadable" }],
+          `${branch} ${head}`,
+        );
+      }
+      assert.deepEqual(await state(t), before);
+      await w.reopen();
+      assert.deepEqual(w.coordinator.project(w.admin, "app").undecided, t.pending);
+      assert.deepEqual(await state(t), before);
+      if (branch === "unreadable") {
+        // Readable again at the base, opening settles it as it always did.
+        await w.repo.move(w.repo.base);
+        await w.reopen();
+        const app = w.coordinator.project(w.admin, "app");
+        assert.deepEqual([app.undecided, app.recoveries, held(w).map((claim) => claim.id).includes(mine.id)], [undefined, undefined, true]);
+      }
+    }
+  });
+
+  test("only an authenticated admin settles, only the intent the project shows, and only once", async () => {
+    const t = await interrupted();
+    const { w, change, elsewhere } = t;
+    const base = w.repo.base;
+    await w.repo.move(base);
+    const before = await state(t);
+    const forged: Actor = Object.freeze({ id: "admin", role: "admin" });
+    const stale = (key: keyof typeof t.pending, value: string | number) =>
+      () => settle(t, w.admin, base, { ...t.pending, [key]: value });
+    const cases: [string, () => unknown, number, string][] = [
+      ["the member holding the claim", () => settle(t, w.alice, base), 403, "adminOnly"],
+      ["another member", () => settle(t, w.bob, base), 403, "adminOnly"],
+      ["a member naming a stale intent", () => settle(t, w.bob, base, { ...t.pending, fence: 99 }), 403, "adminOnly"],
+      ["an actor no token made", () => settle(t, forged, base), 401, "unauthenticated"],
+      ["an unknown project", () => w.coordinator.settleRecovery(w.admin, "nope", { ...t.pending, head: base }), 404, "unknownProject"],
+      ["a project with nothing undecided", () => w.coordinator.settleRecovery(w.admin, "lib", { ...t.pending, head: base }), 409, "nothingToSettle"],
+      ["another claim", stale("claimId", "00000000-0000-0000-0000-000000000000"), 409, "stalePending"],
+      ["another fence", stale("fence", t.pending.fence + 1), 409, "stalePending"],
+      ["another base", stale("from", elsewhere), 409, "stalePending"],
+      ["another change", stale("to", elsewhere), 409, "stalePending"],
+      ["another start", stale("startedAt", new Date(0).toISOString()), 409, "stalePending"],
+      ["a branch it no longer points at", () => settle(t, w.admin, change), 409, "staleBase"],
+      ["no commit id", () => settle(t, w.admin, "HEAD"), 400, "invalidCommit"],
+    ];
+    for (const [name, attempt, status, reason] of cases)
+      assert.deepEqual(await refusal(attempt), { status, reason }, name);
+    assert.deepEqual(await state(t), before);
+
+    const outcomes = await Promise.allSettled([settle(t, w.admin, base), settle(t, w.admin, base)]);
+    assert.deepEqual(outcomes.map((outcome) => outcome.status).sort(), ["fulfilled", "rejected"]);
+    const lost = outcomes.find((outcome) => outcome.status === "rejected") as PromiseRejectedResult;
+    assert.equal((lost.reason as AppError).details?.reason, "nothingToSettle");
+    assert.equal(w.coordinator.project(w.admin, "app").recoveries?.length, 1);
+  });
+
+  test("settling races changes to both projects through the same order", async () => {
+    const t = await interrupted();
+    const { w, mine, libChange } = t;
+    await w.repo.move(w.repo.base);
+    const [settled, appClaim, appAuthorize, libClaimed, libIntegrated] = await Promise.allSettled([
+      settle(t, w.admin, w.repo.base),
+      w.coordinator.claim(w.bob, "app", { taskId: "spare", scopes: ["docs"] }),
+      (async () => w.coordinator.authorize(w.alice, "app", { claimId: mine.id, fence: mine.fence, paths: ["src/a.ts"] }))(),
+      w.coordinator.claim(w.bob, "lib", { taskId: "l2", scopes: ["lib"] }),
+      t.integrateLib(),
+    ]);
+    for (const outcome of [settled, libClaimed, libIntegrated]) assert.equal(outcome.status, "fulfilled");
+    for (const outcome of [appClaim, appAuthorize])
+      if (outcome.status === "rejected")
+        assert.equal((outcome.reason as AppError).details?.reason, "recoveryUndecided");
+    assert.equal(await t.lib.head(), libChange);
+    const spare = w.coordinator.project(w.admin, "app").claims.find((claim) => claim.taskId === "spare");
+    if (!spare) await w.coordinator.claim(w.bob, "app", { taskId: "spare", scopes: ["docs"] });
+    const app = w.coordinator.project(w.admin, "app");
+    const lib = w.coordinator.project(w.admin, "lib");
+    await w.reopen();
+    assert.deepEqual([w.coordinator.project(w.admin, "app"), w.coordinator.project(w.admin, "lib")], [app, lib]);
+  });
+
+  test("a settlement whose write fails stops every project, and opening again decides from the branch", async () => {
+    let writes = 0;
+    let failAt = Infinity;
+    const t = await interrupted("elsewhere", {
+      write: (file, data, opts) => {
+        writes += 1;
+        return writes === failAt ? Promise.reject(new Error("disk full")) : writeDurable(file, data, opts);
+      },
+    });
+    const { w, mine } = t;
+    await w.repo.move(w.repo.base);
+    const before = await w.onDisk();
+    failAt = writes + 1;
+    assert.deepEqual(await refusal(() => settle(t, w.admin, w.repo.base)), { status: 503, reason: "unavailable" });
+    for (const attempt of [
+      () => w.coordinator.project(w.alice, "lib"),
+      () => w.coordinator.claim(w.bob, "lib", { taskId: "l2", scopes: ["lib"] }),
+      () => w.coordinator.addParticipant("carol", "member"),
+      () => settle(t, w.admin, w.repo.base),
+    ])
+      assert.deepEqual(await refusal(attempt), { status: 503, reason: "unavailable" });
+    assert.deepEqual(await w.onDisk(), before);
+    await w.reopen();
+    const app = w.coordinator.project(w.admin, "app");
+    assert.deepEqual([app.undecided, app.recoveries, held(w).map((claim) => claim.id).includes(mine.id)], [undefined, undefined, true]);
+  });
+
+  test("a settlement after the data-directory lock is lost changes nothing", async () => {
+    const t = await interrupted();
+    const { w } = t;
+    await w.repo.move(w.repo.base);
+    const file = dataPaths(w.dataDir).lock;
+    const mine = await readFile(file, "utf8");
+    const before = await w.onDisk();
+    await writeFile(file, JSON.stringify({ ...JSON.parse(mine), pid: process.pid + 1 }));
+    assert.deepEqual(await refusal(() => settle(t, w.admin, w.repo.base)), { status: 503, reason: "notSingleWriter" });
+    await writeFile(file, mine);
+    assert.deepEqual(
+      await refusal(() => w.coordinator.claim(w.bob, "lib", { taskId: "l2", scopes: ["lib"] })),
+      { status: 503, reason: "notSingleWriter" },
+    );
+    assert.deepEqual(await w.onDisk(), before);
+    assert.ok(before.projects[0].pending);
+  });
+
+  test("a project keeps its latest settlements up to the limit, and settling at the byte limit stays within it", async () => {
+    const t = await interrupted();
+    const { w } = t;
+    for (let task = 0; task < 40; task += 1) await w.coordinator.defineTask(w.alice, "lib", { id: `f${task}` });
+    const file = dataPaths(w.dataDir).coordination;
+    const limits = { recoveries: 3, bytes: (await readFile(file)).length + 20_000 };
+    await w.reopen({ limits });
+    for (let task = 0; ; task += 1) {
+      assert.ok(task < 40, "the byte limit was never reached");
+      const attempt = await w.coordinator
+        .claim(task % 2 ? w.bob : w.alice, "lib", { taskId: `f${task}`, scopes: [`docs/${task}/${"x".repeat(200)}`] })
+        .catch((error: unknown) => error);
+      if (attempt instanceof AppError) {
+        assert.deepEqual(attempt.details, { reason: "full", limit: "bytes", max: limits.bytes });
+        break;
+      }
+    }
+    await w.repo.move(w.repo.base);
+    const settled = [await settle(t, w.admin, w.repo.base)];
+    for (let round = 0; round < 4; round += 1) {
+      settled.push(await again(t, { limits }));
+      assert.ok((await readFile(file)).length <= limits.bytes);
+    }
+    const kept = settled.at(-1)!.recoveries!;
+    assert.equal(kept.length, 3);
+    assert.deepEqual(kept, settled.slice(-3).map((view) => view.recoveries!.at(-1)));
+    assert.ok(kept.every((record) => record.outcome === "notIntegrated"));
+    // Settling never made room for anything new.
+    assert.deepEqual(
+      await refusal(() => w.coordinator.claim(w.alice, "lib", { taskId: "f39", scopes: ["other"] })),
+      { status: 409, reason: "full" },
+    );
+    await w.reopen({ limits });
+    assert.deepEqual(w.coordinator.project(w.admin, "app").recoveries, kept);
+    // A build with a higher limit keeps them all and adds the next.
+    await w.reopen();
+    assert.equal((await again(t)).recoveries?.length, 4);
+  });
+
+  test("the room every project's settlements may take is kept free before anything is added", async () => {
+    // The same file and byte limit take fewer tasks when each project may keep more settlements.
+    const added = async (recoveries: number) => {
+      const w = await world();
+      const size = (await readFile(dataPaths(w.dataDir).coordination)).length;
+      await w.reopen({ limits: { recoveries, bytes: size + 12_000 } });
+      for (let task = 0; ; task += 1) {
+        const attempt = await w.coordinator.defineTask(w.alice, "app", { id: `t${task}` }).catch((error: unknown) => error);
+        if (attempt instanceof AppError) {
+          assert.equal(attempt.details?.reason, "full");
+          return task;
+        }
+      }
+    };
+    const [one, ten] = [await added(1), await added(10)];
+    assert.ok(ten > 0 && one > ten, `${one} tasks fit keeping one settlement, ${ten} keeping ten`);
+  });
+
+  test("settlements read back with keys a newer build added, and one by nobody known is refused", async () => {
+    const t = await interrupted();
+    const { w } = t;
+    await w.repo.move(w.repo.base);
+    await settle(t, w.admin, w.repo.base);
+    const file = dataPaths(w.dataDir).coordination;
+    const written = JSON.parse(await readFile(file, "utf8"));
+    written.projects[0].recoveries[0].note = "kept";
+    await writeFile(file, JSON.stringify(written));
+    await w.reopen();
+    await w.coordinator.claim(w.bob, "lib", { taskId: "l2", scopes: ["lib"] });
+    const after = JSON.parse(await readFile(file, "utf8"));
+    assert.equal(after.projects[0].recoveries[0].note, "kept");
+    assert.equal("note" in w.coordinator.project(w.admin, "app").recoveries![0], false);
+    after.projects[0].recoveries[0].by = "ghost";
+    await writeFile(file, JSON.stringify(after));
+    assert.deepEqual(await refusal(() => w.reopen()), { status: 503, reason: "damaged" });
   });
 });
 
