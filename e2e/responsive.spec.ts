@@ -70,9 +70,11 @@ async function settled(page: Page, locale: Locale) {
  *   box lets its overflow show. A box with a negative side margin bleeds
  *   on purpose, and a box positioned on its own (a tooltip, a badge on a
  *   corner) is placed on purpose.
- * Content inside a box that scrolls sideways (code, tables, a row of
- * tabs) can be scrolled to and does not count, and neither does a
- * decoration without text.
+ * Content counts as reachable only inside a box that is meant to scroll
+ * sideways on its own: that box has overflow-x auto or scroll, and a
+ * keyboard user can reach it (code, a wide table, a row of tabs). Any
+ * other overflow:auto ancestor hides the overflow, so it counts. A
+ * decoration without text does not.
  */
 function findSideOverflow(page: Page): Promise<string[]> {
   return page.evaluate(() => {
@@ -97,6 +99,21 @@ function findSideOverflow(page: Page): Promise<string[]> {
       style.overflowX === "auto" || style.overflowX === "scroll";
     const hidesOverflow = (style: CSSStyleDeclaration) =>
       style.overflowX === "hidden" || style.overflowX === "clip";
+    /** In the tab order, so the keyboard can move this box. */
+    const keyboardReachable = (element: Element) => {
+      if (!(element instanceof HTMLElement) || element.matches(":disabled")) return false;
+      const attr = element.getAttribute("tabindex");
+      if (attr !== null) {
+        const index = Number(attr);
+        return Number.isInteger(index) && index >= 0;
+      }
+      return element.matches(
+        "a[href], button, input:not([type='hidden']), select, textarea, summary",
+      );
+    };
+    /** The box itself scrolls sideways and the keyboard can reach it. */
+    const scrollsOnPurpose = (element: Element) =>
+      scrollsSideways(getComputedStyle(element)) && keyboardReachable(element);
     const counts = (element: Element) =>
       element.matches("button, a[href], input, select, textarea, summary, [role='tab']") ||
       !!element.textContent?.trim();
@@ -110,10 +127,11 @@ function findSideOverflow(page: Page): Promise<string[]> {
     };
     /**
      * The left and right edges that clip `element`: the window's,
-     * narrowed by each ancestor that hides its overflow and holds the
-     * element's box (an absolutely positioned box escapes the static
-     * ancestors between it and its containing block, a fixed one all of
-     * them). Undefined when an ancestor scrolls sideways.
+     * narrowed by each ancestor that hides its overflow, or that scrolls
+     * sideways without being keyboard-reachable, and holds the element's
+     * box (an absolutely positioned box escapes the static ancestors
+     * between it and its containing block, a fixed one all of them).
+     * Undefined when an ancestor is meant to scroll sideways on its own.
      */
     const clipEdges = (element: Element) => {
       let left = 0;
@@ -126,8 +144,8 @@ function findSideOverflow(page: Page): Promise<string[]> {
       ) {
         const style = getComputedStyle(parent);
         if (position === "absolute" && style.position === "static") continue;
-        if (scrollsSideways(style)) return undefined;
-        if (hidesOverflow(style)) {
+        if (scrollsOnPurpose(parent)) return undefined;
+        if (hidesOverflow(style) || scrollsSideways(style)) {
           const box = parent.getBoundingClientRect();
           left = Math.max(left, box.left + parent.clientLeft);
           right = Math.min(right, box.left + parent.clientLeft + parent.clientWidth);
@@ -162,14 +180,32 @@ function findSideOverflow(page: Page): Promise<string[]> {
         if (cut.some((other) => other === child || other.contains(child))) continue;
         const childStyle = getComputedStyle(child);
         if (childStyle.position === "absolute" || childStyle.position === "fixed") continue;
-        if (parseFloat(childStyle.marginLeft) < 0 || parseFloat(childStyle.marginRight) < 0)
-          continue;
+        // A negative side margin may bleed by that margin and no further.
+        const bleedLeft = Math.min(0, parseFloat(childStyle.marginLeft) || 0);
+        const bleedRight = Math.min(0, parseFloat(childStyle.marginRight) || 0);
         const rect = child.getBoundingClientRect();
-        if (rect.left >= outer.left - 1 && rect.right <= outer.right + 1) continue;
+        if (
+          rect.left >= outer.left + bleedLeft - 1 &&
+          rect.right <= outer.right - bleedRight + 1
+        )
+          continue;
         result.push(
-          `sticks out: ${describe(child)} spans ${span(rect)} in ${nameOf(box)} at ${span(outer)}`,
+          `sticks out: ${describe(child)} spans ${span(rect)} (${child.scrollWidth} px wide) in ${nameOf(box)} at ${span(outer)}`,
         );
       }
+    }
+
+    // A box that does not scroll still has overflow when its content is
+    // wider than the box (a child can bleed by a negative margin and still
+    // widen the parent). A purposeful sideways scroller is the exception.
+    for (const element of document.body.querySelectorAll("*")) {
+      if (!(element instanceof HTMLElement) || !shown(element) || !counts(element)) continue;
+      if (getComputedStyle(element).overflowX !== "visible") continue;
+      if (element.scrollWidth <= element.clientWidth + 1) continue;
+      if (!clipEdges(element)) continue;
+      result.push(
+        `wider than its box: ${nameOf(element)} is ${element.scrollWidth} px wide in ${element.clientWidth} px`,
+      );
     }
     return result;
   });
