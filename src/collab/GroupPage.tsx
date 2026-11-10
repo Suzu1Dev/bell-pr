@@ -47,11 +47,15 @@ function focusSoon(selector: string) {
   requestAnimationFrame(() => document.querySelector<HTMLElement>(selector)?.focus());
 }
 
-/** A request of the page: `busy` while it runs, and the server's sentence when it is refused. */
+/**
+ * A request of the page: `busy` while it runs, and the server's sentence when it is refused.
+ * The control that was pressed is `aria-disabled` while busy, and never `disabled`: it keeps the focus.
+ */
 function useRequest() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   async function run(request: () => Promise<unknown>) {
+    if (busy) return;
     setBusy(true);
     setError("");
     try {
@@ -213,7 +217,8 @@ function FieldCard({
       className="settings-card"
       onSubmit={(event) => {
         event.preventDefault();
-        void request.run(() => action(value.trim()));
+        // The card goes with a start or a join: the page's heading takes the focus.
+        void request.run(() => action(value.trim()).then(() => focusSoon(".group-page h1")));
       }}
     >
       <div className="section-heading">
@@ -238,7 +243,11 @@ function FieldCard({
           {error}
         </p>
       )}
-      <button className="button primary full-width" disabled={request.busy || !value.trim()}>
+      <button
+        className="button primary full-width"
+        aria-disabled={request.busy}
+        disabled={!value.trim()}
+      >
         {words.submit}
       </button>
     </form>
@@ -324,7 +333,7 @@ function InviteDialog({ store, onClose }: { store: Store; onClose: () => void })
             <button type="button" className="button secondary" onClick={onClose}>
               {actions.cancel}
             </button>
-            <button className="button primary" disabled={request.busy || !name.trim()}>
+            <button className="button primary" aria-disabled={request.busy} disabled={!name.trim()}>
               {words.create}
             </button>
           </div>
@@ -377,6 +386,7 @@ function HeldNow({ store, state, project, held, me }: BoardProps) {
   };
 
   const end = async (hold: CollabHold, mine: boolean) => {
+    if (ending === hold.claimId) return;
     setEnding(hold.claimId);
     setFailed(undefined);
     try {
@@ -463,7 +473,7 @@ function HeldNow({ store, state, project, held, me }: BoardProps) {
                         <button
                           type="button"
                           className="button danger"
-                          disabled={ending === id}
+                          aria-disabled={ending === id}
                           onClick={() => void end(hold, false)}
                         >
                           {t.revoke}
@@ -483,7 +493,7 @@ function HeldNow({ store, state, project, held, me }: BoardProps) {
                   <button
                     type="button"
                     className="button secondary"
-                    disabled={ending === id}
+                    aria-disabled={ending === id}
                     aria-label={t.releaseHold({ title: hold.title })}
                     onClick={() => void end(hold, true)}
                   >
@@ -527,7 +537,7 @@ function Board(props: BoardProps) {
   const format = useFormat();
   const [title, setTitle] = useState("");
   const [paths, setPaths] = useState("");
-  /** The last answer, with the paths and the board it is about. */
+  /** The last answer, with the paths and the board it is about: it shows for those only. */
   const [answered, setAnswered] = useState<{ asked: string; held: CollabHold[]; answer: Answer }>();
   const [busy, setBusy] = useState(false);
   const [refusal, setRefusal] = useState("");
@@ -538,7 +548,8 @@ function Board(props: BoardProps) {
     .filter(Boolean);
   const asked = scopes.join("\n");
   const offline = state.link === "reconnecting";
-  const answer = answered?.answer;
+  const answer =
+    answered?.asked === asked && answered.held === held ? answered.answer : undefined;
   const check = `/projects/${encodeURIComponent(project)}`;
 
   // Asked 400 ms after the last key, and again whenever the board changes.
@@ -593,6 +604,7 @@ function Board(props: BoardProps) {
 
   const take = async (event: FormEvent) => {
     event.preventDefault();
+    if (busy) return;
     setBusy(true);
     setRefusal("");
     try {
@@ -607,8 +619,10 @@ function Board(props: BoardProps) {
         error instanceof ApiError && reasonOf(error) === "conflict"
           ? (error.details.conflicts as CollabConflict[] | undefined)
           : undefined;
-      if (conflicts?.length)
-        setAnswered({
+      if (conflicts?.length) {
+        // The button goes off with the hold in the way: the paths take the focus.
+        focusSoon("#hold-paths");
+        const notTaken: NonNullable<typeof answered> = {
           asked,
           held,
           answer: {
@@ -629,8 +643,12 @@ function Board(props: BoardProps) {
               })),
             ),
           },
-        });
-      else setRefusal(sentenceOf(error));
+        };
+        // An answer that came meanwhile, for other paths or a newer board, stays.
+        setAnswered((last) =>
+          last && (last.asked !== asked || last.held !== held) ? last : notTaken,
+        );
+      } else setRefusal(sentenceOf(error));
     } finally {
       setBusy(false);
     }
@@ -709,12 +727,8 @@ function Board(props: BoardProps) {
             )}
             <button
               className="button primary full-width"
-              disabled={
-                busy ||
-                answered?.asked !== asked ||
-                answered.held !== held ||
-                cannotTake(title, answer)
-              }
+              aria-disabled={busy}
+              disabled={cannotTake(title, answer)}
             >
               {t.takeHold}
             </button>
@@ -740,6 +754,9 @@ export function GroupPage({ status }: { status: Status | null }) {
   const [inviting, setInviting] = useState(false);
   const adding = useRequest();
   const addable = useRef<HTMLSelectElement>(null);
+  /** Adds a repository. Its card goes, or the picker changes: the page's heading takes the focus. */
+  const add = (repoId: string) =>
+    void adding.run(() => store.add(repoId).then(() => focusSoon(".group-page h1")));
 
   const { info, projects, held } = state;
   const me = on && info?.state === "ready" ? info.me : undefined;
@@ -808,7 +825,7 @@ export function GroupPage({ status }: { status: Status | null }) {
         className="settings-card"
         onSubmit={(event) => {
           event.preventDefault();
-          void adding.run(() => store.add(addable.current!.value));
+          add(addable.current!.value);
         }}
       >
         <div className="section-heading">
@@ -820,7 +837,7 @@ export function GroupPage({ status }: { status: Status | null }) {
         <label className="field-label" htmlFor="add-repo">
           {t.repository}
         </label>
-        <select ref={addable} className="text-input" id="add-repo" disabled={adding.busy}>
+        <select ref={addable} className="text-input" id="add-repo" aria-disabled={adding.busy}>
           {state.addable.map((repo) => (
             <option key={repo.repoId} value={repo.repoId}>
               {repo.name}
@@ -837,12 +854,19 @@ export function GroupPage({ status }: { status: Status | null }) {
             {adding.error}
           </p>
         )}
-        <button className="button primary full-width" disabled={adding.busy}>
+        <button className="button primary full-width" aria-disabled={adding.busy}>
           {t.addRepository}
         </button>
       </form>
     ) : (
       <p className="settings-card">{me.admin ? t.nothingToAdd : t.noRepository}</p>
+    );
+  } else if (!held && state.link === "reconnecting") {
+    // No answer yet, and the last request failed: the page says that it is trying.
+    card = (
+      <p className="settings-card" role="status">
+        {t.reconnecting}
+      </p>
     );
   }
 
@@ -861,10 +885,11 @@ export function GroupPage({ status }: { status: Status | null }) {
                     className="sidebar-language-select"
                     aria-label={t.repository}
                     value={project.id}
-                    disabled={adding.busy}
+                    aria-disabled={adding.busy}
                     onChange={({ target: { value } }) => {
+                      if (adding.busy) return;
                       if (projects!.some((item) => item.id === value)) store.choose(value);
-                      else void adding.run(() => store.add(value.slice(1)));
+                      else add(value.slice(1));
                     }}
                   >
                     {projects!.map((item) => (

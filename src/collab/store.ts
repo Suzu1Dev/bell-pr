@@ -188,10 +188,18 @@ export function createGroupStore() {
           query.set("version", String(cursor.version));
           query.set("seen", String(cursor.seen));
         }
+        // The server answers within 25 s: a request still open after 40 is given up, as a failure.
+        const request = new AbortController();
+        const giveUp = () => request.abort();
+        const limit = setTimeout(giveUp, 40_000);
+        signal.addEventListener("abort", giveUp);
         const answer = await call<CollabFeedResponse | undefined>(
           `/projects/${encodeURIComponent(state.project!)}/feed?${query}`,
-          { signal },
-        );
+          { signal: request.signal },
+        ).finally(() => {
+          clearTimeout(limit);
+          signal.removeEventListener("abort", giveUp);
+        });
         if (signal.aborted) return;
         failures = 0;
         set({ ...(answer ? took(answer) : { asOf: Date.now() }), link: polls ? "polling" : "live" });
@@ -203,7 +211,8 @@ export function createGroupStore() {
         if (signal.aborted) return;
         const reason = reasonOf(error);
         if (reason === "tooManyWaiters") {
-          // A request that does not wait is always answered: one every 10 s, and a waiting one again after a minute.
+          // One that does not wait is asked instead, every 10 s also when it is refused, and a waiting one again after a minute.
+          if (polls) await pause(10_000, signal);
           polls = 6;
           set({ link: "polling" });
           continue;
@@ -211,7 +220,13 @@ export function createGroupStore() {
         if (reason === "unknownProject") drop({ projects: undefined, project: undefined });
         else if (reason !== undefined && (error as ApiError).status === 503)
           // Group work is not ready any more: GET /api/collab says where it stands.
-          drop({ info: state.info && { ...state.info, state: "stopped", me: undefined } });
+          drop({
+            info: state.info && {
+              ...state.info,
+              state: reason === "notSetUp" ? reason : "stopped",
+              me: undefined,
+            },
+          });
         else set({ link: "reconnecting" });
         await fail();
       }
@@ -227,7 +242,8 @@ export function createGroupStore() {
   async function join(code: string) {
     const { token } = await api<CollabJoinResponse>("/collab/join", send("POST", { code }));
     keepToken(token);
-    set({ refused: undefined });
+    // Maybe as another person: the repositories, and which ones can be added, are asked for again.
+    set({ refused: undefined, projects: undefined, addable: undefined });
     open();
   }
 
