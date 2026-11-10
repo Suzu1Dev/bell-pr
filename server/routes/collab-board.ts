@@ -24,7 +24,7 @@ import { collabId, sideEntry, type CollabHost } from "../collab-host.js";
 import { CollabHub } from "../collab-hub.js";
 import { PersonLimit } from "../collab-limits.js";
 import { CollabProjects } from "../collab-projects.js";
-import { adminOnly, reasonOf, refuse } from "../collab-refusal.js";
+import { adminOnly, notJoined, reasonOf, refuse } from "../collab-refusal.js";
 import type { Actor } from "../coordination.js";
 import { claimableScope } from "../scope-paths.js";
 import type { Store } from "../store.js";
@@ -209,6 +209,13 @@ export function registerCollabBoardRoutes(
         });
         try {
           const claim = await coordinator.claim(actor, projectId, { taskId, scopes: held });
+          // Removed while this was under way, after the removal looked for their holds.
+          if (sideEntry(host.side().people, actor.id)?.removedAt) {
+            await coordinator
+              .release(actor, projectId, claim.id, { fence: claim.fence })
+              .catch(() => undefined);
+            throw notJoined();
+          }
           return holdOf(host.side(), projectId, claim);
         } catch (error) {
           // Someone took a path in between. The same answer; the task made above

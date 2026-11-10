@@ -450,6 +450,36 @@ test("remove: what the person holds ends in every repository, and so does their 
   await f.nothingLeaked();
 });
 
+test("remove: a take under way for the removed person is refused, and holds nothing", async (t) => {
+  const g = await group(t);
+  const { f, who, ben } = g;
+  const project = await g.add("widgets");
+  // His take is held up between the task and the hold.
+  const claim = Coordinator.prototype.claim;
+  let reached = false;
+  let go = () => {};
+  const gate = new Promise<void>((resolve) => (go = resolve));
+  t.mock.method(
+    Coordinator.prototype,
+    "claim",
+    async function (this: Coordinator, ...args: Parameters<Coordinator["claim"]>) {
+      reached = true;
+      await gate;
+      return claim.apply(this, args);
+    },
+  );
+  const taking = g.work(who.member, project, { title: "Parser", scopes: ["src"] });
+  await until(() => reached);
+
+  const removed = await f.post(`/people/${ben.id}/remove`, who.admin);
+  assert.deepEqual([removed.status, removed.json], [200, { revoked: 0, unpaired: false }]);
+  go();
+  assert.equal(outcome(await taking), "403 notJoined");
+  const board = await g.board(project);
+  assert.deepEqual(board.held, []);
+  assert.deepEqual(board.people.map((person) => person.name), ["Ada", "Dee"]);
+});
+
 test("the feed: the board at once for who is behind; who is current waits for a change, two requests a person at most", async (t) => {
   const g = await group(t);
   const { who, ben } = g;
