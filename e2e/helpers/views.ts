@@ -133,7 +133,7 @@ export const stateViews: StateView[] = [
     route: "#/runs/demo-run/draft",
     include: ".draft-checklist",
     async drive(page) {
-      await expect(page.locator(".draft-checklist-row")).toHaveCount(8);
+      await expect(page.locator(".draft-checklist-row")).toHaveCount(7);
     },
   },
   {

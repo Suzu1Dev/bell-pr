@@ -643,7 +643,7 @@ export function WorkspacePage({
             <span className="footer-spark">
               <Sparkles size={15} />
             </span>
-            <span>{published ? t.footer.publishedChanges : t.footer[footer.status]}</span>
+            {(published || footer.status !== "learning") && <span>{published ? t.footer.publishedChanges : t.footer[footer.status]}</span>}
             {prTextMissing && !byHand.writing && !reviewing && run.status !== "published" ? (
               <button type="button" className="mission-text-button" onClick={() => setTab("draft")}>{t.byHand.writePr}</button>
             ) : <span className="footer-hint">{run.learnByHand ? t.footer.hintByHand : t.footer.hint}</span>}

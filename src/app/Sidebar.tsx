@@ -13,7 +13,6 @@ import {
   Search,
   Settings2,
   UserRound,
-  Workflow,
   type LucideIcon,
 } from "lucide-react";
 import { Logo } from "../brand/Logo";
@@ -163,7 +162,6 @@ export function Sidebar({
           )}
           {navItem("repos", FolderGit2)}
           {navItem("discovery", Search)}
-          {navItem("team", Workflow)}
           {navItem("learning", BookOpen, <PracticeReadyChip count={practiceReady} />)}
         </nav>
         <div className="nav-label recent-label">

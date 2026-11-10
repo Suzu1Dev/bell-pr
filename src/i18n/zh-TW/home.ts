@@ -11,7 +11,7 @@ const m: Translation<typeof en> = {
       text: "完整走一遍已完成的貢獻：專案的規範、Agent 團隊的計畫、用自己的話把改動講一遍，以及 PR 草稿。不需任何設定。",
     },
     import: {
-      title: "匯入 Repository",
+      title: "匯入專案",
       text: "帶入 GitHub 上的專案（owner/repo 或連結），或這台電腦上的 Git 資料夾。",
     },
     discover: {

@@ -1928,7 +1928,7 @@ button {
   padding: 4px 7px;
   border-radius: 3px;
 }
-.note-card h2 {
+.note-card h3 {
   font-size: var(--text-xl);
   font-weight: 550;
 }

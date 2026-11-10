@@ -32,8 +32,9 @@ type DroppedPathField = NonNullable<
 
 const mission = {
   overview: {
+    background: "Project background and other contribution ideas",
     kicker: "PROJECT CONTEXT",
-    title: "Understand the project first, then decide what to change.",
+    title: "Project background",
     lead: "See the reason behind every contribution from the user's side.",
     update: "Update to the latest version",
     updating: "Updating…",
@@ -194,6 +195,7 @@ const mission = {
     afterCaption: "The improvement we hope for",
     impactNote:
       "These are the goals of this contribution; whether they are met still depends on the implementation and how it is verified.",
+    missingAcceptance: "No completion criteria recorded. Confirm how to verify this change before approving it.",
     validation: "How will we know the change helps?",
     risks: "Trade-offs to keep in mind",
     request: "Your request",
@@ -333,7 +335,7 @@ const mission = {
     low: "Early idea",
   } satisfies Record<ContributionRecommendation["confidence"], string>,
   nextStep: {
-    codeTitle: "Back to the code, with the reasons in mind.",
+    codeTitle: "Review this contribution",
     codeLead: "Compare the improvement you expect for users with each actual change.",
     codeAction: "Review the code changes",
     ideaTitle: "Have an idea of your own? You can start here too.",
@@ -356,6 +358,8 @@ const mission = {
     },
   } satisfies Record<ContributionDirection, { label: string; hint: string }>,
   settings: {
+    requirements: "Additional requirements",
+    execution: "AI and team settings",
     directionLegend: "Which direction do you want to contribute in?",
     directionNote: "Pick one main direction so the team works toward the same goal.",
     optional: "Optional",
@@ -387,7 +391,7 @@ const mission = {
     },
     model: {
       heading: "Model and reasoning",
-      note: "All projects and Agents share these settings. Each new run records its own settings, so later changes do not affect runs that already exist.",
+      note: "Defaults apply to new tasks across projects. Existing tasks keep their settings.",
       agent: "Agent",
       providerHelp: {
         codex: "Uses the Codex CLI you installed and signed in to.",
@@ -419,17 +423,17 @@ const mission = {
       defaultModelHelp: ({ provider }: { provider: string }) =>
         `Uses your local ${provider}'s default model.`,
       effort: "Reasoning effort",
-      defaultEffortNote: "Default uses the model's own default effort.",
       /** `effort` is the model's default effort, already labelled. */
       modelDefault: ({ effort }: { effort?: string }) =>
         `Model default${effort ? ` · ${effort}` : ""}`,
       unknownEffort:
         "The saved effort is not in this model's list. Choose again.",
-      effortHelp: `Only the efforts the selected model supports are listed. Higher efforts take longer per turn and use more of your account's usage; ${product.name} waits longer for Claude Code, Antigravity and the xhigh and max efforts.`,
+      effortHelp: "Higher reasoning effort takes longer and uses more of your account’s allowance.",
       webAccess: "Let Agents search the web and read pages",
+      webPages: "Allow agents to read web pages",
+      antigravityWeb: "Antigravity can always search the web, including during project analysis and discovery. This switch only controls reading web pages.",
       webAccessHelp:
-        "Applies to the Lead, Teammates, Reviewer, Test analyst and the follow-up tutor; project analysis and discovery stay offline. Web content is treated as untrusted data, and Claude Code's curl and wget stay blocked except for writable roles with full access. The Antigravity CLI's web search cannot be turned off: with Antigravity, every Agent, analysis and discovery included, can search the web whatever this says; it may only read pages when this is on.",
-      /** `message` is the reason the list could not be loaded. */
+        "Allows task and follow-up agents to search and read web pages. Project analysis and discovery do not use these tools. Web content is untrusted; command-line network access still follows the chosen permissions.",
       error: ({ message }: { message: string }) =>
         `${message} Your saved choice is kept.`,
       loadFailed: ({ provider }: { provider: string }) =>
@@ -448,6 +452,7 @@ const mission = {
       link: "About Ponytail",
     },
     team: {
+      summary: ({ count }: { count: number }) => `${count} teammates`,
       legend: "Team size",
       teammates: "teammates",
       note: "Sets the most teammates the team may use; the run's plan decides the actual split.",
