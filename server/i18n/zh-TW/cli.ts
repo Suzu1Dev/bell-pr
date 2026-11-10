@@ -20,6 +20,7 @@ const m: Translation<typeof en> = {
       "  token      更換 API 權杖，並登出已配對的裝置（`token rotate`）",
       "  pair       產生一次性配對碼，讓手機或另一台電腦配對",
       "  devices    列出已配對裝置（`devices list`）或撤銷其中一台（`devices revoke <id>`）",
+      "  group      小組協作：`group status`、`group setup`、`group invite <名稱>`",
       "  version    顯示版本、Node.js、平台與資料目錄",
       "  help       顯示這份說明",
       "",
@@ -29,6 +30,7 @@ const m: Translation<typeof en> = {
       "  --data-dir <目錄>   資料目錄（BELLPR_DATA_DIR，預設 ~/.bellpr）",
       "  --no-open           不開啟瀏覽器（BELLPR_NO_OPEN=1）",
       "  --force             即使 doctor 尚未就緒也啟動",
+      `  --group             開啟小組協作，讓共用這個 ${name} 的人一起使用（BELLPR_GROUP=1）`,
       "  --env-file <檔案>   先從檔案載入 BELLPR_PORT 等設定",
       "",
       "open 的選項：",
@@ -41,6 +43,9 @@ const m: Translation<typeof en> = {
       "  --name <名稱>       新裝置的建議名稱",
       "  --no-qr             不顯示 QR 碼",
       "  --unlock            解除配對鎖定並清除失敗次數",
+      "",
+      "group invite 的選項：",
+      "  --admin             受邀的人以小組管理員身分加入",
       "",
       `忘了位址？在這台電腦執行 \`${bin} open\`，即可再次印出並開啟。`,
     ].join("\n"),
@@ -87,7 +92,7 @@ const m: Translation<typeof en> = {
     dataDirInUse: ({ dataDir, pid }) =>
       `${name} 已使用資料目錄 ${dataDir} 執行中（行程 ${pid}）。執行 \`${bin} open\` 即可開啟，或先停止該行程。`,
     dataDirHolderUnconfirmed: ({ dataDir, file }) =>
-      `${name} 無法確認持有資料目錄 ${dataDir} 的行程是否已停止：它的鎖 ${file} 來自其他容器、其他電腦或舊版本，或無法讀取。協作不會自行取代這種鎖。請先確認已沒有任何程式使用此資料目錄，再刪除 ${file} 後重新啟動。`,
+      `${name} 無法確認持有資料目錄 ${dataDir} 的行程是否已停止：它的鎖 ${file} 來自其他容器、其他電腦或舊版本，或無法讀取。這次啟動不會自行取代這種鎖。請先確認已沒有任何程式使用此資料目錄，再刪除 ${file} 後重新啟動。`,
     dataDirLockUnsettled: ({ dataDir, file }) =>
       `${name} 無法取得資料目錄 ${dataDir} 的鎖 ${file}：每次嘗試時，這個檔案不是剛被更動，就是無法讀取。請稍後重新啟動。若一再發生，而且沒有任何 ${name} 使用此資料目錄執行，請刪除 ${file}。`,
     lockUnreadable: ({ file, reason }) =>
@@ -95,7 +100,9 @@ const m: Translation<typeof en> = {
     takeoverClaimed: ({ file }) =>
       `另一個 ${name} 正在啟動並取代此資料目錄遺留的鎖，或在取代途中停止了：它的接管標記檔 ${file} 還在。請等候約半分鐘，再重新啟動。若一再發生，而且沒有任何 ${name} 正在啟動，請刪除 ${file}。`,
     takeoverClaimUnconfirmed: ({ file }) =>
-      `${name} 無法確認另一次啟動是否已停止：它在取代此資料目錄遺留的鎖時留下的接管標記檔 ${file} 還在。協作不會自行刪除這種標記檔。請先確認沒有任何 ${name} 正在此資料目錄啟動，再刪除 ${file} 後重新啟動。`,
+      `${name} 無法確認另一次啟動是否已停止：它在取代此資料目錄遺留的鎖時留下的接管標記檔 ${file} 還在。這次啟動不會自行刪除這種標記檔。請先確認沒有任何 ${name} 正在此資料目錄啟動，再刪除 ${file} 後重新啟動。`,
+    withoutGroup: ({ url }) =>
+      `${name} 已在 ${url} 執行，但沒有開啟小組協作。請先停止它，再用 \`${bin} start --group\` 啟動。`,
     listenFailed: ({ address, reason }) =>
       `${name} 無法在 ${address} 監聽：${reason}`,
     failed: ({ reason }) => `${name} 未能啟動：${reason}`,
@@ -143,6 +150,20 @@ const m: Translation<typeof en> = {
     neverUsed: "從未使用",
     revoked: ({ id }) => `已撤銷 ${id}，它的權杖不再有效。`,
     notFound: ({ id }) => `沒有 id 為 ${id} 的已配對裝置。執行 \`${bin} devices list\` 查看。`,
+  },
+  group: {
+    usage: `執行 \`${bin} group status\`、\`${bin} group setup\` 或 \`${bin} group invite <名稱> [--admin]\`。`,
+    notSetUp: `尚未設定小組協作。請執行 \`${bin} group setup\`。`,
+    ready: "小組協作已設定完成，可以使用。",
+    stopped: ({ reason }) =>
+      `小組協作已停止（原因：${reason}）。docs/troubleshooting.md 說明每一種原因。請先排除原因，再重新啟動 ${name}。`,
+    setUp: `小組協作已設定完成。請用 \`${bin} group invite <名稱> --admin\` 邀請第一位管理員。`,
+    alreadySetUp: "小組協作先前已設定完成。",
+    invited: ({ person, admin, code, expiresAt, minutes }) =>
+      [
+        `給 ${person}${admin ? "（管理員）" : ""}的邀請碼：${code}`,
+        `邀請碼只能用一次，於 ${expiresAt} 失效（${minutes} 分鐘後）。重新啟動 ${name} 會讓它作廢。`,
+      ].join("\n"),
   },
   requestFailed: ({ status, error }) => `${name} 回應 ${status}：${error}`,
 };

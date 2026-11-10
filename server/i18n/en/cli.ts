@@ -20,6 +20,7 @@ export default {
       "  token      Replace the API token and sign out paired devices (`token rotate`)",
       "  pair       Make a one-time code to pair a phone or another computer",
       "  devices    List paired devices (`devices list`) or revoke one (`devices revoke <id>`)",
+      "  group      Group work: `group status`, `group setup`, `group invite <name>`",
       "  version    Show the version, Node.js, platform and data directory",
       "  help       Show this help",
       "",
@@ -29,6 +30,7 @@ export default {
       "  --data-dir <dir>    Data directory (BELLPR_DATA_DIR, default ~/.bellpr)",
       "  --no-open           Do not open the browser (BELLPR_NO_OPEN=1)",
       "  --force             Start even when doctor reports Not ready",
+      `  --group             Host group work for the people who share this ${name} (BELLPR_GROUP=1)`,
       "  --env-file <file>   Load settings such as BELLPR_PORT from a file first",
       "",
       "Options for open:",
@@ -41,6 +43,9 @@ export default {
       "  --name <name>       Suggested name for the new device",
       "  --no-qr             Do not draw the QR code",
       "  --unlock            Clear the pairing lock and the failure count",
+      "",
+      "Options for group invite:",
+      "  --admin             The invited person joins as a group admin",
       "",
       `Lost the address? Run \`${bin} open\` on this computer to print and open it again.`,
     ].join("\n"),
@@ -113,7 +118,7 @@ export default {
       `${name} is already running with the data directory ${dataDir} (process ${pid}). Run \`${bin} open\` to open it, or stop that process first.`,
     /** Strict rule (coordination): a lock whose holder cannot be shown to have stopped. */
     dataDirHolderUnconfirmed: ({ dataDir, file }: { dataDir: string; file: string }) =>
-      `${name} cannot tell whether the process holding the data directory ${dataDir} has stopped: its lock ${file} comes from another container, another machine or an older version, or cannot be read. Coordination never replaces such a lock by itself. Make sure nothing uses this data directory any more, then remove ${file} and start again.`,
+      `${name} cannot tell whether the process holding the data directory ${dataDir} has stopped: its lock ${file} comes from another container, another machine or an older version, or cannot be read. This start does not replace such a lock by itself. Make sure nothing uses this data directory any more, then remove ${file} and start again.`,
     /** No holder to name: the lock was gone, or not a lock, each time the start looked. */
     dataDirLockUnsettled: ({ dataDir, file }: { dataDir: string; file: string }) =>
       `${name} could not take the lock ${file} of the data directory ${dataDir}: each time it tried, the file had just changed or could not be read. Start again in a moment. If this keeps happening and no ${name} is running with this data directory, remove ${file}.`,
@@ -125,7 +130,10 @@ export default {
       `Another ${name} start is replacing a lock left behind in this data directory, or stopped while doing so: its claim file ${file} is still there. Wait about half a minute and start again. If this keeps happening and no ${name} is starting, remove ${file}.`,
     /** Strict rule (coordination): a claim whose start cannot be shown to have stopped. */
     takeoverClaimUnconfirmed: ({ file }: { file: string }) =>
-      `${name} cannot tell whether the start that was replacing a lock left behind in this data directory has stopped: its claim file ${file} is still there. Coordination never removes such a claim by itself. Make sure no ${name} is starting on this data directory, then remove ${file} and start again.`,
+      `${name} cannot tell whether the start that was replacing a lock left behind in this data directory has stopped: its claim file ${file} is still there. This start does not remove such a claim by itself. Make sure no ${name} is starting on this data directory, then remove ${file} and start again.`,
+    /** `start --group` or a `group` command: the running instance was started without group work. */
+    withoutGroup: ({ url }: { url: string }) =>
+      `${name} is already running at ${url} without group work. Stop it first, then start it with \`${bin} start --group\`.`,
     listenFailed: ({ address, reason }: { address: string; reason: string }) =>
       `${name} could not listen on ${address}: ${reason}`,
     failed: ({ reason }: { reason: string }) =>
@@ -190,7 +198,35 @@ export default {
     revoked: ({ id }: { id: string }) => `Revoked ${id}. Its token no longer works.`,
     notFound: ({ id }: { id: string }) => `No paired device has the id ${id}. Run \`${bin} devices list\` to see them.`,
   },
-  /** A pair or devices request the running server refused. */
+  /** `bell-pr group`. The invite code is shown; no token ever is. */
+  group: {
+    usage: `Run \`${bin} group status\`, \`${bin} group setup\` or \`${bin} group invite <name> [--admin]\`.`,
+    notSetUp: `Group work is not set up yet. Run \`${bin} group setup\`.`,
+    ready: "Group work is set up and ready.",
+    /** `reason` is the stable word the server gives, such as sideMissing. */
+    stopped: ({ reason }: { reason: string }) =>
+      `Group work has stopped (reason: ${reason}). docs/troubleshooting.md explains each reason. Fix the cause, then restart ${name}.`,
+    setUp: `Group work is set up. Invite the first admin with \`${bin} group invite <name> --admin\`.`,
+    alreadySetUp: "Group work is already set up.",
+    invited: ({
+      person,
+      admin,
+      code,
+      expiresAt,
+      minutes,
+    }: {
+      person: string;
+      admin: boolean;
+      code: string;
+      expiresAt: string;
+      minutes: number;
+    }) =>
+      [
+        `Invite code for ${person}${admin ? " (admin)" : ""}: ${code}`,
+        `The code works once and expires at ${expiresAt} (in ${minutes} minutes). Restarting ${name} voids it.`,
+      ].join("\n"),
+  },
+  /** A pair, devices or group request the running server refused. */
   requestFailed: ({ status, error }: { status: number; error: string }) =>
     `${name} answered ${status}: ${error}`,
 };
