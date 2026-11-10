@@ -1,7 +1,7 @@
 // The product switcher (docs/bell-suite.md): a button that shows once
 // BELLPR_SUITE_LINKS names another BELL product, and its dialog. The open
 // dialog's accessibility and narrow widths are in e2e/helpers/views.ts.
-import { expect, test } from "@playwright/test";
+import { expect, test, type Route } from "@playwright/test";
 import { e2eApiHeaders } from "./api-token.mjs";
 import { product } from "../shared/product";
 import app from "../src/i18n/en/app";
@@ -17,6 +17,34 @@ test("no switcher shows while no other BELL product is linked", async ({ page })
   expect(await (await manifest).json()).toMatchObject({ appId: "pr", links: {} });
   await expect(page.locator(".home-page h1")).toBeVisible();
   await expect(page.locator(".suite-trigger")).toHaveCount(0);
+});
+
+test("an answer that is no manifest or links nowhere shows no switcher", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  let answer: Parameters<Route["fulfill"]>[0] = {};
+  await page.route("**/api/suite/manifest", (route) => route.fulfill(answer));
+  await page.goto("/#/home");
+  const answers = [
+    // As a proxy may answer for an address it does not know.
+    { body: "" },
+    { json: { links: "http://localhost:5173" } },
+    // Nothing the switcher would link to.
+    { json: { links: { explain: "javascript:alert(1)", personal: 4400 } } },
+  ];
+  for (const next of answers) {
+    answer = next;
+    await page.reload();
+    await expect(page.locator(".home-page h1")).toBeVisible();
+    await page.waitForLoadState("networkidle");
+    await expect(page.locator(".suite-trigger"), JSON.stringify(next)).toHaveCount(0);
+    expect(errors, JSON.stringify(next)).toEqual([]);
+  }
+  // The same page shows the button for a link.
+  answer = { json: { links: { explain: "javascript:alert(1)", personal: "http://localhost:5173" } } };
+  await page.reload();
+  await page.getByRole("button", { name: t.open }).click();
+  await expect(page.getByRole("dialog", { name: t.title }).getByRole("link")).toHaveCount(1);
 });
 
 test.describe("with BELLPR_SUITE_LINKS", () => {

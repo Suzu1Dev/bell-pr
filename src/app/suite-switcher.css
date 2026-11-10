@@ -11,6 +11,13 @@
     display: inline-flex;
   }
 }
+/* Below 390 px present=1's sample badge leaves the button no room: the top
+   bar would push the quick switch off the screen. */
+@media (max-width: 389px) {
+  .topbar:has(.presentation-sample-badge) .breadcrumb .suite-trigger {
+    display: none;
+  }
+}
 .suite-switcher {
   width: min(360px, calc(100vw - 32px));
   padding: 0;
