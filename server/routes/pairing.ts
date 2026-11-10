@@ -19,8 +19,8 @@ import { log } from "../log.js";
 import { clearPairing, Pairing, type PairLocked } from "../pairing.js";
 import type { AppOptions } from "../app.js";
 
-/** No control or bidirectional-override characters in a device name. */
-const deviceName = z
+/** No control or bidirectional-override characters in a device name; a group name follows the same rule. */
+export const deviceName = z
   .string()
   .trim()
   .min(1)

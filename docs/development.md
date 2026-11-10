@@ -299,6 +299,9 @@ product.
 ## More
 
 - [Security model](security-model.md), including the agent sandbox canary.
+- [Team collaboration](team-collaboration.md): the design of the agent
+  team's task board, dependencies and blocked subtasks, and the questions
+  open for its next step.
 - [Brand](brand.md): the logo, colors and how to name other products.
 - [CONTRIBUTING.md](../CONTRIBUTING.md) and the
   [Code of Conduct](../CODE_OF_CONDUCT.md).

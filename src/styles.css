@@ -2459,10 +2459,19 @@ button {
 .draft-task-items span {
   overflow-wrap: anywhere;
 }
+.publish-outgoing > div:first-child pre {
+  max-width: 100%;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+}
 .publish-body-preview {
   margin-top: 16px;
   border: 1px solid var(--color-border-subtle);
   border-radius: 8px;
+}
+.publish-body-preview pre {
+  max-width: 100%;
+  overflow-x: auto;
 }
 .publish-body-preview summary {
   padding: 10px 14px;

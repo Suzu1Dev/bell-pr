@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import type { AppSettings, AppSettingsView } from "../../../shared/app-settings";
+import type { CollabStatus } from "../../../shared/collab";
 import { api, ApiError } from "../../api";
 import type { Repo, RunSummary } from "../../types";
 
@@ -22,6 +23,8 @@ export type Status = {
   };
   /** The server's version, for the About dialog. */
   version?: string;
+  /** Where group work stands; absent when BELL PR runs without --group. */
+  collab?: CollabStatus;
 };
 
 /** The first load's requests; each one answers on its own. */

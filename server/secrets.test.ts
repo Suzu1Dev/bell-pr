@@ -278,3 +278,26 @@ test("secrets: device tokens and pairing codes are masked; ids that only look al
   for (const text of ["abababab-7777-4777-8777-777777777777", "ABABABAB-7777-4777-8777-777777777777", "test-1234", "ABCD-EFGH-JK", "bpd_short"])
     assert.equal(redact(text), text);
 });
+
+test("secrets: participant tokens are masked and block a patch; look-alikes stay", () => {
+  const token = `bpc_${"A1b2-_x".repeat(6)}Z`;
+  assert.equal(redact(`x-bell-participant: ${token}`), "x-bell-participant: [REDACTED]");
+  assert.equal(redact(`group: joined with ${token}.`), "group: joined with [REDACTED].");
+  assert.equal(secretInPatch(`+const t = "${token}";`), true);
+  // Only the token's own length: identifiers a project may use, and longer tails, stay.
+  for (const text of [
+    "bpc_short",
+    `abpc_${"a".repeat(43)}`,
+    "bpc_attribCache_init(ac);",
+    "bpc_frame_buffer_config",
+    "bpc_max_requested_value",
+    "bpc_poolWrite_unmarkPendingDelete",
+    "+  u32 bpc_default_bits_per_component;",
+    `bpc_${"a".repeat(42)}`,
+    `bpc_${"a".repeat(44)}`,
+    `${token}_copy`,
+  ]) {
+    assert.equal(redact(text), text);
+    assert.equal(secretInPatch(text), false, text);
+  }
+});

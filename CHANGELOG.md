@@ -7,8 +7,98 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- **Group work for the people who share one BELL PR, from the command
+  line and the API.** `bell-pr start --group` (or `BELLPR_GROUP=1`) turns
+  it on. The person at the host sets the group up with
+  `bell-pr group setup` and invites each person by name with a one-time
+  code (`bell-pr group invite <name> [--admin]`); `bell-pr group status`
+  says whether group work is not set up, ready or stopped. A person joins
+  with the code through `POST /api/collab/join` and gets a participant
+  token, sent in `x-bell-participant` next to the app token; an admin can
+  remove a person and, when asked, unpair the device they joined from.
+  There is no Group page yet, and nothing is protected at write time:
+  admin and member only decide who may invite and remove people. Without
+  the switch nothing changes, except that a participant token is masked
+  (under Changed). `docs/group-work.md` describes it.
+- **With group work on, the data-directory lock is the strict one.** It is
+  never replaced because of its age. After a crash that leaves a lock
+  whose holder cannot be confirmed (another container or machine, an older
+  build, an unreadable file), the next start is refused until a person
+  removes the lock file. `bell-pr start --group` never reuses a BELL PR
+  that runs without group work: it says to stop that one first and exits
+  with 1.
+- **A coordination core for several people on one project, its claims not
+  reachable yet.** `server/coordination.ts` grants claims on files all or
+  nothing, waits for task dependencies, and moves a dedicated branch one
+  checked change at a time, as `docs/multiuser-collaboration.md` describes.
+  Only group work opens it, to add the people of a group; nothing in the
+  app, the CLI or any listener reaches its tasks, claims or integration,
+  and it protects nothing at write time: a shell, an editor or an agent
+  can still write outside a claim. Working together on one project is not
+  safer yet.
+- **An admin can reopen a failed coordination task, in the core only.** The
+  task keeps its claims, their reasons and fences, and records who reopened
+  it and when. Members cannot reopen a task, and an integrated task never
+  reopens. Nothing in the app, the CLI or any listener reaches it yet.
+- **An interrupted integration the branch cannot settle when the
+  coordinator opens closes only its own project, in the core only.** Other
+  projects keep working; the closed one refuses every change, keeps its
+  claims and fences, and shows the interrupted integration to anyone who
+  reads it. An admin settles it once the branch is back at its base or its
+  change; settling never moves the branch, and each project keeps its
+  latest 10 settlements: who, when and what. While the coordinator runs, a
+  failed write or an integration it cannot account for still stops every
+  project until it opens again. Nothing in the app, the CLI or any
+  listener reaches it yet.
+- **Coordination never reads a commit-graph file, in the core only.** Git
+  takes the parents and trees of the commits it walks to from that file,
+  so one edited by someone with write access to the repository's directory
+  could hide a file outside the claim, a merge or a non-fast-forward
+  from the checks. Every coordination Git command now turns it off, even
+  where the repository's config turns it on. Other files in that
+  directory, such as object files, packs and alternates, are still trusted,
+  and nothing in the app, the CLI or any listener runs those commands yet.
+- **BELL Suite link (contract v1).** `BELLPR_SUITE_LINKS` tells this BELL PR
+  where BELL Explain and BELL Personal are, on the same computer or tailnet,
+  and a switcher between the BELL products shows once a link is set.
+  `GET /api/suite/manifest` and `GET /api/suite/today` describe BELL PR and
+  the runs that wait for you or for BELL PR: two counts and, for each run
+  listed, its id and route, title, state with a fixed phrase, and time.
+  Nothing else about a run is sent. Both stay behind the access token like
+  the rest of the API, and no existing protection changes. No other BELL
+  product can read the feed yet, because BELL PR has no read-only
+  credential to give one. [BELL Suite link](docs/bell-suite.md) has the
+  details.
+
+### Changed
+
+- **The data-directory lock is written whole.** Where the file system
+  supports hard links, a start writes its lock aside and links it into
+  place, so no other start reads it half written. A stale lock is removed
+  only after a start claims it, so two starts that find the same stale
+  lock cannot remove the lock either of them then writes. A lock taken
+  for coordination is never replaced until its holder is shown to have
+  stopped; group work takes one. Tests now hold an integration after its
+  last lock check, and put holders and starts in real separate PID
+  namespaces where bubblewrap can make them: no start of this version
+  takes such a lock, running, paused or expired. A lock a person removes
+  or replaces while its holder runs is still outside that rule: an
+  integration already past its last lock check still moves the branch.
+- **A participant token is masked like other tokens, in every BELL PR.**
+  Text shaped exactly like one (`bpc_` and 43 letters, digits, `-` or `_`)
+  is masked in logs, Agent answers and drafts; a changed file that holds
+  it is held back from review, and a draft that holds it cannot be
+  published. This applies with or without group work. A longer or shorter
+  name that starts with `bpc_` is left as it is.
+
 ### Fixed
 
+- **The publish dialog keeps the draft body inside a phone-width column.**
+  The body is shown preformatted in the browser's own monospace, which is
+  wider than the column with some fonts. The line scrolls inside the
+  preview instead of sticking out of it.
 - **Other requests no longer wait while the server starts Git.** Before each
   Git command, the server read the repository's driver settings with a
   synchronous `git config`, so no other request was served until it
@@ -16,6 +106,26 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   wait was closed with the next request already on it, and a client that
   reuses connections without retrying, such as Playwright's request
   context, got `ECONNRESET`. The read now runs without blocking the server.
+- **Every subtask after a failed one is now blocked.** When a subtask
+  failed, a subtask that depended on it through another one could still show
+  as waiting on dependencies if the plan listed it first. Every pending or
+  ready subtask that depends on a failed or blocked one, directly or through
+  others, is now blocked in the same step, whatever the plan's order, and
+  that step starts no subtask. Subtasks that a restart of BELL PR stopped
+  now block the subtasks after them in the same way. A dependency on a task
+  the plan does not list, which only an edited data file can hold, no longer
+  causes an internal error and never counts as finished: its subtask keeps
+  waiting unless another dependency blocks it, and the run stops with "Task
+  dependencies or file assignments stop the team from continuing".
+- **The task board no longer shows failed subtasks as done.** Done now holds
+  only integrated subtasks; a failed one stays in To do with its status. A
+  subtask's dependencies used to read "Waits for" with their IDs, finished
+  ones included; each is now listed by title with its current status, and a
+  task the plan does not list shows as unknown. In a run that failed or was
+  cancelled, a subtask whose dependencies are integrated shows "Ready after
+  retry" instead of "Ready to claim", since nothing starts it until you
+  retry. Long titles and descriptions, even with no space to break at, now
+  wrap inside their card.
 
 ## [1.1.0] - 2026-11-04
 

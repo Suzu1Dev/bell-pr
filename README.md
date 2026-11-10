@@ -301,6 +301,21 @@ delete a test. A **Reviewer** and a **Test analyst** then check the
 integrated result, each adding only what the Lead's summary does not say.
 Failed subtasks can be retried.
 
+The task board has three lanes: To do, In progress and Done. Done holds only
+integrated subtasks; a failed or blocked subtask stays in To do with its
+status, so it does not look finished. Each subtask names the subtasks it
+depends on, with their current status; a task the plan does not list shows
+as unknown and never counts as finished. When a subtask fails, the team
+starts no further subtask, and each subtask that has not started and depends
+on the failed one, directly or through others, is marked **Blocked**,
+whatever order the plan lists them in. Subtasks after one that a restart of
+BELL PR stopped are blocked the same way. Once a run has failed or been
+cancelled, a subtask whose dependencies are integrated shows **Ready after
+retry**: nothing starts it until you retry. Retrying schedules the unfinished
+subtasks again and keeps integrated work; each one still starts only when its
+dependencies, its files and the team's free places allow, so a retry does not
+promise that all of them run.
+
 Before it plans, the Lead checks any assumption the request states against
 the code, and every role is told the verdict. The brief shows it, and once
 the run is finished you can check it again, also on a run made before
@@ -587,7 +602,7 @@ leaked — it also invalidates every paired device.
 
 BELL PR needs no configuration. Every setting below is an environment
 variable read at start; `bell-pr start` also takes `--port`, `--host`,
-`--data-dir`, `--no-open`, `--force` and `--env-file <file>`. `start` exits
+`--data-dir`, `--no-open`, `--force`, `--group` and `--env-file <file>`. `start` exits
 before it listens when a required `bell-pr doctor` check fails; `--force`
 starts anyway. Values set in the app's
 Settings are used unless a variable sets them.
@@ -598,8 +613,10 @@ Settings are used unless a variable sets them.
 | `BELLPR_HOST` | `127.0.0.1` | Address to listen on; keep loopback and reach other machines with Tailscale serve (or another private HTTPS front) plus `BELLPR_PUBLIC_URL` — not Funnel, not the public internet |
 | `BELLPR_PUBLIC_URL` | none | HTTPS origin browsers use (no path), required for Tailscale serve / remote access; without it remote Hosts get 403 |
 | `BELLPR_ALLOWED_ORIGINS` | none | Extra exact origins to accept, comma-separated |
+| `BELLPR_SUITE_LINKS` | none | Where BELL Explain and BELL Personal are (`explain=<origin>,personal=<origin>`); shows the product switcher. See [BELL Suite link](docs/bell-suite.md) |
 | `BELLPR_DATA_DIR` | `~/.bellpr` | The data directory |
 | `BELLPR_NO_OPEN` | not set | `1` never opens a browser |
+| `BELLPR_GROUP` | not set | `1` turns [group work](docs/group-work.md) on for the people who share this BELL PR (also `--group`); set up and invite with `bell-pr group setup` and `bell-pr group invite <name>` |
 | `BELLPR_LOCALE` | `en` | Default language of server and CLI messages (`en` or `zh-TW`) |
 | `BELLPR_LOG_LEVEL` | `info` | `debug`, `info`, `warn` or `error` |
 | `BELLPR_MAX_AGENT_PROCESSES` | `3` | Agent CLI processes at the same time (1 to 32) |
@@ -682,6 +699,7 @@ readable by your user only.
 - [Upgrading](docs/upgrading.md)
 - [FAQ](docs/faq.md)
 - [Self-hosting](docs/self-hosting.md) and [Docker](docs/docker.md)
+- [Group work](docs/group-work.md)
 - [Security model](docs/security-model.md)
 - [Development](docs/development.md): building and checking BELL PR from
   its source

@@ -3,8 +3,10 @@ import type en from "../en/index.js";
 import analysis from "./analysis.js";
 import byHand from "./by-hand.js";
 import cli from "./cli.js";
+import collab from "./collab.js";
 import common from "./common.js";
 import contribution from "./contribution.js";
+import coordination from "./coordination.js";
 import run from "./run.js";
 import security from "./security.js";
 import setup from "./setup.js";
@@ -26,5 +28,7 @@ const m: Translation<typeof en> = {
   understanding,
   contribution,
   byHand,
+  coordination,
+  collab,
 };
 export default m;

@@ -140,6 +140,10 @@ export function TeamBoard({
     !team.tasks.some((task) => task.id === recipient && canReceive(task));
   const messagingDisabled = !demo && (finished || team.phase === "planning");
   const done = team.tasks.filter((task) => task.status === "complete").length;
+  const taskStatusLabel = (task: TeamTask) =>
+    task.status === "ready" && ["failed", "cancelled"].includes(team.phase)
+      ? t.task.readyAfterRetry
+      : taskLabels[task.status];
   const revisions = team.planRevisions ?? [];
   const revisionsLeft = revisions.length < maxPlanRevisions;
   const retryable =
@@ -511,7 +515,7 @@ export function TeamBoard({
                         ) : (
                           <Circle size={12} />
                         )}{" "}
-                        {taskLabels[task.status]}
+                        {taskStatusLabel(task)}
                       </span>
                     </div>
                     <h4>{task.title}</h4>
@@ -570,9 +574,24 @@ export function TeamBoard({
                     )}
                     {task.dependsOn.length > 0 && (
                       <div className="team-task-deps">
-                        {t.task.dependsOn({
-                          tasks: fmt.list(task.dependsOn, { type: "unit" }),
-                        })}
+                        <span>{t.task.dependsOn}</span>
+                        <ul aria-label={t.task.dependsOn}>
+                          {task.dependsOn.map((dependencyId) => {
+                            const dependency = team.tasks.find(
+                              ({ id }) => id === dependencyId,
+                            );
+                            return (
+                              <li key={dependencyId}>
+                                <span>{dependency?.title ?? dependencyId}</span>
+                                <span>
+                                  {dependency
+                                    ? taskStatusLabel(dependency)
+                                    : t.task.dependencyUnknown}
+                                </span>
+                              </li>
+                            );
+                          })}
+                        </ul>
                       </div>
                     )}
                     {task.integratedFiles && task.integratedFiles.length > 0 && (

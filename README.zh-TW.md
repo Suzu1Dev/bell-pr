@@ -215,6 +215,8 @@ Agent 以唯讀方式閱讀專案，說明它的用途、使用者、各部分�
 
 你描述這次貢獻：誰會受益、對他們有什麼改變、哪些行為不能改變、怎樣才算完成。**Lead** 把工作拆成檔案範圍明確的任務，你可以確認計畫或退回並補充意見。**Teammates**（2、3 或 4 位，由你選擇）各自在自己的 Git worktree 中平行工作，透過團隊收件匣分享發現；它們被要求只改自己範圍內的檔案、不做純格式的修改，也絕不削弱、略過或刪除測試。整合之後，**Reviewer** 與 **Test analyst** 會檢查結果，各自只補充 Lead 摘要沒說到的部分。失敗的子任務可以重試。
 
+任務看板有三欄：待處理、進行中、已完成。已完成只放已整合的子任務；失敗或已阻擋的子任務會留在待處理並標示狀態，不會看起來像已經做完。每個子任務會列出它依賴的子任務名稱與目前狀態；計畫裡沒有的任務會顯示為未知，也不會算作已完成。某個子任務失敗時，團隊不再開始新的子任務；尚未開始、直接或間接依賴它的子任務會標為**已阻擋**，不受計畫中的排列順序影響。BELL PR 重新啟動而中斷的子任務，其後的子任務也會這樣阻擋。工作失敗或取消後，依賴都已整合的子任務會顯示**重試後可執行**：在你重試之前不會開始。重試會重新排程未完成的子任務並保留已整合的工作；每個子任務仍要等依賴、檔案範圍與團隊名額允許才會開始，所以不保證全部都能執行。
+
 規劃之前，Lead 會對照程式碼查核需求裡寫下的假設，並把結論告訴每個角色；任務簡介會顯示結論；工作完成後可以重新查核，在有這項查核之前建立的工作也能補做。預設的「工作目錄（預設）」權限要求 Agent 不用 `sudo`，也不做全域安裝。檢查需要這台電腦缺少的環境時，全貌頁會列出它與建議的安裝指令，由你確認後自行執行。使用完整權限的工作也可以勾選這些指令並確認，交給一輪協作在沒有沙箱的情況下用你的帳號安裝、重跑受阻的檢查並逐項回報；停止它不會還原已安裝的內容。模型設定可明確選擇「完整權限」，讓會寫入檔案的角色安裝與設定所需環境；這會移除它們的沙箱限制，唯讀角色仍維持原本限制。Linux 上也可選擇為執行 BELL PR 的使用者帳號設定免密碼 sudo，詳見[安全模型](docs/security-model.md#explicit-full-access)。
 
 多項貢獻可以同時進行，上限由**設定 → 效能**或 `BELLPR_MAX_ACTIVE_RUNS` 決定（1 到 8；預設 2），其餘的依序排隊。
@@ -321,7 +323,7 @@ Authorization: Bearer <token>
 
 ## 設定
 
-BELL PR 不需要任何設定就能啟動。下列設定都是啟動時讀取的環境變數；`bell-pr start` 另外接受 `--port`、`--host`、`--data-dir`、`--no-open`、`--force` 與 `--env-file <file>`。必要的 `bell-pr doctor` 檢查失敗時，`start` 會在監聽前結束；`--force` 仍會啟動。在應用程式「設定」中調整的值，除非被環境變數指定，否則都會生效。
+BELL PR 不需要任何設定就能啟動。下列設定都是啟動時讀取的環境變數；`bell-pr start` 另外接受 `--port`、`--host`、`--data-dir`、`--no-open`、`--force`、`--group` 與 `--env-file <file>`。必要的 `bell-pr doctor` 檢查失敗時，`start` 會在監聽前結束；`--force` 仍會啟動。在應用程式「設定」中調整的值，除非被環境變數指定，否則都會生效。
 
 | 變數 | 預設值 | 用途 |
 | --- | --- | --- |
@@ -329,8 +331,10 @@ BELL PR 不需要任何設定就能啟動。下列設定都是啟動時讀取的
 | `BELLPR_HOST` | `127.0.0.1` | 監聽位址；請維持本機回環，遠端請用 Tailscale serve（或其他私人 HTTPS 前端）加上 `BELLPR_PUBLIC_URL`，不要用 Funnel，也不要暴露到公網 |
 | `BELLPR_PUBLIC_URL` | 無 | 瀏覽器使用的 HTTPS 來源（不含路徑）；Tailscale serve／遠端連線必填，未設則遠端 Host 會得到 403 |
 | `BELLPR_ALLOWED_ORIGINS` | 無 | 額外接受的精確 origin，以逗號分隔 |
+| `BELLPR_SUITE_LINKS` | 無 | BELL Explain 與 BELL Personal 的位址（`explain=<origin>,personal=<origin>`）；設定後會顯示產品切換按鈕。見 [BELL Suite 連結說明](docs/bell-suite.md) |
 | `BELLPR_DATA_DIR` | `~/.bellpr` | 資料目錄 |
 | `BELLPR_NO_OPEN` | 未設定 | `1` 表示絕不開啟瀏覽器 |
+| `BELLPR_GROUP` | 未設定 | `1` 為共用這個 BELL PR 的人開啟[小組協作](docs/group-work.md)（也可用 `--group`）；用 `bell-pr group setup` 設定，用 `bell-pr group invite <名稱>` 邀請 |
 | `BELLPR_LOCALE` | `en` | 伺服器與 CLI 訊息的預設語言（`en` 或 `zh-TW`） |
 | `BELLPR_LOG_LEVEL` | `info` | `debug`、`info`、`warn` 或 `error` |
 | `BELLPR_MAX_AGENT_PROCESSES` | `3` | 同時執行的 Agent CLI 行程數（1 到 32） |
@@ -387,6 +391,7 @@ BELL PR 把所有資料放在 `~/.bellpr`（或 `--data-dir`／`BELLPR_DATA_DIR`
 - [升級說明](docs/upgrading.md)
 - [常見問題](docs/faq.md)
 - [自架說明](docs/self-hosting.md)與 [Docker 說明](docs/docker.md)
+- [小組協作](docs/group-work.md)
 - [安全模型](docs/security-model.md)
 - [開發說明](docs/development.md)：從原始碼建置與檢查 BELL PR
 - [變更紀錄](CHANGELOG.md)

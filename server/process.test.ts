@@ -13,6 +13,7 @@ import {
   gitChildEnv,
   gitNetwork,
   gitNetworkConfig,
+  noGraftFile,
 } from "./process.js";
 import { AppError } from "./types.js";
 import { withLocale } from "./i18n/index.js";
@@ -535,6 +536,14 @@ test("server git does not pass askpass variables", (t) => {
   assert.equal(env.SSH_ASKPASS, undefined);
   assert.equal(env.GIT_PAGER, "cat");
   assert.equal(env.GH_TOKEN, undefined);
+});
+
+test("a graft file reaches Git only as none, never from the parent or as another path", (t) => {
+  withEnv(t, { GIT_GRAFT_FILE: "/tmp/bell-grafts" });
+  assert.equal(gitChildEnv(undefined, false).GIT_GRAFT_FILE, undefined);
+  assert.equal(gitChildEnv({ ...process.env }, false).GIT_GRAFT_FILE, undefined);
+  assert.equal(gitChildEnv({ GIT_GRAFT_FILE: "/tmp/bell-grafts" }, false).GIT_GRAFT_FILE, undefined);
+  assert.equal(gitChildEnv({ GIT_GRAFT_FILE: noGraftFile }, false).GIT_GRAFT_FILE, noGraftFile);
 });
 
 test("a checkout .gitattributes driver from local config, include.path, or includeIf does not run", async (t) => {

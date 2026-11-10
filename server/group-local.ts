@@ -25,6 +25,7 @@ import { activeFollowUp } from "../shared/followups.js";
 import type { LocalOverlap, TeamTask } from "../shared/team.js";
 import { sm } from "./i18n/index.js";
 import { assertGitConfigSafe, git } from "./process.js";
+import { pathsMeet } from "./scope-paths.js";
 import type { DiffFile, Repository, Run } from "./types.js";
 import type { WorkbenchContext } from "./workbench-context.js";
 
@@ -47,19 +48,7 @@ const holdingStatuses: Run["status"][] = [
 /** Checkouts read at once, so a project with many runs does not start dozens of git processes together. */
 const readsAtOnce = 4;
 
-/** ASCII lower case only, so every build and Node release folds alike. */
-const fold = (value: string) => value.replace(/[A-Z]/g, (letter) => letter.toLowerCase());
-const directory = (scope: string) => (scope.endsWith("/") ? scope : `${scope}/`);
-
-/**
- * Whether two paths or scopes name a common file: the same, or one is a
- * directory above the other. An exact name also meets what is below it,
- * because a file and a directory cannot share a name.
- */
-export function pathsMeet(left: string, right: string) {
-  const [a, b] = [fold(left), fold(right)];
-  return a === b || b.startsWith(directory(a)) || a.startsWith(directory(b));
-}
+export { pathsMeet } from "./scope-paths.js";
 
 const names = (output: string) => output.split("\0").filter(Boolean);
 /** Whether the run's pull request was read as merged (Read feedback). */

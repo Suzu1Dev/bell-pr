@@ -147,13 +147,18 @@ test("lanes keep their grouping and the empty running lane has its own message",
     false,
   );
   const [todo, running, done] = lanes(html);
-  assert.match(todo, /^<h3>待處理<span>2<\/span><\/h3>/);
-  assert.ok(todo.includes(first.title) && todo.includes(second.title));
+  assert.match(todo, /^<h3>待處理<span>3<\/span><\/h3>/);
+  assert.ok(
+    todo.includes(first.title) &&
+      todo.includes(second.title) &&
+      todo.includes(third.title),
+  );
+  assert.match(todo, /失敗/);
   assert.match(running, /^<h3>進行中<span>0<\/span><\/h3>/);
   assert.match(running, /目前沒有正在執行的子任務/);
-  // Failed tasks sit in the done lane.
-  assert.match(done, /^<h3>已完成<span>2<\/span><\/h3>/);
-  assert.ok(done.includes(third.title) && done.includes(fourth.title));
+  assert.match(done, /^<h3>已完成<span>1<\/span><\/h3>/);
+  assert.ok(done.includes(`<h4>${fourth.title}</h4>`));
+  assert.ok(!done.includes(`<h4>${third.title}</h4>`));
   const empty = lanes(
     render({ ...demoRun, team: { ...demoTeam, phase: "planning", tasks: [] } }, false),
   );
@@ -292,7 +297,8 @@ test("the English board renders every phase without Han", () => {
   assert.match(sample, /4 \/ 4 subtasks done/);
   assert.match(sample, /Up to 3 members work at the same time/);
   assert.match(sample, /Integrated: src\/utils\/retry.ts, src\/types.ts/);
-  assert.match(sample, /Waits for task-2, task-3/);
+  assert.match(sample, /Depends on/);
+  assert.doesNotMatch(sample, /Waits for/);
   assert.match(sample, /The app saw 2 commands run/);
   assert.match(sample, /Delivered · Sample/);
   assert.match(sample, /BELL PR coordinates the team/);
@@ -401,6 +407,91 @@ const english = (run: Run) => {
   assertNoHan(html);
   return html;
 };
+
+test("dependencies show every task title, live status and unknown references in both languages", () => {
+  const withDependencies = (run: Run): Run => {
+    const team = run.team!;
+    const [complete, failed, dependent] = team.tasks;
+    return {
+      ...run,
+      status: "running",
+      team: {
+        ...team,
+        phase: "developing",
+        tasks: [
+          { ...complete, status: "complete" },
+          { ...failed, status: "failed" },
+          {
+            ...dependent,
+            status: "ready",
+            dependsOn: [complete.id, failed.id, "missing-task"],
+          },
+        ],
+      },
+    };
+  };
+  const [zhComplete, zhFailed] = demoTeam.tasks;
+  const zh = render(withDependencies(demoRunZh), false);
+  assert.match(zh, /<div class="team-task-deps"><span>依賴<\/span><ul aria-label="依賴">/);
+  assert.ok(
+    zh.includes(`<li><span>${zhComplete.title}</span><span>已整合</span></li>`),
+  );
+  assert.ok(
+    zh.includes(`<li><span>${zhFailed.title}</span><span>失敗</span></li>`),
+  );
+  assert.ok(zh.includes("<li><span>missing-task</span><span>未知</span></li>"));
+  assert.doesNotMatch(zh, /先完成/);
+
+  const [enComplete, enFailed] = englishTeam.tasks;
+  const en = english(withDependencies(englishRun));
+  assert.match(en, /<div class="team-task-deps"><span>Depends on<\/span><ul aria-label="Depends on">/);
+  assert.ok(
+    en.includes(`<li><span>${enComplete.title}</span><span>Integrated</span></li>`),
+  );
+  assert.ok(
+    en.includes(
+      `<li><span>${enFailed.title.replace("'", "&#x27;")}</span><span>Failed</span></li>`,
+    ),
+  );
+  assert.ok(en.includes("<li><span>missing-task</span><span>Unknown</span></li>"));
+});
+
+test("stopped runs label ready tasks and their dependencies as ready after retry", () => {
+  const withReadyDependency = (
+    run: Run,
+    phase: "failed" | "cancelled" | "developing",
+  ): Run => {
+    const team = run.team!;
+    const [ready, dependent] = team.tasks;
+    return {
+      ...run,
+      status: phase === "developing" ? "running" : phase,
+      team: {
+        ...team,
+        phase,
+        tasks: [
+          { ...ready, status: "ready" },
+          { ...dependent, status: "blocked", dependsOn: [ready.id] },
+        ],
+      },
+    };
+  };
+  for (const phase of ["failed", "cancelled"] as const) {
+    const zh = render(withReadyDependency(demoRunZh, phase), false);
+    assert.equal(zh.match(/重試後可執行/g)?.length, 2, phase);
+    assert.doesNotMatch(zh, /可認領/, phase);
+    const en = english(withReadyDependency(englishRun, phase));
+    assert.equal(en.match(/Ready after retry/g)?.length, 2, phase);
+    assert.doesNotMatch(en, /Ready to claim/, phase);
+  }
+
+  const zh = render(withReadyDependency(demoRunZh, "developing"), false);
+  assert.equal(zh.match(/可認領/g)?.length, 2);
+  assert.doesNotMatch(zh, /重試後可執行/);
+  const en = english(withReadyDependency(englishRun, "developing"));
+  assert.equal(en.match(/Ready to claim/g)?.length, 2);
+  assert.doesNotMatch(en, /Ready after retry/);
+});
 
 test("a queued run says it waits to start, with no progress count yet", () => {
   const html = english({
