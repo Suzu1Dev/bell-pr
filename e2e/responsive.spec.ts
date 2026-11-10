@@ -200,23 +200,12 @@ function findSideOverflow(page: Page): Promise<string[]> {
     }
 
     // A box that does not scroll still has overflow when its content is
-    // wider than the box. The same negative-margin bleed the sticks-out
-    // loop allows does not count. A purposeful sideways scroller is exempt.
+    // wider than the box. A purposeful sideways scroller is exempt.
     for (const element of document.body.querySelectorAll("*")) {
       if (!(element instanceof HTMLElement) || !shown(element) || !counts(element)) continue;
       if (getComputedStyle(element).overflowX !== "visible") continue;
-      const excess = element.scrollWidth - element.clientWidth;
-      if (excess <= 1) continue;
+      if (element.scrollWidth <= element.clientWidth + 1) continue;
       if (!clipEdges(element)) continue;
-      let bleed = 0;
-      for (const child of element.children) {
-        if (!shown(child)) continue;
-        const childStyle = getComputedStyle(child);
-        const left = Math.max(0, -(parseFloat(childStyle.marginLeft) || 0));
-        const right = Math.max(0, -(parseFloat(childStyle.marginRight) || 0));
-        bleed = Math.max(bleed, left + right);
-      }
-      if (excess <= bleed + 1) continue;
       result.push(
         `wider than its box: ${nameOf(element)} is ${element.scrollWidth} px wide in ${element.clientWidth} px`,
       );
