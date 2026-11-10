@@ -17,7 +17,6 @@ import {
   Loader2,
   Play,
   RefreshCw,
-  ShieldCheck,
 } from "lucide-react";
 import { getDemo } from "../demo";
 import { useFormat, useLocale, useT } from "../i18n";
@@ -253,6 +252,110 @@ export function DraftTab({
       onUndo={() => void undoSync()}
     />
   );
+  const basicChecks = [
+    {
+      id: "reviewed",
+      done: allReviewed,
+      off: false,
+      content: (
+        <>
+          <span>
+            {t.checklist.allReviewed}
+            <small>{t.checklist.files({ reviewed: reviewedCount, total: files.length })}</small>
+          </span>
+          {!allReviewed && (
+            <button type="button" className="button secondary" onClick={() => setTab("changes")}>
+              {t.checklist.reviewAction}
+            </button>
+          )}
+        </>
+      ),
+    },
+    {
+      id: "saved",
+      done: !draftDirty,
+      off: false,
+      content: (
+        <>
+          <span>{t.checklist.saved}{draftDirty && <small>{t.checklist.unsaved}</small>}</span>
+          {draftDirty && (
+            <button
+              type="button"
+              className="button secondary"
+              disabled={busy || sessionRunning || run.status === "published"}
+              onClick={saveDraft}
+            >
+              {t.draft.save}
+            </button>
+          )}
+        </>
+      ),
+    },
+    {
+      id: "description",
+      done: followUp ? !commitMessageUnfinished : !!draftBody.trim() && !draftUnfinished,
+      off: false,
+      content: (
+        <>
+          <span>
+            {followUp ? t.checklist.commitReady : t.checklist.noPlaceholders}
+            <small>
+              {followUp
+                ? (commitMessageUnfinished ? t.checklist.commitMissing : "")
+                : !draftBody.trim() ? t.checklist.noDescription : draftUnfinished?.details.join("\n")}
+            </small>
+          </span>
+          {(followUp ? commitMessageUnfinished : !draftBody.trim() || draftUnfinished) && (
+            <button
+              type="button"
+              className="button secondary"
+              onClick={() => document.getElementById(followUp ? "pr-commit-message" : "pr-body")?.focus()}
+            >
+              {t.checklist.editAction}
+            </button>
+          )}
+        </>
+      ),
+    },
+    ...(understanding ? [{
+      id: "understanding",
+      done: understanding.passed || understanding.off || !understanding.required,
+      off: !understanding.passed && (understanding.off || !understanding.required),
+      content: <UnderstandingRow run={run} check={understanding} />,
+    }] : []),
+  ];
+  const checkRows = (done: boolean) => basicChecks.filter((item) => item.done === done).map((item) => (
+    <li key={item.id} className={`checklist-item${item.done && !item.off ? " checked" : ""}`}>
+      {item.id !== "understanding" && (item.done ? <CircleCheck size={18} /> : <Circle size={18} />)}
+      {item.content}
+    </li>
+  ));
+  const taskChecks = {
+    pending: (
+      <>
+        {checkRows(false)}
+        {run.learnByHand && (
+          <li><Deferred resetKey={run.id}><ByHandRecord run={run} place="draft" /></Deferred></li>
+        )}
+      </>
+    ),
+    complete: checkRows(true),
+    passed: basicChecks.filter((item) => item.done && !item.off).length,
+    off: basicChecks.filter((item) => item.off).length,
+    hasUnderstanding: !!understanding,
+  };
+  const basicChecklist = (
+    <section className="publish-checklist draft-round-checklist" tabIndex={-1}>
+      <h3>{t.checklist.title}</h3>
+      <ul>{taskChecks.pending}</ul>
+      <details>
+        <summary>{t.checklist.completed}</summary>
+        <ul>{taskChecks.complete}</ul>
+      </details>
+      <p>{followUp ? t.checklist.samePr : t.checklist.draftPr}</p>
+      <p>{followUp ? t.checklist.samePrHelp : t.checklist.draftPrHelp}</p>
+    </section>
+  );
   return (
     <div className="draft-workspace">
       {demo && <SamplePublishedCard run={run} />}
@@ -270,14 +373,17 @@ export function DraftTab({
           }
         />
       )}
-      <div className="draft-layout">
+      <div className="draft-layout is-focused">
         <div className="draft-editor">
           <div className="section-heading">
             <div>
               <h2>{t.draft.heading}</h2>
-              <p>{t.draft.subheading}</p>
             </div>
-            <span className="draft-label">{t.draft.label}</span>
+            <button type="button" className="button secondary" onClick={() => {
+              const checklist = document.querySelector<HTMLElement>(".draft-checklist, .draft-round-checklist");
+              checklist?.focus();
+              checklist?.scrollIntoView({ block: "start" });
+            }}>{t.checklist.open}</button>
           </div>
           {!demo && !followUp && recoverablePublish(run) && (
             <div className="draft-origin-notice">
@@ -383,6 +489,44 @@ export function DraftTab({
               </button>
             </div>
           )}
+          {draftTaskGroups.length > 0 && (
+            <fieldset
+              className="draft-task-items"
+              disabled={sessionRunning || run.status === "published" || busy}
+            >
+              <legend>{t.checklist.taskItems}</legend>
+              <p>{t.checklist.taskItemsHelp}</p>
+              {draftTaskGroups.map(([heading, items]) => (
+                <div key={`${heading}:${items[0].line}`}>
+                  <strong>{heading || t.checklist.noSection}</strong>
+                  {items.map((item) => (
+                    <label key={item.line}>
+                      <input
+                        type="checkbox"
+                        checked={item.checked}
+                        onChange={(event) => {
+                          const checked = event.target.checked;
+                          setDraftBody((body) =>
+                            draftChecks
+                              ? draftChecks.setDraftTaskItem(
+                                  body,
+                                  item.line,
+                                  checked,
+                                )
+                              : body,
+                          );
+                        }}
+                      />
+                      <span>{item.text}</span>
+                    </label>
+                  ))}
+                </div>
+              ))}
+            </fieldset>
+          )}
+
+          <details className="draft-publish-options" open={publishBranchInvalid || !!followUp}>
+            <summary>{t.draft.publishOptions}</summary>
           <label
             className="field-label"
             htmlFor="pr-commit-message"
@@ -460,6 +604,7 @@ export function DraftTab({
               </div>
             </div>
           )}
+          </details>
           <div className="draft-save-row">
             <span>
               {demo ? t.draft.savedInBrowser : t.draft.savedLocally}
@@ -480,161 +625,16 @@ export function DraftTab({
             </button>
           </div>
         </div>
-        <aside className="publish-checklist">
-          <div className="checklist-icon">
-            <GitPullRequest size={24} />
-          </div>
-          <h3>{t.checklist.title}</h3>
-          <p>{t.checklist.text}</p>
-          <div
-            className={
-              allReviewed
-                ? "checklist-item checked"
-                : "checklist-item"
-            }
-          >
-            {allReviewed ? (
-              <CircleCheck size={18} />
-            ) : (
-              <Circle size={18} />
-            )}
-            <span>
-              {t.checklist.allReviewed}
-              <small>
-                {t.checklist.files({
-                  reviewed: reviewedCount,
-                  total: files.length,
-                })}
-              </small>
-            </span>
-          </div>
-          {understanding && <UnderstandingRow run={run} check={understanding} />}
-          {run.learnByHand && <Deferred resetKey={run.id}><ByHandRecord run={run} place="draft" /></Deferred>}
-          <div
-            className={
-              !draftDirty
-                ? "checklist-item checked"
-                : "checklist-item"
-            }
-          >
-            {!draftDirty ? (
-              <CircleCheck size={18} />
-            ) : (
-              <Circle size={18} />
-            )}
-            <span>
-              {t.checklist.saved}
-              <small>
-                {draftDirty ? t.checklist.unsaved : t.checklist.canAdjust}
-              </small>
-            </span>
-          </div>
-          {followUp ? (
-            <div
-              className={
-                commitMessageUnfinished
-                  ? "checklist-item"
-                  : "checklist-item checked"
-              }
-            >
-              {commitMessageUnfinished ? (
-                <Circle size={18} />
-              ) : (
-                <CircleCheck size={18} />
-              )}
-              <span>
-                {t.checklist.commitReady}
-                <small>
-                  {commitMessageUnfinished
-                    ? t.checklist.commitMissing
-                    : t.checklist.commitBecomes}
-                </small>
-              </span>
-            </div>
-          ) : (
-          <>
-          <div
-            className={
-              draftBody.trim() && !draftUnfinished
-                ? "checklist-item checked"
-                : "checklist-item"
-            }
-          >
-            {draftBody.trim() && !draftUnfinished ? (
-              <CircleCheck size={18} />
-            ) : (
-              <Circle size={18} />
-            )}
-            <span>
-              {t.checklist.noPlaceholders}
-              <small>
-                {!draftBody.trim()
-                  ? t.checklist.noDescription
-                  : draftUnfinished
-                    ? draftUnfinished.details.join("\n")
-                    : t.checklist.placeholdersStay}
-              </small>
-            </span>
-          </div>
-          {draftTaskGroups.length > 0 && (
-            <fieldset
-              className="draft-task-items"
-              disabled={sessionRunning || run.status === "published" || busy}
-            >
-              <legend>{t.checklist.taskItems}</legend>
-              <p>{t.checklist.taskItemsHelp}</p>
-              {draftTaskGroups.map(([heading, items]) => (
-                <div key={`${heading}:${items[0].line}`}>
-                  <strong>{heading || t.checklist.noSection}</strong>
-                  {items.map((item) => (
-                    <label key={item.line}>
-                      <input
-                        type="checkbox"
-                        checked={item.checked}
-                        onChange={(event) => {
-                          const checked = event.target.checked;
-                          setDraftBody((body) =>
-                            draftChecks
-                              ? draftChecks.setDraftTaskItem(
-                                  body,
-                                  item.line,
-                                  checked,
-                                )
-                              : body,
-                          );
-                        }}
-                      />
-                      <span>{item.text}</span>
-                    </label>
-                  ))}
-                </div>
-              ))}
-            </fieldset>
-          )}
-          </>
-          )}
-          <div className="checklist-item">
-            <ShieldCheck size={18} />
-            {followUp ? (
-              <span>
-                {t.checklist.samePr}
-                <small>{t.checklist.samePrHelp}</small>
-              </span>
-            ) : (
-              <span>
-                {t.checklist.draftPr}
-                <small>{t.checklist.draftPrHelp}</small>
-              </span>
-            )}
-          </div>
-        </aside>
+
       </div>
+      {followUp && basicChecklist}
       {!followUp && (
       <ErrorBoundary resetKey={run.id}>
         <Suspense
-          fallback={<p className="muted">{t.draft.loadingGuide}</p>}
+          fallback={basicChecklist}
         >
           <DraftGuide
+            taskChecks={taskChecks}
             run={run}
             files={files}
             repo={currentRepo}

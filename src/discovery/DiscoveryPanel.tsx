@@ -53,8 +53,6 @@ const sortOptions: DiscoveryPreferences["sort"][] = [
   "stars",
 ];
 const phaseSteps = ["searching", "screening", "analyzing"] as const;
-/** The four angles every opportunity is weighed from, in display order. */
-const angles = ["rules", "activity", "needs", "barrier"] as const;
 
 /** An http(s) link, or undefined for anything else (a sample's empty URL). */
 function webLink(value?: string) {
@@ -269,11 +267,9 @@ export default function DiscoveryPanel({
     <div className="discovery-page">
       <header className="discovery-hero">
         <div>
-          <span className="eyebrow">{t.eyebrow}</span>
           <h1 tabIndex={-1}>
             {t.title.lead}
-            <br />
-            <em>{t.title.emphasis}</em>
+            {" "}<em>{t.title.emphasis}</em>
           </h1>
           <p>
             {t.intro.lead}
@@ -284,9 +280,6 @@ export default function DiscoveryPanel({
         <div className="discovery-hero-art" aria-hidden="true">
           <span className="discovery-orbit">
             <Compass size={58} strokeWidth={1.2} />
-          </span>
-          <span className="discovery-orbit-label">
-            <FolderGit2 size={15} /> {t.heroCaption}
           </span>
           <span className="discovery-hero-dot" />
         </div>
@@ -376,7 +369,7 @@ export default function DiscoveryPanel({
                 </option>
               ))}
             </select>
-            <small>{t.form.sortHint}</small>
+            <details><summary>{t.form.sortHelp}</summary><small>{t.form.sortHint}</small></details>
           </label>
           <label>
             {t.form.minStars}
@@ -619,15 +612,7 @@ export default function DiscoveryPanel({
           <Compass size={34} strokeWidth={1.3} />
           <h2>{shown ? t.empty.retryTitle : t.empty.title}</h2>
           <p>{shown ? t.empty.retryBody : t.empty.body}</p>
-          <div>
-            {angles.map((angle, index) => (
-              <div key={angle}>
-                <span>{String(index + 1).padStart(2, "0")}</span>
-                <strong>{t.empty.angles[angle].title}</strong>
-                <small>{t.empty.angles[angle].detail}</small>
-              </div>
-            ))}
-          </div>
+
         </section>
       )}
       {!!opportunities.length && (

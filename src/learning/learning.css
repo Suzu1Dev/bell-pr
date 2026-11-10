@@ -143,7 +143,7 @@
   font-size: var(--text-2xs);
   color: var(--color-text-muted);
 }
-.note-card h2:focus-visible {
+.note-card h3:focus-visible {
   outline: 2px solid var(--color-accent-500);
   outline-offset: 3px;
 }
@@ -677,3 +677,9 @@
   flex: none;
   white-space: nowrap;
 }
+
+.learning-note-group { margin-block: 24px; }
+.learning-note-group > p { margin-bottom: 12px; color: var(--color-text-muted); }
+
+.learning-demo > summary > h2 { display: inline; font-size: inherit; }
+.learning-demo > summary { cursor: pointer; font-size: var(--text-md); font-weight: 600; }

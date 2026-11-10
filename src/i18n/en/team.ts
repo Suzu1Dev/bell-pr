@@ -121,6 +121,7 @@ const team = {
   /** The running lane while the plan waits for approval. */
   laneEmptyAwaiting: "Subtasks start once you approve the plan.",
   task: {
+    details: "Assignment and files",
     worktree: "Isolated worktree",
     worktreeRemoved: "Isolated worktree cleaned up",
     filesPending: "Being planned",

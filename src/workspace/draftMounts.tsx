@@ -86,6 +86,7 @@ export function UnderstandingRow({
               ? t.understandingOff
               : t.understandingRequired}
         </small>
+        {state === "required" && open && <button type="button" className="run-notice-link" onClick={() => openCheckPanel(run.id)}>{t.understandingAction}</button>}
         {state === "off" && open && (
           <button
             type="button"

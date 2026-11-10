@@ -1335,3 +1335,23 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+.draft-layout.is-focused { grid-template-columns: minmax(0, 1fr); }
+.draft-publish-options { margin-block: 20px; }
+.draft-publish-options > summary,
+.reviewability-reference > summary,
+.draft-round-checklist summary { cursor: pointer; font-weight: 600; }
+.draft-guidance-panel > .draft-checklist { margin: 0 0 24px; padding: 0 0 24px; border-top: 0; border-bottom: 1px solid var(--color-border); }
+.draft-guidance-panel .draft-completed-checks > summary,
+.draft-guidance-panel .draft-checklist-sources > summary { list-style: disclosure-closed; }
+.draft-guidance-panel .draft-completed-checks[open] > summary,
+.draft-guidance-panel .draft-checklist-sources[open] > summary { list-style: disclosure-open; }
+.draft-completed-checks { margin-top: 16px; }
+.draft-pending-checks .checklist-item,
+.draft-completed-checks .checklist-item { align-items: center; }
+.checklist-item > .checklist-item { margin: 0; padding: 0; border: 0; width: 100%; }
+.draft-pending-checks .checklist-item > span,
+.draft-completed-checks .checklist-item > span { flex: 1; }
+.draft-pending-checks .button { flex-shrink: 0; }
+.draft-round-checklist { margin: 24px 28px; }
+.reviewability-reference { margin-block: 12px; }

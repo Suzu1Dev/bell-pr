@@ -41,7 +41,8 @@ const modals = {
     submitting: "Splitting…",
   },
   help: {
-    title: "From an idea to your next PR.",
+    teamGuide: "How the AI team works",
+    title: "How to contribute",
     subtitle: "Four steps that connect building, reviewing and learning.",
     steps: {
       import: {
@@ -65,7 +66,7 @@ const modals = {
     about: `About ${product.name}`,
   },
   runs: {
-    title: "Every idea has its progress.",
+    title: "Contributions",
     subtitle: "Switch tasks to see their status, code changes and PR draft.",
     demo: "Interactive demo",
     newContribution: "New contribution",
@@ -88,7 +89,7 @@ const modals = {
     deleted: "Contribution deleted.",
   },
   newTask: {
-    title: "Hand your idea to your agent team.",
+    title: "New contribution",
     subtitle: "Describe what you want to improve and how it should behave when it is done.",
     repo: "Target repository",
     chooseRepo: "Choose a repository",

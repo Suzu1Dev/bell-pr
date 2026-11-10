@@ -120,7 +120,7 @@ const m: Translation<typeof en> = {
     newFiles: ({ n, list }) => `${name} 看到你的測試新寫了 ${n} 個檔案：${list}`,
     output: "輸出",
     explain: "解說這次失敗",
-    error: `可能是輸出太多，${name} 停止了測試，或是指令無法啟動；「Agent 動態」裡的執行紀錄會說明是哪一種。`,
+    error: `可能是輸出太多，${name} 停止了測試，或是指令無法啟動；「執行進度」裡的執行紀錄會說明是哪一種。`,
   },
   live: {
     tail: "目前的輸出",
