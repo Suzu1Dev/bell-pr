@@ -38,6 +38,7 @@ import {
   type Run,
 } from "./types.js";
 import { assertRemoteHead, prHasCommit, remoteBranchHead } from "./pr-branch.js";
+import { releasePublishRecovery } from "./cleanup.js";
 import { assertConflictsResolved, runBusy } from "./sync-runs.js";
 import { applyAiDisclosure } from "./drafts.js";
 import { assertReady } from "./by-hand.js";
@@ -633,7 +634,10 @@ export async function publish(
       displayedFingerprint !== run.approvedFingerprint
     )
       throw new AppError((m) => m.run.publish.approvalStale, 409);
-    if (run.status === "published") return run;
+    if (run.status === "published") {
+      await releasePublishRecovery(ctx, run);
+      return run;
+    }
     assertSessionIdle(run);
     const repo = ctx.repo(run.repoId);
     if (run.status !== "approved" || !run.approvedFingerprint)
@@ -711,6 +715,7 @@ export async function publish(
         delete run.error;
         ctx.log(run, "system", sm().run.publish.prCreated);
         await ctx.store.save();
+        await releasePublishRecovery(ctx, run);
         return run;
       }
     }
@@ -948,6 +953,7 @@ export async function publish(
       run.publishing = false;
       await ctx.store.save();
     }
+    if (run.status === "published") await releasePublishRecovery(ctx, run);
     return run;
   });
 }
