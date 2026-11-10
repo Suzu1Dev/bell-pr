@@ -147,6 +147,7 @@ jobs:
       - name: Run the installed command outside the checkout
         working-directory: ${{ runner.temp }}
         run: |
+          set -o pipefail
           export PATH="$RUNNER_TEMP/p/bin:$PATH"
           version="$(node -p "require(process.env.GITHUB_WORKSPACE + '/package.json').version")"
           bell-pr --version
@@ -220,6 +221,7 @@ jobs:
           BELLPR_E2E_PORT: "4599"
           SHARD: ${{ matrix.shard }}
         run: |
+          set -o pipefail
           # Cut at a file boundary to balance the shards; see test-cli docs.
           cut=e2e/real-run-journey.spec.ts
           files=()
