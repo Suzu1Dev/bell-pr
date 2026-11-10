@@ -57,6 +57,10 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **The publish dialog keeps the draft body inside a phone-width column.**
+  The body is shown preformatted in the browser's own monospace, which is
+  wider than the column with some fonts. The line scrolls inside the
+  preview instead of sticking out of it.
 - **Other requests no longer wait while the server starts Git.** Before each
   Git command, the server read the repository's driver settings with a
   synchronous `git config`, so no other request was served until it

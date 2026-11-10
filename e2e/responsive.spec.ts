@@ -223,10 +223,13 @@ async function expectFits(
   {
     collapsed = false,
     drive,
+    after,
   }: {
     collapsed?: boolean;
     /** Takes the opened page to a view that needs steps (e2e/helpers/views.ts). */
     drive?: (page: Page, locale: Locale) => Promise<void>;
+    /** Extra checks on the opened page, after the fit check. */
+    after?: (page: Page) => Promise<void>;
   } = {},
 ) {
   const context = await browser.newContext({
@@ -263,6 +266,7 @@ async function expectFits(
       ),
     ];
     expect(problems, `${hash} in ${locale} at ${viewport.width} px`).toEqual([]);
+    if (after) await after(page);
   } finally {
     await context.close();
   }
@@ -381,6 +385,42 @@ test.describe("the v1.1 views on phones", () => {
         });
 });
 
+/** The publish dialog's draft body scrolls inside its own pre, and neither
+ * that block nor the page scrolls sideways. */
+async function expectPublishBodyScrolls(page: Page) {
+  const measured = await page.evaluate(() => {
+    const pageBox = document.documentElement;
+    const block = document.querySelector(".publish-outgoing");
+    const pre = document.querySelector(".publish-body-preview pre");
+    if (!(block instanceof HTMLElement) || !(pre instanceof HTMLElement))
+      return null;
+    const style = getComputedStyle(pre);
+    return {
+      page: [pageBox.scrollWidth, pageBox.clientWidth],
+      block: [block.scrollWidth, block.clientWidth],
+      pre: [pre.scrollWidth, pre.clientWidth],
+      overflowX: style.overflowX,
+      whiteSpace: style.whiteSpace,
+    };
+  });
+  expect(measured, "the publish dialog shows the draft body").not.toBeNull();
+  if (!measured) return;
+  const box = measured;
+  expect(box.page[0]).toBeLessThanOrEqual(box.page[1]);
+  expect(box.block[0]).toBeLessThanOrEqual(box.block[1]);
+  expect(box.overflowX).toBe("auto");
+  expect(box.whiteSpace).toBe("pre");
+  if (box.pre[0] > box.pre[1]) {
+    const moved = await page.locator(".publish-body-preview pre").evaluate((pre) => {
+      pre.scrollLeft = 0;
+      const before = pre.scrollLeft;
+      pre.scrollLeft = 40;
+      return pre.scrollLeft > before;
+    });
+    expect(moved).toBe(true);
+  }
+}
+
 for (const view of stateViews.filter((entry) => entry.real))
   test.describe(`${view.name} on a real run, on phones`, () => {
     let project: LaunchedServer | undefined;
@@ -393,6 +433,11 @@ for (const view of stateViews.filter((entry) => entry.real))
     for (const locale of locales)
       for (const viewport of [...phones, ...(view.wider ?? [])])
         test(`${view.name} in ${locale} fits at ${viewport.width} px`, async ({ browser }) => {
-          await expectFits(browser, project!, locale, view.route, viewport, false, { drive: view.drive });
+          await expectFits(browser, project!, locale, view.route, viewport, false, {
+            drive: view.drive,
+            ...(viewport.width === 390 && view.name === "publish-groups"
+              ? { after: expectPublishBodyScrolls }
+              : {}),
+          });
         });
   });
