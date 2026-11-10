@@ -47,6 +47,9 @@ without JavaScript, all seven commands are visible together.
   the brand copies drift from `public/`. See `docs/brand.md`.
 - **Checks.** `node site/check-site.mjs` checks links, resources, the
   no-inline-script rule, the screenshot copies and the 5 MB size budget.
+  It pairs each `zh-tw/` page with its English page and fails when a visible
+  text node is still the English one. Brand and product names may match;
+  text inside `code`, `pre` or `kbd` is not compared.
   Missing `.mp4`/`.webm` under `assets/video/` are allowed (deploy-only) and
   those extensions do not count toward the size budget.
   `node site/check-site.mjs --browser --port <port>` also loads every page in

@@ -16,7 +16,10 @@
  *   Security Policy can apply, and every page declares one;
  * - every image in assets/screenshots/ is a byte-identical copy of the one
  *   in docs/images/en/;
- * - the site's files total at most 5 MB.
+ * - the site's files total at most 5 MB;
+ * - each zh-tw page is paired with its English page. A visible text node
+ *   that is identical fails, except brand and product names (the list in
+ *   this file) and text inside code, pre or kbd.
  *
  * Browser checks (--browser), with the pages served from a static server on
  * 127.0.0.1, at 1440 x 900, 390 x 844 and 320 x 740:
@@ -77,6 +80,134 @@ function generatedRanges(html) {
 
 const ids = (html) => new Set([...html.matchAll(/\sid="([^"]+)"/g)].map((match) => match[1]));
 const listedInReadme = (value) => readme.includes(value);
+
+/**
+ * Brand, product, tool and platform names that stay in English, plus the
+ * Apache License's own name. Longest first, so "Claude Code" is removed
+ * before "Claude" and "WSL2" before "WSL".
+ *
+ * A zh-tw text node may match an English one only when removing these names
+ * leaves no letters. "macOS · Linux" passes (both words are names, the dot
+ * is not a letter). "Apache-2.0 license" does not: "license" is still there.
+ * A node that never had a letter — 中文, the slash, ›_, ↗, + — is not English.
+ */
+const keptInEnglish = [
+  "Apache License",
+  "Claude Code",
+  "Antigravity",
+  "PowerShell",
+  "Homebrew",
+  "Node.js",
+  "BELL PR",
+  "bell-pr",
+  "GitHub",
+  "OpenAI",
+  "Anthropic",
+  "Gemini",
+  "Google",
+  "Claude",
+  "Codex",
+  "Docker",
+  "Ubuntu",
+  "Debian",
+  "macOS",
+  "Linux",
+  "Windows",
+  "WSL2",
+  "WSL",
+  "npm",
+  "npx",
+  "mise",
+  "Bun",
+  "bun",
+  "curl",
+  "brew",
+  "ps1",
+  "Git",
+].sort((a, b) => b.length - a.length);
+
+const skipTextTags = new Set(["script", "style", "code", "pre", "kbd"]);
+const voidTags = new Set(["area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "source", "track", "wbr"]);
+
+function decodeEntities(text) {
+  return text
+    .replace(/&#x([0-9a-f]+);/gi, (_, hex) => String.fromCodePoint(Number.parseInt(hex, 16)))
+    .replace(/&#(\d+);/g, (_, digits) => String.fromCodePoint(Number(digits)))
+    .replace(/&nbsp;/g, " ")
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;|&#39;/g, "'")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&amp;/g, "&");
+}
+
+/** Visible text nodes, excluding code, pre and kbd. Whitespace is collapsed. */
+function visibleTextNodes(html) {
+  const nodes = [];
+  const stack = [];
+  let index = 0;
+  while (index < html.length) {
+    if (html.startsWith("<!--", index)) {
+      const end = html.indexOf("-->", index);
+      index = end === -1 ? html.length : end + 3;
+      continue;
+    }
+    if (html[index] === "<") {
+      const end = html.indexOf(">", index);
+      const raw = html.slice(index + 1, end === -1 ? html.length : end);
+      index = end === -1 ? html.length : end + 1;
+      if (raw.startsWith("/") || raw.startsWith("!") || raw.startsWith("?")) {
+        if (raw.startsWith("/")) {
+          const name = raw.slice(1).trim().split(/\s/)[0].toLowerCase();
+          for (let at = stack.length - 1; at >= 0; at -= 1) {
+            if (stack[at] === name) {
+              stack.splice(at);
+              break;
+            }
+          }
+        }
+        continue;
+      }
+      const tag = raw.split(/[\s/>]/)[0].toLowerCase();
+      if (!raw.endsWith("/") && !voidTags.has(tag)) stack.push(tag);
+      continue;
+    }
+    const end = html.indexOf("<", index);
+    const raw = html.slice(index, end === -1 ? html.length : end);
+    index = end === -1 ? html.length : end;
+    if (stack.some((tag) => skipTextTags.has(tag))) continue;
+    const text = decodeEntities(raw).replace(/\s+/g, " ").trim();
+    if (text) nodes.push(text);
+  }
+  return nodes;
+}
+
+/** True when `text` is only kept names, separators and digits. */
+function onlyKeptNames(text) {
+  let rest = text;
+  for (const name of keptInEnglish) rest = rest.split(name).join(" ");
+  return !/[A-Za-z]/.test(rest);
+}
+
+/** English copy left on a zh-tw page: the same visible text node as the English page. */
+function checkZhTw(problems) {
+  for (const file of pages()) {
+    if (!file.startsWith("zh-tw/") || !file.endsWith(".html")) continue;
+    const english = file.slice("zh-tw/".length);
+    if (!fs.existsSync(path.join(siteDir, english))) {
+      problems.push(`${file}: no English page at ${english}`);
+      continue;
+    }
+    const englishText = new Set(visibleTextNodes(fs.readFileSync(path.join(siteDir, english), "utf8")));
+    const seen = new Set();
+    for (const text of visibleTextNodes(fs.readFileSync(path.join(siteDir, file), "utf8"))) {
+      if (!englishText.has(text) || seen.has(text)) continue;
+      seen.add(text);
+      if (onlyKeptNames(text)) continue;
+      problems.push(`${file}: untranslated text "${text}"`);
+    }
+  }
+}
 
 /** Every file under site/, relative to it. */
 function siteFiles(dir = siteDir) {
@@ -166,6 +297,8 @@ function checkStatic() {
     .filter((name) => !/\.(mp4|webm)$/i.test(name))
     .reduce((total, name) => total + fs.statSync(path.join(siteDir, name)).size, 0);
   if (bytes > maxSiteBytes) problems.push(`site/: ${bytes} bytes, over the ${maxSiteBytes}-byte budget`);
+
+  checkZhTw(problems);
 
   // Stylesheets may load fonts and images through url().
   for (const css of fs.readdirSync(siteDir).filter((name) => name.endsWith(".css"))) {

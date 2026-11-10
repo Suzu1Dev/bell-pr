@@ -98,7 +98,7 @@ builds, tests and packs on Linux with Node.js 22.
 | `node scripts/check-personal-info.mjs` (and `--pack`) | No personal details (a real person's home path, tailnet host names, private keys, access tokens) in the repository or the package |
 | `npx tsx scripts/render-generated-regions.ts --check` | The generated product links are current, and `publishedInstallVersion` is a stable `MAJOR.MINOR.PATCH` (no leading zeros, prerelease, or build metadata) that is not a lower semver than the stable version in `package.json` or `Formula/bell-pr.rb`. A prerelease in either file is not compared |
 | `node scripts/npm-readme.mjs --check-docs` | Every link in the READMEs and `docs/` resolves, every error code is in the troubleshooting guide, and every hand-written `bell-pr@<version>` pin names the version in `package.json`. A pin inside a generated region, such as the mise install command, comes from `publishedInstallVersion` and is not checked here |
-| `node site/check-site.mjs` | The landing site's links and resources, and its size |
+| `node site/check-site.mjs` | The landing site's links, resources and size, and untranslated text on the zh-tw pages |
 | `node scripts/sync-installers.mjs --check` | Standalone installer identity and the published Homebrew formula |
 | `node --test scripts/install.test.mjs scripts/install-wsl.test.mjs` | Installer argument, failure and environment behavior with isolated tool fixtures |
 | `node --test scripts/install-powershell.test.mjs` | PowerShell installer behavior with WSL fixtures; needs PowerShell (Windows CI uses 5.1) |
