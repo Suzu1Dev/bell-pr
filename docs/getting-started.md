@@ -48,7 +48,7 @@ problem.
 ### With no AI provider
 
 When the AI provider is the only required check that fails, `bell-pr start`
-still listens and opens Welcome. Welcome shows how to install and sign in
+still listens. The first time, Welcome shows how to install and sign in
 to one CLI, as the same user that runs BELL PR:
 
 - Codex CLI: `npm install -g @openai/codex`, then `codex login`.

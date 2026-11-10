@@ -553,9 +553,9 @@ there, then publish again.
 
 - **"Not ready: fix the required check…"**: `bell-pr doctor` failed a
   required check other than the AI provider alone, so `bell-pr start`
-  exited before it listened. A missing provider, with every other required
-  check passing, still starts and Welcome shows how to install Codex CLI,
-  Claude Code or the Antigravity CLI. The message is the doctor's
+  exited before it listened. If only the provider check fails, start still
+  listens. The first time, Welcome shows how to install Codex CLI, Claude
+  Code or the Antigravity CLI. The message is the doctor's
   checklist: each failed check and the command that fixes it, then how to
   start anyway. `bell-pr start --force` starts and prints a warning. The
   sample tour needs no AI provider; a real agent run still waits until

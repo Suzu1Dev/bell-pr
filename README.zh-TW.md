@@ -23,7 +23,7 @@ BELL PR 是以 [Apache-2.0](LICENSE) 授權的免費開源軟體。沒有付費�
 「試用範例專案」或側欄「範例」開啟。
 
 請先走完範例審閱流程，再匯入真實專案。只有 AI 服務這項必要檢查失敗時，
-`bell-pr` 仍會開啟，歡迎畫面會說明如何安裝。其他必要檢查失敗時，請用
+`bell-pr` 仍會開啟。第一次啟動時，歡迎畫面會說明如何安裝。其他必要檢查失敗時，請用
 `bell-pr start --force` 啟動，範例導覽才能開啟。真實的 Agent 工作仍要等到
 有已登入的 AI 服務。
 
@@ -61,7 +61,7 @@ BELL PR 是本機工作台。請先裝好並登入下列工具，再跑快速開
 目前不支援原生 Windows 執行。
 
 `bell-pr doctor` 必要檢查全過後，再繼續。只有 AI 服務這項必要檢查失敗時，
-`bell-pr start` 仍會監聽，歡迎畫面會說明如何安裝。其他必要檢查失敗時，它會在
+`bell-pr start` 仍會監聽。第一次啟動時，歡迎畫面會說明如何安裝。其他必要檢查失敗時，它會在
 監聽前結束。`bell-pr start --force` 仍會啟動。真實 Agent 工作與發佈會等到有
 就緒的 AI 服務為止。
 
@@ -93,7 +93,7 @@ BELL PR 是本機工作台。請先裝好並登入下列工具，再跑快速開
 ## 安裝方式
 
 選擇一種即可。真實工作仍需要 Git、已登入的 GitHub CLI 與 AI CLI。只有 AI
-服務這項必要檢查失敗時，`bell-pr` 仍會開啟歡迎畫面，並說明如何安裝；範例導覽就在那裡。
+服務這項必要檢查失敗時，`bell-pr` 仍會啟動。第一次啟動會看到歡迎畫面，並說明如何安裝；範例導覽就在那裡。
 其他必要檢查失敗時，可用 `bell-pr start --force` 啟動。參數與 PATH 設定請見[安裝指南](docs/installation.md)（英文）。
 
 ### macOS 與 Linux
@@ -187,7 +187,7 @@ WSL 終端機執行 `bell-pr open --print --print-token`，自行開啟印出的
 
 **尚未安裝或登入任何 AI 服務時：** `bell-pr doctor` 會以非零結束代碼結束，並將
 必要的「AI 服務」檢查標為失敗。若這是唯一失敗的必要檢查，`bell-pr start`
-仍會監聽，歡迎畫面會說明如何安裝並登入其中一套：
+仍會監聽。第一次啟動時，歡迎畫面會說明如何安裝並登入其中一套：
 
 - Codex CLI：`npm install -g @openai/codex`，再執行 `codex login`。其他安裝方式請見 [Codex CLI](https://github.com/openai/codex)。
 - Claude Code：`npm install -g @anthropic-ai/claude-code`，再執行 `claude auth login`。其他安裝方式請見 [Claude Code 文件](https://code.claude.com/docs/en/overview)。

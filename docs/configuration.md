@@ -49,8 +49,8 @@ Options of `bell-pr start`:
 | `--env-file <file>` | | none |
 
 `bell-pr start` runs the same required checks as `bell-pr doctor`. When the
-AI provider is the only required check that fails, it still listens and
-Welcome shows how to install one. When any other required check fails,
+AI provider is the only required check that fails, it still listens. The
+first time, Welcome shows how to install one. When any other required check fails,
 alone or together with the provider, it exits with status 1 before it
 listens. The message is the doctor's checklist (each failed check and the
 command that fixes it) plus how to start anyway. `--force` skips that gate

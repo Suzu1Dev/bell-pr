@@ -183,9 +183,9 @@ Docker stays **beta** because the agent sandbox needs the three
 29.7) with an image built from 1.0.1:
 
 - the image builds; with `bell-pr start --force` it reports healthy within
-  seconds and prints its address (without a provider signed in, plain
-  `bell-pr start` also listens when that is the only required failure, as
-  [Run it](#run-it) says);
+  seconds and prints its address. On that 1.0.1 image, plain `bell-pr start`
+  exited when no provider was signed in. Current behavior is in
+  [Run it](#run-it);
 - git, the GitHub CLI, the Codex CLI, bubblewrap and socat are in the
   image, and `bell-pr doctor` runs in it;
 - the sandbox probe in the table above: it fails with the default options

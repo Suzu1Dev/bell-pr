@@ -58,8 +58,8 @@ and sends nothing to GitHub. Open it from Home (**Try the sample project**) or
 **Sample** in the sidebar once BELL PR is running.
 
 Use it to learn the review flow before you import a real repository. When
-the AI provider is the only required check that fails, `bell-pr` still opens
-and Welcome shows how to install one; the tour is on that screen. When
+the AI provider is the only required check that fails, `bell-pr` still opens.
+The first time, Welcome shows how to install one; the tour is on that screen. When
 another required check fails, start with `bell-pr start --force` so this
 tour can open. A real agent run still waits for a signed-in AI provider.
 
@@ -94,7 +94,7 @@ can prepare the tools there; sign in afterward. Native Windows is not supported.
 
 When `bell-pr doctor` reports every required check green, continue.
 `bell-pr start` still listens when the AI provider is the only required
-check that fails, and Welcome shows how to install one. It exits before it
+check that fails. The first time, Welcome shows how to install one. It exits before it
 listens when any other required check fails. `bell-pr start --force` starts
 anyway. Agent runs and publishing wait until a provider is ready.
 
@@ -135,8 +135,8 @@ through a whole contribution.
 
 Choose one method. Git, GitHub sign-in and an AI CLI remain prerequisites for
 real work. When no AI CLI is installed and that is the only required check
-that fails, `bell-pr` still opens Welcome, which shows how to install one;
-the sample tour is there. `bell-pr start --force` starts when another
+that fails, `bell-pr` still starts. The first time, Welcome shows how to
+install one; the sample tour is there. `bell-pr start --force` starts when another
 required check fails.
 See the [installation guide](docs/installation.md) for options and PATH setup.
 
@@ -252,8 +252,8 @@ problem. See [Before you start](#before-you-start).
 
 **With no AI provider installed or signed in:** `bell-pr doctor` exits
 non-zero and marks the required **AI provider** check failed. `bell-pr
-start` still listens when that is the only required failure, and Welcome
-shows how to install and sign in to one:
+start` still listens when that is the only required failure. The first time,
+Welcome shows how to install and sign in to one:
 
 - Codex CLI: `npm install -g @openai/codex`, then `codex login`. See the
   [Codex CLI](https://github.com/openai/codex) for other ways to install it.

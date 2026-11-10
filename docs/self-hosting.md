@@ -25,8 +25,8 @@ bell-pr
 
 `bell-pr` (also `bellpr`) starts the server and prints a line such as
 the one below when every required `bell-pr doctor` check passed, and also
-when the AI provider is the only required check that fails. Welcome then
-shows how to install one. If any other required check fails, alone or
+when the AI provider is the only required check that fails. The first time,
+Welcome shows how to install one. If any other required check fails, alone or
 together with the provider, start exits before it listens and prints each
 failed check with the command that fixes it. `bell-pr start --force`
 starts anyway and prints a warning. A real agent run is still refused

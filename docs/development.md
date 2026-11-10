@@ -69,7 +69,7 @@ npm start
 without `dist/`, the server warns that the web interface is not built and
 only the API answers. It prints its address as an installed BELL PR does.
 `bell-pr start` still listens when the AI provider is the only required
-check that fails, and Welcome shows how to install one. It exits when any
+check that fails. The first time, Welcome shows how to install one. It exits when any
 other required check fails. To open the sample tour from a checkout where
 another required check fails, run `npm start -- --force`.
 
