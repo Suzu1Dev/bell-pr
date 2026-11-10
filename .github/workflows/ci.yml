@@ -197,6 +197,11 @@ jobs:
       - name: Read the Playwright version from the lockfile
         id: playwright-version
         run: echo "version=$(node -p "require('./package-lock.json').packages['node_modules/playwright'].version")" >> "$GITHUB_OUTPUT"
+      - name: Cache apt packages for Playwright's system libraries
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/apt-archives
+          key: apt-archives-${{ runner.os }}-playwright-${{ steps.playwright-version.outputs.version }}
       - name: Cache Playwright browsers
         id: playwright-browsers
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -206,6 +211,14 @@ jobs:
       - name: Install packages, Chromium's libraries, and Chromium on a cache miss
         run: |
           version="${{ steps.playwright-version.outputs.version }}"
+          # Retry a stalled font download and reuse the packages next time.
+          mkdir -p "$HOME/.cache/apt-archives/partial"
+          sudo tee /etc/apt/apt.conf.d/99-playwright-fetch >/dev/null <<EOF
+          Dir::Cache::archives "$HOME/.cache/apt-archives";
+          Acquire::Retries "5";
+          Acquire::http::Timeout "15";
+          Acquire::https::Timeout "15";
+          EOF
           # Overlap Chromium's apt libraries with npm ci; a hit still installs them and skips the browser download.
           npx --yes "playwright@${version}" install-deps chromium &
           deps=$!
