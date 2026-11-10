@@ -177,6 +177,13 @@ jobs:
     name: End-to-end tests (shard ${{ matrix.shard }}/2)
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    # Must match the v1.64.0 tag on the image below.
+    env:
+      PLAYWRIGHT_IMAGE_VERSION: "1.64.0"
+    # uid 1001 is the runner: the workspace is writable and the job is not root.
+    container:
+      image: mcr.microsoft.com/playwright:v1.64.0-noble@sha256:bc72a8df40831ded821e3cbc79c318c21b44d6e51dff9fd89ace7a8249c5b462
+      options: --user 1001 --ipc=host
     strategy:
       fail-fast: false
       matrix:
@@ -191,50 +198,23 @@ jobs:
           cache: npm
       - name: Pin npm 11.21.1
         run: |
+          node --version
+          id
           npm install -g npm@11.21.1
           node -e "if (process.versions.node !== '24.22.1') { console.error(process.versions.node); process.exit(1); }"
           test "$(npm --version)" = "11.21.1"
+          test "$(id -u)" != "0"
       - name: Read the Playwright version from the lockfile
         id: playwright-version
         run: echo "version=$(node -p "require('./package-lock.json').packages['node_modules/playwright'].version")" >> "$GITHUB_OUTPUT"
-      - name: Cache apt packages for Playwright's system libraries
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          # Leave apt's root-owned scratch files out of the cache.
-          path: |
-            ~/.cache/apt-archives
-            !~/.cache/apt-archives/partial
-            !~/.cache/apt-archives/lock
-          key: apt-archives-${{ runner.os }}-playwright-${{ steps.playwright-version.outputs.version }}
-      - name: Cache Playwright browsers
-        id: playwright-browsers
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}-chromium
-      - name: Install packages, Chromium's libraries, and Chromium on a cache miss
+      - name: Check the image tag matches the lockfile
+        run: test "${{ steps.playwright-version.outputs.version }}" = "$PLAYWRIGHT_IMAGE_VERSION"
+      - run: npm ci
+      - name: Check the installed Playwright version
         run: |
-          version="${{ steps.playwright-version.outputs.version }}"
-          # Retry a stalled font download and reuse the packages next time.
-          mkdir -p "$HOME/.cache/apt-archives/partial"
-          # _apt must own partial/ so apt keeps its download sandbox.
-          sudo chown _apt "$HOME/.cache/apt-archives/partial"
-          sudo tee /etc/apt/apt.conf.d/99-playwright-fetch >/dev/null <<EOF
-          Dir::Cache::archives "$HOME/.cache/apt-archives";
-          Acquire::Retries "5";
-          Acquire::http::Timeout "15";
-          Acquire::https::Timeout "15";
-          EOF
-          # Overlap Chromium's apt libraries with npm ci; a hit still installs them and skips the browser download.
-          npx --yes "playwright@${version}" install-deps chromium &
-          deps=$!
-          npm ci
           installed="$(node -p "require('playwright/package.json').version")"
-          test "$installed" = "$version"
-          if [ "${{ steps.playwright-browsers.outputs.cache-hit }}" != "true" ]; then
-            npx playwright install chromium
-          fi
-          wait "$deps"
+          test "$installed" = "$PLAYWRIGHT_IMAGE_VERSION"
+          test "$installed" = "${{ steps.playwright-version.outputs.version }}"
       - name: Run the end-to-end tests (builds, then starts bell-pr on port 4599)
         env:
           BELLPR_E2E_PORT: "4599"
