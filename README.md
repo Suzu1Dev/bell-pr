@@ -613,6 +613,7 @@ Settings are used unless a variable sets them.
 | `BELLPR_HOST` | `127.0.0.1` | Address to listen on; keep loopback and reach other machines with Tailscale serve (or another private HTTPS front) plus `BELLPR_PUBLIC_URL` — not Funnel, not the public internet |
 | `BELLPR_PUBLIC_URL` | none | HTTPS origin browsers use (no path), required for Tailscale serve / remote access; without it remote Hosts get 403 |
 | `BELLPR_ALLOWED_ORIGINS` | none | Extra exact origins to accept, comma-separated |
+| `BELLPR_SUITE_LINKS` | none | Where BELL Explain and BELL Personal are (`explain=<origin>,personal=<origin>`); shows the product switcher. See [BELL Suite link](docs/bell-suite.md) |
 | `BELLPR_DATA_DIR` | `~/.bellpr` | The data directory |
 | `BELLPR_NO_OPEN` | not set | `1` never opens a browser |
 | `BELLPR_GROUP` | not set | `1` turns [group work](docs/group-work.md) on for the people who share this BELL PR (also `--group`); set up and invite with `bell-pr group setup` and `bell-pr group invite <name>` |

@@ -10,6 +10,7 @@ import { DiscoveryService } from "./discovery.js";
 import type { AgentSlots } from "./agent-slots.js";
 import { localhostGuard, parseAllowedOrigins } from "./http-guard.js";
 import type { ApiErrorBody } from "../shared/errors.js";
+import type { SuiteLinks } from "../shared/suite.js";
 import { formatters, htmlLang, parseLocale } from "../shared/i18n/locale.js";
 import { defaultStaticDir } from "./config.js";
 import { currentLocale, sm, withLocale } from "./i18n/index.js";
@@ -34,6 +35,7 @@ import { registerUnderstandingRoutes } from "./routes/understanding.js";
 import { registerContributionRoutes } from "./routes/contribution.js";
 import { registerByHandRoutes } from "./routes/by-hand.js";
 import { registerSessionRoutes } from "./routes/session.js";
+import { registerSuiteRoutes } from "./routes/suite.js";
 import { registerSudoRoutes } from "./routes/sudo.js";
 import type { PasswordlessSudo } from "./sudo.js";
 import { readApiToken } from "./api-token.js";
@@ -126,6 +128,8 @@ export interface AppOptions {
   apiTokenFile?: string;
   /** Group work's host (collab-host.ts), when BELL PR was started with --group. */
   collab?: CollabHost;
+  /** The other BELL products' origins (BELLPR_SUITE_LINKS); none by default. */
+  suiteLinks?: SuiteLinks;
 }
 
 export function createApp(workbench: Workbench, options: AppOptions = {}) {
@@ -224,6 +228,7 @@ export function createApp(workbench: Workbench, options: AppOptions = {}) {
   registerContributionRoutes(app, deps);
   registerByHandRoutes(app, deps);
   registerSessionRoutes(app, deps);
+  registerSuiteRoutes(app, deps);
   if (tokenFile && devices)
     registerPairingRoutes(app, tokenFile, {
       devices,

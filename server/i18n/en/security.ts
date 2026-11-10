@@ -32,6 +32,8 @@ export default {
   /** BELLPR_ALLOWED_ORIGINS (or an origin given to the request guard) is not valid. */
   invalidOrigins:
     "BELLPR_ALLOWED_ORIGINS must contain comma-separated origins without credentials, paths, queries, fragments, or wildcards; plain HTTP is accepted only for loopback addresses.",
+  /** BELLPR_SUITE_LINKS is not valid. Never quotes the value: it may hold a private host name. */
+  suiteLinksInvalid: `BELLPR_SUITE_LINKS must list explain=<origin> or personal=<origin>, separated by commas, each product once. An origin has no credentials, path (not even a trailing /), query, fragment, wildcard or port 0. It is on this computer (localhost, 127.x.x.x or [::1]) or an https *.ts.net name in the same tailnet as BELLPR_PUBLIC_URL or BELLPR_ALLOWED_ORIGINS, and never this ${product.name}'s own address.`,
   /** A repository whose own Git configuration could run commands (409). */
   gitConfigUnsafe: ({ keys }: { keys: string[] }) =>
     `This repository's Git configuration sets ${list(keys)}, which can make Git run other programs or send credentials elsewhere. ${product.name} does not run Git in it. Remove these settings from its .git/config, or import the project again.`,

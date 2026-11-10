@@ -13,6 +13,8 @@ import { parseActiveRunLimit, parseAgentProcessLimit } from "./agent-slots.js";
 import { parseAgentTimeoutScale } from "./agent-timeouts.js";
 import { parseAllowedOrigins } from "./http-guard.js";
 import { sm } from "./i18n/index.js";
+import { parseSuiteLinks } from "./suite-contract.js";
+import type { SuiteLinks } from "../shared/suite.js";
 
 /** Command-line flags of `bell-pr start`; every field is optional. */
 export interface StartFlags {
@@ -53,6 +55,8 @@ export interface Config {
   staticDir: string;
   /** BELLPR_ALLOWED_ORIGINS plus the BELLPR_PUBLIC_URL origin. */
   allowedOrigins: string[];
+  /** BELLPR_SUITE_LINKS: the other BELL products' origins; empty when unset. */
+  suiteLinks: SuiteLinks;
   /** --dev or BELLPR_DEV=1: the dev server port is trusted. */
   dev: boolean;
   /** The Vite dev server port (BELLPR_FRONTEND_PORT, 4310); only in dev. */
@@ -285,6 +289,13 @@ export function resolveConfig(
       ),
     ),
   ];
+  const suiteLinks = parsed(() =>
+    parseSuiteLinks(
+      env.BELLPR_SUITE_LINKS,
+      allowedOrigins,
+      frontendPort === undefined ? [port] : [port, frontendPort],
+    ),
+  );
   const limits: Limits = {
     maxAgentProcesses: parsed(() =>
       parseAgentProcessLimit(env.BELLPR_MAX_AGENT_PROCESSES),
@@ -311,6 +322,7 @@ export function resolveConfig(
     dataDir,
     staticDir,
     allowedOrigins,
+    suiteLinks,
     dev,
     ...(frontendPort !== undefined ? { frontendPort } : {}),
     open:

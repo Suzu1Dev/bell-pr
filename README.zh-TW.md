@@ -331,6 +331,7 @@ BELL PR 不需要任何設定就能啟動。下列設定都是啟動時讀取的
 | `BELLPR_HOST` | `127.0.0.1` | 監聽位址；請維持本機回環，遠端請用 Tailscale serve（或其他私人 HTTPS 前端）加上 `BELLPR_PUBLIC_URL`，不要用 Funnel，也不要暴露到公網 |
 | `BELLPR_PUBLIC_URL` | 無 | 瀏覽器使用的 HTTPS 來源（不含路徑）；Tailscale serve／遠端連線必填，未設則遠端 Host 會得到 403 |
 | `BELLPR_ALLOWED_ORIGINS` | 無 | 額外接受的精確 origin，以逗號分隔 |
+| `BELLPR_SUITE_LINKS` | 無 | BELL Explain 與 BELL Personal 的位址（`explain=<origin>,personal=<origin>`）；設定後會顯示產品切換按鈕。見 [BELL Suite 連結說明](docs/bell-suite.md) |
 | `BELLPR_DATA_DIR` | `~/.bellpr` | 資料目錄 |
 | `BELLPR_NO_OPEN` | 未設定 | `1` 表示絕不開啟瀏覽器 |
 | `BELLPR_GROUP` | 未設定 | `1` 為共用這個 BELL PR 的人開啟[小組協作](docs/group-work.md)（也可用 `--group`）；用 `bell-pr group setup` 設定，用 `bell-pr group invite <名稱>` 邀請 |

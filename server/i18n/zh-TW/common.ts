@@ -16,5 +16,22 @@ const m: Translation<typeof en> = {
   jsonRequired: "變更操作必須使用 application/json。",
   apiTokenRequired: `這個請求需要這份 ${product.name} 的 API 權杖。請在這台電腦執行 \`${bin} open\` 開啟帶有權杖的頁面，或以 Authorization: Bearer <token> 或 X-Bell-Token 標頭送出。`,
   unsupportedProvider: "不支援這個 Agent 類型。",
+  suite: {
+    summary: "貢獻與審查",
+    untitled: "未命名的工作",
+    detail: {
+      followUpRunning: "後續修改進行中",
+      followUpReady: "後續修改等你處理",
+      byHandPlan: "輪到你：寫下計畫",
+      planReady: "計畫等你確認",
+      byHandChange: "輪到你：動手修改",
+      review: "等你審查",
+      publishing: "送出中",
+      approved: "已確認，尚未送出",
+      failed: "執行失敗",
+      queued: "等待執行",
+      running: "進行中",
+    },
+  },
 };
 export default m;

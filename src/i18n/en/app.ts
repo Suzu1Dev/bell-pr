@@ -141,6 +141,17 @@ const app = {
     switchProjectHint: "Switch project",
     closeHint: "Close",
   },
+  /** The switcher between BELL products; it shows once BELLPR_SUITE_LINKS names one. */
+  suite: {
+    open: "Switch BELL product",
+    title: "BELL products",
+    personal: { name: "BELL Personal", summary: "Today and inbox" },
+    explain: { name: "BELL Explain", summary: "Understanding and review" },
+    /** What this product is for; its name comes from shared/product.ts. */
+    prSummary: "Contributions and review",
+    current: "Current",
+    notLinked: "Not linked",
+  },
 };
 
 export default app;
