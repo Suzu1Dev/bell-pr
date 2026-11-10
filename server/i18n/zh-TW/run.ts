@@ -457,7 +457,7 @@ const m: Translation<typeof en> = {
     holdsUnknown: ({ name }) =>
       `小組協作已停止，無法確認檔案佔用狀態。發佈前請先在主機修復小組協作並重新啟動 ${name}。`,
     turnHeldByOther: ({ items }) =>
-      `Agent 改到別人佔用的檔案，所以這項工作已停止。改動仍留在工作目錄裡。${items.join("；")}。請對方釋出、請小組管理員收回佔用，或把這些檔案的改動復原，再試一次。`,
+      `Agent 改到別人佔用的檔案，所以這項工作已停止。改動仍留在工作目錄裡。${items.join("；")}。請對方釋出、請小組管理員收回佔用，或把這些檔案的改動還原，再試一次。`,
     taskHeldByOther: ({ items }) =>
       `隊友改到別人佔用的檔案，所以這些改動沒有加入這份貢獻。${items.join("；")}。請對方釋出，或請小組管理員收回佔用，再試一次。`,
     planHeldByOther: ({ items }) =>

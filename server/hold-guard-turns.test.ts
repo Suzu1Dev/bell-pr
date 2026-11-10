@@ -306,7 +306,7 @@ test("a teammate's change to a file Ada took a hold on while it worked is not ad
   const run = s.run(id);
   assert.match(
     run.error ?? "",
-    /^A teammate changed files someone else holds, so those changes were not added to the contribution\. src\/api\/users\.ts — held by Ada for “Users API” \(since .+\)\. Ask them to release the hold or a group admin to revoke it, then try again\.$/,
+    /^A teammate changed files someone else holds, so those changes were not added to the contribution\. src\/api\/users\.ts — held by Ada for “Users API” \(since .+\)\. Ask them to release the hold, or ask a group admin to revoke it, then try again\.$/,
   );
   assert.equal(run.team?.tasks[0].status, "failed");
   assert.deepEqual(await readDiff(run), []);
@@ -343,7 +343,7 @@ test("a write turn is told the held paths without names or titles, goes on when 
   assert.equal(stopped.failed, true);
   assert.match(
     stopped.content,
-    /^The agent changed files someone else holds, so the run stopped\. The changes are still in the checkout\. src\/api\/users\.ts — held by Ada for “Secret plan” \(since .+\)\. /,
+    /^The agent changed files someone else holds, so the run stopped\. The changes are still in the checkout\. src\/api\/users\.ts — held by Ada for “Secret plan” \(since .+\)\. Ask them to release the hold, ask a group admin to revoke it, or undo the changes to these files, then try again\./,
   );
   // Nothing is undone: the file stays as the agent left it.
   assert.equal(await s.read("src/api/users.ts"), "export const users = ['ben'];\n");

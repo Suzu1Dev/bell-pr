@@ -743,10 +743,10 @@ export default {
       `Can't check file holds because group work has stopped. Fix group work on the host and restart ${name} before publishing.`,
     /** An agent's write turn changed files someone else holds. */
     turnHeldByOther: ({ items }: { items: readonly string[] }) =>
-      `The agent changed files someone else holds, so the run stopped. The changes are still in the checkout. ${items.join("; ")}. Ask them to release the hold or a group admin to revoke it, or undo the changes to these files, then try again.`,
+      `The agent changed files someone else holds, so the run stopped. The changes are still in the checkout. ${items.join("; ")}. Ask them to release the hold, ask a group admin to revoke it, or undo the changes to these files, then try again.`,
     /** A teammate's changes meet someone else's hold, so they were not brought into the contribution. */
     taskHeldByOther: ({ items }: { items: readonly string[] }) =>
-      `A teammate changed files someone else holds, so those changes were not added to the contribution. ${items.join("; ")}. Ask them to release the hold or a group admin to revoke it, then try again.`,
+      `A teammate changed files someone else holds, so those changes were not added to the contribution. ${items.join("; ")}. Ask them to release the hold, or ask a group admin to revoke it, then try again.`,
     planHeldByOther: ({ items }: { items: readonly string[] }) =>
       `This plan covers files someone else holds, so it can't be approved. ${items.join("; ")}. Send the plan back with feedback, or wait until the hold is released.`,
     autoHeld:
