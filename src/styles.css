@@ -1438,6 +1438,26 @@ button {
 }
 .origin-ignored .copy-command {
   min-width: 0;
+  max-width: 100%;
+}
+@media (min-width: 761px) {
+  .origin-ignored {
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+  .origin-ignored > p,
+  .origin-ignored .copy-command {
+    flex: 1 1 auto;
+    min-width: 0;
+    max-width: 100%;
+  }
+  .origin-ignored .copy-command-row {
+    align-items: center;
+  }
+  .origin-ignored .copy-command-row code {
+    white-space: nowrap;
+    overflow-x: auto;
+  }
 }
 .draft-layout {
   display: grid;
