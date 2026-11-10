@@ -977,9 +977,11 @@ export class Coordinator {
    * Git in the project's repository, which must be a bare one. Replace
    * refs, which anyone who can push may add, are never followed, nor is a
    * graft file (info/grafts, which takes write access to the repository
-   * directory): every check and the branch update see the commits and
-   * parents as they are. The git dir goes in one argument, so process.ts
-   * still finds the command's name.
+   * directory). Nor is a commit-graph read, one file or a split chain:
+   * Git takes the parents and trees of the commits it walks to from it, and
+   * the same access can write one. Every check and the branch update see
+   * the commits and parents as they are. The git dir goes in one argument,
+   * so process.ts still finds the command's name.
    */
   async #git(repository: string, args: string[], options: Parameters<typeof git>[2] = {}) {
     return await git(
@@ -988,6 +990,8 @@ export class Coordinator {
         "--no-replace-objects",
         "-c",
         "advice.graftFileDeprecated=false",
+        "-c",
+        "core.commitGraph=false",
         `--git-dir=${repository}`,
         ...args,
       ],

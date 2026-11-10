@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { after, describe, test } from "node:test";
-import { makeRepo, type TestRepo } from "../test/coordination-fixtures.js";
+import { forgeCommitGraph, makeRepo, writeCommitGraph, type TestRepo } from "../test/coordination-fixtures.js";
 import { dataPaths } from "./config.js";
 import {
   changedFiles,
@@ -1059,6 +1059,70 @@ describe("integration", () => {
     assert.equal(await w.repo.head(), inside);
     assert.deepEqual(held(w).map((claim) => claim.id), [bobs.id]);
   });
+
+  for (const layout of ["single", "split"] as const)
+    test(`a commit-graph in the repository (${layout === "single" ? "one file" : "a split chain"}) never decides what a change's history is`, async () => {
+      const w = await world();
+      const mine = await claimed(w, w.alice, "lib", ["lib"]);
+      const bobs = await claimed(w, w.bob, "bob", ["src/a.ts"]);
+      const { base, bare } = w.repo;
+      // The repository's own config asks for the graph.
+      await git(bare, ["config", "core.commitGraph", "true"]);
+      const plain = (args: string[], input?: string) =>
+        git(bare, ["--no-replace-objects", ...args], { allowedCodes: [0, 1], input });
+      const forge = async (commit: string, change: { parents?: string[]; tree?: string }) => {
+        await writeCommitGraph(bare, layout);
+        await forgeCommitGraph(bare, layout, commit, change);
+      };
+      const integrate = async (claim: ClaimView, from: string, commit: string) => {
+        const before = { file: await w.onDisk(), head: await w.repo.head() };
+        const error = await w.coordinator
+          .integrate(w.alice, "app", claim.id, { fence: claim.fence, base: from, commit })
+          .then(() => assert.fail("integrated"), (thrown: AppError) => thrown);
+        assert.deepEqual({ file: await w.onDisk(), head: await w.repo.head() }, before);
+        return { status: error.statusCode, reason: error.details?.reason, path: error.details?.path };
+      };
+      // Git reads a commit named on its command line from the object, and
+      // the commits it walks to from the graph: each forgery sits below a tip.
+      // A change to bob's file in a middle commit, undone by the next one.
+      const middle = await w.repo.commit(base, { "src/a.ts": "alice\n" });
+      const undo = await w.repo.commit(middle, { "lib/c.ts": "1\n", "src/a.ts": "a\n" });
+      const hidden = await w.repo.commit(undo, { "lib/c.ts": "2\n" });
+      await forge(undo, { parents: [base] });
+      assert.ok(!(await plain(["rev-list", `${base}..${hidden}`])).stdout.includes(middle));
+      assert.deepEqual(await integrate(mine, base, hidden), { status: 403, reason: "outOfScope", path: "src/a.ts" });
+      // A merge that keeps lib's files but brings a secret and bob's file into the history.
+      const side = await w.repo.commit(base, { "src/.env": "TOKEN=not-real\n", "src/a.ts": "side\n" });
+      const lib = await w.repo.commit(base, { "lib/c.ts": "3\n" });
+      const merge = await w.repo.merge(lib, side, "ours");
+      const merged = await w.repo.commit(merge, { "lib/c.ts": "4\n" });
+      await forge(merge, { parents: [lib] });
+      assert.equal((await plain(["rev-list", "--merges", "--count", `${base}..${merged}`])).stdout.trim(), "0");
+      assert.deepEqual(await integrate(mine, base, merged), { status: 409, reason: "mergeCommit", path: undefined });
+      // One commit changing bob's file, against a base shown with that change already in its files.
+      const outside = await w.repo.commit(base, { "src/a.ts": "alice\n", "lib/c.ts": "5\n" });
+      const already = await w.repo.commit(base, { "src/a.ts": "alice\n" });
+      await forge(base, { tree: (await git(bare, ["rev-parse", `${already}^{tree}`])).stdout.trim() });
+      const listed = await plain(["diff-tree", "--stdin", "-r", "--name-only"], `${outside} ${base}\n`);
+      assert.ok(!listed.stdout.includes("src/a.ts"));
+      assert.deepEqual(await integrate(mine, base, outside), { status: 403, reason: "outOfScope", path: "src/a.ts" });
+
+      // With a graph Git wrote, a change as it is integrates.
+      const first = await w.repo.commit(base, { "lib/c.ts": "6\n" });
+      await writeCommitGraph(bare, layout);
+      await w.coordinator.integrate(w.alice, "app", mine.id, { fence: mine.fence, base, commit: first });
+      assert.equal(await w.repo.head(), first);
+      // A commit beside the branch, shown as one on top of it: the branch would lose a commit.
+      const next = await claimed(w, w.alice, "lib-2", ["lib"]);
+      const beside = await w.repo.commit(await w.repo.commit(base, { "lib/c.ts": "7\n" }), { "lib/c.ts": "8\n" });
+      const above = await w.repo.commit(beside, { "lib/c.ts": "9\n" });
+      await forge(beside, { parents: [first] });
+      assert.equal((await plain(["merge-base", "--is-ancestor", first, above])).code, 0);
+      assert.deepEqual(await integrate(next, first, above), { status: 409, reason: "notFastForward", path: undefined });
+
+      assert.equal(await w.repo.head(), first);
+      assert.deepEqual(held(w).map((claim) => claim.id), [bobs.id, next.id]);
+    });
 
   test("refuses secrets, links, submodules and names it cannot read exactly, in any commit, before the branch moves", async () => {
     const w = await world();

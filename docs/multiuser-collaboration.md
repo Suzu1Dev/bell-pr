@@ -88,9 +88,11 @@ with the group-mode overlap check.
   - a symbolic link (`symlink`) or a submodule (`submodule`);
   - any other file mode (`mode`).
 
-  Every Git command coordination runs passes `--no-replace-objects`, so
-  replace refs pushed into the repository cannot change what a commit,
-  its parents or its files are.
+  Every Git command coordination runs passes `--no-replace-objects` and
+  `-c core.commitGraph=false`, so neither replace refs pushed into the
+  repository nor a commit-graph file can change what a commit, its parents
+  or its files are, even where the repository's config turns the
+  commit-graph on.
 
   It saves its intent, moves the branch with `git update-ref <ref> <new>
   <old>` (a compare-and-swap), and then saves the outcome. A stale base is
@@ -239,15 +241,25 @@ with the group-mode overlap check.
 - **Settlements are kept as a window, not a permanent audit log.** Each
   project keeps its latest 10; the next one drops the oldest, so settling
   is never refused for room.
-- **Commit-graph files are still read.** Every coordination Git command
-  ignores replace refs (`--no-replace-objects`) and graft files
-  (`GIT_GRAFT_FILE` set to the null device, so `info/grafts` is never
-  read), and every check sees each commit's own parents. Writing a graft
-  file takes write access to the repository's own directory, which a push
-  does not give; the same access could write a commit-graph file
-  (`objects/info/commit-graph`), which Git still reads. Whether a forged one
-  changes what the checks see has not been tested. A shallow history shows
-  a commit without its parent, which is refused.
+- **The repository's files on the coordinator host are trusted.** They
+  are assumed to be controlled only by whoever runs that host. Every
+  coordination Git command ignores replace refs (`--no-replace-objects`),
+  graft files (`GIT_GRAFT_FILE` set to the null device, so `info/grafts`
+  is never read) and commit-graph files (`-c core.commitGraph=false`,
+  which the repository's config cannot turn back on), and every check
+  sees each commit's own parents. A shallow history shows a commit without
+  its parent, which is refused. In the tests, a commit-graph Git wrote and
+  that was then edited, as one file (`objects/info/commit-graph`) or a
+  split chain of one layer (`objects/info/commit-graphs/`), to hide a
+  commit outside the claim, a merge's second parent or a non-fast-forward,
+  or to give the base another tree, is refused with the branch, the claims
+  and the file left as they were; a chain of several layers is not
+  tested. Writing these files takes write access to the repository's own
+  directory, which a push does not give. Nothing here protects against a
+  process that can change files there directly, such as object files,
+  packs or `objects/info/alternates`, and what such changes do to the
+  checks has not been tested. Mounting coordination in the product has to
+  keep that directory out of reach of everyone but the host.
 - **Names shown inexactly.** Scopes are printable ASCII and a path's ASCII
   parts decide every rule, so decisions are exact. A name that is not
   UTF-8, or a multibyte name split between two reads of Git's output, can
@@ -319,8 +331,8 @@ with the group-mode overlap check.
        Today nothing outside the tests calls either, and an ordinary
        start's lock is refused.
      - Tests cover the window between the last lock check and
-       `update-ref`, a forged commit-graph file, and a lock written in a
-       real other PID namespace, not only a simulated one.
+       `update-ref`, and a lock written in a real other PID namespace, not
+       only a simulated one.
      - Large files are handled: on one Linux machine a write took about
        0.3 seconds at 8 MiB and an integration about 0.6, and near the
        reader's 32 MiB about 1.1 and 2.4 seconds with about 900 MB of
@@ -364,8 +376,9 @@ directories and repositories, and cover:
   kept free, within the byte limit; and both kept across restarts;
 - each limit refusing the next addition without changing anything, while
   held claims still end, integrate and recover, and the file reopens;
-- replace refs, graft files and shallow lists that would hide a file, a
-  merge or a non-fast-forward;
+- replace refs, graft files, shallow lists and commit-graph files (one
+  file or a split chain of one layer, even with the repository's config
+  turning them on) that would hide a file, a merge or a non-fast-forward;
 - a paused host keeping its lock however old it looks, against starts in
   its own and in another (simulated) PID namespace, and giving it up when
   closed;

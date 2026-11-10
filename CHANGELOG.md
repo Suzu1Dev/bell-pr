@@ -31,6 +31,14 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   failed write or an integration it cannot account for still stops every
   project until it opens again. Nothing in the app, the CLI or any
   listener reaches it yet.
+- **Coordination never reads a commit-graph file, in the core only.** Git
+  takes the parents and trees of the commits it walks to from that file,
+  so one edited by someone with write access to the repository's directory
+  could hide a file outside the claim, a merge or a non-fast-forward
+  from the checks. Every coordination Git command now turns it off, even
+  where the repository's config turns it on. Other files in that
+  directory, such as object files, packs and alternates, are still trusted,
+  and nothing in the app, the CLI or any listener reaches the core yet.
 
 ### Changed
 
