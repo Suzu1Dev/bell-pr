@@ -321,8 +321,8 @@ async function start(args: string[], ctx: Context): Promise<number | undefined> 
   };
   if (await reuseRunning()) return 0;
   // Before anything listens: the same required checks as `bell-pr doctor`.
-  // The provider check alone still opens Welcome. --force starts when
-  // another required check failed.
+  // The provider check alone still lets this start listen, the first time
+  // and every later start. --force starts when another required check failed.
   if (values.force) {
     ctx.stderr.write(`${sm().cli.start.forced}\n`);
   } else {

@@ -1862,6 +1862,34 @@ test("a first start listens when the only required failure is the provider", asy
   }
 });
 
+test("a second start also listens when the only required failure is the provider", async () => {
+  const box = await sandbox();
+  const listen = async () => {
+    const port = await freePort();
+    const server = launch(
+      cliEntry,
+      ["start", "--port", String(port), "--data-dir", box.data],
+      box.env,
+    );
+    try {
+      await started(server);
+      assert.match(server.stdout(), new RegExp(`→ http://127\\.0\\.0\\.1:${port}`));
+      assert.doesNotMatch(server.stderr(), /did not start/);
+      assert.equal((await get(`http://127.0.0.1:${port}/`)).status, 200);
+      assert.equal((await stop(server)).code, 0, server.stderr());
+    } finally {
+      if (server.child.exitCode === null && server.child.signalCode === null) await stop(server);
+    }
+  };
+  try {
+    await listen();
+    assert.equal(existsSync(box.data), true);
+    await listen();
+  } finally {
+    await box.cleanup();
+  }
+});
+
 test("a start exits 1 when another required check fails, alone or with the provider", async () => {
   const box = await sandbox();
   const bin = path.join(box.directory, "bin");

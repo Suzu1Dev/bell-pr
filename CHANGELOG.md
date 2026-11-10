@@ -74,9 +74,9 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
-- **A first start with no provider CLI still opens Welcome.** Whenever the
-  provider is the only required check that fails, `bell-pr start` listens.
-  The first time, Welcome shows how to install Codex CLI, Claude Code or the
+- **Start still listens when the provider is the only required check that
+  fails,** on the first start and on every later one. The first time,
+  Welcome shows how to install Codex CLI, Claude Code or the
   Antigravity CLI, with the same commands and documentation links as the
   guides. Any other required check, alone or together with the provider,
   still prints the checklist and exits 1. `bell-pr doctor` still exits 1
