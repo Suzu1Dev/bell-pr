@@ -650,9 +650,9 @@ files.
 Only with [group work](group-work.md). A request that would add to the
 group's record is answered 409 with `reason: "full"` and "The group's
 record is full. Ask the host to reset group storage.": taking a hold,
-taking a task again, joining, and adding a repository. It is the same for
-everyone, and a restart does not change it. Holds can still be released
-and revoked, and the boards can still be read.
+joining, and adding a repository. It is the same for everyone, and a
+restart does not change it. Holds can still be released and revoked, and
+the boards can still be read.
 
 First find out which limit it is ([Limits](group-work.md#limits) lists
 them). A group admin reads `storage` in the answer of
@@ -706,7 +706,10 @@ was changed by the refused request.
   person already has 2 requests waiting, or the group has 64. Close a
   page, or stop a script that follows the feed. Until then, the same
   request with `wait=0` is still answered, so a board can be read by asking
-  again every few seconds.
+  again every few seconds. The same answer, with `wait=0` too, goes to a
+  person whose connections have left 8 feed answers unread: a script that
+  sends requests and does not read the answers. It ends when the answers
+  are read or those connections close.
 
 ## Runs that wait, stop or cannot be reviewed
 

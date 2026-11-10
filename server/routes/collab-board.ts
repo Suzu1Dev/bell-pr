@@ -39,7 +39,10 @@ export const checkLimit = { max: 120, windowMs: 60_000 };
 /** Per person: feed answers BELL PR still keeps because their connections have not taken them. */
 export const maxUntaken = 8;
 
-/** One line of text: a control or bidirectional-override character becomes a space. */
+/**
+ * One line of text: a control character, or one that embeds, overrides or
+ * isolates the direction of text, becomes a space. Direction marks stay.
+ */
 const line = z
   .string()
   .transform((text) => text.replace(/[\p{Cc}\u202a-\u202e\u2066-\u2069]/gu, " ").trim());
