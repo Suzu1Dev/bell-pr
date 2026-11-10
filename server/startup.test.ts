@@ -21,6 +21,7 @@ import { request } from "node:http";
 import { createServer, type AddressInfo } from "node:net";
 import { tmpdir, uptime } from "node:os";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 import { baseUrl, resolveConfig, ConfigError, defaultStaticDir } from "./config.js";
 import { createApp } from "./app.js";
 import { version } from "./build-info.js";
@@ -982,6 +983,94 @@ test("under the strict rule a takeover claim stays however old it is, and the re
     }
   } finally {
     claimer.kill("SIGKILL");
+    await box.cleanup();
+  }
+});
+
+/** Waits until a start is halted at `hook` (test/lock-stall.mjs), or fails with its output. */
+async function halted(launched: Launched, hook: string, timeoutMs = 30_000) {
+  const deadline = Date.now() + timeoutMs;
+  while (!existsSync(`${hook}.reached`)) {
+    if (launched.child.exitCode !== null || Date.now() > deadline)
+      assert.fail(
+        `The start was not halted.\nstdout: ${launched.stdout()}\nstderr: ${launched.stderr()}`,
+      );
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+}
+
+test("a start held up while it writes its takeover claim in place removes neither the lock nor the claim of the start that cleared it", async () => {
+  const box = await sandbox();
+  const preload = pathToFileURL(path.join(repoRoot, "test", "lock-stall.mjs")).href;
+  // A real start that test/lock-stall.mjs halts once, until `<hook>.go` is there.
+  const launchHalting = async (hook: string, where: NodeJS.ProcessEnv) =>
+    launch(
+      cliEntry,
+      ["start", "--force", "--port", String(await freePort()), "--data-dir", box.data],
+      {
+        ...box.env,
+        NODE_OPTIONS: `${box.env.NODE_OPTIONS ?? ""} --import=${preload}`,
+        LOCK_TEST_HOOK: hook,
+        ...where,
+      },
+    );
+  const launched: Launched[] = [];
+  try {
+    mkdirSync(box.data, { recursive: true });
+    const file = path.join(box.data, "bellpr.lock");
+    const probe = await acquireWriterLock(box.data);
+    const here = { ...JSON.parse(readFileSync(file, "utf8")), strict: undefined };
+    probe.release();
+    const stale = JSON.stringify({ ...here, pid: await gonePid() });
+    writeFileSync(file, stale);
+    const claim = claimFile(file, stale);
+    const claims = "\\.takeover-[0-9a-f]{16}$";
+    // Hard links fail for its claim: the first start creates the claim in place
+    // and is held up before it writes it. The claim lies empty for over a lease.
+    const firstHook = path.join(box.directory, "first");
+    const first = await launchHalting(firstHook, {
+      LOCK_TEST_NO_LINK: claims,
+      LOCK_TEST_STALL_WRITE: claims,
+    });
+    launched.push(first);
+    await halted(first, firstHook);
+    assert.equal(statSync(claim).size, 0);
+    const lapsed = new Date(Date.now() - 31_000);
+    utimesSync(claim, lapsed, lapsed);
+    // The second clears the empty claim, writes its own and is held up just
+    // before it removes the stale lock.
+    const secondHook = path.join(box.directory, "second");
+    const second = await launchHalting(secondHook, { LOCK_TEST_STALL_REMOVE: "bellpr\\.lock$" });
+    launched.push(second);
+    await halted(second, secondHook);
+    const claimer = () => JSON.parse(readFileSync(claim, "utf8")).pid;
+    assert.equal(claimer(), second.child.pid);
+    // The first goes on. Its text went into the file it created, which the
+    // claim path no longer leads to: the claim there is the second's, and it
+    // may remove neither that claim nor the lock, or two starts would get the
+    // lock, and coordination would lose one it took in between.
+    writeFileSync(`${firstHook}.go`, "");
+    const ended = await Promise.race([
+      first.exited.then(({ code }) => code),
+      started(first).then(() => "started"),
+    ]);
+    assert.equal(ended, 1, first.stdout() + first.stderr());
+    assert.ok(first.stderr().includes(claim), first.stderr());
+    assert.equal(readFileSync(file, "utf8"), stale);
+    assert.equal(claimer(), second.child.pid);
+    // Coordination that starts now finds the lock claimed, not free to take.
+    const message = await refusedWith(lockStarts(box).strict);
+    assert.ok(message.includes(claim), message);
+    assert.equal(readFileSync(file, "utf8"), stale);
+    // The second goes on, and is the one start that has the data directory.
+    writeFileSync(`${secondHook}.go`, "");
+    await started(second);
+    assert.equal(JSON.parse(readFileSync(file, "utf8")).pid, second.child.pid);
+    assert.deepEqual(lockLitter(box.data), []);
+  } finally {
+    // A halted start handles no signal.
+    for (const { child } of launched) child.kill("SIGKILL");
+    await Promise.all(launched.map(({ exited }) => exited));
     await box.cleanup();
   }
 });

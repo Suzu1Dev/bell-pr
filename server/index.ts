@@ -333,7 +333,9 @@ export async function acquireWriterLock(dataDir: string): Promise<WriterLock> {
  * Creates `file` with `text` unless it exists, whole or not at all: the
  * text is written aside and linked into place, so no start ever reads a
  * lock half written. Without hard links only a start that is not strict
- * goes on, writing the file in place as before.
+ * goes on, writing the file in place as before. There the file lies empty
+ * until its text is written, and another start may remove an empty file:
+ * false also when the path does not read `text` after the write.
  */
 function createExclusive(file: string, text: string, strict: boolean): boolean {
   const temp = `${file}.new-${process.pid}-${randomBytes(4).toString("hex")}`;
@@ -354,7 +356,9 @@ function createExclusive(file: string, text: string, strict: boolean): boolean {
     } finally {
       closeSync(fd);
     }
-    return true;
+    // Removed while it was still empty, the file took the text where no
+    // path leads: what the path reads now shows whether this start has it.
+    return readLockText(file) === text;
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "EEXIST") return false;
     throw error;
@@ -367,10 +371,13 @@ function createExclusive(file: string, text: string, strict: boolean): boolean {
  * that start is shown to have stopped, however old it is: a claimer
  * suspended between its last check and its removal would remove the lock a
  * later start took, a strict one too. One that names no start (empty, or
- * not a claim) was left before any check, and a takeover lasts
+ * not a claim) shows no start to wait for, and a takeover lasts
  * milliseconds: outside the strict rule, the contender's or the stale
  * lock's (`strict`), it is abandoned once it was last modified longer ago
- * than the lease. A date in the future, as after the clock was stepped
+ * than the lease. Its writer may still run, held up between creating the
+ * claim in place and writing it: it made no check yet, and once the claim
+ * is removed its write shows it that the claim is not its own
+ * (createExclusive). A date in the future, as after the clock was stepped
  * back, shows no age: that claim counts as new.
  */
 function claimHeld(text: string, claim: string, strict: boolean) {
