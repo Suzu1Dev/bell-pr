@@ -134,9 +134,10 @@ through a whole contribution.
 ## Installation options
 
 Choose one method. Git, GitHub sign-in and an AI CLI remain prerequisites for
-real work. With no AI CLI, `bell-pr` still opens Welcome, which shows how to
-install one; the sample tour is there. `bell-pr start --force` starts when
-another required check fails.
+real work. When no AI CLI is installed and that is the only required check
+that fails, `bell-pr` still opens Welcome, which shows how to install one;
+the sample tour is there. `bell-pr start --force` starts when another
+required check fails.
 See the [installation guide](docs/installation.md) for options and PATH setup.
 
 ### macOS and Linux

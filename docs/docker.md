@@ -38,10 +38,10 @@ docker run -d --name bell-pr \
 ```
 
 - The image's command is `bell-pr start`. With no Codex or Claude Code
-  sign-in yet, and no other required check failing, it still listens and
-  Welcome shows how to install one. If another required check fails, the
-  process exits before it listens and prints each failed check with its
-  fix command. Sign in as below, or open the sample tour with
+  sign-in yet, and no other required check failing, it still listens. The
+  first time, Welcome shows how to install one. If another required check
+  fails, the process exits before it listens and prints each failed check
+  with its fix command. Sign in as below, or start anyway with
   `docker run ... bell-pr start --force` (that replaces the image command).
   A real agent run is still refused until a provider is signed in.
 - `-p 127.0.0.1:4311:4311` publishes BELL PR on this computer only. The

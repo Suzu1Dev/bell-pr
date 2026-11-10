@@ -92,8 +92,8 @@ BELL PR 是本機工作台。請先裝好並登入下列工具，再跑快速開
 
 ## 安裝方式
 
-選擇一種即可。真實工作仍需要 Git、已登入的 GitHub CLI 與 AI CLI。尚未安裝
-AI CLI 時，`bell-pr` 仍會開啟歡迎畫面，並說明如何安裝；範例導覽就在那裡。
+選擇一種即可。真實工作仍需要 Git、已登入的 GitHub CLI 與 AI CLI。只有 AI
+服務這項必要檢查失敗時，`bell-pr` 仍會開啟歡迎畫面，並說明如何安裝；範例導覽就在那裡。
 其他必要檢查失敗時，可用 `bell-pr start --force` 啟動。參數與 PATH 設定請見[安裝指南](docs/installation.md)（英文）。
 
 ### macOS 與 Linux
