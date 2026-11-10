@@ -656,9 +656,7 @@
 :is(.draft-guidance-panel, .draft-editor) .markdown-content pre code {
   background: none;
   padding: 0;
-  /* Wrap a line the phone column cannot hold. */
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
+  white-space: pre;
 }
 :is(.draft-guidance-panel, .draft-editor) .markdown-content blockquote {
   margin: 16px 0;
