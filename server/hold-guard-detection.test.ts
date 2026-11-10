@@ -24,6 +24,7 @@ import type { HeldUpstreamChange } from "../shared/sync.js";
 import { collabFixture, outcome, type Headers } from "../test/collab-fixture.js";
 import { fakeGitHub } from "../test/fake-github.js";
 import { participantHeader } from "./coordination-routes.js";
+import { Coordinator } from "./coordination.js";
 import { readDiff } from "./git.js";
 import { git } from "./process.js";
 import type { TeamAgentRunner } from "./team.js";
@@ -579,4 +580,138 @@ test("privacy boundaries hold: no commit subjects, no cross-holder leaks, 403 fo
   assert.doesNotMatch(prompts[0], new RegExp(secretTitle));
   assert.doesNotMatch(prompts[0], new RegExp(secretSubject));
   assert.doesNotMatch(prompts[0], /\bAda\b/);
+});
+
+test("collab.json holds records only active claims and cleans up on conflict, abort, non-done release, revoke, and member removal", async (t) => {
+  const s = await detectionScene(t);
+  const headSha = (await git(s.repo.path, ["rev-parse", "refs/heads/main"])).stdout.trim();
+  const savedSide = async () => JSON.parse((await s.f.files())[0]) as {
+    tasks?: Record<string, { title?: string; doneAt?: string }>;
+    holds?: Record<string, string>;
+  };
+
+  assert.equal((await savedSide()).holds, undefined);
+
+  // Active hold records [project/taskId]: headSha.
+  const { hold: adaHold } = await s.work(s.who.admin, ["src/api/users.ts"], "Ada users");
+  assert.deepEqual((await savedSide()).holds, {
+    [`${s.project}/${adaHold.taskId}`]: headSha,
+  });
+
+  // (a1) Pre-claim conflicted POST .../work (409) leaves no orphaned entry.
+  const preConflict = await s.f.post(`/projects/${s.project}/work`, { ...english, ...s.who.member }, {
+    title: "Conflicting take",
+    scopes: ["src/api/users.ts"],
+  });
+  assert.equal(outcome(preConflict), "409 conflict");
+  assert.deepEqual((await savedSide()).holds, {
+    [`${s.project}/${adaHold.taskId}`]: headSha,
+  });
+
+  // (a2) In-flight claim conflict (409 after defineTask + saveSide(tasks)) leaves no orphaned entry.
+  const origClaim = Coordinator.prototype.claim;
+  const raceGate = { reached: false, go: () => {} };
+  const waitGate = new Promise<void>((resolve) => (raceGate.go = resolve));
+  const claimMock = t.mock.method(
+    Coordinator.prototype,
+    "claim",
+    async function (this: Coordinator, ...args: Parameters<Coordinator["claim"]>) {
+      if (!raceGate.reached) {
+        raceGate.reached = true;
+        await waitGate;
+      }
+      return origClaim.apply(this, args);
+    },
+  );
+  const inFlightConflict = s.f.post(`/projects/${s.project}/work`, { ...english, ...s.who.member }, {
+    title: "Raced guide take",
+    scopes: ["docs/guide.md"],
+  });
+  for (let i = 0; i < 500 && !raceGate.reached; i += 1)
+    await new Promise((r) => setTimeout(r, 5));
+  assert.equal(raceGate.reached, true);
+  const { hold: deeHold } = await s.work(s.who.dee, ["docs"], "Dee docs");
+  raceGate.go();
+  assert.equal(outcome(await inFlightConflict), "409 conflict");
+  claimMock.mock.restore();
+  assert.deepEqual((await savedSide()).holds, {
+    [`${s.project}/${adaHold.taskId}`]: headSha,
+    [`${s.project}/${deeHold.taskId}`]: headSha,
+  });
+
+  // (a3) In-flight claim aborted because the member was removed mid-claim (403 notJoined) leaves no orphaned entry.
+  const eveDevice = await s.f.device("Eve Laptop");
+  const eve = await s.f.join(eveDevice, await s.f.invite(s.who.admin, { name: "Eve" }));
+  const eveHeaders: Headers = { ...eveDevice, [participantHeader]: eve.token };
+  const abortGate = { reached: false, go: () => {} };
+  const waitAbort = new Promise<void>((resolve) => (abortGate.go = resolve));
+  const abortMock = t.mock.method(
+    Coordinator.prototype,
+    "claim",
+    async function (this: Coordinator, ...args: Parameters<Coordinator["claim"]>) {
+      if (!abortGate.reached) {
+        abortGate.reached = true;
+        await waitAbort;
+      }
+      return origClaim.apply(this, args);
+    },
+  );
+  const abortedTake = s.f.post(`/projects/${s.project}/work`, { ...english, ...eveHeaders }, {
+    title: "Eve math take",
+    scopes: ["src/lib/math.ts"],
+  });
+  for (let i = 0; i < 500 && !abortGate.reached; i += 1)
+    await new Promise((r) => setTimeout(r, 5));
+  assert.equal(abortGate.reached, true);
+  const eveRemoved = await s.f.post(`/people/${eve.id}/remove`, s.who.admin);
+  assert.deepEqual([eveRemoved.status, eveRemoved.json], [200, { revoked: 0, unpaired: false }]);
+  abortGate.go();
+  assert.equal(outcome(await abortedTake), "403 notJoined");
+  abortMock.mock.restore();
+  assert.deepEqual((await savedSide()).holds, {
+    [`${s.project}/${adaHold.taskId}`]: headSha,
+    [`${s.project}/${deeHold.taskId}`]: headSha,
+  });
+
+  // (b) Releasing with done: false deletes that claim's holds entry (and removes holds when empty).
+  assert.equal((await s.release(s.who.dee, deeHold, false)).status, 200);
+  assert.deepEqual((await savedSide()).holds, {
+    [`${s.project}/${adaHold.taskId}`]: headSha,
+  });
+  assert.equal((await s.release(s.who.admin, adaHold, false)).status, 200);
+  assert.equal((await savedSide()).holds, undefined);
+
+  // (c) Admin revoke deletes the revoked claim's holds entry.
+  const { hold: benRevoked } = await s.work(s.who.member, ["src/api/index.ts"], "Ben index");
+  assert.deepEqual((await savedSide()).holds, {
+    [`${s.project}/${benRevoked.taskId}`]: headSha,
+  });
+  const revokedReply = await s.f.post(
+    `/projects/${s.project}/holds/${benRevoked.claimId}/revoke`,
+    s.who.admin,
+    {},
+  );
+  assert.equal(revokedReply.status, 200, revokedReply.body);
+  assert.equal((await savedSide()).holds, undefined);
+
+  // (d) Member removal deletes all holds entries of the removed member while preserving others' active holds.
+  const { hold: benHold1 } = await s.work(s.who.member, ["src/api/index.ts"], "Ben one");
+  const { hold: benHold2 } = await s.work(s.who.member, ["docs/guide.md"], "Ben two");
+  const { hold: adaKeep } = await s.work(s.who.admin, ["src/lib/math.ts"], "Ada math");
+  assert.deepEqual((await savedSide()).holds, {
+    [`${s.project}/${benHold1.taskId}`]: headSha,
+    [`${s.project}/${benHold2.taskId}`]: headSha,
+    [`${s.project}/${adaKeep.taskId}`]: headSha,
+  });
+  const benRemoved = await s.f.post(`/people/${s.ben.id}/remove`, s.who.admin);
+  assert.deepEqual([benRemoved.status, benRemoved.json], [200, { revoked: 2, unpaired: false }]);
+  assert.deepEqual((await savedSide()).holds, {
+    [`${s.project}/${adaKeep.taskId}`]: headSha,
+  });
+
+  // Releasing the remaining hold with done: true removes holds while keeping tasks[key].doneAt.
+  assert.equal((await s.release(s.who.admin, adaKeep, true)).status, 200);
+  const finalSide = await savedSide();
+  assert.equal(finalSide.holds, undefined);
+  assert.ok(finalSide.tasks?.[`${s.project}/${adaKeep.taskId}`]?.doneAt);
 });

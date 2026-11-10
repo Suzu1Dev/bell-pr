@@ -252,7 +252,8 @@ What can be detected, and where:
   checked, however it was written (agent, by hand in the checkout, a
   sync).
 - **At the holder's sync and publish (S4, implemented).** `POST .../work`
-  records `knownBranchTip` for the task in `collab.json` (`holds`). At
+  records `knownBranchTip` for the active hold in `collab.json` (`holds`),
+  removing it when the hold ends (`release`, `revoke`, or member removal). At
   `POST /api/runs/:id/sync` (unpublished runs and published PRs) and at
   first `GET /api/runs/:id/preflight` / `POST /api/runs/:id/publish`,
   `heldUpstreamChanges` walks first-parent commits (`--first-parent -m

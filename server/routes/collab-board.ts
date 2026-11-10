@@ -27,6 +27,7 @@ import type {
 import {
   boardOf,
   dependencyOf,
+  dropHoldEntries,
   holdOf,
   inTheWay,
   nameOf,
@@ -389,22 +390,33 @@ export function registerCollabBoardRoutes(
         refuseWaiting();
         refuseMeeting();
         const taskId = collabId("t");
+        const key = taskKey(projectId, taskId);
         await coordinator.defineTask(actor, projectId, { id: taskId });
         await host.saveSide((draft) => {
-          const key = taskKey(projectId, taskId);
           (draft.tasks ??= {})[key] = {
             title: body.title,
             ...(dependsOn.length ? { dependsOn } : {}),
           };
-          if (holdBase) (draft.holds ??= {})[key] = holdBase;
         });
         try {
           const claim = await coordinator.claim(actor, projectId, { taskId, scopes: held });
+          const removed = () => Boolean(sideEntry(host.side().people, actor.id)?.removedAt);
+          if (!removed() && holdBase) {
+            await host.saveSide((draft) => {
+              if (sideEntry(draft.people, actor.id)?.removedAt) return;
+              const stillHeld = coordinator
+                .claimsForHost(projectId)
+                .some((item) => item.id === claim.id && item.status === "held");
+              if (stillHeld) (draft.holds ??= {})[key] = holdBase;
+            });
+          }
           // Removed while this was under way, after the removal looked for their holds.
-          if (sideEntry(host.side().people, actor.id)?.removedAt) {
+          if (removed()) {
             await coordinator
               .release(actor, projectId, claim.id, { fence: claim.fence })
               .catch(() => undefined);
+            if (sideEntry(host.side().holds, key) !== undefined)
+              await host.saveSide((draft) => dropHoldEntries(draft, [key])).catch(() => undefined);
             throw notJoined();
           }
           return holdOf(host.side(), projectId, claim);
@@ -432,12 +444,14 @@ export function registerCollabBoardRoutes(
       await host.run(async () => {
         const ended = await host.coordinator().release(actor, project, claim, { fence });
         // After the release: a write that fails leaves the task not done, never done and held.
-        if (done)
+        const key = taskKey(project, ended.taskId);
+        if (done || sideEntry(host.side().holds, key) !== undefined)
           await host.saveSide((draft) => {
-            const tasks = (draft.tasks ??= {});
-            const key = taskKey(project, ended.taskId);
-            tasks[key] = { ...sideEntry(tasks, key), doneAt: ended.updatedAt };
-            if (draft.holds) delete draft.holds[key];
+            if (done) {
+              const tasks = (draft.tasks ??= {});
+              tasks[key] = { ...sideEntry(tasks, key), doneAt: ended.updatedAt };
+            }
+            dropHoldEntries(draft, [key]);
           });
       }, project);
       const answer: CollabOkResponse = { ok: true };
@@ -454,7 +468,12 @@ export function registerCollabBoardRoutes(
       if (actor.role !== "admin") throw adminOnly();
       const { project, claim } = req.params;
       projectOf(project);
-      await host.run(() => host.coordinator().revoke(actor, project, claim, {}), project);
+      await host.run(async () => {
+        const ended = await host.coordinator().revoke(actor, project, claim, {});
+        const key = taskKey(project, ended.taskId);
+        if (sideEntry(host.side().holds, key) !== undefined)
+          await host.saveSide((draft) => dropHoldEntries(draft, [key]));
+      }, project);
       const answer: CollabOkResponse = { ok: true };
       res.json(answer);
     },

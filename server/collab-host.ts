@@ -68,9 +68,10 @@ const sideSchema = z.strictObject({
     )
     .optional(),
   /**
-   * The repository's default-branch commit when each hold's task was created,
-   * by "<project id>/<task id>", so the holder's sync and publish can report
-   * commits on the target branch since then that touch held paths (S4).
+   * The repository's default-branch commit when each active hold was taken,
+   * by "<project id>/<task id>", removed when the hold ends, so the holder's
+   * sync and publish can report commits on the target branch since then that
+   * touch held paths (S4).
    */
   holds: z.record(z.string().max(140), z.string().max(64)).optional(),
 });

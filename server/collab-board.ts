@@ -11,6 +11,15 @@ import { pathsMeet } from "./scope-paths.js";
 /** The side file's key of a task. */
 export const taskKey = (projectId: string, taskId: string) => `${projectId}/${taskId}`;
 
+/** Drops recorded hold base commits from the side file; omits `holds` once empty. */
+export function dropHoldEntries(draft: CollabSide, keys: readonly string[]) {
+  if (!draft.holds || !keys.length) return;
+  for (const key of keys) {
+    if (Object.hasOwn(draft.holds, key)) delete draft.holds[key];
+  }
+  if (!Object.keys(draft.holds).length) delete draft.holds;
+}
+
 /** A person's name as the side file has it, else their id. */
 export const nameOf = (side: CollabSide, id: string) => sideEntry(side.people, id)?.name ?? id;
 
