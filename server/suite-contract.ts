@@ -106,13 +106,20 @@ function loopbackHostname(hostname: string): boolean {
   );
 }
 
+/** The port an origin is reached on: its own, or its scheme's default. */
+function effectivePort(url: URL): number {
+  return Number(url.port) || (url.protocol === "https:" ? 443 : 80);
+}
+
 /**
  * Parses BELLPR_SUITE_LINKS: `explain=<origin>` and `personal=<origin>`,
  * separated by commas, each product once. An origin is on this computer,
  * or an https name in the tailnet of one of `ownOrigins`. A link back to
- * this BELL PR is refused: a loopback address on one of `ownPorts`, or one
- * of `ownOrigins`. The error names the variable and never the value, which
- * may hold a private host name.
+ * this BELL PR is refused: one of `ownOrigins`, or a loopback address on
+ * one of `ownPorts` or on the port of a loopback entry of `ownOrigins` (a
+ * local proxy in front of this server, under another loopback name). The
+ * error names the variable and never the value, which may hold a private
+ * host name.
  */
 export function parseSuiteLinks(
   value: string | undefined,
@@ -123,7 +130,12 @@ export function parseSuiteLinks(
   const entries = (value ?? "").trim();
   if (!entries) return links;
   const invalid = () => new Error(sm().security.suiteLinksInvalid);
-  const ownTailnets = new Set(ownOrigins.map((entry) => tailnetOf(new URL(entry).hostname)));
+  const own = ownOrigins.map((entry) => new URL(entry));
+  const ownTailnets = new Set(own.map((url) => tailnetOf(url.hostname)));
+  const refusedPorts = [
+    ...ownPorts,
+    ...own.filter((url) => loopbackHostname(url.hostname)).map(effectivePort),
+  ];
   for (const entry of entries.split(",")) {
     const [, app, address] = /^([a-z]+)=(.+)$/.exec(entry.trim()) ?? [];
     if ((app !== "explain" && app !== "personal") || app in links) throw invalid();
@@ -145,8 +157,7 @@ export function parseSuiteLinks(
     )
       throw invalid();
     if (loopbackHostname(url.hostname)) {
-      const port = Number(url.port) || (url.protocol === "https:" ? 443 : 80);
-      if (ownPorts.includes(port)) throw invalid();
+      if (refusedPorts.includes(effectivePort(url))) throw invalid();
     } else {
       const tailnet = tailnetOf(url.hostname);
       if (url.protocol !== "https:" || !tailnet || !ownTailnets.has(tailnet)) throw invalid();

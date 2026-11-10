@@ -24,6 +24,8 @@ import type { Run } from "./types.js";
 import { Workbench } from "./workbench.js";
 
 const day = (date: number) => `2026-11-0${date}T00:00:00.000Z`;
+/** A time that parses, in a year the contract's four-digit form cannot express. */
+const farFuture = "+010000-01-01T00:00:00.000Z";
 
 /** A run in review. SENTINEL marks every value the feed must never send. */
 function run(id: string, patch: Partial<Run> = {}): Run {
@@ -141,6 +143,10 @@ test("a link back to this BELL PR stops the start, in the CLI's language and wit
     // In development the UI's own server is this BELL PR too.
     [{ dev: true }, {}, "explain=http://localhost:4310"],
     [{}, { BELLPR_ALLOWED_ORIGINS: "https://localhost:8443" }, "explain=https://localhost:8443"],
+    // A local proxy in front of this BELL PR, under another loopback name or scheme.
+    [{}, { BELLPR_ALLOWED_ORIGINS: "https://localhost:8443" }, "explain=https://127.0.0.1:8443"],
+    [{}, { BELLPR_ALLOWED_ORIGINS: "https://localhost:8443" }, "explain=http://[::1]:8443"],
+    [{}, { BELLPR_PUBLIC_URL: "https://localhost" }, "personal=https://127.0.0.1"],
     [{}, {}, "explain=http://localhost:5173/private-path"],
   ];
   for (const locale of locales)
@@ -160,6 +166,12 @@ test("a link back to this BELL PR stops the start, in the CLI's language and wit
   assert.deepEqual(resolveConfig({}, { BELLPR_SUITE_LINKS: "explain=http://localhost:4310" }).suiteLinks, {
     explain: "http://localhost:4310",
   });
+  // Only a loopback address of this BELL PR claims its port on this computer.
+  const remote = { BELLPR_PUBLIC_URL: "https://pr.example:8443" };
+  assert.deepEqual(
+    resolveConfig({}, { ...remote, BELLPR_SUITE_LINKS: "explain=https://localhost:8443" }).suiteLinks,
+    { explain: "https://localhost:8443" },
+  );
   assert.deepEqual(resolveConfig({}, {}).suiteLinks, {});
 });
 
@@ -207,13 +219,15 @@ test("the manifest names BELL PR, its feed and its links in the request's langua
 
 test("each run state gives one feed row, and the first match wins", () => {
   const complete = { phase: "complete" } as Run["team"];
+  // Every run BELL PR starts has a team; a Learn-by-hand run's is developing until its first Ready.
+  const developing = { phase: "developing" } as Run["team"];
   const rows: [Partial<Run>, ("needs-you" | "waiting")?, string?][] = [
     [{ status: "queued" }, "waiting", "Queued"],
     [{ status: "running" }, "waiting", "In progress"],
     [{ status: "awaiting_plan" }, "needs-you", "Plan ready for your approval"],
     [{ status: "awaiting_plan", learnByHand: true }, "needs-you", "Your turn: write the plan"],
     [{ status: "review" }, "needs-you", "Ready for your review"],
-    [{ status: "review", learnByHand: true }, "needs-you", "Your turn: make the change"],
+    [{ status: "review", learnByHand: true, team: developing }, "needs-you", "Your turn: make the change"],
     [{ status: "review", learnByHand: true, team: complete }, "needs-you", "Ready for your review"],
     [{ status: "approved" }, "needs-you", "Approved, not published yet"],
     [{ status: "approved", publishing: true }, "waiting", "Publishing"],
@@ -222,6 +236,13 @@ test("each run state gives one feed row, and the first match wins", () => {
     [{ status: "review", followUps: [round("review")] }, "needs-you", "Follow-up ready for you"],
     [{ status: "approved", followUps: [round("review")] }, "needs-you", "Follow-up ready for you"],
     [{ status: "approved", publishing: true, followUps: [round("review")] }, "waiting", "Publishing"],
+    // An agent resolves the conflicts of a round that merges the target branch.
+    [{ status: "running", followUps: [round("review")] }, "waiting", "Follow-up in progress"],
+    [
+      { status: "review", learnByHand: true, team: complete, followUps: [round("review")] },
+      "needs-you",
+      "Follow-up ready for you",
+    ],
     // Left out: v1 lists no published run, and a split run's parts are counted instead.
     [{ status: "published" }],
     [{ status: "published", followUps: [round("published")] }],
@@ -229,6 +250,7 @@ test("each run state gives one feed row, and the first match wins", () => {
     [{ workspaceRemovedAt: day(3) }],
     [{ splitInto: [{ runId: "part", title: "Part" }] }],
     [{ createdAt: "yesterday" }],
+    [{ createdAt: farFuture }],
     [{ id: "not an id" }],
     [{ id: ".." }],
   ];
@@ -253,7 +275,7 @@ test("each run state gives one feed row, and the first match wins", () => {
 
 test("the feed lists five runs, what needs the person first and then the newest", () => {
   const runs = [
-    run("waiting-old", { status: "running" }),
+    run("waiting-earlier", { status: "running" }),
     run("old"),
     run("logged", { logs: [{ time: day(5), agent: "system", message: "log SENTINEL" }] }),
     run("waiting-new", { status: "queued", createdAt: day(4) }),
@@ -269,7 +291,26 @@ test("the feed lists five runs, what needs the person first and then the newest"
   assert.equal(feed.truncated, true);
   assert.equal(feed.generatedAt, day(6));
   assert.equal(suiteFeedSchema.safeParse(feed).success, true);
-  assert.equal(withLocale("en", () => buildTodayFeed(runs.slice(0, 5))).truncated, false);
+  const few = withLocale("en", () => buildTodayFeed(runs.slice(0, 5)));
+  assert.equal(few.truncated, false);
+  // The runs that wait for BELL PR come last, the newest of them first (their ids alone give the other order).
+  assert.deepEqual(few.items.map((item) => item.id), ["logged", "same-b", "old", "waiting-new", "waiting-earlier"]);
+});
+
+test("a later time the contract cannot express is passed over, as one that does not parse", () => {
+  const log = (time: string) => ({ logs: [{ time, agent: "system", message: "log" }] });
+  const runs = [
+    run("year-12345", log("12345")),
+    run("not-a-time", log("later")),
+    run("round", { followUps: [round("review", farFuture)] }),
+    run("round-and-log", { followUps: [round("review", farFuture)], ...log(day(3)) }),
+  ];
+  const feed = withLocale("en", () => buildTodayFeed(runs));
+  assert.deepEqual(
+    feed.items.map((item) => [item.id, item.updatedAt]),
+    [["round-and-log", day(3)], ["not-a-time", day(1)], ["round", day(1)], ["year-12345", day(1)]],
+  );
+  assert.equal(suiteFeedSchema.safeParse(feed).success, true);
 });
 
 test("a title is sent as one plain line of at most 120 characters", () => {
@@ -284,6 +325,14 @@ test("a title is sent as one plain line of at most 120 characters", () => {
   // A title cut from the request's first 72 UTF-16 units can end in half a character.
   assert.equal(title(`Add a ${face}`.slice(0, -1)), "Add a");
   assert.equal(title(` ${bell}\n`), "Untitled run");
+  // Zero-width space, word joiner and soft hyphen: nothing to read.
+  assert.equal(title(` ${String.fromCodePoint(0x200b, 0x2060)} ${String.fromCodePoint(0xad)}`), "Untitled run");
+  // An unnamed run's title is the start of the request: a credential in it is masked.
+  assert.equal(title(`Push with ghp_${"A".repeat(36)} please`), "Push with [REDACTED] please");
+  assert.equal(
+    title("Clone https://alice:hunter2pass@git.invalid/repo and fix"),
+    "Clone https://[REDACTED]@git.invalid/repo and fix",
+  );
   assert.equal(title("", "zh-TW"), "未命名的工作");
 });
 
@@ -326,8 +375,10 @@ test("the feed sends a run's id, title, state and time, and writes nothing", asy
 });
 
 test("a feed that breaks the contract is not sent, and the answer says nothing about it", async (t) => {
-  // A time the contract's format cannot express.
-  const { send } = await serve(t, [run("one", { createdAt: "+010000-01-01T00:00:00.000Z" })]);
+  const { send } = await serve(t, [run("one")]);
+  assert.equal((await send("/api/suite/today")).status, 200);
+  // Every stored value is made to fit, so the clock breaks it: a time the contract's form cannot express.
+  t.mock.timers.enable({ apis: ["Date"], now: Date.parse(farFuture) });
   const response = await send("/api/suite/today", { "x-bell-locale": "en" });
   assert.equal(response.status, 500);
   assert.deepEqual(JSON.parse(response.text), { error: en.internalError });

@@ -6,6 +6,7 @@ import { activeFollowUp } from "../shared/followups.js";
 import { suiteLimits, type SuiteTodayFeed, type SuiteTodayItem } from "../shared/suite.js";
 import type { RunCore } from "../shared/types.js";
 import { sm, type ServerMessages } from "./i18n/index.js";
+import { redact } from "./secrets.js";
 import { suiteObjectId, suiteRunHref, unsafeText } from "./suite-contract.js";
 
 type Detail = keyof ServerMessages["common"]["suite"]["detail"];
@@ -46,18 +47,31 @@ function runState(run: RunCore): [SuiteTodayItem["state"], Detail] | undefined {
   }
 }
 
-/** The latest time the run records: its creation, its last log line or its last follow-up round. */
+/** The times the contract can express: its form has a four-digit year. */
+const firstTime = Date.parse("0000-01-01T00:00:00.000Z");
+const lastTime = Date.parse("9999-12-31T23:59:59.999Z");
+/** False also for a time that does not parse (NaN). */
+const expressible = (time: number) => time >= firstTime && time <= lastTime;
+
+/**
+ * The latest time the run records: its creation, its last log line or the
+ * request of its last follow-up round. A time that does not parse or that
+ * the contract cannot express (a damaged file) is unreadable: the run is
+ * left out for its creation, and a later time is passed over.
+ */
 function updatedAt(run: RunCore): string | undefined {
-  const created = Date.parse(run.createdAt);
-  if (Number.isNaN(created)) return undefined;
-  const round = run.followUps?.at(-1);
-  const later = [run.logs.at(-1)?.time, round?.requestedAt, round?.publishedAt]
-    .map((time) => Date.parse(time ?? ""))
-    .filter((time) => !Number.isNaN(time));
-  return new Date(Math.max(created, ...later)).toISOString();
+  const [created, ...later] = [
+    run.createdAt,
+    run.logs.at(-1)?.time,
+    run.followUps?.at(-1)?.requestedAt,
+  ].map((time) => Date.parse(time ?? ""));
+  if (!expressible(created)) return undefined;
+  return new Date(Math.max(created, ...later.filter(expressible))).toISOString();
 }
 
 const unsafeCharacters = new RegExp(unsafeText.source, "gu");
+/** Characters that show nothing, such as a zero-width space. */
+const invisibleCharacters = /\p{Default_Ignorable_Code_Point}/gu;
 /** Half of a character pair, as a title cut from the request's first 72 UTF-16 units can end with. */
 const loneSurrogates = /[\ud800-\udbff](?![\udc00-\udfff])|(?<![\ud800-\udbff])[\udc00-\udfff]/g;
 
@@ -68,8 +82,9 @@ function plainTitle(title: string): string {
     .replace(unsafeCharacters, " ")
     .replace(/\s+/g, " ")
     .trim();
+  // A title of spaces and invisible characters alone has no name to read.
+  if (!text.replace(invisibleCharacters, "").trim()) return sm().common.suite.untitled;
   const characters = [...text];
-  if (!characters.length) return sm().common.suite.untitled;
   return characters.length > suiteLimits.title
     ? `${characters.slice(0, suiteLimits.title - 1).join("").trimEnd()}…`
     : text;
@@ -111,7 +126,8 @@ export function buildTodayFeed(runs: readonly RunCore[], now = new Date()): Suit
       sourceApp: "pr",
       type: "run",
       id: run.id,
-      title: plainTitle(run.title),
+      // An unnamed run's title is the start of the request, which may hold a credential.
+      title: plainTitle(redact(run.title)),
       href: suiteRunHref(run.id),
       ...entry,
     })),
