@@ -1437,40 +1437,61 @@ button {
   max-width: 100%;
 }
 .origin-ignored .copy-command {
-  flex: 1 1 auto;
   min-width: 0;
   max-width: 100%;
 }
-.origin-ignored > p {
-  min-width: 0;
-}
-.origin-ignored .copy-command-row code {
-  white-space: normal;
-  overflow-wrap: anywhere;
-  overflow-x: visible;
-}
-.repository-card:has(.origin-ignored),
-.page-title > div:has(.origin-ignored) {
-  container-type: inline-size;
-  container-name: origin-notice;
-}
-.page-title > div:has(.origin-ignored) {
-  flex: 1 1 auto;
-  min-width: 0;
-}
-@container origin-notice (max-width: 36rem) {
+@media (min-width: 761px) {
+  .repository-card:has(.origin-ignored),
+  .page-title:has(.origin-ignored) {
+    container-type: inline-size;
+    container-name: origin-notice;
+  }
+  .page-title:has(.origin-ignored) > div {
+    flex: 1 1 auto;
+    min-width: 0;
+    max-width: 100%;
+  }
   .origin-ignored {
-    flex-direction: column;
-    align-items: stretch;
+    flex-wrap: wrap;
+    align-items: flex-start;
   }
-}
-@container origin-notice (max-width: 15rem) {
+  .origin-ignored > p {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  .origin-ignored .copy-command {
+    flex: 1 1 auto;
+    max-width: 100%;
+  }
   .origin-ignored .copy-command-row {
-    flex-direction: column;
-    align-items: stretch;
+    flex-wrap: wrap;
+    align-items: center;
   }
-  .origin-ignored .copy-command-button {
-    align-self: flex-start;
+  .origin-ignored .copy-command-row code {
+    flex: 1 1 auto;
+    min-width: max-content;
+    max-width: 100%;
+    white-space: normal;
+    overflow-wrap: break-word;
+    overflow-x: visible;
+  }
+  @container origin-notice (max-width: 36rem) {
+    .origin-ignored {
+      flex-direction: column;
+      align-items: stretch;
+      width: 100%;
+    }
+    .origin-ignored .copy-command,
+    .origin-ignored .copy-command-row {
+      width: 100%;
+      min-width: 0;
+      max-width: 100%;
+    }
+    .origin-ignored .copy-command-row code {
+      flex: 1 1 100%;
+      min-width: 0;
+      max-width: 100%;
+    }
   }
 }
 .draft-layout {

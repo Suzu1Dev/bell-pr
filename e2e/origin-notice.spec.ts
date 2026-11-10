@@ -86,13 +86,64 @@ async function expectNoticeFits(
       await notice.getByRole("button", { name: label }).click();
       await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe(command);
     }
-    if (width >= 761) {
-      expect(fit.prefixClipped, detail).toBe(false);
-      expect(fit.widestPrefixLine + 1, detail).toBeGreaterThanOrEqual(fit.prefixWidth * 0.45);
+    const lines = await commandLines(page);
+    expect.soft(lines.splitWords, `${where} split ${JSON.stringify(lines.splitWords)}`).toEqual([]);
+    if (width === 1280 && hash === "#/repos/ignored-repo") {
+      expect.soft(
+        lines.lineCount,
+        `${where} lines ${lines.lineCount} code ${fit.code!.width.toFixed(1)}×${fit.code!.height.toFixed(1)}`,
+      ).toBe(1);
     }
   } finally {
     await context.close();
   }
+}
+
+/** Words that cross a line, except a URL token wider than the code box. */
+function commandLines(page: Page) {
+  return page.evaluate(() => {
+    const code = document.querySelector(".origin-ignored code");
+    const textNode = code?.firstChild;
+    const text = textNode?.textContent ?? "";
+    if (!code || !textNode || textNode.nodeType !== Node.TEXT_NODE) {
+      return { lineCount: 0, splitWords: [{ word: text, reason: "no text" }] };
+    }
+    const style = getComputedStyle(code);
+    const contentWidth = code.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+    const widthOf = (value: string) => {
+      const probe = document.createElement("span");
+      probe.textContent = value;
+      probe.style.font = style.font;
+      probe.style.whiteSpace = "nowrap";
+      probe.style.position = "absolute";
+      probe.style.visibility = "hidden";
+      document.body.appendChild(probe);
+      const width = probe.getBoundingClientRect().width;
+      probe.remove();
+      return width;
+    };
+    const splitWords: { word: string; lines: number; wordWidth: number; contentWidth: number }[] = [];
+    for (const match of text.matchAll(/\S+/g)) {
+      const word = match[0];
+      const range = document.createRange();
+      range.setStart(textNode, match.index ?? 0);
+      range.setEnd(textNode, (match.index ?? 0) + word.length);
+      const tops = new Set(
+        [...range.getClientRects()].filter((rect) => rect.width > 0).map((rect) => Math.round(rect.top)),
+      );
+      if (tops.size <= 1) continue;
+      const wordWidth = widthOf(word);
+      const url = word.startsWith("https://");
+      if (url && wordWidth > contentWidth + 1) continue;
+      splitWords.push({ word, lines: tops.size, wordWidth, contentWidth });
+    }
+    const whole = document.createRange();
+    whole.selectNodeContents(textNode);
+    const lineCount = new Set(
+      [...whole.getClientRects()].filter((rect) => rect.width > 0).map((rect) => Math.round(rect.top)),
+    ).size;
+    return { lineCount, splitWords };
+  });
 }
 
 function measure(page: Page) {
