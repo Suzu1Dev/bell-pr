@@ -232,11 +232,15 @@ export async function releasePublishRecovery(
       );
       continue;
     }
-    const present = await git(cwd, ["show-ref", "--verify", "--quiet", ref], {
-      allowedCodes: [0, 1],
-    });
-    if (present.code !== 0) continue;
-    await git(cwd, ["update-ref", "-d", ref], { allowedCodes: [0, 1] });
+    // The old value keeps a ref that was replaced while reachability was checked.
+    // A missing ref exits 1, which is the same result as deleting it once.
+    try {
+      await git(cwd, ["update-ref", "-d", ref, commit], { allowedCodes: [0, 1] });
+    } catch (error) {
+      log.info(
+        `Keeping ${ref}: could not delete it (${error instanceof Error ? error.message : "unknown error"})`,
+      );
+    }
   }
 }
 
@@ -411,7 +415,11 @@ export async function removeRun(ctx: WorkbenchContext, id: string) {
     // A worktree outside the data directory is left where it is.
     if (!run.workspaceRemovedAt && (await ownsWorkspace(ctx, run)))
       await removeWorkspace(ctx, run, repo);
-    else await releasePublishRecovery(ctx, run, repo?.path);
+    else if (repo)
+      await ctx.lock(`repository:${repo.id}`, () =>
+        releasePublishRecovery(ctx, run, repo.path),
+      );
+    else await releasePublishRecovery(ctx, run);
     // A part that built on a deleted part builds on what that part was split from, if it is still
     // there and is not one of its own originals, which hold its files too. Decided before any link
     // is dropped: dropping them removes the splitFrom links an ancestry is read through.

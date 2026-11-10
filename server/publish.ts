@@ -60,6 +60,15 @@ import { localPublishChecks } from "./group-local.js";
 
 const now = () => new Date().toISOString();
 
+/** Same repository lock as workspace cleanup, so two runs cannot each treat the other's ref as the remaining copy. */
+async function releasePublishedRecovery(ctx: WorkbenchContext, run: Run) {
+  const repo = ctx.store.data.repos.find((item) => item.id === run.repoId);
+  const release = () =>
+    releasePublishRecovery(ctx, run, repo?.path ?? run.worktreePath);
+  if (!repo) return release();
+  return ctx.lock(`repository:${repo.id}`, release);
+}
+
 const json = <T>(value: string) => JSON.parse(value) as T;
 
 /**
@@ -635,7 +644,7 @@ export async function publish(
     )
       throw new AppError((m) => m.run.publish.approvalStale, 409);
     if (run.status === "published") {
-      await releasePublishRecovery(ctx, run);
+      await releasePublishedRecovery(ctx, run);
       return run;
     }
     assertSessionIdle(run);
@@ -715,7 +724,7 @@ export async function publish(
         delete run.error;
         ctx.log(run, "system", sm().run.publish.prCreated);
         await ctx.store.save();
-        await releasePublishRecovery(ctx, run);
+        await releasePublishedRecovery(ctx, run);
         return run;
       }
     }
@@ -953,7 +962,7 @@ export async function publish(
       run.publishing = false;
       await ctx.store.save();
     }
-    if (run.status === "published") await releasePublishRecovery(ctx, run);
+    if (run.status === "published") await releasePublishedRecovery(ctx, run);
     return run;
   });
 }

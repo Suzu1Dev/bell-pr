@@ -128,50 +128,59 @@ process.exit(97);
   );
   const previousPath = process.env.PATH;
   process.env.PATH = `${bin}${path.delimiter}${previousPath}`;
-  const store = new Store(path.join(directory, "data"));
-  await store.initialize();
-  const workbench = new Workbench(store);
-  const repo: Repository = {
-    id: "11111111-1111-4111-8111-111111111111",
-    name: "example",
-    owner: "test-owner",
-    fullName: "test-owner/example",
-    path: repository,
-    defaultBranch: "main",
-    url: "https://github.com/test-owner/example",
-  };
-  store.data.repos.push(repo);
-  const run = reviewRun("ref-run1", repo, repository, baseSha);
-  run.draft.commitMessage = "Improve the greeting";
-  store.data.runs.push(run);
-  await git(repository, ["checkout", "-q", "-b", run.branch]);
-  await writeFile(
-    path.join(repository, "hello.ts"),
-    'export const hello = "after";\n',
-  );
-  for (const file of await readDiff(run))
-    await workbench.review(run.id, file.path, true, file.fingerprint);
-  await workbench.approve(run.id, { ...run.draft });
-  const calls = async () =>
-    (await readFile(callsFile, "utf8"))
-      .trim()
-      .split("\n")
-      .filter(Boolean)
-      .map((line) => JSON.parse(line) as string[]);
-  return {
-    repository,
-    workbench,
-    run,
-    baseSha,
-    calls,
-    mode: (value: string) => writeFile(modeFile, value),
-    remoteHead: (value: string) => writeFile(remoteHeadFile, value),
-    cleanup: async () => {
-      process.env.PATH = previousPath;
-      await workbench.shutdown();
-      await rm(directory, { recursive: true, force: true });
-    },
-  };
+  let workbench: Workbench | undefined;
+  try {
+    const store = new Store(path.join(directory, "data"));
+    await store.initialize();
+    workbench = new Workbench(store);
+    const repo: Repository = {
+      id: "11111111-1111-4111-8111-111111111111",
+      name: "example",
+      owner: "test-owner",
+      fullName: "test-owner/example",
+      path: repository,
+      defaultBranch: "main",
+      url: "https://github.com/test-owner/example",
+    };
+    store.data.repos.push(repo);
+    const run = reviewRun("ref-run1", repo, repository, baseSha);
+    run.draft.commitMessage = "Improve the greeting";
+    store.data.runs.push(run);
+    await git(repository, ["checkout", "-q", "-b", run.branch]);
+    await writeFile(
+      path.join(repository, "hello.ts"),
+      'export const hello = "after";\n',
+    );
+    for (const file of await readDiff(run))
+      await workbench.review(run.id, file.path, true, file.fingerprint);
+    await workbench.approve(run.id, { ...run.draft });
+    const calls = async () =>
+      (await readFile(callsFile, "utf8"))
+        .trim()
+        .split("\n")
+        .filter(Boolean)
+        .map((line) => JSON.parse(line) as string[]);
+    const opened = workbench;
+    return {
+      repository,
+      workbench: opened,
+      run,
+      baseSha,
+      calls,
+      mode: (value: string) => writeFile(modeFile, value),
+      remoteHead: (value: string) => writeFile(remoteHeadFile, value),
+      cleanup: async () => {
+        process.env.PATH = previousPath;
+        await opened.shutdown();
+        await rm(directory, { recursive: true, force: true });
+      },
+    };
+  } catch (error) {
+    process.env.PATH = previousPath;
+    if (workbench) await workbench.shutdown().catch(() => undefined);
+    await rm(directory, { recursive: true, force: true });
+    throw error;
+  }
 }
 
 test("a publish that fails after the commit and before a push target is archived by recovery, and a retry reuses that ref", async () => {
