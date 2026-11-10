@@ -240,6 +240,7 @@ export function OutgoingText({
       <div className="publish-body-preview">
         <strong id="publish-body-label">{demo ? t.bodyPreviewDemo : t.bodyPreview}</strong>
         <pre
+          role="group"
           tabIndex={0}
           aria-labelledby="publish-body-label"
           onKeyDown={(event) => {

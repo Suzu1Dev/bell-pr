@@ -174,7 +174,7 @@ function codeRegion(html: string) {
   return html.slice(start, end);
 }
 
-test("a 500-line diff is one tab stop: a listbox of lines with a roving tabindex", () => {
+test("a 500-line diff keeps one tab stop in the line list; the scroller hands focus to that line", () => {
   for (const view of ["unified", "split"] as const) {
     const html = renderEn(
       createElement(DiffView, {
@@ -187,7 +187,7 @@ test("a 500-line diff is one tab stop: a listbox of lines with a roving tabindex
     );
     const region = codeRegion(html);
     assert.equal(count(region, /tabindex="0"/g), 1, view);
-    // The scroller is the other tabindex=0. Focus moves straight to the line.
+    assert.match(html, /class="rv-code-scroll"[^>]*tabindex="0"/, view);
     assert.equal(count(html, /tabindex="0"/g), 2, view);
     assert.equal(count(region, /tabindex="-1"/g), 499, view);
     // Every code line is one option, named by its own label.

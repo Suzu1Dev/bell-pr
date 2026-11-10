@@ -843,9 +843,9 @@
   scroll-padding-inline: 4px;
   scrollbar-color: var(--color-accent-500) var(--color-accent-50);
   scrollbar-width: auto;
-  /* Room for the scrollbar only. A negative margin here made the section
-     wider than its box by that margin. */
-  padding: 0 0 16px;
+  /* Padding keeps the inset focus ring off the cards. No negative
+     margin: that made the section wider than its box. */
+  padding: 4px 4px 16px;
   min-width: 0;
 }
 .mission-idea-list::-webkit-scrollbar {

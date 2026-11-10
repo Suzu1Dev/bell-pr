@@ -609,10 +609,10 @@ export function DiffView({
             // order so the sideways overflow can be reached, then focus
             // moves on: forward to the line the reader left, back to the
             // control before the code.
-            if (event.target !== event.currentTarget) return;
-            const box = event.currentTarget;
             const back = tabBack.current;
             tabBack.current = false;
+            if (event.target !== event.currentTarget) return;
+            const box = event.currentTarget;
             if (back) {
               const stops = [...document.querySelectorAll<HTMLElement>("a[href], button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), summary, [tabindex='0']")];
               const index = stops.indexOf(box);

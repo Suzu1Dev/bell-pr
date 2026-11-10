@@ -2486,22 +2486,18 @@ button {
   font-size: var(--text-xs);
   line-height: 1.7;
   white-space: pre;
-}
-/* A fade on the side that still has more to scroll. The covers move with
-   the text and hide the fade at each end; nothing sits on top of the text
-   or the focus ring. */
-@media (max-width: 320px) {
-  .publish-body-preview pre {
-    background-image:
-      linear-gradient(to right, var(--color-surface-sunken) 45%, transparent),
-      linear-gradient(to left, var(--color-surface-sunken) 45%, transparent),
-      linear-gradient(to right, color-mix(in srgb, var(--color-text) 28%, transparent), transparent),
-      linear-gradient(to left, color-mix(in srgb, var(--color-text) 28%, transparent), transparent);
-    background-repeat: no-repeat;
-    background-size: 28px 100%, 28px 100%, 14px 100%, 14px 100%;
-    background-position: 0 0, 100% 0, 0 0, 100% 0;
-    background-attachment: local, local, scroll, scroll;
-  }
+  /* A fade on the side that still has more to scroll. The covers move with
+     the text and hide the fade at each end; nothing sits on top of the text
+     or the focus ring. */
+  background-image:
+    linear-gradient(to right, var(--color-surface-sunken) 45%, transparent),
+    linear-gradient(to left, var(--color-surface-sunken) 45%, transparent),
+    linear-gradient(to right, color-mix(in srgb, var(--color-text) 28%, transparent), transparent),
+    linear-gradient(to left, color-mix(in srgb, var(--color-text) 28%, transparent), transparent);
+  background-repeat: no-repeat;
+  background-size: 28px 100%, 28px 100%, 14px 100%, 14px 100%;
+  background-position: 0 0, 100% 0, 0 0, 100% 0;
+  background-attachment: local, local, scroll, scroll;
 }
 .publish-body-preview summary {
   padding: 10px 14px;

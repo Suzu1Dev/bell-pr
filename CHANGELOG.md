@@ -105,8 +105,9 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **Sideways overflow on the overview and in the publish dialog.** The
   contribution directions stay a sideways row you can scroll (arrow keys,
   previous and next), and that row no longer pushes its section wider than
-  the page. On a narrow phone the publish description keeps its long lines
-  and shows a fade on the side that still has more to scroll.
+  the page. The publish description keeps its long lines, scrolls them
+  with the arrow keys, and shows a fade on the side that still has more
+  to scroll.
 - **Other requests no longer wait while the server starts Git.** Before each
   Git command, the server read the repository's driver settings with a
   synchronous `git config`, so no other request was served until it
