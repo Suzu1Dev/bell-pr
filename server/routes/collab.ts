@@ -242,8 +242,7 @@ export function registerCollabRoutes(
               await coordinator.revoke(actor, projectId, claim.id, {});
               revoked += 1;
             } catch (error) {
-              // A hold that cannot end now (it just did, or its repository is closed)
-              // stays on the board under the removed person's name.
+              // A hold that ended in the meantime is not counted.
               if (!(error instanceof AppError) || error.statusCode >= 500) throw error;
             }
           }
