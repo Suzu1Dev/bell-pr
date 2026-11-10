@@ -66,7 +66,7 @@ function useRequest() {
       setBusy(false);
     }
   }
-  return { busy, error, run };
+  return { busy, error, run, setError };
 }
 
 /** What the box between Paths and the button says. */
@@ -761,6 +761,9 @@ export function GroupPage({ status }: { status: Status | null }) {
   const { info, projects, held } = state;
   const me = on && info?.state === "ready" ? info.me : undefined;
   const project = me && projects?.find((item) => item.id === state.project);
+  // A failed add's sentence goes with the card or the board it was said beside.
+  const forget = adding.setError;
+  useEffect(() => forget(""), [forget, project?.id, me?.id]);
   const canInvite = me && (me.admin || info?.host);
   const people = state.people.filter((person) => !person.removed);
   const circles = people.length > 4 ? people.slice(0, 3) : people;

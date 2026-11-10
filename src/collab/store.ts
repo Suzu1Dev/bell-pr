@@ -311,15 +311,9 @@ export function createGroupStore() {
     /** Adds a repository of this instance to the group and shows its board; can take minutes. */
     async add(repoId: string) {
       const { project } = await call<CollabAddProjectResponse>("/projects", send("POST", { repoId }));
-      const listed = state.projects ?? [];
-      drop({
-        // Not twice, when the list brought it before this answer.
-        projects: listed.some((other) => other.id === project.id) ? listed : [...listed, project],
-        addable: state.addable?.filter((repo) => repo.repoId !== repoId),
-        project: project.id,
-        // An answer: what failed before it no longer shows as "Reconnecting".
-        link: "live",
-      });
+      // The list is asked again: it has this repository, and what else came while it was copied.
+      // An answer: what failed before it no longer shows as "Reconnecting".
+      drop({ projects: undefined, addable: undefined, project: project.id, link: "live" });
       restart();
     },
   };

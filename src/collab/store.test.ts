@@ -230,15 +230,23 @@ test("with no repository yet a list only adds to what can be added", async (t) =
   );
 });
 
-test("a repository that the list brought before its add was answered is listed once", async (t) => {
+test("an answered add asks for the list again, for what came while it was copied", async (t) => {
   const { store, answer, pass } = await joined(t, []);
   await pass(10_000);
   const adding = store.add("r1");
   await settle();
-  await answer("/projects", { projects: [{ id: "p1", name: "shop" }] });
+  // The list asked before the answer is still empty; another admin's repository comes after it.
+  await answer("/projects", { projects: [], addable: [{ repoId: "r2", name: "site" }] });
   await answer("/projects", { project: { id: "p1", name: "shop" } }, 201);
   await adding;
-  assert.deepEqual(store.get().projects, [{ id: "p1", name: "shop" }]);
+  const both = [
+    { id: "p2", name: "site" },
+    { id: "p1", name: "shop" },
+  ];
+  await answer("/projects", { projects: both, addable: [] });
+  assert.deepEqual(store.get().projects, both);
+  assert.equal(store.get().project, "p1");
+  assert.deepEqual(store.get().addable, []);
 });
 
 test('an answered first add no longer shows "Reconnecting"', async (t) => {
