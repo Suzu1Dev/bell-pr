@@ -286,61 +286,80 @@ test("a plan over Ada's hold does not start on its own, cannot be approved while
   }
 });
 
-test("a teammate's change to a file Ada took a hold on while it worked is not added, the run stops, and its retry is told the paths only", async (t) => {
-  let adaHolds = async () => {};
-  const s = await scene(t, async (input) => {
-    if (input.role === "lead") return plan([{ id: "alpha", files: ["src/api"] }]);
-    if (input.taskId) {
-      await adaHolds();
-      await write(input.cwd, "src/api/users.ts", "export const users = ['ben'];\n");
-      return report("Listed Ben");
-    }
-    return "Not used";
-  });
-  let held: CollabHold | undefined;
-  adaHolds = async () => {
-    held = await s.hold(s.who.admin, ["src/api/users.ts"], "Secret plan");
-    adaHolds = async () => {};
-  };
-  const started = await s.start(s.who.member, false);
-  assert.equal(started.status, 202, started.body);
-  const id = started.json.run.id as string;
-  await waitUntil(() => s.run(id).status === "failed", "the refusal");
-  const run = s.run(id);
-  assert.match(
-    run.error ?? "",
-    /^A teammate changed files someone else holds, so those changes were not added to the contribution\. src\/api\/users\.ts — held by Ada for “Secret plan” \(since .+\)\. Ask them to release the hold, or ask a group admin to revoke it, then try again\.$/,
-  );
-  assert.equal(run.team?.tasks[0].status, "failed");
-  assert.deepEqual(await readDiff(run), []);
-  // The teammate's checkout keeps the change.
-  assert.equal(
-    await readFile(path.join(run.team!.tasks[0].worktreePath!, "src/api/users.ts"), "utf8"),
-    "export const users = ['ben'];\n",
-  );
-  // The person reads who holds it; the task keeps the paths for its retry.
-  assert.match(run.team!.tasks[0].error ?? "", /held by Ada for “Secret plan”/);
-  assert.deepEqual(run.team!.tasks[0].heldPaths, ["src/api/users.ts"]);
+for (const retryShape of ["current", "legacy-en", "legacy-zh-TW", "ordinary"] as const) {
+  test(`a teammate's change to a file Ada holds stops and retries privately (${retryShape})`, async (t) => {
+    let adaHolds = async () => {};
+    const s = await scene(t, async (input) => {
+      if (input.role === "lead") return plan([{ id: "alpha", files: ["src/api"] }]);
+      if (input.taskId) {
+        await adaHolds();
+        await write(input.cwd, "src/api/users.ts", "export const users = ['ben'];\n");
+        return report("Listed Ben");
+      }
+      return "Not used";
+    });
+    let held: CollabHold | undefined;
+    adaHolds = async () => {
+      held = await s.hold(s.who.admin, ["src/api/users.ts"], "Secret plan");
+      adaHolds = async () => {};
+    };
+    const started = await s.start(s.who.member, false);
+    assert.equal(started.status, 202, started.body);
+    const id = started.json.run.id as string;
+    await waitUntil(() => s.run(id).status === "failed", "the refusal");
+    const run = s.run(id);
+    assert.match(
+      run.error ?? "",
+      /^A teammate changed files someone else holds, so those changes were not added to the contribution\. src\/api\/users\.ts — held by Ada for “Secret plan” \(since .+\)\. Ask them to release the hold, or ask a group admin to revoke it, then try again\.$/,
+    );
+    assert.equal(run.team?.tasks[0].status, "failed");
+    assert.deepEqual(await readDiff(run), []);
+    // The teammate's checkout keeps the change.
+    assert.equal(
+      await readFile(path.join(run.team!.tasks[0].worktreePath!, "src/api/users.ts"), "utf8"),
+      "export const users = ['ben'];\n",
+    );
+    // The person reads who holds it; the task keeps the paths for its retry.
+    assert.match(run.team!.tasks[0].error ?? "", /held by Ada for “Secret plan”/);
+    assert.deepEqual(run.team!.tasks[0].heldPaths, ["src/api/users.ts"]);
 
-  // Ada releases; Ben retries. The teammate's fresh first turn is told why
-  // the last attempt failed by its paths, never by her name or her title.
-  await s.release(s.who.admin, held!);
-  const before = s.turns.length;
-  const retried = await s.f.send("POST", `/api/runs/${id}/team/retry`, { ...english, ...s.who.member }, {});
-  assert.equal(retried.status, 200, retried.body);
-  await waitUntil(() => s.turns.slice(before).some((turn) => turn.taskId), "the retried teammate turn");
-  const retry = s.turns.slice(before).find((turn) => turn.taskId)!.prompt;
-  assert.ok(
-    retry.startsWith(
-      "Previous attempt failed: BELL did not add the changes because they touched files other people hold: src/api/users.ts\n",
-    ),
-    retry.slice(0, 300),
-  );
-  await waitUntil(() => !["queued", "running"].includes(s.run(id).status), "the retried run");
-  assert.equal(s.run(id).team?.tasks[0].heldPaths, undefined);
-  for (const turn of s.turns)
-    for (const secret of ["Ada", "Secret plan"]) assert.equal(turn.prompt.includes(secret), false, `${turn.role}: ${secret}`);
-});
+    // Ada releases; Ben retries. The teammate's fresh first turn is told why
+    // the last attempt failed by its paths, never by her name or her title.
+    await s.release(s.who.admin, held!);
+    if (retryShape !== "current") {
+      delete run.team!.tasks[0].heldPaths;
+      run.team!.tasks[0].error = retryShape === "ordinary"
+        ? "Compiler failed: missing export users"
+        : withLocale(retryShape === "legacy-en" ? "en" : "zh-TW", () =>
+            sm().run.local.taskHeldByOther({ items: ["src/api/users.ts — Ada: Secret plan"] }),
+          );
+      await s.f.store.save();
+      await s.f.start();
+      assert.equal(s.run(id).team!.tasks[0].heldPaths, undefined);
+      assert.equal(s.run(id).team!.tasks[0].error, run.team!.tasks[0].error);
+    }
+    const before = s.turns.length;
+    const retried = await s.f.send("POST", `/api/runs/${id}/team/retry`, { ...english, ...s.who.member }, {});
+    assert.equal(retried.status, 200, retried.body);
+    await waitUntil(() => s.turns.slice(before).some((turn) => turn.taskId), "the retried teammate turn");
+    const retry = s.turns.slice(before).find((turn) => turn.taskId)!.prompt;
+    assert.ok(
+      retry.startsWith(
+        retryShape === "current"
+          ? "Previous attempt failed: BELL did not add the changes because they touched files other people hold: src/api/users.ts\n"
+          : retryShape === "ordinary"
+            ? "Previous attempt failed: Compiler failed: missing export users\n"
+            : "Previous attempt failed: BELL did not add the changes because they touched files other people hold.\n",
+      ),
+      retry.slice(0, 300),
+    );
+    await waitUntil(() => !["queued", "running"].includes(s.run(id).status), "the retried run");
+    assert.equal(s.run(id).team?.tasks[0].heldPaths, undefined);
+    for (const turn of s.turns)
+      for (const secret of ["Ada", "Secret plan"]) assert.equal(turn.prompt.includes(secret), false, `${turn.role}: ${secret}`);
+  });
+
+}
 
 test("a write turn is told the held paths without names or titles, goes on when it keeps off them, and stops when it does not", async (t) => {
   const s = await scene(t, async (input) => {

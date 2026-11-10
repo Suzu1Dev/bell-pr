@@ -54,7 +54,7 @@ import {
   retryTransientAuth,
 } from "./agent-cli.js";
 import { draftFingerprint } from "./drafts.js";
-import { cancelled, currentLocale, sm } from "./i18n/index.js";
+import { cancelled, currentLocale, sm, withLocale } from "./i18n/index.js";
 import type { Locale } from "../shared/i18n/locale.js";
 import {
   adoptLegacyCheckout,
@@ -541,9 +541,19 @@ async function executeTeamTask(
   // explain to the teammate why the earlier attempt was rejected. A stop over
   // other people's holds is told by its paths only: the person's message names
   // the holders and their titles, text other people typed.
+  // Older persisted tasks have only a localized error. Match the fixed
+  // prefix, never try to extract paths from text containing holder metadata.
+  const legacyHeld = (["en", "zh-TW"] as const).some((locale) =>
+    withLocale(locale, () => {
+      const prefix = sm().run.local.taskHeldByOther({ items: ["\0"] }).split("\0")[0];
+      return task.error?.startsWith(prefix);
+    }),
+  );
   const previousFailure = task.heldPaths?.length
     ? `BELL did not add the changes because they touched files other people hold: ${task.heldPaths.join(", ")}`
-    : task.error;
+    : legacyHeld
+      ? "BELL did not add the changes because they touched files other people hold."
+      : task.error;
   delete task.error;
   delete task.heldPaths;
   try {

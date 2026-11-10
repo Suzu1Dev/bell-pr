@@ -327,3 +327,7 @@ Defaults this design takes, each open to change:
 5. **Holds cover every branch** of the repository.
 6. **G3 (expiry) stays separate.** Admin revoke is the answer to a
    forgotten hold for now.
+
+Stopped teammate retries send held paths to the agent without holder names or
+hold titles. Older saved tasks without held paths receive a generic hold-stop
+reason in either supported locale; ordinary failure details remain available.
