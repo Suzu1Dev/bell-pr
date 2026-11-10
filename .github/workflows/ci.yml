@@ -193,35 +193,61 @@ jobs:
           npm install -g npm@11.21.1
           node -e "if (process.versions.node !== '24.22.1') { console.error(process.versions.node); process.exit(1); }"
           test "$(npm --version)" = "11.21.1"
-      - run: npm ci
-      - name: Read the installed Playwright version
+      - name: Read the Playwright version from the lockfile
         id: playwright-version
-        run: |
-          locked="$(node -p "require('./package-lock.json').packages['node_modules/playwright'].version")"
-          installed="$(node -p "require('playwright/package.json').version")"
-          test "$locked" = "$installed"
-          echo "version=$installed" >> "$GITHUB_OUTPUT"
+        run: echo "version=$(node -p "require('./package-lock.json').packages['node_modules/playwright'].version")" >> "$GITHUB_OUTPUT"
       - name: Cache Playwright browsers
         id: playwright-browsers
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.cache/ms-playwright
-          key: ms-playwright-${{ runner.os }}-chromium-${{ steps.playwright-version.outputs.version }}
-      - name: Install Playwright's Chromium
-        if: steps.playwright-browsers.outputs.cache-hit != 'true'
-        run: npx playwright install chromium
-      - name: Install Playwright system dependencies
-        run: npx playwright install-deps chromium
-      - name: Check bilingual landing pages and installation controls
-        run: node site/check-site.mjs --browser
+          key: ms-playwright-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}-chromium
+      - name: Install packages, Chromium's libraries, and Chromium on a cache miss
+        run: |
+          version="${{ steps.playwright-version.outputs.version }}"
+          # Chromium only. Libraries start before npm ci so a slow apt
+          # download overlaps the install. A cache hit skips the browser
+          # download and still installs the libraries.
+          npx --yes "playwright@${version}" install-deps chromium &
+          deps=$!
+          npm ci
+          installed="$(node -p "require('playwright/package.json').version")"
+          test "$installed" = "$version"
+          if [ "${{ steps.playwright-browsers.outputs.cache-hit }}" != "true" ]; then
+            npx playwright install chromium
+          fi
+          wait "$deps"
       - name: Run the end-to-end tests (builds, then starts bell-pr on port 4599)
         env:
           BELLPR_E2E_PORT: "4599"
-          # Equal weights put the long serial files on shard 1, and that job
-          # ran 10.7 minutes. 4:11 stops before real-run-journey.spec.ts.
-          # Both shards must use the same weights.
-          PWTEST_SHARD_WEIGHTS: "4:11"
-        run: npm run test:e2e -- --shard=${{ matrix.shard }}/2
+          SHARD: ${{ matrix.shard }}
+        run: |
+          # Equal --shard runs put the long serial files on shard 1 (10.7 min).
+          # PWTEST_SHARD_WEIGHTS is not a documented Playwright 1.64 option.
+          # Pass the files on either side of this cut instead:
+          # https://playwright.dev/docs/test-cli
+          cut=e2e/real-run-journey.spec.ts
+          files=()
+          while IFS= read -r file; do
+            if [[ "$file" < "$cut" ]]; then
+              [[ "$SHARD" == 1 ]] && files+=("$file")
+            else
+              [[ "$SHARD" == 2 ]] && files+=("$file")
+            fi
+          done < <(LC_ALL=C find e2e -name '*.spec.ts' -type f | LC_ALL=C sort)
+          [[ ${#files[@]} -gt 0 ]]
+          echo "shard ${SHARD}: ${#files[@]} files"
+          # The site check uses its own port. Run it during the suite.
+          node site/check-site.mjs --browser &
+          site=$!
+          set +e
+          npm run test:e2e -- "${files[@]}"
+          tests=$?
+          wait "$site"
+          site_status=$?
+          set -e
+          test "$tests" = 0
+          test "$site_status" = 0
       - name: Upload the traces and the report
         if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
