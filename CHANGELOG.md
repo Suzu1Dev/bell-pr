@@ -18,11 +18,11 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   with the code through `POST /api/collab/join` and gets a participant
   token, sent in `x-bell-participant` next to the app token; an admin can
   remove a person and, when asked, unpair the device they joined from.
-  Nothing is protected at write time:
-  admin and member only decide who may invite and remove people, add
-  repositories and revoke a hold (next entry). Without the switch nothing
-  changes, except that a participant token is masked (under Changed).
-  `docs/group-work.md` describes it.
+  Group work keeps nobody from writing anything: admin and member only
+  decide who may invite and remove people, add repositories and revoke a
+  hold (next entry). Without the switch nothing changes, except that a
+  participant token is masked (under Changed). `docs/group-work.md`
+  describes it.
 - **The group's repositories, holds on files and folders, and a live feed,
   through the API.** A group admin adds a repository this BELL PR has
   (`POST /api/collab/projects`), and the group gets its own bare copy of
@@ -32,15 +32,15 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   everything inside it, and letter case is ignored. BELL PR refuses a hold
   that meets one already held and names who holds what; `check` asks the
   same question without taking anything. The holder releases a hold, an
-  admin revokes one, anyone takes a released task again, and removing a
-  person ends what they hold. `GET /api/collab/projects/<id>/feed` answers
-  with the repository's board and waits up to 25 seconds for the next
-  change. A hold does not stop a tool, an editor or a push from writing
-  outside it, and BELL PR's agents do not read holds. The group's record
-  keeps every ended hold and nothing cleans it up: once it is full (8 MiB)
-  new holds are refused until the host resets group storage, which
-  `docs/troubleshooting.md` describes. The paths that cannot be held and
-  every limit are in `docs/group-work.md`.
+  admin revokes one, and removing a person ends what they hold.
+  `GET /api/collab/projects/<id>/feed` answers with the repository's
+  board, the people of the group and what is held now, and waits up to 25
+  seconds for the next change. A hold does not stop a tool, an editor or a
+  push from writing outside it, and BELL PR's agents do not read holds.
+  The group's record keeps every ended hold and nothing cleans it up: once
+  it is full (8 MiB) new holds are refused until the host resets group
+  storage, which `docs/troubleshooting.md` describes. The paths that
+  cannot be held and every limit are in `docs/group-work.md`.
 - **With group work on, the data-directory lock is the strict one.** It is
   never replaced because of its age. After a crash that leaves a lock
   whose holder cannot be confirmed (another container or machine, an older
@@ -114,7 +114,14 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   supports hard links, a start writes its lock aside and links it into
   place, so no other start reads it half written. A stale lock is removed
   only after a start claims it, so two starts that find the same stale
-  lock cannot remove the lock either of them then writes. A lock taken
+  lock cannot remove the lock either of them then writes. A claim left by
+  a start that stopped is cleared by the next start once its process is
+  gone, and one that names no start, outside coordination, once it is 30
+  seconds old;
+  a claim that stays, like a lock that cannot be read, is named in the
+  refusal. Without hard links, a start gives up a lock it wrote in place
+  when another start had claimed it empty, so both cannot run; a leftover
+  claim there can refuse a start until it is removed. A lock taken
   for coordination is never replaced until its holder is shown to have
   stopped; group work takes one. Tests now hold an integration after its
   last lock check, and put holders and starts in real separate PID

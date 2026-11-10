@@ -50,6 +50,8 @@ export class CollabProjects {
     const found: { repoId: string; name: string }[] = [];
     for (const repo of this.store.data.repos) {
       if (this.added(repo.id)) continue;
+      // The coordinator takes no other name for a branch (branchPattern in coordination.ts).
+      if (!/^[A-Za-z0-9][A-Za-z0-9._/-]{0,199}$/.test(repo.defaultBranch)) continue;
       const ref = `refs/heads/${repo.defaultBranch}`;
       const copyable = await git(
         repo.path,
@@ -77,15 +79,20 @@ export class CollabProjects {
    * Adds a repository of this BELL PR to the group: 400 `unknownRepository`,
    * 409 `alreadyAdded`, and `cloneFailed` (504 when the copy took too long,
    * else 500) when the copy or the project cannot be made. A failure leaves
-   * no folder and no entry behind.
+   * no folder and no repository in the group; a project made before a failed
+   * side-file write stays in the record.
    */
   async add(repoId: string): Promise<CollabProject> {
     const repo = this.store.data.repos.find((candidate) => candidate.id === repoId);
     if (!repo) throw refuse(400, "unknownRepository", (m) => m.collab.unknownRepository);
     if (this.added(repoId)) throw refuse(409, "alreadyAdded", (m) => m.collab.alreadyAdded);
     const id = collabId("p");
+    // The side file takes a name of 200 characters.
+    const name = repo.fullName.slice(0, 200);
     const target = path.join(dataPaths(this.store.directory).collabRepos, `${id}.git`);
     this.adding.add(repoId);
+    // Taken now: stop() puts a new one in its place.
+    const { signal } = this.stopping;
     try {
       return await this.host.run(async () => {
         try {
@@ -105,12 +112,12 @@ export class CollabProjects {
               target,
             ],
             // The time limit of BELL's own copy of a local repository (repositories.ts).
-            { timeoutMs: 180_000, maxBytes: 1_000_000, signal: this.stopping.signal },
+            { timeoutMs: 180_000, maxBytes: 1_000_000, signal },
           );
           await this.host.coordinator().defineProject(id, target, repo.defaultBranch);
           await this.host.saveSide((draft) => {
             (draft.projects ??= {})[id] = {
-              name: repo.fullName,
+              name,
               repoId,
               addedAt: new Date().toISOString(),
             };
@@ -119,7 +126,7 @@ export class CollabProjects {
           await rm(target, { recursive: true, force: true });
           throw this.refusal(error, id, repoId);
         }
-        return { id, name: repo.fullName };
+        return { id, name };
       }, id);
     } finally {
       this.adding.delete(repoId);

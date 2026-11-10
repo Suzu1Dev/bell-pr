@@ -119,6 +119,18 @@ export default {
     /** Strict rule (coordination): a lock whose holder cannot be shown to have stopped. */
     dataDirHolderUnconfirmed: ({ dataDir, file }: { dataDir: string; file: string }) =>
       `${name} cannot tell whether the process holding the data directory ${dataDir} has stopped: its lock ${file} comes from another container, another machine or an older version, or cannot be read. This start does not replace such a lock by itself. Make sure nothing uses this data directory any more, then remove ${file} and start again.`,
+    /** No holder to name: the lock was gone, or not a lock, each time the start looked. */
+    dataDirLockUnsettled: ({ dataDir, file }: { dataDir: string; file: string }) =>
+      `${name} could not take the lock ${file} of the data directory ${dataDir}: each time it tried, the file had just changed or could not be read. Start again in a moment. If this keeps happening and no ${name} is running with this data directory, remove ${file}.`,
+    /** A lock, or what lies in its place, that cannot be read: no start replaces it. `reason` is the system's. */
+    lockUnreadable: ({ file, reason }: { file: string; reason: string }) =>
+      `${name} cannot read the lock file ${file}: ${reason}. It may belong to a ${name} that is still running, so it is not replaced. Make sure no ${name} is running with this data directory, then remove ${file} and start again.`,
+    /** Another start's claim on a stale lock, which this start could not clear. */
+    takeoverClaimed: ({ file }: { file: string }) =>
+      `Another ${name} start is replacing a lock left behind in this data directory, or stopped while doing so: its claim file ${file} is still there. Wait about half a minute and start again. If this keeps happening and no ${name} is starting, remove ${file}.`,
+    /** Strict rule (coordination): a claim whose start cannot be shown to have stopped. */
+    takeoverClaimUnconfirmed: ({ file }: { file: string }) =>
+      `${name} cannot tell whether the start that was replacing a lock left behind in this data directory has stopped: its claim file ${file} is still there. This start does not remove such a claim by itself. Make sure no ${name} is starting on this data directory, then remove ${file} and start again.`,
     /** `start --group` or a `group` command: the running instance was started without group work. */
     withoutGroup: ({ url }: { url: string }) =>
       `${name} is already running at ${url} without group work. Stop it first, then start it with \`${bin} start --group\`.`,

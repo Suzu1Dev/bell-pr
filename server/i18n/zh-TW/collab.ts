@@ -22,7 +22,6 @@ const m: Translation<typeof en> = {
   alreadyAdded: "這個儲存庫已經是小組的儲存庫。",
   cloneFailed: `${name} 無法為小組複製這個儲存庫，詳細原因記錄在主機的日誌裡。`,
   unknownProject: "小組沒有這個 id 的儲存庫。",
-  unknownRun: "這項貢獻不屬於這個儲存庫。",
   tooManyWaiters: "目前開著小組看板的頁面太多。請關掉其中一個再試。",
   slowDown: ({ seconds }) => `短時間內的請求太多，請在 ${seconds} 秒後再試。`,
   invalidScope: ({ max }) =>
@@ -30,14 +29,10 @@ const m: Translation<typeof en> = {
   tooManyScopes: ({ max }) => `一次佔用最多 ${max} 個路徑。`,
   conflict: "已經有人佔用了會互相衝突的路徑，所以這次沒有佔用任何路徑。",
   full: "小組的紀錄已滿。請主機的使用者重設小組的儲存空間。",
-  unknownTask: "這個儲存庫沒有這個 id 的任務。",
   unknownClaim: "這個儲存庫沒有這個 id 的佔用。",
-  taskClaimed: "這個任務已經有人佔用。",
-  taskClosed: "這個任務已經結束，不能再接手。",
   ended: "這項佔用已經結束。",
   notHolder: "只有佔用這些路徑的人可以釋出它們。",
   staleFence: "這項佔用在看板讀取之後有了變更。請重新載入看板再試。",
-  recoveryUndecided: "這個儲存庫暫時關閉，要等小組管理員處理完一項被中斷的變更。",
   refused: "小組協作拒絕了這個請求。",
   failed: "小組協作無法完成這個動作，詳細原因記錄在主機的日誌裡。",
 };

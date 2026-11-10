@@ -588,6 +588,39 @@ there, then publish again.
   Removing the lock while its BELL PR still runs lets two processes write
   the same data directory; the one that lost the lock then stops group
   work (`notSingleWriter` below).
+- **"Another BELL PR start is replacing a lock left behind in this data
+  directory …"**: before a start replaces a lock left by a crash, it
+  writes a claim file beside it, `bellpr.lock.takeover-…`, and removes it
+  a moment later. This one is still there: another start is at work, or
+  one stopped part-way. Wait about half a minute and start again: a start
+  clears a claim once the process that wrote it is gone, and an empty one,
+  as after a power cut, 30 seconds after it was written. A claim whose
+  process id now belongs to another running Node.js program stays, because
+  a start that is only suspended looks the same. If the message keeps
+  coming back and no BELL PR is starting, remove the file the message
+  names. On a file system without hard links, the same refusal can come
+  where there is no lock, only a leftover claim, and it can leave an empty
+  `bellpr.lock` behind: once the claim is gone, the next start clears
+  that by itself.
+- **"BELL PR cannot tell whether the start that was replacing a lock left
+  behind in this data directory has stopped …"**: the same claim file, on
+  a data directory used with [group work](group-work.md). There a claim
+  stays, however old it is, until the process that wrote it is shown to
+  have stopped. Make
+  sure no BELL PR is starting on this data directory, then remove the file
+  the message names and start again.
+- **"BELL PR cannot read the lock file …"**: a lock is there that this
+  user may not read (its owner or mode was changed, or a start as another
+  user was killed before it removed its lock), or a directory lies in its
+  place. The message gives the system's reason. A
+  lock that cannot be read is never replaced: it may belong to a BELL PR
+  that is still running. Make sure none runs with this data directory,
+  remove it yourself, then start again.
+- **"BELL PR could not take the lock … of the data directory …"**: each
+  time the start looked, the lock file had just changed or could not be
+  read, so there is no running process to name. Start again in a moment.
+  If it keeps happening and no BELL PR is running with this data
+  directory, remove the file the message names.
 - **"BELL PR is already running at … without group work"**:
   `bell-pr start --group` (or `BELLPR_GROUP=1`) found a BELL PR that runs
   with this data directory but was started without group work, and never
@@ -650,9 +683,9 @@ files.
 Only with [group work](group-work.md). A request that would add to the
 group's record is answered 409 with `reason: "full"` and "The group's
 record is full. Ask the host to reset group storage.": taking a hold,
-taking a task again, joining, and adding a repository. It is the same for
-everyone, and a restart does not change it. Holds can still be released
-and revoked, and the boards can still be read.
+joining, and adding a repository. It is the same for everyone, and a
+restart does not change it. Holds can still be released and revoked, and
+the boards can still be read.
 
 First find out which limit it is ([Limits](group-work.md#limits) lists
 them). A group admin reads `storage` in the answer of
@@ -706,7 +739,10 @@ was changed by the refused request.
   person already has 2 requests waiting, or the group has 64. Close a
   page, or stop a script that follows the feed. Until then, the same
   request with `wait=0` is still answered, so a board can be read by asking
-  again every few seconds.
+  again every few seconds. The same answer, with `wait=0` too, goes to a
+  person whose connections have left 8 feed answers unread: a script that
+  sends requests and does not read the answers. It ends when the answers
+  are read or those connections close.
 
 ## Runs that wait, stop or cannot be reviewed
 

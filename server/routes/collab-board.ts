@@ -9,7 +9,7 @@
  * it. A path, a title or an id from a request is never the key of a plain
  * object: the side file's records are read through sideEntry.
  */
-import type { Express, RequestHandler } from "express";
+import type { Express, RequestHandler, Response } from "express";
 import { z } from "zod";
 import type {
   CollabAddProjectResponse,
@@ -24,7 +24,7 @@ import { collabId, sideEntry, type CollabHost } from "../collab-host.js";
 import { CollabHub } from "../collab-hub.js";
 import { PersonLimit } from "../collab-limits.js";
 import { CollabProjects } from "../collab-projects.js";
-import { adminOnly, reasonOf, refuse } from "../collab-refusal.js";
+import { adminOnly, notJoined, reasonOf, refuse } from "../collab-refusal.js";
 import type { Actor } from "../coordination.js";
 import { claimableScope } from "../scope-paths.js";
 import type { Store } from "../store.js";
@@ -36,8 +36,13 @@ export const maxTitle = 120;
 /** Per person: 30 calls of `work` in 10 minutes, 120 of `check` in a minute. */
 export const workLimit = { max: 30, windowMs: 10 * 60_000 };
 export const checkLimit = { max: 120, windowMs: 60_000 };
+/** Per person: feed answers BELL PR still keeps because their connections have not taken them. */
+export const maxUntaken = 8;
 
-/** One line of text: a control or bidirectional-override character becomes a space. */
+/**
+ * One line of text: a control character, or one that embeds, overrides or
+ * isolates the direction of text, becomes a space. Direction marks stay.
+ */
 const line = z
   .string()
   .transform((text) => text.replace(/[\p{Cc}\u202a-\u202e\u2066-\u2069]/gu, " ").trim());
@@ -51,16 +56,9 @@ const feedSchema = z.object({
   wait: z.coerce.number().int().min(0).max(25).default(0),
 });
 const checkSchema = z.strictObject({ scopes });
-const workSchema = z.union([
-  z.strictObject({
-    title: line.pipe(z.string().min(1).max(maxTitle)),
-    scopes,
-    runId: z.string().max(64).optional(),
-  }),
-  z.strictObject({ taskId: z.string().max(64), scopes }),
-]);
+const workSchema = z.strictObject({ title: line.pipe(z.string().min(1).max(maxTitle)), scopes });
 const releaseSchema = z.strictObject({ fence: z.number().int().min(0) });
-const revokeSchema = z.strictObject({ reason: line.pipe(z.string().max(500)).optional() });
+const revokeSchema = z.strictObject({});
 
 const invalidScope = (invalid: string[] = []) =>
   refuse(400, "invalidScope", (m) => m.collab.invalidScope({ max: maxPathLength }), { invalid });
@@ -97,6 +95,8 @@ export function registerCollabBoardRoutes(
   );
   const works = new PersonLimit(workLimit.max, workLimit.windowMs);
   const checks = new PersonLimit(checkLimit.max, checkLimit.windowMs);
+  /** Feed answers that have not left BELL PR yet, by participant id. */
+  const untaken = new Map<string, Set<Response>>();
 
   host.onChange((projectId) => {
     if (host.status().state === "ready") hub.changed(projectId);
@@ -143,11 +143,23 @@ export function registerCollabBoardRoutes(
     const question = feedSchema.parse(req.query);
     const projectId = req.params.project;
     projectOf(projectId);
-    const gone = hub.ask({ projectId, actor: res.locals.actor as Actor, ...question }, (body) => {
+    const actor = res.locals.actor as Actor;
+    // A connection that asks and never reads would fill the memory with boards.
+    const kept = untaken.get(actor.id) ?? new Set<Response>();
+    untaken.set(actor.id, kept);
+    // An answer whose connection went away before it left never finishes.
+    for (const answer of kept) if (answer.req.socket.destroyed) kept.delete(answer);
+    if (kept.size >= maxUntaken)
+      throw refuse(429, "tooManyWaiters", (m) => m.collab.tooManyWaiters);
+    const gone = hub.ask({ projectId, actor, ...question }, (body) => {
       // Answered because group work is stopping: the connection ends with the answer.
       if (host.status().state !== "ready") res.set("Connection", "close");
       if (body === undefined) res.status(204).end();
-      else res.type("json").send(body);
+      else {
+        kept.add(res);
+        res.once("finish", () => kept.delete(res));
+        res.type("json").send(body);
+      }
     });
     // Also when the client went away before any answer: its place is free again.
     res.on("close", gone);
@@ -187,14 +199,9 @@ export function registerCollabBoardRoutes(
       pace(works, actor);
       const body = workSchema.parse(req.body);
       const projectId = req.params.project;
-      const project = projectOf(projectId);
+      projectOf(projectId);
       const { held, invalid } = heldScopes(body.scopes);
       if (invalid.length || !held.length) throw invalidScope(invalid);
-      if ("runId" in body && body.runId !== undefined) {
-        const run = store.data.runs.find((candidate) => candidate.id === body.runId);
-        if (!run || run.repoId !== project.repoId)
-          throw refuse(400, "unknownRun", (m) => m.collab.unknownRun);
-      }
       const hold = await host.run(async () => {
         const coordinator = host.coordinator();
         /** 409 `conflict`, with who holds what, when a held path is in the way. */
@@ -214,25 +221,27 @@ export function registerCollabBoardRoutes(
         };
         // Asked first, so a refusal makes nothing.
         refuseMeeting();
-        let taskId: string;
-        if ("taskId" in body) taskId = body.taskId;
-        else {
-          taskId = collabId("t");
-          await coordinator.defineTask(actor, projectId, { id: taskId });
-          await host.saveSide((draft) => {
-            (draft.tasks ??= {})[taskKey(projectId, taskId)] = {
-              title: body.title,
-              ...(body.runId === undefined ? {} : { runId: body.runId }),
-              createdAt: new Date().toISOString(),
-            };
-          });
-        }
+        const taskId = collabId("t");
+        await coordinator.defineTask(actor, projectId, { id: taskId });
+        await host.saveSide((draft) => {
+          (draft.tasks ??= {})[taskKey(projectId, taskId)] = { title: body.title };
+        });
         try {
           const claim = await coordinator.claim(actor, projectId, { taskId, scopes: held });
+          // Removed while this was under way, after the removal looked for their holds.
+          if (sideEntry(host.side().people, actor.id)?.removedAt) {
+            await coordinator
+              .release(actor, projectId, claim.id, { fence: claim.fence })
+              .catch((error) => {
+                // An admin's revoke was there first.
+                if (reasonOf(error) !== "ended") throw error;
+              });
+            throw notJoined();
+          }
           return holdOf(host.side(), projectId, claim);
         } catch (error) {
-          // Someone took a path in between. The same answer; a task made above
-          // stays on the board, free to take.
+          // Someone took a path in between. The same answer; the task made above
+          // stays in the record.
           if (reasonOf(error) === "conflict") refuseMeeting();
           throw error;
         }
@@ -260,15 +269,12 @@ export function registerCollabBoardRoutes(
     "/api/collab/projects/:project/holds/:claim/revoke",
     participant,
     async (req, res) => {
-      const { reason } = revokeSchema.parse(req.body);
+      revokeSchema.parse(req.body);
       const actor = res.locals.actor as Actor;
       if (actor.role !== "admin") throw adminOnly();
       const { project, claim } = req.params;
       projectOf(project);
-      await host.run(
-        () => host.coordinator().revoke(actor, project, claim, reason ? { reason } : {}),
-        project,
-      );
+      await host.run(() => host.coordinator().revoke(actor, project, claim, {}), project);
       const answer: CollabOkResponse = { ok: true };
       res.json(answer);
     },

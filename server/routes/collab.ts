@@ -27,7 +27,7 @@ import type {
 import { readApiToken } from "../api-token.js";
 import { collabId, sideEntry, type CollabHost, type CollabSide } from "../collab-host.js";
 import { CollabInvites, inviteTtl, maxInvites, type Invite } from "../collab-invites.js";
-import { adminOnly, collabErrors, notJoined, refuse } from "../collab-refusal.js";
+import { adminOnly, collabErrors, notJoined, reasonOf, refuse } from "../collab-refusal.js";
 import { participantHeader } from "../coordination-routes.js";
 import type { Actor } from "../coordination.js";
 import type { DeviceTokens } from "../device-tokens.js";
@@ -224,12 +224,14 @@ export function registerCollabRoutes(
       const deviceId = await host.run(async () => {
         const person = personOf(host, id);
         if (!person) throw refuse(404, "unknownPerson", (m) => m.collab.unknownPerson);
-        if (!person.removedAt)
+        if (!person.removedAt) {
           await host.saveSide((draft) => {
             // One removal at a time: an admin removed a moment ago removes nobody.
             if (draft.people![actor.id]?.removedAt) throw notJoined();
             draft.people![id].removedAt = new Date().toISOString();
           });
+          log.info(`group: ${id} removed by ${actor.id}`);
+        }
         hub.forget(id);
         // What they hold goes with them, in every repository of the group.
         const coordinator = host.coordinator();
@@ -240,9 +242,8 @@ export function registerCollabRoutes(
               await coordinator.revoke(actor, projectId, claim.id, {});
               revoked += 1;
             } catch (error) {
-              // A hold that cannot end now (it just did, or its repository is closed)
-              // stays on the board under the removed person's name.
-              if (!(error instanceof AppError) || error.statusCode >= 500) throw error;
+              // A hold that ended in the meantime is not counted.
+              if (reasonOf(error) !== "ended") throw error;
             }
           }
         return person.deviceId;
@@ -261,7 +262,6 @@ export function registerCollabRoutes(
         const installToken = readApiToken(tokenFile);
         if (installToken) unpaired = await devices.revoke(deviceId, installToken);
       }
-      log.info(`group: ${id} removed by ${actor.id}`);
       const body: CollabRemoveResponse = { revoked, unpaired };
       res.json(body);
     },
