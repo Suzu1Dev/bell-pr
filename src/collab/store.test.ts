@@ -37,13 +37,15 @@ async function joined(t: TestContext) {
   const asked: { path: string; token: string | null; answer(response: Response): void }[] = [];
   const realFetch = globalThis.fetch;
   globalThis.fetch = ((input: RequestInfo | URL, init?: RequestInit) =>
-    new Promise<Response>((answer) =>
+    new Promise<Response>((answer, fail) => {
+      // As fetch does when the request is given up.
+      init?.signal?.addEventListener("abort", () => fail(init.signal!.reason));
       asked.push({
         path: String(input).replace("/api/collab", ""),
         token: new Headers(init?.headers).get("x-bell-participant"),
         answer,
-      }),
-    )) as typeof fetch;
+      });
+    })) as typeof fetch;
   mock.timers.enable({ apis: ["setTimeout"] });
   const store = createGroupStore();
   t.after(() => {
@@ -145,9 +147,14 @@ test("failures wait 1, 2, 5 and then 15 seconds, and an answer starts that again
 
 test("with no place for a waiting request the page asks every 10 seconds, then waits again", async (t) => {
   const { store, answer, waiting, pass } = await joined(t);
-  await answer(first, { reason: "tooManyWaiters", error: "Too many requests are waiting." }, 429);
+  const refusal = { reason: "tooManyWaiters", error: "Too many requests are waiting." };
+  await answer(first, refusal, 429);
   assert.equal(store.get().link, "polling");
-  // At once, and without waiting.
+  // At once, and without waiting. When that one is refused too, the next is 10 seconds later.
+  await answer("/projects/p1/feed?wait=0", refusal, 429);
+  await pass(9_999);
+  assert.deepEqual(waiting(), []);
+  await pass(1);
   await answer("/projects/p1/feed?wait=0", feed(1, [hold("a")]));
   assert.deepEqual([store.get().link, ids(store.get().held)], ["polling", ["a"]]);
   for (let poll = 0; poll < 5; poll++) {
@@ -159,6 +166,20 @@ test("with no place for a waiting request the page asks every 10 seconds, then w
   await pass(10_000);
   await answer(`${first}&epoch=e1&version=1&seen=1`);
   assert.equal(store.get().link, "live");
+});
+
+test("a feed request that is not answered in 40 seconds is given up, and the page reconnects", async (t) => {
+  const { store, answer, waiting, pass } = await joined(t);
+  await answer(first, feed(1, [hold("a")]));
+  const next = `${first}&epoch=e1&version=1&seen=1`;
+  await pass(39_999);
+  assert.equal(store.get().link, "live");
+  await pass(1);
+  // The board in hand stays, and is no longer said to be live.
+  assert.deepEqual([store.get().link, ids(store.get().held)], ["reconnecting", ["a"]]);
+  await pass(1000);
+  // The request that was given up, and the one after it.
+  assert.deepEqual(waiting(), [next, next]);
 });
 
 test("when group work stops the board goes, and the page asks where group work stands", async (t) => {
@@ -179,6 +200,9 @@ test("when group work stops the board goes, and the page asks where group work s
   await answer("", { state: "ready", host: false, me });
   await answer(first, feed(1, []));
   assert.deepEqual(store.get().held, []);
+  // Reset at the host: not set up, which is not "stopped".
+  await answer(`${first}&epoch=e1&version=1&seen=1`, { reason: "notSetUp", error: "Not set up." }, 503);
+  assert.equal(store.get().info?.state, "notSetUp");
 });
 
 test("an answer that comes after another repository was chosen, or after the page closed, is dropped", async (t) => {
@@ -213,4 +237,6 @@ test("a person the server no longer knows gets its sentence, and keeps the token
   await joining;
   assert.equal(store.get().refused, undefined);
   assert.equal(await answer("", { state: "ready", host: false, me }), "second");
+  // They may be another person now: the repositories are asked for again.
+  assert.deepEqual(waiting(), ["/projects"]);
 });

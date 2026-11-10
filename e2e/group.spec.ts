@@ -3,7 +3,9 @@
 // and Ben on a paired device. Each has a browser context of their own, and
 // what one does reaches the other's page through the feed, without a reload.
 // The invite code is read from Ada's dialog and typed into Ben's page; it and
-// the tokens stay in the test and are never printed. Then axe on the board
+// the tokens stay in the test and are never printed. Where a step needs an
+// answer to be late, the page's own request is kept back and then sent on to
+// the server unchanged. Then axe on the board
 // and on the invite dialog, in both languages and at both widths. On the
 // shared server, which runs without the switch, the page says how to turn
 // group work on and the sidebar has no Group item.
@@ -11,7 +13,7 @@ import { execFileSync } from "node:child_process";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import AxeBuilder from "@axe-core/playwright";
-import { expect, request, test, type Page } from "@playwright/test";
+import { expect, request, test, type Page, type Route } from "@playwright/test";
 import { locales } from "../shared/i18n/locale";
 import { product } from "../shared/product";
 import { e2eApiHeaders } from "./api-token.mjs";
@@ -73,6 +75,18 @@ const expectFits = async (page: Page) =>
     await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth),
   ).toBe(0);
 
+/** Keeps the page's requests to `url` back until the function it returns is called. */
+async function keepBack(page: Page, url: RegExp) {
+  const kept: Route[] = [];
+  await page.route(url, (route) => void kept.push(route));
+  return async () => {
+    await page.unroute(url);
+    // A request the page gave up meanwhile has nothing to send on.
+    for (const route of kept) await route.continue().catch(() => undefined);
+  };
+}
+const checks = /\/check$/;
+
 /** Fills Start work and waits for the answer that nothing is in the way, then takes the hold. */
 async function takeHold(page: Page, title: string, paths: string) {
   await page.locator("#hold-title").fill(title);
@@ -109,12 +123,15 @@ test.describe("two people on one group", () => {
 
   test("a hold reaches the other person, one that meets it is refused in the form, and a release frees it", async () => {
     // Ada starts group work at the host, adds the repository and invites Ben.
+    // Each card goes with its button, and the page's heading takes the focus.
     await ada.goto("/#/group?locale=en");
     await expect(sidebarItem(ada)).toBeVisible();
     await ada.locator("#host-name").fill("Ada");
     await ada.getByRole("button", { name: en.host.submit }).click();
+    await expect(ada.locator(".group-page h1")).toBeFocused();
     await ada.getByRole("button", { name: en.addRepository }).click();
     await expect(ada.locator("#hold-title")).toBeVisible();
+    await expect(ada.locator(".group-page h1")).toBeFocused();
     await ada.getByRole("button", { name: en.invite, exact: true }).click();
     const dialog = ada.getByRole("dialog");
     await dialog.locator("#invite-name").fill("Ben");
@@ -123,42 +140,93 @@ test.describe("two people on one group", () => {
     const code = await dialog.locator("code").innerText();
     await dialog.getByRole("button", { name: en.inviteDialog.done }).click();
 
-    // Ben joins with the code: the same board, and nothing only an admin has.
+    // Ben types a wrong code and presses Join by keyboard: the server's sentence, and the focus stays on the button.
     await ben.goto("/#/group?locale=en");
+    await ben.locator("#join-code").fill("not-the-code");
+    await ben.keyboard.press("Tab");
+    const join = ben.getByRole("button", { name: en.join.submit, exact: true });
+    await expect(join).toBeFocused();
+    await ben.keyboard.press("Space");
+    await expect(ben.locator("#card-error")).toBeVisible();
+    await expect(join).toBeFocused();
+
+    // Ben joins with the code: the same board, and nothing only an admin has.
     await ben.locator("#join-code").fill(code);
-    await ben.getByRole("button", { name: en.join.submit, exact: true }).click();
+    await join.click();
     await expect(ben.locator("#hold-title")).toBeVisible();
+    await expect(ben.locator(".group-page h1")).toBeFocused();
     await expect(ben.getByRole("button", { name: en.invite, exact: true })).toHaveCount(0);
 
-    // Ada's hold shows on Ben's page by itself.
+    // Ben asks for a file while nothing is held: nothing is in the way.
+    await ben.locator("#hold-title").fill("Rename users");
+    const paths = ben.locator("#hold-paths");
+    await paths.fill("src/api/users.ts");
+    const box = ben.locator("#hold-answer");
+    await expect(box.locator(".split-info")).toContainText(en.free);
+
+    // Ada's hold shows on Ben's page by itself, and the answer for the board
+    // before goes with it, however long the next answer takes.
+    let answer = await keepBack(ben, checks);
     await takeHold(ada, "Fix pagination", "src/api");
     await expect(ada.locator(".group-hold.mine")).toContainText(en.me);
     const adas = ben.locator(".group-hold", { hasText: "Fix pagination" });
     await expect(adas).toContainText("Ada");
     await expect(adas.locator("code")).toHaveText("src/api");
     await expect(adas.getByRole("button")).toHaveCount(0);
+    await expect(box).toBeEmpty();
+    await answer();
 
     // A file inside the held folder: the form says who holds it, and the button is off.
-    await ben.locator("#hold-title").fill("Rename users");
-    await ben.locator("#hold-paths").fill("src/api/users.ts");
-    const refused = ben.locator("#hold-answer .split-warning");
+    const refused = box.locator(".split-warning");
     await expect(refused.locator("strong")).toHaveText("Ada");
     await expect(refused.locator("code")).toHaveText("src/api");
     await expect(refused).toContainText("Fix pagination");
     const take = ben.getByRole("button", { name: en.takeHold });
     await expect(take).toBeDisabled();
 
+    // Other paths: the answer for the paths before goes at once.
+    answer = await keepBack(ben, checks);
+    await paths.fill("src/api");
+    await expect(box).toBeEmpty();
+    await answer();
+    await expect(refused.locator("strong")).toHaveText("Ada");
+
     // Ada releases: Ben's form turns free without a key, and his hold shows for Ada.
     await ada.getByRole("button", { name: en.releaseHold({ title: "Fix pagination" }) }).click();
     await expect(ada.locator(".group-hold")).toContainText(en.gone);
-    await expect(ben.locator("#hold-answer .split-info")).toContainText(en.free);
+    await expect(box.locator(".split-info")).toContainText(en.free);
     await take.click();
     await expect(ben.locator(".group-hold.mine")).toContainText("Rename users");
     await expect(ada.locator(".group-hold", { hasText: "Rename users" })).toContainText("Ben");
 
-    // For the pages below: Ada holds something too.
+    // Ben presses Take hold by keyboard, and Ada gets there first while his request is on its way:
+    // it is refused, the form says who holds the path, and the focus is on Paths.
+    await ben.locator("#hold-title").fill("Add tests");
+    await paths.fill("test");
+    await expect(box.locator(".split-info")).toContainText(en.free);
+    const send = await keepBack(ben, /\/work$/);
+    await take.press("Space");
+    await takeHold(ada, "Fix the tests", "test");
+    await expect(refused.locator("strong")).toHaveText("Ada");
+    await send();
+    await expect(paths).toBeFocused();
+    await expect(refused.locator("strong")).toHaveText("Ada");
+
+    // For the pages below: Ada holds one thing and Ben another.
+    await ada.getByRole("button", { name: en.releaseHold({ title: "Fix the tests" }) }).click();
     await takeHold(ada, "Write the guide", "docs");
     await expect(ben.locator(".group-hold")).toHaveCount(2);
+  });
+
+  test("a page opened while the host does not answer says that it is reconnecting, then shows the board", async () => {
+    const page = await ada.context().newPage();
+    const info = /\/api\/collab$/;
+    await page.route(info, (route) => route.abort());
+    await page.goto("/#/group?locale=en");
+    await expect(page.locator(".group-page > [role=status]")).toHaveText(en.reconnecting);
+    await page.unroute(info);
+    await expect(page.locator(".group-hold")).toHaveCount(2, { timeout: 20_000 });
+    await page.close();
   });
 
   for (const locale of locales)
