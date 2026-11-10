@@ -50,6 +50,8 @@ interface SidebarProps {
   openModal: (value: ModalName) => void;
   beginContribution: () => void;
   chooseRun: (id: string) => Promise<boolean>;
+  /** The product switcher's button, when another BELL product is linked. */
+  suiteTrigger?: ReactNode;
 }
 
 /** How many of the person's runs the recent list shows. */
@@ -71,6 +73,7 @@ export function Sidebar({
   openModal,
   beginContribution,
   chooseRun,
+  suiteTrigger,
 }: SidebarProps) {
   const t = useT("app");
   const byHand = useT("workspace").byHand.badge;
@@ -147,6 +150,7 @@ export function Sidebar({
             <Logo variant="wordmark" size={30} title="" className="brand-wordmark" />
             <Logo variant="mark" size={30} title="" className="brand-mark" />
           </a>
+          {suiteTrigger}
         </div>
         <div className="nav-label">{t.sidebar.navigationHeading}</div>
         <nav aria-label={t.sidebar.mainNavigation}>
