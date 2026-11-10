@@ -4,8 +4,8 @@ BELL PR is one of three BELL products, next to BELL Explain and BELL
 Personal. Each one runs on its own and has its own address. The Suite
 link tells BELL PR where the other two are, so you can move between them,
 and it describes BELL PR to them in the form the BELL Suite contract
-(version 1) sets. It is off until you set `BELLPR_SUITE_LINKS`, and BELL
-PR works the same without it.
+(version 1) sets. The switcher is off until you set `BELLPR_SUITE_LINKS`,
+and BELL PR works the same without it.
 
 ## Link the other products
 
@@ -34,7 +34,9 @@ end of the sidebar's logo row (beside the menu button on a narrow
 screen). It lists the three products: a linked one is a link that opens
 in the same tab, BELL PR is marked as the current one, and the rest read
 "Not linked". The link is the address you set and nothing more. BELL PR
-adds no token, run or other data to it.
+adds no token, run or other data to it. On a screen narrower than 390 px
+the button makes room for the "Sample project" badge of presentation mode
+(`present=1`) while that badge shows.
 
 Your browser keeps each product's sign-in under that product's own
 address, and `localhost` and `127.0.0.1` count as different addresses.
@@ -52,7 +54,8 @@ access token again:
 
 Two addresses, both read-only and both behind the same protection as the
 rest of the API: the trusted-host and origin checks and BELL PR's access
-token. Neither sends a CORS header.
+token. Neither sends a CORS header. Both answer whether or not
+`BELLPR_SUITE_LINKS` is set; without it the manifest lists no origin.
 
 `GET /api/suite/manifest` says what this product is: its contract id
 (`pr`), its name, a summary of a few words, the path of the feed below,
@@ -73,14 +76,24 @@ is not in the feed. Cancelled runs, runs whose working files were
 removed and a run that was split into smaller ones (its parts are listed
 instead) are left out too.
 
+The state follows the run's status and its follow-up round. Work BELL PR
+does on a run that is already yours to review or publish stays
+`needs-you`: a Collaborate turn, or the guide's review of your change in
+a Learn by hand run.
+
 For each listed run BELL PR sends exactly this:
 
 - its id and the route that opens it (`#/runs/<id>`);
 - its title, as one line of at most 120 characters. When you did not name
   the run, its title is the first 72 characters of your request, as
-  everywhere in BELL PR;
+  everywhere in BELL PR. Text in it that looks like a credential is
+  masked as `[REDACTED]`, and a title with nothing to read is sent as
+  "Untitled run";
 - its state, with a fixed phrase for it such as "Ready for your review";
-- the time of its last recorded step.
+- the time of its last log line or, when that is later, of the request
+  of its last follow-up round; the time it was created when it has
+  neither. A step that writes no log line, such as approving a run,
+  leaves the time as it was.
 
 Nothing else leaves BELL PR through these addresses: not the rest of your
 request, the plan, the diff, log lines, the project's name or address,
