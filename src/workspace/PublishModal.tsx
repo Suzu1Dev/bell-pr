@@ -238,8 +238,8 @@ export function OutgoingText({
         <pre>{text.commitMessage}</pre>
       </div>
       <div className="publish-body-preview">
-        <strong>{demo ? t.bodyPreviewDemo : t.bodyPreview}</strong>
-        <pre>{text.body}</pre>
+        <strong id="publish-body-label">{demo ? t.bodyPreviewDemo : t.bodyPreview}</strong>
+        <pre tabIndex={0} aria-labelledby="publish-body-label">{text.body}</pre>
       </div>
     </div>
   );
