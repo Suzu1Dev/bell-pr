@@ -46,7 +46,10 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   supports hard links, a start writes its lock aside and links it into
   place, so no other start reads it half written. A stale lock is removed
   only after a start claims it, so two starts that find the same stale
-  lock cannot remove the lock either of them then writes. A lock taken
+  lock cannot remove the lock either of them then writes. A claim left by
+  a start that stopped is cleared by the next start once its process is
+  gone or it is 30 seconds old; for coordination it stays until that start
+  is shown to have stopped, and the refusal names the file. A lock taken
   for coordination is never replaced until its holder is shown to have
   stopped; nothing takes one yet. Tests now hold an integration after its
   last lock check, and put holders and starts in real separate PID
