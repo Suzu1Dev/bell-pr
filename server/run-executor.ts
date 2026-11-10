@@ -13,7 +13,7 @@ import { assertRunAgentAllowed } from "./codex-guard.js";
 import { command, git, agentEnvironment, recordedGitDir, redact } from "./process.js";
 import { readDiff } from "./git.js";
 import { planOverlaps, planScopes } from "./group-local.js";
-import { assertNotHeld, changedPaths, heldNotice } from "./hold-guard.js";
+import { assertNotHeld, changedPaths, heldNotice, heldPathsOf } from "./hold-guard.js";
 import {
   claimReadyTasks,
   consumeTeamInbox,
@@ -538,9 +538,14 @@ async function executeTeamTask(
 ) {
   const team = run.team!;
   // A retried task keeps the previous error until its fresh first turn can
-  // explain to the teammate why the earlier attempt was rejected.
-  const previousFailure = task.error;
+  // explain to the teammate why the earlier attempt was rejected. A stop over
+  // other people's holds is told by its paths only: the person's message names
+  // the holders and their titles, text other people typed.
+  const previousFailure = task.heldPaths?.length
+    ? `BELL did not add the changes because they touched files other people hold: ${task.heldPaths.join(", ")}`
+    : task.error;
   delete task.error;
+  delete task.heldPaths;
   try {
     await ctx.lock(`integration:${run.id}`, async () => {
       if (signal.aborted) throw new AppError(cancelled(), 409);
@@ -665,6 +670,8 @@ async function executeTeamTask(
     task.error = redact(
       error instanceof Error ? error.message : sm().run.team.taskFailed,
     );
+    const held = heldPathsOf(error);
+    if (held) task.heldPaths = held;
     const member = run.agents.find((agent) => agent.id === task.owner);
     if (member) {
       member.status = "failed";

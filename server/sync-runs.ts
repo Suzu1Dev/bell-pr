@@ -32,6 +32,7 @@ import {
   worktreeDirty,
 } from "./pr-branch.js";
 import { assertRunAgentAllowed } from "./codex-guard.js";
+import { heldPathsOf } from "./hold-guard.js";
 import { runAgent } from "./run-executor.js";
 import { contributionContext } from "./prompts/team.js";
 import { conflictPrompt } from "./prompts/sync.js";
@@ -489,15 +490,15 @@ async function runConflictResolution(
   } catch (error) {
     await ctx.lock(run.id, async () => {
       await restoreSyncHead(run, head).catch(() => undefined);
+      const reason = redact(
+        error instanceof Error ? error.message : sm().run.sync.incompleteReason,
+      );
+      // A stop over other people's holds already says the changes are kept.
       holder.report = controller.signal.aborted
         ? sm().run.sync.stopped
-        : sm().run.sync.failed({
-            reason: redact(
-              error instanceof Error
-                ? error.message
-                : sm().run.sync.incompleteReason,
-            ),
-          });
+        : heldPathsOf(error)
+          ? reason
+          : sm().run.sync.failed({ reason });
       await ctx.diff(run.id).catch(() => undefined);
       run.status = "review";
       ctx.log(run, "system", holder.report ?? sm().run.sync.incomplete);

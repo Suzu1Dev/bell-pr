@@ -573,6 +573,7 @@ export const runReadSchema = loose({
           status: text,
           setup: later(setupNeedsSchema),
           gitDir: later(text),
+          heldPaths: later(list),
         }),
       ),
       messages: z.array(loose({})),

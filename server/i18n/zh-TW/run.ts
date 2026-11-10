@@ -348,7 +348,7 @@ const m: Translation<typeof en> = {
       `Agent 處理後仍有衝突標記：${list(files)}；可以自行修改，或再請 Agent 處理。`,
     stopped: "已停止解衝突；已改的檔案保留，可以自行完成，或再請 Agent 處理。",
     failed: ({ reason }) =>
-      `${reason}；已改的檔案保留，可以自行完成，或再請 Agent 處理。`,
+      `${reason.replace(/[.。]+$/u, "")}；已改的檔案保留，可以自行完成，或再請 Agent 處理。`,
     incompleteReason: "解衝突未完成",
     incomplete: "解衝突未完成。",
     conflictsOpen: ({ files }) =>

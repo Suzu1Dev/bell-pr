@@ -286,7 +286,7 @@ test("a plan over Ada's hold does not start on its own, cannot be approved while
   }
 });
 
-test("a teammate's change to a file Ada took a hold on while it worked is not added, and the run stops", async (t) => {
+test("a teammate's change to a file Ada took a hold on while it worked is not added, the run stops, and its retry is told the paths only", async (t) => {
   let adaHolds = async () => {};
   const s = await scene(t, async (input) => {
     if (input.role === "lead") return plan([{ id: "alpha", files: ["src/api"] }]);
@@ -297,8 +297,10 @@ test("a teammate's change to a file Ada took a hold on while it worked is not ad
     }
     return "Not used";
   });
+  let held: CollabHold | undefined;
   adaHolds = async () => {
-    await s.hold(s.who.admin, ["src/api/users.ts"]);
+    held = await s.hold(s.who.admin, ["src/api/users.ts"], "Secret plan");
+    adaHolds = async () => {};
   };
   const started = await s.start(s.who.member, false);
   assert.equal(started.status, 202, started.body);
@@ -307,7 +309,7 @@ test("a teammate's change to a file Ada took a hold on while it worked is not ad
   const run = s.run(id);
   assert.match(
     run.error ?? "",
-    /^A teammate changed files someone else holds, so those changes were not added to the contribution\. src\/api\/users\.ts — held by Ada for “Users API” \(since .+\)\. Ask them to release the hold, or ask a group admin to revoke it, then try again\.$/,
+    /^A teammate changed files someone else holds, so those changes were not added to the contribution\. src\/api\/users\.ts — held by Ada for “Secret plan” \(since .+\)\. Ask them to release the hold, or ask a group admin to revoke it, then try again\.$/,
   );
   assert.equal(run.team?.tasks[0].status, "failed");
   assert.deepEqual(await readDiff(run), []);
@@ -316,6 +318,28 @@ test("a teammate's change to a file Ada took a hold on while it worked is not ad
     await readFile(path.join(run.team!.tasks[0].worktreePath!, "src/api/users.ts"), "utf8"),
     "export const users = ['ben'];\n",
   );
+  // The person reads who holds it; the task keeps the paths for its retry.
+  assert.match(run.team!.tasks[0].error ?? "", /held by Ada for “Secret plan”/);
+  assert.deepEqual(run.team!.tasks[0].heldPaths, ["src/api/users.ts"]);
+
+  // Ada releases; Ben retries. The teammate's fresh first turn is told why
+  // the last attempt failed by its paths, never by her name or her title.
+  await s.release(s.who.admin, held!);
+  const before = s.turns.length;
+  const retried = await s.f.send("POST", `/api/runs/${id}/team/retry`, { ...english, ...s.who.member }, {});
+  assert.equal(retried.status, 200, retried.body);
+  await waitUntil(() => s.turns.slice(before).some((turn) => turn.taskId), "the retried teammate turn");
+  const retry = s.turns.slice(before).find((turn) => turn.taskId)!.prompt;
+  assert.ok(
+    retry.startsWith(
+      "Previous attempt failed: BELL did not add the changes because they touched files other people hold: src/api/users.ts\n",
+    ),
+    retry.slice(0, 300),
+  );
+  await waitUntil(() => !["queued", "running"].includes(s.run(id).status), "the retried run");
+  assert.equal(s.run(id).team?.tasks[0].heldPaths, undefined);
+  for (const turn of s.turns)
+    for (const secret of ["Ada", "Secret plan"]) assert.equal(turn.prompt.includes(secret), false, `${turn.role}: ${secret}`);
 });
 
 test("a write turn is told the held paths without names or titles, goes on when it keeps off them, and stops when it does not", async (t) => {
@@ -413,11 +437,15 @@ test("without --group nothing changes: no held paths in the prompt, and a turn w
   assert.doesNotMatch(prompt, /hold these paths|Your own work is under/);
 });
 
-test("a reason that ends in a full stop is joined to the kept-edits sentences once", () => {
+test("a reason that ends in a full stop is joined to the kept-edits sentences once, conflict resolution's too", () => {
   for (const locale of ["en", "zh-TW"] as const)
     withLocale(locale, () => {
       for (const reason of ["Try again.", "請再試一次。"])
-        for (const text of [sm().session.editsKept({ reason }), sm().run.followUp.keptEdits({ reason })])
+        for (const text of [
+          sm().session.editsKept({ reason }),
+          sm().run.followUp.keptEdits({ reason }),
+          sm().run.sync.failed({ reason }),
+        ])
           assert.doesNotMatch(text, /[.。]{2}|[.。][；;]/u, `${locale}: ${text}`);
     });
 });

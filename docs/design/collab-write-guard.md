@@ -168,8 +168,9 @@ release).
    and keeping them out keeps them from acting as instructions.
 2. **Check after the turn (S2).** This is the guard that counts. A prompt
    is a request, not a rule. The stop it makes keeps names and titles for
-   the person; later turns' history and the PR draft get a line with the
-   paths only (`heldPaths` on the message), for the reason above.
+   the person; later turns' history, a retried teammate task and the PR
+   draft get a line with the paths only (`heldPaths` on the session
+   message or the team task), for the reason above.
 3. **Sandbox denies (S3, defence in depth).** The sandboxes can already
    deny writes to single paths. Codex profiles mark `.git` as `"read"`
    (`codexSandboxConfig`, `server/agent-cli.ts:202`), and Claude Code gets

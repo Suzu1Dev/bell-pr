@@ -581,7 +581,7 @@ export default {
       "Stopped resolving the conflicts; the edited files are kept, and you can finish yourself or ask the agent again.",
     /** `reason` is an error message without its final period. */
     failed: ({ reason }: { reason: string }) =>
-      `${reason}; the edited files are kept, and you can finish yourself or ask the agent again.`,
+      `${reason.replace(/[.\u3002]+$/u, "")}; the edited files are kept, and you can finish yourself or ask the agent again.`,
     incompleteReason: "Resolving the conflicts did not finish",
     incomplete: "Resolving the conflicts did not finish.",
     conflictsOpen: ({ files }: { files: string[] }) =>

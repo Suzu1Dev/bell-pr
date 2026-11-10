@@ -423,8 +423,8 @@ everyone else:
   A change over someone else's hold stops the turn with the files.
   Nothing is undone: the changes stay in the checkout for review, and a
   follow-up round keeps them without a commit message. The person sees
-  who holds each file; the run's later turns, and the PR draft written
-  from the run, are told only the paths.
+  who holds each file; the run's later turns, a retried teammate task,
+  and the PR draft written from the run, are told only the paths.
 
 Turns that only read or review, and turns that work outside the run's
 checkout, are not checked. While group work
