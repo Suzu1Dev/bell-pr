@@ -224,7 +224,7 @@ test("a publish that fails after the commit and before a push target is archived
   }
 });
 
-test("the recovery ref is removed after a later publish succeeds", { skip: "the recovery ref is left in place after a successful publish and after the run is removed" }, async () => {
+test("the recovery ref is removed after a later publish succeeds", { skip: "the recovery ref is left in place after a successful publish and after the run is removed; to be decided in a follow-up PR" }, async () => {
   const f = await fixture();
   try {
     await assert.rejects(
@@ -253,7 +253,7 @@ test("the recovery ref is removed after a later publish succeeds", { skip: "the 
   }
 });
 
-test("the recovery ref is removed when the run is removed", { skip: "the recovery ref is left in place after a successful publish and after the run is removed" }, async () => {
+test("the recovery ref is removed when the run is removed", { skip: "the recovery ref is left in place after a successful publish and after the run is removed; to be decided in a follow-up PR" }, async () => {
   const f = await fixture();
   try {
     await assert.rejects(
