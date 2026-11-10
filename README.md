@@ -513,6 +513,16 @@ access, except with the Antigravity CLI, whose web search cannot be turned
 off: every Antigravity agent can search the web, and only reads pages on
 GitHub's sites when this setting is on.
 
+### Group work, for people who share one BELL PR
+
+Started with `--group`, a BELL PR that several people use (the host and
+paired devices) has a **Group** page. Each person says which files and
+folders of a repository they are working on by taking a hold. The page
+shows who holds what as it changes and tells you, before you start, whether
+the paths you want are held; BELL PR refuses a hold that meets one already
+held. A hold is a record for the group: it does not stop a tool, an editor
+or a push from writing outside it. See [Group work](docs/group-work.md).
+
 ## Privacy
 
 - BELL PR runs on your computer and keeps everything in one data
