@@ -83,6 +83,12 @@ export const secretPatterns: readonly SecretPattern[] = [
     blocks: true,
   },
   {
+    // Participant tokens (coordination.ts): bpc_ and 43 base64url characters.
+    pattern: /\bbpc_[A-Za-z0-9_-]{16,}/g,
+    replacement: "[REDACTED]",
+    blocks: true,
+  },
+  {
     // A pairing code in a /pair?code= or /pair#code= link (pair-qr.ts).
     pattern: /([?#&]code=)[^&#\s"']+/gi,
     replacement: "$1[REDACTED]",
