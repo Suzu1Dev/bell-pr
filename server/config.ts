@@ -129,6 +129,8 @@ export function dataPaths(dataDir: string) {
     coordination: path.join(dataDir, "coordination.json"),
     /** Group work beside coordination.json: the group's id and people's names (collab-host.ts). */
     collab: path.join(dataDir, "collab.json"),
+    /** Group work's own bare copy of each of the group's repositories (collab-projects.ts). */
+    collabRepos: path.join(dataDir, "collab"),
   };
 }
 

@@ -232,7 +232,7 @@ export function createApp(workbench: Workbench, options: AppOptions = {}) {
     });
   if (options.collab) {
     app.locals.collab = options.collab;
-    registerCollabRoutes(app, options.collab, { devices, tokenFile });
+    registerCollabRoutes(app, options.collab, { store: workbench.store, devices, tokenFile });
   }
   if ((options.platform ?? process.platform) === "linux") registerSudoRoutes(app, deps);
   app.use("/api", (_req, res) => {

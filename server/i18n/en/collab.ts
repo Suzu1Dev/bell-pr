@@ -17,4 +17,28 @@ export default {
     `${max} invite codes are already waiting. Wait until one is used or expires (${minutes} minutes).`,
   removeSelf: "You cannot remove yourself from the group.",
   unknownPerson: "Nobody in this group has this id.",
+  unknownRepository: `This ${name} has no repository with this id.`,
+  alreadyAdded: "This repository is already one of the group's.",
+  cloneFailed: `${name} could not copy the repository for the group. The log on the host has the details.`,
+  unknownProject: "The group has no repository with this id.",
+  unknownRun: "This contribution does not belong to this repository.",
+  tooManyWaiters: "Too many pages are open on the group's boards. Close one, then try again.",
+  slowDown: ({ seconds }: { seconds: number }) =>
+    `Too many requests in a short time. Try again in ${seconds} ${seconds === 1 ? "second" : "seconds"}.`,
+  invalidScope: ({ max }: { max: number }) =>
+    `Name at least one file or folder of the repository, each as a path of at most ${max} characters. Some paths cannot be held, such as one outside the repository or one with special characters.`,
+  tooManyScopes: ({ max }: { max: number }) => `One hold takes at most ${max} paths.`,
+  conflict: "Someone already holds a path that is in the way. Nothing was held.",
+  full: "The group's record is full. Ask the host to reset group storage.",
+  unknownTask: "This repository has no task with this id.",
+  unknownClaim: "This repository has no hold with this id.",
+  taskClaimed: "Someone already holds this task.",
+  taskClosed: "This task is closed and cannot be taken again.",
+  ended: "This hold has already ended.",
+  notHolder: "Only the person who holds these paths can release them.",
+  staleFence: "This hold has changed since the board was read. Reload the board, then try again.",
+  recoveryUndecided:
+    "This repository is closed until a group admin settles a change that was interrupted.",
+  refused: "Group work refused this request.",
+  failed: "Group work could not do this. The log on the host has the details.",
 };
