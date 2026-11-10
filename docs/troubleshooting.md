@@ -552,12 +552,14 @@ there, then publish again.
 ## BELL PR does not start
 
 - **"Not ready: fix the required check…"**: `bell-pr doctor` failed a
-  required check, so `bell-pr start` exited before it listened. The message
-  is the doctor's checklist: each failed check and the command that fixes
-  it, then how to start anyway. `bell-pr start --force` starts and prints a
-  warning. The sample tour needs no AI provider; a real agent run still
-  waits until Codex CLI, Claude Code or the Antigravity CLI is installed
-  and signed in.
+  required check other than the AI provider alone, so `bell-pr start`
+  exited before it listened. A missing provider, with every other required
+  check passing, still starts and Welcome shows how to install Codex CLI,
+  Claude Code or the Antigravity CLI. The message is the doctor's
+  checklist: each failed check and the command that fixes it, then how to
+  start anyway. `bell-pr start --force` starts and prints a warning. The
+  sample tour needs no AI provider; a real agent run still waits until
+  Codex CLI, Claude Code or the Antigravity CLI is installed and signed in.
 - **"BELL PR needs Node.js 22 or later"**: install the current Node.js LTS
   from [nodejs.org](https://nodejs.org/en) (or `nvm install 22`).
 - **"Port 4311 is already in use by another program"**: start on a free

@@ -22,7 +22,8 @@ BELL PR 是以 [Apache-2.0](LICENSE) 授權的免費開源軟體。沒有付費�
 **不需設定**、**不呼叫 AI**、也不會送到 GitHub。BELL PR 啟動後，從首頁的
 「試用範例專案」或側欄「範例」開啟。
 
-請先走完範例審閱流程，再匯入真實專案。`bell-pr doctor` 尚未就緒時，請用
+請先走完範例審閱流程，再匯入真實專案。只有 AI 服務這項必要檢查失敗時，
+`bell-pr` 仍會開啟，歡迎畫面會說明如何安裝。其他必要檢查失敗時，請用
 `bell-pr start --force` 啟動，範例導覽才能開啟。真實的 Agent 工作仍要等到
 有已登入的 AI 服務。
 
@@ -59,9 +60,10 @@ BELL PR 是本機工作台。請先裝好並登入下列工具，再跑快速開
 發行版內安裝以上全部。[Windows 安裝腳本](#windowswsl2) 可以先準備工具，再由你登入。
 目前不支援原生 Windows 執行。
 
-`bell-pr doctor` 必要檢查全過後，再繼續。在那之前 `bell-pr start` 會在監聽前
-結束。尚未安裝／登入 AI 服務時，`bell-pr start --force` 仍會開啟 BELL PR，
-讓你走範例導覽；真實 Agent 工作與發佈會等到有就緒的 AI 服務為止。
+`bell-pr doctor` 必要檢查全過後，再繼續。只有 AI 服務這項必要檢查失敗時，
+`bell-pr start` 仍會監聽，歡迎畫面會說明如何安裝。其他必要檢查失敗時，它會在
+監聽前結束。`bell-pr start --force` 仍會啟動。真實 Agent 工作與發佈會等到有
+就緒的 AI 服務為止。
 
 ## 快速開始
 
@@ -80,9 +82,9 @@ BELL PR 是本機工作台。請先裝好並登入下列工具，再跑快速開
 3. 依照歡迎畫面完成設定：選擇**語言**、檢查**工作環境**（缺少的工具都會附上修正指令），再選擇 Agent 使用的 **AI 服務**。
 4. 觀看範例導覽、匯入 Repository，或尋找想貢獻的專案。
 
-`npx bell-pr` 就是 `bell-pr start`。只有在 `bell-pr doctor` 就緒時才會監聽；
-否則它會結束，並印出每一項失敗檢查的修正指令。`npx bell-pr start --force`
-仍可開啟範例導覽。
+`npx bell-pr` 就是 `bell-pr start`。`bell-pr doctor` 就緒時會監聽；只有 AI
+服務這項必要檢查失敗時也會監聽。其他必要檢查失敗時，它會結束，並印出每一項
+失敗檢查的修正指令。`npx bell-pr start --force` 仍可開啟範例導覽。
 
 **位址不見了？執行 `bell-pr open`**（若用 `npx` 啟動，請執行 `npx bell-pr open`）。它會再次印出位址（不含 API 權杖）並在瀏覽器中開啟。瀏覽器會收到權杖。
 
@@ -90,8 +92,9 @@ BELL PR 是本機工作台。請先裝好並登入下列工具，再跑快速開
 
 ## 安裝方式
 
-選擇一種即可。真實工作仍需要 Git、已登入的 GitHub CLI 與 AI CLI；尚未登入時，
-可用 `bell-pr start --force` 開啟範例導覽。參數與 PATH 設定請見[安裝指南](docs/installation.md)（英文）。
+選擇一種即可。真實工作仍需要 Git、已登入的 GitHub CLI 與 AI CLI。只有 AI
+服務這項必要檢查失敗時，`bell-pr` 仍會開啟歡迎畫面，並說明如何安裝；範例導覽就在那裡。
+其他必要檢查失敗時，可用 `bell-pr start --force` 啟動。參數與 PATH 設定請見[安裝指南](docs/installation.md)（英文）。
 
 ### macOS 與 Linux
 
@@ -183,9 +186,15 @@ WSL 終端機執行 `bell-pr open --print --print-token`，自行開啟印出的
 `bell-pr doctor` 會檢查以上所有項目，並為每個問題印出修正指令。請見[開始之前](#開始之前)。
 
 **尚未安裝或登入任何 AI 服務時：** `bell-pr doctor` 會以非零結束代碼結束，並將
-必要的「AI 服務」檢查標為失敗。`bell-pr start` 會在監聽前以非零結束代碼結束，
-並印出該清單與每一項失敗檢查的修正指令。`bell-pr start --force` 仍會啟動，
-並警告已略過檢查。歡迎畫面可繼續；你可以先走**範例導覽**（不呼叫 AI）。在
+必要的「AI 服務」檢查標為失敗。若這是唯一失敗的必要檢查，`bell-pr start`
+仍會監聽，歡迎畫面會說明如何安裝並登入其中一套：
+
+- Codex CLI：`npm install -g @openai/codex`，再執行 `codex login`。其他安裝方式請見 [Codex CLI](https://github.com/openai/codex)。
+- Claude Code：`npm install -g @anthropic-ai/claude-code`，再執行 `claude auth login`。其他安裝方式請見 [Claude Code 文件](https://code.claude.com/docs/en/overview)。
+- Antigravity CLI：`curl -fsSL https://antigravity.google/cli/install.sh | bash`，再執行一次 `agy` 登入。
+
+其他必要檢查也失敗時，`bell-pr start` 會在監聽前以非零結束代碼結束，並印出該清單。
+`bell-pr start --force` 仍會啟動，並警告已略過檢查。你可以先走**範例導覽**（不呼叫 AI）。在
 至少一套 Codex CLI、Claude Code 或 Antigravity CLI 安裝並登入之前，無法開始真實的 Agent 工作；
 探索功能另需已登入的 GitHub CLI。
 
@@ -323,7 +332,7 @@ Authorization: Bearer <token>
 
 ## 設定
 
-BELL PR 不需要任何設定就能啟動。下列設定都是啟動時讀取的環境變數；`bell-pr start` 另外接受 `--port`、`--host`、`--data-dir`、`--no-open`、`--force`、`--group` 與 `--env-file <file>`。必要的 `bell-pr doctor` 檢查失敗時，`start` 會在監聽前結束；`--force` 仍會啟動。在應用程式「設定」中調整的值，除非被環境變數指定，否則都會生效。
+BELL PR 不需要任何設定就能啟動。下列設定都是啟動時讀取的環境變數；`bell-pr start` 另外接受 `--port`、`--host`、`--data-dir`、`--no-open`、`--force`、`--group` 與 `--env-file <file>`。只有 AI 服務這項必要檢查失敗時，`start` 仍會監聽。其他必要的 `bell-pr doctor` 檢查失敗時，`start` 會在監聽前結束；`--force` 仍會啟動。在應用程式「設定」中調整的值，除非被環境變數指定，否則都會生效。
 
 | 變數 | 預設值 | 用途 |
 | --- | --- | --- |
@@ -358,7 +367,7 @@ docker run -d --name bell-pr -p 127.0.0.1:4311:4311 \
 docker exec bell-pr bell-pr open --print --print-token
 ```
 
-映像檔包含 Git、GitHub CLI 與 Codex CLI；Claude Code 可以由你自行安裝到容器中。映像檔的指令是 `bell-pr start`，在 `bell-pr doctor` 尚未就緒時會在監聽前結束。若要在登入 AI 服務之前開啟範例導覽，請執行 `docker run ... bell-pr start --force`（這會取代映像檔的指令）。Docker 目前為 **beta**：Agent 的沙箱需要另外三個 `--security-opt` 選項。使用前請先閱讀 [Docker 說明](docs/docker.md)（英文）；若要以 systemd 服務執行或放在反向代理之後，請見[自架說明](docs/self-hosting.md)（英文）。
+映像檔包含 Git、GitHub CLI 與 Codex CLI；Claude Code 可以由你自行安裝到容器中。映像檔的指令是 `bell-pr start`。只有 AI 服務這項必要檢查失敗時仍會監聽；其他必要檢查失敗時會在監聽前結束。尚未登入 AI 服務、且這是唯一的失敗時，直接啟動就能開啟範例導覽；其他必要檢查失敗時請執行 `docker run ... bell-pr start --force`（這會取代映像檔的指令）。Docker 目前為 **beta**：Agent 的沙箱需要另外三個 `--security-opt` 選項。使用前請先閱讀 [Docker 說明](docs/docker.md)（英文）；若要以 systemd 服務執行或放在反向代理之後，請見[自架說明](docs/self-hosting.md)（英文）。
 
 ## 疑難排解
 

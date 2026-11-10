@@ -197,7 +197,7 @@ brew install suzu1dev/bell-pr/bell-pr<!-- /generated:install-commands --></code>
             <h2 id="first-start">安裝之後</h2>
             <p>用 <code>git config --global user.name "Your Name"</code> 與 <code>git config --global user.email "you@example.com"</code> 設定 Git 身分，請將範例值換成自己的名字與電子郵件。執行 <code>gh auth login</code>，再用 <code>codex login</code> 或 <code>claude auth login</code> 登入 AI 工具（Antigravity CLI 則執行一次 <code>agy</code> 登入），最後用 <code>bell-pr doctor</code> 檢查環境。</p>
             <p>curl 腳本會印出啟動指令與 PATH 設定，請依照它操作，讓終端機找到已安裝的工具。Homebrew 或 Bun 安裝後用 <code>bell-pr</code>；mise 則用 <code>mise exec -- bell-pr</code>。工作時保持終端機開啟；<kbd>Ctrl</kbd>+<kbd>C</kbd> 可停止 BELL PR。</p>
-            <p>尚未登入時，可以用 <code>bell-pr start --force</code> 試用範例專案。範例不呼叫 AI，也不傳送內容到 GitHub；真實 Agent 工作仍需要已登入的 AI 服務。</p>
+            <p>只有 AI 服務這項必要檢查失敗時，<code>bell-pr</code> 仍會啟動。第一次啟動會看到歡迎畫面，說明如何安裝，也可以試用範例專案。範例不呼叫 AI，也不傳送內容到 GitHub；真實 Agent 工作仍需要已登入的 AI 服務。其他必要檢查失敗時，<code>bell-pr start --force</code> 仍會啟動。</p>
 
             <h2 id="windows">Windows 與 WSL2</h2>
             <ol class="setup-steps">

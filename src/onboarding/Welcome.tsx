@@ -20,6 +20,8 @@ import { api, send } from "../api";
 import { useCheckSettings } from "../app/hooks/useUnderstanding";
 import { useLocale, useT } from "../i18n";
 import { LanguageSwitcher, saveLocale } from "../i18n/LanguageSwitcher";
+import { WebLink } from "../review/MarkdownContent";
+import { CopyCommand } from "../setup/CopyCommand";
 import { readinessOf } from "../setup/ReadinessNotice";
 import { SetupChecklist } from "../setup/SetupChecklist";
 import { useDoctor, type DoctorState } from "../setup/useDoctor";
@@ -304,6 +306,7 @@ function ProviderStep({
 
   const note = (provider: AgentProvider) =>
     ({ codex: t.codexNote, claude: t.claudeNote, antigravity: t.antigravityNote })[provider];
+  const fixes = report?.checks.find((check) => check.id === "provider-ready")?.fixes ?? [];
 
   return (
     <div className="welcome-body">
@@ -317,6 +320,23 @@ function ProviderStep({
             .map((line) => (
               <p key={line}>{line}</p>
             ))}
+          {fixes.length > 0 && (
+            <div className="welcome-install">
+              {fixes.map((fix) => (
+                <CopyCommand
+                  key={`${fix.label}\n${fix.command}`}
+                  label={fix.label}
+                  command={fix.command}
+                />
+              ))}
+            </div>
+          )}
+          <p className="welcome-install-links">
+            <DocsLink sentence={t.codexDocs} label={t.codexDocsLabel} href={t.codexDocsUrl} />
+          </p>
+          <p className="welcome-install-links">
+            <DocsLink sentence={t.claudeDocs} label={t.claudeDocsLabel} href={t.claudeDocsUrl} />
+          </p>
           <button type="button" className="button secondary" onClick={() => void refresh()}>
             {recheck}
           </button>
@@ -361,6 +381,22 @@ function ProviderStep({
         </p>
       )}
     </div>
+  );
+}
+
+/** Wraps `label` where it sits in `sentence`, so the link follows the language's word order. */
+function DocsLink({ sentence, label, href }: { sentence: string; label: string; href: string }) {
+  const at = sentence.indexOf(label);
+  const link = (
+    <WebLink href={href} target="_blank" rel="noreferrer">{label}</WebLink>
+  );
+  if (at < 0) return <>{sentence} {link}</>;
+  return (
+    <>
+      {sentence.slice(0, at)}
+      {link}
+      {sentence.slice(at + label.length)}
+    </>
   );
 }
 
