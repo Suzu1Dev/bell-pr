@@ -1309,7 +1309,8 @@ test("a start held up while it writes its lock or its claim in place leaves the 
         started(first).then(() => "started"),
       ]);
       assert.equal(ended, 1, first.stdout() + first.stderr());
-      assert.ok(first.stderr().includes(target), first.stderr());
+      // Never the lock itself: a person told to remove it could remove a later start's.
+      assert.ok(first.stderr().includes(written === "claim" ? target : claim), first.stderr());
       assert.equal(readFileSync(target, "utf8"), "", written);
       // Coordination that starts now does not get the lock either.
       const message = await refusedWith(lockStarts(box).strict);
