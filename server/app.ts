@@ -40,6 +40,8 @@ import { readApiToken } from "./api-token.js";
 import { DeviceTokens } from "./device-tokens.js";
 import { Pairing } from "./pairing.js";
 import { registerPairingRoutes } from "./routes/pairing.js";
+import type { CollabHost } from "./collab-host.js";
+import { registerCollabRoutes } from "./routes/collab.js";
 
 /** Masks secrets in string values, which may quote command output. */
 function redactValues<T extends Record<string, unknown>>(values?: T) {
@@ -122,6 +124,8 @@ export interface AppOptions {
    * and device tokens next to it under the data directory.
    */
   apiTokenFile?: string;
+  /** Group work's host (collab-host.ts), when BELL PR was started with --group. */
+  collab?: CollabHost;
 }
 
 export function createApp(workbench: Workbench, options: AppOptions = {}) {
@@ -226,6 +230,10 @@ export function createApp(workbench: Workbench, options: AppOptions = {}) {
       pairing: new Pairing(path.dirname(tokenFile), devices),
       publicUrl: options.publicUrl,
     });
+  if (options.collab) {
+    app.locals.collab = options.collab;
+    registerCollabRoutes(app, options.collab, { devices, tokenFile });
+  }
   if ((options.platform ?? process.platform) === "linux") registerSudoRoutes(app, deps);
   app.use("/api", (_req, res) => {
     res.status(404).json({ error: sm().common.notFound });

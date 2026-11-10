@@ -39,6 +39,7 @@ import {
 } from "./app-settings.js";
 import { bundled, version } from "./build-info.js";
 import { run } from "./cli.js";
+import { openCollabHost, type CollabHost } from "./collab-host.js";
 import { loadOrCreateApiToken, readApiToken, withApiToken } from "./api-token.js";
 import {
   baseUrl,
@@ -314,14 +315,19 @@ interface HeldLock {
 /**
  * Takes the data directory's lock for a process that hosts coordination,
  * under the strict rule: neither it nor any start of this version replaces
- * a lock whose holder is not shown to have stopped (lockHolderAlive). Port
- * 0: no address for `bell-pr open`.
+ * a lock whose holder is not shown to have stopped (lockHolderAlive). With
+ * `address` (a start with group work) the lock names where the instance
+ * serves, as an ordinary one does; without it, port 0: no address for
+ * `bell-pr open`.
  */
-export async function acquireWriterLock(dataDir: string): Promise<WriterLock> {
+export async function acquireWriterLock(
+  dataDir: string,
+  address?: { port: number; host?: string; url?: string },
+): Promise<WriterLock> {
   const resolved = path.resolve(dataDir);
   const held = await acquireLock(
     dataPaths(resolved).lock,
-    { ...lockInfo(0), strict: true },
+    { ...lockInfo(address?.port ?? 0, address?.host, address?.url), strict: true },
     resolved,
   );
   return issueWriterLock({ dataDir: resolved, holds: held.holds, release: held.release });
@@ -508,6 +514,18 @@ export function probeHealth(host: string, port: number, timeoutMs = 2000) {
   );
 }
 
+/** Waits for `work`, but no longer than `ms`. */
+async function within(ms: number, work: Promise<unknown>) {
+  let timer: NodeJS.Timeout | undefined;
+  await Promise.race([
+    work,
+    new Promise((resolve) => {
+      timer = setTimeout(resolve, ms);
+    }),
+  ]);
+  clearTimeout(timer);
+}
+
 function listen(server: http.Server, port: number, host: string) {
   return new Promise<void>((resolve, reject) => {
     const failed = (error: Error) => {
@@ -593,6 +611,7 @@ export async function startServer(
   });
 
   let workbench: Workbench | undefined;
+  let collab: CollabHost | undefined;
   let stopping: Promise<void> | undefined;
   const shutdown = () =>
     (stopping ??= (async () => {
@@ -601,23 +620,20 @@ export async function startServer(
         res.setHeader("Connection", "close");
         res.end();
       };
+      // Group work in flight lands before the server closes and the lock goes.
+      if (collab) await within(4000, collab.close());
       server.close();
       server.closeIdleConnections();
       try {
         if (workbench && app) {
-          const work = Promise.allSettled([
-            workbench.shutdown(),
-            app.locals.insights.shutdown(),
-            app.locals.discovery.shutdown(),
-          ]);
-          let timer: NodeJS.Timeout | undefined;
-          await Promise.race([
-            work,
-            new Promise((resolve) => {
-              timer = setTimeout(resolve, 4000);
-            }),
-          ]);
-          clearTimeout(timer);
+          await within(
+            4000,
+            Promise.allSettled([
+              workbench.shutdown(),
+              app.locals.insights.shutdown(),
+              app.locals.discovery.shutdown(),
+            ]),
+          );
         }
       } finally {
         cleanUp();
@@ -627,7 +643,11 @@ export async function startServer(
   try {
     mkdirSync(config.dataDir, { recursive: true, mode: 0o700 });
     await loadOrCreateApiToken(paths.apiToken);
-    const { release: releaseLock } = await acquireLock(
+    // Group work needs the strict lock; it still names this address.
+    const writerLock = config.collab
+      ? await acquireWriterLock(config.dataDir, { port: config.port, host: config.host, url })
+      : undefined;
+    const { release: releaseLock } = writerLock ?? await acquireLock(
       paths.lock,
       lockInfo(config.port, config.host, url),
       config.dataDir,
@@ -690,6 +710,8 @@ export async function startServer(
       maxActiveRuns: config.limits.maxActiveRuns,
       agentTimeoutScale: config.limits.agentTimeoutScale,
     });
+    if (writerLock)
+      collab = await openCollabHost({ dataDir: config.dataDir, lock: writerLock });
     app = createApp(workbench, {
       port: config.port,
       ...(config.frontendPort ? { frontendPort: config.frontendPort } : {}),
@@ -701,6 +723,7 @@ export async function startServer(
       agentSlots,
       readApiToken: () => readApiToken(paths.apiToken),
       apiTokenFile: paths.apiToken,
+      ...(collab ? { collab } : {}),
     });
     handler = app;
 

@@ -1,0 +1,444 @@
+/**
+ * The group routes behind the request guard (routes/collab.ts): who may
+ * use each one, invites as a browser meets them, and what never reaches a
+ * log or a file. Synthetic tokens only; the clock is real, so time-based
+ * rules live in collab-invites.test.ts.
+ */
+import test, { type TestContext } from "node:test";
+import assert from "node:assert/strict";
+import { once } from "node:events";
+import { existsSync } from "node:fs";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { request } from "node:http";
+import type { AddressInfo } from "node:net";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import { inspect } from "node:util";
+import type { CollabJoinResponse } from "../shared/collab.js";
+import { loadOrCreateApiToken } from "./api-token.js";
+import { createApp } from "./app.js";
+import { openCollabHost } from "./collab-host.js";
+import { maxInvites } from "./collab-invites.js";
+import { dataPaths } from "./config.js";
+import { participantHeader } from "./coordination-routes.js";
+import { acquireWriterLock } from "./index.js";
+import { log } from "./log.js";
+import { failureLimit, normalizePairCode } from "./pairing.js";
+import { Store } from "./store.js";
+import { Workbench } from "./workbench.js";
+
+type Headers = Record<string, string>;
+/** A response; `json` is loose so each test reads the fields it checks. */
+interface Reply {
+  status: number;
+  body: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  json: any;
+}
+/** "403 notJoined", or "201" when the answer names no reason. */
+const outcome = (reply: Reply) => [reply.status, reply.json?.reason].filter(Boolean).join(" ");
+const wrong = { code: "0000-0000" };
+
+async function fixture(t: TestContext) {
+  const directory = await mkdtemp(path.join(tmpdir(), "bell-collab-routes-"));
+  const file = path.join(directory, "api-token");
+  const install: Headers = { authorization: `Bearer ${await loadOrCreateApiToken(file)}` };
+  const paths = dataPaths(directory);
+  /** Every line the server logged, and every code and token it handed out. */
+  const logged: string[] = [];
+  const secrets: string[] = [];
+  for (const level of ["debug", "info", "warn", "error"] as const)
+    t.mock.method(log, level, (...line: unknown[]) => {
+      logged.push(inspect(line, { depth: 8 }));
+    });
+
+  let port = 0;
+  let stop = async () => {};
+  /** BELL PR with group work on this directory; called again, a restart (after `change`). */
+  const start = async (change?: () => Promise<unknown>) => {
+    await stop();
+    await change?.();
+    const lock = await acquireWriterLock(directory);
+    const collab = await openCollabHost({ dataDir: directory, lock });
+    const store = new Store(directory);
+    await store.initialize();
+    const workbench = new Workbench(store);
+    const app = createApp(workbench, {
+      staticDirectory: path.join(directory, "missing"),
+      port: 4311,
+      publicUrl: "https://bell.example.internal",
+      apiTokenFile: file,
+      collab,
+    });
+    const server = app.listen(0, "127.0.0.1");
+    await once(server, "listening");
+    port = (server.address() as AddressInfo).port;
+    stop = async () => {
+      stop = async () => {};
+      await collab.close();
+      await new Promise<void>((resolve, reject) =>
+        server.close((error) => (error ? reject(error) : resolve())),
+      );
+      await app.locals.insights.shutdown();
+      await app.locals.discovery.shutdown();
+      await workbench.shutdown();
+      lock.release();
+    };
+  };
+  await start();
+  t.after(async () => {
+    await stop();
+    await rm(directory, { recursive: true, force: true });
+  });
+
+  const send = (method: string, urlPath: string, headers: Headers = {}, body?: unknown) =>
+    new Promise<Reply>((resolve, reject) => {
+      const text = body === undefined ? "" : JSON.stringify(body);
+      const req = request(
+        {
+          host: "127.0.0.1",
+          port,
+          path: urlPath,
+          method,
+          headers: {
+            host: "127.0.0.1:4311",
+            "content-type": "application/json",
+            "content-length": String(Buffer.byteLength(text)),
+            ...headers,
+          },
+        },
+        (res) => {
+          let data = "";
+          res.setEncoding("utf8");
+          res.on("data", (chunk) => (data += chunk));
+          res.on("end", () => {
+            let json: Reply["json"];
+            try {
+              json = JSON.parse(data);
+            } catch {
+              json = undefined;
+            }
+            if (urlPath.startsWith("/api/collab"))
+              for (const secret of [json?.code, json?.token])
+                if (typeof secret === "string") secrets.push(secret);
+            resolve({ status: res.statusCode!, body: data, json });
+          });
+        },
+      );
+      req.on("error", reject);
+      req.end(text);
+    });
+  const post = (urlPath: string, who: Headers, body: unknown = {}) =>
+    send("POST", `/api/collab${urlPath}`, who, body);
+  const info = (who: Headers) => send("GET", "/api/collab", who);
+  /** The headers of a newly paired device. */
+  const device = async (name: string): Promise<Headers> => {
+    const code = await send("POST", "/api/pair/codes", install, {});
+    const paired = await send("POST", "/api/pair", {}, { code: code.json.code, name });
+    assert.equal(paired.status, 201, paired.body);
+    return { authorization: `Bearer ${paired.json.token}` };
+  };
+  const invite = async (who: Headers, body: unknown) => {
+    const made = await post("/invites", who, body);
+    assert.equal(made.status, 201, made.body);
+    return made.json.code as string;
+  };
+  const join = async (who: Headers, code: string) => {
+    const joined = await post("/join", who, { code });
+    assert.equal(joined.status, 201, joined.body);
+    return joined.json as CollabJoinResponse;
+  };
+  const withToken = (who: Headers, token: string): Headers => ({ ...who, [participantHeader]: token });
+  const files = () =>
+    Promise.all([paths.collab, paths.coordination].map((each) => readFile(each, "utf8")));
+
+  /** The group set up, with an admin, a member and a removed person, each on a paired device. */
+  const cast = async () => {
+    const setup = await post("/setup", install);
+    assert.equal(setup.status, 201, setup.body);
+    const devices = {
+      ada: await device("Phone A"),
+      ben: await device("Laptop B"),
+      cy: await device("Tablet C"),
+      none: await device("Not joined"),
+    };
+    const ada = await join(devices.ada, await invite(install, { name: "Ada", admin: true }));
+    const admin = withToken(devices.ada, ada.token);
+    const ben = await join(devices.ben, await invite(admin, { name: "Ben" }));
+    const cy = await join(devices.cy, await invite(admin, { name: "Cy" }));
+    const removed = await post(`/people/${cy.id}/remove`, admin);
+    assert.deepEqual([removed.status, removed.json], [200, { revoked: 0, unpaired: false }]);
+    return {
+      groupId: setup.json.groupId as string,
+      ada,
+      ben,
+      cy,
+      devices,
+      who: {
+        install,
+        device: devices.none,
+        member: withToken(devices.ben, ben.token),
+        admin,
+        removed: withToken(devices.cy, cy.token),
+        stranger: withToken(devices.none, `bpc_${"s".repeat(43)}`),
+      },
+    };
+  };
+
+  /** No log line and neither file holds a code (as shown or as typed) or a participant token. */
+  const nothingLeaked = async () => {
+    assert.ok(secrets.length > 0);
+    const kept = [...logged, ...(await files())].join("\n");
+    assert.equal(/bpc_/.test(kept), false);
+    for (const secret of secrets)
+      for (const form of [secret, normalizePairCode(secret) ?? secret])
+        assert.equal(kept.includes(form), false);
+  };
+
+  return { paths, install, logged, start, send, post, info, device, invite, join, files, cast, nothingLeaked };
+}
+
+test("before setup the group routes say so, only the person at the host sets it up, and a stopped group stays stopped", async (t) => {
+  const f = await fixture(t);
+  const phone = await f.device("Phone");
+  const asks: [string, unknown][] = [
+    ["/invites", { name: "Ben" }],
+    ["/invites", { self: true }],
+    ["/join", wrong],
+    ["/people/m-0000000001/remove", {}],
+  ];
+  const expectNotReady = async (state: string) => {
+    for (const who of [f.install, phone])
+      for (const [urlPath, body] of asks) {
+        const reply = await f.post(urlPath, who, body);
+        assert.equal(outcome(reply), `503 ${state}`, urlPath);
+        assert.deepEqual(Object.keys(reply.json).sort(), ["error", "reason"]);
+      }
+  };
+  assert.deepEqual((await f.info(f.install)).json, { state: "notSetUp", host: true });
+  assert.deepEqual((await f.info(phone)).json, { state: "notSetUp", host: false });
+  await expectNotReady("notSetUp");
+  assert.equal(outcome(await f.post("/setup", phone)), "403 hostOnly");
+  assert.equal(existsSync(f.paths.coordination) || existsSync(f.paths.collab), false);
+
+  const setup = await f.post("/setup", f.install);
+  assert.equal(setup.status, 201, setup.body);
+  assert.deepEqual(Object.keys(setup.json).sort(), ["groupId", "state"]);
+  assert.match(setup.json.groupId, /^g-[0-9a-f]{16}$/);
+  const { groupId } = setup.json;
+  assert.equal(outcome(await f.post("/setup", f.install)), "409 exists");
+  await f.start();
+  assert.deepEqual((await f.info(phone)).json, { state: "ready", groupId, host: false });
+
+  await f.start(() => rm(f.paths.coordination));
+  assert.deepEqual((await f.info(f.install)).json, {
+    state: "stopped",
+    reason: "missing",
+    groupId,
+    host: true,
+  });
+  await expectNotReady("stopped");
+  assert.equal(outcome(await f.post("/setup", f.install)), "409 missing");
+  assert.equal(existsSync(f.paths.coordination), false);
+  // Asking while group work is not ready is no failure worth a log line.
+  assert.equal(f.logged.some((line) => line.includes("Request failed")), false);
+});
+
+test("who may use each route: the person at the host, a device, a member, an admin, a removed person", async (t) => {
+  const f = await fixture(t);
+  const c = await f.cast();
+  type Who = keyof typeof c.who;
+  const all = (answer: string) =>
+    Object.fromEntries(Object.keys(c.who).map((who) => [who, answer])) as Record<Who, string>;
+  const outsiders = { device: "403 notJoined", removed: "403 notJoined", stranger: "403 notJoined" };
+  const rows: [string, string, unknown, Record<Who, string>][] = [
+    ["GET", "", undefined, all("200")],
+    ["POST", "/setup", {}, { ...all("403 hostOnly"), install: "409 exists" }],
+    [
+      "POST",
+      "/invites",
+      { name: "Dee" },
+      { ...outsiders, install: "201", member: "403 adminOnly", admin: "201" },
+    ],
+    [
+      "POST",
+      "/invites",
+      { self: true },
+      { ...outsiders, install: "403 notJoined", member: "201", admin: "201" },
+    ],
+    ["POST", "/join", wrong, all("400 invalidCode")],
+    [
+      "POST",
+      `/people/${c.cy.id}/remove`,
+      {},
+      { ...outsiders, install: "403 notJoined", member: "403 adminOnly", admin: "200" },
+    ],
+    [
+      "POST",
+      `/people/${c.ada.id}/remove`,
+      {},
+      { ...outsiders, install: "403 notJoined", member: "403 adminOnly", admin: "409 self" },
+    ],
+  ];
+  for (const [method, urlPath, body, expected] of rows) {
+    const name = `${method} /api/collab${urlPath} ${JSON.stringify(body)}`;
+    for (const who of Object.keys(c.who) as Who[]) {
+      const reply = await f.send(method, `/api/collab${urlPath}`, c.who[who], body);
+      assert.equal(outcome(reply), expected[who], `${name} as ${who}`);
+      if (reply.status >= 400) assert.equal(typeof reply.json.error, "string");
+    }
+    // 401 is the guard's alone: no app token, whatever the participant token.
+    const noAppToken = await f.send(method, `/api/collab${urlPath}`, {
+      [participantHeader]: c.ada.token,
+    }, body);
+    assert.equal(noAppToken.status, 401, name);
+  }
+
+  assert.deepEqual((await f.info(c.who.admin)).json, {
+    state: "ready",
+    groupId: c.groupId,
+    host: false,
+    me: { id: c.ada.id, name: "Ada", admin: true },
+  });
+  assert.deepEqual((await f.info(c.who.member)).json.me, { id: c.ben.id, name: "Ben" });
+  for (const who of ["install", "device", "removed", "stranger"] as const) {
+    const { json } = await f.info(c.who[who]);
+    assert.deepEqual(json, { state: "ready", groupId: c.groupId, host: who === "install" }, who);
+  }
+  assert.ok(f.logged.some((line) => line.includes(`group: ${c.ben.id} joined`)));
+  assert.ok(f.logged.some((line) => line.includes(`group: ${c.cy.id} removed by ${c.ada.id}`)));
+  await f.nothingLeaked();
+});
+
+test("an invite code works once, 20 wait at most, a restart voids them; wrong codes lock only their sender", async (t) => {
+  const f = await fixture(t);
+  const c = await f.cast();
+  const code = await f.invite(c.who.admin, { name: " Dee " });
+  assert.match(code, /^[0-9A-HJKMNP-TV-Z]{4}-[0-9A-HJKMNP-TV-Z]{4}$/);
+  const dee = await f.join(c.who.device, code.toLowerCase());
+  assert.deepEqual(Object.keys(dee).sort(), ["groupId", "id", "name", "token"]);
+  assert.deepEqual([dee.groupId, dee.name], [c.groupId, "Dee"]);
+  assert.match(dee.id, /^m-[0-9a-f]{10}$/);
+  assert.match(dee.token, /^bpc_[A-Za-z0-9_-]{43}$/);
+  assert.equal(outcome(await f.post("/join", f.install, { code })), "400 invalidCode");
+  // The person at the host joins too; only a paired device is recorded.
+  const host = await f.join(f.install, await f.invite(f.install, { name: "Host", admin: true }));
+  assert.equal(host.admin, true);
+  const { people } = JSON.parse((await f.files())[0]);
+  assert.match(people[dee.id].deviceId, /^dev_[0-9a-f]{32}$/);
+  assert.deepEqual(Object.keys(people[host.id]).sort(), ["admin", "joinedAt", "name"]);
+
+  const forLocked = await f.invite(c.who.admin, { name: "Eve" });
+  const forOther = await f.invite(c.who.admin, { name: "Fay" });
+  const locked = c.devices.none;
+  for (let attempt = 1; attempt < failureLimit; attempt++)
+    assert.equal(outcome(await f.post("/join", locked, wrong)), "400 invalidCode");
+  const tenth = await f.post("/join", locked, wrong);
+  assert.equal(outcome(tenth), "429 joinLocked");
+  assert.equal(tenth.json.retryAfter, 15 * 60);
+  // Locked means locked for the right code too; nobody else is, and no code was voided.
+  const right = await f.post("/join", locked, { code: forLocked });
+  assert.equal(outcome(right), "429 joinLocked");
+  assert.ok(right.json.retryAfter > 14 * 60 && right.json.retryAfter <= 15 * 60);
+  assert.equal(outcome(await f.post("/join", f.install, wrong)), "400 invalidCode");
+  assert.equal((await f.join(await f.device("Tablet F"), forOther)).name, "Fay");
+
+  // forLocked still waits, so 19 more fit.
+  for (let more = 1; more < maxInvites; more++) await f.invite(f.install, { name: `More ${more}` });
+  assert.equal(outcome(await f.post("/invites", f.install, { name: "One too many" })), "429 tooManyInvites");
+  assert.equal(outcome(await f.post("/invites", c.who.member, { self: true })), "429 tooManyInvites");
+
+  await f.start();
+  assert.equal(outcome(await f.post("/join", f.install, { code: forLocked })), "400 invalidCode");
+  // People and their tokens are kept; only the codes went.
+  assert.deepEqual((await f.info(c.who.member)).json.me, { id: c.ben.id, name: "Ben" });
+  assert.equal((await f.join(locked, await f.invite(f.install, { name: "Eve" }))).name, "Eve");
+  await f.nothingLeaked();
+});
+
+test("use on another device: the same person and token, and nobody is added", async (t) => {
+  const f = await fixture(t);
+  const c = await f.cast();
+  const before = await f.files();
+  const tablet = await f.device("Tablet");
+  assert.deepEqual(await f.join(tablet, await f.invite(c.who.member, { self: true })), {
+    groupId: c.groupId,
+    id: c.ben.id,
+    name: "Ben",
+    token: c.ben.token,
+  });
+  assert.deepEqual(await f.join(f.install, await f.invite(c.who.admin, { self: true })), {
+    groupId: c.groupId,
+    id: c.ada.id,
+    name: "Ada",
+    admin: true,
+    token: c.ada.token,
+  });
+  assert.deepEqual(await f.files(), before);
+
+  // A person removed before the code is used gets nothing from it.
+  const late = await f.invite(c.who.member, { self: true });
+  assert.equal(outcome(await f.post(`/people/${c.ben.id}/remove`, c.who.admin)), "200");
+  assert.equal(outcome(await f.post("/join", tablet, { code: late })), "400 invalidCode");
+  await f.nothingLeaked();
+});
+
+test("remove: the person leaves the group; their device is unpaired only when asked", async (t) => {
+  const f = await fixture(t);
+  const c = await f.cast();
+  const remove = (id: string, body: unknown = {}) => f.post(`/people/${id}/remove`, c.who.admin, body);
+  for (const id of ["m-ffffffffff", "constructor", "__proto__"])
+    assert.equal(outcome(await remove(id)), "404 unknownPerson", id);
+
+  assert.deepEqual((await remove(c.ben.id)).json, { revoked: 0, unpaired: false });
+  // Still a paired device, no longer a participant: 403, never 401.
+  assert.deepEqual((await f.info(c.who.member)).json, {
+    state: "ready",
+    groupId: c.groupId,
+    host: false,
+  });
+  assert.equal(outcome(await f.post("/invites", c.who.member, { self: true })), "403 notJoined");
+  const removedAt = () => f.files().then(([side]) => JSON.parse(side).people[c.ben.id].removedAt);
+  const first = await removedAt();
+  assert.ok(Date.parse(first));
+
+  // Asked again with the tick box: the device they joined from goes, the date stays.
+  assert.deepEqual((await remove(c.ben.id, { unpair: true })).json, { revoked: 0, unpaired: true });
+  assert.equal(await removedAt(), first);
+  assert.equal((await f.info(c.who.member)).status, 401);
+  assert.equal((await f.info(c.who.admin)).status, 200);
+  // Nothing to unpair for someone who joined at the host.
+  const host = await f.join(f.install, await f.invite(f.install, { name: "Host", admin: true }));
+  assert.deepEqual((await remove(host.id, { unpair: true })).json, { revoked: 0, unpaired: false });
+  // A removed admin is nobody: the participant answer, not the admin one.
+  assert.equal(
+    outcome(await f.post(`/people/${c.ada.id}/remove`, { ...f.install, [participantHeader]: host.token })),
+    "403 notJoined",
+  );
+  await f.nothingLeaked();
+});
+
+test("bodies are strict: unknown fields, bad names and long codes are refused", async (t) => {
+  const f = await fixture(t);
+  const c = await f.cast();
+  const before = await f.files();
+  const bad: [string, Headers, unknown][] = [
+    ["/setup", f.install, { force: true }],
+    ["/invites", f.install, {}],
+    ["/invites", f.install, { name: " " }],
+    ["/invites", f.install, { name: "n".repeat(41) }],
+    ["/invites", f.install, { name: "Ben‮" }],
+    ["/invites", f.install, { name: "Ben", admin: false }],
+    ["/invites", c.who.admin, { self: true, name: "Ben" }],
+    ["/join", f.install, { code: "0".repeat(33) }],
+    ["/join", f.install, { ...wrong, name: "Ben" }],
+    [`/people/${c.ben.id}/remove`, c.who.admin, { unpair: false }],
+  ];
+  for (const [urlPath, who, body] of bad) {
+    const reply = await f.post(urlPath, who, body);
+    assert.equal(reply.status, 400, `${urlPath} ${JSON.stringify(body)}`);
+    assert.equal(typeof reply.json.error, "string");
+  }
+  assert.deepEqual(await f.files(), before);
+  assert.deepEqual((await f.info(c.who.member)).json.me, { id: c.ben.id, name: "Ben" });
+});

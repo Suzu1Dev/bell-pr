@@ -1,0 +1,19 @@
+import { product } from "../../../shared/product.js";
+
+const name = product.name;
+
+/** Group work: the people who share one running BELL PR (collab-host.ts, routes/collab.ts). */
+export default {
+  notSetUp: `Group work is not set up yet on this ${name}.`,
+  stopped: `Group work has stopped. Restart ${name} on the host. Nothing is treated as free.`,
+  hostOnly: `Only the computer that runs ${name} can set group work up.`,
+  notJoined: "You have not joined this group on this device, or you were removed from it.",
+  adminOnly: "Only a group admin can do this.",
+  invalidCode: "This invite code is wrong, has expired or was already used.",
+  joinLocked: ({ minutes }: { minutes: number }) =>
+    `Too many wrong invite codes. Try again in ${minutes} ${minutes === 1 ? "minute" : "minutes"}.`,
+  tooManyInvites:
+    "20 invite codes are already waiting. Wait until one is used or expires (10 minutes).",
+  removeSelf: "You cannot remove yourself from the group.",
+  unknownPerson: "Nobody in this group has this id.",
+};

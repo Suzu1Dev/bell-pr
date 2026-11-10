@@ -22,6 +22,7 @@ import path from "node:path";
 import { baseUrl, resolveConfig, ConfigError, defaultStaticDir } from "./config.js";
 import { createApp } from "./app.js";
 import { version } from "./build-info.js";
+import type { CollabHost } from "./collab-host.js";
 import { acquireWriterLock, lockHolderRunning, startServer, StartupError } from "./index.js";
 import { withLocale } from "./i18n/index.js";
 import { Store } from "./store.js";
@@ -794,6 +795,143 @@ test("a strict lock is replaced once its holder is shown to have stopped here, a
       await running.shutdown();
     }
     assert.deepEqual(lockLitter(box.data), []);
+  } finally {
+    await box.cleanup();
+  }
+});
+
+test("group work is on only with --group or BELLPR_GROUP", () => {
+  const home = path.join(tmpdir(), "bell-pr-config-home");
+  assert.equal(resolveConfig({ group: true }, {}, home).collab, true);
+  assert.equal(resolveConfig({}, { BELLPR_GROUP: "1" }, home).collab, true);
+  for (const [flags, env] of [
+    [{}, {}],
+    [{ group: false }, {}],
+    [{}, { BELLPR_GROUP: "0" }],
+    [{}, { BELLPR_GROUP: "" }],
+  ] as const)
+    assert.equal("collab" in resolveConfig(flags, env, home), false);
+});
+
+/** A start in this process, the install token's header, and the lock it wrote. */
+async function startedHere(box: Awaited<ReturnType<typeof sandbox>>, group?: boolean) {
+  const port = await freePort();
+  const running = await startServer({
+    config: resolveConfig({ port, dataDir: box.data, group }, box.env),
+    handleExit: false,
+    print: () => {},
+  });
+  const token = readFileSync(path.join(box.data, "api-token"), "utf8").trim();
+  const lockText = readFileSync(path.join(box.data, "bellpr.lock"), "utf8");
+  return {
+    running,
+    port,
+    auth: { authorization: `Bearer ${token}` },
+    lockText,
+    lock: JSON.parse(lockText),
+  };
+}
+const groupFiles = (data: string) =>
+  ["collab.json", "coordination.json"].filter((name) => existsSync(path.join(data, name)));
+
+test("without --group a start is as before: an ordinary lock, no collab in /api/status, no group route or file", async () => {
+  const box = await sandbox();
+  try {
+    const { running, port, auth, lock } = await startedHere(box);
+    try {
+      assert.deepEqual([lock.port, lock.url, "strict" in lock], [port, running.url, false]);
+      const status = await get(`${running.url}/api/status`, auth);
+      assert.equal(status.status, 200);
+      assert.equal("collab" in JSON.parse(status.body), false);
+      // The group routes are not there: the answer of any path the API does not have.
+      const absent = await get(`${running.url}/api/collab`, auth);
+      const unknown = await get(`${running.url}/api/no-such-route`, auth);
+      assert.equal(absent.status, 404);
+      assert.equal(absent.body, unknown.body);
+      assert.equal(running.app.locals.collab, undefined);
+    } finally {
+      await running.shutdown();
+    }
+    assert.deepEqual(groupFiles(box.data), []);
+  } finally {
+    await box.cleanup();
+  }
+});
+
+test("with --group a start takes the strict lock under its real address, reports group work and refuses a second start", async () => {
+  const box = await sandbox();
+  try {
+    const plain = await startedHere(box);
+    await plain.running.shutdown();
+    const { running, port, auth, lock, lockText } = await startedHere(box, true);
+    try {
+      // The ordinary lock and one field more, so `bell-pr open` still finds the instance.
+      assert.deepEqual(Object.keys(lock), [...Object.keys(plain.lock), "strict"]);
+      assert.deepEqual(
+        [lock.pid, lock.port, lock.host, lock.url, lock.strict],
+        [process.pid, port, "127.0.0.1", running.url, true],
+      );
+      const status = await get(`${running.url}/api/status`, auth);
+      assert.deepEqual(JSON.parse(status.body).collab, { state: "notSetUp" });
+      const info = await get(`${running.url}/api/collab`, auth);
+      assert.deepEqual([info.status, JSON.parse(info.body)], [200, { state: "notSetUp", host: true }]);
+      // Asking wrote nothing: the files come with setup.
+      assert.deepEqual(groupFiles(box.data), []);
+
+      // A second start on this data directory is refused, with group work or without.
+      for (const group of [true, false])
+        await assert.rejects(
+          startServer({
+            config: resolveConfig({ port: await freePort(), dataDir: box.data, group }, box.env),
+            handleExit: false,
+            print: () => {},
+          }),
+          StartupError,
+        );
+      assert.equal(readFileSync(path.join(box.data, "bellpr.lock"), "utf8"), lockText);
+    } finally {
+      await running.shutdown();
+    }
+    assert.equal(existsSync(path.join(box.data, "bellpr.lock")), false);
+    assert.deepEqual(lockLitter(box.data), []);
+  } finally {
+    await box.cleanup();
+  }
+});
+
+test("shutdown lets group work in flight land before the server closes and the lock goes", async () => {
+  const box = await sandbox();
+  try {
+    const { running } = await startedHere(box, true);
+    try {
+      const collab = running.app.locals.collab as CollabHost;
+      await collab.setUp();
+      let release!: () => void;
+      const gate = new Promise<void>((resolve) => (release = resolve));
+      const work = collab.run(async () => {
+        await gate;
+        return collab.coordinator().addParticipant("m-0000000001", "member");
+      });
+      let stopped = false;
+      const stopping = running.shutdown().then(() => (stopped = true));
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      // Still waiting for the work: the server has not closed and the lock is held.
+      assert.deepEqual(
+        [stopped, running.server.listening, existsSync(path.join(box.data, "bellpr.lock"))],
+        [false, true, true],
+      );
+      assert.deepEqual(collab.status(), { state: "stopped", reason: "closed" });
+      release();
+      // The write needed the lock, so it landed before the lock went.
+      const { id } = await work;
+      await stopping;
+      assert.equal(existsSync(path.join(box.data, "bellpr.lock")), false);
+      assert.equal(running.server.listening, false);
+      assert.ok(readFileSync(path.join(box.data, "coordination.json"), "utf8").includes(id));
+      await assert.rejects(collab.run(async () => undefined));
+    } finally {
+      await running.shutdown();
+    }
   } finally {
     await box.cleanup();
   }

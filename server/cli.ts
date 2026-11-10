@@ -282,6 +282,7 @@ async function start(args: string[], ctx: Context): Promise<number | undefined> 
     "no-open": { type: "boolean" },
     dev: { type: "boolean" },
     force: { type: "boolean" },
+    group: { type: "boolean" },
   });
   loadEnvFile(values["env-file"]);
   const config = resolveConfig(
@@ -291,6 +292,7 @@ async function start(args: string[], ctx: Context): Promise<number | undefined> 
       dataDir: values["data-dir"],
       dev: values.dev,
       open: values["no-open"] ? false : undefined,
+      group: values.group,
     },
     ctx.env,
   );

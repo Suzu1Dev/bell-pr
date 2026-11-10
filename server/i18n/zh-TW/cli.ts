@@ -29,6 +29,7 @@ const m: Translation<typeof en> = {
       "  --data-dir <目錄>   資料目錄（BELLPR_DATA_DIR，預設 ~/.bellpr）",
       "  --no-open           不開啟瀏覽器（BELLPR_NO_OPEN=1）",
       "  --force             即使 doctor 尚未就緒也啟動",
+      `  --group             開啟小組協作，讓共用這個 ${name} 的人一起使用（BELLPR_GROUP=1）`,
       "  --env-file <檔案>   先從檔案載入 BELLPR_PORT 等設定",
       "",
       "open 的選項：",

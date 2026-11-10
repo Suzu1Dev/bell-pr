@@ -29,6 +29,7 @@ export default {
       "  --data-dir <dir>    Data directory (BELLPR_DATA_DIR, default ~/.bellpr)",
       "  --no-open           Do not open the browser (BELLPR_NO_OPEN=1)",
       "  --force             Start even when doctor reports Not ready",
+      `  --group             Host group work for the people who share this ${name} (BELLPR_GROUP=1)`,
       "  --env-file <file>   Load settings such as BELLPR_PORT from a file first",
       "",
       "Options for open:",
