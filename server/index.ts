@@ -11,6 +11,7 @@ import { createHash, randomBytes } from "node:crypto";
 import {
   closeSync,
   existsSync,
+  ftruncateSync,
   linkSync,
   mkdirSync,
   openSync,
@@ -334,8 +335,9 @@ export async function acquireWriterLock(dataDir: string): Promise<WriterLock> {
  * text is written aside and linked into place, so no start ever reads a
  * lock half written. Without hard links only a start that is not strict
  * goes on, writing the file in place as before. There the file lies empty
- * until its text is written, and another start may remove an empty file:
- * false also when the path does not read `text` after the write.
+ * until its text is written, and another start may claim and remove an
+ * empty file: false also when such a claim stays, and when the path does
+ * not read `text` after the write.
  */
 function createExclusive(file: string, text: string, strict: boolean): boolean {
   const temp = `${file}.new-${process.pid}-${randomBytes(4).toString("hex")}`;
@@ -353,6 +355,19 @@ function createExclusive(file: string, text: string, strict: boolean): boolean {
     const fd = openSync(file, "wx", 0o600);
     try {
       writeSync(fd, text);
+      // A start that found the file empty and claimed it may be about to
+      // remove it, and would remove whatever lies at the path by then, be
+      // it the lock of a later start. While that claim stays (one that
+      // cannot be read does), the file is left to it empty, as it claimed
+      // it: nothing takes the path before that start has removed it.
+      const claim = claimFile(file, "");
+      const claimed = readLockText(claim);
+      const stays =
+        typeof claimed === "string" ? claimHeld(claimed, claim, false) : claimed !== undefined;
+      if (stays) {
+        ftruncateSync(fd, 0);
+        return false;
+      }
     } finally {
       closeSync(fd);
     }
@@ -365,6 +380,12 @@ function createExclusive(file: string, text: string, strict: boolean): boolean {
   }
 }
 
+/** The claim a start takes on `file`, which reads `text`, before it removes it. */
+function claimFile(file: string, text: string) {
+  const digest = createHash("sha256").update(text).digest("hex").slice(0, 16);
+  return `${file}.takeover-${digest}`;
+}
+
 /**
  * Whether the takeover claim at `claim`, which reads `text`, still keeps
  * other starts from its stale lock. One that names its start stays until
@@ -375,8 +396,8 @@ function createExclusive(file: string, text: string, strict: boolean): boolean {
  * milliseconds: outside the strict rule, the contender's or the stale
  * lock's (`strict`), it is abandoned once it was last modified longer ago
  * than the lease. Its writer may still run, held up between creating the
- * claim in place and writing it: it made no check yet, and once the claim
- * is removed its write shows it that the claim is not its own
+ * claim in place and writing it: it made no check yet, and after its write
+ * it finds that the claim is being removed, or is no longer its own
  * (createExclusive). A date in the future, as after the clock was stepped
  * back, shows no age: that claim counts as new.
  */
@@ -400,8 +421,7 @@ function removeStale(
   strict: boolean,
   depth = 0,
 ): StartupError | undefined {
-  const digest = createHash("sha256").update(text).digest("hex").slice(0, 16);
-  const claim = `${file}.takeover-${digest}`;
+  const claim = claimFile(file, text);
   if (!createExclusive(claim, `${JSON.stringify({ ...lockInfo(0), strict })}\n`, strict)) {
     const held = readLockText(claim);
     if (held === undefined) return undefined;

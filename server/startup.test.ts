@@ -1000,21 +1000,27 @@ async function halted(launched: Launched, hook: string, timeoutMs = 30_000) {
   }
 }
 
+/** A real start that test/lock-stall.mjs halts once at `where`, until `<hook>.go` is there. */
+async function haltingStart(
+  box: { data: string; env: NodeJS.ProcessEnv },
+  hook: string,
+  where: NodeJS.ProcessEnv,
+) {
+  const preload = pathToFileURL(path.join(repoRoot, "test", "lock-stall.mjs")).href;
+  return launch(
+    cliEntry,
+    ["start", "--force", "--port", String(await freePort()), "--data-dir", box.data],
+    {
+      ...box.env,
+      NODE_OPTIONS: `${box.env.NODE_OPTIONS ?? ""} --import=${preload}`,
+      LOCK_TEST_HOOK: hook,
+      ...where,
+    },
+  );
+}
+
 test("a start held up while it writes its takeover claim in place removes neither the lock nor the claim of the start that cleared it", async () => {
   const box = await sandbox();
-  const preload = pathToFileURL(path.join(repoRoot, "test", "lock-stall.mjs")).href;
-  // A real start that test/lock-stall.mjs halts once, until `<hook>.go` is there.
-  const launchHalting = async (hook: string, where: NodeJS.ProcessEnv) =>
-    launch(
-      cliEntry,
-      ["start", "--force", "--port", String(await freePort()), "--data-dir", box.data],
-      {
-        ...box.env,
-        NODE_OPTIONS: `${box.env.NODE_OPTIONS ?? ""} --import=${preload}`,
-        LOCK_TEST_HOOK: hook,
-        ...where,
-      },
-    );
   const launched: Launched[] = [];
   try {
     mkdirSync(box.data, { recursive: true });
@@ -1029,7 +1035,7 @@ test("a start held up while it writes its takeover claim in place removes neithe
     // Hard links fail for its claim: the first start creates the claim in place
     // and is held up before it writes it. The claim lies empty for over a lease.
     const firstHook = path.join(box.directory, "first");
-    const first = await launchHalting(firstHook, {
+    const first = await haltingStart(box, firstHook, {
       LOCK_TEST_NO_LINK: claims,
       LOCK_TEST_STALL_WRITE: claims,
     });
@@ -1041,7 +1047,9 @@ test("a start held up while it writes its takeover claim in place removes neithe
     // The second clears the empty claim, writes its own and is held up just
     // before it removes the stale lock.
     const secondHook = path.join(box.directory, "second");
-    const second = await launchHalting(secondHook, { LOCK_TEST_STALL_REMOVE: "bellpr\\.lock$" });
+    const second = await haltingStart(box, secondHook, {
+      LOCK_TEST_STALL_REMOVE: "bellpr\\.lock$",
+    });
     launched.push(second);
     await halted(second, secondHook);
     const claimer = () => JSON.parse(readFileSync(claim, "utf8")).pid;
@@ -1073,6 +1081,76 @@ test("a start held up while it writes its takeover claim in place removes neithe
     for (const { child } of launched) child.kill("SIGKILL");
     await Promise.all(launched.map(({ exited }) => exited));
     await box.cleanup();
+  }
+});
+
+test("a start held up while it writes its lock or its claim in place leaves the file to the start that claimed it empty", async () => {
+  const cases = [
+    { written: "lock", files: "bellpr\\.lock$" },
+    { written: "claim", files: "\\.takeover-[0-9a-f]{16}$" },
+  ];
+  for (const { written, files } of cases) {
+    const box = await sandbox();
+    const launched: Launched[] = [];
+    try {
+      mkdirSync(box.data, { recursive: true });
+      const file = path.join(box.data, "bellpr.lock");
+      const probe = await acquireWriterLock(box.data);
+      const here = { ...JSON.parse(readFileSync(file, "utf8")), strict: undefined };
+      probe.release();
+      const stale = JSON.stringify({ ...here, pid: await gonePid() });
+      // The claim is written for a stale lock; the lock where there is none.
+      if (written === "claim") writeFileSync(file, stale);
+      const target = written === "claim" ? claimFile(file, stale) : file;
+      // Hard links fail for it: the first start creates the file in place and
+      // is held up before it writes it.
+      const firstHook = path.join(box.directory, "first");
+      const first = await haltingStart(box, firstHook, {
+        LOCK_TEST_NO_LINK: files,
+        LOCK_TEST_STALL_WRITE: files,
+      });
+      launched.push(first);
+      await halted(first, firstHook);
+      assert.equal(statSync(target).size, 0, written);
+      // An empty lock is removed at once, an empty claim once it is a lease old.
+      const lapsed = new Date(Date.now() - 31_000);
+      if (written === "claim") utimesSync(target, lapsed, lapsed);
+      // The second finds the file empty, claims it and is held up just before
+      // it removes it.
+      const secondHook = path.join(box.directory, "second");
+      const second = await haltingStart(box, secondHook, { LOCK_TEST_STALL_REMOVE: files });
+      launched.push(second);
+      await halted(second, secondHook);
+      const claim = claimFile(target, "");
+      assert.equal(JSON.parse(readFileSync(claim, "utf8")).pid, second.child.pid, written);
+      // The first goes on. Were its text to stay, the file would be its own,
+      // and the second would still remove what lies at the path: the lock of
+      // whichever start took it since, be it coordination, or the claim under
+      // which the first replaces the stale lock. The file stays empty instead.
+      writeFileSync(`${firstHook}.go`, "");
+      const ended = await Promise.race([
+        first.exited.then(({ code }) => code),
+        started(first).then(() => "started"),
+      ]);
+      assert.equal(ended, 1, first.stdout() + first.stderr());
+      assert.ok(first.stderr().includes(target), first.stderr());
+      assert.equal(readFileSync(target, "utf8"), "", written);
+      // Coordination that starts now does not get the lock either.
+      const message = await refusedWith(lockStarts(box).strict);
+      assert.ok(message.includes(target), message);
+      assert.equal(readFileSync(target, "utf8"), "", written);
+      if (written === "claim") assert.equal(readFileSync(file, "utf8"), stale);
+      // The second goes on, and is the one start that has the data directory.
+      writeFileSync(`${secondHook}.go`, "");
+      await started(second);
+      assert.equal(JSON.parse(readFileSync(file, "utf8")).pid, second.child.pid, written);
+      assert.deepEqual(lockLitter(box.data), [], written);
+    } finally {
+      // A halted start handles no signal.
+      for (const { child } of launched) child.kill("SIGKILL");
+      await Promise.all(launched.map(({ exited }) => exited));
+      await box.cleanup();
+    }
   }
 });
 
