@@ -93,53 +93,71 @@ const invalidScope = (invalid: string[] = []) =>
  * one or through a submodule, on the default branch of BELL PR's clone of
  * the repository. Git records a change at its real path, never through a
  * link, and records a submodule as one entry, so a hold spelled this way
- * would protect nothing. Compared in the case Git records. None when the branch cannot be read, as before this check:
+ * would protect nothing. Compared without regard to ASCII case, as holds
+ * are: on a disk that does not tell case apart, ALIAS/users.ts opens the
+ * link alias. None when the branch cannot be read, as before this check:
  * taking a hold writes no file. The log on the host says so.
  */
 async function linkedScopes(repo: Repository | undefined, scopes: string[]) {
   const linked = new Set<string>();
   if (!repo || !scopes.length) return linked;
+  const fold = (path: string) => path.replace(/[A-Z]/g, (letter) => letter.toLowerCase());
   const prefixes = (scope: string) =>
     scope.split("/").map((_, n, parts) => parts.slice(0, n + 1).join("/"));
-  const asked = [...new Set(scopes.flatMap(prefixes))];
-  // Git's modes for a symbolic link and a submodule.
+  const asked = new Set(scopes.flatMap(prefixes).map(fold));
+  const parents = new Set(scopes.flatMap((scope) => prefixes(scope).slice(0, -1)).map(fold));
+  // Git's modes for a symbolic link and a submodule, by folded path.
   const modes = new Map<string, string>();
-  // In parts, so no command line is longer than Windows takes.
-  for (let start = 0; start < asked.length; ) {
-    const batch: string[] = [];
-    for (let length = 0; start < asked.length && length < 8_000; start += 1) {
-      batch.push(asked[start]);
-      length += asked[start].length + 1;
-    }
-    const listed = await git(
-      repo.path,
-      [
-        "--literal-pathspecs",
-        "ls-tree",
-        "--full-tree",
-        "-z",
-        "--end-of-options",
-        `refs/heads/${repo.defaultBranch}`,
-        "--",
-        ...batch,
-      ],
-      { timeoutMs: 10_000 },
-    ).catch((error: unknown) => {
-      log.warn("Group work could not read the repository's default branch", {
-        repoId: repo.id,
-        error,
+  // One folder level at a time, since ls-tree matches paths in their exact
+  // case: the root, then each folder in Git's spelling that an asked path
+  // goes through. No folder in a level is inside another, so each lists
+  // its own entries.
+  for (let folders = [""]; folders.length; ) {
+    const next: string[] = [];
+    // In parts, so no command line is longer than Windows takes.
+    for (let start = 0; start < folders.length; ) {
+      const batch: string[] = [];
+      for (let length = 0; start < folders.length && length < 8_000; start += 1) {
+        if (folders[start]) batch.push(`${folders[start]}/`);
+        length += folders[start].length + 2;
+      }
+      const listed = await git(
+        repo.path,
+        [
+          "--literal-pathspecs",
+          "ls-tree",
+          "--full-tree",
+          "-z",
+          "--end-of-options",
+          `refs/heads/${repo.defaultBranch}`,
+          // A bare "--" would list nothing; without paths, the root.
+          ...(batch.length ? ["--", ...batch] : []),
+        ],
+        { timeoutMs: 10_000 },
+      ).catch((error: unknown) => {
+        log.warn("Group work could not read the repository's default branch", {
+          repoId: repo.id,
+          error,
+        });
       });
-    });
-    if (!listed) return linked;
-    for (const entry of listed.stdout.split("\0")) {
-      const mode = entry.slice(0, entry.indexOf(" "));
-      const tab = entry.indexOf("\t");
-      if (tab > 0 && (mode === "120000" || mode === "160000")) modes.set(entry.slice(tab + 1), mode);
+      if (!listed) return linked;
+      for (const entry of listed.stdout.split("\0")) {
+        const mode = entry.slice(0, entry.indexOf(" "));
+        const tab = entry.indexOf("\t");
+        if (tab < 0) continue;
+        const recorded = entry.slice(tab + 1);
+        const folded = fold(recorded);
+        if (!asked.has(folded)) continue;
+        // A link wins over a folder spelled in another case: either opens.
+        if (mode === "120000" || (mode === "160000" && !modes.has(folded))) modes.set(folded, mode);
+        if (mode === "040000" && parents.has(folded)) next.push(recorded);
+      }
     }
+    folders = next;
   }
   for (const scope of scopes) {
     const through = prefixes(scope).some((prefix, n, all) => {
-      const mode = modes.get(prefix);
+      const mode = modes.get(fold(prefix));
       // A submodule itself is held as Git records it.
       return mode === "120000" || (mode === "160000" && n < all.length - 1);
     });

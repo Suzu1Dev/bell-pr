@@ -228,10 +228,12 @@ What can be detected, and where:
   `src/api`, never met a change to `src/api/users.ts` (Rigel's QA of #79,
   D-1). Taking a hold now refuses, with 400 `invalidScope`, a path that is
   a symbolic link, or goes through one or into a submodule, on the default
-  branch of BELL PR's clone of the repository. One `git ls-tree` of the
-  path and its folders. A link committed upstream after the clone was last
-  updated, or spelled in another letter case than Git records, is not
-  seen. When the branch cannot be read, the hold is taken as before and
+  branch of BELL PR's clone of the repository, in any ASCII letter case:
+  on a disk that does not tell case apart, `ALIAS/users.ts` opens `alias`
+  (Rigel's QA of #80, F-2). One `git ls-tree` per folder level, since
+  ls-tree matches paths in their exact case. A link committed upstream
+  after the clone was last updated is not seen. When the branch cannot be
+  read, the hold is taken as before and
   the host's log says so: taking a hold writes no file. Resolving the link
   to the real path instead was left out.
 - **Costs.** One project read and one pass over the changed paths per

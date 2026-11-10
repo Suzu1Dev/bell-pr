@@ -444,9 +444,9 @@ were sent:
   `invalid`;
 - a path that is a symbolic link, or goes through one or into a
   submodule, on the repository's default branch in BELL PR's copy on the
-  host. Git records a change at the file's real path, and a submodule as
-  one entry, so such a hold would protect nothing. Hold the real path, or
-  the submodule as a whole.
+  host, in any letter case. Git records a change at the file's real path,
+  and a submodule as one entry, so such a hold would protect nothing. Hold
+  the real path, or the submodule as a whole.
 
 The other rules are about spelling only. They exist so that two spellings
 of one file always meet, on every file system a person in the group may

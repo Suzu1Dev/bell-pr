@@ -1006,8 +1006,19 @@ test("a path through a committed symbolic link or into a submodule cannot be hel
   assert.equal(added.status, 201, added.body);
   const project = added.json.project.id as string;
 
-  const asked = ["./alias/users.ts", "alias/", "readme", "vendor/lib/x.ts", "src/api/users.ts"];
-  const linked = ["./alias/users.ts", "alias/", "readme", "vendor/lib/x.ts"];
+  // In another case too: on a disk that does not tell case apart, ALIAS opens the link.
+  const asked = [
+    "./alias/users.ts",
+    "alias/",
+    "readme",
+    "vendor/lib/x.ts",
+    "ALIAS/users.ts",
+    "Readme",
+    "VENDOR/Lib/x.ts",
+    "src/api/users.ts",
+    "SRC/Api/users.ts",
+  ];
+  const linked = asked.slice(0, -2);
   const checked = await g.check(who.member, project, asked);
   assert.equal(checked.status, 200, checked.body);
   assert.deepEqual([checked.json.invalid, checked.json.meets], [linked, []]);
