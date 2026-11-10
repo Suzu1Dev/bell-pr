@@ -20,6 +20,7 @@ export default {
       "  token      Replace the API token and sign out paired devices (`token rotate`)",
       "  pair       Make a one-time code to pair a phone or another computer",
       "  devices    List paired devices (`devices list`) or revoke one (`devices revoke <id>`)",
+      "  group      Group work: `group status`, `group setup`, `group invite <name>`",
       "  version    Show the version, Node.js, platform and data directory",
       "  help       Show this help",
       "",
@@ -42,6 +43,9 @@ export default {
       "  --name <name>       Suggested name for the new device",
       "  --no-qr             Do not draw the QR code",
       "  --unlock            Clear the pairing lock and the failure count",
+      "",
+      "Options for group invite:",
+      "  --admin             The invited person joins as a group admin",
       "",
       `Lost the address? Run \`${bin} open\` on this computer to print and open it again.`,
     ].join("\n"),
@@ -115,6 +119,9 @@ export default {
     /** Strict rule (coordination): a lock whose holder cannot be shown to have stopped. */
     dataDirHolderUnconfirmed: ({ dataDir, file }: { dataDir: string; file: string }) =>
       `${name} cannot tell whether the process holding the data directory ${dataDir} has stopped: its lock ${file} comes from another container, another machine or an older version, or cannot be read. Coordination never replaces such a lock by itself. Make sure nothing uses this data directory any more, then remove ${file} and start again.`,
+    /** `start --group` or a `group` command: the running instance was started without group work. */
+    withoutGroup: ({ url }: { url: string }) =>
+      `${name} is already running at ${url} without group work. Stop it first, then start it with \`${bin} start --group\`.`,
     listenFailed: ({ address, reason }: { address: string; reason: string }) =>
       `${name} could not listen on ${address}: ${reason}`,
     failed: ({ reason }: { reason: string }) =>
@@ -179,7 +186,35 @@ export default {
     revoked: ({ id }: { id: string }) => `Revoked ${id}. Its token no longer works.`,
     notFound: ({ id }: { id: string }) => `No paired device has the id ${id}. Run \`${bin} devices list\` to see them.`,
   },
-  /** A pair or devices request the running server refused. */
+  /** `bell-pr group`. The invite code is shown; no token ever is. */
+  group: {
+    usage: `Run \`${bin} group status\`, \`${bin} group setup\` or \`${bin} group invite <name> [--admin]\`.`,
+    notSetUp: `Group work is not set up yet. Run \`${bin} group setup\`.`,
+    ready: "Group work is set up and ready.",
+    /** `reason` is the stable word the server gives, such as sideMissing. */
+    stopped: ({ reason }: { reason: string }) =>
+      `Group work has stopped (reason: ${reason}). docs/troubleshooting.md explains each reason. Fix the cause, then restart ${name}.`,
+    setUp: `Group work is set up. Invite the first admin with \`${bin} group invite <name> --admin\`.`,
+    alreadySetUp: "Group work is already set up.",
+    invited: ({
+      person,
+      admin,
+      code,
+      expiresAt,
+      minutes,
+    }: {
+      person: string;
+      admin: boolean;
+      code: string;
+      expiresAt: string;
+      minutes: number;
+    }) =>
+      [
+        `Invite code for ${person}${admin ? " (admin)" : ""}: ${code}`,
+        `The code works once and expires at ${expiresAt} (in ${minutes} minutes). Restarting ${name} voids it.`,
+      ].join("\n"),
+  },
+  /** A pair, devices or group request the running server refused. */
   requestFailed: ({ status, error }: { status: number; error: string }) =>
     `${name} answered ${status}: ${error}`,
 };

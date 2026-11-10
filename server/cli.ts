@@ -1,8 +1,8 @@
 import { openBrowserFile, type BrowserOpener } from "./browser-open.js";
 /**
  * The `bell-pr` / `bellpr` command: start (the default), open, doctor,
- * token, pair, devices, version and help. bin/bellpr.mjs loads the bundle
- * of this file (build/cli.mjs) and calls `run`.
+ * token, pair, devices, group, version and help. bin/bellpr.mjs loads the
+ * bundle of this file (build/cli.mjs) and calls `run`.
  */
 import { spawn } from "node:child_process";
 import { randomBytes } from "node:crypto";
@@ -37,6 +37,8 @@ import {
 import { redact } from "./process.js";
 import { clearPairing } from "./pairing.js";
 import { printPairQr } from "./pair-qr.js";
+import { inviteTtl } from "./collab-invites.js";
+import type { CollabInfo, CollabInviteResponse } from "../shared/collab.js";
 import { formatters } from "../shared/i18n/locale.js";
 import type { DeviceSummary, PairCodeResponse, PairLockedResponse } from "../shared/pairing.js";
 
@@ -300,10 +302,14 @@ async function start(args: string[], ctx: Context): Promise<number | undefined> 
   const reuseRunning = async () => {
     // --no-open, CI and development starts still mean "run a server".
     // A service must not silently succeed while another process owns it.
-    if (!config.open) return false;
+    if (!config.open && !config.collab) return false;
     const instance = await provenInstance(config.dataDir);
     if (!instance) return false;
     const { lock, token } = instance;
+    // Group work was asked for: an instance started without it is never passed off as one.
+    if (config.collab && lock.strict !== true)
+      throw new StartupError(sm().cli.start.withoutGroup({ url: lockUrl(lock) }));
+    if (!config.open) return false;
     if ((values.port !== undefined || ctx.env.BELLPR_PORT?.trim()) && lock.port !== config.port)
       return false;
     if ((values.host !== undefined || ctx.env.BELLPR_HOST?.trim()) && (lock.host ?? "127.0.0.1") !== config.host)
@@ -550,6 +556,72 @@ async function devices(args: string[], ctx: Context): Promise<number> {
   throw new UsageError(m.usage);
 }
 
+/**
+ * `bell-pr group status`, `group setup` and `group invite <name> [--admin]`:
+ * group work on the running instance, as the person at the host.
+ */
+async function group(args: string[], ctx: Context): Promise<number> {
+  const [sub, ...rest] = args;
+  const m = sm().cli.group;
+  const name = sub === "invite" && rest[0] && !rest[0].startsWith("-") ? rest[0] : undefined;
+  if (sub !== "status" && sub !== "setup" && name === undefined) throw new UsageError(m.usage);
+  const { values } = parse(name === undefined ? rest : rest.slice(1), {
+    ...commonOptions,
+    admin: { type: "boolean" },
+  });
+  if (values.admin && name === undefined) throw new UsageError(m.usage);
+  loadEnvFile(values["env-file"]);
+  const instance = await runningInstance(values, ctx);
+  if (!instance) return 1;
+  // Only a start with --group takes the strict lock and registers /api/collab.
+  if (instance.lock.strict !== true) {
+    ctx.stderr.write(`${sm().cli.start.withoutGroup({ url: lockUrl(instance.lock) })}\n`);
+    return 1;
+  }
+  const info = await callInstance(instance, "GET", "/api/collab", {});
+  if (info.status !== 200) return requestFailed(ctx, info);
+  const { state, reason } = info.body as CollabInfo;
+  if (state === "stopped") {
+    ctx.stderr.write(`${m.stopped({ reason: reason ?? "" })}\n`);
+    return 1;
+  }
+  if (sub === "status") {
+    ctx.stdout.write(`${state === "ready" ? m.ready : m.notSetUp}\n`);
+    return 0;
+  }
+  if (sub === "setup") {
+    if (state === "ready") {
+      ctx.stdout.write(`${m.alreadySetUp}\n`);
+      return 0;
+    }
+    const response = await callInstance(instance, "POST", "/api/collab/setup", {});
+    if (response.status !== 201) return requestFailed(ctx, response);
+    ctx.stdout.write(`${m.setUp}\n`);
+    return 0;
+  }
+  if (state !== "ready") {
+    ctx.stderr.write(`${m.notSetUp}\n`);
+    return 1;
+  }
+  const admin = values.admin === true;
+  const response = await callInstance(instance, "POST", "/api/collab/invites", {
+    name,
+    ...(admin ? { admin } : {}),
+  });
+  if (response.status !== 201) return requestFailed(ctx, response);
+  const { code, expiresAt } = response.body as CollabInviteResponse;
+  ctx.stdout.write(
+    `${m.invited({
+      person: name!,
+      admin,
+      code,
+      expiresAt: formatters(currentLocale()).time(expiresAt),
+      minutes: inviteTtl / 60_000,
+    })}\n`,
+  );
+  return 0;
+}
+
 function printVersion(args: string[], ctx: Context): number {
   const { values } = parse(args, commonOptions);
   loadEnvFile(values["env-file"]);
@@ -626,7 +698,7 @@ export async function main(
   try {
     // `bell-pr start --help` and the like show the help instead of failing.
     if (
-      ["start", "open", "token", "pair", "devices", "version", "--version", "-v"].includes(first) ||
+      ["start", "open", "token", "pair", "devices", "group", "version", "--version", "-v"].includes(first) ||
       first?.startsWith("-")
     )
       if (wantsHelp(argv)) return help();
@@ -643,6 +715,8 @@ export async function main(
         return await pair(rest, ctx);
       case "devices":
         return await devices(rest, ctx);
+      case "group":
+        return await group(rest, ctx);
       case "doctor":
         return await doctor(rest, ctx);
       case "version":
