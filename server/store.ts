@@ -19,6 +19,7 @@ import {
 } from "./types.js";
 import { activeFollowUp } from "../shared/followups.js";
 import { withStoredReach } from "../shared/project-policy.js";
+import { maxRunOwners } from "../shared/collab.js";
 import { groupAfterLimit, splitLimits } from "../shared/split.js";
 import { sessionMessageLimit, sessionContentLimit } from "../shared/session.js";
 import { setupTurnLimit } from "../shared/setup-needs.js";
@@ -655,6 +656,8 @@ export const runReadSchema = loose({
     splitInto: later(z.array(splitRefSchema).max(splitLimits.maxContributions)),
     // Group mode Phase 0 (server/group-local.ts), optional in the same way.
     group: later(loose({ after: later(z.array(text).max(groupAfterLimit)) })),
+    // The write guard's S2 (server/hold-guard.ts), optional in the same way.
+    owners: later(z.array(text.max(64)).max(maxRunOwners)),
 });
 
 const runSchema = lenientRead(runReadSchema);

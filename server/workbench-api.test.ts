@@ -36,6 +36,7 @@ const methods = [
   "managedClone",
   "updateRepository",
   "createRun",
+  "guardHolds",
   "sendTeamMessage",
   "approvePlan",
   "planOverlaps",

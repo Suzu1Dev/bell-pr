@@ -3,7 +3,8 @@
 Status: draft for review. Written against
 `feat/collab-work-depends-on` at 9272696. S1 is implemented on
 `feat/collab-write-guard` (`server/hold-guard.ts`, tests in
-`server/hold-guard.test.ts`).
+`server/hold-guard.test.ts`), and S2 on `feat/collab-write-guard-turns`
+(tests in `server/hold-guard-turns.test.ts`).
 
 ## The gap
 

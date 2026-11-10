@@ -69,6 +69,8 @@ import type { GuardOverride } from "../shared/contribution.js";
 import type { SplitRequest } from "../shared/split.js";
 import type { WorkbenchContext } from "./workbench-context.js";
 import { planOverlaps } from "./group-local.js";
+import type { CollabHost } from "./collab-host.js";
+import { runHolds } from "./hold-guard.js";
 
 export type { WorkbenchContext };
 
@@ -398,6 +400,15 @@ export class Workbench {
       status: () => this.status(),
     };
     return createRun(this.context, sources, repoId, prompt, title, settings, mode);
+  }
+
+  /**
+   * Gives agent turns, teammates and plans the group's holds
+   * (hold-guard.ts, S2). createApp calls it when BELL PR runs with --group;
+   * without it, none of them is checked.
+   */
+  guardHolds(host: CollabHost) {
+    this.context.holds = runHolds(host);
   }
 
   /** Appends to the run's own log through the context (see appendRunLog). */

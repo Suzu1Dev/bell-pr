@@ -659,6 +659,9 @@ keeps working, except that nothing in a repository of the group is
 published: the publish dialog shows a block, and publishing answers 503
 with `reason: "holdsUnknown"`
 ([Publishing over someone else's hold](group-work.md#publishing-over-someone-elses-hold)).
+Agent turns that may change files there, and plan approvals, are answered
+503 `holdsUnknown` too
+([BELL PR's agents and someone else's hold](group-work.md#bell-prs-agents-and-someone-elses-hold)).
 
 A stopped group stays stopped until BELL PR is restarted, and BELL PR
 never creates or repairs the group's files by itself. Fix the cause below,

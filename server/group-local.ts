@@ -325,6 +325,13 @@ function planFiles(run: Run) {
 }
 
 /**
+ * The plan's files as the group's holds are compared with them
+ * (hold-guard.ts): a folder scope without its trailing "/". One that is
+ * left empty cannot be compared, so it meets every hold.
+ */
+export const planScopes = (run: Run) => [...new Set(planFiles(run).map((file) => file.replace(/\/+$/, "")))];
+
+/**
  * The overlaps of `run`'s plan, with the tasks each one meets, and a digest
  * of the plan's files and the runs it overlaps. Approving needs that digest
  * back, so a tick never counts for another plan or for a run the person was

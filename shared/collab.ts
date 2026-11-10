@@ -8,6 +8,9 @@
 /** Where group work stands on this instance. Never persisted. */
 export type CollabState = "notSetUp" | "ready" | "stopped";
 
+/** At most this many people are saved as one run's owners (`Run.owners`); a device rarely has more than a few. */
+export const maxRunOwners = 100;
+
 /** `collab` in GET /api/status; absent when BELL PR runs without --group. */
 export interface CollabStatus {
   state: CollabState;

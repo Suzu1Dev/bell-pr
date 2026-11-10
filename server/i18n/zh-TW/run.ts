@@ -456,6 +456,15 @@ const m: Translation<typeof en> = {
     heldByOtherItem: ({ path, holder, title, since }) => `${path}：由 ${holder} 為「${title}」佔用（${since} 起）`,
     holdsUnknown: ({ name }) =>
       `小組協作已停止，無法確認檔案佔用狀態。發佈前請先在主機修復小組協作並重新啟動 ${name}。`,
+    turnHeldByOther: ({ items }) =>
+      `Agent 改到別人佔用的檔案，所以這項工作已停止。改動仍留在工作目錄裡。${items.join("；")}。請對方釋出、請小組管理員收回佔用，或把這些檔案的改動復原，再試一次。`,
+    taskHeldByOther: ({ items }) =>
+      `隊友改到別人佔用的檔案，所以這些改動沒有加入這份貢獻。${items.join("；")}。請對方釋出，或請小組管理員收回佔用，再試一次。`,
+    planHeldByOther: ({ items }) =>
+      `這個計畫涵蓋別人佔用的檔案，所以無法核准。${items.join("；")}。請附上意見退回計畫，或等對方釋出。`,
+    autoHeld: "這個計畫涵蓋小組裡別人佔用的檔案，所以改為等待你核准，不會自動開始。",
+    agentsHoldsUnknown: ({ name }) =>
+      `小組協作已停止，無法確認檔案佔用狀態，所以 Agent 不能修改檔案。請先在主機修復小組協作並重新啟動 ${name}，或改以不帶 --group 的方式啟動 ${name}。`,
   },
   publish: {
     heldByOther: ({ items }) =>

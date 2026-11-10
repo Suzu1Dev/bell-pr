@@ -222,6 +222,14 @@ export interface RunCore {
    * Phase 0). Absent on every run that has nothing to record.
    */
   group?: RunGroup;
+  /**
+   * The group's participant ids that started this run (group work, the
+   * write guard's S2): everyone who counted as "you" for the request that
+   * created it. Agent turns, teammates and plans of the run may change
+   * files these people hold, and no one else's. Set only when group work
+   * was set up; absent on every other run, which respects every hold.
+   */
+  owners?: string[];
 }
 
 export interface RunGroup {

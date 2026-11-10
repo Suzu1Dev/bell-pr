@@ -367,7 +367,7 @@ const feedbackItem: PrFeedbackItem = {
   createdAt: "2026-10-10T00:00:00Z",
 };
 
-test("a follow-up round is held to the same rule: no second push over Ada's hold, and one once she releases it", async (t) => {
+test("a follow-up round is held to the same rule: its turn stops over Ada's hold, no second push, and one once she releases it", async (t) => {
   const s = await scene(t, {
     runner: async (input) => {
       assert.equal(input.role, "followup");
@@ -392,7 +392,12 @@ test("a follow-up round is held to the same rule: no second push over Ada's hold
   await s.f.workbench.startFollowUp(run.id, { feedbackUrls: [feedbackItem.url] });
   for (let turn = 0; turn < 3000 && s.current().status === "running"; turn += 1)
     await new Promise((resolve) => setTimeout(resolve, 10));
+  // The turn itself is stopped (S2, server/hold-guard-turns.test.ts); its
+  // edit stays for review, and the person writes the commit message.
   assert.equal(s.current().status, "review");
+  assert.match(s.current().followUps?.at(-1)?.error ?? "", /^Agent 改到別人佔用的檔案，所以這項工作已停止。/);
+  assert.equal(await readFile(path.join(s.folder, "src/api/users.ts"), "utf8"), "export const users = ['ben'];\n");
+  s.current().draft.commitMessage = "List Ben in the users";
   await s.reviewAll();
   await s.f.workbench.approve(run.id, { ...s.current().draft });
   const before = await s.head();

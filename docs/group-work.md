@@ -15,10 +15,11 @@ held, and one whose work
 yet. Everyone who follows that repository's
 [live feed](#the-live-feed) hears of each change. All of that is the API
 only. The Group page comes later: nothing in the app shows the group yet.
-One thing changes in the app: BELL PR
-[publishes no change that touches someone else's hold](#publishing-over-someone-elses-hold).
-Before that, a hold **does not stop a tool, an editor or a push** from
-writing inside it or outside it.
+Two things change in the app: BELL PR
+[publishes no change that touches someone else's hold](#publishing-over-someone-elses-hold),
+and [its agents are held to the same holds](#bell-prs-agents-and-someone-elses-hold).
+A hold still **does not stop a tool outside BELL PR, an editor or a push**
+from writing inside it or outside it.
 [What is promised and what is not](#what-is-promised-and-what-is-not) lists
 what you can rely on today.
 
@@ -387,13 +388,58 @@ publishes as before, as long as `collab.json` still says which
 repositories are in the group. Fix group work and restart BELL PR, or
 start it without `--group`: then nothing is checked.
 
+### BELL PR's agents and someone else's hold
+
+A run belongs to the people who started it, worked out as for publishing:
+the person of the `x-bell-participant` token, or else everyone in the
+group who joined from the device that started it. BELL PR keeps them with
+the run, so they stay its owners after a restart. A run nobody in the
+group started (a device where nobody joined) has no owners, and then
+every hold counts as someone else's. An unknown token, or one of someone
+removed, is answered 403 `notJoined` and no run is started.
+
+In a repository of the group, a run's agents are held to the holds of
+everyone else:
+
+- **The agents are told.** Every turn that may change files gets the
+  paths other people hold, and the paths its own people hold, read again
+  for each turn. Only the paths: not who holds them or why.
+- **A plan over someone else's hold waits.** A plan that would start on
+  its own waits for approval instead, with a notice that it covers files
+  someone else holds. Approving a plan that covers such a file is
+  answered 409 with `reason: "heldByOther"` and `held`, as for
+  publishing. Send the plan back with feedback, or approve it once the
+  hold is released.
+- **A teammate's change is checked before it is added.** When a
+  teammate's task is integrated, its changed files are compared with the
+  holds right after the check that they stay inside the task. A change
+  over someone else's hold is not added: the run stops with the files,
+  and the teammate's own checkout keeps the change.
+- **A turn in the run's checkout is checked after it ends.** After a
+  turn from the **Collaborate** tab, a follow-up round or a turn that
+  resolves sync conflicts, every file the run changed since its base (new
+  files too, and a moved file at both of its paths) is compared with the
+  holds of that moment.
+  A change over someone else's hold stops the turn with the files.
+  Nothing is undone: the changes stay in the checkout for review, and a
+  follow-up round keeps them without a commit message.
+
+Turns that only read or review, and turns that work outside the run's
+checkout, are not checked. While group work
+[has stopped](#when-group-work-stops), turns that may change files and
+plan approvals in a repository of the group are answered 503 with
+`reason: "holdsUnknown"`, and a plan that would start on its own fails;
+turns that only read go on. Without `--group`, and in a repository
+outside the group, nothing is checked.
+
 ### What a hold does not do
 
 A hold is a record the group can see, the reason a second hold that meets
-it is refused, and the reason BELL PR does not
-[publish a change over it](#publishing-over-someone-elses-hold). Until a
-change is published, a hold **does not stop a tool, an editor or a push
-from writing** inside it: BELL PR's agents do not read the holds, and
+it is refused, the reason BELL PR does not
+[publish a change over it](#publishing-over-someone-elses-hold), and a
+[limit for BELL PR's agents](#bell-prs-agents-and-someone-elses-hold). It
+**does not stop a write as it happens**: an agent's change is found when
+its turn ends, an editor or a tool outside BELL PR is not checked, and
 nothing is locked in a checkout or on GitHub. A push made outside BELL PR
 is not checked at all. A hold says nothing about a path nobody named, and
 nothing about two changes in different files that do not work together.
@@ -551,7 +597,9 @@ is fixed and BELL PR is restarted. BELL PR never creates either file again
 by itself and never repairs one: nothing is assumed about a group whose
 record is gone. The rest of BELL PR keeps working, except that nothing in
 a repository of the group is
-[published](#publishing-over-someone-elses-hold). BELL PR notices a stop
+[published](#publishing-over-someone-elses-hold), and no agent turn that
+may change files and no plan approval
+[runs there](#bell-prs-agents-and-someone-elses-hold). BELL PR notices a stop
 at the next request that reads or writes the group's record or asks for
 its state, and at the latest when a request waiting on a
 [live feed](#the-live-feed) has waited its time. At that moment every
@@ -617,6 +665,10 @@ Promised:
 - BELL PR publishes no change, first round or follow-up, that touches a
   path someone else in the group holds at that moment, and while group
   work has stopped it publishes nothing in a repository of the group.
+- In a repository of the group, BELL PR approves no plan that covers a
+  path someone else holds, adds no teammate's change over such a path, and
+  stops a turn whose changes in the run's checkout touch one. While group
+  work has stopped, no agent turn there changes files.
 - No participant token and no invite code is put in a URL or written to a
   log.
 - Group work adds no listener, no dependency, no account, no cloud call and
@@ -624,11 +676,12 @@ Promised:
 
 Not promised:
 
-- **A hold stops no write before publishing.** An agent, an editor or a
-  push outside BELL PR can still change any file, held or not, and
-  BELL PR's agents do not read the holds. Only BELL PR's publish compares
-  a change with them, and only with the holds of that moment: a hold taken
-  later says nothing about what was already published.
+- **A hold stops no write as it happens.** An editor, a tool or a push
+  outside BELL PR can still change any file, held or not. A BELL PR agent
+  is told the held paths, but its change is found only when its turn ends
+  or its task is integrated, and nothing is undone then. Each check uses
+  the holds of that moment: a hold taken later says nothing about what was
+  already changed or published.
 - **A hold covers only the paths and the tasks it names.** Two people who
   hold different files can still make changes that do not work together,
   and work waits only for the tasks it names. A task is done when its

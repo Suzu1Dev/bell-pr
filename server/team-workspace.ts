@@ -140,6 +140,8 @@ export async function integrateTeamTask(
   run: Run,
   task: TeamTask,
   signal?: AbortSignal,
+  /** Throws when the changed paths meet someone else's hold (group work, hold-guard.ts). */
+  checkHolds?: (paths: readonly string[]) => void,
 ): Promise<string[]> {
   if (signal?.aborted) throw new AppError(cancelled(), 409);
   if (!task.worktreePath || !task.baseSha)
@@ -171,6 +173,8 @@ export async function integrateTeamTask(
         422,
       );
   }
+  // Inside the task's boundary is not enough: nobody else may hold the files.
+  checkHolds?.(files.map((file) => file.path));
   if (!files.length) return [];
   const patch = files.map((file) => file.patch).join("\n");
   await git(
