@@ -327,6 +327,8 @@ function ProviderStep({
                   key={`${fix.label}\n${fix.command}`}
                   label={fix.label}
                   command={fix.command}
+                  codeClassName="welcome-command"
+                  codeLabel={t.commandLabel({ command: fix.command })}
                 />
               ))}
             </div>

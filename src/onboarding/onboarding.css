@@ -156,7 +156,14 @@
 }
 .welcome-install-links {
   margin: 0;
-  overflow-wrap: anywhere;
+}
+/* One line, scrolled sideways. Scoped here so the shared command style is unchanged. */
+.welcome-install code.welcome-command {
+  white-space: pre;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-wrap: normal;
+  word-break: normal;
 }
 .welcome-provider-state:empty {
   display: none;

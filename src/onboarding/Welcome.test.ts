@@ -175,14 +175,23 @@ test("with no provider ready, Welcome shows how to install one", () => {
     "curl -fsSL https://antigravity.google/cli/install.sh | bash",
     "agy",
   ])
-    assert.ok(html.includes(`<code>${command}</code>`), command);
+    assert.match(
+      html,
+      new RegExp(
+        `<code class="welcome-command" tabindex="0" aria-label="Scroll the command: ${command.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}">${command.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}</code>`,
+      ),
+      command,
+    );
   assert.match(html, /href="https:\/\/github.com\/openai\/codex"/);
   assert.match(html, /See the <a[^>]*>Codex CLI<\/a> for other ways to install it\./);
   assert.match(html, /href="https:\/\/code\.claude\.com\/docs\/en\/overview"/);
   assert.match(html, /See the <a[^>]*>Claude Code documentation<\/a> for other ways to install it\./);
   const zh = renderZh(welcome("provider", { doctor: doctor(missing) }));
   assert.match(zh, /歡迎使用 BELL PR/);
-  assert.match(zh, /<code>npm install -g @openai\/codex<\/code>/);
+  assert.match(
+    zh,
+    /<code class="welcome-command" tabindex="0" aria-label="左右捲動指令：npm install -g @openai\/codex">npm install -g @openai\/codex<\/code>/,
+  );
   assert.match(zh, /其他安裝方式請見 <a[^>]*>Codex CLI<\/a>/);
   assert.match(zh, /href="https:\/\/github.com\/openai\/codex"/);
   assert.match(zh, /其他安裝方式請見 <a[^>]*>Claude Code 文件<\/a>/);

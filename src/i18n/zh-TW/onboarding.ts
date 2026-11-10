@@ -37,6 +37,7 @@ const m: Translation<typeof en> = {
     claudeDocs: "其他安裝方式請見 Claude Code 文件。",
     claudeDocsLabel: "Claude Code 文件",
     claudeDocsUrl: "https://code.claude.com/docs/en/overview",
+    commandLabel: ({ command }) => `左右捲動指令：${command}`,
     checking: "正在檢查哪些服務已就緒…",
     saving: "儲存中…",
     saved: ({ provider }) => `你的 Agent 會使用 ${provider}。`,

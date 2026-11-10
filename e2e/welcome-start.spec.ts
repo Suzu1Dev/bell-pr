@@ -35,6 +35,40 @@ async function fits(page: Page, width: number) {
   ).toBe(true);
 }
 
+const widths = [320, 375, 390, 768, 1280];
+
+/** Each install command is one line, and the page around it does not scroll sideways. */
+async function commandsOnOneLine(page: Page, width: number) {
+  await page.setViewportSize({ width, height: 800 });
+  const problems = await page.evaluate(() => {
+    const found: string[] = [];
+    const range = document.createRange();
+    for (const code of document.querySelectorAll(".welcome-install code")) {
+      const texts = [...code.childNodes].filter(
+        (node): node is Text => node.nodeType === Node.TEXT_NODE && !!node.textContent,
+      );
+      const rects = texts.flatMap((text) => {
+        range.selectNodeContents(text);
+        return [...range.getClientRects()].filter((rect) => rect.width > 0 && rect.height > 0);
+      });
+      const lines = new Set(rects.map((rect) => Math.round(rect.top)));
+      if (lines.size !== 1) found.push(`${lines.size} lines: ${code.textContent}`);
+    }
+    for (const node of [
+      document.documentElement,
+      document.querySelector(".welcome-screen"),
+      document.querySelector(".welcome"),
+      document.querySelector(".welcome-card"),
+    ]) {
+      if (!(node instanceof HTMLElement)) continue;
+      if (node.scrollWidth > node.clientWidth + 1)
+        found.push(`sideways ${node.className || node.tagName}: ${node.scrollWidth}>${node.clientWidth}`);
+    }
+    return found;
+  });
+  expect(problems, `width ${width}`).toEqual([]);
+}
+
 test("a first start with no provider CLI opens Welcome and shows how to install one", async ({ browser }) => {
   const server = await launchServer({ settingsPut: false, force: false });
   const { page, close } = await openWelcome(browser, server.baseURL);
@@ -56,6 +90,7 @@ test("a first start with no provider CLI opens Welcome and shows how to install 
     );
     await fits(page, 1280);
     await fits(page, 375);
+    for (const width of widths) await commandsOnOneLine(page, width);
 
     await page.setViewportSize({ width: 1280, height: 800 });
     await page.getByRole("button", { name: onboarding.back }).click();
@@ -71,6 +106,7 @@ test("a first start with no provider CLI opens Welcome and shows how to install 
     );
     await fits(page, 1280);
     await fits(page, 375);
+    for (const width of widths) await commandsOnOneLine(page, width);
   } finally {
     await close();
     await server.stop();

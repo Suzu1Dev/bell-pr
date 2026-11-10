@@ -39,6 +39,7 @@ export default {
     claudeDocs: "See the Claude Code documentation for other ways to install it.",
     claudeDocsLabel: "Claude Code documentation",
     claudeDocsUrl: "https://code.claude.com/docs/en/overview",
+    commandLabel: ({ command }: { command: string }) => `Scroll the command: ${command}`,
     checking: "Checking which providers are ready…",
     saving: "Saving…",
     saved: ({ provider }: { provider: string }) => `Your agents use ${provider}.`,
