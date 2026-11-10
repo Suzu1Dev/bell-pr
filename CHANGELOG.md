@@ -48,7 +48,8 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   only after a start claims it, so two starts that find the same stale
   lock cannot remove the lock either of them then writes. A claim left by
   a start that stopped is cleared by the next start once its process is
-  gone, and an empty one, outside coordination, once it is 30 seconds old;
+  gone, and one that names no start, outside coordination, once it is 30
+  seconds old;
   a claim that stays, like a lock that cannot be read, is named in the
   refusal. A lock taken
   for coordination is never replaced until its holder is shown to have
