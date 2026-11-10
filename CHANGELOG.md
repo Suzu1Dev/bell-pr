@@ -16,6 +16,26 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   wait was closed with the next request already on it, and a client that
   reuses connections without retrying, such as Playwright's request
   context, got `ECONNRESET`. The read now runs without blocking the server.
+- **Every subtask after a failed one is now blocked.** When a subtask
+  failed, a subtask that depended on it through another one could still show
+  as waiting on dependencies if the plan listed it first. Every pending or
+  ready subtask that depends on a failed or blocked one, directly or through
+  others, is now blocked in the same step, whatever the plan's order, and
+  that step starts no subtask. Subtasks that a restart of BELL PR stopped
+  now block the subtasks after them in the same way. A dependency on a task
+  the plan does not list, which only an edited data file can hold, no longer
+  causes an internal error and never counts as finished: its subtask keeps
+  waiting unless another dependency blocks it, and the run stops with "Task
+  dependencies or file assignments stop the team from continuing".
+- **The task board no longer shows failed subtasks as done.** Done now holds
+  only integrated subtasks; a failed one stays in To do with its status. A
+  subtask's dependencies used to read "Waits for" with their IDs, finished
+  ones included; each is now listed by title with its current status, and a
+  task the plan does not list shows as unknown. In a run that failed or was
+  cancelled, a subtask whose dependencies are integrated shows "Ready after
+  retry" instead of "Ready to claim", since nothing starts it until you
+  retry. Long titles and descriptions, even with no space to break at, now
+  wrap inside their card.
 
 ## [1.1.0] - 2026-11-04
 

@@ -27,6 +27,7 @@ import { writeDurable } from "./fs-atomic.js";
 import { initLog, log } from "./log.js";
 import { lenientRead } from "./persisted-schema.js";
 import { bindStoredGitDirs } from "./process.js";
+import { claimReadyTasks } from "./team.js";
 
 /** What loading state.json had to repair at this start; GET /api/status shows it. */
 export interface StoreRecovery {
@@ -859,6 +860,8 @@ export class Store {
               task.status = "failed";
               task.error = recovery.task;
             }
+          // Block their dependents, as when a task fails during the run.
+          claimReadyTasks(run.team.tasks, 0);
         }
       }
     }

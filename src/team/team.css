@@ -357,11 +357,13 @@
   line-height: 1.7;
   margin: 13px 0 9px;
   color: var(--color-accent-600);
+  overflow-wrap: anywhere;
 }
 .team-task > p {
   font-size: var(--text-xs);
   line-height: 1.9;
   color: var(--color-text-muted);
+  overflow-wrap: anywhere;
 }
 .team-task-owner {
   display: flex;
@@ -395,6 +397,22 @@
   font-size: var(--text-2xs);
   color: var(--color-text-muted);
   margin-top: 8px;
+}
+.team-task-deps ul {
+  list-style: none;
+  padding: 0;
+  margin: 4px 0 0;
+}
+.team-task-deps li {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 2px 8px;
+  margin-top: 4px;
+}
+.team-task-deps li > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 .team-lane-empty {
   font-size: var(--text-xs);
