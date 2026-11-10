@@ -16,6 +16,11 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   Nothing in the app, the CLI or any listener calls it, and it protects
   nothing at write time: a shell, an editor or an agent can still write
   outside a claim. Working together on one project is not safer yet.
+- **An admin can reopen a failed coordination task, in the core only.** The
+  task keeps its claims, their reasons and fences, and records who reopened
+  it and when. Members cannot reopen a task, and an integrated task never
+  reopens. Like the rest of the coordination core, nothing in the app, the
+  CLI or any listener reaches it yet.
 
 ### Changed
 

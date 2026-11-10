@@ -455,6 +455,12 @@ describe("the coordination file", () => {
       ["damaged", edited((state) => (state.projects[0].claims[0].fence = 99))],
       ["damaged", edited((state) => (state.projects[0].claims[0].scopes = ["src/Ä"]))],
       ["damaged", edited((state) => (state.projects[0].tasks[0].dependsOn = ["two"]))],
+      // A reopening by someone who is not a participant, or without a time.
+      [
+        "damaged",
+        edited((state) => (state.projects[0].tasks[0].reopenings = [{ by: "mallory", at: state.projects[0].tasks[0].createdAt }])),
+      ],
+      ["damaged", edited((state) => (state.projects[0].tasks[0].reopenings = [{ by: "admin" }]))],
     ];
     for (const [reason, content] of cases) {
       if (content === undefined) await rm(file);
@@ -583,6 +589,302 @@ describe("revocation", () => {
       await refusal(() => w.coordinator.authorize(w.alice, "app", { claimId: old.id, fence: old.fence, paths: ["src/a.ts"] })),
       ended,
     );
+  });
+});
+
+describe("reopening a failed task", () => {
+  /** What a refused reopening must leave as it was: the file and the answers. */
+  async function unchanged(w: World) {
+    return {
+      file: await readFile(dataPaths(w.dataDir).coordination, "utf8"),
+      project: w.coordinator.project(w.admin, "app"),
+    };
+  }
+  const taskOf = (w: World, id: string) =>
+    w.coordinator.project(w.admin, "app").tasks.find((task) => task.id === id);
+  const claimOf = (w: World, id: string) =>
+    w.coordinator.project(w.admin, "app").claims.find((claim) => claim.id === id);
+
+  test("only an authenticated admin reopens, and the reopening is kept with who and when", async () => {
+    const w = await world();
+    await w.coordinator.defineTask(w.alice, "app", { id: "one", dependsOn: [] });
+    const old = await w.coordinator.claim(w.alice, "app", { taskId: "one", scopes: ["src"] });
+    await w.coordinator.failTask(w.alice, "app", "one", { reason: "broken build" });
+    const before = await unchanged(w);
+    // Neither the task's creator and holder nor another member may reopen it.
+    for (const member of [w.alice, w.bob])
+      assert.deepEqual(await refusal(() => w.coordinator.reopenTask(member, "app", "one", {})), {
+        status: 403,
+        reason: "adminOnly",
+      });
+    // ...nor learn first whether a task exists.
+    assert.deepEqual(await refusal(() => w.coordinator.reopenTask(w.bob, "app", "nope", {})), {
+      status: 403,
+      reason: "adminOnly",
+    });
+    // An actor that only says it is the admin, or copies the admin's, is no one.
+    for (const forged of [{ id: "admin", role: "admin" } as const, { ...w.admin }])
+      assert.deepEqual(await refusal(() => w.coordinator.reopenTask(forged, "app", "one", {})), {
+        status: 401,
+        reason: "unauthenticated",
+      });
+    assert.deepEqual(await unchanged(w), before);
+
+    const from = new Date().toISOString();
+    const reopened = await w.coordinator.reopenTask(w.admin, "app", "one", { reason: "flaky runner" });
+    const to = new Date().toISOString();
+    assert.deepEqual(
+      { ...reopened, reopenings: reopened.reopenings?.map(({ by, reason }) => ({ by, reason })) },
+      { id: "one", dependsOn: [], status: "open", createdBy: "alice", reopenings: [{ by: "admin", reason: "flaky runner" }] },
+    );
+    const at = reopened.reopenings?.[0].at ?? "";
+    assert.ok(from <= at && at <= to, at);
+    // Reopening claims nothing, and the old claim stays ended with its reason and fence.
+    assert.equal(held(w).length, 0);
+    assert.deepEqual(claimOf(w, old.id), before.project.claims.find((claim) => claim.id === old.id));
+    assert.deepEqual(
+      [claimOf(w, old.id)?.status, claimOf(w, old.id)?.endedBy, claimOf(w, old.id)?.reason],
+      ["released", "alice", "broken build"],
+    );
+    const ended = { status: 409, reason: "ended" };
+    const authorizeOld = () =>
+      w.coordinator.authorize(w.alice, "app", { claimId: old.id, fence: old.fence, paths: ["src/a.ts"] });
+    assert.deepEqual(await refusal(authorizeOld), ended);
+    assert.deepEqual(
+      await refusal(() => w.coordinator.release(w.alice, "app", old.id, { fence: old.fence })),
+      ended,
+    );
+
+    // The next claim takes a higher fence, and the old holder cannot borrow it.
+    const next = await w.coordinator.claim(w.bob, "app", { taskId: "one", scopes: ["src"] });
+    assert.ok(next.fence > old.fence);
+    assert.deepEqual(
+      await refusal(() => w.coordinator.authorize(w.alice, "app", { claimId: next.id, fence: next.fence, paths: ["src/a.ts"] })),
+      { status: 403, reason: "notHolder" },
+    );
+    // A reason past the longest kept is cut, and a second reopening keeps the first.
+    await w.coordinator.failTask(w.bob, "app", "one", { reason: "still broken" });
+    await w.coordinator.reopenTask(w.admin, "app", "one", { reason: "r".repeat(600) });
+    await w.coordinator.failTask(w.admin, "app", "one", {});
+    await w.coordinator.reopenTask(w.admin, "app", "one", {});
+    const reopenings = taskOf(w, "one")?.reopenings ?? [];
+    assert.deepEqual(
+      reopenings.map((reopening) => [reopening.by, reopening.reason?.length]),
+      [["admin", 12], ["admin", 500], ["admin", undefined]],
+    );
+    assert.equal("reason" in reopenings[2], false);
+
+    // All of it is what a restarted host reads.
+    const project = w.coordinator.project(w.admin, "app");
+    await w.reopen();
+    assert.deepEqual(w.coordinator.project(w.admin, "app"), project);
+    assert.deepEqual(await refusal(authorizeOld), ended);
+    assert.deepEqual(
+      project.claims.map((claim) => [claim.fence, claim.status]),
+      [[old.fence, "released"], [next.fence, "released"]],
+    );
+  });
+
+  test("an open, integrated or unknown task is refused, and nothing changes", async () => {
+    const w = await world();
+    await w.coordinator.defineTask(w.alice, "app", { id: "done" });
+    const done = await w.coordinator.claim(w.alice, "app", { taskId: "done", scopes: ["src"] });
+    const change = await w.repo.commit(w.repo.base, { "src/a.ts": "1\n" });
+    await w.coordinator.integrate(w.alice, "app", done.id, { fence: done.fence, base: w.repo.base, commit: change });
+    await w.coordinator.defineTask(w.alice, "app", { id: "idle" });
+    await w.coordinator.defineTask(w.bob, "app", { id: "busy" });
+    const busy = await w.coordinator.claim(w.bob, "app", { taskId: "busy", scopes: ["lib"] });
+    const before = await unchanged(w);
+    for (const task of ["done", "idle", "busy"])
+      assert.deepEqual(await refusal(() => w.coordinator.reopenTask(w.admin, "app", task, {})), {
+        status: 409,
+        reason: "notFailed",
+      });
+    assert.deepEqual(await refusal(() => w.coordinator.reopenTask(w.admin, "app", "nope", {})), {
+      status: 404,
+      reason: "unknownTask",
+    });
+    assert.deepEqual(await refusal(() => w.coordinator.reopenTask(w.admin, "elsewhere", "idle", {})), {
+      status: 404,
+      reason: "unknownProject",
+    });
+    assert.deepEqual(await unchanged(w), before);
+    assert.equal(await w.repo.head(), change);
+    w.coordinator.authorize(w.bob, "app", { claimId: busy.id, fence: busy.fence, paths: ["lib/b.ts"] });
+  });
+
+  test("a reopened task still waits for its dependencies and free files; its dependants stay as they were", async () => {
+    const w = await world();
+    await w.coordinator.defineTask(w.alice, "app", { id: "base" });
+    await w.coordinator.defineTask(w.alice, "app", { id: "mid", dependsOn: ["base"] });
+    await w.coordinator.defineTask(w.bob, "app", { id: "top", dependsOn: ["mid"] });
+    await w.coordinator.defineTask(w.bob, "app", { id: "beside" });
+    const base = await w.coordinator.claim(w.alice, "app", { taskId: "base", scopes: ["src"] });
+    await w.coordinator.failTask(w.alice, "app", "base", { reason: "broken build" });
+    await w.coordinator.failTask(w.admin, "app", "mid", { reason: "base failed" });
+
+    // Reopening the dependency leaves the task that depends on it failed.
+    await w.coordinator.reopenTask(w.admin, "app", "base", {});
+    assert.deepEqual(
+      ["base", "mid", "top"].map((id) => taskOf(w, id)?.status),
+      ["open", "failed", "open"],
+    );
+    assert.deepEqual(
+      await refusal(() => w.coordinator.claim(w.bob, "app", { taskId: "mid", scopes: ["lib"] })),
+      { status: 409, reason: "taskClosed" },
+    );
+    assert.deepEqual(
+      await refusal(() => w.coordinator.claim(w.bob, "app", { taskId: "top", scopes: ["lib"] })),
+      { status: 409, reason: "dependencyFailed" },
+    );
+    // Reopened too, it waits until the dependency is integrated.
+    await w.coordinator.reopenTask(w.admin, "app", "mid", {});
+    assert.deepEqual(
+      await refusal(() => w.coordinator.claim(w.bob, "app", { taskId: "mid", scopes: ["lib"] })),
+      { status: 409, reason: "dependencyPending" },
+    );
+    // Files another claim holds stay out of reach.
+    const theirs = await w.coordinator.claim(w.bob, "app", { taskId: "beside", scopes: ["src/a.ts"] });
+    assert.deepEqual(
+      await refusal(() => w.coordinator.claim(w.alice, "app", { taskId: "base", scopes: ["src"] })),
+      { status: 409, reason: "conflict" },
+    );
+    await w.coordinator.release(w.bob, "app", theirs.id, { fence: theirs.fence });
+    const again = await w.coordinator.claim(w.alice, "app", { taskId: "base", scopes: ["src"] });
+    assert.ok(again.fence > base.fence);
+    const change = await w.repo.commit(w.repo.base, { "src/a.ts": "1\n" });
+    await w.coordinator.integrate(w.alice, "app", again.id, { fence: again.fence, base: w.repo.base, commit: change });
+    const mid = await w.coordinator.claim(w.bob, "app", { taskId: "mid", scopes: ["lib"] });
+    assert.equal(mid.holder, "bob");
+  });
+
+  test("racing for a reopened task, exactly one claim wins, and other tasks stay parallel", async () => {
+    const w = await world();
+    for (let round = 0; round < 10; round += 1) {
+      const [task, beside] = [`r${round}`, `p${round}`];
+      await w.coordinator.defineTask(w.alice, "app", { id: task });
+      await w.coordinator.defineTask(w.admin, "app", { id: beside });
+      const old = await w.coordinator.claim(w.alice, "app", { taskId: task, scopes: [`src/${round}`] });
+      await w.coordinator.failTask(w.alice, "app", task, {});
+      // Two reopenings at once: exactly one is kept.
+      const reopened = await Promise.allSettled([
+        w.coordinator.reopenTask(w.admin, "app", task, {}),
+        w.coordinator.reopenTask(w.admin, "app", task, {}),
+      ]);
+      assert.equal(reopened.filter((outcome) => outcome.status === "fulfilled").length, 1, `round ${round}`);
+      assert.equal(
+        ((reopened.find((outcome) => outcome.status === "rejected") as PromiseRejectedResult).reason as AppError)
+          .details?.reason,
+        "notFailed",
+      );
+      assert.equal(taskOf(w, task)?.reopenings?.length, 1);
+      const outcomes = await Promise.allSettled([
+        w.coordinator.claim(w.alice, "app", { taskId: task, scopes: [`src/${round}`] }),
+        w.coordinator.claim(w.bob, "app", { taskId: task, scopes: [`lib/${round}`] }),
+        w.coordinator.claim(w.admin, "app", { taskId: beside, scopes: [`docs/${round}`] }),
+      ]);
+      const [mine, theirs, aside] = outcomes;
+      assert.equal(aside.status, "fulfilled", `round ${round}`);
+      const won = [mine, theirs].filter((outcome) => outcome.status === "fulfilled");
+      const lost = [mine, theirs].filter((outcome) => outcome.status === "rejected");
+      assert.equal(won.length, 1, `round ${round}`);
+      assert.equal((lost[0].reason as AppError).details?.reason, "taskClaimed");
+      const winner = (won[0] as PromiseFulfilledResult<ClaimView>).value;
+      assert.ok(winner.fence > old.fence);
+      assert.deepEqual(
+        held(w).filter((claim) => claim.taskId === task).map((claim) => claim.id),
+        [winner.id],
+      );
+    }
+    const claims = held(w);
+    assert.equal(claims.length, 20);
+    await w.reopen();
+    assert.deepEqual(held(w), claims);
+  });
+
+  test("reopening races failing and claiming through the same order, never past it", async () => {
+    const w = await world();
+    for (let round = 0; round < 10; round += 1) {
+      const task = `r${round}`;
+      await w.coordinator.defineTask(w.alice, "app", { id: task });
+      const first = await w.coordinator.claim(w.alice, "app", { taskId: task, scopes: [`src/${round}`] });
+      // Failing and reopening at once: the reopening either finds the task failed or not yet.
+      const [failed, reopened] = await Promise.allSettled([
+        w.coordinator.failTask(w.alice, "app", task, {}),
+        w.coordinator.reopenTask(w.admin, "app", task, {}),
+      ]);
+      assert.equal(failed.status, "fulfilled");
+      const status = reopened.status === "fulfilled" ? "open" : "failed";
+      if (reopened.status === "rejected")
+        assert.equal((reopened.reason as AppError).details?.reason, "notFailed");
+      assert.equal(taskOf(w, task)?.status, status);
+      assert.equal(taskOf(w, task)?.reopenings?.length ?? 0, status === "open" ? 1 : 0);
+      if (status === "failed") await w.coordinator.reopenTask(w.admin, "app", task, {});
+      await w.coordinator.failTask(w.admin, "app", task, {});
+      // Claiming and reopening at once: a claim is granted only on the reopened task.
+      const [claimed, again] = await Promise.allSettled([
+        w.coordinator.claim(w.bob, "app", { taskId: task, scopes: [`src/${round}`] }),
+        w.coordinator.reopenTask(w.admin, "app", task, {}),
+      ]);
+      assert.equal(again.status, "fulfilled");
+      if (claimed.status === "rejected")
+        assert.equal((claimed.reason as AppError).details?.reason, "taskClosed");
+      else assert.ok(claimed.value.fence > first.fence);
+      assert.equal(taskOf(w, task)?.status, "open");
+      assert.equal(held(w).filter((claim) => claim.taskId === task).length, claimed.status === "fulfilled" ? 1 : 0);
+    }
+    const project = w.coordinator.project(w.admin, "app");
+    await w.reopen();
+    assert.deepEqual(w.coordinator.project(w.admin, "app"), project);
+  });
+
+  test("a reopening whose write fails is not answered, and the file decides", async () => {
+    let failing: "before" | "after" | undefined;
+    const w = await world({
+      write: async (file, data, opts) => {
+        if (failing === "before") throw new Error("disk full");
+        await writeDurable(file, data, opts);
+        if (failing === "after") throw new Error("fsync reported an error");
+      },
+    });
+    await w.coordinator.defineTask(w.alice, "app", { id: "one" });
+    const old = await w.coordinator.claim(w.alice, "app", { taskId: "one", scopes: ["src"] });
+    await w.coordinator.failTask(w.alice, "app", "one", { reason: "broken build" });
+    const before = await readFile(dataPaths(w.dataDir).coordination, "utf8");
+    failing = "before";
+    assert.deepEqual(await refusal(() => w.coordinator.reopenTask(w.admin, "app", "one", {})), {
+      status: 503,
+      reason: "unavailable",
+    });
+    failing = undefined;
+    // Memory and disk may disagree now, so nothing is answered from memory.
+    assert.deepEqual(
+      await refusal(() => w.coordinator.claim(w.bob, "app", { taskId: "one", scopes: ["lib"] })),
+      { status: 503, reason: "unavailable" },
+    );
+    assert.equal(await readFile(dataPaths(w.dataDir).coordination, "utf8"), before);
+    await w.reopen();
+    assert.deepEqual([taskOf(w, "one")?.status, taskOf(w, "one")?.reopenings], ["failed", undefined]);
+    assert.deepEqual(
+      await refusal(() => w.coordinator.claim(w.bob, "app", { taskId: "one", scopes: ["lib"] })),
+      { status: 409, reason: "taskClosed" },
+    );
+
+    // A write that landed before failing counts once reopened, and only once.
+    failing = "after";
+    assert.equal((await refusal(() => w.coordinator.reopenTask(w.admin, "app", "one", {}))).reason, "unavailable");
+    failing = undefined;
+    await w.reopen();
+    assert.deepEqual(
+      [taskOf(w, "one")?.status, taskOf(w, "one")?.reopenings?.length],
+      ["open", 1],
+    );
+    assert.deepEqual(
+      await refusal(() => w.coordinator.authorize(w.alice, "app", { claimId: old.id, fence: old.fence, paths: ["src/a.ts"] })),
+      { status: 409, reason: "ended" },
+    );
+    const next = await w.coordinator.claim(w.bob, "app", { taskId: "one", scopes: ["lib"] });
+    assert.ok(next.fence > old.fence);
   });
 });
 
@@ -1315,6 +1617,123 @@ describe("capacity", () => {
     assert.equal(project.tasks.find((task) => task.id === "late")?.dependsOn.length, 50);
     const claim = project.claims.find((candidate) => candidate.id === mine.id);
     assert.deepEqual([claim?.scopes.length, claim?.scopes[0].length, claim?.reason], [200, 1024, longestReason.slice(0, 500)]);
+  });
+
+  test("reopenings stop at their limit per task: the next changes nothing, and the task still settles", async () => {
+    const limits = { reopenings: 2 };
+    const w = await world({ limits });
+    for (const id of ["one", "two"]) await w.coordinator.defineTask(w.alice, "app", { id });
+    const ended: ClaimView[] = [];
+    const claimAndFail = async (task: string) => {
+      const claim = await w.coordinator.claim(w.alice, "app", { taskId: task, scopes: ["src"] });
+      await w.coordinator.failTask(w.alice, "app", task, { reason: longestReason });
+      ended.push(claim);
+    };
+    for (let round = 0; round < 2; round += 1) {
+      await claimAndFail("one");
+      await w.coordinator.reopenTask(w.admin, "app", "one", { reason: longestReason });
+    }
+    await claimAndFail("one");
+    const before = await snapshot(w);
+    const full = { reason: "full", limit: "reopenings", max: 2 };
+    assert.deepEqual(await details(() => w.coordinator.reopenTask(w.admin, "app", "one", {})), full);
+    assert.deepEqual(await snapshot(w), before);
+    assertEnded(w, ended);
+    assert.deepEqual(
+      ended.map((claim) => claim.fence),
+      [1, 2, 3],
+    );
+
+    // The limit is per task, and a reopened task still integrates.
+    await claimAndFail("two");
+    await w.coordinator.reopenTask(w.admin, "app", "two", {});
+    const last = await w.coordinator.claim(w.bob, "app", { taskId: "two", scopes: ["src"] });
+    const change = await w.repo.commit(w.repo.base, { "src/a.ts": "1\n" });
+    const done = await w.coordinator.integrate(w.bob, "app", last.id, { fence: last.fence, base: w.repo.base, commit: change });
+    assert.equal(await w.repo.head(), change);
+    ended.push(done.claim);
+
+    await w.reopen({ limits });
+    assertEnded(w, ended);
+    assert.deepEqual(await details(() => w.coordinator.reopenTask(w.admin, "app", "one", {})), full);
+    const reopenings = (id: string) =>
+      w.coordinator.project(w.admin, "app").tasks.find((task) => task.id === id)?.reopenings?.length;
+    assert.deepEqual([reopenings("one"), reopenings("two")], [2, 1]);
+    // A file with more reopenings than a build allows still opens there.
+    await w.reopen({ limits: { reopenings: 1 } });
+    assert.equal(reopenings("one"), 2);
+    // Under the default limits it reopens again.
+    await w.reopen({ limits: {} });
+    await w.coordinator.reopenTask(w.admin, "app", "one", {});
+    assert.equal(reopenings("one"), 3);
+  });
+
+  test("at the byte limit a reopening changes nothing, and every held claim and open task still ends in its longest way", async () => {
+    const w = await world();
+    for (const id of ["loop", "a", "b"]) await w.coordinator.defineTask(w.alice, "app", { id });
+    const mine = await w.coordinator.claim(w.alice, "app", { taskId: "a", scopes: ["src"] });
+    const theirs = await w.coordinator.claim(w.bob, "app", { taskId: "b", scopes: ["lib"] });
+    const limits = { bytes: (await bytesOnDisk(w)) + 30_000 };
+    await w.reopen({ limits });
+    let round = 0;
+    for (; ; round += 1) {
+      assert.ok(round < 30, "the byte limit was never reached");
+      await w.coordinator.failTask(w.admin, "app", "loop", {});
+      const before = await snapshot(w);
+      const attempt = await w.coordinator
+        .reopenTask(w.admin, "app", "loop", { reason: longestReason })
+        .catch((error: unknown) => error);
+      if (attempt instanceof AppError) {
+        assert.deepEqual([attempt.statusCode, attempt.details], [409, { reason: "full", limit: "bytes", max: limits.bytes }]);
+        assert.deepEqual(await snapshot(w), before);
+        break;
+      }
+      assert.ok((await bytesOnDisk(w)) <= limits.bytes);
+    }
+    assert.ok(round >= 3);
+    assert.equal(w.coordinator.project(w.admin, "app").tasks[0].status, "failed");
+
+    // Its holder fails one task, an admin revokes the other claim and fails what is left open.
+    await w.coordinator.failTask(w.alice, "app", "a", { reason: longestReason });
+    assert.ok((await bytesOnDisk(w)) <= limits.bytes);
+    const revoked = await w.coordinator.revoke(w.admin, "app", theirs.id, { reason: longestReason });
+    assert.equal(revoked.reason?.length, 500);
+    assert.ok((await bytesOnDisk(w)) <= limits.bytes);
+    await w.coordinator.failTask(w.admin, "app", "b", { reason: longestReason });
+    assert.ok((await bytesOnDisk(w)) <= limits.bytes);
+
+    await w.reopen({ limits });
+    assert.equal(held(w).length, 0);
+    assertEnded(w, [mine, theirs]);
+    const reopenings = w.coordinator.project(w.admin, "app").tasks[0].reopenings ?? [];
+    assert.deepEqual(
+      [reopenings.length, reopenings.every((reopening) => reopening.reason?.length === 500)],
+      [round, true],
+    );
+  });
+
+  test("the most reopenings, each with the longest reason, read back, and one more is refused", async () => {
+    assert.equal(coordinationLimits.reopenings, 100);
+    const w = await world();
+    await w.coordinator.defineTask(w.alice, "app", { id: "one" });
+    for (let round = 0; round < coordinationLimits.reopenings; round += 1) {
+      await w.coordinator.failTask(w.admin, "app", "one", {});
+      await w.coordinator.reopenTask(w.admin, "app", "one", { reason: longestReason });
+    }
+    await w.coordinator.failTask(w.admin, "app", "one", {});
+    const before = await snapshot(w);
+    assert.deepEqual(await details(() => w.coordinator.reopenTask(w.admin, "app", "one", {})), {
+      reason: "full",
+      limit: "reopenings",
+      max: 100,
+    });
+    assert.deepEqual(await snapshot(w), before);
+    await w.reopen();
+    const reopenings = w.coordinator.project(w.admin, "app").tasks[0].reopenings ?? [];
+    assert.deepEqual(
+      [reopenings.length, reopenings.every((reopening) => reopening.reason === longestReason.slice(0, 500))],
+      [100, true],
+    );
   });
 
   test("a file over this build's byte limit opens and settles; one past what the reader takes is refused", async () => {

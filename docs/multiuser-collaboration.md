@@ -42,7 +42,22 @@ with the group-mode overlap check.
   - `.git` in any case, files BELL PR holds back, and the whole repository.
 - **Dependencies:** a task's dependencies must be integrated before it can be
   claimed, authorized or integrated. A failed or unknown dependency refuses
-  outright.
+  outright, until an admin reopens the failed one.
+- **Only an admin reopens a failed task**
+  (`POST /projects/:project/tasks/:task/reopen`, with an optional `reason`
+  of at most 500 characters). Nothing changes when it is refused:
+  - anyone else gets `403` `adminOnly`, before the task is even looked up;
+  - an open or integrated task gets `409` `notFailed`; an integrated task
+    never reopens.
+
+  The task keeps its id, creator and dependencies, and every claim it had
+  keeps its status, reason and fence. An ended claim stays ended, and the
+  next claim takes a higher fence. That claim still needs integrated
+  dependencies and free scopes. Reopening claims nothing, and leaves the
+  tasks that depend on it as they are, failed ones included. Each
+  reopening is kept on the task with who reopened it, when, and any
+  reason given. A reopening runs in the same serial queue as claims and
+  failures, so for the same task one always happens after the other.
 - **Widening a claim** is arbitrated in one step while the old scopes stay
   held. A conflict changes nothing.
 - **Claims never lapse.** Time, disconnects and restarts release nothing;
@@ -84,15 +99,18 @@ with the group-mode overlap check.
 - **Refuses what does not fit before anything changes.** One file holds
   at most 1,000 participants and 100 projects. Each project holds at most
   10,000 tasks and 100,000 claims, of which at most 1,000 are held at once,
-  with 20,000 scopes together. One participant holds at most 100 claims at
-  once across all projects, with 2,000 scopes together. The whole file is
-  at most 8 MiB.
-  - An addition (a participant, project, task, claim or scope) must also
-    leave room for every held claim to end, every open task to close and
-    every project to save an integration intent, each at its longest.
+  with 20,000 scopes together, and each task keeps at most 100
+  reopenings. One participant holds at most 100 claims at once across all
+  projects, with 2,000 scopes together. The whole file is at most 8 MiB.
+  - An addition (a participant, project, task, claim, scope or
+    reopening) must also leave room for every held claim to end, every
+    open task to close and every project to save an integration intent,
+    each at its longest.
   - Past a limit the addition is refused with `409` and
     `details.reason: "full"`. Memory, the file and the branch stay as they
-    were, and the coordinator keeps answering.
+    were, and the coordinator keeps answering. A task's 101st reopening is
+    refused this way (`details.limit: "reopenings"`); no earlier one is
+    dropped.
   - Releasing, revoking, failing a task, integrating and recovering only
     spend that room, so they still work at the limit.
   - Every write is first read back by the same reader `open()` uses. An
@@ -179,12 +197,12 @@ with the group-mode overlap check.
   UTF-8, or a multibyte name split between two reads of Git's output, can
   still show U+FFFD in a refusal's message and in `details.path`, which is
   then not the file's exact name.
-- **The file keeps every ended claim.** Compaction comes later. Until
-  then, a project that reaches its claim limit, or a file that reaches
-  its byte limit, takes no new additions; nothing is deleted
-  automatically. Each held claim keeps about 3 KB free so that it can end
-  with the longest reason. At 8 MiB, that allows roughly 2,200 claims
-  held at once, each with its own task and one short scope.
+- **The file keeps every ended claim and every reopening.** Compaction
+  comes later. Until then, a project that reaches its claim limit, or a
+  file that reaches its byte limit, takes no new additions; nothing is
+  deleted automatically. Each held claim keeps about 3 KB free so that it
+  can end with the longest reason. At 8 MiB, that allows roughly 2,200
+  claims held at once, each with its own task and one short scope.
 - **Team runs do not share these rules yet.** Their scope check
   (`team.ts scopeContains`) is still case-sensitive.
 
@@ -198,6 +216,10 @@ with the group-mode overlap check.
   included (32 MiB). A file that a build with higher limits wrote still
   opens and settles. A larger file refuses to open.
 - Keys a newer build adds survive this build's writes.
+- A task may have `reopenings`, oldest first, each
+  `{ by, at, reason? }`. The key is optional: a file without it reads as
+  before, and an older build keeps it on the task when it writes. An
+  older build has nothing to enforce about it, so `version` stays 1.
 - An unknown status, role or version refuses to open.
 - A newer build that adds a field this build would have to enforce must
   raise `version`.
@@ -218,9 +240,10 @@ with the group-mode overlap check.
      - follow-ups.
    - Move team runs onto the shared scope rules.
    - Before the router is mounted:
-     - Any member may claim an open task, as now. A failed task reopens
-       only through a permission-checked step. An integrated task never
-       reopens, and a reopen keeps the task's history and fences.
+     - Any member may claim an open task, as now. Done in the core: a
+       failed task reopens only through an admin's step, an integrated
+       task never reopens, and a reopen keeps the task's history and
+       fences. Like the rest of the core, nothing reaches it yet.
      - An undecided recovery closes only its own project. An admin settles
        it through an audited step, while other projects stay available.
        The undecided project stays closed until then. Nothing resets a
@@ -257,6 +280,11 @@ directories and repositories, and cover:
 - failed writes that grant nothing;
 - a host killed mid-race that never grants twice after restart;
 - revoked fences that authorize nothing;
+- reopening a failed task: by an admin only, refused for members, forged
+  identities and open or integrated tasks without changing anything; old
+  claims and fences kept and ended; dependencies still refusing; one claim
+  winning when clients race for the reopened task; failed writes, its
+  limits and a restart;
 - one winner when two integrations start from the same base;
 - recovery at each integration step;
 - each limit refusing the next addition without changing anything, while
