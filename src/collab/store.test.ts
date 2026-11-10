@@ -193,16 +193,19 @@ test("a request before the board is given up after 40 seconds too", async (t) =>
   assert.equal(store.get().link, "reconnecting");
   await pass(2000);
   assert.deepEqual(waiting(), ["/projects", "/projects"]);
+  // The one given up is answered too late and the next one in time: no longer "Reconnecting".
+  await answer("/projects", { projects: [] });
+  await answer("/projects", { projects: [] });
+  assert.equal(store.get().link, "live");
 });
 
 test("a group without a repository is asked for its list every 10 seconds", async (t) => {
   const { store, answer, waiting, pass } = await joined(t, []);
   assert.deepEqual([store.get().projects, waiting()], [[], []]);
-  const card = store.get();
   await pass(10_000);
-  // Still none, and a repository this page is adding is left out of the list: the card stays as it is.
-  await answer("/projects", { projects: [], addable: [] });
-  assert.equal(store.get(), card);
+  // Still none, but one was imported meanwhile: an admin's card offers it.
+  await answer("/projects", { projects: [], addable: [{ repoId: "r1", name: "shop" }] });
+  assert.deepEqual(store.get().addable, [{ repoId: "r1", name: "shop" }]);
   await pass(10_000);
   // An admin added one meanwhile: its board follows without a reload.
   await answer("/projects", { projects: [{ id: "p1", name: "shop" }] });
@@ -210,15 +213,17 @@ test("a group without a repository is asked for its list every 10 seconds", asyn
   assert.deepEqual([store.get().project, ids(store.get().held)], ["p1", ["a"]]);
 });
 
-test("a repository that the list brought before its add was answered is listed once", async (t) => {
-  const { store, answer, pass } = await joined(t, []);
-  await pass(10_000);
-  const adding = store.add("r1");
+test("while the first add copies nothing else is asked, and a failed one asks for the list again", async (t) => {
+  const { store, answer, waiting, pass } = await joined(t, []);
+  const failed = assert.rejects(store.add("r1"));
   await settle();
-  await answer("/projects", { projects: [{ id: "p1", name: "shop" }] });
-  await answer("/projects", { project: { id: "p1", name: "shop" } }, 201);
-  await adding;
-  assert.deepEqual(store.get().projects, [{ id: "p1", name: "shop" }]);
+  // The list would leave out the repository that is being copied, and the card would change.
+  await pass(10_000);
+  assert.deepEqual(waiting(), ["/projects"]);
+  await answer("/projects", { reason: "cloneFailed", error: "The copy failed." }, 500);
+  await failed;
+  await answer("/projects", { projects: [], addable: [{ repoId: "r1", name: "shop" }] });
+  assert.deepEqual(store.get().addable, [{ repoId: "r1", name: "shop" }]);
 });
 
 test("when group work stops the board goes, and the page asks where group work stands", async (t) => {

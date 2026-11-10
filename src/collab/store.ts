@@ -162,7 +162,7 @@ export function createGroupStore() {
     // Requests left that do not wait, after the server had no place for one that does.
     let polls = 0;
     const fail = () => pause(backoff[Math.min(failures++, 3)] * 1000, signal);
-    /** The server answers within 25 s: a request still open after 40 is given up, as a failure. */
+    /** The feed waits up to 25 s and nothing else waits: a request still open after 40 is given up, as a failure. */
     const ask = <T>(path: string) => {
       const request = new AbortController();
       const giveUp = () => request.abort();
@@ -191,14 +191,13 @@ export function createGroupStore() {
           const { projects, addable } = await ask<CollabProjectsResponse>("/projects");
           if (signal.aborted) return;
           const chosen = projects.find((project) => project.id === state.project) ?? projects[0];
+          // An answer: what failed before it no longer shows as "Reconnecting".
+          drop({ projects, addable, project: chosen?.id, link: "live" });
           if (!chosen) {
-            // None yet: asked again, for the one an admin adds meanwhile. A list that is still
-            // empty changes nothing: it leaves out the repository that this page is adding.
-            if (state.projects?.length !== 0) drop({ projects, addable, project: undefined });
+            // None yet: asked again, for the one an admin adds meanwhile.
             await pause(10_000, signal);
             continue;
           }
-          drop({ projects, addable, project: chosen.id });
         }
         const query = new URLSearchParams({ wait: polls ? "0" : "25" });
         if (cursor) {
@@ -255,7 +254,7 @@ export function createGroupStore() {
     keepToken(token);
     // The card goes at once, so a second press cannot send the used code again. Maybe as
     // another person: the repositories, and which ones can be added, are asked for again.
-    set({ info: undefined, refused: undefined, projects: undefined, addable: undefined });
+    set({ info: undefined, refused: undefined, projects: undefined, addable: undefined, link: "live" });
     restart();
   }
 
@@ -298,14 +297,23 @@ export function createGroupStore() {
     },
     /** Adds a repository of this instance to the group and shows its board; can take minutes. */
     async add(repoId: string) {
-      const { project } = await call<CollabAddProjectResponse>("/projects", send("POST", { repoId }));
-      drop({
-        // Not twice, when the list brought it before this answer.
-        projects: [...(state.projects ?? []).filter((item) => item.id !== project.id), project],
-        addable: state.addable?.filter((repo) => repo.repoId !== repoId),
-        project: project.id,
-      });
-      restart();
+      // A group with no repository asks for its list every 10 seconds, and the list leaves out
+      // a repository that is being copied: nothing is asked beside this add, so its card stays.
+      if (!state.project) loop?.abort();
+      try {
+        const { project } = await call<CollabAddProjectResponse>(
+          "/projects",
+          send("POST", { repoId }),
+        );
+        drop({
+          projects: [...(state.projects ?? []), project],
+          addable: state.addable?.filter((repo) => repo.repoId !== repoId),
+          project: project.id,
+        });
+      } finally {
+        // After a failure too: a group with no repository asks for its list again.
+        restart();
+      }
     },
   };
 }
