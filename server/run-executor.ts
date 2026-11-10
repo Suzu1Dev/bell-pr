@@ -242,6 +242,8 @@ export async function runAgent(
         outputSchema: context.outputSchema,
         skipGitRepoCheck: context.isolated,
         web,
+        // Group work (S3): the sandbox makes other people's holds read-only.
+        held: holdScope?.others,
       });
       // Full access is a saved setting. The confirm dialog is only in the
       // UI, so a run created from the API or from the settings file still

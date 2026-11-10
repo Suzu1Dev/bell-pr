@@ -404,6 +404,17 @@ everyone else:
 - **The agents are told.** Every turn that may change files gets the
   paths other people hold, and the paths its own people hold, read again
   for each turn. Only the paths: not who holds them or why.
+- **Held paths are read-only in the agent's sandbox.** A Codex or Claude
+  Code turn that may change files gets the paths other people hold as
+  read-only, read again for each turn, so writing, deleting or renaming
+  them fails as the agent tries. That covers each spelling of the path
+  the checkout has (holds ignore ASCII letter case) and a held file that
+  does not exist yet, when its folder does. Claude Code's edit tools are
+  refused those paths with or without its sandbox; its shell commands only
+  inside the sandbox, and only for paths that already exist. Left to the
+  check after the turn: a held path that goes through a symbolic link or
+  whose folder does not exist yet, a spelling the checkout does not have
+  yet, Codex with full access, and Antigravity.
 - **A plan over someone else's hold waits.** A plan that would start on
   its own waits for approval instead, with a notice that it covers files
   someone else holds. Approving a plan that covers such a file is
@@ -440,7 +451,8 @@ A hold is a record the group can see, the reason a second hold that meets
 it is refused, the reason BELL PR does not
 [publish a change over it](#publishing-over-someone-elses-hold), and a
 [limit for BELL PR's agents](#bell-prs-agents-and-someone-elses-hold). It
-**does not stop a write as it happens**: an agent's change is found when
+**does not stop every write as it happens**: an agent's sandbox refuses
+most writes to held paths, any other change an agent makes is found when
 its turn ends, an editor or a tool outside BELL PR is not checked, and
 nothing is locked in a checkout or on GitHub. A push made outside BELL PR
 is not checked at all. A hold says nothing about a path nobody named, and
@@ -678,9 +690,10 @@ Promised:
 
 Not promised:
 
-- **A hold stops no write as it happens.** An editor, a tool or a push
-  outside BELL PR can still change any file, held or not. A BELL PR agent
-  is told the held paths, but its change is found only when its turn ends
+- **A hold stops only some writes as they happen.** An editor, a tool or
+  a push outside BELL PR can still change any file, held or not. A BELL PR
+  agent is told the held paths and its sandbox makes most of them
+  read-only, but a change it makes anyway is found only when its turn ends
   or its task is integrated, and nothing is undone then. Each check uses
   the holds of that moment: a hold taken later says nothing about what was
   already changed or published.

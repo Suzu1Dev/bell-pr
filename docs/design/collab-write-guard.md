@@ -3,8 +3,10 @@
 Status: draft for review. Written against
 `feat/collab-work-depends-on` at 9272696. S1 is implemented on
 `feat/collab-write-guard` (`server/hold-guard.ts`, tests in
-`server/hold-guard.test.ts`), and S2 on `feat/collab-write-guard-turns`
-(tests in `server/hold-guard-turns.test.ts`).
+`server/hold-guard.test.ts`), S2 on `feat/collab-write-guard-turns`
+(tests in `server/hold-guard-turns.test.ts`), and S3 on
+`feat/collab-write-guard-sandbox` (`heldWriteTargets` in
+`server/sandbox.ts`, tests in `server/hold-guard-sandbox.test.ts`).
 
 ## The gap
 
@@ -189,6 +191,40 @@ release).
    So S3 makes the agent's write fail on the spot. It never replaces
    step 2.
 
+   What S3 does (verified on Linux, not yet on macOS). A write turn's
+   `held` paths are the `others` of the turn's hold scope, read again per
+   turn. `heldWriteTargets` looks each one up in the turn's checkout one
+   folder at a time, ignoring ASCII case, and names every spelling it
+   finds. Codex gets each as `"read"` in its profile; Claude Code gets
+   `Edit(//path)` and `Edit(//path/**)` deny rules (Edit, Write and
+   NotebookEdit; with or without its sandbox) and, inside its sandbox,
+   `denyWrite` for the paths that exist. Antigravity, Codex with full
+   access and read turns get nothing. The caveats above, as found:
+
+   - Codex 0.167.0 with bubblewrap 0.11.1 (`codex sandbox`, no model
+     call): a read-only file cannot be written, deleted, or renamed over
+     ("Device or resource busy"); a read-only folder takes no new file;
+     their neighbours stay writable. A folder and a file below it, or
+     `X` and `X/**`, both start. A missing file in an existing folder
+     starts and cannot be created. A missing folder starts, but Codex
+     makes the first missing folder read-only, so other files in it
+     could not be created either: such paths are left out. A path through
+     a symbolic link, or that is one, stops the sandbox from starting
+     ("cannot enforce sandbox read-only path … because it crosses
+     writable symlink"): left out.
+   - Case: only spellings that exist when the turn starts are covered. A
+     new file in another spelling is found by the check after the turn.
+   - Claude Code 2.1.321 (one Haiku turn): the Edit tool on a file in a
+     held folder and the Write tool on a missing held file were refused
+     ("File is in a directory that is denied by your permission
+     settings"); Write on a free file worked. Its Bash sandbox could not
+     start on this host at all, with or without held paths
+     (`apply-seccomp: write /proc/self/setgroups`, with
+     `kernel.apparmor_restrict_unprivileged_userns=1`), so `denyWrite`
+     for held paths is unverified and gets only paths that exist.
+   - At most 200 paths (`maxHeldWriteTargets`); a path below another one
+     in the list, `.git`, and `..` are left out.
+
 ## What cannot be guarded, and how to detect it
 
 BELL PR cannot stop:
@@ -301,8 +337,10 @@ the titles; a team teammate's diff that meets a hold is refused next to
   After each write-role turn, refuse a turn that met someone else's hold.
   Add the prompt block, the plan-approval refusal, the check next to
   `outOfScope` for teammates, and "Put these files back".
-- **S3: sandbox denies** for held paths, after the caveats above are
-  verified on Linux and macOS for Codex and Claude Code.
+- **S3: sandbox denies** for held paths. Done for Codex and Claude Code
+  as described under "Telling agents their scope". Still to verify:
+  macOS (Seatbelt) for both, and Claude Code's Bash `denyWrite` on a host
+  where its sandbox starts.
 - **S4: detection.** Report changes made outside BELL PR to the holder at
   sync and publish, and add `changing` to `check` and `work`.
 

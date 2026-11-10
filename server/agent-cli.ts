@@ -19,6 +19,9 @@ import { exitStatusCanHideFailure } from "./exit-status.js";
 import { git } from "./process.js";
 import {
   agentGitWriteDenials,
+  heldEditDenials,
+  heldSandboxWriteDenials,
+  heldWriteTargets,
   agentReadDenials,
   agentSandboxReadPaths,
   antigravityCloneGitRead,
@@ -46,6 +49,11 @@ export interface AgentCommandOptions {
   web?: boolean;
   /** Write roles only: explicit permission to remove the sandbox and command deny rules. */
   full?: boolean;
+  /**
+   * Write roles only: the paths other people in the group hold, relative
+   * to the checkout. The sandbox makes them read-only (heldWriteTargets).
+   */
+  held?: readonly string[];
 }
 
 export const agentLabel = (provider: AgentProvider = "codex") =>
@@ -197,14 +205,19 @@ function codexDenials(): string[] {
  * reads and writes. `read` allows reads and forbids writes, including
  * delete and replace. The checkout's `.git` and `.git/**` are `read`,
  * so the file cannot be edited or replaced with a directory, and Git
- * can still read it. Credential paths stay `deny`.
+ * can still read it. Credential paths stay `deny`. In a write turn, the
+ * paths other people hold (`held`, from heldWriteTargets) are `read` too.
  */
-export function codexSandboxConfig(access: AgentAccess, cwd: string): string[] {
+export function codexSandboxConfig(
+  access: AgentAccess,
+  cwd: string,
+  held: readonly string[] = [],
+): string[] {
   const dotGit = path.join(cwd, ".git");
   const filesystem = [
     "glob_scan_max_depth=4",
     ...codexDenials().map((entry) => `"${entry}"="deny"`),
-    ...[dotGit, `${dotGit}/**`]
+    ...[dotGit, `${dotGit}/**`, ...(access === "write" ? held : [])]
       .filter(codexProfilePath)
       .map((entry) => `"${entry}"="read"`),
   ].join(", ");
@@ -311,6 +324,8 @@ export function claudeSettings(options: {
   access: AgentAccess;
   sandbox: boolean;
   full?: boolean;
+  /** Write turns: heldWriteTargets, denied to the edit tools and, with the sandbox, to Bash. */
+  held?: readonly string[];
 }): {
   disableAllHooks: true;
   autoMemoryEnabled: false;
@@ -350,7 +365,10 @@ export function claudeSettings(options: {
     agent: "",
     claudeMdExcludes: claudeUserMemoryFiles(),
     permissions: {
-      deny: agentReadDenials(options.cwd),
+      deny: [
+        ...agentReadDenials(options.cwd),
+        ...(options.access === "write" ? heldEditDenials(options.held ?? []) : []),
+      ],
       ...(options.access === "write"
         ? {}
         : { blockReadsOutsideWorkingDirectories: true }),
@@ -368,7 +386,10 @@ export function claudeSettings(options: {
             allowNestedUserNamespaces: false,
             filesystem: {
               ...agentSandboxReadPaths(options.cwd),
-              denyWrite: agentGitWriteDenials(options.cwd),
+              denyWrite: [
+                ...agentGitWriteDenials(options.cwd),
+                ...(options.access === "write" ? heldSandboxWriteDenials(options.held ?? []) : []),
+              ],
               disabled: false,
             },
             network: {
@@ -528,6 +549,9 @@ export async function agentCommand(
     throw new AppError((m) => m.setup.doctor.codexDisabled, 422);
   const full = (options.full ?? execution.agentAccess === "full") && options.access === "write";
   const web = options.web === true && options.access !== "none";
+  // Group work (S3): what other people hold is read-only for this turn.
+  const held =
+    options.access === "write" && options.held?.length ? heldWriteTargets(options.cwd, options.held) : [];
   if (execution.provider === "antigravity") {
     assertNoAntigravityWorkspaceConfig(options.cwd);
     const value = modelExecutionSchema.parse(execution);
@@ -587,7 +611,7 @@ export async function agentCommand(
         "user",
         "--settings",
         JSON.stringify(
-          claudeSettings({ cwd: options.cwd, access: options.access, sandbox, full }),
+          claudeSettings({ cwd: options.cwd, access: options.access, sandbox, full, held }),
         ),
         ...(value.model ? ["--model", value.model] : []),
         ...(value.reasoningEffort ? ["--effort", value.reasoningEffort] : []),
@@ -614,7 +638,7 @@ export async function agentCommand(
       ...modelArguments(execution),
       ...(full
         ? ["--sandbox", "danger-full-access"]
-        : codexSandboxConfig(options.access, options.cwd)),
+        : codexSandboxConfig(options.access, options.cwd, held)),
       "-c",
       'approval_policy="never"',
       // Codex 0.159 `exec` has no --search flag; live search is a config override.
