@@ -142,16 +142,42 @@ async function group(t: TestContext, options?: Parameters<typeof collabFixture>[
 const refusalFields = ["reason", "error", "conflicts", "retryAfter", "invalid"];
 const fieldsOf = (reply: Reply) => Object.keys(reply.json).sort();
 
+/**
+ * Holds up the first take between its task and its hold: `reached` once it
+ * is there, and `go` lets it on.
+ */
+function heldUp(t: TestContext) {
+  const claim = Coordinator.prototype.claim;
+  const first = { reached: false, go: () => {} };
+  const gate = new Promise<void>((resolve) => (first.go = resolve));
+  t.mock.method(
+    Coordinator.prototype,
+    "claim",
+    async function (this: Coordinator, ...args: Parameters<Coordinator["claim"]>) {
+      if (!first.reached) {
+        first.reached = true;
+        await gate;
+      }
+      return claim.apply(this, args);
+    },
+  );
+  return first;
+}
+
 test("add a repository: the group gets its own bare copy of the default branch, once; a copy that fails leaves nothing", async (t) => {
   const g = await group(t);
   const { f, who } = g;
   const widgets = await g.repository("widgets");
   const gadgets = await g.repository("gadgets");
-  // Not offered: its folder is gone, or it has no branch of that name.
+  // Not offered: its folder is gone, it has no branch of that name, or the
+  // coordinator takes no branch of that name.
   const gone = await g.repository("gone");
   await rm(gone.path, { recursive: true });
   const branchless = await g.repository("branchless");
   branchless.defaultBranch = "trunk";
+  const odd = await g.repository("odd");
+  odd.defaultBranch = "release+1";
+  await git(odd.path, ["branch", odd.defaultBranch]);
   const list = (asWho: Headers) => f.send("GET", "/api/collab/projects", asWho);
   const add = (asWho: Headers, body: unknown) => f.post("/projects", asWho, body);
   const storage = async () => ({
@@ -215,9 +241,10 @@ test("add a repository: the group gets its own bare copy of the default branch, 
   });
   assert.deepEqual((await list(who.member)).json, { projects: [{ id, name: "local/widgets" }] });
 
-  // A copy that fails leaves no folder and no entry, and the answer says nothing of this computer.
+  // A copy that fails, or one the coordinator then refuses, leaves no folder and
+  // no entry, and the answer says nothing of this computer.
   const kept = await f.files();
-  for (const repo of [gone, branchless]) {
+  for (const repo of [gone, branchless, odd]) {
     const failed = await add({ ...who.admin, "x-bell-locale": "en" }, { repoId: repo.id });
     assert.deepEqual([failed.status, failed.json], [500, {
       reason: "cloneFailed",
@@ -230,8 +257,8 @@ test("add a repository: the group gets its own bare copy of the default branch, 
   assert.deepEqual(await readdir(f.paths.collabRepos), [`${id}.git`]);
   // Why it failed is in the log on the host.
   const copies = f.logged.filter((line) => line.includes("Group work could not copy a repository"));
-  assert.equal(copies.length, 2);
-  assert.ok(copies.every((line) => line.includes("fatal")));
+  assert.equal(copies.length, 3);
+  assert.equal(copies.filter((line) => line.includes("fatal")).length, 2);
 
   // BELL PR forgets the repository: the group keeps it under the name it had.
   f.store.data.repos.splice(0);
@@ -241,6 +268,12 @@ test("add a repository: the group gets its own bare copy of the default branch, 
     storage: await storage(),
   });
   assert.equal((await g.board(id)).project.name, "local/widgets");
+
+  // A name longer than the side file takes is cut to what it takes.
+  const long = await g.repository("long");
+  long.fullName = `local/${"n".repeat(200)}`;
+  const cut = await add(who.admin, { repoId: long.id });
+  assert.deepEqual([cut.status, cut.json.project.name], [201, long.fullName.slice(0, 200)]);
   await f.nothingLeaked();
 });
 
@@ -362,6 +395,24 @@ test("work: a title and paths become a hold; a held path in the way is refused w
   await f.nothingLeaked();
 });
 
+test("work: a path that someone took in between is refused as a held path is", async (t) => {
+  const g = await group(t);
+  const { who } = g;
+  const project = await g.add("widgets");
+  // Ben's take is on its way when Dee takes the folder above his.
+  const first = heldUp(t);
+  const his = g.work(who.member, project, { title: "Parser", scopes: ["src/parser"] });
+  await until(() => first.reached);
+  const hers = await g.hold(who.dee, project, { title: "Sources", scopes: ["src"] });
+  first.go();
+  const refused = await his;
+  assert.equal(outcome(refused), "409 conflict");
+  assert.deepEqual(refused.json.conflicts, [
+    { scope: "src", holder: "Dee", title: "Sources", since: hers.since },
+  ]);
+  assert.deepEqual((await g.board(project)).held, [hers]);
+});
+
 test("the board: what is held, oldest first, and the people; a hold that ended or was refused is not on it", async (t) => {
   // Two holds a person, so the coordinator is full for Ben at the third.
   const g = await group(t, { limits: { participantHeldClaims: 2 } });
@@ -456,26 +507,13 @@ test("remove: a take under way for the removed person is refused, and holds noth
   const g = await group(t);
   const { f, who, ben } = g;
   const project = await g.add("widgets");
-  // His take is held up between the task and the hold.
-  const claim = Coordinator.prototype.claim;
-  let reached = false;
-  let go = () => {};
-  const gate = new Promise<void>((resolve) => (go = resolve));
-  t.mock.method(
-    Coordinator.prototype,
-    "claim",
-    async function (this: Coordinator, ...args: Parameters<Coordinator["claim"]>) {
-      reached = true;
-      await gate;
-      return claim.apply(this, args);
-    },
-  );
+  const first = heldUp(t);
   const taking = g.work(who.member, project, { title: "Parser", scopes: ["src"] });
-  await until(() => reached);
+  await until(() => first.reached);
 
   const removed = await f.post(`/people/${ben.id}/remove`, who.admin);
   assert.deepEqual([removed.status, removed.json], [200, { revoked: 0, unpaired: false }]);
-  go();
+  first.go();
   assert.equal(outcome(await taking), "403 notJoined");
   const board = await g.board(project);
   assert.deepEqual(board.held, []);
@@ -484,7 +522,7 @@ test("remove: a take under way for the removed person is refused, and holds noth
 
 test("the feed: the board at once for who is behind; who is current waits for a change, two requests a person at most", async (t) => {
   const g = await group(t);
-  const { who, ben } = g;
+  const { f, who, ben } = g;
   const project = await g.add("widgets");
 
   const first = await g.feed(who.member, project);
@@ -539,6 +577,12 @@ test("the feed: the board at once for who is behind; who is current waits for a 
   assert.equal(his.status, 200, his.body);
   assert.equal(his.body, her.body);
   assert.deepEqual([his.json.version, his.json.board.held], [3, []]);
+
+  // Someone joins the group: who waits is given the board with them on it.
+  const again = await g.park(who.dee, project);
+  const eve = await f.join(await f.device("Phone E"), await f.invite(who.admin, { name: "Eve" }));
+  const joined = await again.reply;
+  assert.deepEqual(joined.json.board.people.at(-1), { id: eve.id, name: "Eve" });
 });
 
 test("the feed: a person's connection that never reads keeps eight answers at most; more are refused", async (t) => {
