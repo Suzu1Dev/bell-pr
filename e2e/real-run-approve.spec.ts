@@ -290,7 +290,9 @@ test("a passed check counts after the setting is turned off: publishing asks not
     await page.keyboard.press("Escape");
     await expect(dialog).toHaveCount(0);
     await page.locator("#workspace-tab-draft").click();
-    await expect(page.locator('[data-row="understanding"]')).toContainText(draft.guidance.checklist.understandingPassed);
+    // The passed check lives on the publish checklist. The guide's row
+    // list leaves it out, so it is not shown twice.
+    await expect(page.locator(".draft-round-checklist")).toContainText(workspace.checklist.understandingPassed);
     await expect(page.locator('[data-row="rules"]')).not.toContainText("your understanding check is off");
   } finally {
     await context.close();

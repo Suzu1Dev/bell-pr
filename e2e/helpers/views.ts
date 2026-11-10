@@ -179,8 +179,10 @@ export const stateViews: StateView[] = [
     },
   },
   {
-    // A real run whose premise check refuted the request's assumption: the
-    // brief's motivation and after card carry the tag, at every width.
+    // A real run whose premise check refuted the request's assumption.
+    // This run records no motivation and no hoped-for outcome, so those
+    // cards are not shown and neither is the tag that labels their text.
+    // The premise notice still states the refutation, at every width.
     name: "premise-refuted",
     route: `#/runs/${runId}/overview`,
     include: ".mission-contribution",
@@ -207,8 +209,10 @@ export const stateViews: StateView[] = [
       { width: 1024, height: 768 },
     ],
     async drive(page, locale) {
-      const t = messages[locale].mission.brief;
-      await expect(page.locator(".mission-after .mission-premise-tag")).toHaveText(t.premiseRefuted);
+      const t = messages[locale].workspace.premise;
+      const notice = page.locator(".mission-contribution .premise-notice");
+      await expect(notice.getByRole("heading", { name: t.heading({ verdict: t.verdicts.refuted }) })).toBeVisible();
+      await expect(notice.locator(".premise-statement")).toHaveText("Greetings are always in English today.");
     },
   },
   {
