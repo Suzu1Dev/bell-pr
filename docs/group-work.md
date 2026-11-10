@@ -109,8 +109,9 @@ choose the group's first repository under **Add a repository**, among the
 ones this BELL PR has ([the group's repositories](#the-groups-repositories)
 says what adding does); an admin adds further ones from the picker at the
 top. While the group has no repository, the page says so and asks again
-every 10 seconds. A repository that someone else adds after that shows in
-the picker once the page is loaded again. A paired device cannot set the
+every 10 seconds, so the first repository shows without a reload. Once a
+board is on the page, a repository that someone else adds shows in the
+picker after the page is loaded again. A paired device cannot set the
 group up, and its page says where that is done.
 
 **Invite.** The **Invite** button is there for an admin, and for anyone
