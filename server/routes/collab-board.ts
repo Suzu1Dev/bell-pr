@@ -39,8 +39,11 @@ import { PersonLimit } from "../collab-limits.js";
 import { CollabProjects } from "../collab-projects.js";
 import { adminOnly, notJoined, reasonOf, refuse } from "../collab-refusal.js";
 import type { Actor } from "../coordination.js";
+import { log } from "../log.js";
+import { git } from "../process.js";
 import { claimableScope } from "../scope-paths.js";
 import type { Store } from "../store.js";
+import type { Repository } from "../types.js";
 
 /** Stricter than the coordinator's own limits: what a person types, not what a program sends. */
 export const maxPaths = 50;
@@ -86,22 +89,87 @@ const invalidScope = (invalid: string[] = []) =>
   refuse(400, "invalidScope", (m) => m.collab.invalidScope({ max: maxPathLength }), { invalid });
 
 /**
+ * Of these claimable scopes, those that are a symbolic link, or go through
+ * one or through a submodule, on the default branch of BELL PR's clone of
+ * the repository. Git records a change at its real path, never through a
+ * link, and records a submodule as one entry, so a hold spelled this way
+ * would protect nothing. Compared in the case Git records. None when the branch cannot be read, as before this check:
+ * taking a hold writes no file. The log on the host says so.
+ */
+async function linkedScopes(repo: Repository | undefined, scopes: string[]) {
+  const linked = new Set<string>();
+  if (!repo || !scopes.length) return linked;
+  const prefixes = (scope: string) =>
+    scope.split("/").map((_, n, parts) => parts.slice(0, n + 1).join("/"));
+  const asked = [...new Set(scopes.flatMap(prefixes))];
+  // Git's modes for a symbolic link and a submodule.
+  const modes = new Map<string, string>();
+  // In parts, so no command line is longer than Windows takes.
+  for (let start = 0; start < asked.length; ) {
+    const batch: string[] = [];
+    for (let length = 0; start < asked.length && length < 8_000; start += 1) {
+      batch.push(asked[start]);
+      length += asked[start].length + 1;
+    }
+    const listed = await git(
+      repo.path,
+      [
+        "--literal-pathspecs",
+        "ls-tree",
+        "--full-tree",
+        "-z",
+        "--end-of-options",
+        `refs/heads/${repo.defaultBranch}`,
+        "--",
+        ...batch,
+      ],
+      { timeoutMs: 10_000 },
+    ).catch((error: unknown) => {
+      log.warn("Group work could not read the repository's default branch", {
+        repoId: repo.id,
+        error,
+      });
+    });
+    if (!listed) return linked;
+    for (const entry of listed.stdout.split("\0")) {
+      const mode = entry.slice(0, entry.indexOf(" "));
+      const tab = entry.indexOf("\t");
+      if (tab > 0 && (mode === "120000" || mode === "160000")) modes.set(entry.slice(tab + 1), mode);
+    }
+  }
+  for (const scope of scopes) {
+    const through = prefixes(scope).some((prefix, n, all) => {
+      const mode = modes.get(prefix);
+      // A submodule itself is held as Git records it.
+      return mode === "120000" || (mode === "160000" && n < all.length - 1);
+    });
+    if (through) linked.add(scope);
+  }
+  return linked;
+}
+
+/**
  * The asked paths in the coordinator's spelling, and those that cannot be
  * held as they were sent. More than 50 paths, or one longer than 300
  * characters, is refused.
  */
-function heldScopes(asked: string[]) {
+async function heldScopes(asked: string[], repo: Repository | undefined) {
   if (asked.length > maxPaths)
     throw refuse(400, "tooManyScopes", (m) => m.collab.tooManyScopes({ max: maxPaths }));
   // Not repeated in the answer: a path this long is nothing a person typed.
   if (asked.some((scope) => scope.length > maxPathLength)) throw invalidScope();
+  const spelled = asked.map((scope) => claimableScope(scope));
+  const linked = await linkedScopes(
+    repo,
+    spelled.filter((scope) => scope !== undefined),
+  );
   const held: string[] = [];
   const invalid: string[] = [];
-  for (const scope of asked) {
-    const spelled = claimableScope(scope);
-    if (spelled === undefined) invalid.push(scope);
-    else held.push(spelled);
-  }
+  asked.forEach((scope, n) => {
+    const one = spelled[n];
+    if (one === undefined || linked.has(one)) invalid.push(scope);
+    else held.push(one);
+  });
   return { held, invalid };
 }
 
@@ -142,6 +210,14 @@ export function registerCollabBoardRoutes(
     const project = sideEntry(host.side().projects, id);
     if (!project) throw refuse(404, "unknownProject", (m) => m.collab.unknownProject);
     return project;
+  };
+  /** The paths of a hold in this repository, as heldScopes answers. */
+  const scopesOf = (projectId: string, asked: string[]) => {
+    const { repoId } = projectOf(projectId);
+    return heldScopes(
+      asked,
+      store.data.repos.find((repo) => repo.id === repoId),
+    );
   };
 
   app.get("/api/collab/projects", participant, async (_req, res) => {
@@ -187,13 +263,12 @@ export function registerCollabBoardRoutes(
     res.on("close", gone);
   });
 
-  app.post<{ project: string }>("/api/collab/projects/:project/check", participant, (req, res) => {
+  app.post<{ project: string }>("/api/collab/projects/:project/check", participant, async (req, res) => {
     const actor = res.locals.actor as Actor;
     pace(checks, actor);
     const body = checkSchema.parse(req.body);
     const projectId = req.params.project;
-    projectOf(projectId);
-    const { held, invalid } = heldScopes(body.scopes);
+    const { held, invalid } = await scopesOf(projectId, body.scopes);
     const side = host.side();
     const view = host.coordinator().project(actor, projectId);
     const answer: CollabCheckResponse = {
@@ -221,8 +296,7 @@ export function registerCollabBoardRoutes(
       pace(works, actor);
       const body = workSchema.parse(req.body);
       const projectId = req.params.project;
-      projectOf(projectId);
-      const { held, invalid } = heldScopes(body.scopes);
+      const { held, invalid } = await scopesOf(projectId, body.scopes);
       if (invalid.length || !held.length) throw invalidScope(invalid);
       const dependsOn = [...new Set(body.dependsOn ?? [])];
       const hold = await host.run(async () => {

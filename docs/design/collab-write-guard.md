@@ -223,6 +223,17 @@ What can be detected, and where:
 - **Holds never expire (G3).** With a refusing guard, a forgotten hold now
   blocks other people's publishes until an admin revokes it. Admin revoke
   already exists. G3 becomes more urgent but stays a separate decision.
+- **Holds through a symbolic link.** Git records a change at the real
+  path, so a hold on `alias/users.ts`, where `alias` is a committed link to
+  `src/api`, never met a change to `src/api/users.ts` (Rigel's QA of #79,
+  D-1). Taking a hold now refuses, with 400 `invalidScope`, a path that is
+  a symbolic link, or goes through one or into a submodule, on the default
+  branch of BELL PR's clone of the repository. One `git ls-tree` of the
+  path and its folders. A link committed upstream after the clone was last
+  updated, or spelled in another letter case than Git records, is not
+  seen. When the branch cannot be read, the hold is taken as before and
+  the host's log says so: taking a hold writes no file. Resolving the link
+  to the real path instead was left out.
 - **Costs.** One project read and one pass over the changed paths per
   publish. `scopeParents` makes that one sort. Publish already reads the
   diff, so S1 adds no Git process.

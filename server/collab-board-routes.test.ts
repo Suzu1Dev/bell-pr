@@ -7,7 +7,7 @@
 import test, { type TestContext } from "node:test";
 import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
-import { mkdir, mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, rm, symlink, writeFile } from "node:fs/promises";
 import { connect } from "node:net";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -982,4 +982,48 @@ test("what a person may send: 50 paths of 300 characters, a title of 120, and so
   assert.equal(outcome(hurried), "429 slowDown");
   assert.ok(hurried.json.retryAfter >= 1 && hurried.json.retryAfter <= checkLimit.windowMs / 1000);
   assert.equal((await g.check(who.dee, project, ["lib"])).status, 200);
+});
+
+test("a path through a committed symbolic link or into a submodule cannot be held", async (t) => {
+  const g = await group(t);
+  const { f, who } = g;
+  const repo = await g.repository("links");
+  await mkdir(path.join(repo.path, "src", "api"), { recursive: true });
+  await writeFile(path.join(repo.path, "src", "api", "users.ts"), "export {};\n");
+  await symlink("src/api", path.join(repo.path, "alias"));
+  await symlink("README.md", path.join(repo.path, "readme"));
+  await git(repo.path, ["add", "-A"]);
+  // A submodule as Git records it: one entry, whatever is inside it.
+  await git(repo.path, ["update-index", "--add", "--cacheinfo", `160000,${"1".repeat(40)},vendor/lib`]);
+  await git(repo.path, ["commit", "-q", "-m", "links"]);
+  // Only the default branch counts: on another one, `docs` is a link too.
+  await git(repo.path, ["checkout", "-q", "-b", "linked"]);
+  await symlink("src", path.join(repo.path, "docs"));
+  await git(repo.path, ["add", "docs"]);
+  await git(repo.path, ["commit", "-q", "-m", "docs link"]);
+  await git(repo.path, ["checkout", "-q", "main"]);
+  const added = await f.post("/projects", who.admin, { repoId: repo.id });
+  assert.equal(added.status, 201, added.body);
+  const project = added.json.project.id as string;
+
+  const asked = ["./alias/users.ts", "alias/", "readme", "vendor/lib/x.ts", "src/api/users.ts"];
+  const linked = ["./alias/users.ts", "alias/", "readme", "vendor/lib/x.ts"];
+  const checked = await g.check(who.member, project, asked);
+  assert.equal(checked.status, 200, checked.body);
+  assert.deepEqual([checked.json.invalid, checked.json.meets], [linked, []]);
+  const refused = await g.work(who.member, project, { title: "Users", scopes: asked });
+  assert.equal(outcome(refused), "400 invalidScope");
+  assert.deepEqual(refused.json.invalid, linked);
+  // The real path, the submodule as a whole and a path that is a link on another branch.
+  const held = await g.hold(who.member, project, {
+    title: "Users",
+    scopes: ["src/api/users.ts", "vendor/lib", "docs/guide.md"],
+  });
+  assert.deepEqual(held.scopes, ["src/api/users.ts", "vendor/lib", "docs/guide.md"]);
+
+  // Unread when BELL PR's clone has no default branch: held as before.
+  await git(repo.path, ["checkout", "-q", "linked"]);
+  await git(repo.path, ["branch", "-q", "-D", "main"]);
+  const unread = await g.hold(who.dee, project, { title: "Alias", scopes: ["alias/users.ts"] });
+  assert.deepEqual(unread.scopes, ["alias/users.ts"]);
 });
