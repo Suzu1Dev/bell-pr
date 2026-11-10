@@ -7,6 +7,26 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- **A coordination core for several people on one project, not reachable
+  yet.** `server/coordination.ts` grants claims on files all or nothing,
+  waits for task dependencies, and moves a dedicated branch one checked
+  change at a time, as `docs/multiuser-collaboration.md` describes.
+  Nothing in the app, the CLI or any listener calls it, and it protects
+  nothing at write time: a shell, an editor or an agent can still write
+  outside a claim. Working together on one project is not safer yet.
+
+### Changed
+
+- **The data-directory lock is written whole.** Where the file system
+  supports hard links, a start writes its lock aside and links it into
+  place, so no other start reads it half written. A stale lock is removed
+  only after a start claims it, so two starts that find the same stale
+  lock cannot remove the lock either of them then writes. A lock taken
+  for coordination is never replaced until its holder is shown to have
+  stopped; nothing takes one yet.
+
 ### Fixed
 
 - **Other requests no longer wait while the server starts Git.** Before each

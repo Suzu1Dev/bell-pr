@@ -7,7 +7,7 @@
  * module behaves like `bell-pr start` with the given flags.
  */
 import { spawnSync } from "node:child_process";
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import {
   closeSync,
   existsSync,
@@ -17,10 +17,10 @@ import {
   readFileSync,
   readlinkSync,
   realpathSync,
-  renameSync,
   rmSync,
   statSync,
   utimesSync,
+  writeFileSync,
   writeSync,
 } from "node:fs";
 import http from "node:http";
@@ -55,6 +55,7 @@ import { log } from "./log.js";
 import { redact } from "./process.js";
 import { Store } from "./store.js";
 import { Workbench } from "./workbench.js";
+import { issueWriterLock, type WriterLock } from "./writer-lock.js";
 
 export { createApp, type AppOptions } from "./app.js";
 
@@ -120,6 +121,12 @@ export interface LockInfo {
   bootId?: string;
   /** Seconds the machine had been up when the lock was written. */
   uptime?: number;
+  /**
+   * The holder hosts coordination (acquireWriterLock): no start replaces
+   * the lock unless its holder is shown to have stopped, however long ago
+   * it was renewed.
+   */
+  strict?: boolean;
 }
 
 /**
@@ -141,8 +148,22 @@ export function readLock(dataDir: string): LockInfo | undefined {
 }
 
 function readLockFile(file: string): LockInfo | undefined {
+  const text = readLockText(file);
+  return text === undefined ? undefined : parseLock(text);
+}
+
+/** The text of the lock file at `file`; undefined when it cannot be read. */
+function readLockText(file: string): string | undefined {
   try {
-    const value = JSON.parse(readFileSync(file, "utf8"));
+    return readFileSync(file, "utf8");
+  } catch {
+    return undefined;
+  }
+}
+
+function parseLock(text: string): LockInfo | undefined {
+  try {
+    const value = JSON.parse(text);
     if (
       !Number.isInteger(value?.pid) ||
       value.pid < 1 ||
@@ -239,16 +260,20 @@ function renewedWithinLease(file: string) {
 }
 
 /**
- * Whether the lock's process can still be a running BELL PR. A lock written
- * in another container or on another machine is alive while its holder
- * renews it. Otherwise a lock is stale when its process is gone, when it
- * carries this process's pid without being held here (a container restart
- * reuses pids), when it was written before the machine booted, or when its
- * pid now runs something other than Node.js. `copy` is where the lock lies
- * when it was moved aside.
+ * Whether the lock's process can still be a running BELL PR. Under the
+ * strict rule, the contender's (`strict`) or the lock's own, a lock not
+ * written in this PID namespace (another container, another machine, or a
+ * build that does not record where) is alive: nothing here can show that
+ * its holder stopped. Otherwise such a lock is alive while its holder
+ * renews it. A lock written here is stale when its process is gone, when
+ * it carries this process's pid without being held here (a container
+ * restart reuses pids), when it was written before the machine booted, or
+ * when its pid now runs something other than Node.js.
  */
-function lockHolderAlive(lock: LockInfo, file: string, copy = file): boolean {
-  if (writtenElsewhere(lock)) return renewedWithinLease(copy);
+function lockHolderAlive(lock: LockInfo, file: string, strict = false): boolean {
+  if (strict || lock.strict === true) {
+    if (lock.pidNamespace !== currentPidNamespace()) return true;
+  } else if (writtenElsewhere(lock)) return renewedWithinLease(file);
   if (lock.pid === process.pid) return heldLocks.has(file);
   if (!processAlive(lock.pid)) return false;
   if (writtenBeforeBoot(lock)) return false;
@@ -265,84 +290,187 @@ export function lockHolderRunning(dataDir: string, lock: LockInfo): boolean {
   return lockHolderAlive(lock, dataPaths(dataDir).lock);
 }
 
+/** This process's lock record, with the address it serves on. */
+function lockInfo(port: number, host?: string, url?: string): LockInfo {
+  return {
+    pid: process.pid,
+    port,
+    version,
+    host,
+    url,
+    startedAt: new Date().toISOString(),
+    pidNamespace: currentPidNamespace(),
+    bootId: currentBootId(),
+    uptime: os.uptime(),
+  };
+}
+
+/** A lock this process took: whether its file is still this one's, and its release. */
+interface HeldLock {
+  holds(): boolean;
+  release(): void;
+}
+
+/**
+ * Takes the data directory's lock for a process that hosts coordination,
+ * under the strict rule: neither it nor any start of this version replaces
+ * a lock whose holder is not shown to have stopped (lockHolderAlive). Port
+ * 0: no address for `bell-pr open`.
+ */
+export async function acquireWriterLock(dataDir: string): Promise<WriterLock> {
+  const resolved = path.resolve(dataDir);
+  const held = await acquireLock(
+    dataPaths(resolved).lock,
+    { ...lockInfo(0), strict: true },
+    resolved,
+  );
+  return issueWriterLock({ dataDir: resolved, holds: held.holds, release: held.release });
+}
+
+/**
+ * Creates `file` with `text` unless it exists, whole or not at all: the
+ * text is written aside and linked into place, so no start ever reads a
+ * lock half written. Without hard links only a start that is not strict
+ * goes on, writing the file in place as before.
+ */
+function createExclusive(file: string, text: string, strict: boolean): boolean {
+  const temp = `${file}.new-${process.pid}-${randomBytes(4).toString("hex")}`;
+  try {
+    writeFileSync(temp, text, { flag: "wx", mode: 0o600 });
+    linkSync(temp, file);
+    return true;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "EEXIST") return false;
+    if (strict) throw error;
+  } finally {
+    rmSync(temp, { force: true });
+  }
+  try {
+    const fd = openSync(file, "wx", 0o600);
+    try {
+      writeSync(fd, text);
+    } finally {
+      closeSync(fd);
+    }
+    return true;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "EEXIST") return false;
+    throw error;
+  }
+}
+
+/**
+ * Removes the lock at `file` if it still reads `text` and is still stale.
+ * It first claims that very text, exclusively: a start that found the same
+ * stale lock finds the claim or the lock written in its place, so none
+ * removes a lock that has just replaced it. A claim left by a start shown
+ * to have stopped is removed the same way, two levels deep at most. False
+ * while another start holds the claim.
+ */
+function removeStale(file: string, text: string, strict: boolean, depth = 0): boolean {
+  const digest = createHash("sha256").update(text).digest("hex").slice(0, 16);
+  const claim = `${file}.takeover-${digest}`;
+  if (!createExclusive(claim, `${JSON.stringify({ ...lockInfo(0), strict })}\n`, strict)) {
+    const held = readLockText(claim);
+    if (held === undefined) return true;
+    const claimer = parseLock(held);
+    if (depth >= 2 || !claimer || lockHolderAlive(claimer, claim, strict)) return false;
+    removeStale(claim, held, strict, depth + 1);
+    return true;
+  }
+  try {
+    const current = readLockText(file);
+    const lock = current === undefined ? undefined : parseLock(current);
+    if (current === text && !(lock ? lockHolderAlive(lock, file, strict) : strict)) {
+      rmSync(file, { force: true });
+      log.info("Removed a stale lock", { pid: lock?.pid });
+    }
+  } finally {
+    rmSync(claim, { force: true });
+  }
+  return true;
+}
+
+/**
+ * Holds the lock just written at `file` with `text`, renewing it while it
+ * is held. A lock that another start wrote in its place is never renewed,
+ * so it lapses as its own holder's would.
+ */
+function holdLock(file: string, text: string): HeldLock {
+  heldLocks.add(file);
+  const holds = () => heldLocks.has(file) && readLockText(file) === text;
+  const renewal = setInterval(() => {
+    if (!holds()) return;
+    const now = new Date();
+    try {
+      utimesSync(file, now, now);
+    } catch {
+      // Removed or unreachable for now: the next renewal tries again.
+    }
+  }, lockRenewMs);
+  renewal.unref();
+  return {
+    holds,
+    release: () => {
+      clearInterval(renewal);
+      // Only remove the lock while it is still ours.
+      if (holds()) rmSync(file, { force: true });
+      heldLocks.delete(file);
+    },
+  };
+}
+
+/** The refusal for a lock that stays, saying when only a person can tell it is stale. */
+function lockInUse(file: string, dataDir: string, holder: LockInfo | undefined, strict: boolean) {
+  const unconfirmed =
+    (strict || holder?.strict === true) &&
+    (!holder || holder.pidNamespace !== currentPidNamespace());
+  return new StartupError(
+    unconfirmed
+      ? sm().cli.start.dataDirHolderUnconfirmed({ dataDir, file })
+      : sm().cli.start.dataDirInUse({ dataDir, pid: holder?.pid ?? 0 }),
+  );
+}
+
 /**
  * Writes the lock exclusively, replacing a stale one, and renews it while
- * it is held. Returns its release.
+ * it is held. A strict lock (`info.strict`), or a strict holder, puts the
+ * start under the strict rule: it neither waits for a lease nor replaces a
+ * lock it cannot read.
  */
 async function acquireLock(
   file: string,
   info: LockInfo,
   dataDir: string,
-): Promise<() => void> {
+): Promise<HeldLock> {
+  const strict = info.strict === true;
+  const text = `${JSON.stringify(info)}\n`;
   // A lock from elsewhere lapses at most a lease after its last renewal.
   const deadline = Date.now() + lockLeaseMs + 1000;
-  for (let attempt = 0; attempt < 3; attempt += 1) {
-    try {
-      const fd = openSync(file, "wx", 0o600);
-      try {
-        writeSync(fd, `${JSON.stringify(info)}\n`);
-      } finally {
-        closeSync(fd);
-      }
-      heldLocks.add(file);
-      const renewal = setInterval(() => {
-        const now = new Date();
-        try {
-          utimesSync(file, now, now);
-        } catch {
-          // Removed or unreachable for now: the next renewal tries again.
-        }
-      }, lockRenewMs);
-      renewal.unref();
-      return () => {
-        clearInterval(renewal);
-        heldLocks.delete(file);
-        // Only remove the lock while it is still ours.
-        const lock = readLockFile(file);
-        if (lock?.pid === process.pid && lock.pidNamespace === info.pidNamespace)
-          rmSync(file, { force: true });
-      };
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
-    }
-    let holder = readLockFile(file);
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    if (createExclusive(file, text, strict)) return holdLock(file, text);
+    let current = readLockText(file);
+    let holder = current === undefined ? undefined : parseLock(current);
     // Its holder may have just stopped: wait for the lease to run out.
     while (
       holder &&
+      !strict &&
+      holder.strict !== true &&
       writtenElsewhere(holder) &&
       lockHolderAlive(holder, file) &&
       Date.now() < deadline
     ) {
       await new Promise((resolve) => setTimeout(resolve, 1000));
-      holder = readLockFile(file);
+      current = readLockText(file);
+      holder = current === undefined ? undefined : parseLock(current);
     }
-    if (holder && lockHolderAlive(holder, file))
-      throw new StartupError(
-        sm().cli.start.dataDirInUse({ dataDir, pid: holder.pid }),
-      );
-    // Move the stale lock aside before removing it, so two starts cannot
-    // both remove a fresh one: if what was moved belongs to a live start
-    // after all, it goes back.
-    const aside = `${file}.stale-${process.pid}-${randomBytes(4).toString("hex")}`;
-    try {
-      renameSync(file, aside);
-    } catch {
-      continue;
-    }
-    const moved = readLockFile(aside);
-    if (moved && lockHolderAlive(moved, file, aside)) {
-      try {
-        linkSync(aside, file);
-      } catch {
-        // Yet another start holds the lock now; the next attempt reports it.
-      }
-    } else log.info("Removed a stale lock", { pid: moved?.pid });
-    rmSync(aside, { force: true });
+    if (current === undefined) continue;
+    if (holder ? lockHolderAlive(holder, file, strict) : strict)
+      throw lockInUse(file, dataDir, holder, strict);
+    if (!removeStale(file, current, strict || holder?.strict === true))
+      await new Promise((resolve) => setTimeout(resolve, 100));
   }
-  const holder = readLockFile(file);
-  throw new StartupError(
-    sm().cli.start.dataDirInUse({ dataDir, pid: holder?.pid ?? 0 }),
-  );
+  throw lockInUse(file, dataDir, readLockFile(file), strict);
 }
 
 /** GET /api/health on `host:port`: whether BELL PR answers there. */
@@ -499,19 +627,9 @@ export async function startServer(
   try {
     mkdirSync(config.dataDir, { recursive: true, mode: 0o700 });
     await loadOrCreateApiToken(paths.apiToken);
-    const releaseLock = await acquireLock(
+    const { release: releaseLock } = await acquireLock(
       paths.lock,
-      {
-        pid: process.pid,
-        port: config.port,
-        version,
-        host: config.host,
-        url,
-        startedAt: new Date().toISOString(),
-        pidNamespace: currentPidNamespace(),
-        bootId: currentBootId(),
-        uptime: os.uptime(),
-      },
+      lockInfo(config.port, config.host, url),
       config.dataDir,
     );
     cleanups.push(releaseLock);
