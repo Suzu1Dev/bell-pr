@@ -315,7 +315,7 @@ test("work: a title and paths become a hold; a held path in the way is refused w
     title: "Another",
     scopes: ["docs"],
   });
-  assert.equal(inChinese.json.error, "已經有人保留了會互相衝突的路徑，所以這次沒有保留任何路徑。");
+  assert.equal(inChinese.json.error, "已經有人佔用了會互相衝突的路徑，所以這次沒有佔用任何路徑。");
   assert.equal(inChinese.json.conflicts[0].scope, "docs/guide.md");
   assert.deepEqual(await f.files(), kept);
 
