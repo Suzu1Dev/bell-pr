@@ -1206,6 +1206,35 @@ test("a lock path that holds nothing a start can read or replace is refused by n
   }
 });
 
+test("a stale lock that a start could not replace is not reported as a running process", {
+  skip: process.platform === "win32" && "making a symbolic link needs a privilege there",
+}, async () => {
+  const box = await sandbox();
+  try {
+    mkdirSync(box.data, { recursive: true });
+    const file = path.join(box.data, "bellpr.lock");
+    const probe = await acquireWriterLock(box.data);
+    const here = { ...JSON.parse(readFileSync(file, "utf8")), strict: undefined };
+    probe.release();
+    const gone = await gonePid();
+    const stale = JSON.stringify({ ...here, pid: gone });
+    writeFileSync(file, stale);
+    // A link to nowhere at the claim path: it is there for a start that
+    // creates its claim and gone for one that reads it.
+    const claim = claimFile(file, stale);
+    symlinkSync(path.join(box.data, "nowhere"), claim);
+    for (const [name, start] of Object.entries(lockStarts(box))) {
+      const message = await refusedWith(start);
+      assert.ok(message.includes(file), `${name}: ${message}`);
+      assert.doesNotMatch(message, new RegExp(`\\b${gone}\\b`), name);
+      assert.equal(readFileSync(file, "utf8"), stale, name);
+      assert.deepEqual(lockLitter(box.data), [path.basename(claim)], name);
+    }
+  } finally {
+    await box.cleanup();
+  }
+});
+
 test("a lock from before the last boot is told by its boot id or uptime, not by a clock step", async () => {
   const box = await sandbox();
   // A live Node.js process stands in for the running instance.

@@ -525,7 +525,13 @@ async function acquireLock(
         : new StartupError(sm().cli.start.lockUnreadable({ file, reason: current.message }));
     if (refused) await new Promise((resolve) => setTimeout(resolve, 100));
   }
-  throw refused ?? lockInUse(file, dataDir, readLockFile(file), strict);
+  if (refused) throw refused;
+  const holder = readLockFile(file);
+  // A stale lock is still there, as when its claim path holds nothing a
+  // start can read: its process is gone and must not be named as running.
+  if (holder && !lockHolderAlive(holder, file, strict))
+    throw new StartupError(sm().cli.start.dataDirLockUnsettled({ dataDir, file }));
+  throw lockInUse(file, dataDir, holder, strict);
 }
 
 /** GET /api/health on `host:port`: whether BELL PR answers there. */
