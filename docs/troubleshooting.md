@@ -570,20 +570,24 @@ there, then publish again.
   writes a claim file beside it, `bellpr.lock.takeover-…`, and removes it
   a moment later. This one is still there: another start is at work, or
   one stopped part-way. Wait about half a minute and start again: a start
-  clears a claim once the process that wrote it is gone, or 30 seconds
-  after it was written. If the message keeps coming back and no BELL PR is
-  starting, remove the file the message names.
+  clears a claim once the process that wrote it is gone, and an empty one,
+  as after a power cut, 30 seconds after it was written. A claim whose
+  process id now belongs to another running Node.js program stays, because
+  a start that is only suspended looks the same. If the message keeps
+  coming back and no BELL PR is starting, remove the file the message
+  names.
 - **"BELL PR cannot tell whether the start that was replacing a lock left
   behind in this data directory has stopped …"**: the same claim file, on
   a data directory used for coordination. There a claim stays, however old
   it is, until the process that wrote it is shown to have stopped. Make
   sure no BELL PR is starting on this data directory, then remove the file
   the message names and start again.
-- **"BELL PR could not remove the leftover lock file …"**: what lies at the
-  lock path is nothing BELL PR can replace, such as a directory, or a file
-  in a folder this user may not change. The message gives the system's
-  reason. Make sure no BELL PR is running with this data directory, remove
-  it yourself, then start again.
+- **"BELL PR cannot read the lock file …"**: a lock is there that this
+  user may not read, as after BELL PR ran here once as another user, or a
+  directory lies in its place. The message gives the system's reason. A
+  lock that cannot be read is never replaced: it may belong to a BELL PR
+  that is still running. Make sure none runs with this data directory,
+  remove it yourself, then start again.
 - **"BELL PR could not take the lock … of the data directory …"**: each
   time the start looked, the lock file had just changed or could not be
   read, so there is no running process to name. Start again in a moment.
