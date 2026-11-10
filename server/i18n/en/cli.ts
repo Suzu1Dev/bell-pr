@@ -117,10 +117,10 @@ export default {
     /** No holder to name: the lock was gone, or not a lock, each time the start looked. */
     dataDirLockUnsettled: ({ dataDir, file }: { dataDir: string; file: string }) =>
       `${name} could not take the lock ${file} of the data directory ${dataDir}: each time it tried, the file had just changed or could not be read. Start again in a moment. If this keeps happening and no ${name} is running with this data directory, remove ${file}.`,
-    /** A stale lock, or what lies in its place, that cannot be removed: `reason` is the system's. */
-    lockNotRemoved: ({ file, reason }: { file: string; reason: string }) =>
-      `${name} could not remove the leftover lock file ${file}: ${reason}. Make sure no ${name} is running with this data directory, then remove ${file} and start again.`,
-    /** Another start's claim on a stale lock; it lapses half a minute after it was written. */
+    /** A lock, or what lies in its place, that cannot be read: no start replaces it. `reason` is the system's. */
+    lockUnreadable: ({ file, reason }: { file: string; reason: string }) =>
+      `${name} cannot read the lock file ${file}: ${reason}. It may belong to a ${name} that is still running, so it is not replaced. Make sure no ${name} is running with this data directory, then remove ${file} and start again.`,
+    /** Another start's claim on a stale lock, which this start could not clear. */
     takeoverClaimed: ({ file }: { file: string }) =>
       `Another ${name} start is replacing a lock left behind in this data directory, or stopped while doing so: its claim file ${file} is still there. Wait about half a minute and start again. If this keeps happening and no ${name} is starting, remove ${file}.`,
     /** Strict rule (coordination): a claim whose start cannot be shown to have stopped. */

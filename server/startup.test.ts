@@ -888,12 +888,13 @@ async function refusedWith(start: () => Promise<() => unknown>) {
 /** A refusal that names a process that does not exist. */
 const processZero = /(process|行程) 0\b/;
 
-test("an ordinary start clears a takeover claim older than the lease, whatever it holds, and names a newer one when it refuses", async () => {
+test("an ordinary start clears a takeover claim that names no start once it is older than the lease; one that names a running process stays, and the refusal names it", async () => {
   const box = await sandbox();
-  // A live Node.js process got the pid of a start that crashed while it removed the lock.
-  const reused = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], { stdio: "ignore" });
+  // A live Node.js process: a start suspended before it removed the lock, or a
+  // program that got the pid of one that crashed. Nothing here tells them apart.
+  const claimer = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], { stdio: "ignore" });
   try {
-    await once(reused, "spawn");
+    await once(claimer, "spawn");
     mkdirSync(box.data, { recursive: true });
     const file = path.join(box.data, "bellpr.lock");
     const starts = lockStarts(box);
@@ -903,38 +904,40 @@ test("an ordinary start clears a takeover claim older than the lease, whatever i
     const gone = await gonePid();
     const stale = JSON.stringify({ ...here, pid: gone });
     const claim = claimFile(file, stale);
-    const claims = {
-      "a live Node.js pid": JSON.stringify({ ...here, pid: reused.pid, strict: false }),
-      // Power was lost before the claim's text reached the disk.
-      nothing: "",
-    };
-    for (const [name, text] of Object.entries(claims)) {
-      // A takeover lasts milliseconds: a lease later, its start has stopped.
-      const lapsed = new Date(Date.now() - 31_000);
+    const leave = (text: string, written: number) => {
       writeFileSync(file, stale);
       writeFileSync(claim, text);
-      utimesSync(claim, lapsed, lapsed);
-      const stop = await starts.ordinary();
-      try {
-        assert.equal(JSON.parse(readFileSync(file, "utf8")).pid, process.pid, name);
-        assert.deepEqual(lockLitter(box.data), [], name);
-      } finally {
-        await stop();
-      }
-      // Written just now, or dated an hour ahead: the clock was stepped back since.
-      for (const written of [Date.now(), Date.now() + 3_600_000]) {
-        writeFileSync(file, stale);
-        writeFileSync(claim, text);
-        utimesSync(claim, new Date(written), new Date(written));
-        const message = await refusedWith(starts.ordinary);
-        assert.ok(message.includes(claim), `${name}: ${message}`);
-        assert.doesNotMatch(message, new RegExp(`\\b${gone}\\b`), name);
-        assert.equal(readFileSync(file, "utf8"), stale, name);
-        assert.equal(readFileSync(claim, "utf8"), text, name);
-      }
+      utimesSync(claim, new Date(written), new Date(written));
+    };
+    const stays = async (name: string, text: string, written: number) => {
+      leave(text, written);
+      const message = await refusedWith(starts.ordinary);
+      assert.ok(message.includes(claim), `${name}: ${message}`);
+      assert.doesNotMatch(message, new RegExp(`\\b${gone}\\b`), name);
+      assert.equal(readFileSync(file, "utf8"), stale, name);
+      assert.equal(readFileSync(claim, "utf8"), text, name);
+    };
+    const lapsed = Date.now() - 31_000;
+    // Resumed, a suspended start would remove the lock taken since: age shows nothing.
+    const running = JSON.stringify({ ...here, pid: claimer.pid, strict: false });
+    await stays("a running process, just now", running, Date.now());
+    await stays("a running process, a lease ago", running, lapsed);
+    await stays("a running process, an hour ago", running, Date.now() - 3_600_000);
+    // Power was lost before the claim's text reached the disk: it names no start.
+    await stays("nothing, just now", "", Date.now());
+    // Dated an hour ahead: the clock was stepped back since.
+    await stays("nothing, dated ahead", "", Date.now() + 3_600_000);
+    // A takeover lasts milliseconds: a lease later, that start has stopped.
+    leave("", lapsed);
+    const stop = await starts.ordinary();
+    try {
+      assert.equal(JSON.parse(readFileSync(file, "utf8")).pid, process.pid);
+      assert.deepEqual(lockLitter(box.data), []);
+    } finally {
+      await stop();
     }
   } finally {
-    reused.kill("SIGKILL");
+    claimer.kill("SIGKILL");
     await box.cleanup();
   }
 });
@@ -962,17 +965,20 @@ test("under the strict rule a takeover claim stays however old it is, and the re
     for (const { name, start, ...strict } of cases) {
       const stale = JSON.stringify({ ...here, pid: gone, strict: strict.lock || undefined });
       const claim = claimFile(file, stale);
-      const text = JSON.stringify({ ...here, pid: claimer.pid, strict: strict.claim });
-      writeFileSync(file, stale);
-      writeFileSync(claim, text);
-      utimesSync(claim, hourAgo, hourAgo);
-      const message = await refusedWith(start);
-      assert.ok(message.includes(claim), `${name}: ${message}`);
-      assert.doesNotMatch(message, new RegExp(`\\b${gone}\\b`), name);
-      assert.equal(readFileSync(file, "utf8"), stale, name);
-      assert.equal(readFileSync(claim, "utf8"), text, name);
-      assert.deepEqual(lockLitter(box.data), [path.basename(claim)], name);
-      await rm(claim);
+      const named = JSON.stringify({ ...here, pid: claimer.pid, strict: strict.claim });
+      // One that names no start stays as well; it cannot carry the rule itself.
+      for (const text of strict.claim ? [named] : [named, ""]) {
+        writeFileSync(file, stale);
+        writeFileSync(claim, text);
+        utimesSync(claim, hourAgo, hourAgo);
+        const message = await refusedWith(start);
+        assert.ok(message.includes(claim), `${name}: ${message}`);
+        assert.doesNotMatch(message, new RegExp(`\\b${gone}\\b`), name);
+        assert.equal(readFileSync(file, "utf8"), stale, name);
+        assert.equal(readFileSync(claim, "utf8"), text, name);
+        assert.deepEqual(lockLitter(box.data), [path.basename(claim)], name);
+        await rm(claim);
+      }
     }
   } finally {
     claimer.kill("SIGKILL");
@@ -987,28 +993,41 @@ const readableWhateverTheMode =
       ? "root reads a file whatever its mode"
       : false;
 
-test("a lock file that cannot be read stays under the strict rule; an ordinary start replaces it", { skip: readableWhateverTheMode }, async () => {
+test("no start replaces a lock file it cannot read, and the refusal names the file", { skip: readableWhateverTheMode }, async () => {
   const box = await sandbox();
   try {
     mkdirSync(box.data, { recursive: true });
     const file = path.join(box.data, "bellpr.lock");
     const starts = lockStarts(box);
+    const hourAgo = new Date(Date.now() - 3_600_000);
     // As after BELL PR ran here once as another user.
-    writeFileSync(file, JSON.stringify({ pid: await gonePid(), port: 4311, version }));
+    const left = JSON.stringify({ pid: await gonePid(), port: 4311, version });
+    writeFileSync(file, left);
     chmodSync(file, 0);
-    const message = await refusedWith(starts.strict);
-    assert.ok(message.includes(file), message);
-    assert.doesNotMatch(message, processZero);
-    assert.equal(statSync(file).mode & 0o777, 0);
-    assert.deepEqual(lockLitter(box.data), []);
-    // 1.1.0 replaced it, as it does a file that is not a lock.
-    const stop = await starts.ordinary();
-    try {
-      assert.equal(JSON.parse(readFileSync(file, "utf8")).pid, process.pid);
-      assert.deepEqual(lockLitter(box.data), []);
-    } finally {
-      await stop();
+    utimesSync(file, hourAgo, hourAgo);
+    for (const [name, start] of Object.entries(starts)) {
+      const message = await refusedWith(start);
+      assert.ok(message.includes(file), `${name}: ${message}`);
+      assert.doesNotMatch(message, processZero, name);
+      // An ordinary start gives the system's reason; the strict rule has its own words.
+      if (name === "ordinary") assert.match(message, /EACCES/);
+      assert.equal(statSync(file).mode & 0o777, 0, name);
+      assert.deepEqual(lockLitter(box.data), [], name);
     }
+    chmodSync(file, 0o600);
+    assert.equal(readFileSync(file, "utf8"), left);
+    await rm(file);
+    // A running coordination's lock, last renewed an hour ago, as when its
+    // process was suspended: its age does not show that it stopped.
+    const held = await acquireWriterLock(box.data);
+    chmodSync(file, 0);
+    utimesSync(file, hourAgo, hourAgo);
+    const message = await refusedWith(starts.ordinary);
+    assert.ok(message.includes(file), message);
+    chmodSync(file, 0o600);
+    assert.equal(held.holds(), true);
+    held.release();
+    assert.deepEqual(lockLitter(box.data), []);
   } finally {
     await box.cleanup();
   }
