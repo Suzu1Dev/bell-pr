@@ -20,7 +20,8 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   remove a person and, when asked, unpair the device they joined from.
   There is no Group page yet, and nothing is protected at write time:
   admin and member only decide who may invite and remove people. Without
-  the switch nothing changes. `docs/group-work.md` describes it.
+  the switch nothing changes, except that a participant token is masked
+  (under Changed). `docs/group-work.md` describes it.
 - **With group work on, the data-directory lock is the strict one.** It is
   never replaced because of its age. After a crash that leaves a lock
   whose holder cannot be confirmed (another container or machine, an older
@@ -74,6 +75,12 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   takes such a lock, running, paused or expired. A lock a person removes
   or replaces while its holder runs is still outside that rule: an
   integration already past its last lock check still moves the branch.
+- **A participant token is masked like other tokens, in every BELL PR.**
+  Text shaped exactly like one (`bpc_` and 43 letters, digits, `-` or `_`)
+  is masked in logs, Agent answers and drafts; a changed file that holds
+  it is held back from review, and a draft that holds it cannot be
+  published. This applies with or without group work. A longer or shorter
+  name that starts with `bpc_` is left as it is.
 
 ### Fixed
 
