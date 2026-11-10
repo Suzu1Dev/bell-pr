@@ -17,9 +17,10 @@
  * - every image in assets/screenshots/ is a byte-identical copy of the one
  *   in docs/images/en/;
  * - the site's files total at most 5 MB;
- * - each zh-tw page is paired with its English page. A visible text node
- *   that is identical fails, except brand and product names (the list in
- *   this file) and text inside code, pre or kbd.
+ * - each zh-tw page is paired with its English page. Visible text, and the
+ *   translatable attributes and meta text listed below, fail when identical,
+ *   except brand and product names (the list in this file) and text inside
+ *   code, pre or kbd. In site.js the two sides of `isZh ? zh : en` must differ.
  *
  * Browser checks (--browser), with the pages served from a static server on
  * 127.0.0.1, at 1440 x 900, 390 x 844 and 320 x 740:
@@ -126,7 +127,7 @@ const keptInEnglish = [
   "Git",
 ].sort((a, b) => b.length - a.length);
 
-const skipTextTags = new Set(["script", "style", "code", "pre", "kbd"]);
+const skipTextTags = new Set(["script", "style", "code", "pre", "kbd", "title"]);
 const voidTags = new Set(["area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "source", "track", "wbr"]);
 
 function decodeEntities(text) {
@@ -189,7 +190,37 @@ function onlyKeptNames(text) {
   return !/[A-Za-z]/.test(rest);
 }
 
-/** English copy left on a zh-tw page: the same visible text node as the English page. */
+const metaNames = new Set(["description", "og:title", "og:description", "twitter:title", "twitter:description"]);
+
+/** Visible text, plus alt, title, aria-label, placeholder, label, the document title and description metas. */
+function translatableStrings(html) {
+  const found = [];
+  for (const text of visibleTextNodes(html)) found.push(["text", text]);
+  const title = /<title>([^<]*)<\/title>/i.exec(html);
+  if (title) {
+    const text = decodeEntities(title[1]).replace(/\s+/g, " ").trim();
+    if (text) found.push(["title", text]);
+  }
+  for (const match of html.matchAll(/<(?:meta|[a-z0-9]+)\b([^>]*)>/gi)) {
+    const raw = match[1];
+    const value = (name) => raw.match(new RegExp(`(?:^|\\s)${name}="([^"]*)"`, "i"))?.[1];
+    for (const name of ["alt", "title", "aria-label", "placeholder", "label"]) {
+      const text = value(name);
+      if (text === undefined) continue;
+      const normalized = decodeEntities(text).replace(/\s+/g, " ").trim();
+      if (normalized) found.push([name, normalized]);
+    }
+    const meta = value("name") || value("property");
+    const content = value("content");
+    if (meta && content && metaNames.has(meta)) {
+      const normalized = decodeEntities(content).replace(/\s+/g, " ").trim();
+      if (normalized) found.push([meta, normalized]);
+    }
+  }
+  return found;
+}
+
+/** English copy left on a zh-tw page: the same visible text, attribute or meta text as the English page. */
 function checkZhTw(problems) {
   for (const file of pages()) {
     if (!file.startsWith("zh-tw/") || !file.endsWith(".html")) continue;
@@ -198,15 +229,30 @@ function checkZhTw(problems) {
       problems.push(`${file}: no English page at ${english}`);
       continue;
     }
-    const englishText = new Set(visibleTextNodes(fs.readFileSync(path.join(siteDir, english), "utf8")));
+    const englishText = new Set(translatableStrings(fs.readFileSync(path.join(siteDir, english), "utf8")).map((item) => item[1]));
     const seen = new Set();
-    for (const text of visibleTextNodes(fs.readFileSync(path.join(siteDir, file), "utf8"))) {
-      if (!englishText.has(text) || seen.has(text)) continue;
-      seen.add(text);
+    for (const [kind, text] of translatableStrings(fs.readFileSync(path.join(siteDir, file), "utf8"))) {
+      const key = `${kind}\0${text}`;
+      if (!englishText.has(text) || seen.has(key)) continue;
+      seen.add(key);
       if (onlyKeptNames(text)) continue;
-      problems.push(`${file}: untranslated text "${text}"`);
+      problems.push(`${file}: untranslated ${kind} "${text}"`);
     }
   }
+}
+
+/** User-facing copy in site.js is `isZh ? zh : en`. The two sides must both exist and differ. */
+function checkSiteJs(problems) {
+  const js = fs.readFileSync(path.join(siteDir, "site.js"), "utf8");
+  const pattern = /isZh\s*\?\s*(?:"((?:\\.|[^"\\])*)"|'((?:\\.|[^'\\])*)')\s*:\s*(?:"((?:\\.|[^"\\])*)"|'((?:\\.|[^'\\])*)')/g;
+  const pairs = [...js.matchAll(pattern)];
+  if (pairs.length === 0) problems.push("site.js: no isZh ? zh : en string");
+  for (const match of pairs) {
+    const zh = match[1] ?? match[2];
+    const en = match[3] ?? match[4];
+    if (zh === en) problems.push(`site.js: zh and en are the same "${zh}"`);
+  }
+  if (/textContent\s*=\s*["'][^"']+["']/.test(js)) problems.push("site.js: textContent is set from a string with no zh branch");
 }
 
 /** Every file under site/, relative to it. */
@@ -299,6 +345,7 @@ function checkStatic() {
   if (bytes > maxSiteBytes) problems.push(`site/: ${bytes} bytes, over the ${maxSiteBytes}-byte budget`);
 
   checkZhTw(problems);
+  checkSiteJs(problems);
 
   // Stylesheets may load fonts and images through url().
   for (const css of fs.readdirSync(siteDir).filter((name) => name.endsWith(".css"))) {
