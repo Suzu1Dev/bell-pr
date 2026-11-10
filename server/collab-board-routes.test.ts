@@ -8,6 +8,7 @@ import test, { type TestContext } from "node:test";
 import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
 import { mkdir, mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
+import { connect } from "node:net";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
@@ -22,6 +23,7 @@ import {
   maxPathLength,
   maxPaths,
   maxTitle,
+  maxUntaken,
   workLimit,
 } from "./routes/collab-board.js";
 import { AppError, type Repository } from "./types.js";
@@ -537,6 +539,44 @@ test("the feed: the board at once for who is behind; who is current waits for a 
   assert.equal(his.status, 200, his.body);
   assert.equal(his.body, her.body);
   assert.deepEqual([his.json.version, his.json.board.held], [3, []]);
+});
+
+test("the feed: a person's connection that never reads keeps eight answers at most; more are refused", async (t) => {
+  const g = await group(t);
+  const { f, who } = g;
+  const project = await g.add("widgets");
+  const { json } = await g.feed(who.member, project);
+  const request = (query: string) =>
+    [
+      `GET /api/collab/projects/${project}/feed${query} HTTP/1.1`,
+      "host: 127.0.0.1:4311",
+      ...Object.entries(who.member).map(([name, value]) => `${name}: ${value}`),
+      "\r\n",
+    ].join("\r\n");
+  // One connection of Ben's: a request that waits, and behind it eight that are
+  // given the board at once. None of those answers can leave before the first.
+  const socket = connect(f.port, "127.0.0.1");
+  t.after(() => socket.destroy());
+  socket.write(
+    request(`?epoch=${json.epoch}&version=${json.version}&seen=${json.seen}&wait=25`) +
+      request("").repeat(maxUntaken),
+  );
+  const asked = async (expected: number) => {
+    let reply = await g.feed(who.member, project, "?wait=0");
+    for (let turn = 0; turn < 2000 && reply.status !== expected; turn += 1) {
+      await sleep(5);
+      reply = await g.feed(who.member, project, "?wait=0");
+    }
+    return reply;
+  };
+  const refused = await asked(429);
+  assert.equal(outcome(refused), "429 tooManyWaiters");
+  assert.deepEqual(fieldsOf(refused), ["error", "reason"]);
+  // Only he is: someone else is given the board as ever.
+  assert.equal((await g.feed(who.dee, project)).status, 200);
+  // The connection goes, and its answers with it.
+  socket.destroy();
+  assert.equal((await asked(200)).status, 200);
 });
 
 test("who may use the repositories and the boards: people of the group, and no 401 for a participant reason", async (t) => {

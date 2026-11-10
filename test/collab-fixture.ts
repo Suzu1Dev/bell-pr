@@ -223,6 +223,10 @@ export async function collabFixture(
     get store() {
       return live.store;
     },
+    /** Where the server now running listens, for a test that writes to a socket itself. */
+    get port() {
+      return port;
+    },
     start,
     send,
     post,

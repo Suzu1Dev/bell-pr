@@ -9,7 +9,7 @@
  * it. A path, a title or an id from a request is never the key of a plain
  * object: the side file's records are read through sideEntry.
  */
-import type { Express, RequestHandler } from "express";
+import type { Express, RequestHandler, Response } from "express";
 import { z } from "zod";
 import type {
   CollabAddProjectResponse,
@@ -36,6 +36,8 @@ export const maxTitle = 120;
 /** Per person: 30 calls of `work` in 10 minutes, 120 of `check` in a minute. */
 export const workLimit = { max: 30, windowMs: 10 * 60_000 };
 export const checkLimit = { max: 120, windowMs: 60_000 };
+/** Per person: feed answers BELL PR still keeps because their connections have not taken them. */
+export const maxUntaken = 8;
 
 /** One line of text: a control or bidirectional-override character becomes a space. */
 const line = z
@@ -90,6 +92,8 @@ export function registerCollabBoardRoutes(
   );
   const works = new PersonLimit(workLimit.max, workLimit.windowMs);
   const checks = new PersonLimit(checkLimit.max, checkLimit.windowMs);
+  /** Feed answers that have not left BELL PR yet, by participant id. */
+  const untaken = new Map<string, Set<Response>>();
 
   host.onChange((projectId) => {
     if (host.status().state === "ready") hub.changed(projectId);
@@ -136,11 +140,23 @@ export function registerCollabBoardRoutes(
     const question = feedSchema.parse(req.query);
     const projectId = req.params.project;
     projectOf(projectId);
-    const gone = hub.ask({ projectId, actor: res.locals.actor as Actor, ...question }, (body) => {
+    const actor = res.locals.actor as Actor;
+    // A connection that asks and never reads would fill the memory with boards.
+    const kept = untaken.get(actor.id) ?? new Set<Response>();
+    untaken.set(actor.id, kept);
+    // An answer whose connection went away before it left never finishes.
+    for (const answer of kept) if (answer.req.socket.destroyed) kept.delete(answer);
+    if (kept.size >= maxUntaken)
+      throw refuse(429, "tooManyWaiters", (m) => m.collab.tooManyWaiters);
+    const gone = hub.ask({ projectId, actor, ...question }, (body) => {
       // Answered because group work is stopping: the connection ends with the answer.
       if (host.status().state !== "ready") res.set("Connection", "close");
       if (body === undefined) res.status(204).end();
-      else res.type("json").send(body);
+      else {
+        kept.add(res);
+        res.once("finish", () => kept.delete(res));
+        res.type("json").send(body);
+      }
     });
     // Also when the client went away before any answer: its place is free again.
     res.on("close", gone);
