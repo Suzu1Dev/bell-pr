@@ -148,22 +148,24 @@ export function readLock(dataDir: string): LockInfo | undefined {
 }
 
 function readLockFile(file: string): LockInfo | undefined {
-  const text = readLockText(file);
-  return text === undefined ? undefined : parseLock(text);
+  return parseLock(readLockText(file));
 }
 
-/** The text of the lock file at `file`; undefined when it cannot be read. */
-function readLockText(file: string): string | undefined {
+/**
+ * The text of the lock file at `file`: undefined when there is no file,
+ * null when one is there that cannot be read.
+ */
+function readLockText(file: string): string | null | undefined {
   try {
     return readFileSync(file, "utf8");
-  } catch {
-    return undefined;
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code === "ENOENT" ? undefined : null;
   }
 }
 
-function parseLock(text: string): LockInfo | undefined {
+function parseLock(text: string | null | undefined): LockInfo | undefined {
   try {
-    const value = JSON.parse(text);
+    const value = JSON.parse(text ?? "");
     if (
       !Number.isInteger(value?.pid) ||
       value.pid < 1 ||
@@ -360,35 +362,72 @@ function createExclusive(file: string, text: string, strict: boolean): boolean {
 }
 
 /**
- * Removes the lock at `file` if it still reads `text` and is still stale.
- * It first claims that very text, exclusively: a start that found the same
- * stale lock finds the claim or the lock written in its place, so none
- * removes a lock that has just replaced it. A claim left by a start shown
- * to have stopped is removed the same way, two levels deep at most. False
- * while another start holds the claim.
+ * Whether the takeover claim at `claim` still keeps other starts from its
+ * stale lock. A claim is never renewed and a takeover lasts milliseconds,
+ * so one last modified longer ago than the lease is abandoned, whatever it
+ * holds. A date in the future, as after the clock was stepped back, shows
+ * no age: that claim counts as new. Under the strict rule, the contender's
+ * or the stale lock's (`strict`) or the claim's own, age clears nothing: a
+ * claimer suspended between its last check and its removal would remove
+ * the lock a later start took, so its claim stays until it is shown to
+ * have stopped.
  */
-function removeStale(file: string, text: string, strict: boolean, depth = 0): boolean {
-  const digest = createHash("sha256").update(text).digest("hex").slice(0, 16);
+function claimHeld(claimer: LockInfo | undefined, claim: string, strict: boolean) {
+  if (!strict && claimer?.strict !== true && !renewedWithinLease(claim)) return false;
+  return !claimer || lockHolderAlive(claimer, claim, strict);
+}
+
+/**
+ * Removes the lock at `file` if it still reads `text` (null: it cannot be
+ * read) and is still stale. It first claims that very text, exclusively: a
+ * start that found the same stale lock finds the claim or the lock written
+ * in its place, so none removes a lock that has just replaced it. A claim
+ * that is no longer held (claimHeld) is removed the same way, two levels
+ * deep at most. Returns the refusal to give while another start's claim
+ * stays, which names that claim: the stale lock's pid is gone.
+ */
+function removeStale(
+  file: string,
+  text: string | null,
+  strict: boolean,
+  depth = 0,
+): StartupError | undefined {
+  const messages = sm().cli.start;
+  const digest = createHash("sha256").update(text ?? "").digest("hex").slice(0, 16);
   const claim = `${file}.takeover-${digest}`;
   if (!createExclusive(claim, `${JSON.stringify({ ...lockInfo(0), strict })}\n`, strict)) {
     const held = readLockText(claim);
-    if (held === undefined) return true;
+    if (held === undefined) return undefined;
     const claimer = parseLock(held);
-    if (depth >= 2 || !claimer || lockHolderAlive(claimer, claim, strict)) return false;
-    removeStale(claim, held, strict, depth + 1);
-    return true;
+    if (depth >= 2 || claimHeld(claimer, claim, strict))
+      return new StartupError(
+        strict || claimer?.strict === true
+          ? messages.takeoverClaimUnconfirmed({ file: claim })
+          : messages.takeoverClaimed({ file: claim }),
+      );
+    return removeStale(claim, held, strict, depth + 1);
   }
   try {
     const current = readLockText(file);
-    const lock = current === undefined ? undefined : parseLock(current);
-    if (current === text && !(lock ? lockHolderAlive(lock, file, strict) : strict)) {
-      rmSync(file, { force: true });
+    const lock = parseLock(current);
+    // Below the lock itself, `file` is a claim and is judged as one.
+    const held =
+      depth > 0 ? claimHeld(lock, file, strict) : lock ? lockHolderAlive(lock, file, strict) : strict;
+    if (current === text && !held) {
+      try {
+        rmSync(file, { force: true });
+      } catch (error) {
+        // A directory, or a file this user may not remove.
+        throw new StartupError(
+          messages.lockNotRemoved({ file, reason: (error as Error).message }),
+        );
+      }
       log.info("Removed a stale lock", { pid: lock?.pid });
     }
   } finally {
     rmSync(claim, { force: true });
   }
-  return true;
+  return undefined;
 }
 
 /**
@@ -425,10 +464,13 @@ function lockInUse(file: string, dataDir: string, holder: LockInfo | undefined, 
   const unconfirmed =
     (strict || holder?.strict === true) &&
     (!holder || holder.pidNamespace !== currentPidNamespace());
+  const messages = sm().cli.start;
   return new StartupError(
     unconfirmed
-      ? sm().cli.start.dataDirHolderUnconfirmed({ dataDir, file })
-      : sm().cli.start.dataDirInUse({ dataDir, pid: holder?.pid ?? 0 }),
+      ? messages.dataDirHolderUnconfirmed({ dataDir, file })
+      : holder
+        ? messages.dataDirInUse({ dataDir, pid: holder.pid })
+        : messages.dataDirLockUnsettled({ dataDir, file }),
   );
 }
 
@@ -436,7 +478,8 @@ function lockInUse(file: string, dataDir: string, holder: LockInfo | undefined, 
  * Writes the lock exclusively, replacing a stale one, and renews it while
  * it is held. A strict lock (`info.strict`), or a strict holder, puts the
  * start under the strict rule: it neither waits for a lease nor replaces a
- * lock it cannot read.
+ * lock it cannot read. Any other start replaces a lock it cannot read, as
+ * it does one that is not a lock.
  */
 async function acquireLock(
   file: string,
@@ -447,10 +490,13 @@ async function acquireLock(
   const text = `${JSON.stringify(info)}\n`;
   // A lock from elsewhere lapses at most a lease after its last renewal.
   const deadline = Date.now() + lockLeaseMs + 1000;
+  // What the last attempt has to say when a takeover claim stopped it.
+  let claimed: StartupError | undefined;
   for (let attempt = 0; attempt < 5; attempt += 1) {
     if (createExclusive(file, text, strict)) return holdLock(file, text);
+    claimed = undefined;
     let current = readLockText(file);
-    let holder = current === undefined ? undefined : parseLock(current);
+    let holder = parseLock(current);
     // Its holder may have just stopped: wait for the lease to run out.
     while (
       holder &&
@@ -462,15 +508,16 @@ async function acquireLock(
     ) {
       await new Promise((resolve) => setTimeout(resolve, 1000));
       current = readLockText(file);
-      holder = current === undefined ? undefined : parseLock(current);
+      holder = parseLock(current);
     }
+    // Gone since the attempt to create it: another start removed it.
     if (current === undefined) continue;
     if (holder ? lockHolderAlive(holder, file, strict) : strict)
       throw lockInUse(file, dataDir, holder, strict);
-    if (!removeStale(file, current, strict || holder?.strict === true))
-      await new Promise((resolve) => setTimeout(resolve, 100));
+    claimed = removeStale(file, current, strict || holder?.strict === true);
+    if (claimed) await new Promise((resolve) => setTimeout(resolve, 100));
   }
-  throw lockInUse(file, dataDir, readLockFile(file), strict);
+  throw claimed ?? lockInUse(file, dataDir, readLockFile(file), strict);
 }
 
 /** GET /api/health on `host:port`: whether BELL PR answers there. */

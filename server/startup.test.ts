@@ -4,8 +4,10 @@ import { spawn, type ChildProcess } from "node:child_process";
 import { createHash } from "node:crypto";
 import { once } from "node:events";
 import {
+  chmodSync,
   cpSync,
   existsSync,
+  lstatSync,
   mkdirSync,
   readdirSync,
   readFileSync,
@@ -846,6 +848,194 @@ test("a takeover claim left by a start that stopped is cleared; one whose start 
     }
   } finally {
     claimer.kill("SIGKILL");
+    await box.cleanup();
+  }
+});
+
+/** The takeover claim file of the lock at `file` that reads `text`. */
+const claimFile = (file: string, text: string) =>
+  `${file}.takeover-${createHash("sha256").update(text).digest("hex").slice(0, 16)}`;
+
+/** A start on the box's data directory under each rule; each resolves to what stops it. */
+const lockStarts = (box: { data: string; env: NodeJS.ProcessEnv }) => ({
+  strict: async () => {
+    const lock = await acquireWriterLock(box.data);
+    return () => lock.release();
+  },
+  ordinary: async () => {
+    const running = await startServer({
+      config: resolveConfig({ port: await freePort(), dataDir: box.data }, box.env),
+      handleExit: false,
+      print: () => {},
+    });
+    return () => running.shutdown();
+  },
+});
+
+/** The message a start is refused with; a start that goes through is stopped and fails. */
+async function refusedWith(start: () => Promise<() => unknown>) {
+  let stop: () => unknown;
+  try {
+    stop = await start();
+  } catch (error) {
+    assert.ok(error instanceof StartupError, String(error));
+    return error.message;
+  }
+  await stop();
+  return assert.fail("the start was not refused");
+}
+
+/** A refusal that names a process that does not exist. */
+const processZero = /(process|行程) 0\b/;
+
+test("an ordinary start clears a takeover claim older than the lease, whatever it holds, and names a newer one when it refuses", async () => {
+  const box = await sandbox();
+  // A live Node.js process got the pid of a start that crashed while it removed the lock.
+  const reused = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], { stdio: "ignore" });
+  try {
+    await once(reused, "spawn");
+    mkdirSync(box.data, { recursive: true });
+    const file = path.join(box.data, "bellpr.lock");
+    const starts = lockStarts(box);
+    const probe = await acquireWriterLock(box.data);
+    const here = { ...JSON.parse(readFileSync(file, "utf8")), strict: undefined };
+    probe.release();
+    const gone = await gonePid();
+    const stale = JSON.stringify({ ...here, pid: gone });
+    const claim = claimFile(file, stale);
+    const claims = {
+      "a live Node.js pid": JSON.stringify({ ...here, pid: reused.pid, strict: false }),
+      // Power was lost before the claim's text reached the disk.
+      nothing: "",
+    };
+    for (const [name, text] of Object.entries(claims)) {
+      // A takeover lasts milliseconds: a lease later, its start has stopped.
+      const lapsed = new Date(Date.now() - 31_000);
+      writeFileSync(file, stale);
+      writeFileSync(claim, text);
+      utimesSync(claim, lapsed, lapsed);
+      const stop = await starts.ordinary();
+      try {
+        assert.equal(JSON.parse(readFileSync(file, "utf8")).pid, process.pid, name);
+        assert.deepEqual(lockLitter(box.data), [], name);
+      } finally {
+        await stop();
+      }
+      // Written just now, or dated an hour ahead: the clock was stepped back since.
+      for (const written of [Date.now(), Date.now() + 3_600_000]) {
+        writeFileSync(file, stale);
+        writeFileSync(claim, text);
+        utimesSync(claim, new Date(written), new Date(written));
+        const message = await refusedWith(starts.ordinary);
+        assert.ok(message.includes(claim), `${name}: ${message}`);
+        assert.doesNotMatch(message, new RegExp(`\\b${gone}\\b`), name);
+        assert.equal(readFileSync(file, "utf8"), stale, name);
+        assert.equal(readFileSync(claim, "utf8"), text, name);
+      }
+    }
+  } finally {
+    reused.kill("SIGKILL");
+    await box.cleanup();
+  }
+});
+
+test("under the strict rule a takeover claim stays however old it is, and the refusal names it", async () => {
+  const box = await sandbox();
+  // A live Node.js process stands in for a start suspended before it removed the lock.
+  const claimer = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], { stdio: "ignore" });
+  try {
+    await once(claimer, "spawn");
+    mkdirSync(box.data, { recursive: true });
+    const file = path.join(box.data, "bellpr.lock");
+    const starts = lockStarts(box);
+    const probe = await acquireWriterLock(box.data);
+    const here = { ...JSON.parse(readFileSync(file, "utf8")), strict: undefined };
+    probe.release();
+    const gone = await gonePid();
+    const hourAgo = new Date(Date.now() - 3_600_000);
+    // The rule is the start's, the stale lock's or the claim's own.
+    const cases = [
+      { name: "a strict start", start: starts.strict, lock: false, claim: false },
+      { name: "a strict stale lock", start: starts.ordinary, lock: true, claim: false },
+      { name: "a strict claim", start: starts.ordinary, lock: false, claim: true },
+    ];
+    for (const { name, start, ...strict } of cases) {
+      const stale = JSON.stringify({ ...here, pid: gone, strict: strict.lock || undefined });
+      const claim = claimFile(file, stale);
+      const text = JSON.stringify({ ...here, pid: claimer.pid, strict: strict.claim });
+      writeFileSync(file, stale);
+      writeFileSync(claim, text);
+      utimesSync(claim, hourAgo, hourAgo);
+      const message = await refusedWith(start);
+      assert.ok(message.includes(claim), `${name}: ${message}`);
+      assert.doesNotMatch(message, new RegExp(`\\b${gone}\\b`), name);
+      assert.equal(readFileSync(file, "utf8"), stale, name);
+      assert.equal(readFileSync(claim, "utf8"), text, name);
+      assert.deepEqual(lockLitter(box.data), [path.basename(claim)], name);
+      await rm(claim);
+    }
+  } finally {
+    claimer.kill("SIGKILL");
+    await box.cleanup();
+  }
+});
+
+const readableWhateverTheMode =
+  process.platform === "win32"
+    ? "Windows has no file mode that keeps its owner from reading a file"
+    : process.getuid?.() === 0
+      ? "root reads a file whatever its mode"
+      : false;
+
+test("a lock file that cannot be read stays under the strict rule; an ordinary start replaces it", { skip: readableWhateverTheMode }, async () => {
+  const box = await sandbox();
+  try {
+    mkdirSync(box.data, { recursive: true });
+    const file = path.join(box.data, "bellpr.lock");
+    const starts = lockStarts(box);
+    // As after BELL PR ran here once as another user.
+    writeFileSync(file, JSON.stringify({ pid: await gonePid(), port: 4311, version }));
+    chmodSync(file, 0);
+    const message = await refusedWith(starts.strict);
+    assert.ok(message.includes(file), message);
+    assert.doesNotMatch(message, processZero);
+    assert.equal(statSync(file).mode & 0o777, 0);
+    assert.deepEqual(lockLitter(box.data), []);
+    // 1.1.0 replaced it, as it does a file that is not a lock.
+    const stop = await starts.ordinary();
+    try {
+      assert.equal(JSON.parse(readFileSync(file, "utf8")).pid, process.pid);
+      assert.deepEqual(lockLitter(box.data), []);
+    } finally {
+      await stop();
+    }
+  } finally {
+    await box.cleanup();
+  }
+});
+
+test("a lock path that holds nothing a start can read or replace is refused by naming it", async () => {
+  const box = await sandbox();
+  try {
+    mkdirSync(box.data, { recursive: true });
+    const file = path.join(box.data, "bellpr.lock");
+    const starts = lockStarts(box);
+    const cases: Array<[string, () => void]> = [["a directory", () => mkdirSync(file)]];
+    // It is there for a start that creates the lock and gone for one that reads it.
+    if (process.platform !== "win32")
+      cases.push(["a link to nowhere", () => symlinkSync(path.join(box.data, "nowhere"), file)]);
+    for (const [name, occupy] of cases) {
+      occupy();
+      for (const start of [starts.strict, starts.ordinary]) {
+        const message = await refusedWith(start);
+        assert.ok(message.includes(file), `${name}: ${message}`);
+        assert.doesNotMatch(message, processZero, name);
+      }
+      assert.ok(lstatSync(file), name);
+      assert.deepEqual(lockLitter(box.data), [], name);
+      await rm(file, { recursive: true });
+    }
+  } finally {
     await box.cleanup();
   }
 });

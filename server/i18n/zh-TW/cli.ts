@@ -88,6 +88,14 @@ const m: Translation<typeof en> = {
       `${name} 已使用資料目錄 ${dataDir} 執行中（行程 ${pid}）。執行 \`${bin} open\` 即可開啟，或先停止該行程。`,
     dataDirHolderUnconfirmed: ({ dataDir, file }) =>
       `${name} 無法確認持有資料目錄 ${dataDir} 的行程是否已停止：它的鎖 ${file} 來自其他容器、其他電腦或舊版本，或無法讀取。協作不會自行取代這種鎖。請先確認已沒有任何程式使用此資料目錄，再刪除 ${file} 後重新啟動。`,
+    dataDirLockUnsettled: ({ dataDir, file }) =>
+      `${name} 無法取得資料目錄 ${dataDir} 的鎖 ${file}：每次嘗試時，這個檔案不是剛被更動，就是無法讀取。請稍後重新啟動。若一再發生，而且沒有任何 ${name} 使用此資料目錄執行，請刪除 ${file}。`,
+    lockNotRemoved: ({ file, reason }) =>
+      `${name} 無法刪除遺留的鎖 ${file}：${reason}。請先確認沒有任何 ${name} 使用此資料目錄執行，再刪除 ${file} 後重新啟動。`,
+    takeoverClaimed: ({ file }) =>
+      `另一個 ${name} 正在啟動並取代此資料目錄遺留的鎖，或在取代途中停止了：它的接管標記檔 ${file} 還在。請等候約半分鐘，再重新啟動。若一再發生，而且沒有任何 ${name} 正在啟動，請刪除 ${file}。`,
+    takeoverClaimUnconfirmed: ({ file }) =>
+      `${name} 無法確認另一次啟動是否已停止：它在取代此資料目錄遺留的鎖時留下的接管標記檔 ${file} 還在。協作不會自行刪除這種標記檔。請先確認沒有任何 ${name} 正在此資料目錄啟動，再刪除 ${file} 後重新啟動。`,
     listenFailed: ({ address, reason }) =>
       `${name} 無法在 ${address} 監聽：${reason}`,
     failed: ({ reason }) => `${name} 未能啟動：${reason}`,

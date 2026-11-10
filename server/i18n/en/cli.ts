@@ -114,6 +114,18 @@ export default {
     /** Strict rule (coordination): a lock whose holder cannot be shown to have stopped. */
     dataDirHolderUnconfirmed: ({ dataDir, file }: { dataDir: string; file: string }) =>
       `${name} cannot tell whether the process holding the data directory ${dataDir} has stopped: its lock ${file} comes from another container, another machine or an older version, or cannot be read. Coordination never replaces such a lock by itself. Make sure nothing uses this data directory any more, then remove ${file} and start again.`,
+    /** No holder to name: the lock was gone, or not a lock, each time the start looked. */
+    dataDirLockUnsettled: ({ dataDir, file }: { dataDir: string; file: string }) =>
+      `${name} could not take the lock ${file} of the data directory ${dataDir}: each time it tried, the file had just changed or could not be read. Start again in a moment. If this keeps happening and no ${name} is running with this data directory, remove ${file}.`,
+    /** A stale lock, or what lies in its place, that cannot be removed: `reason` is the system's. */
+    lockNotRemoved: ({ file, reason }: { file: string; reason: string }) =>
+      `${name} could not remove the leftover lock file ${file}: ${reason}. Make sure no ${name} is running with this data directory, then remove ${file} and start again.`,
+    /** Another start's claim on a stale lock; it lapses half a minute after it was written. */
+    takeoverClaimed: ({ file }: { file: string }) =>
+      `Another ${name} start is replacing a lock left behind in this data directory, or stopped while doing so: its claim file ${file} is still there. Wait about half a minute and start again. If this keeps happening and no ${name} is starting, remove ${file}.`,
+    /** Strict rule (coordination): a claim whose start cannot be shown to have stopped. */
+    takeoverClaimUnconfirmed: ({ file }: { file: string }) =>
+      `${name} cannot tell whether the start that was replacing a lock left behind in this data directory has stopped: its claim file ${file} is still there. Coordination never removes such a claim by itself. Make sure no ${name} is starting on this data directory, then remove ${file} and start again.`,
     listenFailed: ({ address, reason }: { address: string; reason: string }) =>
       `${name} could not listen on ${address}: ${reason}`,
     failed: ({ reason }: { reason: string }) =>
