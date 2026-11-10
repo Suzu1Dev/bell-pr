@@ -15,8 +15,6 @@ concurrency:
 env:
   # Parallel test processes must not share tsx's transform cache.
   TSX_DISABLE_CACHE: "1"
-  # Tag on the e2e Playwright image (v<this>-noble). The job fails if the lockfile differs.
-  PLAYWRIGHT_IMAGE_VERSION: "1.64.0"
 
 jobs:
   build-and-test:
@@ -179,10 +177,15 @@ jobs:
     name: End-to-end tests (shard ${{ matrix.shard }}/2)
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    # uid 1001 is the runner: the workspace is writable and the job is not root.
+    env:
+      PLAYWRIGHT_IMAGE_VERSION: "1.64.0"
+    # uid 1001 is the runner; bash is required because the image's shell is sh.
     container:
-      image: mcr.microsoft.com/playwright:v${{ env.PLAYWRIGHT_IMAGE_VERSION }}-noble@sha256:bc72a8df40831ded821e3cbc79c318c21b44d6e51dff9fd89ace7a8249c5b462
+      image: mcr.microsoft.com/playwright:v1.64.0-noble@sha256:bc72a8df40831ded821e3cbc79c318c21b44d6e51dff9fd89ace7a8249c5b462
       options: --user 1001 --ipc=host
+    defaults:
+      run:
+        shell: bash
     strategy:
       fail-fast: false
       matrix:
@@ -207,7 +210,11 @@ jobs:
         id: playwright-version
         run: echo "version=$(node -p "require('./package-lock.json').packages['node_modules/playwright'].version")" >> "$GITHUB_OUTPUT"
       - name: Check the image tag matches the lockfile
-        run: test "${{ steps.playwright-version.outputs.version }}" = "$PLAYWRIGHT_IMAGE_VERSION"
+        run: |
+          test "${{ steps.playwright-version.outputs.version }}" = "$PLAYWRIGHT_IMAGE_VERSION"
+          image="$(node -p "JSON.parse(require('fs').readFileSync('/ms-playwright/.docker-info','utf8')).dockerImageName")"
+          echo "image ${image}"
+          test "$image" = "mcr.microsoft.com/playwright:v${PLAYWRIGHT_IMAGE_VERSION}-noble"
       - run: npm ci
       - name: Check the installed Playwright version
         run: |
