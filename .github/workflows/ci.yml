@@ -200,19 +200,25 @@ jobs:
       - name: Cache apt packages for Playwright's system libraries
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          path: ~/.cache/apt-archives
+          # Leave apt's root-owned scratch files out of the cache.
+          path: |
+            ~/.cache/apt-archives
+            !~/.cache/apt-archives/partial
+            !~/.cache/apt-archives/lock
           key: apt-archives-${{ runner.os }}-playwright-${{ steps.playwright-version.outputs.version }}
       - name: Cache Playwright browsers
         id: playwright-browsers
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.cache/ms-playwright
-          key: playwright-chromium-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}
+          key: playwright-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}-chromium
       - name: Install packages, Chromium's libraries, and Chromium on a cache miss
         run: |
           version="${{ steps.playwright-version.outputs.version }}"
           # Retry a stalled font download and reuse the packages next time.
           mkdir -p "$HOME/.cache/apt-archives/partial"
+          # _apt must own partial/ so apt keeps its download sandbox.
+          sudo chown _apt "$HOME/.cache/apt-archives/partial"
           sudo tee /etc/apt/apt.conf.d/99-playwright-fetch >/dev/null <<EOF
           Dir::Cache::archives "$HOME/.cache/apt-archives";
           Acquire::Retries "5";
@@ -229,8 +235,6 @@ jobs:
             npx playwright install chromium
           fi
           wait "$deps"
-          # Root and _apt own these files; the cache save must be able to read them.
-          chmod -R a+rX "$HOME/.cache/apt-archives"
       - name: Run the end-to-end tests (builds, then starts bell-pr on port 4599)
         env:
           BELLPR_E2E_PORT: "4599"
@@ -248,8 +252,8 @@ jobs:
             fi
           done < <(LC_ALL=C find e2e -name '*.spec.ts' -type f | LC_ALL=C sort)
           [[ ${#files[@]} -gt 0 ]]
-          # Shard 1's suite is shorter, so the site check runs there before the tests.
-          if [[ "$SHARD" == 1 ]]; then
+          # Shard 2's test step is shorter, so the site check runs there before the tests.
+          if [[ "$SHARD" == 2 ]]; then
             node site/check-site.mjs --browser
           fi
           npm run test:e2e -- "${files[@]}" | tee "$RUNNER_TEMP/e2e-shard.log" && status=0 || status=$?
