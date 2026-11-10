@@ -373,9 +373,11 @@ export interface DraftCheck {
     | "group-own-overlap"
     | "split-order"
     // Group work (server/hold-guard.ts): the change meets a file someone
-    // else in the group holds, or group work stopped and cannot say.
+    // else in the group holds, group work stopped and cannot say, or commits
+    // on the target branch changed files under the person's own hold.
     | "held-by-other"
-    | "holds-unknown";
+    | "holds-unknown"
+    | "held-changed-upstream";
   /** block stops approval and publishing; confirm needs the person's acknowledgement before publishing. */
   kind: "block" | "confirm";
   message: string;

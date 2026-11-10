@@ -73,7 +73,7 @@ Line numbers are at 9272696.
 | Team retry and split | `/team/retry` `runs.ts:51`, `/split` `runs.ts:97` | Agents write again. A split makes new checkouts from parts of the diff | The same agent-turn and publish checks apply to the new runs | S2 |
 | Follow-up rounds | `POST /api/runs/:id/follow-ups` `server/routes/follow-ups.ts:17`, `server/followup-runs.ts:96` | Agent turns in the checkout | After each turn | S2 |
 | Session messages | `POST /api/runs/:id/session/messages` `server/routes/session.ts:8`, `server/session-runs.ts:73` | Agent turns in the checkout | After each turn | S2 |
-| Sync, sync resolve and undo | `server/routes/sync.ts:10-16` | Sync merges the target branch into the checkout. Resolve is an agent turn. Undo puts the checkout back | Resolve: after the turn. Sync and undo bring in other people's commits that are already on the target branch, so they are not this run's change. The publish check sees the result either way | S2 for resolve |
+| Sync, sync resolve and undo | `server/routes/sync.ts:10-16` | Sync merges the target branch into the checkout. Resolve is an agent turn. Undo puts the checkout back | Resolve: after the turn. Sync also reports commits on the target branch since the holder's hold was taken (`heldChanges`), and undo clears them | S2 for resolve, S4 for sync |
 | Learn-by-hand edits | The person's own editor, in the run's checkout | Files in the checkout, by hand | Plan approval (step files) and publish. Nothing sees keystrokes | S1 publish, S2 plan |
 | Recover a failed publish | `recoverPublish` `server/publish.ts:406` | Local only. It releases an unpublished commit and never pushes | None needed | — |
 
@@ -251,12 +251,22 @@ What can be detected, and where:
 - **At publish (S1).** Every change that leaves through BELL PR is
   checked, however it was written (agent, by hand in the checkout, a
   sync).
-- **At the holder's sync and publish (S4).** List the commits on the
-  target branch since the hold was taken that touch held paths (`git log
-  <hold base>..<target> -- <held paths>`). Show them as a `confirm` to the
-  holder: "`src/api/users.ts` changed on main since your hold (abc1234)".
-  This is how edits made outside BELL PR show up.
-- **When a hold is taken (S4).** The `changing` list above.
+- **At the holder's sync and publish (S4, implemented).** `POST .../work`
+  records `knownBranchTip` for the task in `collab.json` (`holds`). At
+  `POST /api/runs/:id/sync` (unpublished runs and published PRs) and at
+  first `GET /api/runs/:id/preflight` / `POST /api/runs/:id/publish`,
+  `heldUpstreamChanges` walks first-parent commits (`--first-parent -m
+  --no-renames`) across `<hold base>..<target>` for the caller's own active
+  holds, reporting `heldChanges` (`{ path, commits }`, 7-char SHAs only,
+  never commit subjects) in `SyncPanel` and the run log, and requiring
+  `held-changed-upstream` (`confirm` under **File holds**) before first
+  publish.
+- **When checking or taking a hold (S4, implemented).** `POST .../check`
+  and `POST .../work` return `changing: CollabChanging[]` via
+  `changingRuns` (`server/group-local.ts`), listing other people's
+  unfinished runs whose checkout diffs, active plans or unmerged PRs meet
+  the asked or held scopes, with active group member names in `owners`
+  (excluding removed people and the caller's own runs).
 - **Opt-in local hook (later, not planned yet).** `bell-pr group hook`
   installs a pre-push hook in a person's own clone that asks `check` about
   the pushed paths. It can be skipped with `--no-verify` and needs the
@@ -350,8 +360,10 @@ the titles; a team teammate's diff that meets a hold is refused next to
   as described under "Telling agents their scope". Still to verify:
   macOS (Seatbelt) for both, and Claude Code's Bash `denyWrite` on a host
   where its sandbox starts.
-- **S4: detection.** Report changes made outside BELL PR to the holder at
-  sync and publish, and add `changing` to `check` and `work`.
+- **S4: detection (done).** Report changes made outside BELL PR to the
+  holder at sync (`heldChanges` on `run.sync`, `round`, and `run`) and
+  first publish (`held-changed-upstream` `confirm` check), and return
+  `changing` on `check` and `work` (`server/hold-guard-detection.test.ts`).
 
 S1 alone already means no change that BELL PR commits and pushes can
 overwrite someone else's held file, whatever wrote it. S2 moves the stop

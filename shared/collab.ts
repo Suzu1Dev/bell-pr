@@ -4,6 +4,7 @@
  * does, and says who is asking within the group with a participant token
  * (`bpc_…`) in the `x-bell-participant` header.
  */
+import type { RunStatus } from "./types.js";
 
 /** Where group work stands on this instance. Never persisted. */
 export type CollabState = "notSetUp" | "ready" | "stopped";
@@ -149,6 +150,17 @@ export interface CollabMeeting {
   holder: string;
 }
 
+/** Another unfinished run of this repository whose files or plan meet an asked path. */
+export interface CollabChanging {
+  runId: string;
+  title: string;
+  status: RunStatus;
+  /** Names of the group's people who own the run; empty when none of them started it. */
+  owners: string[];
+  /** The changed or planned paths of the run that meet the asked paths, sorted. */
+  paths: string[];
+}
+
 /** POST /api/collab/projects/:project/check → 200. Changes nothing. */
 export interface CollabCheckResponse {
   /** ISO 8601. */
@@ -156,6 +168,8 @@ export interface CollabCheckResponse {
   /** The asked paths that cannot be held, as they were sent. */
   invalid: string[];
   meets: CollabMeeting[];
+  /** Other people's unfinished runs whose files or plans already meet the asked paths. */
+  changing: CollabChanging[];
 }
 
 /** POST /api/collab/projects/:project/work. */
@@ -169,6 +183,8 @@ export interface CollabWorkRequest {
 /** POST /api/collab/projects/:project/work → 201. */
 export interface CollabWorkResponse {
   hold: CollabHold;
+  /** Other people's unfinished runs whose files or plans already meet the new hold. */
+  changing: CollabChanging[];
 }
 
 /** In a 409 `conflict`: a held path that is in the way. */

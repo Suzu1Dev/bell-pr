@@ -10,7 +10,7 @@ import type { FileConversation } from "./chat.js";
 import type { PrFeedback } from "./pr-feedback.js";
 import type { Locale } from "./i18n/locale.js";
 import type { FollowUpRound } from "./followups.js";
-import type { BaseSync } from "./sync.js";
+import type { BaseSync, HeldUpstreamChange } from "./sync.js";
 import type {
   FeedbackTag,
   FileAttempt,
@@ -148,6 +148,12 @@ export interface RunCore {
   followUps?: FollowUpRound[];
   /** The last move of an unpublished run onto a newer target-branch commit. */
   sync?: BaseSync;
+  /**
+   * Files under the person's hold that commits on the target branch changed
+   * since the hold was taken, recorded by a sync that needed no merge so the
+   * Target branch panel still shows them.
+   */
+  heldChanges?: HeldUpstreamChange[];
   contributionSettings?: ContributionSettings;
   team?: AgentTeam;
   /** Follow-up Q&A per diff path; absent on runs saved before it was persisted. */

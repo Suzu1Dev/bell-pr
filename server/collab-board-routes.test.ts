@@ -287,7 +287,8 @@ test("work: a title and paths become a hold; a held path in the way is refused w
     scopes: ["./src/parser/", "docs/guide.md"],
   });
   assert.equal(made.status, 201, made.body);
-  assert.deepEqual(Object.keys(made.json), ["hold"]);
+  assert.deepEqual(Object.keys(made.json), ["hold", "changing"]);
+  assert.deepEqual(made.json.changing, []);
   const held: CollabHold = made.json.hold;
   assert.deepEqual(Object.keys(held), [
     "claimId",
@@ -355,6 +356,7 @@ test("work: a title and paths become a hold; a held path in the way is refused w
         holder: "Ben",
       },
     ],
+    changing: [],
   });
   assert.deepEqual(await f.files(), kept);
 

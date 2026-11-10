@@ -21,6 +21,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { copyFile, rm, stat, utimes } from "node:fs/promises";
 import path from "node:path";
 import type { DraftCheck } from "../shared/draft-checks.js";
+import type { CollabChanging } from "../shared/collab.js";
 import { activeFollowUp } from "../shared/followups.js";
 import type { LocalOverlap, TeamTask } from "../shared/team.js";
 import { sm } from "./i18n/index.js";
@@ -310,6 +311,52 @@ export async function localOverlaps(
     };
   });
   return found.filter((overlap): overlap is LocalOverlap => overlap !== undefined);
+}
+
+/**
+ * Unfinished runs of `scope.repo` owned by other people (`ownersOf` !== "self")
+ * whose changed paths, active plan scopes, or unmerged PR paths meet `scopes`.
+ */
+export async function changingRuns(
+  scope: LocalScope & { baseSha?: string },
+  scopes: readonly string[],
+  ownersOf: (run: Run) => string[] | "self",
+): Promise<CollabChanging[]> {
+  if (!scopes.length) return [];
+  const entries: { run: Run; owners: string[] }[] = [];
+  for (const run of scope.runs) {
+    if (run.repoId !== scope.repo.id || !holdingStatuses.includes(run.status)) continue;
+    const owners = ownersOf(run);
+    if (owners !== "self") entries.push({ run, owners });
+  }
+  const hold = holdings(scope);
+  const meets = (held: string) => {
+    const clean = held.replace(/\/+$/, "");
+    return clean.length > 0 && scopes.some((wanted) => pathsMeet(clean, wanted));
+  };
+  const found = await inTurn(
+    entries,
+    readsAtOnce,
+    async ({ run, owners }): Promise<CollabChanging | undefined> => {
+      const held = await hold(run);
+      const local = held.local.filter(meets);
+      let fromPr = held.pr.filter((file) => meets(file) && !local.includes(file));
+      if (fromPr.length) {
+        const landed = await landedPaths(scope.repo, run, held.head, fromPr, scope.baseSha);
+        fromPr = fromPr.filter((file) => !landed.has(file));
+      }
+      const paths = [...new Set([...local, ...fromPr])].sort();
+      if (!paths.length) return undefined;
+      return {
+        runId: run.id,
+        title: run.title,
+        status: run.status,
+        owners,
+        paths,
+      };
+    },
+  );
+  return found.filter((entry): entry is CollabChanging => entry !== undefined);
 }
 
 /** The scope of a check made with the Workbench context. */

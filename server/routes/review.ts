@@ -110,7 +110,13 @@ export function registerReviewRoutes(
       currentLocale(),
       { repo, runs: workbench.store.data.runs },
     );
-    checks.push(...(holds(req, res)?.preflight(run, files) ?? []));
+    const guard = holds(req, res);
+    if (guard) {
+      const holdChecks = guard.preflight(run, files);
+      checks.push(...holdChecks);
+      if (!holdChecks.some((check) => check.id === "holds-unknown"))
+        checks.push(...(await guard.confirms(run, repo, workbench.store.data.runs)));
+    }
     // After an attempt that pushed but recorded no PR, GitHub's open count
     // may include the PR that attempt opened. publish() records that PR
     // before its checks and still refuses with this block when there is no
@@ -213,7 +219,7 @@ export function registerReviewRoutes(
         acknowledged,
         overrides,
         rulesDigest,
-        holds(req, res)?.publishing,
+        holds(req, res),
       ),
     });
   });

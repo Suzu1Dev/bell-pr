@@ -117,6 +117,7 @@ test("every detail field is left out", () => {
       "feedbackTags",
       "followUps",
       "guardOverrides",
+      "heldChanges",
       "logs",
       "notes",
       "prFeedback",

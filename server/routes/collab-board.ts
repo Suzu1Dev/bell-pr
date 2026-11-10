@@ -39,6 +39,8 @@ import { PersonLimit } from "../collab-limits.js";
 import { CollabProjects } from "../collab-projects.js";
 import { adminOnly, notJoined, reasonOf, refuse } from "../collab-refusal.js";
 import type { Actor } from "../coordination.js";
+import { changingRuns } from "../group-local.js";
+import { knownBranchTip } from "../hold-guard.js";
 import { log } from "../log.js";
 import { git } from "../process.js";
 import { claimableScope } from "../scope-paths.js";
@@ -229,12 +231,33 @@ export function registerCollabBoardRoutes(
     if (!project) throw refuse(404, "unknownProject", (m) => m.collab.unknownProject);
     return project;
   };
-  /** The paths of a hold in this repository, as heldScopes answers. */
-  const scopesOf = (projectId: string, asked: string[]) => {
+  /** BELL PR's repository entry for a group project, if still registered. */
+  const repoOf = (projectId: string) => {
     const { repoId } = projectOf(projectId);
-    return heldScopes(
-      asked,
-      store.data.repos.find((repo) => repo.id === repoId),
+    return store.data.repos.find((repo) => repo.id === repoId);
+  };
+  /** The paths of a hold in this repository, as heldScopes answers. */
+  const scopesOf = (projectId: string, asked: string[]) => heldScopes(asked, repoOf(projectId));
+  /** Other people's unfinished runs of `repo` whose files or plans meet `scopes`. */
+  const changingFor = (
+    repo: Repository | undefined,
+    actor: Actor,
+    scopes: readonly string[],
+    baseSha?: string,
+  ) => {
+    if (!repo || !scopes.length) return Promise.resolve([]);
+    const side = host.side();
+    return changingRuns(
+      { runs: store.data.runs, repo, directory: store.directory, baseSha },
+      scopes,
+      (run) => {
+        const active = (run.owners ?? []).filter((id) => {
+          const person = sideEntry(side.people, id);
+          return person && !person.removedAt;
+        });
+        if (active.includes(actor.id)) return "self";
+        return active.map((id) => nameOf(side, id));
+      },
     );
   };
 
@@ -287,6 +310,9 @@ export function registerCollabBoardRoutes(
     const body = checkSchema.parse(req.body);
     const projectId = req.params.project;
     const { held, invalid } = await scopesOf(projectId, body.scopes);
+    const repo = repoOf(projectId);
+    const tip = held.length ? await knownBranchTip(repo, store.data.runs) : undefined;
+    const changing = await changingFor(repo, actor, held, tip);
     const side = host.side();
     const view = host.coordinator().project(actor, projectId);
     const answer: CollabCheckResponse = {
@@ -302,6 +328,7 @@ export function registerCollabBoardRoutes(
           holder: nameOf(side, hold.holder),
         };
       }),
+      changing,
     };
     res.json(answer);
   });
@@ -316,6 +343,8 @@ export function registerCollabBoardRoutes(
       const projectId = req.params.project;
       const { held, invalid } = await scopesOf(projectId, body.scopes);
       if (invalid.length || !held.length) throw invalidScope(invalid);
+      const repo = repoOf(projectId);
+      const holdBase = await knownBranchTip(repo, store.data.runs);
       const dependsOn = [...new Set(body.dependsOn ?? [])];
       const hold = await host.run(async () => {
         const coordinator = host.coordinator();
@@ -362,10 +391,12 @@ export function registerCollabBoardRoutes(
         const taskId = collabId("t");
         await coordinator.defineTask(actor, projectId, { id: taskId });
         await host.saveSide((draft) => {
-          (draft.tasks ??= {})[taskKey(projectId, taskId)] = {
+          const key = taskKey(projectId, taskId);
+          (draft.tasks ??= {})[key] = {
             title: body.title,
             ...(dependsOn.length ? { dependsOn } : {}),
           };
+          if (holdBase) (draft.holds ??= {})[key] = holdBase;
         });
         try {
           const claim = await coordinator.claim(actor, projectId, { taskId, scopes: held });
@@ -384,7 +415,8 @@ export function registerCollabBoardRoutes(
           throw error;
         }
       }, projectId);
-      const answer: CollabWorkResponse = { hold };
+      const changing = await changingFor(repo, actor, held, holdBase);
+      const answer: CollabWorkResponse = { hold, changing };
       res.status(201).json(answer);
     },
   );
@@ -405,6 +437,7 @@ export function registerCollabBoardRoutes(
             const tasks = (draft.tasks ??= {});
             const key = taskKey(project, ended.taskId);
             tasks[key] = { ...sideEntry(tasks, key), doneAt: ended.updatedAt };
+            if (draft.holds) delete draft.holds[key];
           });
       }, project);
       const answer: CollabOkResponse = { ok: true };

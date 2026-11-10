@@ -329,6 +329,10 @@ const m: Translation<typeof en> = {
       unpublished: ({ latest, ours }) =>
         `檔案裡標示 ${latest} 的一邊是目標分支現在的內容，標示 ${ours} 的一邊是這次的貢獻。衝突標記全部移除前不能核准。請親手解決衝突標記；你到「程式碼變更」重新整理差異時，${product.name} 會再檢查一次。改過的檔案仍要逐檔審閱。`,
     },
+    heldChanges: "你佔用範圍內的變更",
+    heldChangesNote:
+      "在你佔用期間，{branch} 上有提交改到這些檔案；發佈前請先確認。",
+    heldChangesCommits: ({ commits }) => `（${commits.join("、")}）`,
   },
   followUps: {
     title: "依 review 修正的紀錄",

@@ -16,11 +16,12 @@
  */
 import { maxRunOwners } from "../shared/collab.js";
 import type { DraftCheck } from "../shared/draft-checks.js";
-import { reviewBaseSha } from "../shared/followups.js";
+import { activeFollowUp, reviewBaseSha } from "../shared/followups.js";
 import { formatters } from "../shared/i18n/locale.js";
 import { product } from "../shared/product.js";
-import { nameOf, taskOf } from "./collab-board.js";
-import type { CollabHost } from "./collab-host.js";
+import type { HeldUpstreamChange } from "../shared/sync.js";
+import { nameOf, taskKey, taskOf } from "./collab-board.js";
+import { sideEntry, type CollabHost } from "./collab-host.js";
 import { notJoined } from "./collab-refusal.js";
 import { currentLocale, sm } from "./i18n/index.js";
 import type { HoldCheck } from "./publish.js";
@@ -28,7 +29,7 @@ import { assertGitConfigSafe, git } from "./process.js";
 import { participantOf } from "./routes/collab.js";
 import type { ClaimView } from "./coordination.js";
 import { comparablePath, pathsMeet } from "./scope-paths.js";
-import { AppError, type DiffFile, type Run } from "./types.js";
+import { AppError, type DiffFile, type Repository, type Run } from "./types.js";
 
 /**
  * What a change over someone else's hold does, the one place it is
@@ -140,6 +141,141 @@ function heldItems(held: readonly HeldConflict[]) {
   );
 }
 
+const shaPattern = /^[a-f0-9]{40,64}$/;
+const maxCommitsPerFile = 10;
+
+function activeOwners(host: CollabHost, run: Pick<Run, "owners">): ReadonlySet<string> {
+  const people = host.side().people;
+  return new Set(
+    (run.owners ?? []).filter((id) => {
+      const person = sideEntry(people, id);
+      return person && !person.removedAt;
+    }),
+  );
+}
+
+/**
+ * The newest commit of `branch` already present in BELL PR's local clone:
+ * `origin/<branch>`, `<branch>` and the recorded bases of runs on that
+ * branch. Reads local objects only and never calls the network.
+ */
+export async function knownBranchTip(
+  repo: Repository | undefined,
+  runs: readonly Run[],
+  branch = repo?.defaultBranch,
+): Promise<string | undefined> {
+  if (!repo || !branch || branch.includes("\n")) return undefined;
+  const refs = [
+    `refs/remotes/origin/${branch}^{commit}`,
+    `refs/heads/${branch}^{commit}`,
+  ];
+  for (const run of runs) {
+    if (run.repoId !== repo.id || run.baseBranch !== branch) continue;
+    if (shaPattern.test(run.baseSha)) refs.push(run.baseSha);
+    if (run.sync?.to && shaPattern.test(run.sync.to)) refs.push(run.sync.to);
+    for (const round of run.followUps ?? [])
+      if (round.mergeParent && shaPattern.test(round.mergeParent)) refs.push(round.mergeParent);
+  }
+  const uniqueRefs = [...new Set(refs)];
+  try {
+    const out = (
+      await git(repo.path, ["cat-file", "--batch-check=%(objectname) %(objecttype)"], {
+        input: uniqueRefs.map((ref) => `${ref}\n`).join(""),
+      })
+    ).stdout.split("\n");
+    const commits: string[] = [];
+    for (const line of out) {
+      const match = /^([a-f0-9]{40,64}) commit$/.exec(line.trim());
+      if (match && !commits.includes(match[1])) commits.push(match[1]);
+    }
+    if (!commits.length) return undefined;
+    let best = commits[0];
+    for (let index = 1; index < commits.length; index += 1) {
+      const candidate = commits[index];
+      const ancestor = await git(
+        repo.path,
+        ["merge-base", "--is-ancestor", best, candidate],
+        { allowedCodes: [0, 1] },
+      );
+      if (ancestor.code === 0) best = candidate;
+    }
+    return best;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Files under the caller's own holds on `run.repoId` that first-parent
+ * commits on `target` changed since each hold's recorded base commit
+ * (`<hold base>..<target>`). Returns commit short SHAs only, never subjects
+ * or other people's holds.
+ */
+export async function heldUpstreamChanges(
+  host: CollabHost,
+  repo: Repository | undefined,
+  run: Pick<Run, "repoId" | "owners">,
+  target: string | undefined,
+  asker?: HoldsAsker,
+): Promise<HeldUpstreamChange[]> {
+  const claims = groupClaims(host, run.repoId);
+  if (typeof claims === "string") return [];
+  const you = asker ? yours(host, asker) : activeOwners(host, run);
+  if (!repo || !target || !shaPattern.test(target)) return [];
+  const holds = host.side().holds;
+  const byBase = new Map<string, Set<string>>();
+  for (const { projectId, claim } of claims) {
+    if (!you.has(claim.holder)) continue;
+    const base = sideEntry(holds, taskKey(projectId, claim.taskId));
+    if (!base || base === target || !shaPattern.test(base)) continue;
+    let scopes = byBase.get(base);
+    if (!scopes) byBase.set(base, (scopes = new Set()));
+    for (const scope of claim.scopes) scopes.add(scope);
+  }
+  if (!byBase.size) return [];
+  const byPath = new Map<string, string[]>();
+  for (const [base, scopeSet] of byBase) {
+    const listed = await git(repo.path, [
+      "--no-pager",
+      "log",
+      "--max-count=500",
+      "--first-parent",
+      "-m",
+      "--no-renames",
+      "--pretty=format:%x00%x00%H",
+      "--name-only",
+      "-z",
+      "--end-of-options",
+      `${base}..${target}`,
+      "--",
+    ]).catch(() => undefined);
+    if (!listed?.stdout) continue;
+    const scopes = [...scopeSet];
+    const meets = (file: string) =>
+      !comparablePath(file) || scopes.some((scope) => pathsMeet(scope, file));
+    for (const raw of listed.stdout.split("\0\0")) {
+      const entry = raw.replace(/^\0+/, "");
+      if (!entry) continue;
+      const newline = entry.indexOf("\n");
+      if (newline < 0) continue;
+      const sha = entry.slice(0, newline).trim().slice(0, 7);
+      if (!sha) continue;
+      const touched = new Set<string>();
+      for (const file of entry.slice(newline + 1).split("\0")) {
+        if (file && meets(file)) touched.add(file);
+      }
+      for (const file of touched) {
+        const commits = byPath.get(file) ?? [];
+        if (!commits.includes(sha) && commits.length < maxCommitsPerFile) commits.push(sha);
+        byPath.set(file, commits);
+      }
+    }
+  }
+  return [...byPath.entries()]
+    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+    .map(([path, commits]) => ({ path, commits }));
+}
+
 /**
  * The guard for one request, from the group's host. The review routes
  * build it only when BELL PR runs with --group.
@@ -183,7 +319,29 @@ export function holdGuard(host: CollabHost, asker: HoldsAsker) {
     if (!held.length) return [];
     return [{ id: "held-by-other", kind: heldByOtherKind, message: m.heldByOther, details: heldItems(held) }];
   };
-  return { publishing, preflight };
+  /** S4: upstream commits on the target branch that touched the holder's own held paths. */
+  const confirms = async (
+    run: Run,
+    repo: Repository | undefined,
+    runs: readonly Run[],
+  ): Promise<DraftCheck[]> => {
+    if (activeFollowUp(run.followUps)) return [];
+    const target = (await knownBranchTip(repo, runs, run.baseBranch)) ?? run.baseSha;
+    const changes = await heldUpstreamChanges(host, repo, run, target, asker);
+    if (!changes.length) return [];
+    const m = sm().run.local;
+    return [
+      {
+        id: "held-changed-upstream",
+        kind: "confirm",
+        message: m.heldChangedUpstream({ branch: run.baseBranch }),
+        details: changes.map((change) =>
+          m.heldChangedUpstreamItem({ ...change, branch: run.baseBranch }),
+        ),
+      },
+    ];
+  };
+  return { publishing, preflight, confirms };
 }
 
 /**
@@ -219,13 +377,18 @@ export interface RunHolds {
   scope(run: Run): { others: string[]; yours: string[] } | undefined;
   /** Each path that meets someone else's hold; [] when none or outside the group; 503 `holdsUnknown`. */
   conflicts(run: Run, paths: readonly string[]): HeldConflict[];
+  /** Validates the request's participant token when `run` belongs to a group repository. */
+  assertAsker?(run: Pick<Run, "repoId">, asker?: HoldsAsker): void;
+  /** S4: upstream commits on `target` since each of the caller's holds was taken. */
+  upstreamChanges?(
+    run: Pick<Run, "repoId" | "owners">,
+    repo: Repository,
+    target: string,
+    asker?: HoldsAsker,
+  ): Promise<HeldUpstreamChange[]>;
 }
 
 export function runHolds(host: CollabHost): RunHolds {
-  const owners = (run: Run): ReadonlySet<string> => {
-    const people = host.side().people ?? {};
-    return new Set((run.owners ?? []).filter((id) => people[id] && !people[id].removedAt));
-  };
   const claimsOf = (run: Run) => {
     const claims = groupClaims(host, run.repoId);
     if (claims === "unknown") throw holdsUnknown();
@@ -235,7 +398,7 @@ export function runHolds(host: CollabHost): RunHolds {
     scope(run) {
       const claims = claimsOf(run);
       if (!claims) return undefined;
-      const you = owners(run);
+      const you = activeOwners(host, run);
       const scopes = (mine: boolean) =>
         [
           ...new Set(
@@ -246,7 +409,15 @@ export function runHolds(host: CollabHost): RunHolds {
     },
     conflicts(run, paths) {
       const claims = claimsOf(run);
-      return claims ? conflictsOf(host, claims, paths, owners(run)) : [];
+      return claims ? conflictsOf(host, claims, paths, activeOwners(host, run)) : [];
+    },
+    assertAsker(run, asker) {
+      if (!asker) return;
+      const claims = groupClaims(host, run.repoId);
+      if (Array.isArray(claims)) yours(host, asker);
+    },
+    upstreamChanges(run, repo, target, asker) {
+      return heldUpstreamChanges(host, repo, run, target, asker);
     },
   };
 }

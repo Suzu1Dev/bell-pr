@@ -355,6 +355,10 @@ const m: Translation<typeof en> = {
       `這些檔案還有合併衝突標記：${list(files)}。請先解決衝突（也可以請 Agent 解決）。`,
     mergeFailed: "無法計算合併結果。",
     answerIncomplete: "Agent 回傳的解衝突結果格式不完整",
+    heldChangedUpstream: ({ branch, items }) =>
+      `在你佔用期間，${branch} 上有提交改到你佔用的檔案：${items.join("；")}。`,
+    heldChangedUpstreamItem: ({ path, commits }) =>
+      `${path}（${commits.join("、")}）`,
   },
   followUp: {
     inProgress: "這個工作已有一輪修正在進行。",
@@ -465,6 +469,10 @@ const m: Translation<typeof en> = {
     autoHeld: "這個計畫涵蓋小組裡別人佔用的檔案，所以改為等待你核准，不會自動開始。",
     agentsHoldsUnknown: ({ name }) =>
       `小組協作已停止，無法確認檔案佔用狀態，所以 Agent 不能修改檔案。請先在主機修復小組協作並重新啟動 ${name}，或改以不帶 --group 的方式啟動 ${name}。`,
+    heldChangedUpstream: ({ branch }) =>
+      `在你佔用期間，${branch} 上有提交改到你佔用的檔案。發佈前請先確認這些變更。`,
+    heldChangedUpstreamItem: ({ path, branch, commits }) =>
+      `${path}：在你佔用期間，${branch} 上有變更（${commits.join("、")}）`,
   },
   publish: {
     heldByOther: ({ items }) =>

@@ -18,6 +18,7 @@ export const runDetailFields = [
   "prFeedback",
   "followUps",
   "sync",
+  "heldChanges",
   "explanations",
   "walkthroughs",
   "notes",

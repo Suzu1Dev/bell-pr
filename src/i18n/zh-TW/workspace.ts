@@ -438,6 +438,7 @@ const m: Translation<typeof en> = {
       issue: "Issue",
       pacing: "你在這裡的步調",
       others: "你在這裡的其他貢獻",
+      holds: "檔案佔用",
       words: "你的文字與可審閱性",
       safety: "安全",
     },
@@ -508,6 +509,8 @@ const m: Translation<typeof en> = {
       `已同步，但 ${count} 個檔案有衝突；解決後才能核准。`,
     syncedPr: "已把最新目標分支合併進 PR，審閱後推送一個合併 commit。",
     synced: "已同步到最新目標分支；改到的檔案請重新審閱。",
+    syncHeldChanges: ({ count }) =>
+      `目標分支改到 ${count} 個你佔用的檔案，請查看「目標分支」區塊。`,
     resolvingConflicts: "Agent 正在解決衝突，完成後請逐檔審閱。",
     undoSyncConfirm:
       "復原同步？工作會回到同步前的內容與基準，同步後在工作目錄做的修改會被移除。",

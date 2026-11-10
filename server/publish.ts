@@ -621,6 +621,15 @@ export type HoldCheck = (
   acknowledged: readonly string[],
 ) => void;
 
+export interface PublishHolds {
+  publishing: HoldCheck;
+  confirms?: (
+    run: Run,
+    repo: Repository | undefined,
+    runs: readonly Run[],
+  ) => Promise<DraftCheck[]>;
+}
+
 /**
  * `acknowledged` lists the preflight items the person confirmed in the
  * publish dialog. They are recomputed here from the saved draft, so a stale
@@ -636,8 +645,10 @@ export async function publish(
   acknowledged: string[] = [],
   overrides: Pick<GuardOverride, "id" | "reason">[] = [],
   rulesDigest?: string,
-  holds?: HoldCheck,
+  holds?: HoldCheck | PublishHolds,
 ) {
+  const holdCheck = typeof holds === "function" ? holds : holds?.publishing;
+  const holdConfirms = typeof holds === "function" ? undefined : holds?.confirms;
   return ctx.lock(id, async () => {
     const run = ctx.run(id);
     if (
@@ -674,7 +685,7 @@ export async function publish(
     // and to runs approved by builds before the check existed.
     assertUnderstood(run, files, repo);
     // Before the follow-up branch, so a follow-up round is held to it too.
-    holds?.(run, files, acknowledged);
+    holdCheck?.(run, files, acknowledged);
     const round = activeFollowUp(run.followUps);
     if (round) return publishFollowUp(ctx, run, round, files);
     if (run.prUrl)
@@ -754,6 +765,8 @@ export async function publish(
       currentLocale(),
       { repo, overrides: guardOverrides, runs: ctx.store.data.runs },
     );
+    if (holdConfirms)
+      checks.push(...(await holdConfirms(run, repo, ctx.store.data.runs)));
     const blocking = checks.find((check) => check.kind === "block");
     if (blocking)
       throw new AppError(

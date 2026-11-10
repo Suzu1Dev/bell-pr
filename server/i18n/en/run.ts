@@ -589,6 +589,21 @@ export default {
     mergeFailed: "Could not compute the merge result.",
     answerIncomplete:
       "The agent's answer about the conflict resolution is incomplete",
+    heldChangedUpstream: ({
+      branch,
+      items,
+    }: {
+      branch: string;
+      items: readonly string[];
+    }) =>
+      `Commits on ${branch} changed files under your hold since you took it: ${items.join("; ")}.`,
+    heldChangedUpstreamItem: ({
+      path,
+      commits,
+    }: {
+      path: string;
+      commits: readonly string[];
+    }) => `${path} (${commits.join(", ")})`,
   },
   /** Follow-up rounds on a published PR, and its branch on GitHub. */
   followUp: {
@@ -753,6 +768,17 @@ export default {
       "This plan covers files someone else in the group holds, so it waits for your approval instead of starting on its own.",
     agentsHoldsUnknown: ({ name }: { name: string }) =>
       `Can't check file holds because group work has stopped, so the agents can't change files. Fix group work on the host and restart ${name}, or start ${name} without --group.`,
+    heldChangedUpstream: ({ branch }: { branch: string }) =>
+      `Commits on ${branch} changed files under your hold since you took it. Check those changes before publishing.`,
+    heldChangedUpstreamItem: ({
+      path,
+      branch,
+      commits,
+    }: {
+      path: string;
+      branch: string;
+      commits: readonly string[];
+    }) => `${path} changed on ${branch} since your hold (${commits.join(", ")})`,
   },
   /** The human review gate and publishing: draft, file reviews, approval and push. */
   publish: {

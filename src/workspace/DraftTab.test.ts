@@ -603,3 +603,66 @@ test("a Learn-by-hand run asks for its own PR title and description while either
   assert.doesNotMatch(renderEn(element({ run: { ...review, learnByHand: undefined } }, { draftTitle: "", draftBody: "Greets." })), /draft-origin-notice/);
   assert.match(renderZh(element({ run: review }, { draftTitle: "", draftBody: "" })), /請用自己的話寫下 PR 標題與說明/);
 });
+
+test("SyncPanel lists upstream changes under your hold for unpublished runs, no-op syncs, and published PR sync rounds", () => {
+  const unpublishedSynced: Run = {
+    ...published,
+    status: "review",
+    prUrl: undefined,
+    followUps: [],
+    prFeedback: undefined,
+    sync: {
+      at: "2026-11-10T10:00:00Z",
+      from: "a".repeat(40),
+      to: "b".repeat(40),
+      snapshot: "c".repeat(40),
+      conflicts: [],
+      heldChanges: [{ path: "src/api/users.ts", commits: ["abc1234", "def5678"] }],
+    },
+  };
+  const enSynced = renderEn(element({ run: unpublishedSynced }));
+  assertNoHan(enSynced);
+  assert.match(enSynced, /Changes under your hold/);
+  assert.match(
+    enSynced,
+    /Commits on <code>main<\/code> changed these files since you took your hold\. Check them before you publish\./,
+  );
+  assert.match(enSynced, /<code>src\/api\/users\.ts<\/code>\s*<span>\(abc1234, def5678\)<\/span>/);
+
+  const zhSynced = renderZh(element({ run: unpublishedSynced }));
+  assert.match(zhSynced, /你佔用範圍內的變更/);
+  assert.match(zhSynced, /在你佔用期間，<code>main<\/code> 上有提交改到這些檔案；發佈前請先確認。/);
+  assert.match(zhSynced, /<code>src\/api\/users\.ts<\/code>\s*<span>（abc1234、def5678）<\/span>/);
+
+  const noOpRun: Run = {
+    ...published,
+    status: "review",
+    prUrl: undefined,
+    followUps: [],
+    prFeedback: undefined,
+    heldChanges: [{ path: "docs/guide.md", commits: ["1234567"] }],
+  };
+  assert.match(renderEn(element({ run: noOpRun })), /<code>docs\/guide\.md<\/code>\s*<span>\(1234567\)<\/span>/);
+
+  const prSyncRound: Run = {
+    ...inRound,
+    followUps: [
+      {
+        id: "sync-1",
+        kind: "sync",
+        requestedAt: "2026-11-10T10:00:00Z",
+        feedbackUrls: [],
+        status: "review",
+        parentCommit: "a".repeat(40),
+        mergeParent: "b".repeat(40),
+        previousBase: "c".repeat(40),
+        conflicts: [],
+        heldChanges: [{ path: "src/api/users.ts", commits: ["fedcba9"] }],
+      },
+    ],
+  };
+  assert.match(
+    renderEn(element({ run: prSyncRound }, { followUp: prSyncRound.followUps![0] })),
+    /<code>src\/api\/users\.ts<\/code>\s*<span>\(fedcba9\)<\/span>/,
+  );
+});

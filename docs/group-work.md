@@ -276,10 +276,17 @@ curl -X POST http://127.0.0.1:4311/api/collab/projects/<project id>/work \
   says when it is refused.
 
 The answer (201) is
-`{ "hold": { claimId, taskId, title, holder, scopes, fence, since, dependsOn? } }`.
+`{ "hold": { claimId, taskId, title, holder, scopes, fence, since, dependsOn? }, "changing": [{ runId, title, status, owners, paths }] }`.
 Keep `claimId` and `fence`: releasing the hold needs both. Each hold makes
 its own task, and `taskId` names it. `dependsOn` is there only when the
-work named tasks: each as `{ taskId, title }`.
+work named tasks: each as `{ taskId, title }`. `changing` lists other
+people's unfinished runs of this repository whose changed files, active
+plans or unmerged pull requests already meet the held paths (`owners`
+names the active group members who own the run, or `[]` when none of them
+started it); taking the hold still goes ahead. BELL PR also records the
+default branch's current commit in `collab.json` when the hold is taken,
+so commits that land on the target branch while you hold those paths can
+be [reported at sync and publish](#changes-on-the-target-branch-under-your-hold).
 
 **A folder holds everything inside it.** A hold of `src/api` meets a hold
 of `src/api/users.ts`, of `src/api` and of `src`. **Letter case is
@@ -305,10 +312,12 @@ the group's record ([Limits](#limits)); no board shows it.
 
 `POST /api/collab/projects/<project id>/check` with `{ "scopes": […] }`
 asks the same question and takes nothing. The answer (200) is
-`{ asOf, invalid, meets }`: `meets` lists each held path in the way with
-its `claimId`, `taskId`, title and the holder's name, and `invalid` lists
-the asked paths that cannot be held. The answer is true at `asOf`; someone
-can take a path a moment later.
+`{ asOf, invalid, meets, changing }`: `meets` lists each held path in the
+way with its `claimId`, `taskId`, title and the holder's name, `invalid`
+lists the asked paths that cannot be held, and `changing` lists other
+people's unfinished runs whose files, active plans or unmerged pull
+requests already meet the valid asked paths. The answer is true at
+`asOf`; someone can take a path a moment later.
 
 ### Release and revoke
 
@@ -446,6 +455,30 @@ plan approvals in a repository of the group are answered 503 with
 turns that only read go on. Without `--group`, and in a repository
 outside the group, nothing is checked.
 
+### Changes on the target branch under your hold
+
+Edits pushed straight to GitHub outside BELL PR, or merged from another
+pull request while you hold a path, are reported to the holder when BELL PR
+sees them on the run's target branch (`<hold base>..<target>`):
+
+- **At sync.** `POST /api/runs/<id>/sync` (for both unpublished runs and
+  published pull requests) checks first-parent commits on the target branch
+  since each of your active holds was taken. When any of those commits
+  touched a path under your hold, the response includes `heldChanges`
+  (`[{ path, commits }]`, with 7-character commit hashes), the **Target
+  branch** panel lists the files and commits, and a notice is added to the
+  run's log. Undoing an unpublished sync clears its recorded `heldChanges`.
+- **Before first publish.** `GET /api/runs/<id>/preflight` and
+  `POST /api/runs/<id>/publish` add a `confirm` check
+  `held-changed-upstream` under **File holds** whenever commits on the
+  target branch changed files under your hold since you took it, even if
+  your own run did not touch that file. Publishing requires confirming that
+  item in `acknowledged`.
+
+Only your own active holds are checked (resolved by `x-bell-participant` or
+by device, as for publishing), and only file paths and short commit hashes
+are shown — never commit subjects or other people's holds.
+
 ### What a hold does not do
 
 A hold is a record the group can see, the reason a second hold that meets
@@ -576,8 +609,8 @@ token, or a paired device's). The routes exist only with the switch.
 | `GET /api/collab/projects` | anyone who joined | 200 `{ projects: [{ id, name }], addable?, storage? }`; `addable` (`[{ repoId, name }]`) and `storage` (`{ used, max }`) for an admin only |
 | `POST /api/collab/projects` with `{ repoId }` | an admin | 201 `{ project: { id, name } }`; 403 `adminOnly`; 400 `unknownRepository`; 409 `alreadyAdded`, `full`; 500 or 504 `cloneFailed` |
 | `GET /api/collab/projects/<project id>/feed?epoch=&version=&seen=&wait=` | anyone who joined | 200 `{ epoch, version, seen, asOf, board?, present }`; 204 when nothing changed; 404 `unknownProject`; 429 `tooManyWaiters` |
-| `POST /api/collab/projects/<project id>/check` with `{ scopes }` | anyone who joined | 200 `{ asOf, invalid, meets }`; 400 `tooManyScopes`, `invalidScope`; 404 `unknownProject`; 429 `slowDown` |
-| `POST /api/collab/projects/<project id>/work` with `{ title, scopes, dependsOn? }` | anyone who joined | 201 `{ hold }`; 400 `invalidScope`, `tooManyScopes`, `dependencyUnknown`; 404 `unknownProject`; 409 `conflict`, `dependencyPending`, `full`; 429 `slowDown` |
+| `POST /api/collab/projects/<project id>/check` with `{ scopes }` | anyone who joined | 200 `{ asOf, invalid, meets, changing }`; 400 `tooManyScopes`, `invalidScope`; 404 `unknownProject`; 429 `slowDown` |
+| `POST /api/collab/projects/<project id>/work` with `{ title, scopes, dependsOn? }` | anyone who joined | 201 `{ hold, changing }`; 400 `invalidScope`, `tooManyScopes`, `dependencyUnknown`; 404 `unknownProject`; 409 `conflict`, `dependencyPending`, `full`; 429 `slowDown` |
 | `POST /api/collab/projects/<project id>/holds/<claimId>/release` with `{ fence, done? }` | the person who holds it | 200 `{ ok: true }`; 403 `notHolder`; 404 `unknownProject`, `unknownClaim`; 409 `staleFence`, `ended` |
 | `POST /api/collab/projects/<project id>/holds/<claimId>/revoke` with `{}` | an admin | 200 `{ ok: true }`; 403 `adminOnly`; 404 `unknownProject`, `unknownClaim`; 409 `ended` |
 
@@ -599,9 +632,12 @@ token, or a paired device's). The routes exist only with the switch.
   `pending`, and `slowDown` carries `retryAfter`, in seconds.
 - A body of the wrong shape (a missing or unknown field, a wrong type, a
   title that is too long) is answered 400 with `error` only.
-- With the switch, `GET /api/runs/<id>/preflight` and
-  `POST /api/runs/<id>/publish` also check holds:
-  [Publishing over someone else's hold](#publishing-over-someone-elses-hold).
+- With the switch, `GET /api/runs/<id>/preflight`,
+  `POST /api/runs/<id>/publish` and `POST /api/runs/<id>/sync` also check
+  holds:
+  [Publishing over someone else's hold](#publishing-over-someone-elses-hold)
+  and
+  [Changes on the target branch under your hold](#changes-on-the-target-branch-under-your-hold).
 
 ## When group work stops
 
@@ -644,7 +680,7 @@ All are in the data directory, only with group work: the two files from
 | File | What it holds |
 | --- | --- |
 | `coordination.json` | Each person's id, role (admin or member), the time they were added and the SHA-256 of their participant token; never the token. Each repository of the group, with the folder of its bare copy and the commit it was copied at. Each task, with who made it and when, and every hold, ended ones included: its paths, who holds it, when it was taken and when and by whom it ended |
-| `collab.json` | The group's id and set-up time, and for each person: name, the time they joined, whether they are an admin, the time they were removed, and, when they joined from a paired device, that device's id. For each repository: its name, its id in this BELL PR and the time it was added. For each task: its title, the tasks its work waited for, and when its holder said it is done |
+| `collab.json` | The group's id and set-up time, and for each person: name, the time they joined, whether they are an admin, the time they were removed, and, when they joined from a paired device, that device's id. For each repository: its name, its id in this BELL PR and the time it was added. For each task: its title, the tasks its work waited for, when its holder said it is done, and (`holds`) the default-branch commit recorded when its hold was taken |
 | `collab/<project id>.git` | The group's bare copy of a repository: the commits and files of its default branch, as they were when it was added |
 
 The lock file `bellpr.lock` also carries `"strict": true`. Back the two

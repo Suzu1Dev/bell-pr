@@ -562,6 +562,7 @@ const workspace = {
       issue: "The issue",
       pacing: "Your pace here",
       others: "Your other contributions here",
+      holds: "File holds",
       words: "Your words and reviewability",
       safety: "Safety",
     },
@@ -653,6 +654,10 @@ const workspace = {
     syncedPr:
       "Merged the latest target branch into the PR. Review it, then push one merge commit.",
     synced: "Synced to the latest target branch. Review the files it changed again.",
+    syncHeldChanges: ({ count }: { count: number }) =>
+      plural(count) === "one"
+        ? `${count} file under your hold changed on the target branch. Check the Target branch panel.`
+        : `${count} files under your hold changed on the target branch. Check the Target branch panel.`,
     resolvingConflicts:
       "An agent is resolving the conflicts. Review each file when it finishes.",
     undoSyncConfirm:

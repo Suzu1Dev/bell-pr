@@ -70,7 +70,7 @@ import type { SplitRequest } from "../shared/split.js";
 import type { WorkbenchContext } from "./workbench-context.js";
 import { planOverlaps } from "./group-local.js";
 import type { CollabHost } from "./collab-host.js";
-import { runHolds } from "./hold-guard.js";
+import { runHolds, type HoldsAsker } from "./hold-guard.js";
 
 export type { WorkbenchContext };
 
@@ -625,9 +625,9 @@ export class Workbench {
   }
 
   /** Moves a run onto the latest commit of its target branch (see sync-runs.ts). */
-  async syncRun(id: string) {
+  async syncRun(id: string, asker?: HoldsAsker) {
     cleanup.assertWorkspacePresent(this.run(id), { update: true });
-    return syncing.syncRun(this.context, id);
+    return syncing.syncRun(this.context, id, asker);
   }
 
   async undoSync(id: string) {
@@ -665,7 +665,7 @@ export class Workbench {
     acknowledged: string[] = [],
     overrides: Pick<GuardOverride, "id" | "reason">[] = [],
     rulesDigest?: string,
-    holds?: publishing.HoldCheck,
+    holds?: publishing.HoldCheck | publishing.PublishHolds,
   ) {
     const round = activeFollowUp(this.run(id).followUps);
     return logged(
