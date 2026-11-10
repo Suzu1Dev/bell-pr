@@ -1,5 +1,5 @@
 import { safeLink, WebLink } from "../review/MarkdownContent";
-import type { Dispatch, SetStateAction } from "react";
+import type { Dispatch, ReactNode, SetStateAction } from "react";
 import {
   ChevronRight,
   ExternalLink,
@@ -66,6 +66,8 @@ interface TopbarProps {
    * the bar's own row, so it never covers the page name or the actions.
    */
   sampleBadge?: boolean;
+  /** The product switcher's button, when another BELL product is linked. */
+  suiteTrigger?: ReactNode;
 }
 
 /** The top bar: menu toggles, breadcrumb, quick switch, readiness and profile. */
@@ -83,6 +85,7 @@ export function Topbar({
   repoUrl,
   githubUser,
   sampleBadge = false,
+  suiteTrigger,
 }: TopbarProps) {
   const t = useT("app");
   const commandShortcut = /Mac|iPhone|iPad|iPod/.test(navigator.platform) ? "⌘ K" : "Ctrl K";
@@ -106,6 +109,7 @@ export function Topbar({
         >
           <Menu size={18} />
         </button>
+        {suiteTrigger}
         <button
           className="icon-button sidebar-toggle"
           aria-label={

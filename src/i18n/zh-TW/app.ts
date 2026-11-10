@@ -102,6 +102,15 @@ const m: Translation<typeof en> = {
     switchProjectHint: "切換專案",
     closeHint: "關閉",
   },
+  suite: {
+    open: "切換 BELL 產品",
+    title: "BELL 產品",
+    personal: { name: "BELL Personal", summary: "今日與收件匣" },
+    explain: { name: "BELL Explain", summary: "理解與複習" },
+    prSummary: "貢獻與審查",
+    current: "目前",
+    notLinked: "尚未連結",
+  },
 };
 
 export default m;
