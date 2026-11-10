@@ -843,8 +843,9 @@
   scroll-padding-inline: 4px;
   scrollbar-color: var(--color-accent-500) var(--color-accent-50);
   scrollbar-width: auto;
-  padding: 4px 4px 16px;
-  margin: -4px;
+  /* Room for the scrollbar only. A negative margin here made the section
+     wider than its box by that margin. */
+  padding: 0 0 16px;
   min-width: 0;
 }
 .mission-idea-list::-webkit-scrollbar {
@@ -875,8 +876,14 @@
 }
 .mission-idea:focus-visible {
   outline: 2px solid transparent;
-  outline-offset: 2px;
-  box-shadow: var(--focus-ring);
+  outline-offset: 0;
+  box-shadow: var(--focus-ring-inset);
+}
+/* The global ring is drawn outside the box; these scroll, so it would be clipped. */
+:root .mission-idea-list:focus-visible,
+:root .mission-section-nav ul:focus-visible {
+  outline-offset: 0;
+  box-shadow: var(--focus-ring-inset);
 }
 .mission-idea-new {
   border-color: var(--color-brand-300);

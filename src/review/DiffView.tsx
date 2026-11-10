@@ -204,6 +204,7 @@ export function DiffView({
   const highlightEnd = highlight?.endLine;
   const scrollPending = useRef(false);
   const codeScroll = useRef<HTMLDivElement>(null);
+  const tabBack = useRef(false);
   const highlighted = (line: DiffLine) =>
     highlightStart !== undefined &&
     highlightEnd !== undefined &&
@@ -594,7 +595,33 @@ export function DiffView({
           <p>{file.blocked || t.diff.noTextBody}</p>
         </div>
       ) : (
-        <div className="rv-code-scroll" ref={codeScroll}>
+        <div
+          className="rv-code-scroll"
+          ref={codeScroll}
+          role="region"
+          aria-label={t.diff.regionLabel({ path: file.path })}
+          tabIndex={0}
+          onKeyDown={(event) => {
+            tabBack.current = event.key === "Tab" && event.shiftKey;
+          }}
+          onFocus={(event) => {
+            // The lines stay the one tab stop. The scroller is in the tab
+            // order so the sideways overflow can be reached, then focus
+            // moves on: forward to the line the reader left, back to the
+            // control before the code.
+            if (event.target !== event.currentTarget) return;
+            const box = event.currentTarget;
+            const back = tabBack.current;
+            tabBack.current = false;
+            if (back) {
+              const stops = [...document.querySelectorAll<HTMLElement>("a[href], button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), summary, [tabindex='0']")];
+              const index = stops.indexOf(box);
+              stops.slice(0, index).reverse().find((stop) => !box.contains(stop))?.focus();
+              return;
+            }
+            box.querySelector<HTMLElement>('[role="option"][tabindex="0"]')?.focus();
+          }}
+        >
           {view === "split" ? (
             <div className="rv-split-content">
               <div className="rv-split-labels">

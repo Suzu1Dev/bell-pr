@@ -41,7 +41,7 @@ export function HistoricalDiff({ runId, round, toolbar, showFiles = true }: {
         <div className={`review-grid explanation-hidden${!showFiles || !files.length ? " files-hidden" : ""}`}>
           {showFiles && files.length > 0 && <aside className="file-panel" aria-label={filesLabel}>
             <div className="file-panel-heading"><strong>{filesLabel} <span>{files.length}</span></strong></div>
-            <div className="file-tree">
+            <div className="file-tree" tabIndex={0} role="region" aria-label={filesLabel}>
               {files.map((entry) => (
                 <button type="button" key={entry.path} className={`file-item${file?.path === entry.path ? " selected" : ""}`}
                   title={entry.path} aria-pressed={file?.path === entry.path} onClick={() => setSelected({ key, path: entry.path })}>

@@ -391,7 +391,7 @@ export function ChangesTab({
               </button>
             )}
           </div>}
-          <div className="file-tree">
+          <div className="file-tree" tabIndex={0} role="region" aria-label={t.files}>
             <div className="tree-root">
               <ChevronDown size={13} />
               <FolderGit2 size={15} />

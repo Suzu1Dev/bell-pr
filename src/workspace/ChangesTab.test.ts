@@ -118,7 +118,7 @@ const tag = (html: string, marker: RegExp) =>
 
 test("the two file filters share one row and say whether they are on", () => {
   const html = renderEn(element({ onlyUnreviewed: true }));
-  const filters = html.match(/<div class="file-filters">(.*?)<\/div><div class="file-tree">/)?.[1];
+  const filters = html.match(/<div class="file-filters">(.*?)<\/div><div class="file-tree"[^>]*>/)?.[1];
   assert.ok(filters, "the filters sit in their own row before the file list");
   assert.match(filters, /aria-pressed="true"[^>]*>.*?Only unreviewed/);
   assert.match(filters, /aria-pressed="false"[^>]*>.*?Suggested order/);

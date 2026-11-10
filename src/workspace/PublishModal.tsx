@@ -238,8 +238,20 @@ export function OutgoingText({
         <pre>{text.commitMessage}</pre>
       </div>
       <div className="publish-body-preview">
-        <strong>{demo ? t.bodyPreviewDemo : t.bodyPreview}</strong>
-        <pre>{text.body}</pre>
+        <strong id="publish-body-label">{demo ? t.bodyPreviewDemo : t.bodyPreview}</strong>
+        <pre
+          tabIndex={0}
+          aria-labelledby="publish-body-label"
+          onKeyDown={(event) => {
+            // A <pre> does not arrow-scroll on its own. The fade is only a
+            // background, so these keys still move the text.
+            if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+            if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+            event.preventDefault();
+            const box = event.currentTarget;
+            box.scrollLeft += (event.key === "ArrowRight" ? 1 : -1) * box.clientWidth / 4;
+          }}
+        >{text.body}</pre>
       </div>
     </div>
   );

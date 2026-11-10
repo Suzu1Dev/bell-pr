@@ -19,8 +19,12 @@
 // their panes another layout from 761 px up.
 //
 //   BELLPR_E2E_PORT=<port> npx playwright test e2e/responsive.spec.ts
+import { writeFile } from "node:fs/promises";
+import path from "node:path";
+import { inflateSync } from "node:zlib";
 import { expect, test, type Browser, type Page } from "@playwright/test";
 import { e2eApiHeaders } from "./api-token.mjs";
+import { messages } from "./helpers/messages";
 import { htmlLang, locales, type Locale } from "../shared/i18n/locale";
 import { findOverflow } from "./helpers/overflow";
 import { startReadyServer } from "./helpers/ready-server";
@@ -458,3 +462,153 @@ for (const view of stateViews.filter((entry) => entry.real))
           await expectFits(browser, project!, locale, view.route, viewport, false, { drive: view.drive });
         });
   });
+
+/** RGBA pixels of an 8-bit PNG screenshot (Playwright's). */
+function pngPixels(png: Buffer) {
+  let offset = 8;
+  let width = 0;
+  let height = 0;
+  let color = 6;
+  const parts: Buffer[] = [];
+  while (offset + 8 <= png.length) {
+    const length = png.readUInt32BE(offset);
+    const type = png.toString("ascii", offset + 4, offset + 8);
+    const data = png.subarray(offset + 8, offset + 8 + length);
+    if (type === "IHDR") {
+      width = data.readUInt32BE(0);
+      height = data.readUInt32BE(4);
+      color = data[9];
+    } else if (type === "IDAT") parts.push(Buffer.from(data));
+    else if (type === "IEND") break;
+    offset += 12 + length;
+  }
+  const channels = color === 2 ? 3 : 4;
+  const raw = inflateSync(Buffer.concat(parts));
+  const out = Buffer.alloc(width * height * channels);
+  let src = 0;
+  for (let y = 0; y < height; y++) {
+    const filter = raw[src++];
+    const row = y * width * channels;
+    const prev = row - width * channels;
+    for (let i = 0; i < width * channels; i++) {
+      const left = i >= channels ? out[row + i - channels] : 0;
+      const up = y > 0 ? out[prev + i] : 0;
+      const upLeft = y > 0 && i >= channels ? out[prev + i - channels] : 0;
+      const value = raw[src++];
+      let decoded = value;
+      if (filter === 1) decoded = (value + left) & 255;
+      else if (filter === 2) decoded = (value + up) & 255;
+      else if (filter === 3) decoded = (value + Math.floor((left + up) / 2)) & 255;
+      else if (filter === 4) {
+        const estimate = left + up - upLeft;
+        const towardLeft = Math.abs(estimate - left);
+        const towardUp = Math.abs(estimate - up);
+        const towardUpLeft = Math.abs(estimate - upLeft);
+        const pred = towardLeft <= towardUp && towardLeft <= towardUpLeft ? left
+          : towardUp <= towardUpLeft ? up
+          : upLeft;
+        decoded = (value + pred) & 255;
+      }
+      out[row + i] = decoded;
+    }
+  }
+  return { width, height, data: out, channels };
+}
+
+/** Mean luminance of a rectangle in a screenshot. */
+function luminance(png: Buffer, x0: number, x1: number, y0: number, y1: number) {
+  const { width, data, channels } = pngPixels(png);
+  let sum = 0;
+  let count = 0;
+  for (let y = y0; y < y1; y++)
+    for (let x = x0; x < x1; x++) {
+      const i = (y * width + x) * channels;
+      sum += 0.2126 * data[i] + 0.7152 * data[i + 1] + 0.0722 * data[i + 2];
+      count += 1;
+    }
+  return sum / count;
+}
+
+// The description keeps long lines and scrolls them. At 320 a fade sits on
+// the side that still has more, and it is gone once that side is scrolled
+// to the end. The fade is a background, so it does not take the keyboard.
+test.describe("the publish body preview at 320 px", () => {
+  let server: LaunchedServer | undefined;
+  test.beforeAll(async () => {
+    server = await startServer({
+      seed: (dataDir) =>
+        writeFile(
+          path.join(dataDir, "app-settings.json"),
+          JSON.stringify({ skipUnderstandingCheck: true }),
+        ),
+    });
+  });
+  test.afterAll(async () => {
+    await server?.stop();
+  });
+
+  for (const locale of locales)
+    test(`the description shows that it scrolls in ${locale}`, async ({ browser }) => {
+      const context = await browser.newContext({
+        extraHTTPHeaders: e2eApiHeaders,
+        baseURL: server!.baseURL,
+        locale: "en-US",
+        timezoneId: "UTC",
+        viewport: { width: 320, height: 700 },
+        deviceScaleFactor: 1,
+      });
+      try {
+        const page = await context.newPage();
+        const copy = messages[locale];
+        await page.goto(`/#/runs/demo-run/changes?present=1&capture=1&locale=${locale}`);
+        await settled(page, locale);
+        const files = page.locator(".file-item");
+        for (let index = 0; index < (await files.count()); index++) {
+          await files.nth(index).click();
+          await page.getByRole("checkbox", { name: copy.review.diff.reviewed }).check();
+        }
+        await page.getByRole("button", { name: copy.workspace.footer.approvePr }).click();
+        const dialog = page.getByRole("dialog", { name: copy.workspace.publish.titleDemo });
+        const pre = dialog.locator(".publish-body-preview pre");
+        await expect(pre).toBeVisible();
+        const box = await pre.evaluate((element) => ({
+          scroll: element.scrollWidth,
+          client: element.clientWidth,
+          overflowX: getComputedStyle(element).overflowX,
+          attachment: getComputedStyle(element).backgroundAttachment,
+        }));
+        expect(box.scroll).toBeGreaterThan(box.client + 1);
+        expect(box.overflowX).toBe("auto");
+        expect(box.attachment).toContain("local");
+        await dialog.locator("button").first().focus();
+        for (let step = 0; step < 30 && !(await pre.evaluate((element) => element === document.activeElement)); step++)
+          await page.keyboard.press("Tab");
+        await expect(pre).toBeFocused();
+        const ring = await pre.evaluate((element) => getComputedStyle(element).boxShadow);
+        expect(ring).toContain("inset");
+        const start = await pre.evaluate((element) => element.scrollLeft);
+        await page.keyboard.press("ArrowRight");
+        expect(await pre.evaluate((element) => element.scrollLeft)).toBeGreaterThan(start);
+        await pre.evaluate((element) => {
+          element.scrollLeft = 0;
+        });
+        const atStart = await pre.screenshot();
+        await pre.evaluate((element) => {
+          element.scrollLeft = element.scrollWidth;
+        });
+        const atEnd = await pre.screenshot();
+        const edge = (shot: Buffer) => {
+          const { width } = pngPixels(shot);
+          return luminance(shot, width - 10, width - 2, 2, 10) - luminance(shot, Math.floor(width / 2) - 4, Math.floor(width / 2) + 4, 2, 10);
+        };
+        const startEdge = edge(atStart);
+        const endEdge = edge(atEnd);
+        // The trailing fade is darker than the padding beside it, and it
+        // leaves once the line is scrolled to its end.
+        expect(startEdge, `fade at the start (${startEdge})`).toBeLessThan(-8);
+        expect(endEdge, `fade at the end (${endEdge}), start was ${startEdge}`).toBeGreaterThan(-3);
+      } finally {
+        await context.close();
+      }
+    });
+});
