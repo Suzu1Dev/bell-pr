@@ -19,6 +19,8 @@
 - [FAQ](faq.md).
 - [Self-hosting](self-hosting.md): service install, Tailscale serve +
   `BELLPR_PUBLIC_URL`, and pairing a phone or another device.
+- [BELL Suite link](bell-suite.md): `BELLPR_SUITE_LINKS`, the switcher between
+  BELL products, and what BELL PR tells the other products about your runs.
 - [Docker](docker.md) (beta).
 - [Security model](security-model.md): what BELL PR trusts, how agents are
   confined, and the limits of each protection.

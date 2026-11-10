@@ -39,6 +39,15 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   where the repository's config turns it on. Other files in that
   directory, such as object files, packs and alternates, are still trusted,
   and nothing in the app, the CLI or any listener reaches the core yet.
+- **BELL Suite link (contract v1).** `BELLPR_SUITE_LINKS` tells this BELL PR
+  where BELL Explain and BELL Personal are, on the same computer or tailnet,
+  and a switcher between the BELL products shows once a link is set.
+  `GET /api/suite/manifest` and `GET /api/suite/today` describe BELL PR and
+  the runs that wait for you or for BELL PR: a run's id, title, state and
+  time, and nothing else. Both stay behind the access token like the rest
+  of the API, and no existing protection changes. No other BELL product can
+  read the feed yet, because BELL PR has no read-only credential to give
+  one. [BELL Suite link](docs/bell-suite.md) has the details.
 
 ### Changed
 
