@@ -1,0 +1,216 @@
+import assert from "node:assert/strict";
+import test, { mock, type TestContext } from "node:test";
+import { createGroupStore } from "./store";
+
+const me = { id: "u1", name: "Ada", admin: true };
+const people = [me, { id: "u2", name: "Ben" }];
+const hold = (claimId: string, holder = "u1") => ({
+  claimId,
+  title: `Task ${claimId}`,
+  holder,
+  scopes: [`src/${claimId}`],
+  fence: 1,
+  since: "2026-11-10T09:00:00.000Z",
+});
+/** A feed answer for repository p1; without `held` it says only who is present. */
+const feed = (version: number, held?: ReturnType<typeof hold>[], present = ["u1"]) => ({
+  epoch: "e1",
+  version,
+  seen: present.length,
+  asOf: "2026-11-10T09:00:05.000Z",
+  present,
+  ...(held && { board: { project: { id: "p1", name: "shop" }, people, held } }),
+});
+const first = "/projects/p1/feed?wait=25";
+const ids = (holds: { claimId: string }[] = []) => holds.map((item) => item.claimId);
+
+/** Lets the store read an answer and ask again. */
+async function settle() {
+  for (let turn = 0; turn < 5; turn++) await new Promise((resolve) => setImmediate(resolve));
+}
+
+/**
+ * A store that has joined and waits for the board of p1, with a server whose
+ * answers the test gives one at a time and a clock the test moves.
+ */
+async function joined(t: TestContext) {
+  const asked: { path: string; token: string | null; answer(response: Response): void }[] = [];
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = ((input: RequestInfo | URL, init?: RequestInit) =>
+    new Promise<Response>((answer) =>
+      asked.push({
+        path: String(input).replace("/api/collab", ""),
+        token: new Headers(init?.headers).get("x-bell-participant"),
+        answer,
+      }),
+    )) as typeof fetch;
+  mock.timers.enable({ apis: ["setTimeout"] });
+  const store = createGroupStore();
+  t.after(() => {
+    store.close();
+    mock.timers.reset();
+    globalThis.fetch = realFetch;
+  });
+  /** Answers the oldest request, which is for `path`: 204 without a body. Resolves with its participant token. */
+  async function answer(path: string, body?: unknown, status = body === undefined ? 204 : 200) {
+    const request = asked.shift();
+    assert.equal(request?.path, path);
+    request!.answer(
+      new Response(body === undefined ? null : JSON.stringify(body), {
+        status,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+    await settle();
+    return request!.token;
+  }
+  const joining = store.join("the code");
+  await settle();
+  await answer("/join", { token: "first" });
+  await joining;
+  await answer("", { state: "ready", host: false, me });
+  await answer("/projects", {
+    projects: [
+      { id: "p1", name: "shop" },
+      { id: "p2", name: "site" },
+    ],
+  });
+  return {
+    store,
+    answer,
+    /** The requests that wait for an answer. */
+    waiting: () => asked.map((request) => request.path),
+    async pass(ms: number) {
+      mock.timers.tick(ms);
+      await settle();
+    },
+  };
+}
+
+test("a board keeps the server's order and the objects that did not change", async (t) => {
+  const { store, answer } = await joined(t);
+  await answer(first, feed(1, [hold("b"), hold("a")]));
+  const one = store.get();
+  assert.deepEqual(ids(one.held), ["b", "a"]);
+  // The first board of a repository marks nothing.
+  assert.deepEqual([one.added, one.ended, one.link, one.asOf], [[], [], "live", feed(1).asOf]);
+
+  await answer(`${first}&epoch=e1&version=1&seen=1`, feed(2, [hold("b"), hold("a"), hold("c", "u2")]));
+  const two = store.get();
+  assert.deepEqual(ids(two.held), ["b", "a", "c"]);
+  assert.equal(two.held![0], one.held![0]);
+  assert.equal(two.held![1], one.held![1]);
+  assert.equal(two.people, one.people);
+  assert.equal(two.present, one.present);
+  assert.deepEqual([ids(two.added), two.ended], [["c"], []]);
+
+  // Only who is present changed: the answer has no board, and the one in hand stays.
+  await answer(`${first}&epoch=e1&version=2&seen=1`, feed(2, undefined, ["u1", "u2"]));
+  const three = store.get();
+  assert.equal(three.held, two.held);
+  assert.equal(three.people, two.people);
+  assert.deepEqual(three.present, ["u1", "u2"]);
+
+  await answer(`${first}&epoch=e1&version=2&seen=2`, feed(3, [hold("a"), hold("c", "u2")], ["u1", "u2"]));
+  const four = store.get();
+  assert.equal(four.held![0], two.held![1]);
+  assert.equal(four.held![1], two.held![2]);
+  assert.equal(four.present, three.present);
+  assert.deepEqual([ids(four.held), ids(four.added), ids(four.ended)], [["a", "c"], [], ["b"]]);
+
+  // Nothing changed in 25 seconds: the same board, confirmed by this clock.
+  await answer(`${first}&epoch=e1&version=3&seen=2`);
+  assert.equal(store.get().held, four.held);
+  assert.equal(typeof store.get().asOf, "number");
+});
+
+test("failures wait 1, 2, 5 and then 15 seconds, and an answer starts that again", async (t) => {
+  const { store, answer, waiting, pass } = await joined(t);
+  for (const seconds of [1, 2, 5, 15, 15]) {
+    await answer(first, { error: "boom" }, 500);
+    assert.equal(store.get().link, "reconnecting");
+    await pass(seconds * 1000 - 1);
+    assert.deepEqual(waiting(), []);
+    await pass(1);
+    assert.deepEqual(waiting(), [first]);
+  }
+  await answer(first, feed(1, [hold("a")]));
+  assert.equal(store.get().link, "live");
+  await answer(`${first}&epoch=e1&version=1&seen=1`, { error: "boom" }, 500);
+  // The board in hand stays while the page reconnects.
+  assert.deepEqual([store.get().link, ids(store.get().held)], ["reconnecting", ["a"]]);
+  await pass(1000);
+  assert.deepEqual(waiting(), [`${first}&epoch=e1&version=1&seen=1`]);
+});
+
+test("with no place for a waiting request the page asks every 10 seconds, then waits again", async (t) => {
+  const { store, answer, waiting, pass } = await joined(t);
+  await answer(first, { reason: "tooManyWaiters", error: "Too many requests are waiting." }, 429);
+  assert.equal(store.get().link, "polling");
+  // At once, and without waiting.
+  await answer("/projects/p1/feed?wait=0", feed(1, [hold("a")]));
+  assert.deepEqual([store.get().link, ids(store.get().held)], ["polling", ["a"]]);
+  for (let poll = 0; poll < 5; poll++) {
+    await pass(9_999);
+    assert.deepEqual(waiting(), []);
+    await pass(1);
+    await answer("/projects/p1/feed?wait=0&epoch=e1&version=1&seen=1");
+  }
+  await pass(10_000);
+  await answer(`${first}&epoch=e1&version=1&seen=1`);
+  assert.equal(store.get().link, "live");
+});
+
+test("when group work stops the board goes, and the page asks where group work stands", async (t) => {
+  const { store, answer, pass } = await joined(t);
+  await answer(first, feed(1, [hold("a")]));
+  await answer(
+    `${first}&epoch=e1&version=1&seen=1`,
+    { reason: "stopped", error: "Group work has stopped." },
+    503,
+  );
+  const { info, held, people: shown, asOf } = store.get();
+  assert.deepEqual([info?.state, info?.me, held, shown, asOf], ["stopped", undefined, undefined, [], undefined]);
+  await pass(1000);
+  await answer("", { state: "stopped", reason: "lockLost", host: false });
+  assert.equal(store.get().info?.reason, "lockLost");
+  await pass(2000);
+  // Ready again: the whole board is asked for.
+  await answer("", { state: "ready", host: false, me });
+  await answer(first, feed(1, []));
+  assert.deepEqual(store.get().held, []);
+});
+
+test("an answer that comes after another repository was chosen, or after the page closed, is dropped", async (t) => {
+  const { store, answer, waiting } = await joined(t);
+  store.choose("p2");
+  await settle();
+  assert.deepEqual(waiting(), [first, "/projects/p2/feed?wait=25"]);
+  await answer(first, feed(1, [hold("a")]));
+  assert.deepEqual([store.get().project, store.get().held], ["p2", undefined]);
+  store.close();
+  await answer("/projects/p2/feed?wait=25", feed(1, [hold("b")]));
+  assert.equal(store.get().held, undefined);
+  assert.deepEqual(waiting(), []);
+});
+
+test("a person the server no longer knows gets its sentence, and keeps the token until a join gives another", async (t) => {
+  const { store, answer, waiting, pass } = await joined(t);
+  const sentence = "You are not in this group.";
+  assert.equal(await answer(first, { reason: "notJoined", error: sentence }, 403), "first");
+  const { refused, info, held } = store.get();
+  assert.deepEqual([refused, info?.me, held], [sentence, undefined, undefined]);
+  // The join card is next: nothing is asked meanwhile.
+  await pass(60_000);
+  assert.deepEqual(waiting(), []);
+  // After a reload the same token is sent.
+  store.open();
+  await settle();
+  assert.equal(await answer("", { state: "ready", host: false }), "first");
+  const joining = store.join("another code");
+  await settle();
+  assert.equal(await answer("/join", { token: "second" }), null);
+  await joining;
+  assert.equal(store.get().refused, undefined);
+  assert.equal(await answer("", { state: "ready", host: false, me }), "second");
+});

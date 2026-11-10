@@ -55,6 +55,16 @@ test("the sidebar lists every page and marks the open one", () => {
   assert.match(render({ page: "home" }), /class="nav-item active" title="首頁" aria-current="page"/);
 });
 
+test("the Group item shows only where group work is on, after the Agent team", () => {
+  const status = { codex: true, github: true };
+  assert.doesNotMatch(renderEn(element({ status })), /<span>Group<\/span>/);
+  const html = renderEn(element({ status: { ...status, collab: { state: "ready" } }, page: "group" }));
+  assert.match(html, /<span>Agent team<\/span><\/button><button class="nav-item active" title="Group" aria-current="page">/);
+  assert.match(html, /<span>Group<\/span><\/button><button class="nav-item" title="Learning notes">/);
+  assert.equal(html.match(/aria-current="page"/g)?.length, 1);
+  assert.match(render({ status: { ...status, collab: { state: "stopped" } } }), /<span>小組<\/span>/);
+});
+
 test("the workbench count leaves the sample out", () => {
   assert.doesNotMatch(render(), /nav-count/);
   const html = render({ runs: [summary("run-1", "修正登入逾時")] });
