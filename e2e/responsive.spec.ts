@@ -224,12 +224,15 @@ async function expectFits(
     collapsed = false,
     drive,
     after,
+    dialogOnly = false,
   }: {
     collapsed?: boolean;
     /** Takes the opened page to a view that needs steps (e2e/helpers/views.ts). */
     drive?: (page: Page, locale: Locale) => Promise<void>;
     /** Extra checks on the opened page, after the fit check. */
     after?: (page: Page) => Promise<void>;
+    /** Skip the page-wide overflow list and run only `after`. */
+    dialogOnly?: boolean;
   } = {},
 ) {
   const context = await browser.newContext({
@@ -255,17 +258,19 @@ async function expectFits(
     }
     if (collapsed) await expect(page.locator(".app-shell")).toHaveClass(/is-sidebar-collapsed/);
     if (sample) await expect(page.locator(".presentation-sample-badge")).toBeVisible();
-    const problems = [
-      ...(await findOverflow(page)).map(
-        (problem) =>
-          `${problem.reason}: ${problem.element} "${problem.text}" (${problem.scrollWidth}×${problem.scrollHeight} in ${problem.clientWidth}×${problem.clientHeight})`,
-      ),
-      ...(await findSideOverflow(page)),
-      ...(await findCoveredByBadge(page)).map(
-        (covered) => `the sample badge covers "${covered}"`,
-      ),
-    ];
-    expect(problems, `${hash} in ${locale} at ${viewport.width} px`).toEqual([]);
+    if (!dialogOnly) {
+      const problems = [
+        ...(await findOverflow(page)).map(
+          (problem) =>
+            `${problem.reason}: ${problem.element} "${problem.text}" (${problem.scrollWidth}×${problem.scrollHeight} in ${problem.clientWidth}×${problem.clientHeight})`,
+        ),
+        ...(await findSideOverflow(page)),
+        ...(await findCoveredByBadge(page)).map(
+          (covered) => `the sample badge covers "${covered}"`,
+        ),
+      ];
+      expect(problems, `${hash} in ${locale} at ${viewport.width} px`).toEqual([]);
+    }
     if (after) await after(page);
   } finally {
     await context.close();
@@ -411,32 +416,55 @@ test.describe("the v1.1 views on phones", () => {
         });
 });
 
-/** The publish dialog's draft body scrolls inside its own pre, and neither
- * that block nor the page scrolls sideways. */
+/** The publish dialog stays inside the viewport. The title wraps. Only the
+ * body preview stays preformatted and may scroll inside its own box. */
 async function expectPublishBodyScrolls(page: Page) {
   const measured = await page.evaluate(() => {
-    const pageBox = document.documentElement;
-    const block = document.querySelector(".publish-outgoing");
-    const pre = document.querySelector(".publish-body-preview pre");
-    if (!(block instanceof HTMLElement) || !(pre instanceof HTMLElement))
+    const outgoing = document.querySelector(".publish-outgoing");
+    const modal = document.querySelector(".modal");
+    const pres = [...document.querySelectorAll(".publish-outgoing pre")];
+    if (!(outgoing instanceof HTMLElement) || !(modal instanceof HTMLElement) || pres.length < 3)
       return null;
-    const style = getComputedStyle(pre);
+    const measure = (element: HTMLElement) => ({
+      scroll: element.scrollWidth,
+      client: element.clientWidth,
+      whiteSpace: getComputedStyle(element).whiteSpace,
+      overflowX: getComputedStyle(element).overflowX,
+      overflowWrap: getComputedStyle(element).overflowWrap,
+    });
+    const title = pres[0] as HTMLElement;
+    const range = document.createRange();
+    range.selectNodeContents(title);
+    const titleBox = title.getBoundingClientRect();
+    const clipped = [...range.getClientRects()].some(
+      (rect) => rect.width > 0 && (rect.right > titleBox.right + 1 || rect.left < titleBox.left - 1),
+    );
     return {
-      page: [pageBox.scrollWidth, pageBox.clientWidth],
-      block: [block.scrollWidth, block.clientWidth],
-      pre: [pre.scrollWidth, pre.clientWidth],
-      overflowX: style.overflowX,
-      whiteSpace: style.whiteSpace,
+      outgoing: measure(outgoing),
+      modal: measure(modal),
+      title: { ...measure(title), clipped, text: (title.textContent ?? "").replace(/\s+/g, " ").trim() },
+      commit: measure(pres[1] as HTMLElement),
+      body: measure(pres[2] as HTMLElement),
     };
   });
-  expect(measured, "the publish dialog shows the draft body").not.toBeNull();
+  expect(measured, "the publish dialog shows the draft").not.toBeNull();
   if (!measured) return;
-  const box = measured;
-  expect(box.page[0]).toBeLessThanOrEqual(box.page[1]);
-  expect(box.block[0]).toBeLessThanOrEqual(box.block[1]);
-  expect(box.overflowX).toBe("auto");
-  expect(box.whiteSpace).toBe("pre");
-  if (box.pre[0] > box.pre[1]) {
+  const dx = (name: string, box: { scroll: number; client: number }) =>
+    `${name} ${box.scroll} px in ${box.client} px (dx=${box.scroll - box.client})`;
+  expect.soft(measured.outgoing.scroll, dx("publish-outgoing", measured.outgoing)).toBeLessThanOrEqual(measured.outgoing.client);
+  expect.soft(measured.modal.scroll, dx("modal", measured.modal)).toBeLessThanOrEqual(measured.modal.client);
+  expect.soft(
+    measured.title.scroll,
+    `${dx("title", measured.title)}; clipped=${measured.title.clipped}; "${measured.title.text}"`,
+  ).toBeLessThanOrEqual(measured.title.client);
+  expect.soft(measured.title.clipped, measured.title.text).toBe(false);
+  expect.soft(measured.title.whiteSpace).toBe("pre-wrap");
+  expect.soft(measured.title.overflowWrap).toBe("break-word");
+  expect.soft(measured.commit.scroll, dx("commit", measured.commit)).toBeLessThanOrEqual(measured.commit.client);
+  expect.soft(measured.commit.whiteSpace).toBe("pre-wrap");
+  expect.soft(measured.body.whiteSpace).toBe("pre");
+  expect.soft(measured.body.overflowX).toBe("auto");
+  if (measured.body.scroll > measured.body.client) {
     const moved = await page.locator(".publish-body-preview pre").evaluate((pre) => {
       pre.scrollLeft = 0;
       const before = pre.scrollLeft;
@@ -456,14 +484,29 @@ for (const view of stateViews.filter((entry) => entry.real))
     test.afterAll(async () => {
       await project?.stop();
     });
+    const dialogWidths = [
+      { width: 320, height: 640 },
+      { width: 375, height: 812 },
+      { width: 390, height: 844 },
+      { width: 768, height: 1024 },
+      { width: 1280, height: 800 },
+    ];
+    // 768 and 1280 already ellipsize the sidebar title; only the dialog is
+    // measured there. 320, 375 and 390 keep the page-wide fit check.
+    const wideDialog = new Set([768, 1280]);
+    const viewports = [
+      ...phones,
+      ...(view.name === "publish-groups" ? dialogWidths : []),
+      ...(view.wider ?? []),
+    ].filter((entry, index, all) => all.findIndex((other) => other.width === entry.width) === index);
     for (const locale of locales)
-      for (const viewport of [...phones, ...(view.wider ?? [])])
+      for (const viewport of viewports)
         test(`${view.name} in ${locale} fits at ${viewport.width} px`, async ({ browser }) => {
+          const dialog = view.name === "publish-groups" && dialogWidths.some((entry) => entry.width === viewport.width);
           await expectFits(browser, project!, locale, view.route, viewport, false, {
             drive: view.drive,
-            ...(viewport.width === 390 && view.name === "publish-groups"
-              ? { after: expectPublishBodyScrolls }
-              : {}),
+            ...(dialog ? { after: expectPublishBodyScrolls } : {}),
+            ...(dialog && wideDialog.has(viewport.width) ? { dialogOnly: true } : {}),
           });
         });
   });
