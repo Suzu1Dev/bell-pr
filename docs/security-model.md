@@ -73,10 +73,13 @@ what BELL PR trusts, what it does not, and the limits of each protection.
   request carries the install token or a paired device credential as every
   request does, and says who is asking within the group with a participant
   token (`bpc_…`) in the `x-bell-participant` header.
-  - The token is returned once, when the person joins. BELL PR stores only
-    its SHA-256 (`coordination.json`, mode 0600), never puts it in a URL
-    and masks it in logs. An invite code is kept as its SHA-256 in memory,
-    works once and lasts 10 minutes.
+  - The token is returned when the person joins, and again when they
+    redeem a code they made for themself to use another device. On disk
+    BELL PR stores only its SHA-256 (`coordination.json`, mode 0600); it
+    holds the token in memory only while such a code waits, at most 10
+    minutes. It never puts the token in a URL and masks it in logs. An
+    invite code is kept as its SHA-256 in memory, works once and lasts 10
+    minutes.
   - A missing, unknown or removed participant token is answered 403 and
     never signs a device out. Removing a person unpairs their device only
     when the admin asks for that.

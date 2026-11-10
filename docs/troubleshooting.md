@@ -570,11 +570,14 @@ there, then publish again.
   its holder stopped (the next item).
 - **"BELL PR cannot tell whether the process holding the data directory …
   has stopped"** (`dataDirHolderUnconfirmed` in the dictionaries): a BELL
-  PR with group work crashed or was killed and left its lock, and this
-  start cannot confirm that its holder is gone. The lock was written in
-  another container or on another machine, by an older build, or cannot be
-  read. Such a lock is never replaced automatically, whatever its age, and
-  a start without `--group` is refused in the same way.
+  PR crashed or was killed and left its lock, and this start cannot
+  confirm that its holder is gone. The lock was written in another
+  container or on another machine, by an older build, or cannot be read.
+  With group work such a lock is never replaced automatically, whatever
+  its age. When the BELL PR that left it ran with group work, a start
+  without `--group` is refused in the same way. When it ran without group
+  work, only a start with `--group` is refused: the first one after such
+  a crash, for example.
   1. Make sure that no BELL PR still uses this data directory: no process,
      no container, no other machine.
   2. Remove the file the message names (`<data dir>/bellpr.lock`).
@@ -611,9 +614,10 @@ there, then publish again.
 Only for a BELL PR started with `--group` ([Group work](group-work.md)).
 `bell-pr group status` prints "Group work has stopped (reason: …)".
 Inviting, joining and removing answer 503 with `reason: "stopped"`, and
-`GET /api/collab` and `GET /api/status` carry the reason. The server log
-has a "Group work stopped" line with the cause. The rest of BELL PR keeps
-working.
+`GET /api/collab` and `GET /api/status` carry the reason. The one request
+whose write stopped group work can answer 503 with the reason itself,
+`notSingleWriter` or `unavailable`. The server log has a "Group work
+stopped" line with the cause. The rest of BELL PR keeps working.
 
 A stopped group stays stopped until BELL PR is restarted, and BELL PR
 never creates or repairs the group's files by itself. Fix the cause below,

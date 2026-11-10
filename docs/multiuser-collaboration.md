@@ -214,9 +214,11 @@ with the group-mode overlap check.
     have stopped: gone, written before the machine last booted, or not a node
     process. A host that crashed restarts; one that is paused, suspended or
     blocked keeps the directory.
-  - An ordinary BELL PR start never replaces a strict lock. Its own locks
-    keep the earlier rule: one written elsewhere counts as held while it is
-    renewed (every 10 seconds, for a 30-second lease).
+  - An ordinary BELL PR start replaces a strict lock only as a strict start
+    would: when the process that wrote it is shown to have stopped. It
+    never replaces one because of its age. Its own locks keep the earlier
+    rule: one written elsewhere counts as held while it is renewed (every
+    10 seconds, for a 30-second lease).
   - A host whose lock was replaced or removed refuses every write with
     `503` and `details.reason: "notSingleWriter"`, renews nothing and
     removes nothing. It finds out by reading the lock before each write and

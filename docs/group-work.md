@@ -28,6 +28,10 @@ bell-pr start --group
 Without the switch nothing changes: there is no `/api/collab` route (the
 API answers its usual 404), `GET /api/status` has no `collab` field, the
 data directory's lock is the ordinary one, and no new file is written.
+One thing is the same in every BELL PR, with or without the switch: text
+shaped exactly like a participant token (`bpc_` and 43 letters, digits,
+`-` or `_`) is masked like any other token, and a changed file that holds
+it is held back from review.
 
 Group work is chosen when BELL PR starts. `bell-pr start --group` never
 passes off a BELL PR that runs without group work as one: when it finds
@@ -123,11 +127,17 @@ curl -X POST http://127.0.0.1:4311/api/collab/join \
 ```
 
 The answer (201) is `{ "groupId", "id", "name", "admin"?, "token" }`.
-`token` is the person's participant token (`bpc_…`). It is shown only
-here, once, and BELL PR stores only its SHA-256, so keep it like a
-password. Every later group request sends it in the `x-bell-participant`
-header, next to the app token. `GET /api/collab` with that header answers
-with `me`: the id, the name and whether the person is an admin.
+`token` is the person's participant token (`bpc_…`). It is given here,
+and again only when the person redeems a code for themself
+([below](#use-the-same-identity-on-another-device)). On disk BELL PR
+stores only its SHA-256, so keep it like a password. Every later group
+request sends it in the `x-bell-participant` header, next to the app
+token. `GET /api/collab` with that header answers with `me`: the id, the
+name and whether the person is an admin.
+
+A group holds at most 1000 people, removed ones included, because a
+person cannot be deleted. After that, joining answers 409 with
+`reason: "full"`.
 
 Ten wrong codes in 15 minutes lock that caller (one paired device, or the
 host) out of joining for 15 minutes. Other people's codes stay valid.
@@ -138,7 +148,9 @@ A person who has joined asks for a code for themself:
 `POST /api/collab/invites` with the body `{ "self": true }` and their
 participant token. Sending that code to `POST /api/collab/join` from the
 other device answers with the same id, name and token. No person is added.
-The host keeps the token in memory with the code for at most 10 minutes.
+One such code waits per person: asking again replaces the earlier one.
+While the code waits, at most 10 minutes, the host keeps the token in
+memory with it.
 
 ## Remove a person
 
@@ -146,13 +158,16 @@ A group admin sends `POST /api/collab/people/<id>/remove` with the body
 `{}`, or `{ "unpair": true }`.
 
 - The person is marked as removed, and their participant token is answered
-  403 (`notJoined`) from then on.
+  403 (`notJoined`) from then on. The invite codes they gave out, and a
+  code they made for themself, stop working.
 - Removing does not unpair anything by itself: a removed person on a
   paired device can still use everything else in that BELL PR. With
   `"unpair": true`, the paired device the person joined from is unpaired
-  too, when one was recorded; the answer says so (`"unpaired": true`). A
-  device added with a code for oneself is not recorded: revoke it with
-  `bell-pr devices revoke <id>`.
+  too, when one was recorded; the answer says so (`"unpaired": true`).
+  Two devices are never unpaired this way (`"unpaired": false`): the one
+  the request comes from, and one that a person still in the group joined
+  from. A device added with a code for oneself is not recorded. Revoke
+  such a device with `bell-pr devices revoke <id>`.
 - An admin cannot remove themself (409), and a removal cannot be undone.
   Invite the person again; they join as a new person with a new id.
 - A person's id is in the answer to their join and in `collab.json` on the
@@ -170,13 +185,15 @@ token, or a paired device's). The routes exist only with the switch.
 | `POST /api/collab/setup` with `{}` | the install token | 201 `{ state: "ready", groupId }`; 403 `hostOnly`; 409 `exists`, or `missing` when group work has stopped |
 | `POST /api/collab/invites` with `{ name, admin?: true }` | the install token, or an admin | 201 `{ code, expiresAt }`; 403 `adminOnly`; 429 `tooManyInvites` |
 | `POST /api/collab/invites` with `{ self: true }` | anyone who joined | 201 `{ code, expiresAt }` |
-| `POST /api/collab/join` with `{ code }` | anyone with the app token | 201 `{ groupId, id, name, admin?, token }`; 400 `invalidCode`; 429 `joinLocked` |
+| `POST /api/collab/join` with `{ code }` | anyone with the app token | 201 `{ groupId, id, name, admin?, token }`; 400 `invalidCode`; 429 `joinLocked`; 409 `full` |
 | `POST /api/collab/people/<id>/remove` with `{ unpair?: true }` | an admin | 200 `{ revoked, unpaired }`; 409 `self`; 404 `unknownPerson` |
 
 - `state` is `notSetUp`, `ready` or `stopped`. `GET /api/status` carries
   the same `collab: { state, reason? }`.
 - While group work is not ready, inviting, joining and removing answer 503
-  with `reason` `notSetUp` or `stopped`.
+  with `reason` `notSetUp` or `stopped`. The one request whose write stops
+  group work can answer 503 with the reason itself, `notSingleWriter` or
+  `unavailable`.
 - A missing, unknown or removed participant token is answered 403 with
   `reason: "notJoined"`, never 401. A 401 still means what it meant before:
   the app token is missing or wrong.
@@ -184,11 +201,16 @@ token, or a paired device's). The routes exist only with the switch.
 ## When group work stops
 
 Group work stops when its files cannot be trusted or written: one of them
-is missing or damaged, a write failed, or the lock is no longer this
-process's. A stopped group stays stopped until the cause is fixed and
-BELL PR is restarted. BELL PR never creates either file again by itself and
-never repairs one: nothing is assumed about a group whose record is gone.
-The rest of BELL PR keeps working.
+is missing or damaged, a write to `coordination.json` failed, or the lock
+is no longer this process's. A stopped group stays stopped until the cause
+is fixed and BELL PR is restarted. BELL PR never creates either file again
+by itself and never repairs one: nothing is assumed about a group whose
+record is gone. The rest of BELL PR keeps working.
+
+A failed write to `collab.json` after set-up does not stop group work: the
+request fails and the file keeps what it held. When that happens in a
+join, the invite code is spent and the person is not in the group (no
+token was given out), but they count toward the 1000. Invite them again.
 
 `bell-pr group status` prints the reason;
 [Group work has stopped](troubleshooting.md#group-work-has-stopped) says
@@ -212,7 +234,8 @@ work. Deleting the data directory deletes the group.
 
 Promised:
 
-- Without `--group` and `BELLPR_GROUP`, nothing changes.
+- Without `--group` and `BELLPR_GROUP`, nothing changes, except that
+  text shaped exactly like a participant token is masked.
 - A stopped or damaged group is never recreated or repaired silently.
 - A problem with group work never unpairs a device. Only a removal that
   asks for it (`"unpair": true`) does.
