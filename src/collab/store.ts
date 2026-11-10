@@ -191,8 +191,21 @@ export function createGroupStore() {
           const { projects, addable } = await ask<CollabProjectsResponse>("/projects");
           if (signal.aborted) return;
           const chosen = projects.find((project) => project.id === state.project) ?? projects[0];
-          // An answer: what failed before it no longer shows as "Reconnecting".
-          drop({ projects, addable, project: chosen?.id, link: "live" });
+          // With no repository yet a list only adds to what can be added: it leaves out one that
+          // is being copied, and the choice in the card must not change under the person.
+          // shortcut: one that can no longer be added (deleted here, say) stays offered until a
+          // reload and its add is refused; take the list whole once it marks those being copied.
+          const known = (chosen ? undefined : state.addable) ?? [];
+          drop({
+            projects,
+            addable: addable && [
+              ...known,
+              ...addable.filter((repo) => !known.some((old) => old.repoId === repo.repoId)),
+            ],
+            project: chosen?.id,
+            // An answer: what failed before it no longer shows as "Reconnecting".
+            link: "live",
+          });
           if (!chosen) {
             // None yet: asked again, for the one an admin adds meanwhile.
             await pause(10_000, signal);
@@ -297,23 +310,17 @@ export function createGroupStore() {
     },
     /** Adds a repository of this instance to the group and shows its board; can take minutes. */
     async add(repoId: string) {
-      // A group with no repository asks for its list every 10 seconds, and the list leaves out
-      // a repository that is being copied: nothing is asked beside this add, so its card stays.
-      if (!state.project) loop?.abort();
-      try {
-        const { project } = await call<CollabAddProjectResponse>(
-          "/projects",
-          send("POST", { repoId }),
-        );
-        drop({
-          projects: [...(state.projects ?? []), project],
-          addable: state.addable?.filter((repo) => repo.repoId !== repoId),
-          project: project.id,
-        });
-      } finally {
-        // After a failure too: a group with no repository asks for its list again.
-        restart();
-      }
+      const { project } = await call<CollabAddProjectResponse>("/projects", send("POST", { repoId }));
+      const listed = state.projects ?? [];
+      drop({
+        // Not twice, when the list brought it before this answer.
+        projects: listed.some((other) => other.id === project.id) ? listed : [...listed, project],
+        addable: state.addable?.filter((repo) => repo.repoId !== repoId),
+        project: project.id,
+        // An answer: what failed before it no longer shows as "Reconnecting".
+        link: "live",
+      });
+      restart();
     },
   };
 }

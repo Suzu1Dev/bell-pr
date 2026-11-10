@@ -213,17 +213,44 @@ test("a group without a repository is asked for its list every 10 seconds", asyn
   assert.deepEqual([store.get().project, ids(store.get().held)], ["p1", ["a"]]);
 });
 
-test("while the first add copies nothing else is asked, and a failed one asks for the list again", async (t) => {
-  const { store, answer, waiting, pass } = await joined(t, []);
+test("with no repository yet a list only adds to what can be added", async (t) => {
+  const { store, answer, pass } = await joined(t, []);
+  await pass(10_000);
+  await answer("/projects", { projects: [], addable: [{ repoId: "r1", name: "shop" }] });
+  await pass(10_000);
   const failed = assert.rejects(store.add("r1"));
   await settle();
-  // The list would leave out the repository that is being copied, and the card would change.
-  await pass(10_000);
-  assert.deepEqual(waiting(), ["/projects"]);
+  // The list leaves out a repository that is being copied: the card keeps it, also after a failed copy.
+  await answer("/projects", { projects: [], addable: [{ repoId: "r2", name: "site" }] });
   await answer("/projects", { reason: "cloneFailed", error: "The copy failed." }, 500);
   await failed;
-  await answer("/projects", { projects: [], addable: [{ repoId: "r1", name: "shop" }] });
-  assert.deepEqual(store.get().addable, [{ repoId: "r1", name: "shop" }]);
+  assert.deepEqual(
+    store.get().addable?.map((repo) => repo.repoId),
+    ["r1", "r2"],
+  );
+});
+
+test("a repository that the list brought before its add was answered is listed once", async (t) => {
+  const { store, answer, pass } = await joined(t, []);
+  await pass(10_000);
+  const adding = store.add("r1");
+  await settle();
+  await answer("/projects", { projects: [{ id: "p1", name: "shop" }] });
+  await answer("/projects", { project: { id: "p1", name: "shop" } }, 201);
+  await adding;
+  assert.deepEqual(store.get().projects, [{ id: "p1", name: "shop" }]);
+});
+
+test('an answered first add no longer shows "Reconnecting"', async (t) => {
+  const { store, answer, pass } = await joined(t, []);
+  await pass(10_000);
+  await answer("/projects", { error: "Away." }, 500);
+  assert.equal(store.get().link, "reconnecting");
+  const adding = store.add("r1");
+  await settle();
+  await answer("/projects", { project: { id: "p1", name: "shop" } }, 201);
+  await adding;
+  assert.equal(store.get().link, "live");
 });
 
 test("when group work stops the board goes, and the page asks where group work stands", async (t) => {
