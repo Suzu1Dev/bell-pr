@@ -24,32 +24,13 @@ import {
   maxTitle,
   workLimit,
 } from "./routes/collab-board.js";
-import { AppError, type Repository, type Run } from "./types.js";
+import { AppError, type Repository } from "./types.js";
 
 /** Waits, a moment at a time and ten seconds at most, until `done` says so. */
 async function until(done: () => boolean) {
   for (let turn = 0; turn < 2000 && !done(); turn += 1) await sleep(5);
   assert.ok(done());
 }
-
-/** A contribution of this BELL PR, as the store keeps one. */
-const run = (id: string, repoId: string): Run => ({
-  id,
-  repoId,
-  title: id,
-  prompt: id,
-  status: "review",
-  branch: `bellpr/${id}`,
-  baseBranch: "main",
-  baseSha: "a".repeat(40),
-  worktreePath: "",
-  createdAt: "2026-01-01T00:00:00.000Z",
-  agents: [],
-  logs: [],
-  draft: { title: id, body: "" },
-  reviewedFiles: [],
-  reviewedFingerprints: {},
-});
 
 /**
  * The fixture's group (Ada the admin, Ben, and Cy who was removed) with one
@@ -156,7 +137,7 @@ async function group(t: TestContext, options?: Parameters<typeof collabFixture>[
 }
 
 /** The fields a refusal of group work may have. */
-const refusalFields = ["reason", "error", "conflicts", "retryAfter", "invalid", "meets"];
+const refusalFields = ["reason", "error", "conflicts", "retryAfter", "invalid"];
 const fieldsOf = (reply: Reply) => Object.keys(reply.json).sort();
 
 test("add a repository: the group gets its own bare copy of the default branch, once; a copy that fails leaves nothing", async (t) => {
@@ -221,7 +202,6 @@ test("add a repository: the group gets its own bare copy of the default branch, 
       { id: g.dee.id, name: "Dee" },
     ],
     held: [],
-    released: [],
   });
 
   assert.equal(outcome(await add(who.admin, { repoId: widgets.id })), "409 alreadyAdded");
@@ -264,7 +244,7 @@ test("add a repository: the group gets its own bare copy of the default branch, 
 
 test("work: a title and paths become a hold; a held path in the way is refused with who holds it, and nothing is made", async (t) => {
   const g = await group(t);
-  const { f, who, ada, ben, dee } = g;
+  const { f, who, ben, dee } = g;
   const project = await g.add("widgets");
 
   const made = await g.work(who.member, project, {
@@ -353,74 +333,34 @@ test("work: a title and paths become a hold; a held path in the way is refused w
   assert.deepEqual([released.status, released.json], [200, { ok: true }]);
   assert.equal(outcome(await g.release(who.member, project, held)), "409 ended");
 
-  // Free again: anyone takes the task, under its title and with the paths they name.
-  const again = await g.hold(who.dee, project, { taskId: held.taskId, scopes: ["src"] });
-  assert.notEqual(again.claimId, held.claimId);
-  assert.deepEqual([again.taskId, again.title, again.holder, again.scopes, again.fence], [
-    held.taskId,
-    "Fix the parser",
+  // Free again: anyone holds those paths, as a new task with a new title.
+  const again = await g.hold(who.dee, project, { title: "Parser, again", scopes: ["src"] });
+  assert.notEqual(again.taskId, held.taskId);
+  assert.deepEqual([again.title, again.holder, again.scopes, again.fence], [
+    "Parser, again",
     dee.id,
     ["src"],
     2,
   ]);
-  const taken = await g.work(who.member, project, { taskId: held.taskId, scopes: ["lib"] });
-  assert.equal(outcome(taken), "409 taskClaimed");
-  for (const taskId of ["t-0000000000", "__proto__"]) {
-    const unknown = await g.work(who.member, project, { taskId, scopes: ["lib"] });
-    assert.equal(outcome(unknown), "404 unknownTask", taskId);
-  }
+  // The side file keeps the title of a task and nothing else.
+  const saved = JSON.parse((await f.files())[0]).tasks;
+  assert.deepEqual(saved[`${project}/${again.taskId}`], { title: "Parser, again" });
 
-  // Only an admin ends someone else's hold.
+  // Only an admin ends someone else's hold, and says nothing with it.
   assert.equal(outcome(await g.revoke(who.member, project, again.claimId)), "403 adminOnly");
-  const revoked = await g.revoke(who.admin, project, again.claimId, { reason: " Off\tsick\n" });
+  const worded = await g.revoke(who.admin, project, again.claimId, { reason: "Off sick" });
+  assert.equal(worded.status, 400, worded.body);
+  const revoked = await g.revoke(who.admin, project, again.claimId);
   assert.deepEqual([revoked.status, revoked.json], [200, { ok: true }]);
   assert.equal(outcome(await g.revoke(who.admin, project, again.claimId)), "409 ended");
   assert.equal(outcome(await g.revoke(who.admin, project, "no-such-hold")), "404 unknownClaim");
   const noHold = await g.release(who.member, project, { claimId: "no-such-hold", fence: 1 });
   assert.equal(outcome(noHold), "404 unknownClaim");
-  const [free] = (await g.board(project)).released;
-  assert.deepEqual({ ...free, at: "" }, {
-    taskId: held.taskId,
-    title: "Fix the parser",
-    scopes: ["src"],
-    at: "",
-    by: ada.id,
-    how: "revoked",
-    reason: "Off sick",
-  });
-
-  // A contribution of this BELL PR goes with a task only when it is this repository's.
-  const gadgets = await g.repository("gadgets");
-  f.store.data.runs.push(run("run-widgets", "repo-widgets"), run("run-gadgets", gadgets.id));
-  const before = await f.files();
-  for (const runId of ["run-gadgets", "run-none", "__proto__"]) {
-    const refused = await g.work(who.member, project, { title: "With a run", scopes: ["lib"], runId });
-    assert.equal(outcome(refused), "400 unknownRun", runId);
-  }
-  assert.deepEqual(await f.files(), before);
-  const withRun = await g.hold(who.member, project, {
-    title: "With a run",
-    scopes: ["lib"],
-    runId: "run-widgets",
-  });
-  assert.deepEqual(Object.keys(withRun), [
-    "claimId",
-    "taskId",
-    "title",
-    "runId",
-    "holder",
-    "scopes",
-    "fence",
-    "since",
-  ]);
-  assert.equal(withRun.runId, "run-widgets");
-  const saved = JSON.parse((await f.files())[0]).tasks[`${project}/${withRun.taskId}`];
-  assert.deepEqual(Object.keys(saved), ["title", "runId", "createdAt"]);
-  assert.deepEqual([saved.title, saved.runId], ["With a run", "run-widgets"]);
+  assert.deepEqual((await g.board(project)).held, []);
   await f.nothingLeaked();
 });
 
-test("the board: what is held, oldest first; what is free to take, newest first and 20 at most; and the people", async (t) => {
+test("the board: what is held, oldest first, and the people; a hold that ended or was refused is not on it", async (t) => {
   // Two holds a person, so the coordinator is full for Ben at the third.
   const g = await group(t, { limits: { participantHeldClaims: 2 } });
   const { who, ada, ben, dee } = g;
@@ -437,56 +377,15 @@ test("the board: what is held, oldest first; what is free to take, newest first 
     error: "The group's record is full. Ask the host to reset group storage.",
   }]);
   let board = await g.board(project, who.member);
+  assert.deepEqual(Object.keys(board), ["project", "people", "held"]);
   assert.deepEqual(board.held, [one, two]);
-  // The task was made before the hold was refused: nobody held it yet, and it is free to take.
-  assert.equal(board.released.length, 1);
-  const [three] = board.released;
-  assert.ok(Date.parse(three.at) >= Date.parse(two.since));
-  assert.deepEqual({ ...three, taskId: "", at: "" }, {
-    taskId: "",
-    title: "Three",
-    scopes: [],
-    at: "",
-    how: "never",
-  });
-  await g.hold(who.dee, project, { taskId: three.taskId, scopes: ["three"] });
 
-  // 21 more, each released before the next is made.
-  const titles: string[] = [];
-  for (let n = 1; n <= 21; n += 1) {
-    const made = await g.hold(who.dee, project, { title: `Task ${n}`, scopes: [`area-${n}`] });
-    assert.equal((await g.release(who.dee, project, made)).status, 200);
-    titles.unshift(`Task ${n}`);
-  }
-  board = await g.board(project);
-  assert.deepEqual(board.released.map((task) => task.title), titles.slice(0, 20));
-  assert.ok(board.released.every((task) => task.how === "released" && task.by === dee.id));
-  assert.equal(board.moreReleased, 1);
-  assert.deepEqual(board.held.map((hold) => hold.title), ["One", "Two", "Three"]);
-
-  // An admin ends One with a reason, then Ben lets go of Two.
-  await sleep(2);
-  const revoked = await g.revoke(who.admin, project, one.claimId, { reason: "Needed elsewhere" });
-  assert.equal(revoked.status, 200, revoked.body);
-  await sleep(2);
+  // An admin ends One, Ben lets go of Two, and Dee holds the paths Ben was refused.
+  assert.equal((await g.revoke(who.admin, project, one.claimId)).status, 200);
   assert.equal((await g.release(who.member, project, two)).status, 200);
+  const three = await g.hold(who.dee, project, { title: "Three", scopes: ["three"] });
   board = await g.board(project);
-  assert.deepEqual(board.released.slice(0, 3).map((task) => ({ ...task, at: "" })), [
-    { taskId: two.taskId, title: "Two", scopes: ["two"], at: "", by: ben.id, how: "released" },
-    {
-      taskId: one.taskId,
-      title: "One",
-      scopes: ["one"],
-      at: "",
-      by: ada.id,
-      how: "revoked",
-      reason: "Needed elsewhere",
-    },
-    { ...board.released[2], title: "Task 21", at: "" },
-  ]);
-  assert.equal(board.released.length, 20);
-  assert.equal(board.moreReleased, 3);
-  assert.deepEqual(board.held.map((hold) => [hold.title, hold.holder]), [["Three", dee.id]]);
+  assert.deepEqual(board.held, [three]);
   // Cy was removed and holds nothing: not on the board.
   assert.deepEqual(board.people, [
     { id: ada.id, name: "Ada", admin: true },
@@ -536,23 +435,16 @@ test("remove: what the person holds ends in every repository, and so does their 
     { id: ben.id, name: "Ben", removed: true },
     { id: dee.id, name: "Dee" },
   ]);
-  assert.deepEqual(board.released.map((task) => [task.title, task.how, task.by]), [
-    ["Second", "revoked", ada.id],
-  ]);
   // In the other repository he holds nothing now, so he is not on its board.
   const other = await g.board(gadgets);
   assert.deepEqual(other.held, [hers]);
   assert.deepEqual(other.people.map((person) => person.name), ["Ada", "Dee"]);
-  assert.deepEqual(other.released.map((task) => [task.title, task.how, task.by]), [
-    ["Third", "revoked", ada.id],
-  ]);
 
   // The admin ends what stayed: he is gone from that board too.
   assert.equal((await g.revoke(who.admin, widgets, first.claimId)).status, 200);
   board = await g.board(widgets);
   assert.deepEqual(board.held, []);
   assert.deepEqual(board.people.map((person) => person.name), ["Ada", "Dee"]);
-  assert.deepEqual(board.released.map((task) => task.title).sort(), ["First", "Second"]);
   const again = await f.post(`/people/${ben.id}/remove`, who.admin);
   assert.deepEqual([again.status, again.json], [200, { revoked: 0, unpaired: false }]);
   await f.nothingLeaked();
@@ -615,7 +507,6 @@ test("the feed: the board at once for who is behind; who is current waits for a 
   assert.equal(his.status, 200, his.body);
   assert.equal(his.body, her.body);
   assert.deepEqual([his.json.version, his.json.board.held], [3, []]);
-  assert.deepEqual(his.json.board.released.map((task: { title: string }) => task.title), ["Parser"]);
 });
 
 test("who may use the repositories and the boards: people of the group, and no 401 for a participant reason", async (t) => {
@@ -783,8 +674,8 @@ test("what a person may send: 50 paths of 300 characters, a title of 120, and so
     { title: "Both", taskId: "t-0000000000", scopes: ["lib"] },
     { title: "More", scopes: ["lib"], more: true },
     { title: "Text", scopes: "lib" },
-    { title: "Run", scopes: ["lib"], runId: 7 },
-    { taskId: "t-0000000000", scopes: ["lib"], runId: "run-1" },
+    { title: "Run", scopes: ["lib"], runId: "run-1" },
+    { taskId: "t-0000000000", scopes: ["lib"] },
   ];
   for (const body of bad) assert.equal((await work(body)).status, 400, JSON.stringify(body));
   for (const scopes of [undefined, "lib", [7]])

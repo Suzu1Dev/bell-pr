@@ -51,16 +51,9 @@ const feedSchema = z.object({
   wait: z.coerce.number().int().min(0).max(25).default(0),
 });
 const checkSchema = z.strictObject({ scopes });
-const workSchema = z.union([
-  z.strictObject({
-    title: line.pipe(z.string().min(1).max(maxTitle)),
-    scopes,
-    runId: z.string().max(64).optional(),
-  }),
-  z.strictObject({ taskId: z.string().max(64), scopes }),
-]);
+const workSchema = z.strictObject({ title: line.pipe(z.string().min(1).max(maxTitle)), scopes });
 const releaseSchema = z.strictObject({ fence: z.number().int().min(0) });
-const revokeSchema = z.strictObject({ reason: line.pipe(z.string().max(500)).optional() });
+const revokeSchema = z.strictObject({});
 
 const invalidScope = (invalid: string[] = []) =>
   refuse(400, "invalidScope", (m) => m.collab.invalidScope({ max: maxPathLength }), { invalid });
@@ -187,14 +180,9 @@ export function registerCollabBoardRoutes(
       pace(works, actor);
       const body = workSchema.parse(req.body);
       const projectId = req.params.project;
-      const project = projectOf(projectId);
+      projectOf(projectId);
       const { held, invalid } = heldScopes(body.scopes);
       if (invalid.length || !held.length) throw invalidScope(invalid);
-      if ("runId" in body && body.runId !== undefined) {
-        const run = store.data.runs.find((candidate) => candidate.id === body.runId);
-        if (!run || run.repoId !== project.repoId)
-          throw refuse(400, "unknownRun", (m) => m.collab.unknownRun);
-      }
       const hold = await host.run(async () => {
         const coordinator = host.coordinator();
         /** 409 `conflict`, with who holds what, when a held path is in the way. */
@@ -214,25 +202,17 @@ export function registerCollabBoardRoutes(
         };
         // Asked first, so a refusal makes nothing.
         refuseMeeting();
-        let taskId: string;
-        if ("taskId" in body) taskId = body.taskId;
-        else {
-          taskId = collabId("t");
-          await coordinator.defineTask(actor, projectId, { id: taskId });
-          await host.saveSide((draft) => {
-            (draft.tasks ??= {})[taskKey(projectId, taskId)] = {
-              title: body.title,
-              ...(body.runId === undefined ? {} : { runId: body.runId }),
-              createdAt: new Date().toISOString(),
-            };
-          });
-        }
+        const taskId = collabId("t");
+        await coordinator.defineTask(actor, projectId, { id: taskId });
+        await host.saveSide((draft) => {
+          (draft.tasks ??= {})[taskKey(projectId, taskId)] = { title: body.title };
+        });
         try {
           const claim = await coordinator.claim(actor, projectId, { taskId, scopes: held });
           return holdOf(host.side(), projectId, claim);
         } catch (error) {
-          // Someone took a path in between. The same answer; a task made above
-          // stays on the board, free to take.
+          // Someone took a path in between. The same answer; the task made above
+          // stays in the record.
           if (reasonOf(error) === "conflict") refuseMeeting();
           throw error;
         }
@@ -260,15 +240,12 @@ export function registerCollabBoardRoutes(
     "/api/collab/projects/:project/holds/:claim/revoke",
     participant,
     async (req, res) => {
-      const { reason } = revokeSchema.parse(req.body);
+      revokeSchema.parse(req.body);
       const actor = res.locals.actor as Actor;
       if (actor.role !== "admin") throw adminOnly();
       const { project, claim } = req.params;
       projectOf(project);
-      await host.run(
-        () => host.coordinator().revoke(actor, project, claim, reason ? { reason } : {}),
-        project,
-      );
+      await host.run(() => host.coordinator().revoke(actor, project, claim, {}), project);
       const answer: CollabOkResponse = { ok: true };
       res.json(answer);
     },

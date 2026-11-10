@@ -84,45 +84,22 @@ export interface CollabHold {
   claimId: string;
   taskId: string;
   title: string;
-  runId?: string;
   /** The id of the person who holds them. */
   holder: string;
   scopes: string[];
-  /** Goes back with a release: a later hold of the same task has another. */
+  /** Goes back with a release. */
   fence: number;
   /** ISO 8601. */
   since: string;
 }
 
-/** A task nobody holds now, which anyone may take again. */
-export interface CollabReleased {
-  taskId: string;
-  title: string;
-  runId?: string;
-  /** The paths of its last hold; none when it was never held. */
-  scopes: string[];
-  /** ISO 8601: when its last hold ended, or when it was made if never held. */
-  at: string;
-  /** The id of the person who ended the last hold. */
-  by?: string;
-  /** `never`: the task was made and its hold was then refused. */
-  how: "released" | "revoked" | "never";
-  /** What the admin who revoked it wrote. */
-  reason?: string;
-}
-
-/** One repository's board: who holds what, and what is free to take again. */
+/** One repository's board: who holds what. */
 export interface CollabBoard {
-  /** `closed`: the coordinator keeps the project shut until an admin settles an interrupted change. */
-  project: { id: string; name: string; repoId?: string; closed?: true };
+  project: { id: string; name: string; repoId?: string };
   /** The group's people; a removed person only while they still hold something. */
   people: { id: string; name: string; admin?: true; removed?: true }[];
   /** Oldest first. */
   held: CollabHold[];
-  /** Newest first, at most 20. */
-  released: CollabReleased[];
-  /** How many more released tasks there are than `released` lists. */
-  moreReleased?: number;
 }
 
 /**
@@ -170,10 +147,11 @@ export interface CollabCheckResponse {
   meets: CollabMeeting[];
 }
 
-/** POST /api/collab/projects/:project/work: a new task, or a released one taken again. */
-export type CollabWorkRequest =
-  | { title: string; scopes: string[]; runId?: string }
-  | { taskId: string; scopes: string[] };
+/** POST /api/collab/projects/:project/work. */
+export interface CollabWorkRequest {
+  title: string;
+  scopes: string[];
+}
 
 /** POST /api/collab/projects/:project/work → 201. */
 export interface CollabWorkResponse {
@@ -195,11 +173,6 @@ export interface CollabReleaseRequest {
   fence: number;
 }
 
-/** POST /api/collab/projects/:project/holds/:claim/revoke. */
-export interface CollabRevokeRequest {
-  reason?: string;
-}
-
 /** POST …/release and …/revoke → 200. */
 export interface CollabOkResponse {
   ok: true;
@@ -218,5 +191,4 @@ export interface CollabRefusal {
   retryAfter?: number;
   /** With 400 `invalidScope`: the paths that cannot be held. */
   invalid?: string[];
-  meets?: CollabMeeting[];
 }
