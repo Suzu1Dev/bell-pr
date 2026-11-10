@@ -275,6 +275,16 @@ export function heldByOtherError(work: HeldWork, held: readonly HeldConflict[]) 
 }
 
 /**
+ * The paths of a 409 `heldByOther`, each once; undefined for any other
+ * error. All an agent may be told of it: names and titles are text other
+ * people typed.
+ */
+export function heldPathsOf(error: unknown): string[] | undefined {
+  if (!(error instanceof AppError) || error.details?.reason !== "heldByOther") return undefined;
+  return [...new Set((error.details.held as readonly HeldConflict[]).map(({ path }) => path))];
+}
+
+/**
  * Refuses work over someone else's hold: no-op without group work, 409
  * `heldByOther` when `paths` meet a hold, 503 `holdsUnknown` when it
  * cannot be told. Returns the conflicts it let through, which is only

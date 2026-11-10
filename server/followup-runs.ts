@@ -12,6 +12,7 @@ import path from "node:path";
 import { assertRunAgentAllowed } from "./codex-guard.js";
 import { git, redact } from "./process.js";
 import { readDiff } from "./git.js";
+import { heldPathsOf } from "./hold-guard.js";
 import { AppError, withRunLocale, type Run } from "./types.js";
 import type { TeamCheck } from "../shared/team.js";
 import {
@@ -335,7 +336,9 @@ async function runFollowUp(
         : controller.signal.aborted
           ? "cancelled"
           : "failed";
-      round.error = dirty ? sm().run.followUp.keptEdits({ reason }) : reason;
+      // A held stop already says the edits stay; they cannot be pushed until the hold goes.
+      const held = !controller.signal.aborted && heldPathsOf(error);
+      round.error = dirty && !held ? sm().run.followUp.keptEdits({ reason }) : reason;
       if (dirty) await ctx.diff(run.id).catch(() => undefined);
       else await restoreParentMessage(run, round).catch(() => undefined);
       run.status = dirty ? "review" : "published";

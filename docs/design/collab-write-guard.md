@@ -167,7 +167,9 @@ release).
    Names and titles stay out because they are text other people typed,
    and keeping them out keeps them from acting as instructions.
 2. **Check after the turn (S2).** This is the guard that counts. A prompt
-   is a request, not a rule.
+   is a request, not a rule. The stop it makes keeps names and titles for
+   the person; later turns' history and the PR draft get a line with the
+   paths only (`heldPaths` on the message), for the reason above.
 3. **Sandbox denies (S3, defence in depth).** The sandboxes can already
    deny writes to single paths. Codex profiles mark `.git` as `"read"`
    (`codexSandboxConfig`, `server/agent-cli.ts:202`), and Claude Code gets

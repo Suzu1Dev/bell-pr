@@ -375,7 +375,7 @@ const m: Translation<typeof en> = {
     stoppedReason: "這輪修正已停止",
     incompleteReason: "這輪修正未完成",
     keptEdits: ({ reason }) =>
-      `${reason}；工作目錄保留了部分修改，可以審閱、寫好提交訊息後推送，或放棄這輪修正。`,
+      `${reason.replace(/[.。]+$/u, "")}；工作目錄保留了部分修改，可以審閱、寫好提交訊息後推送，或放棄這輪修正。`,
     nothingToDiscard: "目前沒有可以放棄的修正。",
     alreadyPushed: `這輪修正已推送到 PR；請再按一次推送，讓 ${product.name} 記錄完成。`,
     discarded: "已放棄這輪修正，工作目錄回到已推送的 PR 內容。",

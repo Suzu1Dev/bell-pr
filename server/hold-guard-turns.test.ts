@@ -17,6 +17,7 @@ import type { CollabHold } from "../shared/collab.js";
 import type { ContributionSettings } from "../shared/insights.js";
 import { collabFixture, outcome, type Headers } from "../test/collab-fixture.js";
 import { participantHeader } from "./coordination-routes.js";
+import { sm, withLocale } from "./i18n/index.js";
 import { readDiff } from "./git.js";
 import { command, git } from "./process.js";
 import type { TeamAgentInput, TeamAgentRunner } from "./team.js";
@@ -343,11 +344,27 @@ test("a write turn is told the held paths without names or titles, goes on when 
   assert.equal(stopped.failed, true);
   assert.match(
     stopped.content,
-    /^The agent changed files someone else holds, so the run stopped\. The changes are still in the checkout\. src\/api\/users\.ts — held by Ada for “Secret plan” \(since .+\)\. Ask them to release the hold, ask a group admin to revoke it, or undo the changes to these files, then try again\./,
+    /^The agent changed files someone else holds, so the run stopped\. The changes are still in the checkout\. src\/api\/users\.ts — held by Ada for “Secret plan” \(since .+\)\. Ask them to release the hold, ask a group admin to revoke it, or undo the changes to these files, then try again\.$/,
   );
   // Nothing is undone: the file stays as the agent left it.
   assert.equal(await s.read("src/api/users.ts"), "export const users = ['ben'];\n");
   assert.equal(s.run(id).status, "review");
+
+  // The person reads who holds it; agents read only the paths: in the next
+  // turn's conversation, and in the PR draft's account of the session,
+  // which is published as the PR description.
+  assert.deepEqual(stopped.heldPaths, ["src/api/users.ts"]);
+  const told =
+    "BELL stopped this turn because it changed files other people hold; the changes are still in the checkout: src/api/users.ts";
+  await waitUntil(() => s.turns.some((turn) => turn.role === "draft" && turn.prompt.includes(told)), "the PR draft");
+  await s.session(id, "Update the readme again");
+  const next = s.turns.filter((turn) => turn.role === "session").at(-1)!.prompt;
+  assert.ok(next.includes(told));
+  // As BELL's own line, not as the agent's unverified summary.
+  const draft = s.turns.find((turn) => turn.role === "draft" && turn.prompt.includes(told))!.prompt;
+  assert.ok(draft.includes(`src/api/users.ts\\n- ${told}\\n`));
+  for (const turn of s.turns)
+    for (const secret of ["Ada", "Secret plan"]) assert.equal(turn.prompt.includes(secret), false, `${turn.role}: ${secret}`);
 });
 
 test("a run nobody owns respects every hold, its starter's own too", async (t) => {
@@ -394,4 +411,13 @@ test("without --group nothing changes: no held paths in the prompt, and a turn w
   assert.equal(await s.read("src/api/users.ts"), "export const users = ['ben'];\n");
   const prompt = s.turns.at(-1)!.prompt;
   assert.doesNotMatch(prompt, /hold these paths|Your own work is under/);
+});
+
+test("a reason that ends in a full stop is joined to the kept-edits sentences once", () => {
+  for (const locale of ["en", "zh-TW"] as const)
+    withLocale(locale, () => {
+      for (const reason of ["Try again.", "請再試一次。"])
+        for (const text of [sm().session.editsKept({ reason }), sm().run.followUp.keptEdits({ reason })])
+          assert.doesNotMatch(text, /[.。]{2}|[.。][；;]/u, `${locale}: ${text}`);
+    });
 });

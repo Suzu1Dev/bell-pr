@@ -13,6 +13,7 @@ import {
 } from "../shared/session.js";
 import type { TeamCheck } from "../shared/team.js";
 import { readDiff } from "./git.js";
+import { heldPathsOf } from "./hold-guard.js";
 import { git, redact } from "./process.js";
 import { AppError, withRunLocale, type DiffFile, type Run } from "./types.js";
 import { currentLocale, shuttingDown, sm } from "./i18n/index.js";
@@ -297,12 +298,15 @@ async function runSessionTurn(
         () => undefined,
       );
       changedFiles = finished?.changed ?? [];
+      const held = controller.signal.aborted ? undefined : heldPathsOf(error);
       addSessionMessage(run, {
         role: "agent",
         failed: true,
-        content: changedFiles.length
+        // A held stop already says the edits stay, and how to go on.
+        content: changedFiles.length && !held
           ? sm().session.editsKept({ reason })
           : reason,
+        ...(held ? { heldPaths: held } : {}),
         ...(changedFiles.length ? { changedFiles } : {}),
         ...(checks.length ? { checks } : {}),
       });

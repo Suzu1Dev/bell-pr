@@ -395,7 +395,10 @@ test("a follow-up round is held to the same rule: its turn stops over Ada's hold
   // The turn itself is stopped (S2, server/hold-guard-turns.test.ts); its
   // edit stays for review, and the person writes the commit message.
   assert.equal(s.current().status, "review");
-  assert.match(s.current().followUps?.at(-1)?.error ?? "", /^Agent 改到別人佔用的檔案，所以這項工作已停止。.+或把這些檔案的改動還原，再試一次。/);
+  // Said once, with nothing glued on, and no hint to push what will be refused.
+  const stop = s.current().followUps?.at(-1)?.error ?? "";
+  assert.match(stop, /^Agent 改到別人佔用的檔案，所以這項工作已停止。.+或把這些檔案的改動還原，再試一次。$/);
+  assert.doesNotMatch(stop, /推送/);
   assert.equal(await readFile(path.join(s.folder, "src/api/users.ts"), "utf8"), "export const users = ['ben'];\n");
   s.current().draft.commitMessage = "List Ben in the users";
   await s.reviewAll();

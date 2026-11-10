@@ -629,7 +629,7 @@ export default {
     incompleteReason: "This round did not finish",
     /** `reason` is one of the reasons above or an error message. */
     keptEdits: ({ reason }: { reason: string }) =>
-      `${reason}; some edits are kept in the working directory, and you can review them, write a commit message and push, or discard the round.`,
+      `${reason.replace(/[.\u3002]+$/u, "")}; some edits are kept in the working directory, and you can review them, write a commit message and push, or discard the round.`,
     nothingToDiscard: "There is no follow-up round to discard.",
     alreadyPushed:
       `This round is already on the PR; press Push again so ${product.name} records it as done.`,

@@ -496,6 +496,7 @@ const sessionSchema = loose({
         .max(setupTurnLimit),
     ),
     failed: later(z.boolean()),
+    heldPaths: later(list),
     draftUpdate: later(loose({ before: text, after: text })),
   })).max(sessionMessageLimit),
   running: later(z.boolean()),

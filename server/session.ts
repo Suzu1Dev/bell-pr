@@ -191,7 +191,9 @@ export function sessionPrompt(input: {
     },
     conversationSoFar: input.history.slice(-historyLimit).map((entry) => ({
       from: entry.role === "user" ? "person" : entry.role,
-      text: entry.content.slice(0, historyContentLimit),
+      text: entry.heldPaths?.length
+        ? heldStop(entry.heldPaths)
+        : entry.content.slice(0, historyContentLimit),
       ...(entry.questions?.length ? { questionsAsked: entry.questions } : {}),
       ...(entry.changedFiles?.length
         ? { filesChanged: entry.changedFiles }
@@ -216,6 +218,14 @@ ${redact(JSON.stringify(data))}`;
 
 const clip = (text: string, max: number) =>
   text.length > max ? `${text.slice(0, max - 1)}…` : text;
+/**
+ * An agent's account of a turn BELL stopped because it changed files other
+ * people hold: the paths only. The person's message names the holders and
+ * their titles, text other people typed, which must not reach an agent or
+ * the PR text it writes.
+ */
+const heldStop = (paths: readonly string[]) =>
+  `BELL stopped this turn because it changed files other people hold; the changes are still in the checkout: ${clip(paths.join(", "), 1_000)}`;
 /** Writes tied to the current diff must wait for the collaborative editor. */
 export function assertSessionIdle(run: Pick<Run, "session">) {
   if (run.session?.running) throw new AppError((m) => m.session.editing, 409);
@@ -256,7 +266,8 @@ function reportTurn(entry: SessionMessage, request: string, budget: number) {
     }`,
   ];
   const summaryBudget = Math.min(1500, Math.floor(budget / 3));
-  if (entry.content.trim())
+  if (entry.heldPaths?.length) fixed.push(`- ${heldStop(entry.heldPaths)}`);
+  else if (entry.content.trim())
     fixed.push(
       `- Agent-reported summary (UNVERIFIED; not application-observed evidence${entry.content.length > summaryBudget ? "; truncated" : ""}): ${clip(entry.content, summaryBudget)}`,
     );
