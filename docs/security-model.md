@@ -68,6 +68,23 @@ what BELL PR trusts, what it does not, and the limits of each protection.
 - **Same-user programs.** Any program running as your OS user can read the
   token file and call the API. Agents you allowed to run without the
   sandbox are fully trusted.
+- **Group work: a second credential, not a boundary.** Only a BELL PR
+  started with `--group` has it ([Group work](group-work.md)). A group
+  request carries the install token or a paired device credential as every
+  request does, and says who is asking within the group with a participant
+  token (`bpc_…`) in the `x-bell-participant` header.
+  - The token is returned once, when the person joins. BELL PR stores only
+    its SHA-256 (`coordination.json`, mode 0600), never puts it in a URL
+    and masks it in logs. An invite code is kept as its SHA-256 in memory,
+    works once and lasts 10 minutes.
+  - A missing, unknown or removed participant token is answered 403 and
+    never signs a device out. Removing a person unpairs their device only
+    when the admin asks for that.
+  - Roles are not a security boundary. Everyone in the group uses a paired
+    device or sits at the host, and a paired device can use everything in
+    that BELL PR: start agents, read every project, publish. Admin and
+    member only decide who may invite and remove people. A removed person
+    whose device is still paired keeps all of that.
 - **Browser hardening.** Every response carries
   `Content-Security-Policy: default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'`,
   `Cross-Origin-Resource-Policy: same-origin`, `X-Frame-Options: DENY`,

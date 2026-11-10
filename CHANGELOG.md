@@ -9,18 +9,38 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
-- **A coordination core for several people on one project, not reachable
-  yet.** `server/coordination.ts` grants claims on files all or nothing,
-  waits for task dependencies, and moves a dedicated branch one checked
-  change at a time, as `docs/multiuser-collaboration.md` describes.
-  Nothing in the app, the CLI or any listener calls it, and it protects
-  nothing at write time: a shell, an editor or an agent can still write
-  outside a claim. Working together on one project is not safer yet.
+- **Group work for the people who share one BELL PR, from the command
+  line and the API.** `bell-pr start --group` (or `BELLPR_GROUP=1`) turns
+  it on. The person at the host sets the group up with
+  `bell-pr group setup` and invites each person by name with a one-time
+  code (`bell-pr group invite <name> [--admin]`); `bell-pr group status`
+  says whether group work is not set up, ready or stopped. A person joins
+  with the code through `POST /api/collab/join` and gets a participant
+  token, sent in `x-bell-participant` next to the app token; an admin can
+  remove a person and, when asked, unpair the device they joined from.
+  There is no Group page yet, and nothing is protected at write time:
+  admin and member only decide who may invite and remove people. Without
+  the switch nothing changes. `docs/group-work.md` describes it.
+- **With group work on, the data-directory lock is the strict one.** It is
+  never replaced because of its age. After a crash that leaves a lock
+  whose holder cannot be confirmed (another container or machine, an older
+  build, an unreadable file), the next start is refused until a person
+  removes the lock file. `bell-pr start --group` never reuses a BELL PR
+  that runs without group work: it says to stop that one first and exits
+  with 1.
+- **A coordination core for several people on one project, its claims not
+  reachable yet.** `server/coordination.ts` grants claims on files all or
+  nothing, waits for task dependencies, and moves a dedicated branch one
+  checked change at a time, as `docs/multiuser-collaboration.md` describes.
+  Only group work opens it, to add the people of a group; nothing in the
+  app, the CLI or any listener reaches its tasks, claims or integration,
+  and it protects nothing at write time: a shell, an editor or an agent
+  can still write outside a claim. Working together on one project is not
+  safer yet.
 - **An admin can reopen a failed coordination task, in the core only.** The
   task keeps its claims, their reasons and fences, and records who reopened
   it and when. Members cannot reopen a task, and an integrated task never
-  reopens. Like the rest of the coordination core, nothing in the app, the
-  CLI or any listener reaches it yet.
+  reopens. Nothing in the app, the CLI or any listener reaches it yet.
 - **An interrupted integration the branch cannot settle when the
   coordinator opens closes only its own project, in the core only.** Other
   projects keep working; the closed one refuses every change, keeps its
@@ -38,7 +58,7 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   from the checks. Every coordination Git command now turns it off, even
   where the repository's config turns it on. Other files in that
   directory, such as object files, packs and alternates, are still trusted,
-  and nothing in the app, the CLI or any listener reaches the core yet.
+  and nothing in the app, the CLI or any listener runs those commands yet.
 
 ### Changed
 
@@ -48,7 +68,7 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   only after a start claims it, so two starts that find the same stale
   lock cannot remove the lock either of them then writes. A lock taken
   for coordination is never replaced until its holder is shown to have
-  stopped; nothing takes one yet. Tests now hold an integration after its
+  stopped; group work takes one. Tests now hold an integration after its
   last lock check, and put holders and starts in real separate PID
   namespaces where bubblewrap can make them: no start of this version
   takes such a lock, running, paused or expired. A lock a person removes

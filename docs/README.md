@@ -20,6 +20,9 @@
 - [Self-hosting](self-hosting.md): service install, Tailscale serve +
   `BELLPR_PUBLIC_URL`, and pairing a phone or another device.
 - [Docker](docker.md) (beta).
+- [Group work](group-work.md): several people on one running BELL PR as
+  one group. Switched on with `--group`; set up and invited from the
+  command line today.
 - [Security model](security-model.md): what BELL PR trusts, how agents are
   confined, and the limits of each protection.
 - [Development](development.md): building and checking BELL PR from its

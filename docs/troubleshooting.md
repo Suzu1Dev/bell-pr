@@ -31,6 +31,7 @@ Contents:
 - [An earlier publish made a different commit](#an-earlier-publish-made-a-different-commit)
 - [Publishing was blocked by a project rule, an issue or pacing](#publishing-was-blocked-by-a-project-rule-an-issue-or-pacing)
 - [BELL PR does not start](#bell-pr-does-not-start)
+- [Group work has stopped](#group-work-has-stopped)
 - [Runs that wait, stop or cannot be reviewed](#runs-that-wait-stop-or-cannot-be-reviewed)
 - [Collecting details for a support request](#collecting-details-for-a-support-request)
 
@@ -564,7 +565,30 @@ there, then publish again.
 - **"BELL PR is already running at …"** or **"… already running with the
   data directory …"**: one BELL PR runs per data directory. Use it with
   `bell-pr open`, or stop that process first. A lock left behind by a crash
-  is detected and replaced at the next start.
+  is detected and replaced at the next start; with
+  [group work](group-work.md), only when the next start can confirm that
+  its holder stopped (the next item).
+- **"BELL PR cannot tell whether the process holding the data directory …
+  has stopped"** (`dataDirHolderUnconfirmed` in the dictionaries): a BELL
+  PR with group work crashed or was killed and left its lock, and this
+  start cannot confirm that its holder is gone. The lock was written in
+  another container or on another machine, by an older build, or cannot be
+  read. Such a lock is never replaced automatically, whatever its age, and
+  a start without `--group` is refused in the same way.
+  1. Make sure that no BELL PR still uses this data directory: no process,
+     no container, no other machine.
+  2. Remove the file the message names (`<data dir>/bellpr.lock`).
+  3. Start BELL PR again.
+
+  Removing the lock while its BELL PR still runs lets two processes write
+  the same data directory; the one that lost the lock then stops group
+  work (`notSingleWriter` below).
+- **"BELL PR is already running at … without group work"**:
+  `bell-pr start --group` (or `BELLPR_GROUP=1`) found a BELL PR that runs
+  with this data directory but was started without group work, and never
+  uses it in place of one. Stop that BELL PR, then run
+  `bell-pr start --group`. The `bell-pr group` commands print the same
+  message for such a BELL PR.
 - **"The data directory … belongs to another user"**: start BELL PR as that
   user, or choose your own directory with `--data-dir`.
 - **"To listen on …, set BELLPR_PUBLIC_URL …"** or **"BELLPR_PUBLIC_URL
@@ -581,6 +605,34 @@ there, then publish again.
 - **A setting is out of range**, for example
   "BELLPR_MAX_ACTIVE_RUNS must be between 1 and 8": fix or remove the
   variable. [Configuration](configuration.md) lists every range.
+
+## Group work has stopped
+
+Only for a BELL PR started with `--group` ([Group work](group-work.md)).
+`bell-pr group status` prints "Group work has stopped (reason: …)".
+Inviting, joining and removing answer 503 with `reason: "stopped"`, and
+`GET /api/collab` and `GET /api/status` carry the reason. The server log
+has a "Group work stopped" line with the cause. The rest of BELL PR keeps
+working.
+
+A stopped group stays stopped until BELL PR is restarted, and BELL PR
+never creates or repairs the group's files by itself. Fix the cause below,
+then restart BELL PR.
+
+| Reason | What happened | What to do |
+| --- | --- | --- |
+| `sideDamaged` | `<data dir>/collab.json` cannot be read, or is not a file BELL PR wrote | Restore `collab.json` and `coordination.json` together from one backup |
+| `sideMissing` | `coordination.json` exists, but `collab.json` is missing or does not say that the group was set up. Also when set-up could not write `collab.json` | Restore both files together from one backup |
+| `missing` | `collab.json` says the group was set up, but `coordination.json` is gone | Restore both files together from one backup |
+| `damaged` | `coordination.json` cannot be read or is not consistent | Restore both files together from one backup |
+| `notSingleWriter` | The data directory's lock is no longer this process's: it was removed or replaced while BELL PR ran | Make sure only one BELL PR uses the data directory, then restart it |
+| `unavailable` | Writing `coordination.json` failed, for example on a full disk | Fix what stopped the write, then restart; BELL PR reads the file back from disk |
+| `closed` | BELL PR is shutting down | Start it again |
+
+With no backup, the group has to start again: stop BELL PR, move
+`coordination.json` and `collab.json` out of the data directory, start
+BELL PR with `--group`, run `bell-pr group setup` and invite everyone
+again. Their earlier participant tokens no longer work.
 
 ## Runs that wait, stop or cannot be reviewed
 
