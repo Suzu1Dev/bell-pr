@@ -726,17 +726,39 @@ test("long runs of carriage returns or digits in the output keep BELL responsive
   assert.ok(gap < 1_500, `BELL's event loop stood still for ${gap} ms`);
 });
 
-test("once the run is no longer busy, a reload reads the result a slow save just wrote", async (t) => {
+test("once the run is no longer busy, a reload reads the result the save just wrote", async (t) => {
   const f = await fixture(t);
   await f.confirm(`node -e "console.log('3 passing')"`);
-  // The disk write is the slow part. Busy must stay set until it finishes,
-  // or a reload in that gap reads a state with no result.
+  // Hold the save that records the result. Busy must still be set then, and
+  // state.json must not have the result until that save finishes.
+  let releaseSave = () => {};
+  let markEntered = () => {};
+  const entered = new Promise<void>((resolve) => {
+    markEntered = resolve;
+  });
+  const gate = new Promise<void>((resolve) => {
+    releaseSave = resolve;
+  });
+  t.after(() => releaseSave());
   const save = f.store.save.bind(f.store);
   f.store.save = async () => {
-    await sleep(200);
+    if ((f.run.byHand?.tests?.length ?? 0) > 0) {
+      markEntered();
+      await gate;
+    }
     return save();
   };
-  const result = await f.runOnce();
+  const done = f.runOnce();
+  try {
+    await entered;
+    const early = new Store(f.store.directory);
+    await early.initialize();
+    assert.equal(early.data.runs.find((run) => run.id === f.run.id)?.byHand?.tests, undefined);
+    assert.equal(f.run.byHand?.busy?.kind, "tests");
+  } finally {
+    releaseSave();
+  }
+  const result = await done;
   const reloaded = new Store(f.store.directory);
   await reloaded.initialize();
   assert.deepEqual(reloaded.data.runs.find((run) => run.id === f.run.id)?.byHand?.tests?.at(-1), result);
