@@ -56,11 +56,12 @@ test("the origin notice shows only when that origin was imported as local", () =
   const html = renderEn(list([repo, localRepo, ignoredRepo]));
   assert.equal(html.match(/role="note"/g)?.length, 1);
   assert.equal(html.includes('role="alert"'), false);
-  const copyLabel = `Copy the command: ${command}`;
+  const copyLabel = `Copy the command. Replace OWNER and REPO: ${command}`;
   assert.match(html, /The origin URL includes credentials, so this was imported as a local project\./);
   assert.match(html, /Remove them and use a credential helper:/);
   assert.ok(html.includes(`<code>${command}</code>`));
   assert.equal(html.match(/copy-command-button/g)?.length, 1);
+  assert.match(html, /<span class="copy-command-label">Replace OWNER and REPO\.<\/span>/);
   assert.ok(html.includes(`aria-label="${copyLabel}"`));
   assert.equal(html.includes(secretOrigin), false);
   assert.equal(html.includes("user:token"), false);
@@ -68,7 +69,8 @@ test("the origin notice shows only when that origin was imported as local", () =
   const zh = renderZh(list([ignoredRepo]));
   assert.match(zh, /origin 網址含有帳號或權杖，因此以本機專案匯入。請移除並改用 credential helper：/);
   assert.ok(zh.includes(`<code>${command}</code>`));
-  assert.ok(zh.includes(`aria-label="複製指令：${command}"`));
+  assert.match(zh, /<span class="copy-command-label">請替換 OWNER 與 REPO。<\/span>/);
+  assert.ok(zh.includes(`aria-label="複製指令。請替換 OWNER 與 REPO：${command}"`));
   assert.equal(zh.includes(secretOrigin), false);
   assert.equal(zh.includes("user:token"), false);
   for (const repos of [[repo], [localRepo]]) {
@@ -92,7 +94,7 @@ test("the origin notice shows only when that origin was imported as local", () =
     createElement(ExploreHeading, { repo: ignoredRepo, onChooseDirection() {} }),
   );
   assert.match(projectZh, /帳號或權杖/);
-  assert.ok(projectZh.includes(`aria-label="複製指令：${command}"`));
+  assert.ok(projectZh.includes(`aria-label="複製指令。請替換 OWNER 與 REPO：${command}"`));
   assert.equal(projectZh.includes("user:token"), false);
   for (const plainRepo of [repo, localRepo]) {
     const plain = renderEn(
@@ -128,8 +130,8 @@ test("the origin notice's copy button copies the command and says so", async () 
   };
   try {
     for (const [locale, feedback, label] of [
-      ["en", "Copied", `Copy the command: ${command}`],
-      ["zh-TW", "已複製", `複製指令：${command}`],
+      ["en", "Copied", `Copy the command. Replace OWNER and REPO: ${command}`],
+      ["zh-TW", "已複製", `複製指令。請替換 OWNER 與 REPO：${command}`],
     ] as const) {
       written.length = 0;
       const view = await mount(createElement(OriginIgnoredNotice, { ignored: true }), locale);
@@ -144,6 +146,46 @@ test("the origin notice's copy button copies the command and says so", async () 
       } finally {
         await view.unmount();
       }
+    }
+    const secret = "https://user:token@github.com/o/r.git";
+    const runnable = "git remote set-url origin https://github.com/o/r";
+    written.length = 0;
+    const stripped = await mount(
+      createElement(OriginIgnoredNotice, {
+        ignored: true,
+        origin: secret,
+        owner: "local",
+        name: "notes",
+      }),
+    );
+    try {
+      const button = stripped.container.querySelectorAll(
+        (element) => element.getAttribute("aria-label") === `Copy the command: ${runnable}`,
+      )[0];
+      assert.ok(button);
+      await click(button);
+      assert.deepEqual(written, [runnable]);
+      assert.equal(stripped.text().includes(secret), false);
+      assert.equal(stripped.text().includes("user:token"), false);
+      assert.equal(stripped.text().includes("Replace OWNER and REPO"), false);
+    } finally {
+      await stripped.unmount();
+    }
+    written.length = 0;
+    const named = await mount(
+      createElement(OriginIgnoredNotice, { ignored: true, owner: "octo", name: "widgets" }),
+    );
+    try {
+      const button = named.container.querySelectorAll(
+        (element) =>
+          element.getAttribute("aria-label") ===
+          "Copy the command: git remote set-url origin https://github.com/octo/widgets",
+      )[0];
+      assert.ok(button);
+      await click(button);
+      assert.deepEqual(written, ["git remote set-url origin https://github.com/octo/widgets"]);
+    } finally {
+      await named.unmount();
     }
     const hidden = await mount(createElement(OriginIgnoredNotice, {}));
     try {

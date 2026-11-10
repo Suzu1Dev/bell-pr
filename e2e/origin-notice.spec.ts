@@ -51,9 +51,16 @@ async function expectNoticeFits(
     const page = await context.newPage();
     await page.goto(`/${hash}?locale=${locale}`);
     await expect(page.locator("html")).toHaveAttribute("lang", htmlLang(locale));
+    await expect(page.locator("#main-content")).toBeVisible();
+    await expect(page.locator(".app-starting")).toHaveCount(0);
+    await page.waitForLoadState("networkidle");
+    await page.evaluate(() => document.fonts.ready);
     const notice = page.locator(".origin-ignored");
     await expect(notice).toHaveCount(1);
-    const label = locale === "zh-TW" ? `複製指令：${command}` : `Copy the command: ${command}`;
+    const label =
+      locale === "zh-TW"
+        ? `複製指令。請替換 OWNER 與 REPO：${command}`
+        : `Copy the command. Replace OWNER and REPO: ${command}`;
     await expect(notice.getByRole("button", { name: label })).toBeVisible();
     await expectNoOverflow(page, [".origin-ignored"]);
     const fit = await measure(page);

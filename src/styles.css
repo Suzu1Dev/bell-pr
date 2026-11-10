@@ -1433,7 +1433,6 @@ button {
   color: var(--color-accent-600);
 }
 .origin-ignored {
-  flex-direction: column;
   min-width: 0;
   max-width: 100%;
 }
@@ -2827,6 +2826,9 @@ button {
   }
 }
 @media (max-width: 760px) {
+  .origin-ignored {
+    flex-direction: column;
+  }
   .sidebar {
     transform: translateX(-100%);
     transition: transform 0.2s;

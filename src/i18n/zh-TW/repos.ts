@@ -7,6 +7,8 @@ const m: Translation<typeof en> = {
   originIgnored:
     "origin 網址含有帳號或權杖，因此以本機專案匯入。請移除並改用 credential helper：",
   originIgnoredCommand: "git remote set-url origin https://github.com/OWNER/REPO",
+  originIgnoredReplace: "請替換 OWNER 與 REPO。",
+  originIgnoredReplaceLabel: ({ command }) => `複製指令。請替換 OWNER 與 REPO：${command}`,
   list: {
     eyebrow: "你的專案",
     title: "下一個貢獻，從這裡開始。",
