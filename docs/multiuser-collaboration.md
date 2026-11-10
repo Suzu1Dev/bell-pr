@@ -224,6 +224,17 @@ with the group-mode overlap check.
     elsewhere after its lease; two machines with the same host name and PID
     namespace id. On systems other than Linux there is no namespace to
     compare, so every lock counts as written on this machine.
+  - What that leaves, as the tests measure it with an integration held
+    after its last lock check, before `update-ref`. If a person removes the
+    lock and a second host opens, the second host finds the branch still
+    at the base and drops the intent. The held `update-ref` then moves the
+    branch to the change, and the first host answers `503`
+    (`notSingleWriter`). The second host's records still hold the claim:
+    its fence still authorizes, and integrating is refused with
+    `baselineMoved`, as for a branch moved outside coordination, also
+    after a restart. If the lock is replaced instead, the branch moves, the
+    intent stays written, and the first host that opens after a person
+    removes that lock records the integration and ends the fence.
 - **No idempotency key.** A client whose reply was lost reads the project to
   learn the outcome.
 - **Manual repair before a branch at a third commit is settled.** If a
@@ -332,7 +343,22 @@ with the group-mode overlap check.
        start's lock is refused.
      - Tests cover the window between the last lock check and
        `update-ref`, and a lock written in a real other PID namespace, not
-       only a simulated one.
+       only a simulated one. Done in the tests, on Linux only:
+       - A `git` first on the host's PATH holds an integration's
+         `update-ref` before it runs, as Git runs with hooks off. A strict
+         host, `acquireWriterLock` and an ordinary start are refused while
+         it is held, with the host running and with it paused and its lock
+         an hour old. Released, the integration lands once, and a restart
+         keeps it and ends the fence.
+       - Under bubblewrap (`bwrap --unshare-pid`), a host holds the lock in
+         a new PID namespace, with a pid that names no process outside it.
+         Starts outside it, and starts in new namespaces against a host
+         outside, are refused under both rules: holder running, paused
+         with the lock an hour old, and killed. Once the holder is killed,
+         a start in its own namespace takes the lock over; elsewhere only
+         a person removing the lock lets the next start in.
+       - Where bubblewrap cannot make a PID namespace, the namespace tests
+         are skipped with the reason; nothing simulates one instead.
      - Large files are handled: on one Linux machine a write took about
        0.3 seconds at 8 MiB and an integration about 0.6, and near the
        reader's 32 MiB about 1.1 and 2.4 seconds with about 900 MB of
@@ -382,6 +408,13 @@ directories and repositories, and cover:
 - a paused host keeping its lock however old it looks, against starts in
   its own and in another (simulated) PID namespace, and giving it up when
   closed;
+- on Linux, an integration held between its last lock check and
+  `update-ref` keeping its lock from every start, running or paused, then
+  landing once; and the same integration with its lock removed or
+  replaced by hand, which is outside the rule;
+- where bubblewrap can make one, a lock written in a real other PID
+  namespace, and starts in one, refused with the holder running, paused,
+  expired and killed;
 - a host whose lock was replaced refusing every write, and one start
   winning a lock that a killed host left;
 - secrets, links, submodules and names with control characters, in any
