@@ -937,6 +937,44 @@ test("shutdown lets group work in flight land before the server closes and the l
   }
 });
 
+test("a signal leaves the workbench its time to stop after group work that never lands", async () => {
+  const box = await sandbox();
+  const stoppedFile = path.join(box.directory, "workbench-stopped");
+  // In the child, group work never settles and the workbench takes 2 seconds to stop.
+  const script = `
+    import { writeFileSync } from "node:fs";
+    const [port, dataDir, stoppedFile] = process.argv.slice(1);
+    const { startServer } = await import("./server/index.ts");
+    const { Workbench } = await import("./server/workbench.ts");
+    const shutdown = Workbench.prototype.shutdown;
+    Workbench.prototype.shutdown = async function () {
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+      await shutdown.call(this);
+      writeFileSync(stoppedFile, "");
+    };
+    const { app } = await startServer({ flags: { port, dataDir, group: true }, print: () => {} });
+    await app.locals.collab.setUp();
+    void app.locals.collab.run(() => new Promise(() => {}));
+    process.kill(process.pid, "SIGTERM");
+  `;
+  try {
+    const child = spawn(
+      process.execPath,
+      ["--import", "tsx", "--input-type=module", "-e", script, String(await freePort()), box.data, stoppedFile],
+      { cwd: repoRoot, env: box.env, stdio: ["ignore", "ignore", "pipe"] },
+    );
+    let stderr = "";
+    child.stderr!.setEncoding("utf8").on("data", (chunk: string) => (stderr += chunk));
+    const [code] = await once(child, "exit");
+    assert.equal(code, 0, stderr);
+    // Group work waited its 4 seconds; the hard exit still left the workbench its own.
+    assert.equal(existsSync(stoppedFile), true);
+    assert.equal(existsSync(path.join(box.data, "bellpr.lock")), false);
+  } finally {
+    await box.cleanup();
+  }
+});
+
 test("a takeover claim left by a start that stopped is cleared; one whose start still runs keeps the stale lock", async () => {
   const box = await sandbox();
   // A live Node.js process stands in for a start that is removing the lock.

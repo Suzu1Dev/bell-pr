@@ -661,7 +661,8 @@ export async function startServer(
       const exit = (code: number) => {
         // A second signal while stopping exits at once.
         if (stopping) process.exit(code);
-        setTimeout(() => process.exit(code), 5000).unref();
+        // Group work waits up to 4 seconds first; the workbench still gets its own 4.
+        setTimeout(() => process.exit(code), collab ? 9000 : 5000).unref();
         void shutdown().finally(() => process.exit(code));
       };
       const onSignal = () => exit(0);

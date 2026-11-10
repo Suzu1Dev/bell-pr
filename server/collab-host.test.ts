@@ -164,6 +164,14 @@ test("a coordinator that breaks while BELL PR runs stops group work for good", a
   assert.deepEqual(await refusal(() => w.host.coordinator()), { status: 503, reason: "stopped" });
   assert.deepEqual(await refusal(() => w.host.setUp()), { status: 409, reason: "missing" });
 
+  // Without the lock group work is not ready, before anything is written or asked of the core.
+  const { w: idle } = await group();
+  const untouched = await bytes(idle.files);
+  idle.lock.release();
+  assert.deepEqual(idle.host.status(), { state: "stopped", reason: "notSingleWriter" });
+  assert.deepEqual(await refusal(() => idle.host.coordinator()), { status: 503, reason: "stopped" });
+  assert.deepEqual(await bytes(idle.files), untouched);
+
   // Nor is the side file written once the lock is gone.
   const { w: other, ben } = await group();
   const before = await readFile(other.files.side, "utf8");

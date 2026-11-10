@@ -129,6 +129,8 @@ export async function openCollabHost(options: {
   /** The state, whatever close() did: work in flight still finishes after it. */
   const live = (): CollabStatus => {
     if (stopped === undefined && coordinator) {
+      // Ready only under the lock: it can go between two writes.
+      if (!options.lock.holds()) stop("notSingleWriter");
       // A usable coordinator answers 401 to no token; a broken one its 503.
       try {
         coordinator.authenticate(undefined);
