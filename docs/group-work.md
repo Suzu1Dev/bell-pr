@@ -138,10 +138,11 @@ the box under the paths updates by itself:
   hold** is off until the paths change or the hold ends.
 - "Cannot be held: …" names the typed paths that
   [cannot be held](#paths-that-cannot-be-held). **Take hold** is off.
-- No box: no path is typed, or the page has no answer, as while it is
-  reconnecting. **Take hold** is off then, and while the title is empty.
-  A refusal of another kind (`slowDown`, for example) shows as the
-  server's sentence.
+- No box: no path is typed, or the page has no answer for the paths and
+  the board it shows now, as right after a key or a change of the board,
+  and while it is reconnecting. **Take hold** is off then, and while the
+  title is empty. A refusal of another kind (`slowDown`, for example)
+  shows as the server's sentence.
 
 **The chip's three words.** The chip next to the repository says how the
 board on the page is kept current, and "as of" says when it was last
@@ -153,9 +154,11 @@ confirmed:
 - **Updating every 10 s**: the host had no place for one more waiting
   request (`tooManyWaiters`). The page asks every 10 seconds instead, and
   tries a waiting request again after a minute.
-- **Reconnecting**: the last request failed. The page keeps the board it
-  has, with its "as of" time, tries again after 1, 2 and 5 seconds and
-  then every 15, and the form gives no answer until a request succeeds.
+- **Reconnecting**: the last request failed, or had no answer after 40
+  seconds. The page keeps the board it has, with its "as of" time, tries
+  again after 1, 2 and 5 seconds and then every 15, and the form gives no
+  answer until a request succeeds. A page that has no board yet says
+  "Reconnecting" in its place.
 
 **What stays API-only.**
 [Using the same identity on another device](#use-the-same-identity-on-another-device)
