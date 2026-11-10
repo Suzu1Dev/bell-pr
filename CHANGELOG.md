@@ -11,9 +11,9 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - **The origin hint's command can be copied.** When a local import ignored
   an origin that contained credentials, the command in that hint has a
-  copy button. The command keeps OWNER/REPO and says to replace them. On a
-  wide screen it stays on one line beside the hint and scrolls if it does
-  not fit.
+  copy button. The command keeps OWNER/REPO and says to replace them. A
+  narrow card stacks the command under the hint and wraps it, so the
+  command does not scroll.
 
 ### Fixed
 

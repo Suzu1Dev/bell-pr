@@ -1437,26 +1437,40 @@ button {
   max-width: 100%;
 }
 .origin-ignored .copy-command {
+  flex: 1 1 auto;
   min-width: 0;
   max-width: 100%;
 }
-@media (min-width: 761px) {
+.origin-ignored > p {
+  min-width: 0;
+}
+.origin-ignored .copy-command-row code {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  overflow-x: visible;
+}
+.repository-card:has(.origin-ignored),
+.page-title > div:has(.origin-ignored) {
+  container-type: inline-size;
+  container-name: origin-notice;
+}
+.page-title > div:has(.origin-ignored) {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+@container origin-notice (max-width: 36rem) {
   .origin-ignored {
-    flex-wrap: wrap;
-    align-items: flex-start;
+    flex-direction: column;
+    align-items: stretch;
   }
-  .origin-ignored > p,
-  .origin-ignored .copy-command {
-    flex: 1 1 auto;
-    min-width: 0;
-    max-width: 100%;
-  }
+}
+@container origin-notice (max-width: 15rem) {
   .origin-ignored .copy-command-row {
-    align-items: center;
+    flex-direction: column;
+    align-items: stretch;
   }
-  .origin-ignored .copy-command-row code {
-    white-space: nowrap;
-    overflow-x: auto;
+  .origin-ignored .copy-command-button {
+    align-self: flex-start;
   }
 }
 .draft-layout {

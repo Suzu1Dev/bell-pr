@@ -72,16 +72,17 @@ async function expectNoticeFits(
     expect(fit.button, where).not.toBeNull();
     expect(fit.code, where).not.toBeNull();
     const frame = fit.frame!;
-    const detail = `${where} code ${fit.code!.width.toFixed(1)}×${fit.code!.height.toFixed(1)} button ${fit.button!.width.toFixed(1)}×${fit.button!.height.toFixed(1)} frame ${frame.width.toFixed(1)}×${frame.height.toFixed(1)}`;
+    const detail = `${where} code ${fit.code!.width.toFixed(1)}×${fit.code!.height.toFixed(1)} client ${fit.clientWidth} content ${fit.contentWidth.toFixed(1)} scroll ${fit.scrollWidth} prefix ${fit.prefixWidth.toFixed(1)} widest ${fit.widestPrefixLine.toFixed(1)} clipped ${fit.prefixClipped} button ${fit.button!.width.toFixed(1)}×${fit.button!.height.toFixed(1)} frame ${frame.width.toFixed(1)}×${frame.height.toFixed(1)}`;
     for (const part of [fit.button!, fit.code!]) {
       expect(part.left, detail).toBeGreaterThanOrEqual(frame.left - 1);
       expect(part.right, detail).toBeLessThanOrEqual(frame.right + 1);
       expect(part.top, detail).toBeGreaterThanOrEqual(frame.top - 1);
       expect(part.bottom, detail).toBeLessThanOrEqual(frame.bottom + 1);
     }
-    // Wide row: one line. A column of single characters is many times the line height.
+    expect(fit.scrollWidth, detail).toBeLessThanOrEqual(fit.clientWidth + 1);
     if (width >= 761) {
-      expect(fit.codeTextHeight, detail).toBeLessThanOrEqual(fit.lineHeight * 2 + 1);
+      expect(fit.prefixClipped, detail).toBe(false);
+      expect(fit.widestPrefixLine + 1, detail).toBeGreaterThanOrEqual(fit.prefixWidth * 0.45);
     }
   } finally {
     await context.close();
@@ -105,15 +106,49 @@ function measure(page: Page) {
     const parsedLine = style ? parseFloat(style.lineHeight) : Number.NaN;
     const lineHeight = Number.isFinite(parsedLine) ? parsedLine : fontSize * 1.2;
     const codeBox = box(code);
-    const pad = style ? parseFloat(style.paddingTop) + parseFloat(style.paddingBottom) : 0;
-    const border = style ? parseFloat(style.borderTopWidth) + parseFloat(style.borderBottomWidth) : 0;
+    const prefix = "git remote set-url origin";
+    let prefixWidth = 0;
+    let prefixClipped = true;
+    let widestPrefixLine = 0;
+    let contentWidth = 0;
+    if (code && style) {
+      const probe = document.createElement("span");
+      probe.textContent = prefix;
+      probe.style.font = style.font;
+      probe.style.whiteSpace = "nowrap";
+      probe.style.position = "absolute";
+      probe.style.visibility = "hidden";
+      document.body.appendChild(probe);
+      prefixWidth = probe.getBoundingClientRect().width;
+      probe.remove();
+      const text = code.firstChild;
+      const at = text?.textContent?.indexOf(prefix) ?? -1;
+      if (text && at >= 0) {
+        const range = document.createRange();
+        range.setStart(text, at);
+        range.setEnd(text, at + prefix.length);
+        const visibleLeft = code.getBoundingClientRect().left + code.clientLeft;
+        const visibleRight = visibleLeft + code.clientWidth;
+        const rects = [...range.getClientRects()].filter((rect) => rect.width > 0);
+        prefixClipped = rects.some(
+          (rect) => rect.right > visibleRight + 1 || rect.left < visibleLeft - 1,
+        );
+        widestPrefixLine = rects.reduce((wide, rect) => Math.max(wide, rect.width), 0);
+        contentWidth = code.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+      }
+    }
     return {
       pageOverflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
       frame: box(frame),
       code: codeBox,
       button: box(button),
       lineHeight,
-      codeTextHeight: codeBox ? codeBox.height - pad - border : -1,
+      clientWidth: code?.clientWidth ?? 0,
+      scrollWidth: code?.scrollWidth ?? 0,
+      prefixWidth,
+      prefixClipped,
+      widestPrefixLine,
+      contentWidth,
     };
   });
 }
