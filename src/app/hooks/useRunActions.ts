@@ -1157,6 +1157,49 @@ export function useRunActions({
       notify((error as Error).message, "error");
     }
   }
+  async function restoreHeldPaths(): Promise<HoldRestoreResult> {
+    const id = run.id;
+    const result = await api<{ run: Run; restored: string[] }>(
+      `${runPath(id)}/holds/restore`,
+      { ...send("POST", {}), headers: participantHeaders() },
+    );
+    if (runIdRef.current === id) setRun(result.run);
+    try {
+      const files = await readRunFiles(id);
+      if (runIdRef.current === id) setFiles(files);
+      return { restored: result.restored.length, files };
+    } catch (error) {
+      return {
+        restored: result.restored.length,
+        refreshError: error instanceof Error ? error : new Error(String(error)),
+      };
+    }
+  }
+  async function recheckHeldPaths(): Promise<HeldConflict[]> {
+    const id = run.id;
+    try {
+      const result = await api<{ run: Run }>(
+        `${runPath(id)}/holds/recheck`,
+        { ...send("POST", {}), headers: participantHeaders() },
+      );
+      if (runIdRef.current === id) setRun(result.run);
+      return [];
+    } catch (error) {
+      const conflicts = heldConflicts(error);
+      if (!conflicts) throw error;
+      try {
+        const current = await api<{ run: Run }>(runPath(id));
+        if (runIdRef.current === id) setRun(current.run);
+      } catch {
+        if (runIdRef.current === id)
+          setRun((previous) => ({
+            ...previous,
+            heldPaths: [...new Set(conflicts.map((conflict) => conflict.path))],
+          }));
+      }
+      return conflicts;
+    }
+  }
   return {
     setRun,
     setFiles,
@@ -1188,7 +1231,45 @@ export function useRunActions({
     recoverPublish,
     fetchPrFeedback,
     cancel,
+    restoreHeldPaths,
+    recheckHeldPaths,
   };
+}
+
+export interface HeldConflict {
+  path: string;
+  holder: string;
+  title: string;
+  since: string;
+}
+
+export interface HoldRestoreResult {
+  restored: number;
+  files?: DiffFile[];
+  refreshError?: Error;
+}
+
+function participantHeaders() {
+  try {
+    return { "X-Bell-Participant": localStorage.getItem("bellpr-participant-token") ?? "" };
+  } catch {
+    return { "X-Bell-Participant": "" };
+  }
+}
+
+function heldConflicts(error: unknown): HeldConflict[] | undefined {
+  if (!(error instanceof ApiError) || error.status !== 409 ||
+    (error.details.reason !== "heldByOther" && error.details.code !== "heldByOther")) return undefined;
+  if (!Array.isArray(error.details.held)) return undefined;
+  const conflicts = error.details.held.flatMap((value) => {
+    if (typeof value !== "object" || value === null) return [];
+    const conflict = value as Record<string, unknown>;
+    return typeof conflict.path === "string" && typeof conflict.holder === "string" &&
+      typeof conflict.title === "string" && typeof conflict.since === "string"
+      ? [{ path: conflict.path, holder: conflict.holder, title: conflict.title, since: conflict.since }]
+      : [];
+  });
+  return conflicts.length ? conflicts : undefined;
 }
 
 export type RunActions = ReturnType<typeof useRunActions>;

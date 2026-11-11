@@ -70,6 +70,57 @@ const workspace = {
     workspaceRemoved:
       "Files for this run were cleaned up to free disk space. Reports and notes are kept.",
   },
+  holdStop: {
+    heading: ({ count }: { count: number }) =>
+      plural(count) === "one"
+        ? "Stopped because a file is held"
+        : "Stopped because files are held",
+    body:
+      "The last turn changed files someone else holds; edits stay in the working directory. Put these files back, or check again once released or revoked.",
+    legacyBody:
+      "This run stopped earlier because it changed files someone else held. Put these files back, or check current holds again.",
+    legacyTaskStopped:
+      "This subtask touched files someone else held, so its edits weren't added. Retry once the hold is released or revoked.",
+    item: ({
+      path,
+      holder,
+      title,
+      since,
+    }: {
+      path: string;
+      holder: string;
+      title: string;
+      since: string;
+    }) => `${path}: held by ${holder} for “${title}” (since ${since})`,
+    itemMeta: ({
+      holder,
+      title,
+      since,
+    }: {
+      holder: string;
+      title: string;
+      since: string;
+    }) => `Held by ${holder} for “${title}” · since ${since}`,
+    itemPathOnly: ({ path }: { path: string }) => `${path} (held by another member)`,
+    restoreAction: ({ count = 2 }: { count?: number } = {}) =>
+      plural(count) === "one" ? "Put this file back" : "Put these files back",
+    restoringAction: "Putting back…",
+    recheckAction: "Check again",
+    recheckingAction: "Checking…",
+    restoreConfirmTitle: "Put held files back?",
+    restoreConfirmBody: ({ count }: { count: number }) =>
+      plural(count) === "one"
+        ? `Put ${count} held file back to this run's base version? Edits to that file will be removed, while any other changed files stay as they are.`
+        : `Put ${count} held files back to this run's base version? Edits to those files will be removed, while any other changed files stay as they are.`,
+    restoreConfirmAction: "Put these files back",
+    restoreCancelAction: "Cancel",
+    restoreFailed:
+      "Couldn't put these files back. Nothing in the working directory was changed; reload and try again, or restore them by hand.",
+    restoreStale:
+      "The working directory changed, so nothing was restored. Refresh the file list and try again.",
+    recheckFailed: ({ name }: { name: string }) =>
+      `Couldn't check file holds right now. Try again in a moment, or fix group work on the host and restart ${name} if it has stopped.`,
+  },
   sampleReview: "Sample review",
   humanReview: "Human review",
   /** Other contributions of the same project whose files meet the plan's scopes. */
@@ -654,6 +705,21 @@ const workspace = {
       plural(count) === "one"
         ? `${count} file under your hold changed on the target branch. Check the Target branch panel.`
         : `${count} files under your hold changed on the target branch. Check the Target branch panel.`,
+    heldFilesRestored: ({ count, keptOtherChanges = true }: { count: number; keptOtherChanges?: boolean }) =>
+      keptOtherChanges
+        ? plural(count) === "one"
+          ? `${count} file restored. Other changes were kept.`
+          : `${count} files restored. Other changes were kept.`
+        : plural(count) === "one"
+          ? `${count} file restored.`
+          : `${count} files restored.`,
+    holdCleared: "No holds remain on these files. You can continue.",
+    holdStillActiveBy: ({ who, paths, pathCount }: { who: string; paths: string; pathCount: number }) =>
+      plural(pathCount) === "one"
+        ? `${who} still holds ${paths}. Wait for them to release it, ask a group admin to revoke it, or put this file back.`
+        : `${who} still holds ${paths}. Wait for them to release them, ask a group admin to revoke them, or put these files back.`,
+    holdStillActiveMulti: ({ count, holders, paths }: { count: number; holders: string; paths: string }) =>
+      `${count} files are still held by ${holders} (${paths}). Wait for release, ask a group admin to revoke the holds, or put these files back.`,
     resolvingConflicts:
       "An agent is resolving the conflicts. Review each file when it finishes.",
     undoSyncConfirm:
