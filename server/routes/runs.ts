@@ -100,7 +100,7 @@ export function registerRunsRoutes(
     // out (the participant token, else the device); its agents may change
     // these people's held files and no one else's.
     const owners = options.collab
-      ? runOwners(options.collab, { participant: req.get(participantHeader), deviceId: res.locals.deviceId })
+      ? runOwners(options.collab, repoId, { participant: req.get(participantHeader), deviceId: res.locals.deviceId })
       : undefined;
     const selected = settings ?? (await insights.getSettings(repoId));
     res.status(202).json({

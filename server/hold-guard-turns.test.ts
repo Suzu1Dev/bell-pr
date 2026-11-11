@@ -17,6 +17,7 @@ import type { CollabHold } from "../shared/collab.js";
 import type { ContributionSettings } from "../shared/insights.js";
 import { collabFixture, outcome, type Headers } from "../test/collab-fixture.js";
 import { participantHeader } from "./coordination-routes.js";
+import { runOwners } from "./hold-guard.js";
 import { sm, withLocale } from "./i18n/index.js";
 import { readDiff } from "./git.js";
 import { command, git } from "./process.js";
@@ -214,6 +215,8 @@ test("a run saves who starts it: the participant token, else the people who join
   assert.equal(outcome(await s.start({ ...s.devices.ben, [participantHeader]: `bpc_${"x".repeat(43)}` })), "403 notJoined");
   assert.equal(outcome(await s.start(s.who.removed)), "403 notJoined");
   assert.equal(s.f.store.data.runs.length, before);
+  // A repository outside the group is not group work: the same token is no refusal there.
+  assert.equal(runOwners(s.f.collab, "outside-the-group", { participant: `bpc_${"x".repeat(43)}` }), undefined);
 
   // Saved with the run, and read back after a restart, with group work or without.
   for (const id of [byToken.id, byDevice.id, nobody.id, atHost.id])
