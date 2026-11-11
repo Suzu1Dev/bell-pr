@@ -8,6 +8,7 @@ import path from "node:path";
 import { expect, test, type Page } from "@playwright/test";
 import { e2eApiHeaders } from "./api-token.mjs";
 import { getDemo } from "../src/demo/all";
+import { playbackTiming } from "../src/demo/playback";
 import common from "../src/i18n/en/common";
 import review from "../src/i18n/en/review";
 import team from "../src/i18n/en/team";
@@ -319,6 +320,7 @@ test("stopping the sample's team sends nothing and leaves it stopped", async ({ 
       if (request.method() !== "GET" && url.pathname.startsWith("/api/runs"))
         writes.push(`${request.method()} ${url.pathname}`);
     });
+    await page.clock.install({ time: new Date("2026-10-19T09:00:00Z") });
     await page.goto("/#/runs/demo-run/activity?demo=play&speed=4&locale=en");
     const badge = page.locator(".workspace-heading .status-badge");
     await expect(badge).toHaveText(status.awaiting_plan, { timeout: 20_000 });
@@ -327,8 +329,19 @@ test("stopping the sample's team sends nothing and leaves it stopped", async ({ 
     // The toast shows the notice; a live region outside it reads it out.
     await expect(page.locator(".toast", { hasText: workspace.notices.demoStopped })).toBeVisible();
     await expect(page.getByRole("button", { name: workspace.activity.stopTask })).toHaveCount(0);
-    // Nothing plays on after the stop.
-    await page.waitForTimeout(1_500);
+    // Nothing plays on after the stop. The clock installed above, before any
+    // step timer, jumps past every later step at speed 4.
+    const speed = 4;
+    const paced = (ms: number) => Math.round(ms / speed);
+    await page.clock.runFor(
+      paced(playbackTiming.queued) +
+        paced(playbackTiming.planLine) * (demo.run.logs.length + 1) +
+        paced(playbackTiming.task) * (demo.team.tasks.length + 1) +
+        paced(playbackTiming.integrate) +
+        paced(playbackTiming.review) * 2 +
+        paced(playbackTiming.explanation) * demo.files.length +
+        paced(playbackTiming.publish),
+    );
     await expect(badge).toHaveText(status.cancelled);
     expect(writes).toEqual([]);
   } finally {
