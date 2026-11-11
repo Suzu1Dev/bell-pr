@@ -51,6 +51,36 @@ const m: Translation<typeof en> = {
     queued: "排隊中：同時執行的工作數已達上限，其他任務完成後才會開始",
     workspaceRemoved: "為了釋出磁碟空間，這次任務的檔案已清除；報告與筆記仍會保留。",
   },
+  holdStop: {
+    heading: () => "改到別人佔用的檔案，已停止",
+    body:
+      "上一回合改到別人佔用的檔案，改動仍留在工作目錄。你可以還原這些檔案，或等釋出、收回佔用後重新檢查。",
+    legacyBody:
+      "這項工作先前因改到別人佔用的檔案而停止。你可以還原這些檔案，或重新檢查目前的佔用狀態。",
+    legacyTaskStopped:
+      "這個子任務改到別人佔用的檔案，改動未加入這份貢獻。等佔用釋出或收回後即可重試。",
+    item: ({ path, holder, title, since }) =>
+      `${path}：由 ${holder} 為「${title}」佔用（${since} 起）`,
+    itemMeta: ({ holder, title, since }) =>
+      `由 ${holder} 為「${title}」佔用 · ${since} 起`,
+    itemPathOnly: ({ path }) => `${path}（被他人佔用）`,
+    restoreAction: ({ count = 2 } = {}) =>
+      count === 1 ? "還原這個檔案" : "還原這些檔案",
+    restoringAction: "還原中…",
+    recheckAction: "重新檢查",
+    recheckingAction: "檢查中…",
+    restoreConfirmTitle: "還原被佔用的檔案？",
+    restoreConfirmBody: ({ count }) =>
+      `要把這 ${count} 個被佔用的檔案還原回這次工作的基準版本嗎？${count === 1 ? "這個" : "這些"}檔案的改動會移除，其他檔案若有修改會維持原樣。`,
+    restoreConfirmAction: "還原這些檔案",
+    restoreCancelAction: "取消",
+    restoreFailed:
+      "無法還原這些檔案。工作目錄未變動，請重新整理後再試，或在工作目錄手動還原。",
+    restoreStale:
+      "工作目錄已有新的變更，未執行還原。請重新整理檔案清單後再試。",
+    recheckFailed: ({ name }) =>
+      `目前無法確認檔案佔用狀態。請稍後再試；若小組協作已停止，請先在主機修復並重新啟動 ${name}。`,
+  },
   sampleReview: "範例審查",
   humanReview: "人工審查",
   overlap: {
@@ -511,6 +541,15 @@ const m: Translation<typeof en> = {
     synced: "已同步到最新目標分支；改到的檔案請重新審閱。",
     syncHeldChanges: ({ count }) =>
       `目標分支改到 ${count} 個你佔用的檔案，請查看「目標分支」區塊。`,
+    heldFilesRestored: ({ count, keptOtherChanges = true }) =>
+      keptOtherChanges
+        ? `已還原 ${count} 個檔案，其他修改維持原樣。`
+        : `已還原 ${count} 個檔案。`,
+    holdCleared: "這些檔案已無他人佔用，可以繼續進行。",
+    holdStillActiveBy: ({ who, paths, pathCount }) =>
+      `${who} 仍佔用 ${paths}。請等對方釋出、請小組管理員收回佔用，或還原${pathCount === 1 ? "這個" : "這些"}檔案。`,
+    holdStillActiveMulti: ({ count, holders, paths }) =>
+      `仍有 ${count} 個檔案由 ${holders} 佔用（${paths}）。請等對方釋出、請小組管理員收回佔用，或還原這些檔案。`,
     resolvingConflicts: "Agent 正在解決衝突，完成後請逐檔審閱。",
     undoSyncConfirm:
       "復原同步？工作會回到同步前的內容與基準，同步後在工作目錄做的修改會被移除。",

@@ -679,3 +679,67 @@ test("starting a task on a project asks before discarding the open run's unsaved
     await shell.unmount();
   }
 });
+
+test("held-file recovery uses the participant header, refreshes restore diffs, and rereads a held recheck", async (t) => {
+  const realFetch = globalThis.fetch;
+  const storage = Object.getOwnPropertyDescriptor(globalThis, "localStorage");
+  t.after(() => {
+    globalThis.fetch = realFetch;
+    if (storage) Object.defineProperty(globalThis, "localStorage", storage);
+    else delete (globalThis as Record<string, unknown>).localStorage;
+  });
+  Object.defineProperty(globalThis, "localStorage", {
+    configurable: true,
+    value: { getItem: (key: string) => key === "bellpr-participant-token" ? "participant-token" : null },
+  });
+  const heldRun: Run = { ...base, status: "failed", heldPaths: ["src/held.ts"] };
+  const restoredRun: Run = { ...heldRun, status: "review" };
+  delete restoredRun.heldPaths;
+  const heldAgain: Run = { ...heldRun, heldPaths: ["docs/guide.md"] };
+  const files = [{ path: "src/other.ts" } as DiffFile];
+  const conflict = { path: "docs/guide.md", holder: "Dee", title: "Guide work", since: "2026-11-10T09:00:00Z" };
+  const calls: { method: string; url: string; body?: string; participant: string | null }[] = [];
+  let rechecks = 0;
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    const method = init?.method ?? "GET";
+    calls.push({
+      method,
+      url,
+      body: typeof init?.body === "string" ? init.body : undefined,
+      participant: new Headers(init?.headers).get("X-Bell-Participant"),
+    });
+    if (url.endsWith("/holds/restore")) return respond({ run: restoredRun, restored: ["src/held.ts"] });
+    if (url.endsWith("/diff")) return respond({ files });
+    if (url.endsWith("/holds/recheck")) {
+      rechecks++;
+      if (rechecks === 1)
+        return respond({ error: "Still held", reason: "heldByOther", held: [conflict] }, 409);
+      return respond({ run: restoredRun });
+    }
+    if (url === "/api/runs/r") return respond({ run: heldAgain });
+    throw new Error(`unexpected request ${method} ${url}`);
+  }) as typeof fetch;
+  const shell = await mountActions(heldRun);
+  try {
+    const restored = await act(() => shell.actions().restoreHeldPaths());
+    assert.deepEqual(restored, { restored: 1, files });
+    assert.deepEqual(await act(() => shell.actions().recheckHeldPaths()), [conflict]);
+    assert.deepEqual(await act(() => shell.actions().recheckHeldPaths()), []);
+    assert.deepEqual(calls.map(({ method, url }) => [method, url]), [
+      ["POST", "/api/runs/r/holds/restore"],
+      ["GET", "/api/runs/r/diff"],
+      ["POST", "/api/runs/r/holds/recheck"],
+      ["GET", "/api/runs/r"],
+      ["POST", "/api/runs/r/holds/recheck"],
+    ]);
+    for (const call of calls.filter(({ method }) => method === "POST")) {
+      assert.equal(call.body, "{}");
+      assert.equal(call.participant, "participant-token");
+    }
+    assert.deepEqual(shell.shown, [restoredRun, heldAgain, restoredRun]);
+    assert.deepEqual(shell.shownFiles, [files]);
+  } finally {
+    await shell.unmount();
+  }
+});

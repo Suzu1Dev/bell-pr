@@ -157,6 +157,52 @@
   margin: 0 18px var(--space-2);
 }
 
+.run-notices .hold-stop-notice {
+  align-items: flex-start;
+  border-color: var(--color-warning-border);
+  background: var(--color-warning-bg);
+}
+.run-notices .hold-stop-notice > svg {
+  margin-top: 2px;
+  color: var(--color-warning);
+}
+.hold-stop-notice h2 {
+  margin: 0 0 var(--space-1);
+  color: var(--color-text-primary);
+  font-size: var(--text-sm);
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+.hold-stop-list {
+  display: grid;
+  gap: var(--space-2);
+  margin: var(--space-2) 0 var(--space-3);
+  padding: 0;
+  list-style: none;
+}
+.hold-stop-list li {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.hold-stop-list code {
+  font-family: var(--font-mono);
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+.hold-stop-list small {
+  color: var(--color-text-muted);
+  overflow-wrap: anywhere;
+}
+.hold-stop-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.hold-stop-actions .button {
+  white-space: nowrap;
+}
+
 /* The learning record export: a quiet text button in the heading. */
 .workspace-heading .export-button {
   padding: 0;
