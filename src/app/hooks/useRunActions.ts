@@ -1159,20 +1159,54 @@ export function useRunActions({
   }
   async function restoreHeldPaths(): Promise<HoldRestoreResult> {
     const id = run.id;
-    const result = await api<{ run: Run; restored: string[] }>(
-      `${runPath(id)}/holds/restore`,
-      { ...send("POST", {}), headers: participantHeaders() },
-    );
-    if (runIdRef.current === id) setRun(result.run);
     try {
-      const files = await readRunFiles(id);
-      if (runIdRef.current === id) setFiles(files);
-      return { restored: result.restored.length, files };
+      const result = await api<{ run: Run; restored: string[] }>(
+        `${runPath(id)}/holds/restore`,
+        { ...send("POST", {}), headers: participantHeaders() },
+      );
+      if (runIdRef.current !== id) return { restored: result.restored.length };
+      setRun(result.run);
+      try {
+        const files = await readRunFiles(id);
+        if (runIdRef.current === id) {
+          setFiles(files);
+          if (file && !files.some((item) => item.path === file.path))
+            setSelectedPath(files[0]?.path || "");
+        }
+        return { restored: result.restored.length, files };
+      } catch (error) {
+        return {
+          restored: result.restored.length,
+          refreshError: error instanceof Error ? error : new Error(String(error)),
+        };
+      }
     } catch (error) {
-      return {
-        restored: result.restored.length,
-        refreshError: error instanceof Error ? error : new Error(String(error)),
-      };
+      const conflicts = heldConflicts(error);
+      if (conflicts && runIdRef.current === id) {
+        try {
+          const [current, files] = await Promise.all([
+            api<{ run: Run }>(runPath(id)),
+            readRunFiles(id),
+          ]);
+          if (runIdRef.current === id) {
+            setRun(current.run);
+            setFiles(files);
+            if (file && !files.some((item) => item.path === file.path))
+              setSelectedPath(files[0]?.path || "");
+          }
+        } catch {
+          if (runIdRef.current === id)
+            setRun((previous) =>
+              previous.id === id
+                ? {
+                    ...previous,
+                    heldPaths: [...new Set(conflicts.map((conflict) => conflict.path))],
+                  }
+                : previous,
+            );
+        }
+      }
+      throw error;
     }
   }
   async function recheckHeldPaths(): Promise<HeldConflict[]> {
@@ -1187,15 +1221,21 @@ export function useRunActions({
     } catch (error) {
       const conflicts = heldConflicts(error);
       if (!conflicts) throw error;
-      try {
-        const current = await api<{ run: Run }>(runPath(id));
-        if (runIdRef.current === id) setRun(current.run);
-      } catch {
-        if (runIdRef.current === id)
-          setRun((previous) => ({
-            ...previous,
-            heldPaths: [...new Set(conflicts.map((conflict) => conflict.path))],
-          }));
+      if (runIdRef.current === id) {
+        try {
+          const current = await api<{ run: Run }>(runPath(id));
+          if (runIdRef.current === id) setRun(current.run);
+        } catch {
+          if (runIdRef.current === id)
+            setRun((previous) =>
+              previous.id === id
+                ? {
+                    ...previous,
+                    heldPaths: [...new Set(conflicts.map((conflict) => conflict.path))],
+                  }
+                : previous,
+            );
+        }
       }
       return conflicts;
     }
@@ -1249,17 +1289,18 @@ export interface HoldRestoreResult {
   refreshError?: Error;
 }
 
-function participantHeaders() {
+function participantHeaders(): Record<string, string> {
   try {
-    return { "X-Bell-Participant": localStorage.getItem("bellpr-participant-token") ?? "" };
+    const token = localStorage.getItem("bellpr-participant-token")?.trim();
+    return token ? { "X-Bell-Participant": token } : {};
   } catch {
-    return { "X-Bell-Participant": "" };
+    return {};
   }
 }
 
-function heldConflicts(error: unknown): HeldConflict[] | undefined {
-  if (!(error instanceof ApiError) || error.status !== 409 ||
-    (error.details.reason !== "heldByOther" && error.details.code !== "heldByOther")) return undefined;
+export function heldConflicts(error: unknown): HeldConflict[] | undefined {
+  if (!(error instanceof ApiError) || error.status !== 409 || error.details.reason !== "heldByOther")
+    return undefined;
   if (!Array.isArray(error.details.held)) return undefined;
   const conflicts = error.details.held.flatMap((value) => {
     if (typeof value !== "object" || value === null) return [];
