@@ -8,7 +8,7 @@ const fmt = formatters("zh-TW");
 const m: Translation<typeof en> = {
   guidance: {
     eyebrow: "CONTRIBUTION GUIDE",
-    title: "寫出維護者容易理解的 PR",
+    title: "草稿建議",
     intro: "先看投稿規範與範本，再把這次貢獻整理成清楚的草稿。",
     status: {
       generating:
@@ -95,7 +95,9 @@ const m: Translation<typeof en> = {
       textLabel: ({ label }) => `${label}原文`,
     },
     checklist: {
-      title: "維護者檢查清單",
+      sources: "查看依據",
+      completed: ({ passed, off }) => `已通過 ${passed} 項${off ? `・已關閉 ${off} 項` : ""}`,
+      title: "送出前待完成",
       intro: "維護者花時間看一個 Pull Request 之前會確認的事，依專案規範、GitHub 與這次的變更即時整理。發布時會執行相同的檢查。",
       rulesRead: ({ date }) => `規範讀取於 ${date}`,
       factsRead: ({ date }) => `GitHub 讀取於 ${date}`,
@@ -214,6 +216,7 @@ const m: Translation<typeof en> = {
     copyFailed: "無法複製，請自行選取文字複製。",
   },
   reviewability: {
+    reference: "規模判斷方式與專案近期案例",
     title: "這份變更好審查嗎？",
     bands: {
       small: "小",

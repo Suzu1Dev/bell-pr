@@ -848,10 +848,12 @@ test("without --group a start is as before: an ordinary lock, no collab in /api/
       assert.equal(status.status, 200);
       assert.equal("collab" in JSON.parse(status.body), false);
       // The group routes are not there: the answer of any path the API does not have.
-      const absent = await get(`${running.url}/api/collab`, auth);
       const unknown = await get(`${running.url}/api/no-such-route`, auth);
-      assert.equal(absent.status, 404);
-      assert.equal(absent.body, unknown.body);
+      for (const route of ["/api/collab", "/api/collab/projects"]) {
+        const absent = await get(`${running.url}${route}`, auth);
+        assert.equal(absent.status, 404, route);
+        assert.equal(absent.body, unknown.body, route);
+      }
       assert.equal(running.app.locals.collab, undefined);
     } finally {
       await running.shutdown();

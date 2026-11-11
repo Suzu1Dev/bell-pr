@@ -144,7 +144,7 @@ test("a clean Learn-by-hand run: no AI draft or agent line, the facts list and t
     await expect(helpers.getByRole("note")).toHaveText(record.ownWords);
     await expect(helpers.locator("li button, li a")).toHaveCount(0);
     // The checklist row opens the record.
-    const row = page.locator(".publish-checklist details.byhand-record");
+    const row = page.locator(".draft-checklist details.byhand-record");
     await row.locator("summary", { hasText: record.title }).click();
     await expect(row).toContainText(`${record.claim} ${record.quotes}`);
     await expect(row).toContainText("BELL PR ran your tests 2 times; your first prediction after each change was right 2 of 2 times.");
@@ -184,7 +184,7 @@ test("an unclean Learn-by-hand run's record gives the reason and no claim", asyn
   try {
     await page.goto(`/#/runs/${runId}/draft?locale=en`);
     const reason = record.unclean({ reason: record.reasons.agents });
-    const row = page.locator(".publish-checklist details.byhand-record");
+    const row = page.locator(".draft-checklist details.byhand-record");
     await row.locator("summary").click();
     await expect(row).toContainText(reason);
     await expect(row).not.toContainText(record.claim);
@@ -529,7 +529,7 @@ test("against the real server: no AI draft or AI line, a PR title of the person'
     await title.fill("Greet people in their own language");
     await body.fill("## Summary\n\nGreetings come from a table of languages; I wrote and tested it myself.");
     await expect(asks).toHaveCount(0);
-    await page.getByRole("button", { name: workspace.draft.save }).click();
+    await page.locator(".draft-save-row").getByRole("button", { name: workspace.draft.save }).click();
     await expect(page.locator(".toast")).toContainText(workspace.notices.draftSaved);
     const saved = await page.request.patch(`/api/runs/${runId}/draft`, {
       data: { title: "Greet people in their own language", body: await body.inputValue(), aiDisclosure: true },
@@ -627,4 +627,3 @@ test("against the real server: a run fitted to a QEMU-shaped project's carve-out
     await project.stop();
   }
 });
-

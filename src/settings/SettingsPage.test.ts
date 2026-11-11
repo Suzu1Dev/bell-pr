@@ -279,7 +279,7 @@ test("Agent safety shows the sandbox, the unsandboxed opt-in, web access and the
   assert.match(html, /<input id="[^"]+" type="checkbox" aria-describedby="[^"]+"\/><div class="settings-switch-body"><label for="[^"]+">Allow unsandboxed Claude Code and Antigravity agents<\/label>/);
   assert.match(html, /<h3>Web access<\/h3>/);
   assert.doesNotMatch(html, /pro-badge|Pro feature|needs Pro/);
-  assert.match(html, /<a class="settings-link" href="#\/settings\/provider\?present=1">Open the AI provider settings<\/a>/);
+  assert.match(html, /<a class="settings-link" href="#\/settings\/provider\?present=1">Open AI provider settings<\/a>/);
   assert.match(html, /type="checkbox"[^>]* checked=""\/><div class="settings-switch-body"><label for="[^"]+">Always add an AI-assistance note to my pull requests<\/label>/);
   assert.match(html, /pull request drafts mention AI only when the project&#x27;s own rules ask for it/);
   // No confirmation is open until the switch is turned on.

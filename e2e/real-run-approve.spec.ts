@@ -290,7 +290,9 @@ test("a passed check counts after the setting is turned off: publishing asks not
     await page.keyboard.press("Escape");
     await expect(dialog).toHaveCount(0);
     await page.locator("#workspace-tab-draft").click();
-    await expect(page.locator('[data-row="understanding"]')).toContainText(draft.guidance.checklist.understandingPassed);
+    // The passed check is on the loaded guide's checklist. The fallback
+    // copy leaves once that guide is on the page.
+    await expect(page.locator(".draft-checklist")).toContainText(workspace.checklist.understandingPassed);
     await expect(page.locator('[data-row="rules"]')).not.toContainText("your understanding check is off");
   } finally {
     await context.close();

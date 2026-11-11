@@ -131,10 +131,10 @@ const settings = {
     },
     web: {
       title: "Web access",
-      text: "Off unless you turn it on under AI provider. While it is on, agents in contribution runs and follow-up chat can search the web and read pages through the AI CLI's own web tools; project analysis and discovery never get it.",
-      privacy:
-        "Search queries go to the provider's search service, and pages are fetched from the sites that host them. Leave web access off for confidential code.",
-      open: "Open the AI provider settings",
+      text: "Configure web access in AI providers. Codex and Claude Code only enable their web tools for tasks and follow-up questions when this setting is on.",
+      exception: "Antigravity can always search the web, including during project analysis and discovery. Turning this setting off only prevents its web-page fetching tool from reading pages.",
+      privacy: "Search queries go to the provider’s search service. For confidential work, choose a provider whose web search can be disabled and turn it off.",
+      open: "Open AI provider settings",
     },
     disclose: {
       title: "AI-assistance note",
@@ -150,7 +150,7 @@ const settings = {
       title: "Understanding check",
       text: "Before you approve a pull request, you explain the change back in your own words, answer a few questions about it and grade your answers against the reference yourself. No AI model grades you.",
       label: "Ask me to explain each change back before approval",
-      help: "On by default. While it is on, approving and publishing wait until you have explained the latest version of the change back.",
+      help: "When enabled, complete the check for the latest changes before approving and publishing.",
       /** BELLPR_REQUIRE_UNDERSTANDING_CHECK=1 locks it on; no variable turns it off. */
       lockedBy: ({ variable }: { variable: string }) =>
         `Kept on by ${variable}. Remove the variable and restart ${product.name} to change this.`,

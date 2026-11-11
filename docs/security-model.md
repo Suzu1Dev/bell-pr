@@ -87,8 +87,12 @@ what BELL PR trusts, what it does not, and the limits of each protection.
   - Roles are not a security boundary. Everyone in the group uses a paired
     device or sits at the host, and a paired device can use everything in
     that BELL PR: start agents, read every project, publish. Admin and
-    member only decide who may invite and remove people. A removed person
-    whose device is still paired keeps all of that.
+    member only decide who may invite and remove people, add repositories
+    to the group and revoke someone else's hold. A removed person whose
+    device is still paired keeps all of that.
+  - A hold is a record, not a lock. BELL PR refuses a second hold that
+    meets one already held; it does not stop an agent, an editor or a push
+    from writing to a held path.
 - **Browser hardening.** Every response carries
   `Content-Security-Policy: default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'`,
   `Cross-Origin-Resource-Policy: same-origin`, `X-Frame-Options: DENY`,

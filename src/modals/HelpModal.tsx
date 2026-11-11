@@ -27,6 +27,7 @@ export function HelpModal({
       <button className="button primary full-width" onClick={closeModal}>
         {t.start}
       </button>
+      <a className="button secondary full-width" href="#/team" onClick={closeModal}>{t.teamGuide}</a>
       {openAbout && (
         <button className="button secondary full-width" onClick={openAbout}>
           <Info size={15} aria-hidden="true" />

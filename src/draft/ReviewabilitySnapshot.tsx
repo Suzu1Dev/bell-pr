@@ -183,23 +183,11 @@ export default function ReviewabilitySnapshot({
     <section className="reviewability" aria-labelledby={`reviewability-${id}`}>
       {head}
       {figures}
+      <details className="reviewability-reference">
+        <summary>{t.reference}</summary>
       <p id={`reviewability-help-${id}`} className="reviewability-note">
         <Info size={13} aria-hidden="true" /> {t.linesNote} {t.bandHelp}
       </p>
-      {(
-        [
-          ["dependencies", snapshot.newDependencies.map((dependency) => dependency.name)],
-          ["outsidePlan", snapshot.outsidePlan],
-          ["whitespace", snapshot.whitespaceOnly],
-        ] as const
-      ).map(
-        ([key, items]) =>
-          items.length > 0 && (
-            <p key={key} className="reviewability-list">
-              <strong>{t[key]}</strong> {fmt.list([...items], { type: "unit" })}
-            </p>
-          ),
-      )}
       <div className="reviewability-merged">
         <h4>{t.merged}</h4>
         {snapshot.mergedSizes?.length ? (
@@ -219,6 +207,21 @@ export default function ReviewabilitySnapshot({
           <p>{t.mergedNone}</p>
         )}
       </div>
+      </details>
+      {(
+        [
+          ["dependencies", snapshot.newDependencies.map((dependency) => dependency.name)],
+          ["outsidePlan", snapshot.outsidePlan],
+          ["whitespace", snapshot.whitespaceOnly],
+        ] as const
+      ).map(
+        ([key, items]) =>
+          items.length > 0 && (
+            <p key={key} className="reviewability-list">
+              <strong>{t[key]}</strong> {fmt.list([...items], { type: "unit" })}
+            </p>
+          ),
+      )}
       <div className="reviewability-split">
         <h4>{t.split}</h4>
         <p>{t.splitLead}</p>
