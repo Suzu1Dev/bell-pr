@@ -372,8 +372,9 @@ test.describe("a Learn-by-hand run in review, marked ready", () => {
       await page.getByRole("tab", { name: t.review.panel.tabs.walkthrough }).click();
       await page.locator(`.file-item[title="${files.format}"]`).click();
       await expect(page.locator(".file-item.selected")).toHaveAttribute("title", files.format);
-      // Armed after the reload commits. The insights read is queued after the
-      // effect that would POST explanations and walkthroughs.
+      // Installed before the reload and run across the 2s–4s timers. The
+      // round trip after that is so a timer's POST is already in the log.
+      await page.clock.install();
       const navigation = await page.reload({ waitUntil: "commit" });
       if (!navigation) throw new Error("The reload did not commit.");
       const reloadedAt = navigation.request().timing().startTime;
@@ -381,11 +382,17 @@ test.describe("a Learn-by-hand run in review, marked ready", () => {
         response.request().method() === "GET" &&
         new URL(response.url()).pathname === path &&
         response.request().timing().startTime >= reloadedAt;
-      const understanding = page.waitForResponse(getAfterReload(`/api/runs/${runId}/understanding`));
-      const insights = page.waitForResponse(getAfterReload(`/api/repos/${repoId}/insights`));
+      const readAfterReload = (path: string) =>
+        page.waitForResponse(getAfterReload(path), { timeout: 5_000 }).catch((error: unknown) => {
+          throw new Error(`No GET ${path} after reload.`, { cause: error });
+        });
+      const understanding = readAfterReload(`/api/runs/${runId}/understanding`);
+      const insights = readAfterReload(`/api/repos/${repoId}/insights`);
       await expect(page.locator(".explain-panel")).toBeVisible();
       await understanding;
       await insights;
+      await page.clock.runFor(5_000);
+      await page.evaluate(() => undefined);
       expect(asked).toEqual([]);
       const after = (await (await page.request.get(`/api/runs/${runId}/diff`)).json()) as {
         files: { explanationStatus?: string; walkthroughStatus?: string }[];
