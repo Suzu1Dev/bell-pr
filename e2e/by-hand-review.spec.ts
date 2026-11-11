@@ -181,8 +181,19 @@ test.afterAll(async () => {
 
 /** No serious or critical axe issue, color contrast included, within `selector`. */
 async function expectAccessible(page: Page, selector: string) {
-  await page.evaluate(() => document.fonts.ready);
-  await page.waitForTimeout(300);
+  // The dialog fades in on its backdrop. Axe reads contrast once that paint, and any other finite animation on the region, has finished.
+  await page.evaluate(async (root) => {
+    await document.fonts.ready;
+    const scope = document.querySelector(root);
+    const animations: Animation[] = [];
+    for (let node: Element | null = scope; node; node = node.parentElement) animations.push(...node.getAnimations());
+    if (scope) animations.push(...scope.getAnimations({ subtree: true }));
+    await Promise.allSettled(
+      animations
+        .filter((animation) => animation.effect?.getComputedTiming().endTime !== Infinity)
+        .map((animation) => animation.finished),
+    );
+  }, selector);
   const results = await new AxeBuilder({ page }).options({ rules: { "color-contrast": { enabled: true } } }).include(selector).analyze();
   const serious = results.violations.filter((violation) => violation.impact === "serious" || violation.impact === "critical");
   expect(serious.map((violation) => `${violation.id}: ${violation.nodes.map((node) => node.target.join(" ")).join(", ")}`)).toEqual([]);
@@ -268,9 +279,13 @@ test("the same failure three times is checked in once per step and failing run, 
     await page.locator("#workspace-tab-overview").click();
     await page.locator("#workspace-tab-changes").click();
     await expect(guide).toBeVisible();
+    // The check-in effect runs in the same flush as the panel's test-command read. That response means the reload already sent a check-in, or skipped it.
+    const settled = page.waitForResponse(
+      (response) => new URL(response.url()).pathname === `/api/runs/${runs.repeat}/by-hand/test-command`,
+    );
     await page.reload();
     await expect(guide).toBeVisible();
-    await page.waitForTimeout(1500);
+    await settled;
     expect(posts).toHaveLength(expected);
   } finally {
     await close();
