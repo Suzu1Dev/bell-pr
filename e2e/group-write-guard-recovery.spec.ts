@@ -9,9 +9,11 @@
 //     both 1440px and 360px with zero leaked holder names or hold titles,
 //     zero horizontal overflow, and zero serious/critical axe issues; Check
 //     again while held shows the still-held notice (409), Check again after
-//     the host releases clears the card (200), and on a second mixed run Put
-//     these files back restores only the held paths while keeping the
-//     non-conflicting file intact.
+//     the host releases clears the card (200), and on a second mixed run after
+//     clearing localStorage["bellpr-participant-token"] on the paired device,
+//     both Check again and Put these files back omit X-Bell-Participant and
+//     succeed via deviceId fallback (no 403), restoring only the held paths,
+//     handing focus to .workspace-heading h1, and keeping non-conflicting files.
 import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { mkdir, mkdtemp, readFile, rm, unlink, writeFile } from "node:fs/promises";
@@ -538,6 +540,27 @@ if (base === "plan-schema.json") {
     await expect(stopCard).toContainText("docs/admin-only.md");
     await expect(stopCard).toContainText("src/api/users.ts");
 
+    // 7. Paired-device deviceId fallback without localStorage["bellpr-participant-token"]:
+    //    remove the participant token and reload so the paired device relies solely on bellpr-device-token.
+    await ben.evaluate(() => localStorage.removeItem("bellpr-participant-token"));
+    await ben.reload();
+    expect(
+      await ben.evaluate(() => ({
+        participantToken: localStorage.getItem("bellpr-participant-token"),
+        hasDeviceToken: Boolean(localStorage.getItem("bellpr-device-token")),
+      })),
+    ).toEqual({ participantToken: null, hasDeviceToken: true });
+    await expect(stopCard).toBeVisible();
+
+    const recheckFallbackPromise = ben.waitForResponse(
+      (res) => res.url().endsWith(`/api/runs/${benRunId}/holds/recheck`) && res.request().method() === "POST",
+    );
+    await stopCard.getByRole("button", { name: en.workspace.holdStop.recheckAction }).click();
+    const recheckFallbackRes = await recheckFallbackPromise;
+    expect(recheckFallbackRes.request().headers()["x-bell-participant"]).toBeUndefined();
+    expect(recheckFallbackRes.status()).toBe(409);
+    expect(((await recheckFallbackRes.json()) as { reason?: string }).reason).toBe("heldByOther");
+
     await stopCard.getByRole("button", { name: en.workspace.holdStop.restoreAction({ count: 2 }) }).click();
     const confirmModal = ben.getByRole("dialog", { name: en.workspace.holdStop.restoreConfirmTitle });
     await expect(confirmModal).toBeVisible();
@@ -547,9 +570,13 @@ if (base === "plan-schema.json") {
     await confirmModal
       .getByRole("button", { name: en.workspace.holdStop.restoreConfirmAction })
       .click();
-    const restoredJson = (await (await restoreResponse).json()) as { restored: string[]; run: Run };
+    const restoreRes = await restoreResponse;
+    expect(restoreRes.request().headers()["x-bell-participant"]).toBeUndefined();
+    expect(restoreRes.status()).toBe(200);
+    const restoredJson = (await restoreRes.json()) as { restored: string[]; run: Run };
     expect(restoredJson.restored).toEqual(["docs/admin-only.md", "src/api/users.ts"]);
     await expect(stopCard).toHaveCount(0);
+    await expect(ben.locator(".workspace-heading h1")).toBeFocused();
     await expect(ben.locator(".toast")).toContainText(
       en.workspace.notices.heldFilesRestored({ count: 2, keptOtherChanges: true }),
     );
