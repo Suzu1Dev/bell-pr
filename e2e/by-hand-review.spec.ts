@@ -279,11 +279,11 @@ test("the same failure three times is checked in once per step and failing run, 
     await page.locator("#workspace-tab-overview").click();
     await page.locator("#workspace-tab-changes").click();
     await expect(guide).toBeVisible();
-    // The check-in effect runs in the same flush as the panel's test-command read. That response means the reload already sent a check-in, or skipped it.
+    // Commit first, so a test-command read still open from the tab switch cannot satisfy the waiter. The check-in effect runs in the same flush as that read.
+    await page.reload({ waitUntil: "commit" });
     const settled = page.waitForResponse(
       (response) => new URL(response.url()).pathname === `/api/runs/${runs.repeat}/by-hand/test-command`,
     );
-    await page.reload();
     await expect(guide).toBeVisible();
     await settled;
     expect(posts).toHaveLength(expected);
