@@ -372,13 +372,8 @@ test.describe("a Learn-by-hand run in review, marked ready", () => {
       await page.getByRole("tab", { name: t.review.panel.tabs.walkthrough }).click();
       await page.locator(`.file-item[title="${files.format}"]`).click();
       await expect(page.locator(".file-item.selected")).toHaveAttribute("title", files.format);
-      // Armed after the reload commits, so a response still in flight from
-      // before it cannot pass. The reader view's check (GET understanding)
-      // is read in the commit that would POST explanations and walkthroughs.
-      // The project's insights read is queued after that commit's effects, so
-      // its response means those POSTs would already be in the log. This run
-      // is not generating and not busy, so the diff poll and the open-run
-      // poll never start.
+      // Armed after the reload commits. The insights read is queued after the
+      // effect that would POST explanations and walkthroughs.
       const navigation = await page.reload({ waitUntil: "commit" });
       if (!navigation) throw new Error("The reload did not commit.");
       const reloadedAt = navigation.request().timing().startTime;
