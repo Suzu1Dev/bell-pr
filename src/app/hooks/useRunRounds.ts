@@ -6,6 +6,7 @@ import {
   type SetStateAction,
 } from "react";
 import { api, send } from "../../api";
+import { participantHeaders } from "../../collab/participant";
 import { useT } from "../../i18n";
 import type { HeldUpstreamChange } from "../../../shared/sync";
 import type { DiffFile, Run } from "../../types";
@@ -72,7 +73,10 @@ export function useRunRounds({
         updated: boolean;
         conflicts: string[];
         heldChanges?: HeldUpstreamChange[];
-      }>(`/runs/${run.id}/sync`, send("POST"));
+      }>(`/runs/${run.id}/sync`, {
+        ...send("POST"),
+        headers: participantHeaders(),
+      });
       if (runIdRef.current !== result.run.id) return;
       setRun(result.run);
       await refreshFiles(result.run.id);

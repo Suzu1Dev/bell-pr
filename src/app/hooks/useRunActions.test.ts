@@ -18,7 +18,9 @@ import {
   withSampleFeedback,
   type RunActions,
 } from "./useRunActions";
-import type { DraftEditor } from "./useDraftEditor";
+import { keepParticipantToken } from "../../collab/participant";
+import { useDraftEditor, type DraftEditor } from "./useDraftEditor";
+import { useRunRounds, type RunRounds } from "./useRunRounds";
 import type { TaskSetup } from "./useTaskSetup";
 import { getDemo } from "../../demo";
 import type { DiffFile, Run } from "../../types";
@@ -836,6 +838,123 @@ test("held-file recovery skips mutating state or fetching stale diffs when runId
     assert.deepEqual(shell.shown, [remainingRun]);
     assert.deepEqual(shell.shownFiles, [files]);
   } finally {
+    await shell.unmount();
+  }
+});
+
+test("run creation, preflight, publish, and sync send X-Bell-Participant when stored or kept in memory and omit it when blank or absent", async (t) => {
+  const realFetch = globalThis.fetch;
+  const storage = Object.getOwnPropertyDescriptor(globalThis, "localStorage");
+  t.after(() => {
+    globalThis.fetch = realFetch;
+    keepParticipantToken("");
+    if (storage) Object.defineProperty(globalThis, "localStorage", storage);
+    else delete (globalThis as Record<string, unknown>).localStorage;
+  });
+  let rawToken: string | null = "  participant-token  ";
+  let storageThrows = false;
+  Object.defineProperty(globalThis, "localStorage", {
+    configurable: true,
+    value: {
+      getItem: (key: string) => {
+        if (storageThrows) throw new Error("storage blocked");
+        return key === "bellpr-participant-token" ? rawToken : null;
+      },
+      setItem: (_key: string, value: string) => {
+        if (storageThrows) throw new Error("storage blocked");
+        rawToken = value;
+      },
+    },
+  });
+
+  const approved: Run = { ...base, id: "r", status: "approved", approvedFingerprint: "fp-1" };
+  const created: Run = { ...base, id: "run-created", repoId: "repo-2", status: "queued" };
+  const published: Run = { ...approved, status: "published", prUrl: "https://example.test/pull/9" };
+  const seen: { key: string; participant: string | null }[] = [];
+
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    const method = init?.method ?? "GET";
+    const participant = new Headers(init?.headers).get("X-Bell-Participant");
+    if (method === "POST" && url === "/api/runs") {
+      seen.push({ key: "POST /api/runs", participant });
+      return respond({ run: created }, 202);
+    }
+    if (method === "GET" && url === "/api/runs/r/preflight") {
+      seen.push({ key: "GET /api/runs/r/preflight", participant });
+      return respond({ checks: [] });
+    }
+    if (method === "POST" && url === "/api/runs/r/publish") {
+      seen.push({ key: "POST /api/runs/r/publish", participant });
+      return respond({ run: published });
+    }
+    if (method === "POST" && url === "/api/runs/r/sync") {
+      seen.push({ key: "POST /api/runs/r/sync", participant });
+      return respond({ run: approved, updated: false, conflicts: [] });
+    }
+    if (method === "GET" && url === "/api/runs/r/diff") return respond({ files: [] });
+    throw new Error(`unexpected request ${method} ${url}`);
+  }) as typeof fetch;
+
+  let editor!: DraftEditor;
+  let rounds!: RunRounds;
+  function ExtraHooks() {
+    editor = useDraftEditor({
+      run: approved,
+      setRun() {},
+      demo: false,
+      runIdRef: { current: approved.id },
+      notify() {},
+      setBusy() {},
+    });
+    rounds = useRunRounds({
+      run: approved,
+      setRun() {},
+      runIdRef: { current: approved.id },
+      setFiles() {},
+      setBusy() {},
+      notify() {},
+      setTab() {},
+    });
+    return null;
+  }
+
+  const shell = await mountActions(approved);
+  const extra = await mount(createElement(ExtraHooks));
+  const submit = { preventDefault() {} } as FormEvent;
+  const exerciseFourCalls = async () => {
+    seen.length = 0;
+    await act(() => shell.actions().startTask(submit));
+    await act(() => editor.loadPublishChecks(approved.id, approved.approvedFingerprint));
+    await act(() => shell.actions().publish());
+    await act(() => rounds.syncToLatest());
+    assert.deepEqual(
+      seen.map((entry) => entry.key),
+      [
+        "POST /api/runs",
+        "GET /api/runs/r/preflight",
+        "POST /api/runs/r/publish",
+        "POST /api/runs/r/sync",
+      ],
+    );
+  };
+
+  try {
+    await exerciseFourCalls();
+    for (const entry of seen) assert.equal(entry.participant, "participant-token");
+
+    for (const empty of [null, "   "]) {
+      rawToken = empty;
+      await exerciseFourCalls();
+      for (const entry of seen) assert.equal(entry.participant, null);
+    }
+
+    storageThrows = true;
+    keepParticipantToken("  memory-token  ");
+    await exerciseFourCalls();
+    for (const entry of seen) assert.equal(entry.participant, "memory-token");
+  } finally {
+    await extra.unmount();
     await shell.unmount();
   }
 });

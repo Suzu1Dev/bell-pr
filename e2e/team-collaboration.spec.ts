@@ -211,7 +211,7 @@ test.describe("the board after the restart", () => {
           const lanes = board.locator(".team-kanban > .team-lane");
           const [todo, running, done] = [lanes.nth(0), lanes.nth(1), lanes.nth(2)];
           const ids = (lane: typeof todo) =>
-            lane.locator(".team-task-label > span:first-child").allTextContents();
+            lane.locator(".team-task-details > code").allTextContents();
           expect(await ids(todo)).toEqual(["task-6", "task-5", "task-2", "task-3", "task-4", "task-7"]);
           expect(await ids(running)).toEqual([]);
           expect(await ids(done)).toEqual(["task-1"]);
@@ -220,14 +220,14 @@ test.describe("the board after the restart", () => {
           await expect(running.locator("h3 > span")).toHaveText("0");
           await expect(done.locator("h3 > span")).toHaveText("1");
           await expect(done).toBeVisible();
-          // Phones hide an empty lane; a desktop says why it is empty.
+          // Phones hide an empty lane; once the run stopped, a desktop keeps it quiet too.
           if (viewport.width < 600) await expect(running).toBeHidden();
-          else await expect(running.locator(".team-lane-empty")).toHaveText(t.laneEmpty.running);
+          else await expect(running.locator(".team-lane-empty")).toHaveText("");
 
           const card = (id: string) =>
             board
               .locator("article.team-task")
-              .filter({ has: page.locator(".team-task-label > span:first-child", { hasText: id }) });
+              .filter({ has: page.locator(".team-task-details > code", { hasText: id }) });
           // Nothing starts a ready subtask of a stopped run until a retry,
           // and its label says so instead of offering it to claim.
           const shown = (status: TeamTaskStatus) =>

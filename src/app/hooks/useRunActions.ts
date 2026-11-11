@@ -8,6 +8,7 @@ import {
   type SetStateAction,
 } from "react";
 import { api, ApiError, send } from "../../api";
+import { participantHeaders } from "../../collab/participant";
 import { demoAnswer, getDemo, type DemoContent } from "../../demo";
 import { demoLearningExport } from "../../demo/export";
 import {
@@ -710,16 +711,16 @@ export function useRunActions({
     setBusy(true);
     setFormError("");
     try {
-      const { run: created } = await api<{ run: Run }>(
-        "/runs",
-        send("POST", {
+      const { run: created } = await api<{ run: Run }>("/runs", {
+        ...send("POST", {
           repoId: taskRepoId,
           prompt: prompt.trim(),
           title: taskTitle.trim() || undefined,
           settings: contributionSettings,
           ...setup.runRequest.current,
         }),
-      );
+        headers: participantHeaders(),
+      });
       setRuns((previous) => [summarizeRun(created), ...previous]);
       setRun(created);
       setFiles([]);
@@ -1006,12 +1007,15 @@ export function useRunActions({
     try {
       const result = await api<{ run: Run; url?: string }>(
         `/runs/${run.id}/publish`,
-        send("POST", {
-          fingerprint: run.approvedFingerprint,
-          acknowledged,
-          rulesDigest,
-          ...(overrides.length ? { overrides } : {}),
-        }),
+        {
+          ...send("POST", {
+            fingerprint: run.approvedFingerprint,
+            acknowledged,
+            rulesDigest,
+            ...(overrides.length ? { overrides } : {}),
+          }),
+          headers: participantHeaders(),
+        },
       );
       // The person may have opened another run while the PR was created.
       if (runIdRef.current === result.run.id && selectionSequence.current === selection)
@@ -1287,15 +1291,6 @@ export interface HoldRestoreResult {
   restored: number;
   files?: DiffFile[];
   refreshError?: Error;
-}
-
-function participantHeaders(): Record<string, string> {
-  try {
-    const token = localStorage.getItem("bellpr-participant-token")?.trim();
-    return token ? { "X-Bell-Participant": token } : {};
-  } catch {
-    return {};
-  }
 }
 
 export function heldConflicts(error: unknown): HeldConflict[] | undefined {

@@ -1093,3 +1093,138 @@ test("dependsOn & hold baselines: unfinished or non-done prerequisites block cla
   assert.equal((await s.readSideFile()).holds, undefined);
   await s.f.nothingLeaked();
 });
+
+test("second paired device redeeming { self: true } invite succeeds on createRun, syncRun, preflight, and publish over own held paths via x-bell-participant", async (t) => {
+  let leadCalls = 0;
+  const s = await integrationScene(t, async (input) => {
+    if (input.role === "lead") {
+      return leadCalls++ === 0
+        ? planJson([{ id: "web-task", files: ["src/web/App.tsx"] }])
+        : "Integrated web-task.";
+    }
+    if (input.role === "reviewer" || input.role === "tester") {
+      return "Reviewed: no problems.";
+    }
+    if (input.taskId) {
+      await writeCheckoutFile(
+        input.cwd,
+        "src/web/App.tsx",
+        "export const App = () => 'ben-second-device';\n",
+      );
+      return JSON.stringify({ report: "Updated web shell on second device", messages: [] });
+    }
+    return sessionReply();
+  });
+
+  // Ben holds `src/web` and `docs/guide.md` from his first device.
+  const holdReply = await s.f.post(`/projects/${s.project}/work`, s.who.member, {
+    title: "Ben multi-device hold",
+    scopes: ["src/web", "docs/guide.md"],
+  });
+  assert.equal(holdReply.status, 201, holdReply.body);
+  const benHold = (holdReply.json as CollabWorkResponse).hold;
+
+  // Ben pairs a second device (`laptop2`, distinct `deviceId`) and redeems a `{ self: true }` invite.
+  const laptop2 = await s.f.device("Ben Laptop 2");
+  const selfInvite = await s.f.invite(s.who.member, { self: true });
+  const joinedOnSecond = await s.f.join(laptop2, selfInvite);
+  assert.equal(joinedOnSecond.id, s.ben.id);
+  const benOnSecond: Headers = { ...laptop2, [participantHeader]: joinedOnSecond.token };
+
+  // `collab.json` still records Ben's first deviceId, so `laptop2` without `x-bell-participant` is NOT recognized as Ben.
+  const unauthenticatedDeviceRun = await s.f.send(
+    "POST",
+    "/api/runs",
+    { ...english, ...laptop2 },
+    {
+      repoId: s.repo.id,
+      prompt: "Update web shell without participant header",
+      settings: contributionSettings(false),
+    },
+  );
+  assert.equal(unauthenticatedDeviceRun.status, 202, unauthenticatedDeviceRun.body);
+  const unauthRunId = unauthenticatedDeviceRun.json.run.id as string;
+  assert.equal(unauthenticatedDeviceRun.json.run.owners, undefined);
+  await waitUntil(() => s.f.workbench.run(unauthRunId).status === "awaiting_plan", "unauth run held at plan");
+  await s.f.send("POST", `/api/runs/${unauthRunId}/cancel`, { ...english, ...laptop2 }, {});
+
+  // With `x-bell-participant`, `createRun` on `laptop2` records `owners: [s.ben.id]`, auto-approves over Ben's hold, and finishes in `review`.
+  leadCalls = 0;
+  const created = await s.f.send(
+    "POST",
+    "/api/runs",
+    { ...english, ...benOnSecond },
+    {
+      repoId: s.repo.id,
+      prompt: "Update web shell from second paired device",
+      title: "Second device web update",
+      settings: contributionSettings(false),
+    },
+  );
+  assert.equal(created.status, 202, created.body);
+  const runId = created.json.run.id as string;
+  assert.deepEqual(created.json.run.owners, [s.ben.id]);
+  await waitUntil(() => {
+    const current = s.f.workbench.run(runId);
+    const explanationsSettled = Object.values(current.explanations ?? {}).every(
+      (item) => item.status !== "pending",
+    );
+    return (
+      ["review", "failed"].includes(current.status) &&
+      current.draftPreparation?.status !== "generating" &&
+      explanationsSettled
+    );
+  }, "second device run reaches review and settles");
+  const runRecord = s.f.workbench.run(runId);
+  assert.equal(runRecord.status, "review", runRecord.error);
+  assert.equal(runRecord.heldPaths, undefined);
+
+  // Upstream touches `docs/guide.md` (also held by Ben); `syncRun` on `laptop2` with `x-bell-participant` syncs cleanly and reports `heldChanges`.
+  const upstreamSha = await s.github.upstreamCommit(
+    { "docs/guide.md": "Guide v2 upstream\n" },
+    "upstream docs update under Ben hold",
+  );
+  const synced = await s.f.send("POST", `/api/runs/${runId}/sync`, { ...english, ...benOnSecond }, {});
+  assert.equal(synced.status, 200, synced.body);
+  assert.equal(synced.json.updated, true);
+  assert.deepEqual(synced.json.conflicts, []);
+  assert.deepEqual(synced.json.heldChanges, [
+    { path: "docs/guide.md", commits: [upstreamSha.slice(0, 7)] },
+  ]);
+
+  // Prepare clean draft, review, and approve.
+  const syncedRun = s.f.workbench.run(runId);
+  syncedRun.draft = {
+    title: "feat: second device web update",
+    body: "## Summary\nUpdated web shell.\n\n## Validation\nTested locally.",
+    commitMessage: "feat: second device web update",
+    publishBranch: "feat/second-device-web",
+  };
+  await s.f.store.save();
+  await s.reviewAndApprove(runId);
+
+  // Without `x-bell-participant`, `laptop2` is blocked on preflight and publish by Ben's own hold.
+  const checksWithoutToken = await s.preflight(runId, laptop2);
+  assert.equal(checksWithoutToken.some((c) => c.id === "held-by-other" && c.kind === "block"), true);
+  const pubWithoutToken = await s.publish(runId, laptop2, ["held-by-other"]);
+  assert.equal(outcome(pubWithoutToken), "409 heldByOther");
+
+  // With `x-bell-participant`, `laptop2` passes preflight (no `held-by-other`, surfaces `held-changed-upstream`) and publishes cleanly.
+  const checksWithToken = await s.preflight(runId, benOnSecond);
+  assert.equal(checksWithToken.some((c) => c.id === "held-by-other"), false);
+  assert.equal(
+    checksWithToken.some((c) => c.id === "held-changed-upstream" && c.kind === "confirm"),
+    true,
+  );
+  const pubWithToken = await s.publish(runId, benOnSecond);
+  assert.equal(pubWithToken.status, 200, pubWithToken.body);
+  assert.ok(await s.github.head("feat/second-device-web"));
+
+  const released = await s.f.post(
+    `/projects/${s.project}/holds/${benHold.claimId}/release`,
+    benOnSecond,
+    { fence: benHold.fence, done: true },
+  );
+  assert.equal(released.status, 200, released.body);
+  await s.f.nothingLeaked();
+});
