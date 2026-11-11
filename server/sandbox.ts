@@ -588,12 +588,27 @@ const antigravityCustomizations = [
  * folder on that way is checked, and only `cwd` itself when no folder above
  * it is a repository. Paths are relative to `cwd`.
  */
+/**
+ * Whether `directory/.git` marks a Git repository root: a `.git` directory
+ * holding `HEAD`, or a `.git` pointer file starting with `gitdir:`. An empty
+ * orphan `.git` directory does not count.
+ */
+function hasGitRepoMarker(directory: string): boolean {
+  const dotGit = path.join(directory, ".git");
+  if (existsSync(path.join(dotGit, "HEAD"))) return true;
+  try {
+    return lstatSync(dotGit).isFile() && readFileSync(dotGit, "utf8").startsWith("gitdir:");
+  } catch {
+    return false;
+  }
+}
+
 export function antigravityWorkspaceConfig(cwd: string): string[] {
   const start = path.resolve(cwd);
   const folders: string[] = [];
   for (let directory = start; ; ) {
     folders.push(directory);
-    if (existsSync(path.join(directory, ".git"))) break;
+    if (hasGitRepoMarker(directory)) break;
     const parent = path.dirname(directory);
     if (parent === directory) {
       folders.splice(1);

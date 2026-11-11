@@ -573,14 +573,26 @@ test("the task list offers active and done prerequisites, not unfinished ended h
   const { f, who } = g;
   const project = await g.add("widgets");
   const other = await g.add("gadgets");
-  const elsewhere = await g.hold(who.dee, other, { title: "Elsewhere", scopes: ["lib"] });
-  const list = () => f.send("GET", `/api/collab/projects/${project}/tasks`, who.dee);
+  const elsewhere = await g.hold(who.dee, other, { title: "Elsewhere", scopes: ["lib/other.ts"] });
+  const otherFinished = await g.hold(who.member, other, { title: "Gadgets done", scopes: ["docs/other.md"] });
+  assert.equal(
+    (
+      await f.post(`/projects/${other}/holds/${otherFinished.claimId}/release`, who.member, {
+        fence: otherFinished.fence,
+        done: true,
+      })
+    ).status,
+    200,
+  );
+  const list = (asWho: Headers = who.dee, id = project) =>
+    f.send("GET", `/api/collab/projects/${id}/tasks`, asWho);
 
-  const first = await g.hold(who.member, project, { title: "API", scopes: ["src/api"] });
+  const first = await g.hold(who.member, project, { title: "API", scopes: ["src/secret/api.ts"] });
   assert.deepEqual((await list()).json, {
     tasks: [{ taskId: first.taskId, title: "API", status: "held" }],
   });
 
+  // Omitted `done`, explicit `done: false`, admin revoke, and removal auto-revoke all drop from `/tasks`.
   await g.release(who.member, project, first);
   assert.deepEqual((await list()).json, { tasks: [] });
   const pending = await g.work(who.dee, project, {
@@ -590,7 +602,26 @@ test("the task list offers active and done prerequisites, not unfinished ended h
   });
   assert.deepEqual(pending.json.pending, [{ taskId: first.taskId, title: "API", held: false }]);
 
-  const second = await g.hold(who.member, project, { title: "API 2", scopes: ["src/api"] });
+  const explicitFalse = await g.hold(who.member, project, { title: "Draft API", scopes: ["src/secret/draft.ts"] });
+  const releasedFalse = await f.post(`/projects/${project}/holds/${explicitFalse.claimId}/release`, who.member, {
+    fence: explicitFalse.fence,
+    done: false,
+  });
+  assert.equal(releasedFalse.status, 200, releasedFalse.body);
+  assert.deepEqual((await list()).json, { tasks: [] });
+
+  const revokedHold = await g.hold(who.member, project, { title: "Abandoned", scopes: ["src/secret/abandoned.ts"] });
+  assert.equal((await g.revoke(who.admin, project, revokedHold.claimId)).status, 200);
+  assert.deepEqual((await list()).json, { tasks: [] });
+
+  const deskE = await f.device("Desk E");
+  const eve = await f.join(deskE, await f.invite(who.admin, { name: "Eve" }));
+  const whoEve: Headers = { ...deskE, [participantHeader]: eve.token };
+  await g.hold(whoEve, project, { title: "Eve hold", scopes: ["src/secret/eve.ts"] });
+  assert.equal((await f.post(`/people/${eve.id}/remove`, who.admin)).status, 200);
+  assert.deepEqual((await list()).json, { tasks: [] });
+
+  const second = await g.hold(who.member, project, { title: "API 2", scopes: ["src/secret/api2.ts"] });
   const done = await f.post(`/projects/${project}/holds/${second.claimId}/release`, who.member, {
     fence: second.fence,
     done: true,
@@ -598,17 +629,66 @@ test("the task list offers active and done prerequisites, not unfinished ended h
   assert.equal(done.status, 200, done.body);
   const dependent = await g.hold(who.dee, project, {
     title: "UI",
-    scopes: ["web"],
+    scopes: ["web/secret/ui.tsx"],
     dependsOn: [second.taskId],
   });
-  assert.deepEqual((await list()).json, {
+
+  const checkPayload = async () => {
+    const reply = await list(who.member);
+    assert.equal(reply.status, 200, reply.body);
+    assert.deepEqual(Object.keys(reply.json), ["tasks"]);
+    assert.deepEqual(reply.json, {
+      tasks: [
+        { taskId: second.taskId, title: "API 2", status: "done" },
+        { taskId: dependent.taskId, title: "UI", status: "held" },
+      ],
+    });
+    for (const entry of reply.json.tasks)
+      assert.deepEqual(Object.keys(entry).sort(), ["status", "taskId", "title"]);
+    for (const forbidden of [
+      "scopes",
+      "holder",
+      "claimId",
+      "fence",
+      "since",
+      "dependsOn",
+      "src/secret",
+      "web/secret",
+      "lib/other.ts",
+      "docs/other.md",
+      "Elsewhere",
+      "Gadgets done",
+      "Ben",
+      "Dee",
+      "Eve",
+      g.ben.id,
+      g.dee.id,
+      eve.id,
+      second.claimId,
+      dependent.claimId,
+      "bpc_",
+    ])
+      assert.equal(reply.body.includes(forbidden), false, `leaked ${forbidden}`);
+  };
+  await checkPayload();
+
+  // Strict cross-project isolation in both directions, and preserved across restart.
+  const otherReply = await list(who.dee, other);
+  assert.deepEqual(otherReply.json, {
     tasks: [
-      { taskId: second.taskId, title: "API 2", status: "done" },
-      { taskId: dependent.taskId, title: "UI", status: "held" },
+      { taskId: elsewhere.taskId, title: "Elsewhere", status: "held" },
+      { taskId: otherFinished.taskId, title: "Gadgets done", status: "done" },
     ],
   });
-  assert.equal(outcome(await f.send("GET", `/api/collab/projects/no-such/tasks`, who.dee)), "404 unknownProject");
-  assert.equal((await f.send("GET", `/api/collab/projects/${other}/tasks`, who.dee)).json.tasks[0].taskId, elsewhere.taskId);
+  for (const cross of [second.taskId, dependent.taskId, "API 2", "UI"])
+    assert.equal(otherReply.body.includes(cross), false, `cross-project leak ${cross}`);
+
+  const unknown = await list(who.dee, "no-such");
+  assert.equal(outcome(unknown), "404 unknownProject");
+  assert.deepEqual(fieldsOf(unknown), ["error", "reason"]);
+
+  await f.start();
+  await checkPayload();
   await f.nothingLeaked();
 });
 
@@ -976,7 +1056,8 @@ test("who may use the repositories and the boards: people of the group, and no 4
     ["GET", `${at}/feed`, undefined, { member: "200", admin: "200" }],
     ["POST", `${at}/check`, { scopes: ["src"] }, { member: "200", admin: "200" }],
     // The member is asked first and takes the path, so the admin finds it held.
-    ["POST", `${at}/work`, { title: "Parser", scopes: ["src"] }, { member: "201", admin: "409 conflict" }],
+    ["POST", `${at}/work`, { title: "Parser", scopes: ["src/secret/parser.ts"] }, { member: "201", admin: "409 conflict" }],
+    ["GET", `${at}/tasks`, undefined, { member: "200", admin: "200" }],
     [
       "POST",
       `${at}/holds/no-such-hold/release`,
@@ -990,6 +1071,10 @@ test("who may use the repositories and the boards: people of the group, and no 4
       { member: "403 adminOnly", admin: "404 unknownClaim" },
     ],
   ];
+  const assertNoTaskOrPathLeak = (reply: Reply, label: string) => {
+    for (const leaked of ["src/secret/parser.ts", "\"tasks\"", "bpc_"])
+      assert.equal(reply.body.includes(leaked), false, `${label}: leaked ${leaked}`);
+  };
   for (const [method, urlPath, body, expected] of rows) {
     const name = `${method} /api/collab${urlPath}`;
     for (const asWho of Object.keys(who) as Who[]) {
@@ -1000,25 +1085,65 @@ test("who may use the repositories and the boards: people of the group, and no 4
       assert.equal(typeof reply.json.error, "string");
       for (const field of Object.keys(reply.json))
         assert.ok(refusalFields.includes(field), `${name} as ${asWho}: ${field}`);
+      if (urlPath === `${at}/tasks`) {
+        assert.equal(reply.body.includes("Parser"), false, `${name} as ${asWho}: leaked title`);
+        assertNoTaskOrPathLeak(reply, `${name} as ${asWho}`);
+      }
     }
     // 401 is the guard's alone: no app token, whatever the participant token.
     const noAppToken = await f.send(method, `/api/collab${urlPath}`, {
       [participantHeader]: g.ada.token,
     }, body);
     assert.equal(noAppToken.status, 401, name);
+    assert.equal(noAppToken.body.includes("Parser"), false, `${name} 401 leaked title`);
+    assertNoTaskOrPathLeak(noAppToken, `${name} noAppToken`);
+  }
+
+  // `/tasks` auth & revocation edges: untrusted Bearer or unpaired device -> 401;
+  // paired member device without X-Bell-Participant, malformed token, or removed member -> 403 notJoined.
+  const deskE = await f.device("Desk E");
+  const eve = await f.join(deskE, await f.invite(who.admin, { name: "Eve" }));
+  const unpaired = await f.post(`/people/${eve.id}/remove`, who.admin, { unpair: true });
+  assert.deepEqual([unpaired.status, unpaired.json.unpaired], [200, true]);
+  for (const [label, badAuth] of [
+    ["missing Authorization", {}],
+    ["untrusted Bearer with valid participant", { authorization: "Bearer untrusted-token", [participantHeader]: g.ada.token }],
+    ["unpaired device with removed participant", { ...deskE, [participantHeader]: eve.token }],
+    ["unpaired device with active participant", { ...deskE, [participantHeader]: g.ben.token }],
+  ] as [string, Headers][]) {
+    const reply = await f.send("GET", `/api/collab${at}/tasks`, badAuth);
+    assert.equal(reply.status, 401, label);
+    assert.equal(reply.body.includes("Parser"), false, `${label}: leaked title`);
+    assertNoTaskOrPathLeak(reply, label);
+  }
+  for (const [label, unjoinedHeaders] of [
+    ["paired member device without X-Bell-Participant", g.devices.ben],
+    ["empty X-Bell-Participant", { ...g.devices.ben, [participantHeader]: "" }],
+    ["malformed X-Bell-Participant", { ...g.devices.ben, [participantHeader]: "not-a-bpc-token" }],
+    ["removed Eve token on paired device", { ...who.device, [participantHeader]: eve.token }],
+  ] as [string, Headers][]) {
+    const reply = await f.send("GET", `/api/collab${at}/tasks`, unjoinedHeaders);
+    assert.equal(outcome(reply), "403 notJoined", label);
+    assert.deepEqual(fieldsOf(reply), ["error", "reason"]);
+    assert.equal(reply.body.includes("Parser"), false, `${label}: leaked title`);
+    assertNoTaskOrPathLeak(reply, label);
   }
 
   // No repository of the group, or the name of something every object has.
-  for (const id of ["p-0000000000", "__proto__", "constructor"]) {
+  for (const id of ["p-0000000000", "__proto__", "constructor", "toString"]) {
     const base = `/projects/${id}`;
     const replies = [
+      await f.send("GET", `/api/collab${base}/tasks`, who.member),
       await f.send("GET", `/api/collab${base}/feed`, who.member),
       await f.post(`${base}/check`, who.member, { scopes: ["src"] }),
       await f.post(`${base}/work`, who.member, { title: "Parser", scopes: ["lib"] }),
       await f.post(`${base}/holds/no-such-hold/release`, who.member, { fence: 1 }),
       await f.post(`${base}/holds/no-such-hold/revoke`, who.admin, {}),
     ];
-    for (const reply of replies) assert.equal(outcome(reply), "404 unknownProject", id);
+    for (const reply of replies) {
+      assert.equal(outcome(reply), "404 unknownProject", id);
+      assertNoTaskOrPathLeak(reply, `404 ${id}`);
+    }
   }
   assert.deepEqual(Object.getOwnPropertyNames(Object.prototype), prototype);
   // A refusal is no failure worth a log line.
@@ -1044,6 +1169,7 @@ test("a host that stops answers 503 on every route, frees nothing, and does not 
   const calls = [
     () => f.send("GET", "/api/collab/projects", who.admin),
     () => f.post("/projects", who.admin, { repoId: "repo-widgets" }),
+    () => f.send("GET", `/api/collab/projects/${project}/tasks`, who.member),
     () => g.feed(who.member, project),
     () => g.check(who.member, project, ["src"]),
     () => g.work(who.member, project, { title: "More", scopes: ["lib"] }),

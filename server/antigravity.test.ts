@@ -43,6 +43,7 @@ async function folder(t: TestContext) {
 async function checkout(t: TestContext) {
   const directory = await folder(t);
   await mkdir(path.join(directory, ".git"));
+  await writeFile(path.join(directory, ".git", "HEAD"), "ref: refs/heads/main\n");
   return directory;
 }
 
@@ -134,6 +135,7 @@ test("a read-only turn is denied the home directory off the way to its checkout;
   const home = realpathSync(await folder(t));
   for (const directory of ["projects/other", ".gemini/antigravity-cli/brain", ".gemini/config", "work/repo/.git"])
     await mkdir(path.join(home, directory), { recursive: true });
+  await writeFile(path.join(home, "work", "repo", ".git", "HEAD"), "ref: refs/heads/main\n");
   const previous = { home: process.env.HOME, credentials: process.env.GOOGLE_APPLICATION_CREDENTIALS };
   process.env.HOME = home;
   process.env.GOOGLE_APPLICATION_CREDENTIALS = path.join(home, "adc.json");
@@ -268,17 +270,43 @@ test("Antigravity does not start where it would load a project's hooks, MCP serv
     assert.match(error.message, /hooks\.json/);
     return true;
   });
-  // Above the repository root nothing is looked at.
+  // Above the repository root nothing is looked at, for both `.git/HEAD` and `gitdir:` files.
   const outer = await folder(t);
   await mkdir(path.join(outer, ".agents"));
   await writeFile(path.join(outer, ".agents", "mcp_config.json"), "{}");
   const inner = path.join(outer, "repository");
   await mkdir(path.join(inner, ".git"), { recursive: true });
+  await writeFile(path.join(inner, ".git", "HEAD"), "ref: refs/heads/main\n");
   assert.deepEqual(antigravityWorkspaceConfig(inner), []);
-  // Without a repository, only the working folder itself.
+  const worktree = path.join(outer, "worktree");
+  await mkdir(worktree);
+  await writeFile(path.join(worktree, ".git"), "gitdir: ../repository/.git/worktrees/wt\n");
+  assert.deepEqual(antigravityWorkspaceConfig(worktree), []);
+  // An empty orphan `.git/` inside a real repository does not hide the repository's own config.
+  await mkdir(path.join(inner, "_agent", "skills"), { recursive: true });
+  const nestedWithOrphanGit = path.join(inner, "nested");
+  await mkdir(path.join(nestedWithOrphanGit, ".git"), { recursive: true });
+  assert.deepEqual(antigravityWorkspaceConfig(nestedWithOrphanGit), [
+    path.join("..", "_agent", "skills"),
+  ]);
+  // Without a repository, only the working folder itself; an empty orphan ancestor `.git/` without `HEAD` is ignored.
   const loose = path.join(outer, "loose");
   await mkdir(loose);
   assert.deepEqual(antigravityWorkspaceConfig(loose), []);
+  const orphan = path.join(outer, "orphan");
+  await mkdir(path.join(orphan, ".git"), { recursive: true });
+  await mkdir(path.join(orphan, ".agents"), { recursive: true });
+  await writeFile(path.join(orphan, ".agents", "mcp_config.json"), "{}");
+  const underOrphan = path.join(orphan, "loose");
+  await mkdir(underOrphan);
+  assert.deepEqual(antigravityWorkspaceConfig(underOrphan), []);
+  const bogusGitFile = path.join(outer, "bogus-file");
+  await mkdir(path.join(bogusGitFile, ".agents"), { recursive: true });
+  await writeFile(path.join(bogusGitFile, ".git"), "not-a-gitdir-pointer\n");
+  await writeFile(path.join(bogusGitFile, ".agents", "mcp_config.json"), "{}");
+  const underBogusFile = path.join(bogusGitFile, "loose");
+  await mkdir(underBogusFile);
+  assert.deepEqual(antigravityWorkspaceConfig(underBogusFile), []);
 });
 
 /** The events of one agy 1.5.0 turn, with the details BELL does not read left out. */
