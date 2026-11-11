@@ -68,7 +68,7 @@ const collab = {
   keep: "Keep it",
   nothingHeld: ({ time }: { time: string }) => `Nothing is held, as of ${time}.`,
   honesty:
-    "BELL blocks overlapping holds and stops BELL PR runs, syncs, and publishes from touching paths held by someone else. It cannot stop external editors, terminal tools, a direct git push, or renaming a parent folder outside a hold.",
+    `${product.name} refuses a hold that meets another, publishes no change over someone else's hold, and stops a run whose agent changed a held path; that change stays in the working directory. It cannot stop an editor, a terminal tool or a direct git push.`,
   join: {
     title: "Join this group",
     body: "Ask an admin of this group for an invite code. A code works once, for 10 minutes.",

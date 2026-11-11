@@ -97,8 +97,9 @@ of their name (three circles and a count when there are more than four
 people); a ring marks the people who are looking at this board now.
 **Held now** has one row for each [hold](#holds), oldest first: who holds
 it and since when, its title and its paths. Your own rows say **You** and
-have **Release**. An admin has **Revoke** on the other rows, and the page
-asks once before it revokes. A hold that ends while the pointer or the
+have **Finish & release** and **Release only**
+([Release and revoke](#release-and-revoke)). An admin has **Revoke** on
+the other rows, and the page asks once before it revokes. A hold that ends while the pointer or the
 keyboard focus is in the list keeps its row, marked "No longer held",
 until both have left, so that no button moves under them. When
 [group work has stopped](#when-group-work-stops), the page says so and
@@ -153,6 +154,17 @@ the box under the paths updates by itself:
   shows as the server's sentence, and a check that got no answer says that
   BELL PR cannot be reached.
 
+**Work that waits.** Under **Must finish first**, tick the tasks of this
+repository that must be finished before yours starts, up to 50: the list
+has the tasks held now and the finished ones. While one of them is not
+finished, **Take hold** is refused and the page shows the server's
+sentence; untick it, or wait until its holder presses **Finish &
+release**. A hold taken after other tasks says "Started after …" on its
+row. **Finish & release** on your own row says the task is done, so work
+that waits for it can start; **Release only** frees the paths and leaves
+the task not done for good
+([Work that waits for other work](#work-that-waits-for-other-work)).
+
 **The chip's three words.** The chip next to the repository says how the
 board on the page is kept current, and "as of" says when it was last
 confirmed:
@@ -170,10 +182,8 @@ confirmed:
   "Reconnecting" in its place.
 
 **What stays API-only.**
-[Using the same identity on another device](#use-the-same-identity-on-another-device),
-[removing a person](#remove-a-person) and
-[work that waits for other work](#work-that-waits-for-other-work) (`dependsOn`,
-and releasing a hold with `"done": true`) are not on the page.
+[Using the same identity on another device](#use-the-same-identity-on-another-device)
+and [removing a person](#remove-a-person) are not on the page.
 
 ## Set it up
 
@@ -488,7 +498,7 @@ stops a change. Who you are:
 
 - With the `x-bell-participant` header, the person whose token it is. An
   unknown token, or one of someone removed, is answered 403 `notJoined`.
-- Without it (requests outside the Group page send none yet), everyone in
+- Without it (the app sends it once this browser has joined), everyone in
   the group who joined from the device that asks. The install token counts as one device:
   everyone who joined at the host.
 
@@ -507,8 +517,10 @@ the person of the `x-bell-participant` token, or else everyone in the
 group who joined from the device that started it. BELL PR keeps them with
 the run, so they stay its owners after a restart. A run nobody in the
 group started (a device where nobody joined) has no owners, and then
-every hold counts as someone else's. An unknown token, or one of someone
-removed, is answered 403 `notJoined` and no run is started.
+every hold counts as someone else's. In a repository of the group, an
+unknown token, or one of someone removed, is answered 403 `notJoined` and
+no run is started. A run in a repository outside the group has no owners
+and starts as it does without group work.
 
 In a repository of the group, a run's agents are held to the holds of
 everyone else:
@@ -554,22 +566,27 @@ everyone else:
   conflicts). The person sees who holds each file; the run's later turns,
   a retried teammate task, and the PR draft written from the run, are
   told only the paths.
-- **Recovering a stopped checkout.** Two API routes recover a run whose
-  checkout changes met someone else's hold:
-  - `POST /api/runs/<id>/holds/restore` with `{}` puts every changed,
-    added, deleted or moved file that meets someone else's active hold or
-    the run's recorded `heldPaths` back to the run's review base
-    (`baseSha`, or `parentCommit` of an open follow-up round), leaving
-    every other changed file untouched, clearing the hold-stop state, and
-    returning `{ run, restored }`. When reviewable changes remain on a
-    completed solo or team run that stopped as `failed`, its status
-    returns to `review`.
+- **Recovering a stopped checkout.** The page of a run that stopped this
+  way lists the files with two actions, **Put these files back** (after
+  one question) and **Check again**. They are two API routes:
+  - `POST /api/runs/<id>/holds/restore` with `{}` puts the files of the
+    run's recorded `heldPaths` (changed, added, deleted or moved) back to
+    the run's review base (`baseSha`, or `parentCommit` of an open
+    follow-up round), leaving every other changed file untouched,
+    clearing the hold-stop state, and returning `{ run, restored }`. A
+    changed file that came under someone else's hold only after the stop
+    is not put back with them: the answer is then 409 `heldByOther`,
+    `heldPaths` becomes those files, and the run page lists them to be
+    confirmed. A run saved before `heldPaths` existed gets every changed
+    file put back that meets someone else's active hold. When reviewable
+    changes remain on a completed solo or team run that a hold stopped as
+    `failed`, its status returns to `review`.
   - `POST /api/runs/<id>/holds/recheck` with `{}` re-checks the
     checkout's changed files against the current holds without modifying
     any file: it answers 409 `heldByOther` (updating `heldPaths`) while a
     conflict remains, and 200 `{ run }` once the hold is released or
-    revoked, clearing the hold-stop state and returning `failed` to
-    `review` when reviewable changes remain.
+    revoked, clearing the hold-stop state and returning a run that a
+    hold stopped as `failed` to `review` when reviewable changes remain.
 
 Turns that only read or review, and turns that work outside the run's
 checkout, are not checked. While group work
@@ -735,6 +752,7 @@ token, or a paired device's). The routes exist only with the switch.
 | `GET /api/collab/projects` | anyone who joined | 200 `{ projects: [{ id, name }], addable?, storage? }`; `addable` (`[{ repoId, name }]`) and `storage` (`{ used, max }`) for an admin only |
 | `POST /api/collab/projects` with `{ repoId }` | an admin | 201 `{ project: { id, name } }`; 403 `adminOnly`; 400 `unknownRepository`; 409 `alreadyAdded`, `full`; 500 or 504 `cloneFailed` |
 | `GET /api/collab/projects/<project id>/feed?epoch=&version=&seen=&wait=` | anyone who joined | 200 `{ epoch, version, seen, asOf, board?, present }`; 204 when nothing changed; 404 `unknownProject`; 429 `tooManyWaiters` |
+| `GET /api/collab/projects/<project id>/tasks` | anyone who joined | 200 `{ tasks: [{ taskId, title, status }] }`, the tasks held now (`held`) and the finished ones (`done`), to name in `dependsOn`; 404 `unknownProject` |
 | `POST /api/collab/projects/<project id>/check` with `{ scopes }` | anyone who joined | 200 `{ asOf, invalid, meets, changing }`; 400 `tooManyScopes`, `invalidScope`; 404 `unknownProject`; 429 `slowDown` |
 | `POST /api/collab/projects/<project id>/work` with `{ title, scopes, dependsOn? }` | anyone who joined | 201 `{ hold, changing }`; 400 `invalidScope`, `tooManyScopes`, `tooManyDependencies`, `dependencyUnknown`; 404 `unknownProject`; 409 `conflict`, `dependencyPending`, `full`; 429 `slowDown` |
 | `POST /api/collab/projects/<project id>/holds/<claimId>/release` with `{ fence, done? }` | the person who holds it | 200 `{ ok: true }`; 403 `notHolder`; 404 `unknownProject`, `unknownClaim`; 409 `staleFence`, `ended`; 500 `doneNotSaved` |

@@ -11,8 +11,10 @@ tasks: the holder says a task is done, and work that waits for a task not
 done is refused before any task is made. The core's dependencies, which
 wait for an integration, are not used. Widening, failing and reopening a
 task, `authorize` and integration are still not reachable from the app,
-the CLI or any listener, and no write is checked against a claim, so
-BELL PR still has no protection between people working on one project.
+the CLI or any listener, and the core checks no write against a claim.
+Group work checks BELL PR's own publishes and agent turns against holds
+([What a hold does not do](group-work.md#what-a-hold-does-not-do)); an
+editor, a tool or a push outside BELL PR is not checked.
 Overlap warnings for one person's own contributions (group mode) are
 unchanged.
 
