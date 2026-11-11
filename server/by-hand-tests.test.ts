@@ -779,6 +779,74 @@ test("once the run is no longer busy, a reload reads the result the save just wr
   assert.equal(saved?.byHand?.busy, undefined);
 });
 
+test("the by-hand result save keeps the run lock until the stored state is complete", async (t) => {
+  const f = await fixture(t);
+  await f.confirm(`node -e "console.log('3 passing')"`);
+  // Pause the save that writes the result, before it replaces state.json.
+  let releaseWrite = () => {};
+  let markWriting = () => {};
+  const writing = new Promise<void>((resolve) => {
+    markWriting = resolve;
+  });
+  const gate = new Promise<void>((resolve) => {
+    releaseWrite = resolve;
+  });
+  t.after(() => releaseWrite());
+  const save = f.store.save.bind(f.store);
+  let held = false;
+  f.store.save = async () => {
+    if (!held && (f.run.byHand?.tests?.length ?? 0) > 0) {
+      held = true;
+      markWriting();
+      await gate;
+    }
+    return save();
+  };
+  const done = f.runOnce();
+  let reachedWrite = false;
+  const endedFirst = done.then(
+    () => {
+      if (!reachedWrite) assert.fail("the run finished before its result was saved");
+    },
+    (error: unknown) => {
+      if (!reachedWrite) throw error;
+    },
+  );
+  await Promise.race([
+    writing.then(() => {
+      reachedWrite = true;
+    }),
+    endedFirst,
+  ]);
+  const statePath = path.join(f.store.directory, "state.json");
+  let entered = false;
+  const read = f.workbench.lock(f.run.id, async () => {
+    entered = true;
+    try {
+      const parsed = JSON.parse(readFileSync(statePath, "utf8")) as {
+        runs?: { id: string; byHand?: { busy?: unknown; tests?: TestRun[] } }[];
+      };
+      return parsed.runs?.find((run) => run.id === f.run.id);
+    } catch {
+      return undefined;
+    }
+  });
+  // The read is queued on the run lock. Let it run if that lock is free.
+  let enteredDuringWrite = false;
+  try {
+    await new Promise((resolve) => setImmediate(resolve));
+    enteredDuringWrite = entered;
+  } finally {
+    releaseWrite();
+  }
+  const seen = await read;
+  const result = await done;
+  assert.equal(enteredDuringWrite, false, "a read that takes the run lock ran while the result was still being written");
+  assert.ok(seen, "the locked read did not see a complete state");
+  assert.deepEqual(seen.byHand?.tests?.at(-1), JSON.parse(JSON.stringify(result)));
+  assert.equal(seen.byHand?.busy, undefined);
+});
+
 test("a new run starts at once when the last one shows its result and the run is no longer busy", async (t) => {
   const f = await fixture(t);
   await f.confirm(`node -e "process.exit(1)"`);
