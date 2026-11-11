@@ -19,6 +19,7 @@ export const runDetailFields = [
   "followUps",
   "sync",
   "heldChanges",
+  "heldPaths",
   "explanations",
   "walkthroughs",
   "notes",

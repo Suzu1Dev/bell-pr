@@ -6,6 +6,7 @@ import {
 } from "./prompts/setup.js";
 import { currentLocale } from "./i18n/index.js";
 import { unverifiedOutcomeNote } from "./exit-status.js";
+import { isTurnHeldByOtherMessage } from "./hold-guard.js";
 import { outputLanguage } from "./prompt-language.js";
 import { AppError, type Run } from "./types.js";
 import { z } from "zod";
@@ -193,7 +194,9 @@ export function sessionPrompt(input: {
       from: entry.role === "user" ? "person" : entry.role,
       text: entry.heldPaths?.length
         ? heldStop(entry.heldPaths)
-        : entry.content.slice(0, historyContentLimit),
+        : isTurnHeldByOtherMessage(entry.content)
+          ? legacyHeldStop
+          : entry.content.slice(0, historyContentLimit),
       ...(entry.questions?.length ? { questionsAsked: entry.questions } : {}),
       ...(entry.changedFiles?.length
         ? { filesChanged: entry.changedFiles }
@@ -226,6 +229,8 @@ const clip = (text: string, max: number) =>
  */
 const heldStop = (paths: readonly string[]) =>
   `BELL stopped this turn because it changed files other people hold; the changes are still in the checkout: ${clip(paths.join(", "), 1_000)}`;
+const legacyHeldStop =
+  "BELL stopped this turn because it changed files other people hold; the changes are still in the checkout.";
 /** Writes tied to the current diff must wait for the collaborative editor. */
 export function assertSessionIdle(run: Pick<Run, "session">) {
   if (run.session?.running) throw new AppError((m) => m.session.editing, 409);
@@ -267,6 +272,7 @@ function reportTurn(entry: SessionMessage, request: string, budget: number) {
   ];
   const summaryBudget = Math.min(1500, Math.floor(budget / 3));
   if (entry.heldPaths?.length) fixed.push(`- ${heldStop(entry.heldPaths)}`);
+  else if (isTurnHeldByOtherMessage(entry.content)) fixed.push(`- ${legacyHeldStop}`);
   else if (entry.content.trim())
     fixed.push(
       `- Agent-reported summary (UNVERIFIED; not application-observed evidence${entry.content.length > summaryBudget ? "; truncated" : ""}): ${clip(entry.content, summaryBudget)}`,

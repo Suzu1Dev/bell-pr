@@ -37,6 +37,8 @@ const methods = [
   "updateRepository",
   "createRun",
   "guardHolds",
+  "restoreHeldPaths",
+  "recheckHeldPaths",
   "sendTeamMessage",
   "approvePlan",
   "planOverlaps",

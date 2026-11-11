@@ -23,7 +23,7 @@ import type { HeldUpstreamChange } from "../shared/sync.js";
 import { nameOf, taskKey, taskOf } from "./collab-board.js";
 import { sideEntry, type CollabHost } from "./collab-host.js";
 import { notJoined } from "./collab-refusal.js";
-import { currentLocale, sm } from "./i18n/index.js";
+import { currentLocale, sm, withLocale } from "./i18n/index.js";
 import type { HoldCheck } from "./publish.js";
 import { assertGitConfigSafe, git } from "./process.js";
 import { participantOf } from "./routes/collab.js";
@@ -453,6 +453,21 @@ export function heldByOtherError(work: HeldWork, held: readonly HeldConflict[]) 
 export function heldPathsOf(error: unknown): string[] | undefined {
   if (!(error instanceof AppError) || error.details?.reason !== "heldByOther") return undefined;
   return [...new Set((error.details.held as readonly HeldConflict[]).map(({ path }) => path))];
+}
+
+/**
+ * Matches a persisted turn-level `heldByOther` error in any supported locale
+ * by its fixed prefix, without parsing paths out of text containing holder
+ * names or hold titles.
+ */
+export function isTurnHeldByOtherMessage(text: string | undefined): boolean {
+  if (!text) return false;
+  return (["en", "zh-TW"] as const).some((locale) =>
+    withLocale(locale, () => {
+      const prefix = sm().run.local.turnHeldByOther({ items: ["\0"] }).split("\0")[0];
+      return Boolean(prefix && text.startsWith(prefix));
+    }),
+  );
 }
 
 /**

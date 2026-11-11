@@ -393,6 +393,7 @@ export async function discardFollowUp(ctx: WorkbenchContext, id: string) {
       run.status = "published";
       delete run.approvedFingerprint;
       delete run.error;
+      delete run.heldPaths;
       // Reading the pushed message back needs the checkout, so the round's goes.
       const { commitMessage: _round, ...draft } = run.draft;
       run.draft = draft;
@@ -428,6 +429,7 @@ export async function discardFollowUp(ctx: WorkbenchContext, id: string) {
     run.status = "published";
     delete run.approvedFingerprint;
     delete run.error;
+    delete run.heldPaths;
     const files = await ctx.diff(id);
     // The checkout is the pushed head again, whose files were all reviewed
     // before it was pushed, except files changed by commits taken over from

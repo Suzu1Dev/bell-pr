@@ -33,7 +33,8 @@ import {
   worktreeDirty,
 } from "./pr-branch.js";
 import { assertRunAgentAllowed } from "./codex-guard.js";
-import { heldPathsOf, type HoldsAsker } from "./hold-guard.js";
+import { changedPaths, heldPathsOf, type HoldsAsker } from "./hold-guard.js";
+import { comparablePath, pathsMeet } from "./scope-paths.js";
 import { runAgent } from "./run-executor.js";
 import { contributionContext } from "./prompts/team.js";
 import { conflictPrompt } from "./prompts/sync.js";
@@ -378,7 +379,13 @@ async function syncPublishedRun(ctx: WorkbenchContext, run: Run, asker?: HoldsAs
 
 /** Returns an unpublished run to the checkout and base it had before the last sync. */
 export async function undoSync(ctx: WorkbenchContext, id: string) {
-  return logged("sync.undo", { runId: id }, () => undoSyncLocked(ctx, id));
+  return logged("sync.undo", { runId: id }, async () => {
+    const run = ctx.store.data.runs.find((item) => item.id === id);
+    if (run && !run.sync?.resolving && !run.followUps?.some((round) => round.resolving)) {
+      await ctx.conflictJobs.get(id)?.catch(() => undefined);
+    }
+    return undoSyncLocked(ctx, id);
+  });
 }
 
 async function undoSyncLocked(ctx: WorkbenchContext, id: string) {
@@ -418,6 +425,23 @@ async function undoSyncLocked(ctx: WorkbenchContext, id: string) {
     run.reviewedFingerprints = { ...(sync.reviewedFingerprints ?? {}) };
     delete run.sync;
     delete run.heldChanges;
+    if (run.heldPaths) {
+      const remaining = await changedPaths(run);
+      try {
+        const stillHeld = ctx.holds
+          ? ctx.holds.conflicts(run, remaining).map(({ path: heldPath }) => heldPath)
+          : remaining.filter((candidate) =>
+              run.heldPaths!.some(
+                (scope) =>
+                  !comparablePath(scope) || !comparablePath(candidate) || pathsMeet(scope, candidate),
+              ),
+            );
+        if (stillHeld.length) run.heldPaths = [...new Set(stillHeld)];
+        else delete run.heldPaths;
+      } catch {
+        /* Group work stopped (holdsUnknown): keep run.heldPaths intact without aborting local undo. */
+      }
+    }
     if (run.status === "approved") run.status = "review";
     delete run.approvedFingerprint;
     await ctx.diff(id);

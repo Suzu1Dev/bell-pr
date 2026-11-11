@@ -442,15 +442,37 @@ everyone else:
   files too, and a moved file at both of its paths) is compared with the
   holds of that moment.
   A change over someone else's hold stops the turn with the files.
-  Nothing is undone: the changes stay in the checkout for review, and a
-  follow-up round keeps them without a commit message. The person sees
-  who holds each file; the run's later turns, a retried teammate task,
-  and the PR draft written from the run, are told only the paths.
+  Nothing is undone: the changes stay in the checkout for review, a
+  follow-up round keeps them without a commit message, and BELL PR saves
+  the conflicting paths on the run as `heldPaths` (paths only, never
+  holder names or hold titles; exposed on `GET /api/runs/<id>` and
+  cleared once a later write turn finishes without conflict, a follow-up
+  round is discarded, or an unpublished sync is undone without remaining
+  conflicts). The person sees who holds each file; the run's later turns,
+  a retried teammate task, and the PR draft written from the run, are
+  told only the paths.
+- **Recovering a stopped checkout.** Two API routes recover a run whose
+  checkout changes met someone else's hold:
+  - `POST /api/runs/<id>/holds/restore` with `{}` puts every changed,
+    added, deleted or moved file that meets someone else's active hold or
+    the run's recorded `heldPaths` back to the run's review base
+    (`baseSha`, or `parentCommit` of an open follow-up round), leaving
+    every other changed file untouched, clearing the hold-stop state, and
+    returning `{ run, restored }`. When reviewable changes remain on a
+    completed solo or team run that stopped as `failed`, its status
+    returns to `review`.
+  - `POST /api/runs/<id>/holds/recheck` with `{}` re-checks the
+    checkout's changed files against the current holds without modifying
+    any file: it answers 409 `heldByOther` (updating `heldPaths`) while a
+    conflict remains, and 200 `{ run }` once the hold is released or
+    revoked, clearing the hold-stop state and returning `failed` to
+    `review` when reviewable changes remain.
 
 Turns that only read or review, and turns that work outside the run's
 checkout, are not checked. While group work
-[has stopped](#when-group-work-stops), turns that may change files and
-plan approvals in a repository of the group are answered 503 with
+[has stopped](#when-group-work-stops), turns that may change files, plan
+approvals, `holds/restore` and `holds/recheck` in a repository of the
+group are answered 503 with
 `reason: "holdsUnknown"`, and a plan that would start on its own fails;
 turns that only read go on. Without `--group`, and in a repository
 outside the group, nothing is checked.
@@ -633,9 +655,11 @@ token, or a paired device's). The routes exist only with the switch.
 - A body of the wrong shape (a missing or unknown field, a wrong type, a
   title that is too long) is answered 400 with `error` only.
 - With the switch, `GET /api/runs/<id>/preflight`,
-  `POST /api/runs/<id>/publish` and `POST /api/runs/<id>/sync` also check
-  holds:
-  [Publishing over someone else's hold](#publishing-over-someone-elses-hold)
+  `POST /api/runs/<id>/publish`, `POST /api/runs/<id>/sync`,
+  `POST /api/runs/<id>/holds/restore` and
+  `POST /api/runs/<id>/holds/recheck` also check holds:
+  [Publishing over someone else's hold](#publishing-over-someone-elses-hold),
+  [BELL PR's agents and someone else's hold](#bell-prs-agents-and-someone-elses-hold)
   and
   [Changes on the target branch under your hold](#changes-on-the-target-branch-under-your-hold).
 

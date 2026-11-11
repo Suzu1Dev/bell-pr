@@ -118,6 +118,7 @@ test("every detail field is left out", () => {
       "followUps",
       "guardOverrides",
       "heldChanges",
+      "heldPaths",
       "logs",
       "notes",
       "prFeedback",

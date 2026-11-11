@@ -473,6 +473,16 @@ const m: Translation<typeof en> = {
       `在你佔用期間，${branch} 上有提交改到你佔用的檔案。發佈前請先確認這些變更。`,
     heldChangedUpstreamItem: ({ path, branch, commits }) =>
       `${path}：在你佔用期間，${branch} 上有變更（${commits.join("、")}）`,
+    holdRecoveryNotAllowed:
+      "只有已完成且尚未合併 PR 的工作，才能還原佔用檔案或重新檢查佔用狀態。",
+    holdRecoveryBusy:
+      "這個工作還有作業在進行；請等完成後再還原佔用檔案或重新檢查。",
+    holdRecoveryCheckoutMissing: "找不到這個工作的工作目錄或基準提交。",
+    heldPathsRestored: ({ files }) =>
+      files.length
+        ? `已將 ${files.length} 個佔用檔案還原到工作基準：${list([...files])}。`
+        : "沒有佔用檔案與工作基準不同。",
+    heldPathsRechecked: "已重新檢查檔案佔用：目前改到的檔案都沒有被其他人佔用。",
   },
   publish: {
     heldByOther: ({ items }) =>

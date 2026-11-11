@@ -71,6 +71,7 @@ import type { WorkbenchContext } from "./workbench-context.js";
 import { planOverlaps } from "./group-local.js";
 import type { CollabHost } from "./collab-host.js";
 import { runHolds, type HoldsAsker } from "./hold-guard.js";
+import * as holdRecovery from "./hold-recovery.js";
 
 export type { WorkbenchContext };
 
@@ -441,6 +442,16 @@ export class Workbench {
 
   async retryTeam(id: string, message?: string) {
     return retryTeam(this.context, id, message);
+  }
+
+  /** Restores conflicting or recorded held paths in the run's checkout back to its base (hold-recovery.ts). */
+  async restoreHeldPaths(id: string, asker?: HoldsAsker) {
+    return holdRecovery.restoreHeldPaths(this.context, id, asker);
+  }
+
+  /** Re-evaluates the run's changed paths against current holds without modifying checkout files (hold-recovery.ts). */
+  async recheckHeldPaths(id: string, asker?: HoldsAsker) {
+    return holdRecovery.recheckHeldPaths(this.context, id, asker);
   }
 
   async startSession(id: string, content: string) {

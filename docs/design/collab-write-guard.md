@@ -353,10 +353,18 @@ the titles; a team teammate's diff that meets a hold is refused next to
   "a publish through BELL PR that changes a file someone else holds is
   refused". No data-file change and no new route. It is small: one new
   module, two call sites, two dictionary entries, and docs.
-- **S2: agent turns and plans.** Save the run's owner when it is started.
-  After each write-role turn, refuse a turn that met someone else's hold.
-  Add the prompt block, the plan-approval refusal, the check next to
-  `outOfScope` for teammates, and "Put these files back".
+- **S2: agent turns, plans, and checkout recovery (backend done).** Save
+  the run's owner when it is started. After each write-role turn, refuse
+  a turn that met someone else's hold and persist `run.heldPaths` (paths
+  only, never holder names or hold titles; cleared on a clean subsequent
+  write turn, `discardFollowUp`, or `undoSync`). Add the prompt block,
+  the plan-approval refusal, the check next to `outOfScope` for
+  teammates, and the recovery endpoints `POST /api/runs/:id/holds/restore`
+  ("Put these files back", restoring conflicting/recorded paths to
+  `reviewBaseSha`) and `POST /api/runs/:id/holds/recheck` ("Check again",
+  re-evaluating checkout changes against current holds without touching
+  files), tested in `server/hold-guard-turns.test.ts` and
+  `server/hold-guard-recovery.test.ts`.
 - **S3: sandbox denies** for held paths. Done for Codex and Claude Code
   as described under "Telling agents their scope". Still to verify:
   macOS (Seatbelt) for both, and Claude Code's Bash `denyWrite` on a host
@@ -388,6 +396,9 @@ Defaults this design takes, each open to change:
 6. **G3 (expiry) stays separate.** Admin revoke is the answer to a
    forgotten hold for now.
 
-Stopped teammate retries send held paths to the agent without holder names or
-hold titles. Older saved tasks without held paths receive a generic hold-stop
-reason in either supported locale; ordinary failure details remain available.
+Stopped teammate retries and session/PR-draft prompts send held paths to the
+agent without holder names or hold titles. Older saved runs and tasks without
+persisted `heldPaths` match localized `turnHeldByOther` / `taskHeldByOther`
+prefixes (`en` and `zh-TW`) so agents receive a generic hold-stop reason while
+recovery endpoints still clear the stop state; ordinary failure details remain
+available.

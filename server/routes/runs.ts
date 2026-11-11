@@ -57,6 +57,20 @@ export function registerRunsRoutes(
       .parse(req.body ?? {});
     res.json({ run: await workbench.retryTeam(req.params.id, message) });
   });
+  app.post("/api/runs/:id/holds/restore", async (req, res) => {
+    z.object({}).strict().parse(req.body ?? {});
+    const asker = options.collab
+      ? { participant: req.get(participantHeader), deviceId: res.locals.deviceId }
+      : undefined;
+    res.json(await workbench.restoreHeldPaths(req.params.id, asker));
+  });
+  app.post("/api/runs/:id/holds/recheck", async (req, res) => {
+    z.object({}).strict().parse(req.body ?? {});
+    const asker = options.collab
+      ? { participant: req.get(participantHeader), deviceId: res.locals.deviceId }
+      : undefined;
+    res.json(await workbench.recheckHeldPaths(req.params.id, asker));
+  });
   app.get("/api/runs", (_req, res) => {
     // Lists are polled every few seconds; the open run fetches its full record.
     res.json({ runs: workbench.store.data.runs.map(summarizeRun) });

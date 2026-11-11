@@ -779,6 +779,18 @@ export default {
       branch: string;
       commits: readonly string[];
     }) => `${path} changed on ${branch} since your hold (${commits.join(", ")})`,
+    holdRecoveryNotAllowed:
+      "Held files can only be restored or checked again on a finished run whose pull request has not merged.",
+    holdRecoveryBusy:
+      "Work is still running on this contribution. Wait for it to finish before restoring or checking held files.",
+    holdRecoveryCheckoutMissing:
+      "This run's working directory or base commit is unavailable.",
+    heldPathsRestored: ({ files }: { files: readonly string[] }) =>
+      files.length
+        ? `Put back ${count(files.length, "held file", "held files")} to the run's base: ${list([...files])}.`
+        : "No held files differed from the run's base.",
+    heldPathsRechecked:
+      "Checked file holds again: no changed files are held by someone else.",
   },
   /** The human review gate and publishing: draft, file reviews, approval and push. */
   publish: {

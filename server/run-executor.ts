@@ -412,9 +412,12 @@ export async function runAgent(
     // The check that counts: the run's changes, as the turn left them, against
     // the holds as they are now. Nothing is undone. A teammate's checkout is
     // checked when its changes are integrated (integrateTeamTask).
-    if (writes && cwd === run.worktreePath && ctx.holds) {
-      const held = assertNotHeld(ctx.holds, run, await changedPaths(run), "turn");
-      if (held.length) ctx.log(run, role, heldNotice(held), { kind: "notice" });
+    if (writes && cwd === run.worktreePath) {
+      if (ctx.holds) {
+        const held = assertNotHeld(ctx.holds, run, await changedPaths(run), "turn");
+        if (held.length) ctx.log(run, role, heldNotice(held), { kind: "notice" });
+      }
+      delete run.heldPaths;
     }
     if (agent) {
       agent.status = "complete";
@@ -427,6 +430,10 @@ export async function runAgent(
     completed = true;
     return answer;
   } catch (error) {
+    if (writes && cwd === run.worktreePath && !signal.aborted) {
+      const held = heldPathsOf(error);
+      if (held) run.heldPaths = held;
+    }
     if (agent) {
       agent.status = "failed";
       agent.detail = sm().run.agents.failed;

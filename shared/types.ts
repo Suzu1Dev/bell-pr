@@ -154,6 +154,13 @@ export interface RunCore {
    * Target branch panel still shows them.
    */
   heldChanges?: HeldUpstreamChange[];
+  /**
+   * Paths of the run's checkout that met someone else's hold when a write
+   * turn stopped (group work, S2). Paths only, never holder names or titles.
+   * Cleared when those files are put back, when a recheck finds them free, or
+   * when a later write turn finishes without a hold conflict.
+   */
+  heldPaths?: string[];
   contributionSettings?: ContributionSettings;
   team?: AgentTeam;
   /** Follow-up Q&A per diff path; absent on runs saved before it was persisted. */
@@ -246,4 +253,15 @@ export interface RunGroup {
    * split; a deleted part leaves the list.
    */
   after?: string[];
+}
+
+/** POST /api/runs/:id/holds/restore */
+export interface HoldRestoreResponse {
+  run: RunCore;
+  restored: string[];
+}
+
+/** POST /api/runs/:id/holds/recheck */
+export interface HoldRecheckResponse {
+  run: RunCore;
 }

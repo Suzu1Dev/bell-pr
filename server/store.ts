@@ -616,6 +616,7 @@ export const runReadSchema = loose({
       heldChanges: later(heldChangesSchema),
     }).optional(),
     heldChanges: later(heldChangesSchema),
+    heldPaths: later(list),
     prUrl: text.optional(),
     error: text.optional(),
     publishing: z.boolean().optional(),
