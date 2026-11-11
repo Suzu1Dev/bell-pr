@@ -10,7 +10,7 @@
 // stand-in's turn held) read with GETs only. The tests of each server
 // share it and run in order. Axe checks each new view.
 import AxeBuilder from "@axe-core/playwright";
-import { expect, request, test, type Browser, type Page } from "@playwright/test";
+import { expect, request, test, type Browser, type Page, type Response } from "@playwright/test";
 import { e2eApiHeaders } from "./api-token.mjs";
 import { readyNow } from "../shared/by-hand";
 import { changeFingerprint } from "../shared/change-fingerprint";
@@ -18,7 +18,7 @@ import panelStrings from "../src/review/i18n/en";
 import panelStringsZh from "../src/review/i18n/zh-TW";
 import { expectNoOverflow } from "./helpers/overflow";
 import { messages } from "./helpers/messages";
-import { files, prUrl, runId, startRealProject, type RealProject } from "./helpers/real-project";
+import { files, prUrl, repoId, runId, startRealProject, type RealProject } from "./helpers/real-project";
 
 const t = messages.en;
 const zh = messages["zh-TW"];
@@ -372,10 +372,25 @@ test.describe("a Learn-by-hand run in review, marked ready", () => {
       await page.getByRole("tab", { name: t.review.panel.tabs.walkthrough }).click();
       await page.locator(`.file-item[title="${files.format}"]`).click();
       await expect(page.locator(".file-item.selected")).toHaveAttribute("title", files.format);
-      await page.reload();
+      // Armed after the reload commits, so a response still in flight from
+      // before it cannot pass. The reader view's check (GET understanding)
+      // is read in the commit that would POST explanations and walkthroughs.
+      // The project's insights read is queued after that commit's effects, so
+      // its response means those POSTs would already be in the log. This run
+      // is not generating and not busy, so the diff poll and the open-run
+      // poll never start.
+      const navigation = await page.reload({ waitUntil: "commit" });
+      if (!navigation) throw new Error("The reload did not commit.");
+      const reloadedAt = navigation.request().timing().startTime;
+      const getAfterReload = (path: string) => (response: Response) =>
+        response.request().method() === "GET" &&
+        new URL(response.url()).pathname === path &&
+        response.request().timing().startTime >= reloadedAt;
+      const understanding = page.waitForResponse(getAfterReload(`/api/runs/${runId}/understanding`));
+      const insights = page.waitForResponse(getAfterReload(`/api/repos/${repoId}/insights`));
       await expect(page.locator(".explain-panel")).toBeVisible();
-      // The polls and refreshes of a few seconds pass; the network log stays empty.
-      await page.waitForTimeout(3_000);
+      await understanding;
+      await insights;
       expect(asked).toEqual([]);
       const after = (await (await page.request.get(`/api/runs/${runId}/diff`)).json()) as {
         files: { explanationStatus?: string; walkthroughStatus?: string }[];
