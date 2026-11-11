@@ -8,7 +8,6 @@ import path from "node:path";
 import { expect, test, type Page } from "@playwright/test";
 import { e2eApiHeaders } from "./api-token.mjs";
 import { getDemo } from "../src/demo/all";
-import { playbackTiming } from "../src/demo/playback";
 import common from "../src/i18n/en/common";
 import review from "../src/i18n/en/review";
 import team from "../src/i18n/en/team";
@@ -329,19 +328,8 @@ test("stopping the sample's team sends nothing and leaves it stopped", async ({ 
     // The toast shows the notice; a live region outside it reads it out.
     await expect(page.locator(".toast", { hasText: workspace.notices.demoStopped })).toBeVisible();
     await expect(page.getByRole("button", { name: workspace.activity.stopTask })).toHaveCount(0);
-    // Nothing plays on after the stop. The clock installed above, before any
-    // step timer, jumps past every later step at speed 4.
-    const speed = 4;
-    const paced = (ms: number) => Math.round(ms / speed);
-    await page.clock.runFor(
-      paced(playbackTiming.queued) +
-        paced(playbackTiming.planLine) * (demo.run.logs.length + 1) +
-        paced(playbackTiming.task) * (demo.team.tasks.length + 1) +
-        paced(playbackTiming.integrate) +
-        paced(playbackTiming.review) * 2 +
-        paced(playbackTiming.explanation) * demo.files.length +
-        paced(playbackTiming.publish),
-    );
+    // Nothing plays on after the stop, however long the sample would run.
+    await page.clock.runFor("05:00");
     await expect(badge).toHaveText(status.cancelled);
     expect(writes).toEqual([]);
   } finally {
