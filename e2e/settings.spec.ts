@@ -668,18 +668,18 @@ for (const locale of locales)
         await settle(page);
         await page.evaluate(() => document.fonts.ready);
         // Finite animations only: a spinner does not finish, and axe reads the settled colors.
-        await page.evaluate(() =>
-          Promise.allSettled(
+        await page.evaluate(async () => {
+          const moving = () =>
             document
               .getAnimations()
               .filter(
                 (animation) =>
                   animation.playState === "running" &&
                   animation.effect?.getComputedTiming().endTime !== Infinity,
-              )
-              .map((animation) => animation.finished),
-          ),
-        );
+              );
+          for (let running = moving(); running.length > 0; running = moving())
+            await Promise.allSettled(running.map((animation) => animation.finished));
+        });
         const results = await new AxeBuilder({ page })
           .options({ rules: { "color-contrast": { enabled: true } } })
           .analyze();
