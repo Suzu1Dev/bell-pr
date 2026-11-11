@@ -347,14 +347,19 @@ export function holdGuard(host: CollabHost, asker: HoldsAsker) {
 /**
  * Who starts a run, saved on it as `owners`: the participant ids that count
  * as "you" for the request that starts it, by the same rules as publishing.
- * Undefined when the repository is outside the group (a token the group
- * does not know, or group work that stopped, blocks no run there), or when
- * nobody in the group joined from that device; such a run counts every hold
- * as someone else's.
+ * Undefined when nobody in the group joined from that device; such a run
+ * counts every hold as someone else's. A request the group refuses (a token
+ * it does not know, group work that stopped) is no refusal in a repository
+ * outside the group, where nothing is checked: the run starts without owners.
  */
 export function runOwners(host: CollabHost, repoId: string, asker: HoldsAsker): string[] | undefined {
-  if (groupClaims(host, repoId) === "outside") return undefined;
-  const ids = [...yours(host, asker)].sort().slice(0, maxRunOwners);
+  let ids: string[];
+  try {
+    ids = [...yours(host, asker)].sort().slice(0, maxRunOwners);
+  } catch (error) {
+    if (groupClaims(host, repoId) === "outside") return undefined;
+    throw error;
+  }
   return ids.length ? ids : undefined;
 }
 

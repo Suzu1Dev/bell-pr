@@ -355,19 +355,17 @@ export async function restoreHeldPaths(
       const files = await ctx.diff(id);
       const remainingChanges = await allCheckoutChanges(run.worktreePath, base);
       const remaining = ctx.holds?.conflicts(run, remainingChanges) ?? [];
+      const restoredNotice = sm().run.local.heldPathsRestored({ files: targets });
       if (remaining.length && heldByOtherKind === "block") {
         run.heldPaths = [...new Set(remaining.map(({ path: heldPath }) => heldPath))];
+        // What was put back stays on record while other files wait to be confirmed.
+        if (targets.length) ctx.log(run, "system", restoredNotice, { kind: "notice" });
         await ctx.store.save();
         throw heldByOtherError("turn", remaining);
       }
       if (remaining.length) ctx.log(run, "system", heldNotice(remaining), { kind: "notice" });
       clearHoldStopState(run, files, targets.length > 0);
-      ctx.log(
-        run,
-        "system",
-        sm().run.local.heldPathsRestored({ files: targets }),
-        { kind: "notice" },
-      );
+      ctx.log(run, "system", restoredNotice, { kind: "notice" });
       await ctx.store.save();
       return { run, restored: targets };
     });

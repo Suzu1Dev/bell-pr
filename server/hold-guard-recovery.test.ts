@@ -567,6 +567,13 @@ test("POST /api/runs/:id/holds/restore puts back only the recorded paths, and re
   const first = await s.restore(run.id, s.who.member, english);
   assert.equal(outcome(first), "409 heldByOther");
   assert.deepEqual(s.f.workbench.run(run.id).heldPaths, ["src/api/later.ts"]);
+  // What was put back is in the run's log also when the answer is 409.
+  assert.equal(
+    s.f.workbench.run(run.id).logs.at(-1)?.message,
+    withLocale("en", () =>
+      sm().run.local.heldPathsRestored({ files: [".Git/notes.txt", "src/api/users.ts"] }),
+    ),
+  );
   assert.equal(await exists(path.join(run.worktreePath, ".Git/notes.txt")), false);
   assert.equal(
     await readFile(path.join(run.worktreePath, "src/api/users.ts"), "utf8"),

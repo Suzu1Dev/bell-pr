@@ -215,8 +215,13 @@ test("a run saves who starts it: the participant token, else the people who join
   assert.equal(outcome(await s.start({ ...s.devices.ben, [participantHeader]: `bpc_${"x".repeat(43)}` })), "403 notJoined");
   assert.equal(outcome(await s.start(s.who.removed)), "403 notJoined");
   assert.equal(s.f.store.data.runs.length, before);
-  // A repository outside the group is not group work: the same token is no refusal there.
+  // A repository outside the group is not group work: the same token is no refusal there,
+  // and a person of the group still owns the run, for when the repository is added later.
   assert.equal(runOwners(s.f.collab, "outside-the-group", { participant: `bpc_${"x".repeat(43)}` }), undefined);
+  assert.deepEqual(
+    runOwners(s.f.collab, "outside-the-group", { participant: s.who.member[participantHeader] }),
+    [s.ben.id],
+  );
 
   // Saved with the run, and read back after a restart, with group work or without.
   for (const id of [byToken.id, byDevice.id, nobody.id, atHost.id])
