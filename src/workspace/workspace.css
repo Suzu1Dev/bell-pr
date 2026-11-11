@@ -107,6 +107,9 @@
   gap: var(--space-2);
   margin: -8px 34px 22px;
 }
+.run-notices + .run-notices {
+  margin-top: calc(var(--space-2) - 22px);
+}
 .run-notices .run-notice {
   display: flex;
   flex-wrap: wrap;
@@ -152,6 +155,9 @@
   .run-notices {
     margin: -6px 17px 18px;
   }
+  .run-notices + .run-notices {
+    margin-top: calc(var(--space-2) - 18px);
+  }
 }
 .is-reading .run-notices {
   margin: 0 18px var(--space-2);
@@ -168,7 +174,7 @@
 }
 .hold-stop-notice h2 {
   margin: 0 0 var(--space-1);
-  color: var(--color-text-primary);
+  color: var(--color-text);
   font-size: var(--text-sm);
   line-height: 1.35;
   overflow-wrap: anywhere;

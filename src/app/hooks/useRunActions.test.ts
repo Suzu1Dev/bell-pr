@@ -744,7 +744,7 @@ test("held-file recovery uses the participant header, refreshes restore diffs, a
   }
 });
 
-test("held-file recovery omits X-Bell-Participant when no participant token is stored", async (t) => {
+test("held-file recovery omits X-Bell-Participant when no participant token is stored or blank", async (t) => {
   const realFetch = globalThis.fetch;
   const storage = Object.getOwnPropertyDescriptor(globalThis, "localStorage");
   t.after(() => {
@@ -752,9 +752,10 @@ test("held-file recovery omits X-Bell-Participant when no participant token is s
     if (storage) Object.defineProperty(globalThis, "localStorage", storage);
     else delete (globalThis as Record<string, unknown>).localStorage;
   });
+  let rawToken: string | null = null;
   Object.defineProperty(globalThis, "localStorage", {
     configurable: true,
-    value: { getItem: () => null },
+    value: { getItem: () => rawToken },
   });
   const heldRun: Run = { ...base, status: "failed", heldPaths: ["src/held.ts"] };
   const restoredRun: Run = { ...heldRun, status: "review" };
@@ -771,9 +772,69 @@ test("held-file recovery omits X-Bell-Participant when no participant token is s
   const shell = await mountActions(heldRun);
   try {
     await act(() => shell.actions().recheckHeldPaths());
+    rawToken = "   ";
     await act(() => shell.actions().restoreHeldPaths());
     assert.equal(headersSeen.length, 2);
     for (const headers of headersSeen) assert.equal(headers.has("X-Bell-Participant"), false);
+  } finally {
+    await shell.unmount();
+  }
+});
+
+test("held-file recovery skips mutating state or fetching stale diffs when runIdRef changes mid-request, and refreshes on 409 heldByOther restore", async (t) => {
+  const realFetch = globalThis.fetch;
+  t.after(() => {
+    globalThis.fetch = realFetch;
+  });
+  const heldRun: Run = { ...base, status: "failed", heldPaths: ["src/held.ts"] };
+  const remainingRun: Run = { ...heldRun, heldPaths: ["docs/guide.md"] };
+  const files = [{ path: "docs/guide.md" } as DiffFile];
+  const conflict = { path: "docs/guide.md", holder: "Dee", title: "Guide work", since: "2026-11-10T09:00:00Z" };
+  const runIdRef = { current: "r" };
+  const urls: string[] = [];
+  let mode: "switch-on-restore" | "switch-on-recheck" | "restore-conflict" = "switch-on-restore";
+
+  globalThis.fetch = (async (input: RequestInfo | URL) => {
+    const url = String(input);
+    urls.push(url);
+    if (mode === "switch-on-restore" && url.endsWith("/holds/restore")) {
+      runIdRef.current = "other-run";
+      return respond({ run: { ...heldRun, status: "review", heldPaths: undefined }, restored: ["src/held.ts"] });
+    }
+    if (mode === "switch-on-recheck" && url.endsWith("/holds/recheck")) {
+      runIdRef.current = "other-run";
+      return respond({ error: "Still held", reason: "heldByOther", held: [conflict] }, 409);
+    }
+    if (mode === "restore-conflict" && url.endsWith("/holds/restore")) {
+      return respond({ error: "Still held", reason: "heldByOther", held: [conflict] }, 409);
+    }
+    if (url === "/api/runs/r") return respond({ run: remainingRun });
+    if (url === "/api/runs/r/diff") return respond({ files });
+    throw new Error(`unexpected ${url}`);
+  }) as typeof fetch;
+
+  const shell = await mountActions(heldRun, { runIdRef, file: { path: "src/held.ts" } as DiffFile });
+  try {
+    const switchedRestore = await act(() => shell.actions().restoreHeldPaths());
+    assert.deepEqual(switchedRestore, { restored: 1 });
+    assert.deepEqual(shell.shown, []);
+    assert.deepEqual(shell.shownFiles, []);
+    assert.deepEqual(urls, ["/api/runs/r/holds/restore"]);
+
+    urls.length = 0;
+    runIdRef.current = "r";
+    mode = "switch-on-recheck";
+    const switchedRecheck = await act(() => shell.actions().recheckHeldPaths());
+    assert.deepEqual(switchedRecheck, [conflict]);
+    assert.deepEqual(shell.shown, []);
+    assert.deepEqual(urls, ["/api/runs/r/holds/recheck"]);
+
+    urls.length = 0;
+    runIdRef.current = "r";
+    mode = "restore-conflict";
+    await assert.rejects(async () => { await act(() => shell.actions().restoreHeldPaths()); }, /Still held/);
+    assert.deepEqual(shell.shown, [remainingRun]);
+    assert.deepEqual(shell.shownFiles, [files]);
   } finally {
     await shell.unmount();
   }
