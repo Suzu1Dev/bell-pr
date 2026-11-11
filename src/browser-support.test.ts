@@ -25,8 +25,9 @@ test("docs/development.md names each browser version in vite.config.ts build.tar
     const exact = version.includes(".")
       ? `${version.replaceAll(".", "\\.")}(?!\\d)`
       : `${version}(?![\\d.])`;
+    const gap = "(?:(?!\\d)[^\\n]){0,60}";
     const mentioned = new RegExp(
-      `\\b${name}\\b[^\\n]{0,60}${exact}|${exact}[^\\n]{0,60}\\b${name}\\b`,
+      `\\b${name}\\b${gap}${exact}|${exact}${gap}\\b${name}\\b`,
     ).test(docs);
     if (!mentioned) missing.push(`${name} ${version}`);
   }
