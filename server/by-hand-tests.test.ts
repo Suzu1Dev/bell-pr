@@ -811,22 +811,19 @@ test("the by-hand result save keeps the run lock until the stored state is compl
     }
     return save();
   };
-  const done = f.runOnce();
-  let reachedWrite = false;
-  const endedFirst = done.then(
-    () => {
-      if (!reachedWrite) assert.fail("the run finished before its result was saved");
-    },
-    (error: unknown) => {
-      if (!reachedWrite) throw error;
-    },
-  );
-  await Promise.race([
-    writing.then(() => {
-      reachedWrite = true;
-    }),
-    endedFirst,
-  ]);
+  await en(() => f.byHand.runTests(f.run.id, {}));
+  // The 30s wait in finished() never names a missing lock. The job ending
+  // without this save means the write did not run inside workbench.lock.
+  const saveOrEnd = async () => {
+    for (;;) {
+      if (held) return;
+      const live = await en(() => f.byHand.liveTests(f.run.id));
+      if (!live.running) return;
+      await new Promise((resolve) => setImmediate(resolve));
+    }
+  };
+  await Promise.race([writing, saveOrEnd()]);
+  if (!held) assert.fail("save ran outside workbench.lock");
   const statePath = path.join(f.store.directory, "state.json");
   let entered = false;
   const read = f.workbench.lock(f.run.id, async () => {
@@ -840,17 +837,17 @@ test("the by-hand result save keeps the run lock until the stored state is compl
       return undefined;
     }
   });
-  // The read is queued on the run lock. Let it run if that lock is free.
-  let enteredDuringWrite = false;
   try {
+    // lock() chains tasks on a promise. A free lock runs the read on a
+    // microtask, which is before this setImmediate.
     await new Promise((resolve) => setImmediate(resolve));
-    enteredDuringWrite = entered;
+    if (entered) assert.fail("save ran outside workbench.lock");
   } finally {
     releaseWrite();
   }
   const seen = await read;
-  const result = await done;
-  assert.equal(enteredDuringWrite, false, "a read that takes the run lock ran while the result was still being written");
+  const result = f.run.byHand?.tests?.at(-1);
+  assert.ok(result);
   assert.ok(seen, "the locked read did not see a complete state");
   assert.deepEqual(seen.byHand?.tests?.at(-1), JSON.parse(JSON.stringify(result)));
   assert.equal(seen.byHand?.busy, undefined);
