@@ -448,7 +448,10 @@ export function registerCollabBoardRoutes(
           if (removed()) {
             await coordinator
               .release(actor, projectId, claim.id, { fence: claim.fence })
-              .catch(() => undefined);
+              .catch((error) => {
+                // An admin's revoke was there first.
+                if (reasonOf(error) !== "ended") throw error;
+              });
             if (sideEntry(host.side().holds, key) !== undefined)
               await host.saveSide((draft) => dropHoldEntries(draft, [key])).catch(() => undefined);
             throw notJoined();

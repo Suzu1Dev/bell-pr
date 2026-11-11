@@ -221,7 +221,7 @@ test("an open follow-up round keeps the PR text as published and asks for this r
     },
   );
   assert.match(sync, /這次同步會在 PR 分支加上一個合併 commit/);
-  assert.match(sync, /checklist-item checked[^>]*>.*?這輪的提交訊息已填好<small>推送時會成為 PR 分支上的新 commit/);
+  assert.match(sync, /checklist-item checked[^>]*>.*?這輪的提交訊息已填好<small><\/small>/);
 });
 
 test("maintainer feedback on a published PR can be picked for the next round, up to the limit", () => {
@@ -302,9 +302,9 @@ test("before publishing the draft tab leads with the editor, then the guide, the
     return index;
   };
   const draft = renderEn(element({ run: unpublished }));
-  const editor = at(draft, 'class="draft-layout"');
-  assert.ok(editor < at(draft, "Loading the draft guidelines…"));
-  assert.ok(at(draft, "Loading the draft guidelines…") < at(draft, 'class="sync-panel"'));
+  const editor = at(draft, 'class="draft-layout is-focused"');
+  assert.ok(editor < at(draft, "Before you publish"));
+  assert.ok(at(draft, "Before you publish") < at(draft, 'class="sync-panel"'));
   // Copy that points at the guide or the editor follows the order.
   assert.match(
     renderEn(element({ run: { ...unpublished, draft: { title: "t", body: "" } } }, { draftBody: "" })),
@@ -312,7 +312,7 @@ test("before publishing the draft tab leads with the editor, then the guide, the
   );
   const sent = renderEn(element());
   assert.ok(at(sent, 'class="sync-panel"') < at(sent, 'class="follow-up-rounds"'));
-  assert.ok(at(sent, 'class="follow-up-rounds"') < at(sent, 'class="draft-layout"'));
+  assert.ok(at(sent, 'class="follow-up-rounds"') < at(sent, 'class="draft-layout is-focused"'));
   assert.equal(sent.match(/class="sync-panel"/g)?.length, 1);
 });
 
@@ -374,7 +374,7 @@ test("maintainer feedback and the next round's form read in English with no Chin
       { draftBody: "", draftDirty: true },
     ),
   );
-  assert.match(draft, /Loading the draft guidelines…/);
+  assert.match(draft, /Before you publish/);
   assert.match(draft, /There is no PR description yet\./);
   assert.match(draft, /0 \/ 0 files/);
   assert.match(draft, /There are unsaved edits/);

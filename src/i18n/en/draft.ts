@@ -17,7 +17,7 @@ const draft = {
   /** DraftGuidancePanel: the project's rules, the suggested draft and its sources. */
   guidance: {
     eyebrow: "CONTRIBUTION GUIDE",
-    title: "Write a PR that maintainers can follow",
+    title: "Draft suggestions",
     intro:
       "Read the contribution rules and the template first, then turn this contribution into a clear draft.",
     status: {
@@ -124,7 +124,9 @@ const draft = {
      * the unsaved etiquette checkboxes.
      */
     checklist: {
-      title: "The maintainer checklist",
+      sources: "Sources",
+      completed: ({ passed, off }: { passed: number; off: number }) => `${passed} passed${off ? ` · ${off} off` : ""}`,
+      title: "Before you publish",
       intro:
         "What maintainers check before they spend time on a pull request, read from the project's rules, GitHub and this change. Publishing runs the same checks.",
       rulesRead: ({ date }: { date: string }) => `Rules read ${date}`,
@@ -294,6 +296,7 @@ const draft = {
    * reference.
    */
   reviewability: {
+    reference: "How size is assessed and recent project examples",
     title: "How reviewable is this change?",
     bands: {
       small: "Small",

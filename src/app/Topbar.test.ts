@@ -52,7 +52,7 @@ test("the top bar reads in English with no Chinese left", () => {
   assert.match(html, /<span class="readiness-text">Ready<\/span>/);
   assert.match(html, /aria-label="Collapse the sidebar"/);
   assertNoHan(html);
-  for (const page of ["home", "repos", "explore", "discovery", "team", "learning", "settings"] as const)
+  for (const page of ["home", "repos", "explore", "discovery", "team", "group", "learning", "settings"] as const)
     assertNoHan(renderEn(element({ page, sidebarCollapsed: true, report: broken })));
   assert.match(renderEn(element({ page: "settings" })), /<span class="breadcrumb-page">Settings<\/span>/);
   assert.match(renderEn(element({ page: "home" })), /<span class="breadcrumb-page">Home<\/span>/);

@@ -57,6 +57,8 @@ export function holdOf(side: CollabSide, projectId: string, claim: ClaimView): C
  */
 export function inTheWay(view: ProjectView, scopes: string[]) {
   const found: { claim: ClaimView; scope: string }[] = [];
+  // shortcut: each asked path against each held one (about half a second for 50 against
+  // the 20,000 a group can hold), sort as scopeParents does once groups hold thousands.
   for (const claim of view.claims) {
     if (claim.status !== "held") continue;
     for (const scope of claim.scopes)

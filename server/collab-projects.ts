@@ -91,6 +91,8 @@ export class CollabProjects {
     const name = repo.fullName.slice(0, 200);
     const target = path.join(dataPaths(this.store.directory).collabRepos, `${id}.git`);
     this.adding.add(repoId);
+    // Taken now: stop() puts a new one in its place.
+    const { signal } = this.stopping;
     try {
       return await this.host.run(async () => {
         try {
@@ -110,7 +112,7 @@ export class CollabProjects {
               target,
             ],
             // The time limit of BELL's own copy of a local repository (repositories.ts).
-            { timeoutMs: 180_000, maxBytes: 1_000_000, signal: this.stopping.signal },
+            { timeoutMs: 180_000, maxBytes: 1_000_000, signal },
           );
           await this.host.coordinator().defineProject(id, target, repo.defaultBranch);
           await this.host.saveSide((draft) => {

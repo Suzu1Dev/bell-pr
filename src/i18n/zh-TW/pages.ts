@@ -14,7 +14,7 @@ const m: Translation<typeof en> = {
   },
   team: {
     eyebrow: "為協作而生",
-    title: "一個目標，一支 Agent team。",
+    title: "AI 團隊如何分工",
     intro: "從拆解問題到交叉審查，讓專業分工融入你的開發流程。",
     assign: "指派新任務",
     roles: {

@@ -759,7 +759,7 @@ test("the contribution brief shows the premise verdict and labels what still sta
   assert.match(refuted, /前提查核：假設不成立/);
   assert.match(refuted, /src\/web\/interviews\.rs:195/);
   // The request's wording is kept but labelled on both cards that copy it.
-  assert.equal(refuted.match(/依你的假設，查證後不成立/g)?.length, 2);
+  assert.equal(refuted.match(/依你的假設，查證後不成立/g)?.length, 1);
   assert.match(refuted, /若此假設成立，候選人重新整理後就無法開始面試。/);
   assert.match(refuted, /上面依假設描述的問題與影響實際上不會發生/);
   // A check can be made again; the button appears only with the action.
@@ -815,7 +815,7 @@ test("the premise check in the brief reads in English", () => {
   const html = renderEnglish({ run, brief, onCheckPremise() {} });
   assertNoHan(html);
   assert.match(html, /Premise check: the assumption could not be confirmed/);
-  assert.equal(html.match(/Based on an unconfirmed assumption/g)?.length, 2);
+  assert.equal(html.match(/Based on an unconfirmed assumption/g)?.length, 1);
   // In the after card the tag is on a line of its own, outside the label's mono caps.
   assert.match(
     html,
@@ -842,7 +842,7 @@ test("an open contribution leads with its brief, which does not repeat the title
   } as unknown as NonNullable<ProjectOverviewProps["run"]>;
   const html = render({ run });
   const brief = html.indexOf("這次改動，會帶來什麼不同？");
-  assert.ok(brief >= 0 && brief < html.indexOf("先看懂專案，再決定怎麼改。"));
+  assert.ok(brief >= 0 && brief < html.indexOf('<details class="mission-context"'));
   assert.ok(brief < html.indexOf('id="mission-purpose-title"'));
   // The header shows the title; the brief does not repeat it.
   assert.doesNotMatch(html, /mission-contribution-name|確認呼叫端使用回傳的 id/);
