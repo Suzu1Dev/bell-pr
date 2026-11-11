@@ -205,7 +205,9 @@ async function pipeless(directory: string, exitCode?: number) {
 
 test("a confirmed command that exits 0 is recorded as passed, with the prediction and the change it ran on", async (t) => {
   const f = await fixture(t);
-  await f.confirm(`node -e "console.log('3 passing')"`);
+  // Stays running past the 202, so the response still shows the tests as busy.
+  const command = `node -e "setTimeout(() => console.log('3 passing'), 1000)"`;
+  await f.confirm(command);
   const count = f.run.byHand?.tests?.length ?? 0;
   const started = await en(() => f.byHand.runTests(f.run.id, { prediction: "pass", expect: "  retries a 503  " }));
   // 202 body: the run, busy with the tests until they finish.
@@ -215,7 +217,7 @@ test("a confirmed command that exits 0 is recorded as passed, with the predictio
   const files = await readDiff(f.run);
   assert.equal(result.outcome, "passed");
   assert.equal(result.exitCode, 0);
-  assert.equal(result.command, `node -e "console.log('3 passing')"`);
+  assert.equal(result.command, command);
   assert.equal(result.changeFingerprint, changeFingerprint(files));
   assert.equal(result.prediction, "pass");
   assert.equal(result.expect, "retries a 503");
