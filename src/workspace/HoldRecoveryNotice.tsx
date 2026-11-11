@@ -144,6 +144,16 @@ export function HoldRecoveryNotice({
     );
   };
 
+  /** The card goes once the stop is cleared: focus moves to the run's heading instead of being lost with its button. */
+  const focusHeadingOnceGone = (targetRunId: string) => {
+    if (latestRecoverable.current) {
+      focusHeadingForRun.current = targetRunId;
+    } else {
+      focusHeadingForRun.current = undefined;
+      focusWorkspaceHeading();
+    }
+  };
+
   const openConfirm = () => {
     if (current.pending) return;
     const targetRunId = run.id;
@@ -182,12 +192,7 @@ export function HoldRecoveryNotice({
           ? { ...prev, confirming: false, pending: undefined, conflicts: [] }
           : prev,
       );
-      if (!latestRecoverable.current) {
-        focusHeadingForRun.current = undefined;
-        focusWorkspaceHeading();
-      } else {
-        focusHeadingForRun.current = targetRunId;
-      }
+      focusHeadingOnceGone(targetRunId);
       if (result.refreshError) actions.notify(result.refreshError.message, "error");
       else if (result.restored === 0) actions.notify(t.notices.holdCleared, "success");
       else actions.notify(t.notices.heldFilesRestored({
@@ -248,6 +253,7 @@ export function HoldRecoveryNotice({
           : prev,
       );
       if (!nextConflicts.length) {
+        focusHeadingOnceGone(targetRunId);
         actions.notify(t.notices.holdCleared, "success");
         return;
       }

@@ -226,6 +226,37 @@ test("restore asks for confirmation with TriangleAlert mark, blocks close while 
   }
 });
 
+test("Check again moves focus to .workspace-heading h1 when the stop is cleared", async () => {
+  function Page() {
+    const [currentRun, setCurrentRun] = useState(run);
+    return createElement(
+      "div",
+      null,
+      createElement("section", { className: "workspace-heading" }, createElement("h1", { tabIndex: -1 }, currentRun.title)),
+      createElement(HoldRecoveryNotice, {
+        run: currentRun,
+        busy: false,
+        actions: actions({
+          recheckHeldPaths: async () => {
+            setCurrentRun({ ...run, status: "review", heldPaths: undefined });
+            return [];
+          },
+        }),
+      }),
+    );
+  }
+
+  const view = await mount(createElement(Page));
+  try {
+    await click(button(view, "Check again"));
+    assert.doesNotMatch(view.text(), /Stopped because/);
+    const heading = view.container.querySelectorAll((node) => node.nodeName === "H1")[0]!;
+    assert.equal((globalThis.document as unknown as { activeElement: FakeElement | null }).activeElement, heading);
+  } finally {
+    await view.unmount();
+  }
+});
+
 test("switching runs while restore or recheck is in flight never mutates dialog, pending, conflicts, or focus on the newly selected run", async () => {
   let finishRun1Restore!: (result: HoldRestoreResult) => void;
   const run1Restore = new Promise<HoldRestoreResult>((resolve) => { finishRun1Restore = resolve; });

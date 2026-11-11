@@ -833,7 +833,11 @@ function Board(props: BoardProps) {
                   <button
                     type="button"
                     className="button secondary"
-                    onClick={() => setPrerequisites([])}
+                    onClick={() => {
+                      setPrerequisites([]);
+                      // The button goes with the selection: the focus must not go with it.
+                      focusSoon("#hold-paths");
+                    }}
                   >
                     {t.dependsOn.clear}
                   </button>
