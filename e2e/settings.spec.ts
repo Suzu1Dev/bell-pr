@@ -667,8 +667,19 @@ for (const locale of locales)
         await expect(page.locator("html")).toHaveAttribute("lang", htmlLang(locale));
         await settle(page);
         await page.evaluate(() => document.fonts.ready);
-        // Let transitions settle before colors are read.
-        await page.waitForTimeout(300);
+        // Finite animations only: a spinner does not finish, and axe reads the settled colors.
+        await page.evaluate(() =>
+          Promise.allSettled(
+            document
+              .getAnimations()
+              .filter(
+                (animation) =>
+                  animation.playState === "running" &&
+                  animation.effect?.getComputedTiming().endTime !== Infinity,
+              )
+              .map((animation) => animation.finished),
+          ),
+        );
         const results = await new AxeBuilder({ page })
           .options({ rules: { "color-contrast": { enabled: true } } })
           .analyze();
