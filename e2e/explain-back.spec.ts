@@ -41,8 +41,19 @@ async function answer(page: Page, question: string, text: string, confidence: st
 /** No serious or critical axe issue (color contrast included) on the page as it is. */
 async function expectAccessible(page: Page, where: string) {
   await page.evaluate(() => document.fonts.ready);
-  // Let transitions (focus rings, chips) settle before colors are read.
-  await page.waitForTimeout(300);
+  // Finite animations (focus rings, chips) only; a spinner does not finish.
+  await page.evaluate(async () => {
+    const moving = () =>
+      document
+        .getAnimations()
+        .filter(
+          (animation) =>
+            animation.playState === "running" &&
+            animation.effect?.getComputedTiming().endTime !== Infinity,
+        );
+    for (let running = moving(); running.length > 0; running = moving())
+      await Promise.allSettled(running.map((animation) => animation.finished));
+  });
   const { violations } = await new AxeBuilder({ page })
     .options({ rules: { "color-contrast": { enabled: true } } })
     .analyze();
