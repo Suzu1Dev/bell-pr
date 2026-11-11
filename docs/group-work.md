@@ -519,8 +519,9 @@ the run, so they stay its owners after a restart. A run nobody in the
 group started (a device where nobody joined) has no owners, and then
 every hold counts as someone else's. In a repository of the group, an
 unknown token, or one of someone removed, is answered 403 `notJoined` and
-no run is started. A run in a repository outside the group has no owners
-and starts as it does without group work.
+no run is started. In a repository outside the group such a token refuses
+nothing and the run starts without owners, as long as `collab.json` still
+says which repositories are in the group.
 
 In a repository of the group, a run's agents are held to the holds of
 everyone else:
@@ -567,8 +568,9 @@ everyone else:
   a retried teammate task, and the PR draft written from the run, are
   told only the paths.
 - **Recovering a stopped checkout.** The page of a run that stopped this
-  way lists the files with two actions, **Put these files back** (after
-  one question) and **Check again**. They are two API routes:
+  way lists the files with two actions, **Put these files back** (**Put
+  this file back** for one file; after one question) and **Check again**.
+  They are two API routes:
   - `POST /api/runs/<id>/holds/restore` with `{}` puts the files of the
     run's recorded `heldPaths` (changed, added, deleted or moved) back to
     the run's review base (`baseSha`, or `parentCommit` of an open
@@ -576,8 +578,8 @@ everyone else:
     clearing the hold-stop state, and returning `{ run, restored }`. A
     changed file that came under someone else's hold only after the stop
     is not put back with them: the answer is then 409 `heldByOther`,
-    `heldPaths` becomes those files, and the run page lists them to be
-    confirmed. A run saved before `heldPaths` existed gets every changed
+    `heldPaths` becomes those files, the run's log says what was put
+    back, and the run page lists the new files to be confirmed. A run saved before `heldPaths` existed gets every changed
     file put back that meets someone else's active hold. When reviewable
     changes remain on a completed solo or team run that a hold stopped as
     `failed`, its status returns to `review`.

@@ -75,8 +75,9 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   held paths read-only in the sandbox, and a teammate's change over one is
   not integrated. A turn that still changed such a file stops the run,
   with the change left in the checkout: the run page lists the files with
-  **Put these files back** (to the run's base, after one question; other
-  changed files stay) and **Check again**, also
+  **Put these files back** (**Put this file back** for one file; to the
+  run's base, after one question; other changed files stay) and **Check
+  again**, also
   `POST /api/runs/<id>/holds/restore` and `/holds/recheck`. A run keeps
   who started it (`owners`) and the files that stopped it (`heldPaths`).
   Sync and the first publish report commits on the target branch that
