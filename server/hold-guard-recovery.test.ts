@@ -552,13 +552,15 @@ test("POST /api/runs/:id/holds/restore restores modified, deleted, untracked, st
 test("POST /api/runs/:id/holds/restore puts back only the recorded paths, and recovery returns only a hold-stopped run to review", async (t) => {
   const s = await localScene(t);
   await s.hold(s.who.admin, ["src/api"], "API overhaul");
+  // Only a case-sensitive file system can keep ".Git/notes.txt" beside the checkout's own ".git".
+  const odd = process.platform === "linux" ? [".Git/notes.txt"] : [];
   const run = await s.makeRun([s.ben.id], {
     status: "failed",
     error: withLocale("en", () => sm().run.local.turnHeldByOther({ items: ["src/api/users.ts"] })),
     // ".Git/notes.txt" cannot be compared with a hold: it names itself only, not every changed file.
     heldPaths: [".Git/notes.txt", "src/api/users.ts"],
   });
-  await write(run.worktreePath, ".Git/notes.txt", "notes\n");
+  for (const file of odd) await write(run.worktreePath, file, "notes\n");
   await write(run.worktreePath, "src/api/users.ts", "export const users = ['conflicting'];\n");
   // Changed under the hold after the stop, so the run page has not listed it yet.
   await write(run.worktreePath, "src/api/later.ts", "export const later = 1;\n");
@@ -571,7 +573,7 @@ test("POST /api/runs/:id/holds/restore puts back only the recorded paths, and re
   assert.equal(
     s.f.workbench.run(run.id).logs.at(-1)?.message,
     withLocale("en", () =>
-      sm().run.local.heldPathsRestored({ files: [".Git/notes.txt", "src/api/users.ts"] }),
+      sm().run.local.heldPathsRestored({ files: [...odd, "src/api/users.ts"] }),
     ),
   );
   assert.equal(await exists(path.join(run.worktreePath, ".Git/notes.txt")), false);
