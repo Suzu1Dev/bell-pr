@@ -9,6 +9,11 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **Welcome fades the end of an install command** that is wider than its
+  box, so a narrow window shows that the command continues. The fade uses
+  the command's own background and disappears once the command is scrolled
+  to the end. Where the command fits, including a wide window, nothing is
+  added.
 - **Group work for the people who share one BELL PR, from the command
   line and the API.** `bell-pr start --group` (or `BELLPR_GROUP=1`) turns
   it on. The person at the host sets the group up with

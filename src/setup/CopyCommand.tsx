@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Check, Copy } from "lucide-react";
 import { useT } from "../i18n";
 import "./setup.css";
@@ -35,6 +35,34 @@ export function CopyCommand({
     return () => clearTimeout(timer);
   }, [state]);
 
+  // A right-edge fade only while the command is wider than the box and not
+  // scrolled to the end. Scroll-driven masks need newer browsers than this
+  // app's floor (Chrome 111, Firefox 113, Safari 16.2).
+  useLayoutEffect(() => {
+    const node = code.current;
+    const frame = node?.parentElement;
+    if (!node || !codeLabel || !frame?.classList.contains("copy-command-scroller")) return;
+    let live = true;
+    const update = () => {
+      if (!live) return;
+      frame.toggleAttribute(
+        "data-overflow",
+        node.scrollWidth - node.clientWidth - node.scrollLeft > 1,
+      );
+    };
+    update();
+    node.addEventListener("scroll", update, { passive: true });
+    const observer = new ResizeObserver(update);
+    observer.observe(node);
+    observer.observe(frame);
+    void document.fonts?.ready.then(update);
+    return () => {
+      live = false;
+      node.removeEventListener("scroll", update);
+      observer.disconnect();
+    };
+  }, [codeLabel, command]);
+
   const selectCommand = () => {
     const node = code.current;
     const selection = window.getSelection?.();
@@ -60,15 +88,23 @@ export function CopyCommand({
     <div className="copy-command">
       {label && <span className="copy-command-label">{label}</span>}
       <div className="copy-command-row">
-        <code
-          ref={code}
-          className={codeClassName}
-          tabIndex={codeLabel ? 0 : undefined}
-          role={codeLabel ? "region" : undefined}
-          aria-label={codeLabel}
-        >
-          {command}
-        </code>
+        {codeLabel ? (
+          <span className="copy-command-scroller">
+            <code
+              ref={code}
+              className={codeClassName}
+              tabIndex={0}
+              role="region"
+              aria-label={codeLabel}
+            >
+              {command}
+            </code>
+          </span>
+        ) : (
+          <code ref={code} className={codeClassName}>
+            {command}
+          </code>
+        )}
         <button
           type="button"
           className="button secondary copy-command-button"

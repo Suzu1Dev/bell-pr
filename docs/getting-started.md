@@ -61,6 +61,10 @@ to one CLI, as the same user that runs BELL PR:
 - Antigravity CLI: `curl -fsSL https://antigravity.google/cli/install.sh | bash`,
   then run `agy` once to sign in.
 
+On a narrow window a command stays on one line and scrolls sideways. A fade
+at the right edge shows that more of it is hidden, and disappears once you
+reach the end.
+
 The sample tour is on that Welcome screen. It makes no AI call and sends
 nothing to GitHub. A real agent run still waits until a provider is ready.
 

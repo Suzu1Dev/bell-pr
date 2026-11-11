@@ -158,12 +158,34 @@
   margin: 0;
 }
 /* One line, scrolled sideways. Scoped here so the shared command style is unchanged. */
+.welcome-install .copy-command-scroller {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  max-width: 100%;
+}
+@media (min-width: 601px) {
+  .welcome-install .copy-command-scroller {
+    flex: 1;
+  }
+}
 .welcome-install code.welcome-command {
   white-space: pre;
   max-width: 100%;
   overflow-x: auto;
   overflow-wrap: normal;
   word-break: normal;
+}
+.welcome-install .copy-command-scroller[data-overflow]::after {
+  content: "";
+  position: absolute;
+  z-index: 1;
+  top: 1px;
+  right: 1px;
+  bottom: 1px;
+  width: var(--space-8);
+  pointer-events: none;
+  background: linear-gradient(to left, var(--color-surface-sunken), transparent);
 }
 .welcome-provider-state:empty {
   display: none;

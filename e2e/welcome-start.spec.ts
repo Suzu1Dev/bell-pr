@@ -113,3 +113,160 @@ test("a first start with no provider CLI opens Welcome and shows how to install 
     await server.stop();
   }
 });
+
+/** Whether each install command overflows, and whether a right-edge fade is showing. */
+async function commandFade(page: Page) {
+  return page.locator(".welcome-command").evaluateAll((codes) =>
+    codes.map((code) => {
+      if (!(code instanceof HTMLElement))
+        return { text: "", overflow: false, atEnd: true, shown: false };
+      const frame = code.parentElement;
+      const after = frame ? getComputedStyle(frame, "::after") : null;
+      const content = after?.content ?? "none";
+      const shown =
+        !!after &&
+        content !== "none" &&
+        content !== "normal" &&
+        after.display !== "none" &&
+        after.visibility !== "hidden" &&
+        parseFloat(after.opacity) > 0 &&
+        parseFloat(after.width) > 0;
+      const overflow = code.scrollWidth > code.clientWidth + 1;
+      const atEnd = code.scrollLeft + code.clientWidth >= code.scrollWidth - 1;
+      return { text: code.textContent ?? "", overflow, atEnd, shown };
+    }),
+  );
+}
+
+/**
+ * Narrow windows fade a command only while part of it is still hidden.
+ * A wide window, where every command fits, shows no fade.
+ */
+test("an install command fades at the right edge only while it overflows", async ({ browser }) => {
+  const server = await launchServer({ settingsPut: false, force: false });
+  const context = await browser.newContext({
+    extraHTTPHeaders: e2eApiHeaders,
+    baseURL: server.baseURL,
+    locale: "en-US",
+    viewport: { width: 1280, height: 800 },
+    deviceScaleFactor: 1,
+    permissions: ["clipboard-read", "clipboard-write"],
+  });
+  const page = await context.newPage();
+  await page.goto("/#/home");
+  try {
+    await expect(page.locator(".welcome-screen")).toBeVisible();
+    await providerStep(page, onboarding.next);
+    await expect(page.locator(".welcome-command").first()).toBeVisible();
+    await page.evaluate(() => document.fonts.ready);
+
+    const expectFade = async (width: number, narrow: boolean) => {
+      await page.setViewportSize({ width, height: 800 });
+      await expect
+        .poll(async () => {
+          const rows = await commandFade(page);
+          const wanted = (row: (typeof rows)[number]) => row.overflow && !row.atEnd;
+          if (!narrow) {
+            return rows.every((row) => !row.overflow && !row.shown)
+              ? "ok"
+              : rows.map((row) => `${row.text} overflow=${row.overflow} fade=${row.shown}`).join("; ");
+          }
+          if (!rows.some((row) => row.overflow)) return "nothing overflows";
+          const wrong = rows.filter((row) => row.shown !== wanted(row));
+          return wrong.length === 0
+            ? "ok"
+            : wrong
+                .map((row) => `${row.text} overflow=${row.overflow} atEnd=${row.atEnd} fade=${row.shown}`)
+                .join("; ");
+        })
+        .toBe("ok");
+    };
+
+    const scrollCommands = (toEnd: boolean) =>
+      page.locator(".welcome-command").evaluateAll((codes, end) => {
+        for (const code of codes) {
+          if (!(code instanceof HTMLElement)) continue;
+          code.scrollLeft = end && code.scrollWidth > code.clientWidth + 1 ? code.scrollWidth : 0;
+        }
+      }, toEnd);
+
+    for (const width of [320, 375]) {
+      await expectFade(width, true);
+      await scrollCommands(true);
+      await expect
+        .poll(async () => (await commandFade(page)).every((row) => !row.shown))
+        .toBe(true);
+      await scrollCommands(false);
+      await expectFade(width, true);
+    }
+
+    await page.setViewportSize({ width: 320, height: 800 });
+    const curled = "curl -fsSL https://antigravity.google/cli/install.sh | bash";
+    const curl = page.locator(".welcome-command", { hasText: curled });
+    await curl.evaluate((code) => {
+      code.scrollLeft = 0;
+    });
+    await expect.poll(async () => (await commandFade(page)).find((row) => row.text === curled)?.shown).toBe(true);
+    await curl.evaluate((code) => {
+      code.focus({ focusVisible: true } as FocusOptions);
+    });
+    const ring = await curl.evaluate((code) => {
+      const box = code.getBoundingClientRect();
+      const frame = code.parentElement;
+      const shadow = getComputedStyle(code).boxShadow;
+      if (!(frame instanceof HTMLElement)) return { shadow, coversRing: true };
+      const after = getComputedStyle(frame, "::after");
+      if (after.content === "none" || after.content === "normal")
+        return { shadow, coversRing: true };
+      const frameBox = frame.getBoundingClientRect();
+      const width = parseFloat(after.width);
+      const right = parseFloat(after.right) || 0;
+      const top = parseFloat(after.top) || 0;
+      const fadeRight = frameBox.right - right;
+      const fadeLeft = fadeRight - width;
+      const fadeTop = frameBox.top + top;
+      const coversRing = fadeLeft < box.left - 0.5 || fadeRight > box.right + 0.5 || fadeTop < box.top - 0.5;
+      return { shadow, coversRing };
+    });
+    expect(ring.shadow).not.toBe("none");
+    expect(ring.coversRing).toBe(false);
+    const before = await curl.evaluate((code) => code.scrollLeft);
+    await curl.press("ArrowRight");
+    await expect.poll(() => curl.evaluate((code) => code.scrollLeft)).toBeGreaterThan(before);
+    const atEnd = (code: HTMLElement) => code.scrollLeft + code.clientWidth >= code.scrollWidth - 1;
+    await expect
+      .poll(async () => {
+        const done = await curl.evaluate(atEnd);
+        if (!done) await curl.press("ArrowRight");
+        return done;
+      })
+      .toBe(true);
+    await expect.poll(async () => (await commandFade(page)).find((row) => row.text === curled)?.shown).toBe(false);
+
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    const motion = await page.locator(".welcome-install").evaluate(() => {
+      const frame = document.querySelector(".welcome-command")?.parentElement;
+      const after = frame ? getComputedStyle(frame, "::after") : null;
+      return {
+        animation: after?.animationName ?? "none",
+        transition: after?.transitionDuration ?? "0s",
+      };
+    });
+    expect(motion.animation).toBe("none");
+    expect(motion.transition).toBe("0s");
+
+    await page.getByRole("button", { name: `Copy the command: ${curled}` }).click();
+    await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe(curled);
+    await expect(curl).toHaveText(curled);
+
+    await expectFade(1280, false);
+    await commandsOnOneLine(page, 320);
+    await commandsOnOneLine(page, 375);
+    await commandsOnOneLine(page, 1280);
+    await fits(page, 320);
+    await fits(page, 1280);
+  } finally {
+    await context.close();
+    await server.stop();
+  }
+});
