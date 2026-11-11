@@ -8,7 +8,7 @@ import test, { after, before, type TestContext } from "node:test";
 import assert from "node:assert/strict";
 import { once } from "node:events";
 import { existsSync, readFileSync } from "node:fs";
-import { mkdir, mkdtemp, realpath, rename, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, realpath, rename, rm, writeFile } from "node:fs/promises";
 import { request } from "node:http";
 import type { AddressInfo } from "node:net";
 import os from "node:os";
@@ -205,9 +205,7 @@ async function pipeless(directory: string, exitCode?: number) {
 
 test("a confirmed command that exits 0 is recorded as passed, with the prediction and the change it ran on", async (t) => {
   const f = await fixture(t);
-  // Stays running past the 202, so the response still shows the tests as busy.
-  const command = `node -e "setTimeout(() => console.log('3 passing'), 1000)"`;
-  await f.confirm(command);
+  await f.confirm(`node -e "console.log('3 passing')"`);
   const count = f.run.byHand?.tests?.length ?? 0;
   const started = await en(() => f.byHand.runTests(f.run.id, { prediction: "pass", expect: "  retries a 503  " }));
   // 202 body: the run, busy with the tests until they finish.
@@ -217,7 +215,7 @@ test("a confirmed command that exits 0 is recorded as passed, with the predictio
   const files = await readDiff(f.run);
   assert.equal(result.outcome, "passed");
   assert.equal(result.exitCode, 0);
-  assert.equal(result.command, command);
+  assert.equal(result.command, `node -e "console.log('3 passing')"`);
   assert.equal(result.changeFingerprint, changeFingerprint(files));
   assert.equal(result.prediction, "pass");
   assert.equal(result.expect, "retries a 503");
@@ -227,7 +225,16 @@ test("a confirmed command that exits 0 is recorded as passed, with the predictio
   assert.ok(Date.parse(result.at) >= Date.parse(busy.since!));
   assert.equal(f.run.byHand?.busy, undefined);
   assert.deepEqual(await f.byHand.liveTests(f.run.id), { running: false, tail: "" });
-  // Saved: a new store reads the result back.
+  // Saved: a new store reads the result back. That write is queued behind
+  // the 202's save, so wait until the file itself has the result.
+  const statePath = path.join(f.store.directory, "state.json");
+  const deadline = Date.now() + 30_000;
+  for (;;) {
+    const text = await readFile(statePath, "utf8").catch(() => "");
+    if (text.includes(result.tailHash ?? "\0")) break;
+    if (Date.now() > deadline) assert.fail("the recorded test was not stored");
+    await sleep(25);
+  }
   const reloaded = new Store(f.store.directory);
   await reloaded.initialize();
   assert.deepEqual(reloaded.data.runs.find((run) => run.id === f.run.id)?.byHand?.tests?.at(-1), result);
