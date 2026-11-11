@@ -114,6 +114,11 @@ export interface CollabBoard {
   held: CollabHold[];
 }
 
+/** GET /api/collab/projects/:project/tasks → 200. */
+export interface CollabTasksResponse {
+  tasks: (CollabDependency & { status: "held" | "done" })[];
+}
+
 /**
  * GET /api/collab/projects/:project/feed?epoch=&version=&seen=&wait= → 200,
  * or 204 when nothing changed within `wait` seconds (0 to 25). The next

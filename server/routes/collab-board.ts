@@ -1,7 +1,7 @@
 /**
  * Group work's repositories and their boards: GET and POST
- * /api/collab/projects and, under /api/collab/projects/:project, GET feed,
- * POST check, POST work, POST holds/:claim/release and POST
+ * /api/collab/projects and, under /api/collab/projects/:project, GET tasks,
+ * GET feed, POST check, POST work, POST holds/:claim/release and POST
  * holds/:claim/revoke. Registered by routes/collab.ts.
  *
  * Work can name tasks it depends on. It is held only once each of them is
@@ -24,6 +24,7 @@ import type {
   CollabConflict,
   CollabOkResponse,
   CollabProjectsResponse,
+  CollabTasksResponse,
   CollabWorkResponse,
 } from "../../shared/collab.js";
 import {
@@ -307,6 +308,25 @@ export function registerCollabBoardRoutes(
     if ((res.locals.actor as Actor).role !== "admin") throw adminOnly();
     const body: CollabAddProjectResponse = { project: await projects.add(repoId) };
     res.status(201).json(body);
+  });
+
+  app.get<{ project: string }>("/api/collab/projects/:project/tasks", participant, (req, res) => {
+    const projectId = req.params.project;
+    projectOf(projectId);
+    const actor = res.locals.actor as Actor;
+    const view = host.coordinator().project(actor, projectId);
+    const side = host.side();
+    const active = new Set(
+      view.claims.filter((claim) => claim.status === "held").map((claim) => claim.taskId),
+    );
+    const body: CollabTasksResponse = {
+      tasks: view.tasks.flatMap((task) => {
+        const saved = taskOf(side, projectId, task.id);
+        const status = saved?.doneAt ? "done" : active.has(task.id) ? "held" : undefined;
+        return status ? [{ ...dependencyOf(side, projectId, task.id), status }] : [];
+      }),
+    };
+    res.json(body);
   });
 
   app.get<{ project: string }>("/api/collab/projects/:project/feed", participant, (req, res) => {

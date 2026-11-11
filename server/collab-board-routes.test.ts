@@ -568,6 +568,50 @@ test("dependsOn on the board: a hold names the tasks it waited for, the feed wak
   assert.deepEqual(docs.dependsOn, [{ taskId: api.taskId, title: "API" }]);
 });
 
+test("the task list offers active and done prerequisites, not unfinished ended holds", async (t) => {
+  const g = await group(t);
+  const { f, who } = g;
+  const project = await g.add("widgets");
+  const other = await g.add("gadgets");
+  const elsewhere = await g.hold(who.dee, other, { title: "Elsewhere", scopes: ["lib"] });
+  const list = () => f.send("GET", `/api/collab/projects/${project}/tasks`, who.dee);
+
+  const first = await g.hold(who.member, project, { title: "API", scopes: ["src/api"] });
+  assert.deepEqual((await list()).json, {
+    tasks: [{ taskId: first.taskId, title: "API", status: "held" }],
+  });
+
+  await g.release(who.member, project, first);
+  assert.deepEqual((await list()).json, { tasks: [] });
+  const pending = await g.work(who.dee, project, {
+    title: "UI",
+    scopes: ["web"],
+    dependsOn: [first.taskId],
+  });
+  assert.deepEqual(pending.json.pending, [{ taskId: first.taskId, title: "API", held: false }]);
+
+  const second = await g.hold(who.member, project, { title: "API 2", scopes: ["src/api"] });
+  const done = await f.post(`/projects/${project}/holds/${second.claimId}/release`, who.member, {
+    fence: second.fence,
+    done: true,
+  });
+  assert.equal(done.status, 200, done.body);
+  const dependent = await g.hold(who.dee, project, {
+    title: "UI",
+    scopes: ["web"],
+    dependsOn: [second.taskId],
+  });
+  assert.deepEqual((await list()).json, {
+    tasks: [
+      { taskId: second.taskId, title: "API 2", status: "done" },
+      { taskId: dependent.taskId, title: "UI", status: "held" },
+    ],
+  });
+  assert.equal(outcome(await f.send("GET", `/api/collab/projects/no-such/tasks`, who.dee)), "404 unknownProject");
+  assert.equal((await f.send("GET", `/api/collab/projects/${other}/tasks`, who.dee)).json.tasks[0].taskId, elsewhere.taskId);
+  await f.nothingLeaked();
+});
+
 /**
  * Holds up the host's next side-file write, which fails when `fails`.
  * `meanwhile` runs `steps` once the write is on its way, then lets it on,

@@ -37,16 +37,30 @@ const m: Translation<typeof en> = {
   me: "你",
   since: ({ time }) => `自 ${time} 起`,
   gone: "已不再佔用",
-  release: "釋出",
+  dependsOn: {
+    label: "前置任務",
+    help: "勾選此專案中需要先完成的任務，等它們完成後再開始。",
+    empty: "此專案目前沒有其他任務，可以直接開始。",
+    selectedCount: ({ count }) => `已選 ${count} 項`,
+    clear: "清除",
+    limitNote: "最多可勾選 50 項任務。",
+    cardNote: ({ titles }) => `在 ${titles} 完成後開始`,
+  },
+  release: {
+    finish: "完成並釋出",
+    finishAria: ({ title }) => `將「${title}」標示為完成並釋出佔用路徑`,
+    unfinished: "僅釋出路徑",
+    unfinishedAria: ({ title }) => `釋出「${title}」的佔用路徑，但不標示為完成`,
+    finishHint: "選擇「完成並釋出」才會解鎖後續任務；「僅釋出路徑」仍會讓後續任務繼續等候。",
+  },
   revoke: "撤銷",
-  releaseHold: ({ title }) => `釋出「${title}」`,
   revokeHold: ({ title }) => `撤銷「${title}」`,
   revokeQuestion: ({ name, title }) =>
     `要撤銷 ${name} 的佔用「${title}」嗎？撤銷後，任何人都可以佔用這些路徑。`,
   keep: "保留",
   nothingHeld: ({ time }) => `截至 ${time}，沒有任何路徑被佔用。`,
   honesty:
-    "BELL 會拒絕彼此重疊的佔用。它不會阻止工具、編輯器或 push 寫入佔用範圍以外的地方。",
+    "BELL 會擋下重疊的佔用，也會阻止 BELL PR 的執行、同步與發布改動他人佔用的路徑。但它無法攔截外部編輯器、終端機工具、直接 git push，或在佔用範圍外重新命名上層資料夾。",
   join: {
     title: "加入這個小組",
     body: "請向這個小組的管理員索取邀請碼。邀請碼只能用一次，10 分鐘內有效。",
@@ -91,6 +105,10 @@ const m: Translation<typeof en> = {
     youTook: ({ paths, title }) => `你佔用了 ${paths}：${title}。`,
     ended: ({ paths, title }) => `已不再佔用：${paths}（${title}）。`,
     changed: ({ count }) => `看板有變動。目前佔用中：${count}。`,
+    finishedAndReleased: ({ title, paths }) =>
+      `已完成「${title}」並釋出 ${paths}，等候中的任務現在可以開始。`,
+    releasedUnfinished: ({ title, paths }) =>
+      `已釋出 ${paths}，「${title}」尚未標示完成，等候中的任務會繼續等待。`,
     sentence: ({ text }) => `${text}。`,
   },
 };

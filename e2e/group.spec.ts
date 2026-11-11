@@ -25,7 +25,8 @@ const sidebarItem = (page: Page) =>
   page.locator(`#workspace-sidebar button[title="${messages.en.app.pages.group}"]`);
 const viewports = [
   { width: 1440, height: 900 },
-  { width: 390, height: 844 },
+  { width: 360, height: 844 },
+  { width: 320, height: 780 },
 ];
 
 const git = (cwd: string, ...args: string[]) =>
@@ -192,7 +193,7 @@ test.describe("two people on one group", () => {
     await expect(refused.locator("strong")).toHaveText("Ada");
 
     // Ada releases: Ben's form turns free without a key, and his hold shows for Ada.
-    await ada.getByRole("button", { name: en.releaseHold({ title: "Fix pagination" }) }).click();
+    await ada.getByRole("button", { name: en.release.unfinishedAria({ title: "Fix pagination" }) }).click();
     await expect(ada.locator(".group-hold")).toContainText(en.gone);
     await expect(box.locator(".split-info")).toContainText(en.free);
     await take.click();
@@ -213,7 +214,7 @@ test.describe("two people on one group", () => {
     await expect(refused.locator("strong")).toHaveText("Ada");
 
     // For the pages below: Ada holds one thing and Ben another.
-    await ada.getByRole("button", { name: en.releaseHold({ title: "Fix the tests" }) }).click();
+    await ada.getByRole("button", { name: en.release.unfinishedAria({ title: "Fix the tests" }) }).click();
     await takeHold(ada, "Write the guide", "docs");
     await expect(ben.locator(".group-hold")).toHaveCount(2);
   });

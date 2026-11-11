@@ -6,7 +6,7 @@
 // (b) When a member's write turn touches a path held by the host (including
 //     during the refreshAfterSession background draft/explanations window),
 //     the run halts and renders the holdStop recovery card in en and zh-TW at
-//     both 1440px and 360px with zero leaked holder names or hold titles,
+//     1440px, 360px and 320px with zero leaked holder names or hold titles,
 //     zero horizontal overflow, and zero serious/critical axe issues; Check
 //     again while held shows the still-held notice (409), Check again after
 //     the host releases clears the card (200), and on a second mixed run after
@@ -35,6 +35,7 @@ const privateHoldTitle = "SecretAuditHold77";
 const viewports = [
   { width: 1440, height: 900 },
   { width: 360, height: 800 },
+  { width: 320, height: 780 },
 ] as const;
 
 const seedContents: Record<string, string> = {
@@ -368,28 +369,16 @@ if (base === "plan-schema.json") {
     // Release the two initial feature holds on #/group.
     await ada.goto("/#/group?locale=en");
     await ben.goto("/#/group?locale=en");
-    await ada.getByRole("button", { name: en.collab.releaseHold({ title: "Catalog feature work" }) }).click();
-    await ben.getByRole("button", { name: en.collab.releaseHold({ title: "Billing feature work" }) }).click();
+    await ada.getByRole("button", { name: en.collab.release.unfinishedAria({ title: "Catalog feature work" }) }).click();
+    await ben.getByRole("button", { name: en.collab.release.unfinishedAria({ title: "Billing feature work" }) }).click();
     await expect(ada.locator(".group-hold", { hasText: "Catalog feature work" })).toContainText(en.collab.gone);
     await expect(ben.locator(".group-hold", { hasText: "Billing feature work" })).toContainText(en.collab.gone);
 
-    // 5. Dependent Start work naming an unfinished task is refused on #/group until released with done: true.
-    const schemaWorkResponse = ada.waitForResponse(
-      (res) => res.url().endsWith("/work") && res.request().method() === "POST",
-    );
+    // 5. The real prerequisite control blocks until Finish & release, including after a reload.
     await takeHold(ada, "Schema migration", "db/schema.sql");
-    const { hold: prereqHold } = (await (await schemaWorkResponse).json()) as {
-      hold: { claimId: string; taskId: string };
-    };
-    await expect(ben.locator(".group-hold", { hasText: "Schema migration" })).toBeVisible();
-
-    await ben.route(/\/api\/collab\/projects\/[^/]+\/work$/, async (route) => {
-      const payload = JSON.parse(route.request().postData() ?? "{}") as Record<string, unknown>;
-      await route.continue({
-        postData: JSON.stringify({ ...payload, dependsOn: [prereqHold.taskId] }),
-      });
-    });
-
+    const prerequisite = ben.getByRole("checkbox", { name: "Schema migration", exact: true });
+    await expect(prerequisite).toBeVisible();
+    await prerequisite.check();
     await ben.locator("#hold-title").fill("Migration runner");
     await ben.locator("#hold-paths").fill("db/runner.ts");
     await expect(ben.locator("#hold-answer .split-info")).toContainText(en.collab.free);
@@ -401,35 +390,65 @@ if (base === "plan-schema.json") {
     expect(refusedRes.status()).toBe(409);
     expect(((await refusedRes.json()) as { reason?: string }).reason).toBe("dependencyPending");
 
-    // Refused while prerequisite is still unfinished (409 dependencyPending).
     const refusalAlert = ben.locator(".group-page form [role=alert]");
     await expect(refusalAlert).toHaveText("This work depends on a task that is not done yet. Nothing was held.");
     await expect(ben.locator(".group-hold", { hasText: "Migration runner" })).toHaveCount(0);
 
-    // Ada releases prerequisite with done: true on #/group.
-    await ada.route(/\/api\/collab\/projects\/[^/]+\/holds\/[^/]+\/release$/, async (route) => {
-      const payload = JSON.parse(route.request().postData() ?? "{}") as Record<string, unknown>;
-      await route.continue({
-        postData: JSON.stringify({ ...payload, done: true }),
-      });
-    });
-    await ada.getByRole("button", { name: en.collab.releaseHold({ title: "Schema migration" }) }).click();
+    const releaseAnnouncement = ada.locator('section[aria-labelledby="held-h"] > [aria-live="polite"]');
+    await ada.getByRole("button", { name: en.collab.release.finishAria({ title: "Schema migration" }) }).click();
+    await expect(releaseAnnouncement).toHaveText(
+      en.collab.spoken.finishedAndReleased({ title: "Schema migration", paths: "db/schema.sql" }),
+    );
     await expect(ada.locator(".group-hold", { hasText: "Schema migration" })).toContainText(en.collab.gone);
     await expect(ben.locator(".group-hold", { hasText: "Schema migration" })).toHaveCount(0);
 
-    // Now Ben's dependent Start work succeeds!
+    await ben.reload();
+    await expect(ben.locator("#hold-title")).toBeVisible();
+    await ben.getByRole("checkbox", { name: "Schema migration", exact: true }).check();
+    await ben.locator("#hold-title").fill("Migration runner");
+    await ben.locator("#hold-paths").fill("db/runner.ts");
+    await expect(ben.locator("#hold-answer .split-info")).toContainText(en.collab.free);
     await ben.getByRole("button", { name: en.collab.takeHold }).click();
-    await expect(ben.locator(".group-hold.mine", { hasText: "Migration runner" })).toBeVisible();
+    const dependent = ben.locator(".group-hold.mine", { hasText: "Migration runner" });
+    await expect(dependent).toBeVisible();
+    await expect(dependent).toContainText(
+      en.collab.dependsOn.cardNote({ titles: "Schema migration" }),
+    );
     await expect(ada.locator(".group-hold", { hasText: "Migration runner" })).toContainText("Ben");
+    await ben.getByRole("button", { name: en.collab.release.unfinishedAria({ title: "Migration runner" }) }).click();
 
-    await ben.unroute(/\/api\/collab\/projects\/[^/]+\/work$/);
-    await ada.unroute(/\/api\/collab\/projects\/[^/]+\/holds\/[^/]+\/release$/);
-    await ben.getByRole("button", { name: en.collab.releaseHold({ title: "Migration runner" }) }).click();
-    await expect(ben.locator(".group-hold", { hasText: "Migration runner" })).toContainText(en.collab.gone);
-    await expect(ada.locator(".group-hold", { hasText: "Migration runner" })).toContainText(en.collab.gone);
+    // Release only keeps the selected unfinished task, and the next refusal says held: false.
+    await takeHold(ada, "Schema draft", "db/draft.sql");
+    const draft = ben.getByRole("checkbox", { name: "Schema draft", exact: true });
+    await draft.check();
+    await ben.locator("#hold-title").fill("Draft reader");
+    await ben.locator("#hold-paths").fill("db/reader.ts");
+    await expect(ben.locator("#hold-answer .split-info")).toContainText(en.collab.free);
+    await ben.getByRole("button", { name: en.collab.takeHold }).click();
+    await expect(refusalAlert).toHaveText("This work depends on a task that is not done yet. Nothing was held.");
+    await ada.getByRole("button", { name: en.collab.release.unfinishedAria({ title: "Schema draft" }) }).click();
+    await expect(releaseAnnouncement).toHaveText(
+      en.collab.spoken.releasedUnfinished({ title: "Schema draft", paths: "db/draft.sql" }),
+    );
+    await expect(draft).toBeChecked();
+    await expect(refusalAlert).toHaveCount(0);
+    const stillRefused = ben.waitForResponse(
+      (res) => res.url().endsWith("/work") && res.request().method() === "POST",
+    );
+    await ben.getByRole("button", { name: en.collab.takeHold }).click();
+    const stillPending = (await (await stillRefused).json()) as {
+      reason?: string;
+      pending?: { taskId: string; title: string; held: boolean }[];
+    };
+    expect(stillPending.reason).toBe("dependencyPending");
+    expect(stillPending.pending).toEqual([
+      { taskId: expect.any(String), title: "Schema draft", held: false },
+    ]);
+    await ben.getByRole("button", { name: en.collab.dependsOn.clear, exact: true }).click();
+    await expect(draft).toHaveCount(0);
   });
 
-  test("(b) write-guard stop card (en/zh-TW, 1440px/360px, privacy, axe, overflow), Check again during refreshAfterSession -> release -> clear, and selective Put these files back", async () => {
+  test("(b) write-guard stop card (en/zh-TW, 1440px/360px/320px, privacy, axe, overflow), Check again during refreshAfterSession -> release -> clear, and selective Put these files back", async () => {
     // 1. Host (Ada) takes a hold with a private title on src/api/users.ts.
     await ada.goto("/#/group?locale=en");
     await takeHold(ada, privateHoldTitle, "src/api/users.ts");
@@ -514,7 +533,7 @@ if (base === "plan-schema.json") {
     await unlink(refreshGateFile);
 
     // 5. Host releases the hold on #/group -> Ben clicks Check again (200) -> recovery card clears!
-    await ada.getByRole("button", { name: en.collab.releaseHold({ title: privateHoldTitle }) }).click();
+    await ada.getByRole("button", { name: en.collab.release.unfinishedAria({ title: privateHoldTitle }) }).click();
     await expect(ada.locator(".group-hold", { hasText: privateHoldTitle })).toContainText(en.collab.gone);
 
     const recheckCleared = ben.waitForResponse(

@@ -45,16 +45,30 @@ const collab = {
   me: "You",
   since: ({ time }: { time: string }) => `since ${time}`,
   gone: "No longer held",
-  release: "Release",
+  dependsOn: {
+    label: "Must finish first",
+    help: "Choose tasks in this project that must finish before yours starts.",
+    empty: "No other tasks in this project yet. You can start right away.",
+    selectedCount: ({ count }: { count: number }) => `${count} selected`,
+    clear: "Clear",
+    limitNote: "You can choose up to 50 tasks.",
+    cardNote: ({ titles }: { titles: string }) => `Started after ${titles}`,
+  },
+  release: {
+    finish: "Finish & release",
+    finishAria: ({ title }: { title: string }) => `Mark ${title} finished and release its held paths`,
+    unfinished: "Release only",
+    unfinishedAria: ({ title }: { title: string }) => `Release held paths for ${title} without marking it finished`,
+    finishHint: "Finish & release unblocks waiting tasks; Release only keeps them waiting.",
+  },
   revoke: "Revoke",
-  releaseHold: ({ title }: { title: string }) => `Release ${title}`,
   revokeHold: ({ title }: { title: string }) => `Revoke ${title}`,
   revokeQuestion: ({ name, title }: { name: string; title: string }) =>
     `Revoke ${name}'s hold “${title}”? Its paths can then be taken by anyone.`,
   keep: "Keep it",
   nothingHeld: ({ time }: { time: string }) => `Nothing is held, as of ${time}.`,
   honesty:
-    "BELL refuses holds that meet. It does not stop a tool, an editor or a push from writing outside a hold.",
+    "BELL blocks overlapping holds and stops BELL PR runs, syncs, and publishes from touching paths held by someone else. It cannot stop external editors, terminal tools, a direct git push, or renaming a parent folder outside a hold.",
   join: {
     title: "Join this group",
     body: "Ask an admin of this group for an invite code. A code works once, for 10 minutes.",
@@ -103,6 +117,10 @@ const collab = {
     ended: ({ paths, title }: { paths: string; title: string }) =>
       `No longer held: ${paths} (${title}).`,
     changed: ({ count }: { count: number }) => `The board changed. Held now: ${count}.`,
+    finishedAndReleased: ({ title, paths }: { title: string; paths: string }) =>
+      `Finished ${title} and released ${paths}. Waiting tasks can now start.`,
+    releasedUnfinished: ({ title, paths }: { title: string; paths: string }) =>
+      `Released ${paths} without finishing ${title}. Waiting tasks stay on hold.`,
     sentence: ({ text }: { text: string }) => `${text}.`,
   },
 };
