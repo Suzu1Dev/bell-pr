@@ -1249,11 +1249,12 @@ export interface HoldRestoreResult {
   refreshError?: Error;
 }
 
-function participantHeaders() {
+function participantHeaders(): Record<string, string> {
   try {
-    return { "X-Bell-Participant": localStorage.getItem("bellpr-participant-token") ?? "" };
+    const token = localStorage.getItem("bellpr-participant-token")?.trim();
+    return token ? { "X-Bell-Participant": token } : {};
   } catch {
-    return { "X-Bell-Participant": "" };
+    return {};
   }
 }
 

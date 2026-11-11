@@ -743,3 +743,38 @@ test("held-file recovery uses the participant header, refreshes restore diffs, a
     await shell.unmount();
   }
 });
+
+test("held-file recovery omits X-Bell-Participant when no participant token is stored", async (t) => {
+  const realFetch = globalThis.fetch;
+  const storage = Object.getOwnPropertyDescriptor(globalThis, "localStorage");
+  t.after(() => {
+    globalThis.fetch = realFetch;
+    if (storage) Object.defineProperty(globalThis, "localStorage", storage);
+    else delete (globalThis as Record<string, unknown>).localStorage;
+  });
+  Object.defineProperty(globalThis, "localStorage", {
+    configurable: true,
+    value: { getItem: () => null },
+  });
+  const heldRun: Run = { ...base, status: "failed", heldPaths: ["src/held.ts"] };
+  const restoredRun: Run = { ...heldRun, status: "review" };
+  delete restoredRun.heldPaths;
+  const headersSeen: Headers[] = [];
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    if ((init?.method ?? "GET") === "POST") headersSeen.push(new Headers(init?.headers));
+    if (url.endsWith("/holds/recheck")) return respond({ run: restoredRun });
+    if (url.endsWith("/holds/restore")) return respond({ run: restoredRun, restored: [] });
+    if (url.endsWith("/diff")) return respond({ files: [] });
+    throw new Error(`unexpected ${url}`);
+  }) as typeof fetch;
+  const shell = await mountActions(heldRun);
+  try {
+    await act(() => shell.actions().recheckHeldPaths());
+    await act(() => shell.actions().restoreHeldPaths());
+    assert.equal(headersSeen.length, 2);
+    for (const headers of headersSeen) assert.equal(headers.has("X-Bell-Participant"), false);
+  } finally {
+    await shell.unmount();
+  }
+});

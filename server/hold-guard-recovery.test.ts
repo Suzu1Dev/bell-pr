@@ -1071,3 +1071,118 @@ test("auth, stopped group, workspace_removed, busy/disallowed states, non-group 
   assert.equal(outsideRecheck.status, 200, outsideRecheck.body);
   assert.equal(s.f.workbench.run(parallelRun.id).status, "approved");
 });
+
+test("recheck and restore work during refreshAfterSession background draft/explanations while still blocking active checkout jobs", async (t) => {
+  let releaseBackground!: () => void;
+  const backgroundGate = new Promise<void>((resolve) => {
+    releaseBackground = resolve;
+  });
+  let draftStarted = false;
+  let explanationsStarted = false;
+
+  const s = await localScene(t, async (input) => {
+    if (input.role === "session") {
+      await write(input.cwd, "src/api/users.ts", "export const users = ['session-conflict'];\n");
+      await write(input.cwd, "src/free/keep.ts", "export const keep = 77;\n");
+      return "Updated users and keep.";
+    }
+    if (input.role === "draft") {
+      draftStarted = true;
+      await backgroundGate;
+      return JSON.stringify({
+        title: "feat: stale draft",
+        body: "## Problem\nOld.\n\n## Changes\nOld.\n\n## Validation\nOld.\n\n## Limitations\nNone.",
+        policy: "repository",
+        summary: "Old summary.",
+        rules: [],
+        checklist: [],
+        templateSourceId: "",
+        commitMessageSuggestion: null,
+      });
+    }
+    if (input.role === "explanations") {
+      explanationsStarted = true;
+      await backgroundGate;
+      return JSON.stringify({
+        files: [
+          {
+            path: "src/api/users.ts",
+            summary: "Changed users",
+            reason: "Testing users",
+            concept: "Array literal",
+            tip: "Check users",
+            example: { scenario: "Users list", before: "[]", after: "['session-conflict']" },
+            alternatives: "Keep empty",
+            lookup: ["array"],
+            selfCheck: { question: "What changed?", answer: "Users list." },
+          },
+          {
+            path: "src/free/keep.ts",
+            summary: "Changed keep",
+            reason: "Testing keep",
+            concept: "Constant export",
+            tip: "Check keep",
+            example: { scenario: "Keep value", before: "1", after: "77" },
+            alternatives: "Leave 1",
+            lookup: ["const"],
+            selfCheck: { question: "What is keep?", answer: "77." },
+          },
+        ],
+      });
+    }
+    return "Done.";
+  });
+
+  const adaHold = await s.hold(s.who.admin, ["src/api/users.ts"], "Users lock");
+  const run = await s.makeRun([s.ben.id]);
+  const reply = await s.session(run.id, "Update both files");
+  assert.match(reply.content, /someone else holds/);
+  assert.deepEqual(s.f.workbench.run(run.id).heldPaths, ["src/api/users.ts"]);
+
+  // Wait until refreshAfterSession has launched both isolated read-only jobs.
+  await waitUntil(() => draftStarted && explanationsStarted, "background draft and explanations start");
+  const internalCtx = (s.f.workbench as unknown as { context: { controllers: Map<string, AbortController>; jobs: Set<Promise<unknown>> } }).context;
+  assert.equal(internalCtx.controllers.has(`draft:${run.id}`), true);
+  assert.equal(internalCtx.controllers.has(`explanations:${run.id}`), true);
+  internalCtx.controllers.set(`walkthrough:src/free/keep.ts:${run.id}`, new AbortController());
+
+  // Genuine checkout readers/writers must still block with 409 holdRecoveryBusy.
+  for (const blockingKey of [run.id, `premise:${run.id}`, `tests:${run.id}`, `guide:${run.id}`, `review:${run.id}`]) {
+    internalCtx.controllers.set(blockingKey, new AbortController());
+    try {
+      const blockedRecheck = await s.recheck(run.id, s.who.member);
+      assert.equal(blockedRecheck.status, 409, blockingKey);
+      assert.match(blockedRecheck.json.error ?? "", /Work is still running/);
+      const blockedRestore = await s.restore(run.id, s.who.member);
+      assert.equal(blockedRestore.status, 409, blockingKey);
+      assert.match(blockedRestore.json.error ?? "", /Work is still running/);
+    } finally {
+      internalCtx.controllers.delete(blockingKey);
+    }
+  }
+
+  // With only refreshAfterSession (draft + explanations) + walkthrough active:
+  // 1. Recheck runs immediately and returns 409 heldByOther (not holdRecoveryBusy).
+  const stillHeld = await s.recheck(run.id, s.who.member);
+  assert.equal(stillHeld.status, 409, stillHeld.body);
+  assert.equal(stillHeld.json.reason, "heldByOther");
+
+  // 2. Restore runs immediately, puts src/api/users.ts back, and keeps src/free/keep.ts.
+  const restored = await s.restore(run.id, s.who.member);
+  assert.equal(restored.status, 200, restored.body);
+  assert.deepEqual((restored.json as HoldRestoreResponse).restored, ["src/api/users.ts"]);
+  assert.equal(s.f.workbench.run(run.id).heldPaths, undefined);
+  assert.equal(await readFile(path.join(run.worktreePath, "src/api/users.ts"), "utf8"), seedFiles["src/api/users.ts"]);
+  assert.equal(await readFile(path.join(run.worktreePath, "src/free/keep.ts"), "utf8"), "export const keep = 77;\n");
+
+  internalCtx.controllers.delete(`walkthrough:src/free/keep.ts:${run.id}`);
+  releaseBackground();
+  await Promise.allSettled([...internalCtx.jobs]);
+
+  // Background explanations kept the surviving file and skipped the reverted one; pre-restore draft became stale.
+  const finalRun = s.f.workbench.run(run.id);
+  assert.equal(finalRun.explanations?.["src/free/keep.ts"]?.status, "ready");
+  assert.equal(finalRun.explanations?.["src/api/users.ts"], undefined);
+  assert.equal(finalRun.draftPreparation?.status, "stale");
+  await s.release(s.who.admin, adaHold);
+});

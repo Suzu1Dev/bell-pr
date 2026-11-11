@@ -59,9 +59,13 @@ export function HoldRecoveryNotice({
       }), "success");
     } catch (error) {
       actions.notify(
-        error instanceof ApiError && error.status === 409 && error.details.reason === "stale"
-          ? t.holdStop.restoreStale
-          : t.holdStop.restoreFailed,
+        error instanceof ApiError && error.status === 409
+          ? error.details.reason === "stale"
+            ? t.holdStop.restoreStale
+            : error.message
+          : error instanceof ApiError && error.details.reason === "notJoined"
+            ? error.message
+            : t.holdStop.restoreFailed,
         "error",
       );
     } finally {
@@ -91,8 +95,13 @@ export function HoldRecoveryNotice({
             }),
         "error",
       );
-    } catch {
-      actions.notify(t.holdStop.recheckFailed({ name: product.name }), "error");
+    } catch (error) {
+      actions.notify(
+        error instanceof ApiError && (error.status === 409 || error.details.reason === "notJoined")
+          ? error.message
+          : t.holdStop.recheckFailed({ name: product.name }),
+        "error",
+      );
     } finally {
       setPending(undefined);
     }

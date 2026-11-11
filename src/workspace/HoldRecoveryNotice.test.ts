@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { act, createElement } from "react";
+import { ApiError } from "../api";
 import type { HoldRestoreResult } from "../app/hooks/useRunActions";
 import { mount, type FakeElement } from "../mission/test-dom";
 import { assertNoHan, renderEn, renderZh } from "../test-utils/render";
@@ -160,6 +161,40 @@ test("a held recheck shows holder metadata and the exact still-held notice", asy
       message: "Dee still holds docs/guide.md. Wait for them to release it, ask a group admin to revoke it, or put this file back.",
       tone: "error",
     }]);
+  } finally {
+    await view.unmount();
+  }
+});
+
+test("409 busy and 403 notJoined errors surface the server sentence while stale and 503 keep recovery fallbacks", async () => {
+  const notes: { message: string; tone?: string }[] = [];
+  let failWith: Error = new ApiError("Work is still running on this contribution.", { status: 409 });
+  const view = await mount(element({
+    actions: actions({
+      async recheckHeldPaths() { throw failWith; },
+      async restoreHeldPaths() { throw failWith; },
+      notify: (message, tone) => { notes.push({ message, tone }); },
+    }),
+  }));
+  try {
+    await click(button(view, "Check again"));
+    await click(button(view, "Put these files back"));
+    await click(view.container.querySelectorAll((n) => n.nodeName === "BUTTON" && n.textContent === "Put these files back").at(-1)!);
+
+    failWith = new ApiError("Stale", { status: 409, details: { reason: "stale" } });
+    await click(view.container.querySelectorAll((n) => n.nodeName === "BUTTON" && n.textContent === "Put these files back").at(-1)!);
+
+    failWith = new ApiError("Join the group on the Group page first.", { status: 403, details: { reason: "notJoined" } });
+    await click(button(view, "Check again"));
+
+    failWith = new ApiError("Group stopped", { status: 503, details: { reason: "holdsUnknown" } });
+    await click(button(view, "Check again"));
+
+    assert.equal(notes[0]?.message, "Work is still running on this contribution.");
+    assert.equal(notes[1]?.message, "Work is still running on this contribution.");
+    assert.match(notes[2]?.message ?? "", /The working directory changed/);
+    assert.equal(notes[3]?.message, "Join the group on the Group page first.");
+    assert.match(notes[4]?.message ?? "", /Couldn't check file holds right now/);
   } finally {
     await view.unmount();
   }

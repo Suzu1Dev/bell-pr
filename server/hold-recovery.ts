@@ -27,12 +27,36 @@ import { shuttingDown, sm } from "./i18n/index.js";
 import { assertGitConfigSafe, git } from "./process.js";
 import { logged } from "./run-events.js";
 import { comparablePath, pathsMeet } from "./scope-paths.js";
-import { runBusy } from "./sync-runs.js";
 import { AppError, type DiffFile, type Run } from "./types.js";
+import { walkthroughKeyPrefix } from "./walkthroughs.js";
 import type { WorkbenchContext } from "./workbench-context.js";
 
 function sessionRunning(ctx: WorkbenchContext, id: string) {
   return ctx.controllers.has(`session:${id}`) || ctx.sessionJobs.has(id);
+}
+
+/**
+ * Checkout writers and checkout-reading checks that must finish before
+ * restoring or rechecking held files. Isolated read-only background jobs
+ * (`walkthrough:*:${id}`, `draft:${id}`, `explanations:${id}`) never write
+ * `run.worktreePath` and check diff fingerprints before saving, so recovery
+ * right after a session turn (`refreshAfterSession`) does not hit a 409.
+ */
+function holdRecoveryBusy(ctx: WorkbenchContext, id: string) {
+  if (
+    ctx.followUpJobs.has(id) ||
+    ctx.conflictJobs.has(id) ||
+    ctx.reviewJobs.has(id) ||
+    sessionRunning(ctx, id)
+  )
+    return true;
+  const backgroundReadOnly = new Set([`draft:${id}`, `explanations:${id}`]);
+  return [...ctx.controllers.keys()].some(
+    (key) =>
+      (key === id || key.endsWith(`:${id}`)) &&
+      !key.startsWith(walkthroughKeyPrefix) &&
+      !backgroundReadOnly.has(key),
+  );
 }
 
 /**
@@ -77,12 +101,7 @@ async function assertHoldRecoveryReady(
     (run.status === "published" && Boolean(openRound));
   if (merged || !allowedStatus || (!run.prUrl && Boolean(run.publishCommit)))
     throw new AppError((m) => m.run.local.holdRecoveryNotAllowed, 409);
-  if (
-    run.publishing ||
-    run.session?.running ||
-    sessionRunning(ctx, id) ||
-    runBusy(ctx, id, { walkthroughs: false })
-  )
+  if (run.publishing || run.session?.running || holdRecoveryBusy(ctx, id))
     throw new AppError((m) => m.run.local.holdRecoveryBusy, 409);
   const base = reviewBaseSha(run);
   if (!base || !run.worktreePath)
@@ -97,6 +116,8 @@ async function assertHoldRecoveryReady(
   await git(run.worktreePath, ["rev-parse", "--verify", `${base}^{commit}`]).catch(() => {
     throw new AppError((m) => m.run.local.holdRecoveryCheckoutMissing, 409);
   });
+  if (holdRecoveryBusy(ctx, id))
+    throw new AppError((m) => m.run.local.holdRecoveryBusy, 409);
   return { run, base, realRoot };
 }
 
