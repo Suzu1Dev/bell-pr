@@ -390,7 +390,16 @@ test("POST /api/runs/:id/holds/restore restores modified, deleted, untracked, st
     error: withLocale("en", () =>
       sm().run.local.turnHeldByOther({ items: ["src/api/users.ts — Ada"] }),
     ),
-    heldPaths: ["src/api/users.ts", "docs/guide.md"],
+    // What the stop records: every changed path under someone else's hold.
+    heldPaths: [
+      "docs/guide.md",
+      "src/api/legacy.ts",
+      "src/api/nested/staged-new.ts",
+      "src/api/new-route.ts",
+      "src/api/old-route.ts",
+      "src/api/untracked-new.ts",
+      "src/api/users.ts",
+    ],
   });
 
   // Conflicting modifications, deletions, untracked additions, staged additions, and renames under held scopes:
@@ -538,6 +547,49 @@ test("POST /api/runs/:id/holds/restore restores modified, deleted, untracked, st
   const teamRestored = await s.restore(incompleteTeam.id, s.who.member, english);
   assert.equal(teamRestored.status, 200, teamRestored.body);
   assert.equal((teamRestored.json as HoldRestoreResponse).run.status, "failed");
+});
+
+test("POST /api/runs/:id/holds/restore puts back only the recorded paths, and recovery returns only a hold-stopped run to review", async (t) => {
+  const s = await localScene(t);
+  await s.hold(s.who.admin, ["src/api"], "API overhaul");
+  const run = await s.makeRun([s.ben.id], {
+    status: "failed",
+    error: withLocale("en", () => sm().run.local.turnHeldByOther({ items: ["src/api/users.ts"] })),
+    // ".Git/notes.txt" cannot be compared with a hold: it names itself only, not every changed file.
+    heldPaths: [".Git/notes.txt", "src/api/users.ts"],
+  });
+  await write(run.worktreePath, ".Git/notes.txt", "notes\n");
+  await write(run.worktreePath, "src/api/users.ts", "export const users = ['conflicting'];\n");
+  // Changed under the hold after the stop, so the run page has not listed it yet.
+  await write(run.worktreePath, "src/api/later.ts", "export const later = 1;\n");
+  await write(run.worktreePath, "README.md", "Ben's README\n");
+
+  const first = await s.restore(run.id, s.who.member, english);
+  assert.equal(outcome(first), "409 heldByOther");
+  assert.deepEqual(s.f.workbench.run(run.id).heldPaths, ["src/api/later.ts"]);
+  assert.equal(await exists(path.join(run.worktreePath, ".Git/notes.txt")), false);
+  assert.equal(
+    await readFile(path.join(run.worktreePath, "src/api/users.ts"), "utf8"),
+    seedFiles["src/api/users.ts"],
+  );
+  assert.equal(
+    await readFile(path.join(run.worktreePath, "src/api/later.ts"), "utf8"),
+    "export const later = 1;\n",
+  );
+  assert.equal(await readFile(path.join(run.worktreePath, "README.md"), "utf8"), "Ben's README\n");
+
+  const second = await s.restore(run.id, s.who.member, english);
+  assert.equal(second.status, 200, second.body);
+  assert.deepEqual((second.json as HoldRestoreResponse).restored, ["src/api/later.ts"]);
+  assert.equal((second.json as HoldRestoreResponse).run.status, "review");
+
+  // A run that failed for another reason keeps its status when its holds are checked.
+  const otherFailure = await s.makeRun([s.ben.id], { status: "failed", error: "The agent stopped." });
+  await write(otherFailure.worktreePath, "README.md", "Half done\n");
+  const rechecked = await s.recheck(otherFailure.id, s.who.member, english);
+  assert.equal(rechecked.status, 200, rechecked.body);
+  assert.equal(rechecked.json.run.status, "failed");
+  assert.equal(rechecked.json.run.error, "The agent stopped.");
 });
 
 test("POST /api/runs/:id/holds/restore refuses symlink and path-traversal escapes with 422 without modifying external files", async (t) => {

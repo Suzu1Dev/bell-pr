@@ -281,7 +281,8 @@ function clearHoldStopState(run: Run, files: readonly DiffFile[], changedDiff: b
     run.team &&
       (!run.team.tasks.length || run.team.tasks.some((task) => task.status !== "complete")),
   );
-  if (run.status === "failed" && !teamIncomplete && hasReviewableChanges) {
+  // Only a run that a hold stopped goes back to review: any other failure keeps its status.
+  if (hadHoldStop && run.status === "failed" && !teamIncomplete && hasReviewableChanges) {
     run.status = "review";
     if (run.team) run.team.phase = "complete";
     delete run.approvedFingerprint;
@@ -309,10 +310,13 @@ export async function restoreHeldPaths(
       const matchesRecorded = (candidate: string) =>
         recorded.some(
           (scope) =>
-            !comparablePath(scope) || !comparablePath(candidate) || pathsMeet(scope, candidate),
+            scope === candidate ||
+            (comparablePath(scope) && comparablePath(candidate) && pathsMeet(scope, candidate)),
         );
-      const targets = allChanged.filter(
-        (candidate) => activePaths.has(candidate) || matchesRecorded(candidate),
+      // Only what the run page listed is put back: a file that came under a hold later is
+      // recorded by the check below and answered 409, so the person confirms it first.
+      const targets = allChanged.filter((candidate) =>
+        recorded.length ? matchesRecorded(candidate) : activePaths.has(candidate),
       );
       const targetSet = new Set(targets);
       for (const candidate of new Set([...targets, ...recorded])) {
