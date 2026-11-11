@@ -7,7 +7,9 @@
  * Work can name tasks it depends on. It is held only once each of them is
  * done: its holder released it with `done`. The coordinator's own
  * dependencies wait for an integration, which group work does not make,
- * so these are kept in the side file and checked here.
+ * so these are kept in the side file and checked here. A done release and
+ * such work take turns in their project (inOrder): between the end of the
+ * hold and the done write, a task would read as ended and never done.
  *
  * Every route is a participant's. What changes something runs inside
  * host.run with its project, so the requests waiting on that board hear of
@@ -45,6 +47,7 @@ import { knownBranchTip } from "../hold-guard.js";
 import { log } from "../log.js";
 import { git } from "../process.js";
 import { claimableScope } from "../scope-paths.js";
+import { redact } from "../secrets.js";
 import type { Store } from "../store.js";
 import type { Repository } from "../types.js";
 
@@ -80,7 +83,8 @@ const checkSchema = z.strictObject({ scopes });
 const workSchema = z.strictObject({
   title: line.pipe(z.string().min(1).max(maxTitle)),
   scopes,
-  dependsOn: z.array(z.string().max(64)).max(maxDependencies).optional(),
+  /** Checked by hand, as scopes are: a longer id is no task, and is refused as one. */
+  dependsOn: z.array(z.string()).optional(),
 });
 const releaseSchema = z.strictObject({
   fence: z.number().int().min(0),
@@ -194,6 +198,26 @@ async function heldScopes(asked: string[], repo: Repository | undefined) {
   return { held, invalid };
 }
 
+/**
+ * Runs `step` after the steps of this project given before it have
+ * settled, refused or not. One queue per project; it is gone once empty.
+ */
+function inTurns() {
+  const tails = new Map<string, Promise<void>>();
+  return <T>(projectId: string, step: () => Promise<T>): Promise<T> => {
+    const result = (tails.get(projectId) ?? Promise.resolve()).then(step);
+    const tail = result.then(
+      () => undefined,
+      () => undefined,
+    );
+    tails.set(projectId, tail);
+    void tail.then(() => {
+      if (tails.get(projectId) === tail) tails.delete(projectId);
+    });
+    return result;
+  };
+}
+
 /** Registers the routes and returns the hub, so a removal can end a removed person's waiting requests. */
 export function registerCollabBoardRoutes(
   app: Express,
@@ -208,6 +232,12 @@ export function registerCollabBoardRoutes(
   const checks = new PersonLimit(checkLimit.max, checkLimit.windowMs);
   /** Feed answers that have not left BELL PR yet, by participant id. */
   const untaken = new Map<string, Set<Response>>();
+  /**
+   * A release with `done`, from the end of the hold to the done write, and
+   * work that names tasks, from its check to its hold: one at a time in a
+   * project. Other work and releases read no done time and do not wait.
+   */
+  const inOrder = inTurns();
 
   host.onChange((projectId) => {
     if (host.status().state === "ready") hub.changed(projectId);
@@ -344,10 +374,14 @@ export function registerCollabBoardRoutes(
       const projectId = req.params.project;
       const { held, invalid } = await scopesOf(projectId, body.scopes);
       if (invalid.length || !held.length) throw invalidScope(invalid);
+      if ((body.dependsOn?.length ?? 0) > maxDependencies)
+        throw refuse(400, "tooManyDependencies", (m) =>
+          m.collab.tooManyDependencies({ max: maxDependencies }),
+        );
       const repo = repoOf(projectId);
       const holdBase = await knownBranchTip(repo, store.data.runs);
       const dependsOn = [...new Set(body.dependsOn ?? [])];
-      const hold = await host.run(async () => {
+      const take = async () => {
         const coordinator = host.coordinator();
         /**
          * 400 `dependencyUnknown` for a named task this repository does not
@@ -426,7 +460,11 @@ export function registerCollabBoardRoutes(
           if (reasonOf(error) === "conflict") refuseMeeting();
           throw error;
         }
-      }, projectId);
+      };
+      const hold = await host.run(
+        () => (dependsOn.length ? inOrder(projectId, take) : take()),
+        projectId,
+      );
       const changing = await changingFor(repo, actor, held, holdBase);
       const answer: CollabWorkResponse = { hold, changing };
       res.status(201).json(answer);
@@ -441,19 +479,33 @@ export function registerCollabBoardRoutes(
       const { project, claim } = req.params;
       projectOf(project);
       const actor = res.locals.actor as Actor;
-      await host.run(async () => {
+      const release = async () => {
         const ended = await host.coordinator().release(actor, project, claim, { fence });
-        // After the release: a write that fails leaves the task not done, never done and held.
         const key = taskKey(project, ended.taskId);
-        if (done || sideEntry(host.side().holds, key) !== undefined)
+        if (!done) {
+          if (sideEntry(host.side().holds, key) !== undefined)
+            await host.saveSide((draft) => dropHoldEntries(draft, [key]));
+          return;
+        }
+        // After the release: a write that fails leaves the task not done, never done and held.
+        try {
           await host.saveSide((draft) => {
-            if (done) {
-              const tasks = (draft.tasks ??= {});
-              tasks[key] = { ...sideEntry(tasks, key), doneAt: ended.updatedAt };
-            }
+            const tasks = (draft.tasks ??= {});
+            tasks[key] = { ...sideEntry(tasks, key), doneAt: ended.updatedAt };
             dropHoldEntries(draft, [key]);
           });
-      }, project);
+        } catch (error) {
+          // A refusal, such as group work that stopped, says so itself.
+          if (reasonOf(error) !== undefined) throw error;
+          log.error("Group work could not save that a task is done", {
+            project,
+            task: ended.taskId,
+            error: redact(error instanceof Error ? error.message : String(error)),
+          });
+          throw refuse(500, "doneNotSaved", (m) => m.collab.doneNotSaved);
+        }
+      };
+      await host.run(() => (done ? inOrder(project, release) : release()), project);
       const answer: CollabOkResponse = { ok: true };
       res.json(answer);
     },

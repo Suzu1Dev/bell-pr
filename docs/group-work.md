@@ -272,7 +272,7 @@ curl -X POST http://127.0.0.1:4311/api/collab/projects/<project id>/work \
   refused.
 - `dependsOn` is optional: the tasks of this repository that must be done
   before this work starts, at most 50 task ids (each the `taskId` of an
-  earlier hold). [Work that waits for other work](#work-that-waits-for-other-work)
+  earlier hold). More than 50 is refused with 400 `tooManyDependencies`. [Work that waits for other work](#work-that-waits-for-other-work)
   says when it is refused.
 
 The answer (201) is
@@ -346,8 +346,9 @@ and nothing else marks it done. Releasing a hold to take a wider one makes
 a new task too. Work that waits for such a task has to name the new one.
 
 - An id that is not a task of this repository (a task of another
-  repository, or an id nobody made) is refused with 400
-  `dependencyUnknown`, and `unknown` lists those ids.
+  repository, an id nobody made, or one longer than the 64 characters of
+  a task id) is refused with 400 `dependencyUnknown`, and `unknown` lists
+  those ids.
 - A task that is not done yet is refused with 409 `dependencyPending`, and
   `pending` lists each one with its `taskId`, its `title` and `held`:
   whether someone holds it now.
@@ -355,6 +356,11 @@ a new task too. Work that waits for such a task has to name the new one.
   either refuses, nothing is made or held, and the request still counts
   toward the `work` limit.
 - An id named twice counts once.
+- Such work and a release with `"done": true` take turns in a repository.
+  Work sent while that release is under way is asked once the release has
+  answered, so it finds the task done, or, when the release failed, not
+  done. Work that names no task, and a release without `done`, do not
+  wait.
 
 Once every task it names is done, the same request is taken. Nothing tells
 the person who waits, but the [live feed](#the-live-feed) changes when the
@@ -575,7 +581,7 @@ use.
 | Paths in one hold, or in one `check` | 50 | 400 `tooManyScopes` |
 | Length of a path | 300 characters | 400 `invalidScope` |
 | Title of a task | 120 characters | 400 |
-| Tasks one `work` request names in `dependsOn` | 50, each id at most 64 characters | 400 |
+| Tasks one `work` request names in `dependsOn` | 50 | 400 `tooManyDependencies` |
 | `work` requests of one person | 30 in 10 minutes, taken or refused | 429 `slowDown`; `retryAfter` is the seconds to wait |
 | `check` requests of one person | 120 in a minute | 429 `slowDown`, the same way |
 | Feed requests waiting | 2 for one person, 64 for the group, over all repositories | 429 `tooManyWaiters` |
@@ -632,8 +638,8 @@ token, or a paired device's). The routes exist only with the switch.
 | `POST /api/collab/projects` with `{ repoId }` | an admin | 201 `{ project: { id, name } }`; 403 `adminOnly`; 400 `unknownRepository`; 409 `alreadyAdded`, `full`; 500 or 504 `cloneFailed` |
 | `GET /api/collab/projects/<project id>/feed?epoch=&version=&seen=&wait=` | anyone who joined | 200 `{ epoch, version, seen, asOf, board?, present }`; 204 when nothing changed; 404 `unknownProject`; 429 `tooManyWaiters` |
 | `POST /api/collab/projects/<project id>/check` with `{ scopes }` | anyone who joined | 200 `{ asOf, invalid, meets, changing }`; 400 `tooManyScopes`, `invalidScope`; 404 `unknownProject`; 429 `slowDown` |
-| `POST /api/collab/projects/<project id>/work` with `{ title, scopes, dependsOn? }` | anyone who joined | 201 `{ hold, changing }`; 400 `invalidScope`, `tooManyScopes`, `dependencyUnknown`; 404 `unknownProject`; 409 `conflict`, `dependencyPending`, `full`; 429 `slowDown` |
-| `POST /api/collab/projects/<project id>/holds/<claimId>/release` with `{ fence, done? }` | the person who holds it | 200 `{ ok: true }`; 403 `notHolder`; 404 `unknownProject`, `unknownClaim`; 409 `staleFence`, `ended` |
+| `POST /api/collab/projects/<project id>/work` with `{ title, scopes, dependsOn? }` | anyone who joined | 201 `{ hold, changing }`; 400 `invalidScope`, `tooManyScopes`, `tooManyDependencies`, `dependencyUnknown`; 404 `unknownProject`; 409 `conflict`, `dependencyPending`, `full`; 429 `slowDown` |
+| `POST /api/collab/projects/<project id>/holds/<claimId>/release` with `{ fence, done? }` | the person who holds it | 200 `{ ok: true }`; 403 `notHolder`; 404 `unknownProject`, `unknownClaim`; 409 `staleFence`, `ended`; 500 `doneNotSaved` |
 | `POST /api/collab/projects/<project id>/holds/<claimId>/revoke` with `{}` | an admin | 200 `{ ok: true }`; 403 `adminOnly`; 404 `unknownProject`, `unknownClaim`; 409 `ended` |
 
 - `state` is `notSetUp`, `ready` or `stopped`. `GET /api/status` carries
@@ -688,8 +694,9 @@ token was given out), but they count toward the 1000. Invite them again.
 When it happens while a repository is added, the answer is `cloneFailed`,
 the copy is deleted and the repository is not in the group, but it counts
 toward the 100. Add it again. When it happens in a release with
-`"done": true`, the hold has ended but its task is not done, and it cannot
-be marked done any more: work that waits for it has to name another task.
+`"done": true`, the answer is 500 `doneNotSaved`: the hold has ended but
+its task is not done, and it cannot be marked done any more. Work that
+waits for it has to name another task.
 
 `bell-pr group status` prints the reason, and the server log has it in a
 "Group work stopped" line;
