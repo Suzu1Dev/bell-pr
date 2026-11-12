@@ -98,8 +98,13 @@ your AI CLI are still required for real work.
 
 With mise already installed:
 
+<!-- generated:install-commands method=mise -->
 ```sh
-MISE_NPM_PACKAGE_MANAGER=npm mise use -g node@24 npm:bell-pr@1.1.0
+MISE_NPM_PACKAGE_MANAGER=npm mise use -g node@24 npm:bell-pr@1.1.1
+```
+<!-- /generated:install-commands -->
+
+```sh
 mise exec -- bell-pr
 ```
 

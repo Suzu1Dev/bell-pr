@@ -303,7 +303,23 @@ function ProviderStep({
 
   const note = (provider: AgentProvider) =>
     ({ codex: t.codexNote, claude: t.claudeNote, antigravity: t.antigravityNote })[provider];
-  const fixes = report?.checks.find((check) => check.id === "provider-ready")?.fixes ?? [];
+  const providerReady = report?.checks.find((check) => check.id === "provider-ready");
+  const fixes = providerReady?.fixes ?? [];
+  const docs = [
+    { id: "codex" as const, sentence: t.codexDocs, label: t.codexDocsLabel, href: t.codexDocsUrl },
+    { id: "claude" as const, sentence: t.claudeDocs, label: t.claudeDocsLabel, href: t.claudeDocsUrl },
+    {
+      id: "antigravity" as const,
+      sentence: t.antigravityDocs,
+      label: t.antigravityDocsLabel,
+      href: t.antigravityDocsUrl,
+    },
+  ].filter(({ id }) => {
+    if (providerReady?.reason === "claude-only") return id === "claude";
+    if (providerReady?.reason === "chosen-not-ready") return id === providerReady.params?.provider;
+    const tool = report?.checks.find((check) => check.id === id);
+    return !(tool?.status === "skip" && tool.reason === "disabled");
+  });
 
   return (
     <div className="welcome-body">
@@ -330,12 +346,11 @@ function ProviderStep({
               ))}
             </div>
           )}
-          <p className="welcome-install-links">
-            <DocsLink sentence={t.codexDocs} label={t.codexDocsLabel} href={t.codexDocsUrl} />
-          </p>
-          <p className="welcome-install-links">
-            <DocsLink sentence={t.claudeDocs} label={t.claudeDocsLabel} href={t.claudeDocsUrl} />
-          </p>
+          {docs.map((doc) => (
+            <p className="welcome-install-links" key={doc.id}>
+              <DocsLink sentence={doc.sentence} label={doc.label} href={doc.href} />
+            </p>
+          ))}
           <button type="button" className="button secondary" onClick={() => void refresh()}>
             {recheck}
           </button>

@@ -480,7 +480,8 @@ async function keepRefreshedLogin(login) {
     // With "wx", a file that was already there is not this run's copy.
     if (written || error?.code !== "EEXIST") {
       const removed = await rm(next, { force: true }).then(() => true, () => false);
-      if (!removed) throw new Error(`${error?.message ?? error}; also delete ${next}`);
+      if (!removed)
+        throw new Error(`${error?.message ?? error}; also delete ${next}`, { cause: error });
     }
     throw error;
   }
@@ -498,7 +499,7 @@ async function codexSandboxStart(executable, args, checkout) {
     if (args[index] === "-c" && /^(?:default_permissions|permissions)=/.test(args[index + 1]))
       profile.push("-c", args[index + 1]);
   if ((process.platform !== "linux" && !options.fake) || profile.length < 4) return null;
-  let output = "";
+  let output;
   try {
     const run = await command(
       executable,

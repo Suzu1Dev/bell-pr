@@ -926,7 +926,10 @@ test("only Codex installed, with the switch off, asks for Claude Code and does n
     row.detail,
     "1.0.0 supports Claude Code only; Codex support is disabled.\nInstall Claude Code.",
   );
-  assert.equal(row.fixes, undefined);
+  assert.deepEqual(
+    row.fixes?.map((fix) => fix.command),
+    ["npm install -g @anthropic-ai/claude-code", "claude auth login"],
+  );
   assert.equal(check(again, "codex").status, "skip");
   assert.equal(check(again, "codex").reason, "disabled");
   assert.equal(check(again, "codex").required, false);

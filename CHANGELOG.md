@@ -150,6 +150,16 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- **A sync snapshot does not count as another copy of a recovered commit.**
+  `refs/bellpr/sync/<run>` is removed with the run's files, so a
+  publish-recovery ref is kept when that snapshot is the only other ref
+  that can reach the commit.
+- **A publish-recovery ref is deleted only when its commit is already
+  reachable.** After a later publish succeeds, or when a run is removed,
+  `refs/bellpr/publish-recovery/<run>/<commit>` is deleted if that commit
+  can be reached from the remote branch, the pull request, or another ref.
+  If it may be the only copy, it stays, and the log says why. Deleting a
+  ref that is already gone is not an error.
 - **Start now listens when the provider is the only required check that
   fails,** on the first start and on every later one. The first time,
   Welcome shows how to install Codex CLI, Claude Code or the
@@ -202,6 +212,18 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   states them, and the docs quote the current interface labels.
 
 ### Fixed
+
+- **npmjs.com shows the English README.** `npm publish` takes any root
+  file named `README` or `README.*` as the package's README, in no fixed
+  order, so npmjs.com showed the Traditional Chinese README for 1.0.0 and
+  1.1.0. It is now `README-zh-TW.md`, in the repository and in the package,
+  and `node scripts/check-pack.mjs` fails when npm could send another README
+  than `README.md`.
+
+- **A local import uses the origin URL saved in the checkout.** A global
+  `url.*.insteadOf` rewrite no longer hides a GitHub project, and an origin
+  whose URL contains userinfo is imported as a local project. That address
+  is not stored or logged.
 
 - **Sandbox messages name the real Settings section.** They pointed to
   "Settings → Models", which does not exist; they now say "Settings → AI

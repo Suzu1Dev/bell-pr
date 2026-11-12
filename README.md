@@ -2,7 +2,7 @@
 
 **From vibe coding to knowing why.**
 
-English · [繁體中文](README.zh-TW.md)
+English · [繁體中文](README-zh-TW.md)
 
 BELL PR is a local workbench for learning through open-source contributions.
 It uses your Codex CLI, Claude Code or Antigravity CLI to analyze a project
