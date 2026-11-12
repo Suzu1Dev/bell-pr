@@ -217,7 +217,7 @@ export async function releasePublishRecovery(
     const space = trimmed.indexOf(" ");
     const ref = trimmed.slice(0, space);
     const commit = trimmed.slice(space + 1);
-    let reachable = false;
+    let reachable: boolean;
     try {
       reachable = await recoveryCommitReachable(ctx, run, cwd, ref, commit);
     } catch (error) {
