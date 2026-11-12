@@ -6,6 +6,7 @@ import type { useProjectInsights } from "../mission/useProjectInsights";
 import type { ContributionRecommendation } from "../../shared/insights";
 import type { Tab } from "../app/AppShell";
 import { ErrorBoundary } from "../app/ErrorBoundary";
+import { OriginIgnoredNotice } from "./OriginIgnoredNotice";
 
 // The overview is the largest view in the app; it loads with its first visit.
 const ProjectOverview = lazy(() =>
@@ -25,6 +26,36 @@ interface ExplorePageProps {
   updatingRepo: boolean;
 }
 
+/** The project title, and the origin hint outside that title's text styles. */
+export function ExploreHeading({
+  repo,
+  onChooseDirection,
+}: {
+  repo: Repo;
+  onChooseDirection: () => void;
+}) {
+  const t = useT("repos").explore;
+  return (
+    <>
+      <div className="page-title">
+        <div>
+          <h1 tabIndex={-1}>{repo.fullName}</h1>
+          <p>{t.intro}</p>
+        </div>
+        <button className="button primary" onClick={onChooseDirection}>
+          <Target size={16} />
+          {t.chooseDirection}
+        </button>
+      </div>
+      {repo.originUserinfoIgnored ? (
+        <div className="origin-notice-slot">
+          <OriginIgnoredNotice ignored />
+        </div>
+      ) : null}
+    </>
+  );
+}
+
 /** One repository's users, problems and recommended contribution directions. */
 export function ExplorePage({
   exploreRepo,
@@ -35,22 +66,12 @@ export function ExplorePage({
   onUpdateRepo,
   updatingRepo,
 }: ExplorePageProps) {
-  const t = useT("repos").explore;
   return (
     <section className="page-content explore-page">
-      <div className="page-title">
-        <div>
-          <h1 tabIndex={-1}>{exploreRepo.fullName}</h1>
-          <p>{t.intro}</p>
-        </div>
-        <button
-          className="button primary"
-          onClick={() => beginContribution(exploreRepo.id)}
-        >
-          <Target size={16} />
-          {t.chooseDirection}
-        </button>
-      </div>
+      <ExploreHeading
+        repo={exploreRepo}
+        onChooseDirection={() => beginContribution(exploreRepo.id)}
+      />
       <ErrorBoundary resetKey={exploreRepo.id}>
       <Suspense fallback={null}>
       <ProjectOverview

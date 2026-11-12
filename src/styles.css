@@ -69,6 +69,7 @@ a {
    specificity as the rule above, so it has to come after it. */
 :root .rv-line:focus-visible,
 :root .review-toolbar:focus-visible,
+:root .review-tabs > [role="tab"]:focus-visible,
 :root .file-tree:focus-visible,
 :root .mission-idea-list:focus-visible,
 :root .mission-section-nav ul:focus-visible,
@@ -448,15 +449,6 @@ button {
     display: none;
   }
 }
-@media (max-width: 600px) {
-  .workspace-command kbd {
-    display: none;
-  }
-  .workspace-command {
-    min-width: 32px;
-    padding: 5px;
-  }
-}
 /* Below 360 px, such as on a 320 px phone, present=1's sample badge
    shrinks and the actions move closer together, so the quick switch and
    the profile button stay on screen beside the page name. */
@@ -515,11 +507,16 @@ button {
   text-decoration: underline;
 }
 @media (max-width: 600px) {
+  .workspace-command kbd,
   .breadcrumb-root,
   .breadcrumb-separator,
   .readiness-text,
   .topbar-repo-text {
     display: none;
+  }
+  .workspace-command {
+    min-width: 32px;
+    padding: 5px;
   }
   .readiness-pill {
     padding: 6px;
@@ -553,7 +550,7 @@ button {
   display: none;
 }
 .workspace-heading {
-  padding: 32px 34px 25px;
+  padding: 22px 34px 14px;
 }
 .heading-top {
   display: flex;
@@ -785,17 +782,22 @@ button {
   display: flex;
   align-items: stretch;
   justify-content: space-between;
+  height: 58px;
+  gap: 24px;
   padding: 0 19px;
   border-bottom: 1px solid var(--color-border);
 }
 .review-tabs {
   display: flex;
   align-items: stretch;
+  gap: 23px;
 }
 .review-tabs > button {
   display: flex;
   align-items: center;
   gap: 7px;
+  font-size: var(--text-sm);
+  white-space: nowrap;
   color: var(--color-text-muted);
   padding: 0 2px;
   border-bottom: 2px solid transparent;
@@ -1421,9 +1423,6 @@ button {
   margin-left: 8px;
   color: var(--color-text-muted);
 }
-.log-status p {
-  color: var(--color-text-muted);
-}
 .callout {
   display: flex;
   gap: 10px;
@@ -1438,6 +1437,26 @@ button {
   line-height: 1.8;
   color: var(--color-accent-600);
 }
+.origin-ignored {
+  flex-direction: column;
+  align-items: stretch;
+  min-width: 0;
+}
+.origin-ignored .copy-command {
+  min-width: 0;
+}
+.origin-ignored .copy-command-row code {
+  overflow-wrap: break-word;
+}
+@media (min-width: 601px) {
+  .origin-ignored .copy-command-row {
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .origin-ignored .copy-command-row code {
+    flex: 1 1 16rem;
+  }
+}
 .draft-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 268px;
@@ -1445,15 +1464,6 @@ button {
 }
 .draft-editor {
   padding: 28px;
-}
-.draft-label {
-  font-family: var(--font-mono);
-  font-size: var(--text-2xs);
-  letter-spacing: 1px;
-  color: var(--color-text-muted);
-  border: 1px solid var(--color-border-subtle);
-  padding: 4px 7px;
-  border-radius: 4px;
 }
 .field-label {
   display: block;
@@ -1607,16 +1617,6 @@ button {
   border-left: 1px solid var(--color-border);
   background: var(--color-bg);
 }
-.checklist-icon {
-  width: 47px;
-  height: 47px;
-  background: var(--color-accent-100);
-  color: var(--color-accent-600);
-  border-radius: 12px;
-  display: grid;
-  place-items: center;
-  margin-bottom: 20px;
-}
 .publish-checklist h3 {
   font-size: 15px;
   font-weight: 550;
@@ -1721,19 +1721,6 @@ button {
   font-size: var(--text-sm);
   font-weight: 600;
   white-space: nowrap;
-}
-@media (max-width: 760px) {
-  .discovery-entry {
-    flex-wrap: wrap;
-    padding: 18px;
-  }
-  .discovery-entry-action {
-    margin-left: 62px;
-  }
-  .discovery-entry > span:nth-child(2) {
-    flex: 1;
-    min-width: 160px;
-  }
 }
 .repository-grid {
   display: grid;
@@ -2313,38 +2300,11 @@ button {
   gap: 9px;
   margin-left: auto;
 }
-@media (max-width: 760px) {
-  /* The modal's own padding shrinks here; the footer keeps reaching its edges. */
-  .split-footer {
-    bottom: -26px;
-    margin: var(--space-5) -23px -26px;
-    padding: var(--space-3) 23px;
-  }
-  .split-member {
-    grid-template-columns: minmax(0, 1fr) auto;
-  }
-  .split-move {
-    grid-column: 1 / -1;
-    width: 100%;
-  }
-}
 .task-prompt {
   min-height: 130px;
   resize: vertical;
   font-size: var(--text-xs);
   line-height: 1.8;
-}
-.task-team-preview {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  border: 1px solid var(--color-accent-200);
-  background: var(--color-accent-50);
-  padding: 12px;
-  border-radius: 5px;
-  margin-top: 15px;
-  font-size: var(--text-2xs);
-  color: var(--color-accent-600);
 }
 .publish-summary {
   border: 1px solid var(--color-border-subtle);
@@ -2842,13 +2802,40 @@ button {
   }
 }
 @media (max-width: 760px) {
+  .discovery-entry {
+    flex-wrap: wrap;
+    padding: 18px;
+  }
+  .discovery-entry-action {
+    margin-left: 62px;
+  }
+  .discovery-entry > span:nth-child(2) {
+    flex: 1;
+    min-width: 160px;
+  }
+  .split-footer {
+    bottom: -26px;
+    margin: var(--space-5) -23px -26px;
+    padding: var(--space-3) 23px;
+  }
+  .split-member {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .split-move {
+    grid-column: 1 / -1;
+    width: 100%;
+  }
   .sidebar {
     transform: translateX(-100%);
     transition: transform 0.2s;
     width: 228px;
+    visibility: hidden;
+    pointer-events: none;
   }
   .sidebar.sidebar-open {
     transform: translateX(0);
+    visibility: visible;
+    pointer-events: auto;
   }
   .sidebar-scrim {
     display: block;
@@ -3101,9 +3088,6 @@ button {
   .draft-editor {
     padding: 22px 15px;
   }
-  .draft-label {
-    display: none;
-  }
   .draft-save-row > span {
     font-size: var(--text-2xs);
   }
@@ -3157,9 +3141,6 @@ button {
   .modal-actions .button {
     font-size: var(--text-2xs);
     padding: 9px 10px;
-  }
-  .task-team-preview {
-    padding: 11px 8px;
   }
   .toast {
     left: 50%;
@@ -3268,124 +3249,62 @@ button {
   line-height: 25px;
   min-height: 25px;
 }
-.rv-diff-footer {
-  font-size: var(--text-2xs);
-}
-.rv-gutter {
-  font-size: var(--text-2xs);
-}
-.rv-file-path {
-  font-size: var(--text-xs);
-}
-.explain-input-box textarea {
-  font-size: var(--text-xs);
-}
 .explain-message-body {
   font-size: var(--text-sm);
   color: var(--color-text-muted);
 }
-.explain-tabs button {
+.rv-diff-footer,
+.rv-gutter,
+.explain-presets button,
+.explain-header p,
+.explain-context,
+.file-name,
+.rv-reviewed,
+.status-badge,
+.review-footer > div,
+.review-progress > div:first-child,
+.note-card > code,
+.checklist-item small,
+.explain-mode,
+.explain-disclaimer {
+  font-size: var(--text-2xs);
+}
+.rv-file-path,
+.explain-input-box textarea,
+.explain-tabs button,
+.repo-meta,
+.review-footer .button,
+.file-panel-heading strong,
+.recent-item,
+.agent-card p,
+.field-help,
+.callout p,
+.checklist-item {
   font-size: var(--text-xs);
 }
-.explain-presets button {
-  font-size: var(--text-2xs);
+.section-heading p,
+.field-label,
+.modal-subtitle,
+.draft-textarea {
+  font-size: var(--text-sm);
 }
-.explain-header h2 {
-  font-size: var(--text-md);
-}
-.explain-header p {
-  font-size: var(--text-2xs);
-}
-.explain-context {
-  font-size: var(--text-2xs);
-}
-.file-name {
-  font-size: var(--text-2xs);
-}
-.nav-item {
-  font-size: var(--text-md);
-}
-.repo-meta {
-  font-size: var(--text-xs);
-}
-.rv-reviewed {
-  font-size: var(--text-2xs);
-}
-.status-badge {
-  font-size: var(--text-2xs);
-}
-.review-footer > div {
-  font-size: var(--text-2xs);
-}
-.review-footer .button {
-  font-size: var(--text-xs);
-}
-.file-panel-heading strong {
-  font-size: var(--text-xs);
-}
-.review-progress > div:first-child {
-  font-size: var(--text-2xs);
-}
-.recent-item {
-  font-size: var(--text-xs);
-}
-.page-title p {
-  font-size: var(--text-md);
-}
+.explain-header h2,
+.nav-item,
+.page-title p,
 .repository-card p,
 .team-role > p,
 .note-card p {
   font-size: var(--text-md);
 }
-.note-card > code {
-  font-size: var(--text-2xs);
-}
-.section-heading p {
-  font-size: var(--text-sm);
-}
-.agent-card p {
-  font-size: var(--text-xs);
-}
-.field-label {
-  font-size: var(--text-sm);
-}
-.modal-subtitle {
-  font-size: var(--text-sm);
-}
-.field-help {
-  font-size: var(--text-xs);
-}
-.callout p {
-  font-size: var(--text-xs);
-}
-.draft-textarea {
-  font-size: var(--text-sm);
-}
-.checklist-item {
-  font-size: var(--text-xs);
-}
-.checklist-item small {
-  font-size: var(--text-2xs);
-}
-.explain-mode,
-.explain-disclaimer {
-  font-size: var(--text-2xs);
-}
 @media (max-width: 760px) {
-  .rv-file-path {
-    font-size: var(--text-2xs);
-  }
-  .file-name {
-    font-size: var(--text-2xs);
-  }
-  .rv-line {
+  .rv-file-path,
+  .file-name,
+  .rv-line,
+  .review-footer .button {
     font-size: var(--text-2xs);
   }
   .title-row h1 {
     font-size: 22px;
-  }
-  .review-footer .button {
-    font-size: var(--text-2xs);
   }
   .explain-content {
     max-height: 460px;
@@ -3528,16 +3447,6 @@ button {
   gap: 4px;
   flex-shrink: 0;
 }
-@media (max-width: 760px) {
-  .sidebar {
-    visibility: hidden;
-    pointer-events: none;
-  }
-  .sidebar.sidebar-open {
-    visibility: visible;
-    pointer-events: auto;
-  }
-}
 .pr-feedback {
   border-top: 1px solid var(--color-border);
   padding: 28px;
@@ -3647,14 +3556,19 @@ button {
   line-height: 1.7;
 }
 /* Spaced like the draft guide below it, so the first panel clears the tab bar. */
-.follow-up-rounds {
+.follow-up-rounds,
+.sync-panel {
   margin: 24px 28px 0;
   padding: 18px 20px;
   border: 1px solid var(--color-border);
   border-radius: 10px;
   background: var(--color-bg);
 }
-.follow-up-rounds h2 {
+.sync-panel {
+  padding: 16px 20px;
+}
+.follow-up-rounds h2,
+.sync-panel h2 {
   margin: 0;
   font-size: 15px;
   font-weight: 550;
@@ -3784,30 +3698,12 @@ button {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
-@media (max-width: 760px) {
-  .follow-up-round-head time {
-    margin-left: 0;
-  }
-}
-
 /* Where the contribution stands against its target branch, and its conflicts. */
-.sync-panel {
-  margin: 24px 28px 0;
-  padding: 16px 20px;
-  border: 1px solid var(--color-border);
-  border-radius: 10px;
-  background: var(--color-bg);
-}
 .sync-panel-head {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
   gap: 16px;
-}
-.sync-panel h2 {
-  margin: 0;
-  font-size: 15px;
-  font-weight: 550;
 }
 .sync-panel p {
   margin: 6px 0 0;
@@ -3857,6 +3753,9 @@ button {
   }
 }
 @media (max-width: 760px) {
+  .follow-up-round-head time {
+    margin-left: 0;
+  }
   .sync-panel-head {
     flex-direction: column;
   }
@@ -3864,7 +3763,6 @@ button {
     justify-content: flex-start;
     max-width: 100%;
   }
-  /* On the narrowest phones a long label wraps instead of running past the panel. */
   .sync-panel-actions .button {
     max-width: 100%;
     white-space: normal;
