@@ -8,6 +8,7 @@ import {
   type SetStateAction,
 } from "react";
 import { api, ApiError, send } from "../../api";
+import { participantHeaders } from "../../collab/participant";
 import { demoAnswer, getDemo, type DemoContent } from "../../demo";
 import { demoLearningExport } from "../../demo/export";
 import {
@@ -710,16 +711,16 @@ export function useRunActions({
     setBusy(true);
     setFormError("");
     try {
-      const { run: created } = await api<{ run: Run }>(
-        "/runs",
-        send("POST", {
+      const { run: created } = await api<{ run: Run }>("/runs", {
+        ...send("POST", {
           repoId: taskRepoId,
           prompt: prompt.trim(),
           title: taskTitle.trim() || undefined,
           settings: contributionSettings,
           ...setup.runRequest.current,
         }),
-      );
+        headers: participantHeaders(),
+      });
       setRuns((previous) => [summarizeRun(created), ...previous]);
       setRun(created);
       setFiles([]);
@@ -1006,12 +1007,15 @@ export function useRunActions({
     try {
       const result = await api<{ run: Run; url?: string }>(
         `/runs/${run.id}/publish`,
-        send("POST", {
-          fingerprint: run.approvedFingerprint,
-          acknowledged,
-          rulesDigest,
-          ...(overrides.length ? { overrides } : {}),
-        }),
+        {
+          ...send("POST", {
+            fingerprint: run.approvedFingerprint,
+            acknowledged,
+            rulesDigest,
+            ...(overrides.length ? { overrides } : {}),
+          }),
+          headers: participantHeaders(),
+        },
       );
       // The person may have opened another run while the PR was created.
       if (runIdRef.current === result.run.id && selectionSequence.current === selection)
@@ -1157,6 +1161,89 @@ export function useRunActions({
       notify((error as Error).message, "error");
     }
   }
+  async function restoreHeldPaths(): Promise<HoldRestoreResult> {
+    const id = run.id;
+    try {
+      const result = await api<{ run: Run; restored: string[] }>(
+        `${runPath(id)}/holds/restore`,
+        { ...send("POST", {}), headers: participantHeaders() },
+      );
+      if (runIdRef.current !== id) return { restored: result.restored.length };
+      setRun(result.run);
+      try {
+        const files = await readRunFiles(id);
+        if (runIdRef.current === id) {
+          setFiles(files);
+          if (file && !files.some((item) => item.path === file.path))
+            setSelectedPath(files[0]?.path || "");
+        }
+        return { restored: result.restored.length, files };
+      } catch (error) {
+        return {
+          restored: result.restored.length,
+          refreshError: error instanceof Error ? error : new Error(String(error)),
+        };
+      }
+    } catch (error) {
+      const conflicts = heldConflicts(error);
+      if (conflicts && runIdRef.current === id) {
+        try {
+          const [current, files] = await Promise.all([
+            api<{ run: Run }>(runPath(id)),
+            readRunFiles(id),
+          ]);
+          if (runIdRef.current === id) {
+            setRun(current.run);
+            setFiles(files);
+            if (file && !files.some((item) => item.path === file.path))
+              setSelectedPath(files[0]?.path || "");
+          }
+        } catch {
+          if (runIdRef.current === id)
+            setRun((previous) =>
+              previous.id === id
+                ? {
+                    ...previous,
+                    heldPaths: [...new Set(conflicts.map((conflict) => conflict.path))],
+                  }
+                : previous,
+            );
+        }
+      }
+      throw error;
+    }
+  }
+  async function recheckHeldPaths(): Promise<HeldConflict[]> {
+    const id = run.id;
+    try {
+      const result = await api<{ run: Run }>(
+        `${runPath(id)}/holds/recheck`,
+        { ...send("POST", {}), headers: participantHeaders() },
+      );
+      if (runIdRef.current === id) setRun(result.run);
+      return [];
+    } catch (error) {
+      const conflicts = heldConflicts(error);
+      if (!conflicts) throw error;
+      if (runIdRef.current === id) {
+        try {
+          const current = await api<{ run: Run }>(runPath(id));
+          if (runIdRef.current === id) setRun(current.run);
+        } catch {
+          if (runIdRef.current === id)
+            setRun((previous) =>
+              previous.id === id
+                ? {
+                    ...previous,
+                    heldPaths: [...new Set(conflicts.map((conflict) => conflict.path))],
+                  }
+                : previous,
+            );
+        }
+      }
+      return conflicts;
+    }
+  }
   return {
     setRun,
     setFiles,
@@ -1188,7 +1275,37 @@ export function useRunActions({
     recoverPublish,
     fetchPrFeedback,
     cancel,
+    restoreHeldPaths,
+    recheckHeldPaths,
   };
+}
+
+export interface HeldConflict {
+  path: string;
+  holder: string;
+  title: string;
+  since: string;
+}
+
+export interface HoldRestoreResult {
+  restored: number;
+  files?: DiffFile[];
+  refreshError?: Error;
+}
+
+export function heldConflicts(error: unknown): HeldConflict[] | undefined {
+  if (!(error instanceof ApiError) || error.status !== 409 || error.details.reason !== "heldByOther")
+    return undefined;
+  if (!Array.isArray(error.details.held)) return undefined;
+  const conflicts = error.details.held.flatMap((value) => {
+    if (typeof value !== "object" || value === null) return [];
+    const conflict = value as Record<string, unknown>;
+    return typeof conflict.path === "string" && typeof conflict.holder === "string" &&
+      typeof conflict.title === "string" && typeof conflict.since === "string"
+      ? [{ path: conflict.path, holder: conflict.holder, title: conflict.title, since: conflict.since }]
+      : [];
+  });
+  return conflicts.length ? conflicts : undefined;
 }
 
 export type RunActions = ReturnType<typeof useRunActions>;

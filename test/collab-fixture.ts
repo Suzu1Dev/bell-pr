@@ -25,7 +25,9 @@ import { acquireWriterLock } from "../server/index.js";
 import { log } from "../server/log.js";
 import { normalizePairCode } from "../server/pairing.js";
 import { Store } from "../server/store.js";
+import type { TeamAgentRunner } from "../server/team.js";
 import { Workbench } from "../server/workbench.js";
+import type { WriterLock } from "../server/writer-lock.js";
 
 export type Headers = Record<string, string>;
 /** A response; `json` is loose so each test reads the fields it checks. */
@@ -40,10 +42,13 @@ export interface Reply {
 export const outcome = (reply: Reply) =>
   [reply.status, reply.json?.reason].filter(Boolean).join(" ");
 
-/** `limits` lowers the coordinator's limits, for tests that fill it up. */
+/**
+ * `limits` lowers the coordinator's limits, for tests that fill it up;
+ * `runner` stands in for the agents of the workbench's runs.
+ */
 export async function collabFixture(
   t: TestContext,
-  { limits }: Pick<CoordinatorOptions, "limits"> = {},
+  { limits, runner }: Pick<CoordinatorOptions, "limits"> & { runner?: TeamAgentRunner } = {},
 ) {
   const directory = await mkdtemp(path.join(tmpdir(), "bell-collab-routes-"));
   const file = path.join(directory, "api-token");
@@ -60,30 +65,35 @@ export async function collabFixture(
   let port = 0;
   let stop = async () => {};
   /** What the server now running was built from. */
-  let live: { collab: CollabHost; store: Store };
-  /** BELL PR with group work on this directory; called again, a restart (after `change`). */
-  const start = async (change?: () => Promise<unknown>) => {
+  let live: { collab?: CollabHost; store: Store; workbench: Workbench; lock: WriterLock };
+  /**
+   * BELL PR with group work on this directory; called again, a restart
+   * (after `change`). `group: false` starts it without --group.
+   */
+  const start = async (change?: () => Promise<unknown>, { group = true } = {}) => {
     await stop();
     await change?.();
     const lock = await acquireWriterLock(directory);
-    const collab = await openCollabHost({ dataDir: directory, lock, ...(limits ? { limits } : {}) });
+    const collab = group
+      ? await openCollabHost({ dataDir: directory, lock, ...(limits ? { limits } : {}) })
+      : undefined;
     const store = new Store(directory);
     await store.initialize();
-    live = { collab, store };
-    const workbench = new Workbench(store);
+    const workbench = new Workbench(store, runner);
+    live = { collab, store, workbench, lock };
     const app = createApp(workbench, {
       staticDirectory: path.join(directory, "missing"),
       port: 4311,
       publicUrl: "https://bell.example.internal",
       apiTokenFile: file,
-      collab,
+      ...(collab ? { collab } : {}),
     });
     const server = app.listen(0, "127.0.0.1");
     await once(server, "listening");
     port = (server.address() as AddressInfo).port;
     stop = async () => {
       stop = async () => {};
-      await collab.close();
+      await collab?.close();
       await new Promise<void>((resolve, reject) =>
         server.close((error) => (error ? reject(error) : resolve())),
       );
@@ -216,12 +226,19 @@ export async function collabFixture(
     paths,
     install,
     logged,
-    /** The group's host and BELL PR's store, of the server now running. */
+    /** The group's host, BELL PR's store and workbench, and the writer lock, of the server now running. */
     get collab() {
+      assert.ok(live.collab, "started without --group");
       return live.collab;
     },
     get store() {
       return live.store;
+    },
+    get workbench() {
+      return live.workbench;
+    },
+    get lock() {
+      return live.lock;
     },
     /** Where the server now running listens, for a test that writes to a socket itself. */
     get port() {

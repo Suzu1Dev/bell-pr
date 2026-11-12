@@ -8,7 +8,7 @@ import test, { after, before, type TestContext } from "node:test";
 import assert from "node:assert/strict";
 import { once } from "node:events";
 import { existsSync, readFileSync } from "node:fs";
-import { mkdir, mkdtemp, realpath, rename, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, realpath, rename, rm, writeFile } from "node:fs/promises";
 import { request } from "node:http";
 import type { AddressInfo } from "node:net";
 import os from "node:os";
@@ -225,7 +225,16 @@ test("a confirmed command that exits 0 is recorded as passed, with the predictio
   assert.ok(Date.parse(result.at) >= Date.parse(busy.since!));
   assert.equal(f.run.byHand?.busy, undefined);
   assert.deepEqual(await f.byHand.liveTests(f.run.id), { running: false, tail: "" });
-  // Saved: a new store reads the result back.
+  // Saved: a new store reads the result back. That write is queued behind
+  // the 202's save, so wait until the file itself has the result.
+  const statePath = path.join(f.store.directory, "state.json");
+  const deadline = Date.now() + 30_000;
+  for (;;) {
+    const text = await readFile(statePath, "utf8").catch(() => "");
+    if (text.includes(result.tailHash ?? "\0")) break;
+    if (Date.now() > deadline) assert.fail("the recorded test was not stored");
+    await sleep(25);
+  }
   const reloaded = new Store(f.store.directory);
   await reloaded.initialize();
   assert.deepEqual(reloaded.data.runs.find((run) => run.id === f.run.id)?.byHand?.tests?.at(-1), result);
@@ -728,7 +737,8 @@ test("a new run starts at once when the last one shows its result and the run is
   };
   for (let index = 1; index <= 3; index++) {
     // As the Tests card does: Run again as soon as the result shows and busy is gone.
-    await en(() => f.byHand.runTests(f.run.id, {}));
+    const started = await en(() => f.byHand.runTests(f.run.id, {}));
+    assert.equal(started.run.byHand?.busy?.kind, "tests");
     while ((f.run.byHand?.tests?.length ?? 0) < index || f.run.byHand?.busy) await sleep(5);
   }
   assert.deepEqual(

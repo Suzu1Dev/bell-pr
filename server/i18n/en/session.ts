@@ -29,7 +29,7 @@ export default {
   stopped: "This conversation turn was stopped",
   failed: "This conversation turn did not finish",
   editsKept: ({ reason }: { reason: string }) =>
-    `${reason}. Edits remain in the working directory; inspect them in File changes.`,
+    `${reason.replace(/[.\u3002]+$/u, "")}. Edits remain in the working directory; inspect them in File changes.`,
   waiting: "Waiting for your next message",
   interrupted: "Conversation turn interrupted",
   draftStale:

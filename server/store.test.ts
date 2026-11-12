@@ -1031,6 +1031,24 @@ test("a v1.1 field this build cannot read is left out instead of quarantining th
   assert.equal(store.data.runs[0].understandingCheckOff, true);
 });
 
+test("a run's owners load and save as written, and owners this build cannot read are left out", async (t) => {
+  const owned = { ...runWithV11Fields(), id: "run-owned", owners: ["person-a", "person-b"] };
+  const damaged = { ...runWithV11Fields(), id: "run-damaged", owners: "person-a" } as unknown as Run;
+  const { directory, cleanup } = await stateWith([owned, damaged]);
+  t.after(cleanup);
+  const store = new Store(directory);
+  await store.initialize();
+  assert.equal(store.recovery, undefined);
+  const owners = [
+    ["run-owned", ["person-a", "person-b"]],
+    ["run-damaged", undefined],
+  ];
+  assert.deepEqual(store.data.runs.map((run) => [run.id, run.owners]), owners);
+  await store.save();
+  const saved = JSON.parse(await readFile(path.join(directory, "state.json"), "utf8")) as Database;
+  assert.deepEqual(saved.runs.map((run) => [run.id, run.owners]), owners);
+});
+
 // Fields ported from upstream 1fb6329 (PRs #15-#28), under the same rules:
 // optional, and readable by a build whose schema lacks them.
 
