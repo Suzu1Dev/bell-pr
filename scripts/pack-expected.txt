@@ -69,7 +69,7 @@ dist/assets/respect-DiVIZOkX.js
 dist/assets/reviewability-XciVg-x1.js
 dist/assets/rolldown-runtime-XKyaHtl9.js
 dist/assets/route-BKFBlbn1.js
-dist/assets/style-XK3krY-4.css
+dist/assets/style-D3wsgZYf.css
 dist/assets/understanding-BvEbznaK.js
 dist/assets/understandingDemo-CECkaUyL.js
 dist/assets/version-Bex31jD3.js
