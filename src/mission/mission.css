@@ -1586,18 +1586,6 @@
 .mission-settings-models-only {
   margin-top: 20px;
 }
-.mission-model-heading {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 0;
-  font-size: var(--text-md);
-  font-weight: 600;
-  line-height: 1.6;
-}
-.mission-model-heading svg {
-  color: var(--color-accent-600);
-}
 .mission-model-header > .mission-field-note {
   margin-top: 8px;
 }
