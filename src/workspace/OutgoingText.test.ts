@@ -24,5 +24,5 @@ test("the confirm dialog shows the exact title, commit message and PR body", () 
     match[1].replaceAll("&lt;", "<").replaceAll("&gt;", ">").replaceAll("&amp;", "&"),
   );
   assert.deepEqual(pres, [text.title, text.commitMessage, text.body]);
-  assert.match(html, /<pre tabindex="0" aria-labelledby="publish-body-label">/);
+  assert.match(html, /<pre role="group" tabindex="0" aria-labelledby="publish-body-label">/);
 });
