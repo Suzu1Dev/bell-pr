@@ -3155,6 +3155,7 @@ button {
     font-size: var(--text-2xs);
   }
   .modal-actions {
+    flex-wrap: wrap;
     gap: 7px;
   }
   .modal-actions .button {
