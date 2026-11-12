@@ -104,17 +104,17 @@ const confirm: DraftCheck = {
 
 test("the publish dialog summarises the reviewed branch before sending a Draft PR", () => {
   const html = render();
-  assert.match(html, /<h2 id="modal-title">將這次貢獻送上 GitHub。<\/h2>/);
-  assert.match(html, /這會推送審查過的分支，並在目標 repository 建立 Draft PR。/);
+  assert.match(html, /<h2 id="modal-title">將這次貢獻發布到 GitHub。<\/h2>/);
+  assert.match(html, /這會推送審閱過的分支，並在目標 repository 建立 Draft PR。/);
   assert.match(html, /openfetch-sample\/open-fetch/);
   assert.match(html, /<h3>Add retry backoff<\/h3>/);
   assert.match(html, /bell\/retry-backoff<span>→<\/span>main/);
   assert.ok(html.includes(`${demoFiles.length} 個檔案已審閱`));
   assert.match(html, /<b>\+12 −3<\/b>/);
-  assert.match(html, /<strong>會送到 GitHub 的 PR 標題<\/strong><pre>Add retry backoff<\/pre>/);
+  assert.match(html, /<strong>PR 標題<\/strong><pre>Add retry backoff<\/pre>/);
   assert.match(html, /<pre>Add retry backoff\n<\/pre>/);
   assert.match(html, /<pre>## Summary\n\nRetries GET requests\.<\/pre>/);
-  assert.match(html, /<button class="button primary">.*送出 Draft PR<\/button>/);
+  assert.match(html, /<button class="button primary">.*發布 Draft PR<\/button>/);
   assert.match(html, />返回編輯草稿<\/button>/);
 });
 
@@ -142,13 +142,13 @@ test("blocking checks and unconfirmed items keep Send disabled", () => {
   );
   assert.match(
     blocked,
-    /<div class="publish-block" role="alert"><span>會擋下送出：說明還有待填寫的內容<small>TODO: 補上測試結果<\/small><\/span><\/div>/,
+    /<div class="publish-block" role="alert"><span>會擋下發布：說明還有待填寫的內容<small>TODO: 補上測試結果<\/small><\/span><\/div>/,
   );
-  assert.match(blocked, /<legend>你的文字與可審閱性<\/legend>/);
+  assert.match(blocked, /<legend>你的文字與可審查性<\/legend>/);
   assert.match(blocked, /<button class="button primary" disabled="">/);
 
   const unconfirmed = render({}, { publishChecks: [confirm] });
-  assert.match(unconfirmed, /送出前請逐項確認/);
+  assert.match(unconfirmed, /發布前請逐項確認/);
   assert.match(unconfirmed, /說明很短<small>請確認維護者看得懂<\/small>/);
   assert.match(unconfirmed, /<button class="button primary" disabled="">/);
 
@@ -174,17 +174,17 @@ test("the demo previews its PR body and needs neither Git nor the GitHub CLI", (
   // No environment report at all: the sample needs neither Git nor the GitHub CLI.
   const html = render({ demo: true, doctor: doctorWith(null) });
   assert.match(html, /你的示範貢獻，準備好了。/);
-  assert.match(html, /你已完成所有檔案的審查。以下是 PR 的送出預覽。/);
+  assert.match(html, /你已審閱所有檔案。以下是 PR 的預覽。/);
   assert.match(html, /這是互動示範，不會推送任何內容，也不會在 GitHub 建立 PR/);
-  assert.match(html, /開啟範例 Draft PR/);
+  assert.match(html, /開啟示範 Draft PR/);
   assert.match(html, /<strong>PR 標題<\/strong><pre>Add retry backoff<\/pre>/);
   assert.match(html, /<strong>PR 說明預覽<\/strong><pre>## Summary\n\nRetries GET requests\.<\/pre>/);
   assert.doesNotMatch(html, /會送到 GitHub/);
   assert.doesNotMatch(html, /readiness-notice/);
   assert.doesNotMatch(html, /Commit 作者/);
   // Its checks load with the sample's rules; until then nothing is "sent".
-  assert.match(html, /<button class="button primary" disabled="">.*開啟範例 Draft PR<\/button>/);
-  assert.doesNotMatch(html, /正在讀取 GitHub 資訊/);
+  assert.match(html, /<button class="button primary" disabled="">.*開啟示範 Draft PR<\/button>/);
+  assert.doesNotMatch(html, /正在向 GitHub 確認/);
 });
 
 test("publishing waits for Git's identity and the GitHub CLI, and says how to fix them", () => {
@@ -204,7 +204,7 @@ test("publishing waits for Git's identity and the GitHub CLI, and says how to fi
   );
   assert.match(missing, /class="readiness-notice"/);
   assert.match(missing, /brew install gh/);
-  assert.match(missing, /<button class="button primary" disabled="">.*Submit Draft PR<\/button>/);
+  assert.match(missing, /<button class="button primary" disabled="">.*Publish Draft PR<\/button>/);
   assertNoHan(missing);
   // Still checking: nothing can be sent yet.
   const checking = renderEn(element({ doctor: doctorWith(null) }));
@@ -299,25 +299,26 @@ test("a follow-up round previews its commit and pushes to the PR branch instead 
     followUps: [round],
   };
   const html = render({ run: roundRun }, { followUp: round });
-  assert.match(html, /<h2 id="modal-title">把這輪修正推到 PR。<\/h2>/);
-  assert.match(html, /PR 標題與說明不變，也不會覆蓋 GitHub 上的其他提交/);
+  assert.match(html, /<h2 id="modal-title">把這一輪推送到 PR。<\/h2>/);
+  assert.match(html, /PR 標題與說明不變，也不會覆蓋 GitHub 上的其他 commit/);
   // The pushed branch is fixed once the PR exists.
   assert.match(html, /retry-backoff<span>→<\/span>main/);
   assert.doesNotMatch(html, /ignored-branch/);
   assert.match(
     html,
-    /<strong>會送到 GitHub 的提交訊息<\/strong><pre>Rename the option\n\nAddress the review on retry\.ts\.\n<\/pre>/,
+    /<strong>提交訊息<\/strong><pre>Rename the option\n\nAddress the review on retry\.ts\.\n<\/pre>/,
   );
-  assert.match(html, /<strong>會送到 GitHub 的 PR 標題<\/strong><pre>Add retry backoff<\/pre>/);
+  assert.match(html, /<strong>PR 標題<\/strong><pre>Add retry backoff<\/pre>/);
   assert.match(html, /<pre>## Summary\n\nRetries GET requests\.<\/pre>/);
-  assert.match(html, /<button class="button primary">.*推送這輪修正<\/button>/);
+  assert.match(html, /<button class="button primary">.*推送這一輪<\/button>/);
+  assert.match(render({ run: roundRun, busy: true }, { followUp: round }), /正在推送…/);
 
   const sync = render(
     { run: roundRun },
     { followUp: { ...round, kind: "sync" } },
   );
-  assert.match(sync, /<h2 id="modal-title">把同步結果推到 PR。<\/h2>/);
-  assert.match(sync, /這會在 PR 分支加上一個合併 commit/);
+  assert.match(sync, /<h2 id="modal-title">把同步結果推送到 PR。<\/h2>/);
+  assert.match(sync, /一個合併 commit 把最新的目標分支帶進 PR 分支/);
 });
 
 const round = {
@@ -337,12 +338,12 @@ const roundRun: Run = {
 
 test("the publish dialog reads in English with no Chinese left", () => {
   const html = renderEn(element());
-  assert.match(html, /<h2 id="modal-title">Send this contribution to GitHub\.<\/h2>/);
+  assert.match(html, /<h2 id="modal-title">Publish this contribution to GitHub\.<\/h2>/);
   assert.ok(html.includes(`${demoFiles.length} files reviewed`));
-  assert.match(html, /<strong>PR title sent to GitHub<\/strong><pre>Add retry backoff<\/pre>/);
-  assert.match(html, /<strong>Commit message sent to GitHub<\/strong>/);
-  assert.match(html, /<strong>PR description sent to GitHub<\/strong><pre>## Summary\n\nRetries GET requests\.<\/pre>/);
-  assert.match(html, /<button class="button primary">.*Submit Draft PR<\/button>/);
+  assert.match(html, /<strong>PR title<\/strong><pre>Add retry backoff<\/pre>/);
+  assert.match(html, /<strong>Commit message<\/strong>/);
+  assert.match(html, /<strong>PR description<\/strong><pre>## Summary\n\nRetries GET requests\.<\/pre>/);
+  assert.match(html, /<button class="button primary">.*Publish Draft PR<\/button>/);
   assert.match(html, />Back to the draft<\/button>/);
   assert.match(html, /aria-label="Close dialog"/);
   assertNoHan(html);
@@ -357,7 +358,7 @@ test("the publish dialog reads in English with no Chinese left", () => {
       },
     ),
   );
-  assert.match(confirmations, /Confirm each item before submitting/);
+  assert.match(confirmations, /Confirm each item before publishing/);
   assert.match(confirmations, /<legend>Your words and reviewability<\/legend>/);
   assertNoHan(confirmations);
 
@@ -375,8 +376,8 @@ test("the publish dialog reads in English with no Chinese left", () => {
 test("an open round's publish dialog reads in English with no Chinese left", () => {
   const html = renderEn(element({ run: roundRun }, { followUp: round }));
   assert.match(html, /<h2 id="modal-title">Push this round to the PR\.<\/h2>/);
-  assert.match(html, /<strong>Commit message sent to GitHub<\/strong><pre>Rename the option\n<\/pre>/);
-  assert.match(html, /<strong>PR title sent to GitHub<\/strong><pre>Add retry backoff<\/pre>/);
+  assert.match(html, /<strong>Commit message<\/strong><pre>Rename the option\n<\/pre>/);
+  assert.match(html, /<strong>PR title<\/strong><pre>Add retry backoff<\/pre>/);
   assert.match(html, /<pre>## Summary\n\nRetries GET requests\.<\/pre>/);
   assert.match(html, /<button class="button primary">.*Push this round<\/button>/);
   assertNoHan(html);
@@ -384,7 +385,8 @@ test("an open round's publish dialog reads in English with no Chinese left", () 
   const sync = renderEn(element({ run: roundRun }, { followUp: { ...round, kind: "sync" } }));
   assert.match(sync, /<h2 id="modal-title">Push the sync to the PR\.<\/h2>/);
   assertNoHan(sync);
-  assert.match(renderEn(element({ busy: true })), /Submitting…/);
+  assert.match(renderEn(element({ busy: true })), /Publishing…/);
+  assert.match(renderEn(element({ run: roundRun, busy: true }, { followUp: round })), /Pushing…/);
 });
 
 test("the server's local-path, workflow and author e-mail checks each need a tick", () => {
@@ -398,7 +400,7 @@ test("the server's local-path, workflow and author e-mail checks each need a tic
   assert.match(html, /The PR text contains a path on this computer\.<small>Found: \/home\/ada\/notes\.md<\/small>/);
   assert.match(html, /Changed: \.github\/workflows\/ci\.yml/);
   assert.match(html, /The commit will carry ada@example\.com\./);
-  assert.match(html, /<button class="button primary" disabled="">.*Submit Draft PR<\/button>/);
+  assert.match(html, /<button class="button primary" disabled="">.*Publish Draft PR<\/button>/);
   const ticked = renderEn(
     element({}, { publishChecks: checks, acknowledged: checks.map((check) => check.id) }),
   );
@@ -468,8 +470,8 @@ test("a respect check says why maintainers care and where it comes from", () => 
     /<div class="publish-block" role="alert"><span>Blocks publishing: Someone else&#x27;s open pull request would close this issue\.<small class="publish-why">Two pull requests for one issue split the maintainers&#x27; review time\.<\/small><small>#41 by @someone<\/small><\/span>/,
   );
   // Only this block can be lifted, with a reason of 20 to 200 characters.
-  assert.match(html, /Why publish anyway\? Saved on this run, 20 to 200 characters<textarea class="text-input" maxLength="200">/);
-  assert.match(html, /0 of 20 to 200 characters/);
+  assert.match(html, /Why publish anyway\? Saved on this run\.<textarea class="text-input" maxLength="200">/);
+  assert.match(html, /0 \/ 20–200 characters/);
   assert.match(html, /<input type="checkbox"\/><span>The issue may not be free to work on\.<small class="publish-why">/);
   assertNoHan(html);
 });
@@ -489,9 +491,9 @@ test("a typed reason lifts someone else's PR; without one, Send stays off", () =
 });
 
 test("the facts line: reading, couldn't check, the pace here, and the check off", () => {
-  assert.match(renderEn(checksElement({ facts: { loading: true } })), /role="status">.*Reading the GitHub facts…/);
-  const unknown = renderEn(checksElement({ facts: { loading: false, error: "this build cannot read the GitHub facts yet" } }));
-  assert.match(unknown, /Couldn&#x27;t check: this build cannot read the GitHub facts yet/);
+  assert.match(renderEn(checksElement({ facts: { loading: true } })), /role="status">.*Checking GitHub…/);
+  const unknown = renderEn(checksElement({ facts: { loading: false, error: "this version of BELL PR cannot check GitHub yet" } }));
+  assert.match(unknown, /Couldn&#x27;t check: this version of BELL PR cannot check GitHub yet/);
   // Unknown is never a pass: no "all clear" claim without checks, or while
   // the facts are read or could not be read.
   assert.doesNotMatch(renderEn(checksElement({ checks: undefined })), /Every check passes/);
@@ -500,7 +502,7 @@ test("the facts line: reading, couldn't check, the pace here, and the check off"
   assert.match(renderEn(checksElement()), /Every check passes/);
   assert.match(
     renderEn(checksElement({ pacing: { open: 0, budget: 1, first: true } })),
-    /Your open PRs here: 0 of 1 \(first contribution here\)/,
+    /Your open PRs here: 0 of 1 \(BELL PR default; first contribution here\)/,
   );
   assert.match(renderEn(checksElement({ pacing: "exempt" })), /not paced, since you can write to this repository/);
   assert.match(renderEn(checksElement({ checkOff: true })), /Understanding check: off/);
@@ -533,7 +535,7 @@ test("close the loop first links each pull request a maintainer is waiting on", 
   for (const [index, url] of waiting.entries())
     assert.match(
       html,
-      new RegExp(`<a class="run-notice-link" href="${url}" target="_blank" rel="noreferrer">Close the loop first: read the review on pull request #${[2, 5][index]} \\(opens GitHub\\)</a>`),
+      new RegExp(`<a class="run-notice-link" href="${url}" target="_blank" rel="noreferrer">First read the review on pull request #${[2, 5][index]} \\(opens GitHub\\)</a>`),
     );
   assertNoHan(html);
   assert.match(renderZh(createElement(LoopRuns, { run, waiting, closeModal() {} })), /閱讀 PR #2 的審查意見/);
@@ -546,7 +548,7 @@ test("the sample's checks all pass, with its pace shown, in English", () => {
   const checks = samplePublishChecks(demo, { ...demo.run, status: "approved" }, demo.files, "en");
   const html = renderEn(checksElement({ checks, pacing: pacingOf(demo.contributionFacts) }));
   assert.match(html, /Every check passes\./);
-  assert.match(html, /Your open PRs here: 0 of 1 \(first contribution here\)/);
+  assert.match(html, /Your open PRs here: 0 of 1 \(BELL PR default; first contribution here\)/);
   assert.doesNotMatch(html, /<fieldset/);
   assertNoHan(html);
 });
@@ -652,4 +654,45 @@ test("the warning about the person's own words on AI use joins their words, not 
       ["words", ["disclosure-accuracy", "own-words"]],
     ],
   );
+});
+
+test("file-hold checks, including upstream changes under your hold, group under File holds", () => {
+  const check = (id: DraftCheck["id"], kind: DraftCheck["kind"] = "confirm"): DraftCheck => ({
+    id,
+    kind,
+    message: `msg-${id}`,
+    details: [`detail-${id}`],
+  });
+  assert.deepEqual(
+    groupChecks([
+      check("group-own-overlap"),
+      check("held-by-other", "block"),
+      check("holds-unknown", "block"),
+      check("held-changed-upstream", "confirm"),
+      check("brevity"),
+    ]).map((group) => [group.topic, group.checks.map((item) => item.id)]),
+    [
+      ["others", ["group-own-overlap"]],
+      ["holds", ["held-by-other", "holds-unknown", "held-changed-upstream"]],
+      ["words", ["brevity"]],
+    ],
+  );
+  const confirmOnly: DraftCheck[] = [
+    {
+      id: "held-changed-upstream",
+      kind: "confirm",
+      message:
+        "Commits on main changed files under your hold since you took it. Check those changes before publishing.",
+      details: ["src/api/users.ts (abc1234, def5678)"],
+    },
+  ];
+  const enHtml = renderEn(checksElement({ checks: confirmOnly }));
+  assertNoHan(enHtml);
+  assert.match(enHtml, /File holds/);
+  assert.match(enHtml, /Commits on main changed files under your hold since you took it\./);
+  assert.match(enHtml, /src\/api\/users\.ts \(abc1234, def5678\)/);
+  assert.match(enHtml, /type="checkbox"/);
+
+  const zhHtml = renderZh(checksElement({ checks: confirmOnly }));
+  assert.match(zhHtml, /檔案佔用/);
 });

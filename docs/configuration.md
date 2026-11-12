@@ -28,10 +28,11 @@ the settings in the app.
 
 | Command | What it does |
 | --- | --- |
-| `bell-pr` or `bell-pr start` | Starts BELL PR and prints its address. Exits 1 before listening when a required doctor check fails; `--force` starts anyway |
+| `bell-pr` or `bell-pr start` | Starts BELL PR and prints its address. Still listens when the provider is the only required check that fails. Exits 1 before listening when any other required doctor check fails; `--force` starts anyway |
 | `bell-pr open` | Prints the address of the running BELL PR without the API token, and opens the browser with the token. `--print` only prints that address. `--print-token` includes the token in the printed address |
 | `bell-pr token rotate` | Replaces `<data dir>/api-token`. A running BELL PR uses the new token on the next request. The new token is not printed |
 | `bell-pr doctor` | Checks Node.js, Git, the GitHub CLI, the agent CLIs, the sandbox and the data directory; `--json` for scripts. The report does not include the API token |
+| `bell-pr group status`, `bell-pr group setup`, `bell-pr group invite <name> [--admin]` | [Group work](group-work.md) on a BELL PR started with `--group`: shows whether it is set up, sets it up, and prints a one-time invite code for a person (`--admin` for a group admin) |
 | `bell-pr version` | Shows the version, its release date, Node.js, the platform and the data directory |
 | `bell-pr help` | Lists the commands and options |
 
@@ -44,18 +45,20 @@ Options of `bell-pr start`:
 | `--data-dir <dir>` | `BELLPR_DATA_DIR` | `~/.bellpr` |
 | `--no-open` | `BELLPR_NO_OPEN=1` | opens the browser when it can |
 | `--force` | | off. Start even when `bell-pr doctor` reports Not ready |
+| `--group` | `BELLPR_GROUP=1` | off. Turns [group work](group-work.md) on |
 | `--env-file <file>` | | none |
 
-`bell-pr start` runs the same required checks as `bell-pr doctor` and exits
-with status 1 before it listens when one fails. The message is the doctor's
-checklist (each failed check and the command that fixes it) plus how to
-start anyway. `--force` skips that gate and prints a warning. The sample
-tour needs no AI provider, so `bell-pr start --force` is how you open it
-when none is signed in. A real agent run is still refused until a provider
-is ready.
+`bell-pr start` runs the same required checks as `bell-pr doctor`. When the
+AI provider is the only required check that fails, it still listens. The
+first time, Welcome shows how to install one. When any other required check fails,
+alone or together with the provider, it exits with status 1 before it
+listens. The message is the doctor's checklist (each failed check and the
+command that fixes it) plus how to start anyway. `--force` skips that gate
+and prints a warning. The sample tour needs no AI provider. A real agent
+run is still refused until a provider is ready.
 
-`--data-dir` and `--env-file` work with every command, so `open`, `doctor`
-and `version` find the data directory of the BELL PR you mean.
+`--data-dir` and `--env-file` work with every command, so `open`, `doctor`,
+`group` and `version` find the data directory of the BELL PR you mean.
 
 ## Environment variables
 
@@ -65,8 +68,10 @@ and `version` find the data directory of the BELL PR you mean.
 | `BELLPR_HOST` | `127.0.0.1` | Address to listen on. Also `--host`. Prefer loopback. For another machine or phone, keep loopback and use Tailscale serve (not Funnel) with `BELLPR_PUBLIC_URL`. `0.0.0.0` or `::` listen on every address (Docker uses this inside the container) but still answer only this computer or `BELLPR_PUBLIC_URL`. Without `BELLPR_PUBLIC_URL`, a warning is printed to stderr and remote requests get 403. |
 | `BELLPR_PUBLIC_URL` | none | HTTPS origin browsers use (no path), e.g. `https://<your-url>`. Required for Tailscale serve / remote Host acceptance; without it those requests get 403. Must be `https` unless it points to this computer. |
 | `BELLPR_ALLOWED_ORIGINS` | none | Extra exact origins to accept, separated by commas. Rarely needed: `BELLPR_PUBLIC_URL` already adds its own. Plain `http` only for loopback addresses. |
+| `BELLPR_SUITE_LINKS` | none | Where the other BELL products are: `explain=<origin>` and `personal=<origin>`, separated by commas. An origin is on this computer, or an `https` `*.ts.net` name in the same tailnet as `BELLPR_PUBLIC_URL` or `BELLPR_ALLOWED_ORIGINS`. Shows the product switcher; BELL PR refuses to start with an invalid value. See [BELL Suite link](bell-suite.md). |
 | `BELLPR_DATA_DIR` | `~/.bellpr` | Where repositories, worktrees, run records and settings live. Also `--data-dir`. An absolute path is safest. Not under `/tmp` or `$TMPDIR` when Codex agents write code: their sandbox lets commands write there ([security model](security-model.md#codex)). |
 | `BELLPR_NO_OPEN` | not set | Any value other than `0` or `false` stops BELL PR from opening a browser at start and for `bell-pr open`. It also stays closed in CI, in containers and when the output is not a terminal. Also `--no-open`. |
+| `BELLPR_GROUP` | not set | Any value other than `0` or `false` turns [group work](group-work.md) on for the people who share this BELL PR. The data directory's lock is then strict: it is never replaced because of its age, and a start after a crash can be refused until you remove the lock file. Also `--group`. |
 | `BELLPR_LOCALE` | `en` | Language of server and command-line messages when nothing else decides: `en` or `zh-TW`. The language chosen in the app wins. |
 | `BELLPR_LOG_LEVEL` | `info` | How much the server logs: `debug`, `info`, `warn` or `error`. |
 | `BELLPR_MAX_AGENT_PROCESSES` | `3` | Agent CLI processes at the same time across all runs, analyses and discovery, 1 to 32. Lower it when your AI provider's usage limits are tight. Locks **Settings → Performance**. |
@@ -100,15 +105,15 @@ of them. When a turn times out, its message says how long it waited.
 | Section | What you set there |
 | --- | --- |
 | **General** | The language of the interface and of new work; the sample project, and resetting it |
-| **AI provider** | Which agent CLI is ready, with its setup commands, and the agent, model, reasoning effort and web access (off until you turn it on) every project shares |
+| **AI provider** | Which agent CLI is ready, with its setup commands, and the AI provider, model, reasoning effort and web access (off until you turn it on) every project shares |
 | **Agent safety** | The Claude Code sandbox status, allowing unsandboxed Claude Code agents, and the AI-assistance note on pull requests |
-| **Learning** | The understanding check (you explain each change back before you approve it; on by default, and turning it off asks you to confirm and marks the runs you approve without it), the try-first prompts during review, and counts from this computer: runs approved without the check and the median time of your recent checks |
+| **Learning** | The understanding check (you explain each change back before you approve it; on by default, and turning it off asks you to confirm and marks the runs you approve without it), the try-first prompts (**Ask me to answer before the answers show**), and counts from this computer: runs approved without the check and the median time of your recent checks |
 | **Performance** | Runs at the same time, agent processes at the same time, the agent timeout multiplier |
 | **Environment** | The environment check with fix commands, the GitHub CLI sign-in, and what each environment variable does |
 | **Data & privacy** | The data directory, disk use per run and freeing it, automatic cleanup, deleting all data, and what leaves this computer |
 | **About** | The version, and the About dialog with the data directory, the Apache-2.0 license, the notices and the security policy, help links and **Copy diagnostics** |
 
-The model settings (agent, model, reasoning effort, web access and agent access) are shared
+The model settings (AI provider, model, reasoning effort, web access and agent access) are shared
 by every project and saved in `<data dir>/model-settings.json`. Each new
 run records the settings it started with, so later changes do not affect
 runs that already exist. A project's contribution direction, team size,

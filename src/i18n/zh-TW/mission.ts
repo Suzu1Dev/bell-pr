@@ -12,13 +12,12 @@ const version = (sha?: string) => (sha ? `分析版本 ${sha}` : "分析版本")
 
 const m: Translation<typeof en> = {
   overview: {
-    kicker: "PROJECT CONTEXT",
-    title: "先看懂專案，再決定怎麼改。",
-    lead: "從使用者的角度，理解每一次貢獻的理由。",
+    background: "專案背景與其他貢獻方向",
+    title: "專案背景",
     update: "更新到最新版本",
     updating: "正在更新…",
     updateHelp: ({ branch, updatedAt }) =>
-      `從 GitHub 取得 ${branch} 的最新版本，專案全貌與分析會以它為準；新的貢獻本來就從最新版本開始。${updatedAt ? ` 上次更新：${updatedAt}` : ""}`,
+      `從 GitHub 取得 ${branch} 的最新版本，供專案全貌與分析使用。不論是否更新，新的貢獻都從最新版本開始。${updatedAt ? ` 上次更新：${updatedAt}` : ""}`,
     analyze: "分析專案全貌",
     reanalyze: "重新分析",
     analyzing: "正在分析專案…",
@@ -26,9 +25,8 @@ const m: Translation<typeof en> = {
   empty: {
     loadingTitle: "正在把程式碼，整理成專案全貌。",
     title: "你的下一個貢獻，從理解開始。",
-    loadingLead:
-      "Agent 會閱讀專案文件與主要模組，整理用途、使用流程，以及有依據的改善建議。",
-    lead: "讓 Agent 閱讀這個 repository，先回答三個問題，再決定值得投入的方向。",
+    loadingLead: "Agent 正在閱讀專案文件與主要模組。",
+    lead: "讓 Agent 閱讀這個專案，回答三個問題。",
     questions: {
       problem: "它解決什麼問題？",
       users: "誰會使用它？",
@@ -36,7 +34,7 @@ const m: Translation<typeof en> = {
     },
     start: "開始專案分析",
     progressLabel: "分析進度",
-    note: "分析完成前，不會推測這個專案的用途或推薦改動。",
+    note: "分析完成前，不會推測這個專案的用途或推薦變更。",
   },
   progress: {
     phases: {
@@ -49,7 +47,7 @@ const m: Translation<typeof en> = {
     attempt: ({ attempt, attempts }) =>
       `第 ${n(attempt)} / ${n(attempts)} 次嘗試`,
     elapsed: ({ elapsed }) => `已執行 ${elapsed}`,
-    note: "進度條依已用時間占這一步上限的比例填滿，不代表完成了多少工作；只在移動時，表示目前沒有可顯示的時間。",
+    note: "進度條顯示這一步已用時間占上限的比例，而非工作進度。沒有上限時，它只會移動。",
   },
   project: {
     sourceDemo: "示範分析",
@@ -57,7 +55,7 @@ const m: Translation<typeof en> = {
     audience: "主要使用者",
     updatedAt: ({ date }) => `更新於 ${date}`,
     version: "版本",
-    demoNote: "預寫範例，未呼叫 AI",
+    demoNote: "預寫示範，未呼叫 AI",
     coverage: ({ sampled, tracked, kilobytes, truncated }) =>
       `讀取 ${n(sampled)} / ${n(tracked)} 個追蹤檔（約 ${n(kilobytes)} KB${truncated > 0 ? `，${n(truncated)} 檔節錄` : ""}），推論仍需確認`,
     coverageUnknown: "抽樣範圍未記錄，重新分析後顯示，推論仍需確認",
@@ -67,11 +65,11 @@ const m: Translation<typeof en> = {
     unknown:
       "專案內容已更新。這份分析來自先前版本，無法列出變更明細；重新分析後再確認貢獻方向。",
     sameContent:
-      "版本已變更，但分析引用的檔案內容相同；全貌仍可能受其他變更影響，重新分析後再確認貢獻方向。",
+      "版本已變更，但引用的檔案沒變；其他變更仍可能影響全貌，重新分析後再選方向。",
     uncited: ({ changed, sha }) =>
-      `自${version(sha)}後有至少 ${n(changed)} 個檔案變動。分析引用的檔案未變動，但全貌仍可能受其他變更影響，重新分析後再確認貢獻方向。`,
+      `自${version(sha)}後至少 ${n(changed)} 個檔案有變動，都未被引用，但仍可能影響全貌；重新分析後再選方向。`,
     cited: ({ changed, sha, cited, capped, files }) =>
-      `自${version(sha)}後有至少 ${n(changed)} 個檔案變動，其中 ${n(cited)} 個${capped ? "以上" : ""}是本份分析引用的檔案：${files}。重新分析後再確認貢獻方向。`,
+      `自${version(sha)}後至少 ${n(changed)} 個檔案有變動，其中 ${n(cited)} 個${capped ? "以上" : ""}被引用：${files}。重新分析後再選方向。`,
   },
   sections: {
     label: "本頁內容",
@@ -90,14 +88,14 @@ const m: Translation<typeof en> = {
     reanalyze: ({ language }) => `改用${language}重新分析`,
   },
   journey: {
-    kicker: "THE USER JOURNEY",
     title: "使用者如何用到這個專案？",
   },
   reading: {
-    kicker: "WHERE TO START READING",
     title: "第一次讀這個專案，建議這樣讀",
-    lead: "依 Agent 讀過的抽樣檔案排出順序；每一步說明為什麼先看它、看什麼。",
+    lead: "依 Agent 讀過的抽樣檔案排出順序。每一步說明為什麼先看它、看什麼。",
     flow: "模組怎麼串起來",
+    flowOutside: "在這個 repository 之外",
+    flowPasses: "傳給下一步：",
     unsampled: "未抽樣，內容未讀",
     lookFor: "看什麼",
     context: "這個檔案在分析中的其他說明",
@@ -116,8 +114,7 @@ const m: Translation<typeof en> = {
     evidence: "分析依據",
   },
   brief: {
-    kicker: "THIS CONTRIBUTION",
-    title: "這次改動，會帶來什麼不同？",
+    title: "這次變更，會帶來什麼不同？",
     problem: "這次想解決的問題",
     motivation: "為什麼值得現在改善",
     beneficiaries: "受益對象",
@@ -127,21 +124,22 @@ const m: Translation<typeof en> = {
     afterCaption: "希望帶來的改善",
     impactNote:
       "以上是這次貢獻的目標；是否達成，仍需根據實作與驗證結果確認。",
-    validation: "如何知道改動有用？",
+    missingAcceptance: "尚未記錄完成條件，核准前請確認要如何驗證這次修改。",
+    validation: "如何知道變更有用？",
     risks: "一起留意的取捨",
     request: "你提出的需求",
     premiseRefuted: "依你的假設，查證後不成立",
     premiseUnclear: "依你的假設，尚未能確認",
     impactRefuted:
-      "前提查核顯示這個假設不成立：上面依假設描述的問題與影響實際上不會發生，請以查核結果與 Lead 的整合摘要為準。",
+      "前提查核推翻了此假設：上述問題與影響不會發生。以查核結果與 Lead 的整合摘要為準。",
     premiseMissing:
-      "這個貢獻建立時還沒有前提查核，需求裡的假設是否成立沒有記錄下來。可以請 Lead 依目前的程式碼與審查報告補做一次；完成後，程式碼解說與你還沒作答的變更解說會依結論重新產生。",
+      "這個貢獻早於前提查核，假設是否成立沒有記錄。Lead 可依目前程式碼與審查報告查核一次。之後，程式碼解說與未作答的解說會依結論更新。",
     premiseCheck: "依審查結果查核前提",
     premiseRecheck: "重新查核前提",
     premiseChecking: "正在查核前提…",
     premiseRecheckNote: "結論改變時，程式碼解說與你還沒作答的變更解說會依新的結論重新產生。",
     pending:
-      "尚未產生這次貢獻的使用者影響分析。先保留原始需求，完成分析後再連結到具體動機與驗收方式。",
+      "尚未分析使用者影響。需求先保留在此，分析後會連結動機與驗收方式。",
   },
   evidence: {
     none: "尚無檔案依據，開始前需確認。",
@@ -151,7 +149,6 @@ const m: Translation<typeof en> = {
     why: "為什麼引用這段",
   },
   ideas: {
-    kicker: "WHERE YOU CAN HELP",
     title: "值得探索的貢獻方向",
     lead: "先看問題與使用者價值，再決定要不要交給團隊。",
     aiGenerated: "AI 生成",
@@ -168,7 +165,7 @@ const m: Translation<typeof en> = {
     moreLimit: ({ max }) =>
       `已累積 ${n(max)} 個建議，達到這份分析的上限。可先挑選方向，或重新分析專案。`,
     moreHint:
-      "Agent 會沿用這個專案已儲存的模型設定，尋找不同的改善問題與使用者價值。既有建議會保留，由你決定何時開始開發。",
+      "沿用已儲存的模型設定。既有建議會保留。",
     generatingStatus:
       "正在閱讀專案、避開既有方向，你可以繼續閱讀下方建議。",
     viewAdded: ({ added, requested }) =>
@@ -189,18 +186,18 @@ const m: Translation<typeof en> = {
     droppedIdeas: ({ count }) =>
       `引文核對未通過，已略過 ${n(count)} 個建議`,
     droppedIdeasNote:
-      "這些建議引用的原文不在送進模型的節錄中，因此只保留標題與原因；其餘分析結果照常儲存，可再「產出新建議」補足。",
+      "引文不在模型看到的節錄中，只留標題與原因。其餘已儲存；可按「產出新建議」補上。",
     droppedPaths: ({ count }) =>
       `因引用未抽樣／不存在的檔案而略過 ${n(count)} 項說明`,
     droppedPathsNote:
-      "模型只讀過抽樣檔案的內容，其餘路徑只知道存在；依據必須來自讀過的檔案，不在清單中的路徑則無法核對。其餘分析結果照常儲存。",
+      "模型只讀過抽樣檔案，引用其他檔案的說明無法核對。其餘已儲存。",
     rounds: {
       analysis: "專案分析",
       expansion: "最近一次追加",
     },
     navigationHint: "左右滑動，或聚焦清單後按方向鍵",
     showing: ({ first, last, total }) =>
-      `顯示 ${n(first)}${last > first ? `–${n(last)}` : ""} / ${n(total)} 個顯示中的建議`,
+      `第 ${n(first)}${last > first ? `–${n(last)}` : ""} 個，共 ${n(total)} 個顯示中的建議`,
     previous: "上一個建議",
     next: "下一個建議",
     railLabel: "貢獻建議橫向清單",
@@ -234,7 +231,7 @@ const m: Translation<typeof en> = {
     low: "初步構想",
   },
   nextStep: {
-    codeTitle: "帶著理解，回到程式碼。",
+    codeTitle: "審閱這次修改",
     codeLead: "把預期的使用者改善，和每一段實際變更對照。",
     codeAction: "檢閱程式碼變更",
     ideaTitle: "有自己的想法，也可以從這裡開始。",
@@ -251,6 +248,8 @@ const m: Translation<typeof en> = {
     maintenance: { label: "維護整理", hint: "降低後續修改的負擔" },
   },
   settings: {
+    requirements: "補充需求",
+    execution: "AI 與團隊設定",
     directionLegend: "這次想從哪個方向貢獻？",
     directionNote: "選一個主要方向，讓團隊圍繞同一個目標工作。",
     optional: "選填",
@@ -266,7 +265,7 @@ const m: Translation<typeof en> = {
     constraints: {
       label: "開發界線",
       placeholder: "例如：維持既有 API 相容；只處理 GET；不新增套件。",
-      help: "寫下不能改動的行為、相容性或範圍限制。",
+      help: "寫下不能變更的行為、相容性或範圍限制。",
     },
     acceptance: {
       label: "怎樣算完成？",
@@ -276,18 +275,18 @@ const m: Translation<typeof en> = {
     },
     issue: {
       label: "相關 issue 連結",
-      help: "只接受 GitHub issue 頁面網址。填了之後，PR 草稿才可以寫 Fixes／Refs #編號並連回這個 issue；送出前請先在 issue 留言表明要處理。",
+      help: "只接受 GitHub issue 網址；PR 草稿會據此寫 Fixes／Refs #編號。發布前先到 issue 留言認領。",
     },
     model: {
-      heading: "模型與思考方式",
-      note: "所有專案與 Agents 共用此設定。新任務會記錄自己的設定，後續修改不會影響已建立的任務。",
-      agent: "Agent",
+      heading: "模型與思考強度",
+      note: "預設設定套用至各專案的新任務，已建立的任務保留原設定。",
+      agent: "AI 服務",
       providerHelp: {
         codex: "使用你已安裝並登入的 Codex CLI。",
         claude:
           "使用你已安裝並登入的 Claude Code CLI（Claude 方案或 Anthropic API 金鑰皆可）。用量計入你自己的帳號，可用模型依你的方案而定。",
         antigravity:
-          "使用你已安裝並登入的 Antigravity CLI（agy；Google 帳號、Gemini API 金鑰或 Google Cloud 憑證皆可）。用量計入你自己的帳號，列出的模型也依帳號而定。它的 Agent 一律可以搜尋網路；專案若附帶 Antigravity 的 hooks、MCP 伺服器、外掛、Agent 或技能，就不會在其中啟動。",
+          "使用你已安裝並登入的 Antigravity CLI（agy；Google 帳號、Gemini API 金鑰或 Google Cloud 憑證皆可）。用量計入你自己的帳號，列出的模型也依帳號而定。專案若附帶 Antigravity 的 hooks、MCP 伺服器、外掛、Agent 或技能，它就不會啟動。",
       },
       providerOption: ({ provider, state }) => `${provider}（${state}）`,
       providerStates: {
@@ -297,7 +296,7 @@ const m: Translation<typeof en> = {
         "signed-out": "未登入",
         disabled: "已關閉",
       },
-      model: "執行模型",
+      model: "模型",
       providerDefault: ({ provider, model }) =>
         `${provider} 預設${model ? ` · ${model}` : ""}`,
       unconfirmed: ({ value }) => `${value} · 已儲存，待確認`,
@@ -305,13 +304,14 @@ const m: Translation<typeof en> = {
       unknownModel: "目前無法驗證這個已儲存的模型，請重新選擇或載入清單。",
       defaultModelHelp: ({ provider }) => `沿用本機 ${provider} 的預設模型。`,
       effort: "思考強度",
-      defaultEffortNote: "「模型預設」會使用模型本身的預設強度。",
       modelDefault: ({ effort }) => `模型預設${effort ? ` · ${effort}` : ""}`,
       unknownEffort: "已儲存的強度未在此模型的清單中，請重新選擇。",
-      effortHelp: `只列出所選模型支援的強度；較高的強度每回合需要更久、用量也較多，${product.name} 會為 Claude Code、Antigravity 以及 xhigh、max 強度延長等待時間。`,
+      effortHelp: "思考強度越高，通常需要更多時間與帳號用量。",
       webAccess: "允許 Agent 上網搜尋與讀取網頁",
+      webPages: "允許 Agent 讀取網頁",
+      antigravityWeb: "Antigravity 的網路搜尋無法關閉，包含專案分析與探索。這個選項只控制是否允許讀取網頁。",
       webAccessHelp:
-        "套用到 Lead、Teammates、Reviewer、Test analyst 與追問導師；專案分析與探索貢獻維持離線。網頁內容視為不可信資料；Claude Code 的 curl、wget 仍被拒絕（完整權限的可寫入角色除外）。Antigravity CLI 的網路搜尋無法關閉：使用 Antigravity 時，不論這裡怎麼設定，每個 Agent（包括專案分析與探索貢獻）都能搜尋網路；只有開啟這項設定時才能讀取網頁。",
+        "只用於任務與追問，不含分析與探索。網頁內容視為不可信。終端機連網仍依你的權限。",
       error: ({ message }) => `${message} 已儲存的選擇會保留。`,
       loadFailed: ({ provider }) => `暫時無法讀取 ${provider} 模型清單。`,
       reload: "重新載入",
@@ -324,17 +324,18 @@ const m: Translation<typeof en> = {
         full: "完整",
         off: "關閉",
       },
-      help: "輕量：以精簡規則減少過度開發。完整：套用更多規則，優先重用現有程式與原生功能。關閉：方便比較不同方式的成果與用量。",
+      help: "輕量：精簡規則，防止過度開發。完整：更多規則，優先用現有程式與原生功能。關閉：比較成果與用量。",
       link: "查看 Ponytail",
     },
     team: {
-      legend: "協作規模",
+      summary: ({ count }) => `${count} 位隊友`,
+      legend: "團隊人數",
       teammates: "位隊友",
-      note: "設定團隊上限，實際分工由任務計畫決定。",
+      note: "設定隊友人數上限，實際分工由任務計畫決定。",
     },
     planApproval: {
-      label: "開發前，先讓我確認計畫",
-      help: "先看分工、範圍與驗收方式，確認後再進入實作。",
+      label: "開發前，先讓我核准計畫",
+      help: "先看分工、範圍與驗收方式，核准後再進入實作。",
     },
   },
   insights: {
@@ -351,7 +352,6 @@ const m: Translation<typeof en> = {
     analysisFailed: "專案分析未完成，請重試。",
   },
   rules: {
-    kicker: "THE PROJECT'S OWN RULES",
     title: "貢獻之前",
     lead: `這個專案對貢獻者的要求，原文引自專案自己的檔案，並說明發布時 ${product.name} 會怎麼處理每一條規範。`,
     door: {
@@ -369,7 +369,7 @@ const m: Translation<typeof en> = {
       disclose: "說明 AI 有協助",
       understand: "能說明自己的變更",
       area: "留給新手的 issue",
-      agent: "寫給 AI agent 的話",
+      agent: "寫給 AI Agent 的話",
       "own-words": "用自己的話寫說明",
       "issue-first": "先有 issue 再動工",
     },
@@ -379,23 +379,23 @@ const m: Translation<typeof en> = {
       info: "僅供參考",
     },
     effect: {
-      ban: `${product.name} 的每一份變更都由 agent 撰寫，所以不會在這裡發布。你仍可以在本機練習。`,
-      banAmbiguous: "發布時會請你判斷，這條規範是否涵蓋 AI 協助的貢獻。",
-      disclose: "說明裡提到 AI 有協助之前，發布會先等著。",
+      ban: `${product.name} 的每一份變更都由 Agent 撰寫，所以不會在這裡發布。你仍可以在本機練習。`,
+      banAmbiguous: "由你判斷這條規範是否涵蓋 AI 協助的貢獻。",
+      disclose: "說明裡提到 AI 有協助之前。",
       understand: "你的理解檢查涵蓋這一條。如果關閉了理解檢查，發布時會請你確認。",
-      area: "連結的 issue 有新手標籤時，會阻擋發布。",
-      agent: "這是寫給 AI agent 的話。作者是你，所以發布時會請你判斷是否適用。",
-      "own-words": `說明仍是 ${product.name} 的建議文字時，發布會先等著。`,
-      "issue-first": "沒有連結 issue 時，發布前會請你確認。",
+      area: "連結的 issue 有新手標籤時。",
+      agent: "這是寫給 AI Agent 的話。作者是你，所以發布時會請你判斷是否適用。",
+      "own-words": `說明仍是 ${product.name} 的建議文字時。`,
+      "issue-first": "沒有連結 issue 時。",
     },
     found: ({ count, files }) =>
       `從 ${product.name} 讀過的 ${n(files)} 個檔案中，引用了 ${n(count)} 條規範。`,
     notFound: ({ files }) =>
       `在 ${product.name} 讀過的 ${n(files)} 個檔案中沒有找到。有些專案把規範放在網站或 wiki 上，發布前請自行確認。`,
     noFiles:
-      "沒有可讀的貢獻指南、政策或 Pull Request 範本。有些專案把規範放在網站或 wiki 上，發布前請自行確認。",
+      "找不到貢獻指南、政策或 Pull Request 範本。有些專案把規範放在網站或 wiki 上，發布前請自行確認。",
     couldntCheck: ({ reason }) => `無法確認：${reason}`,
-    notRead: `${product.name} 還沒讀取專案規範。匯入或更新專案時會讀取，你也可以按「再確認一次」。`,
+    notRead: "尚未讀取專案規範。按「重新檢查」即可讀取。",
     filesRead: ({ count }) => `${product.name} 讀過的檔案 · ${n(count)}`,
     orgDefaults: ({ repository }) => `包含 ${repository} 的預設檔案。`,
     unread: ({ part, reason }) => {
@@ -406,23 +406,23 @@ const m: Translation<typeof en> = {
       }[part];
       return reason ? `無法讀取${what}：${reason}` : `無法讀取${what}。`;
     },
-    checkedAt: ({ date }) => `確認於 ${date}`,
-    checkAgain: "再確認一次",
-    checking: "正在確認…",
+    checkedAt: ({ date }) => `檢查於 ${date}`,
+    checkAgain: "重新檢查",
+    checking: "正在檢查…",
     sample: "示範：這個專案與它的 CONTRIBUTING.md 都是虛構的，沒有讀取 GitHub。",
   },
   start: {
     title: "開始之前",
-    lead: "每個 issue 連結只讀取一次。這裡的內容不會阻止你練習；發布時會再確認一次。",
-    noIssue: `連結你要處理的 issue，${product.name} 會確認它是否仍開著，以及是否已有別人在做。`,
+    lead: "每個 issue 連結只讀取一次。這裡的內容不會阻止你練習。發布時會重新檢查。",
+    noIssue: `填了連結，${product.name} 會確認 issue 是否仍開放中，以及是否已有人在做。`,
     notGitHub:
       "只有 GitHub issue 連結會讀取 issue 資訊，例如 https://github.com/owner/repo/issues/123。",
     oneIssue:
       "這個欄位只能填一個 issue 連結，所以沒有讀取任何資訊。請在這裡留下主要的 issue，其他的寫在任務說明裡，例如 #123。",
-    checking: "正在到 GitHub 確認這個 issue…",
+    checking: "正在到 GitHub 檢查這個 issue…",
     issue: ({ number }) => `Issue #${number}`,
     sampleIssue: ({ number }) => `#${number}（示範）`,
-    open: "開著",
+    open: "開放中",
     closed: ({ reason }) => (reason ? `已關閉（${reason}）` : "已關閉"),
     closedReasons: {
       COMPLETED: "已完成",
@@ -435,43 +435,43 @@ const m: Translation<typeof en> = {
       bot
         ? `@${author}（機器人）在 ${date} 認領`
         : `@${author} 在 ${date} 認領`,
-    noOtherPr: "沒有其他開著的 PR",
+    noOtherPr: "沒有其他開放中的 PR",
     otherPr: ({ author, number }) => `@${author} 的 PR #${number} 會關閉這個 issue`,
     closedPr: ({ author, number }) => `@${author} 的 PR #${number} 未合併就被關閉`,
     maintainer: ({ quote, date }) => `維護者說：「${quote}」（${date}）`,
     learning: ({ labels }) => `新手標籤：${fmt.list(labels)}`,
-    pacing: ({ open, budget }) => `你在這裡開著的 PR：${n(open)} / ${n(budget)}`,
-    pacingHelp: `這個上限是 ${product.name} 的預設值：在一個 repository 第一次被合併前為 1 個，之後為 2 個。`,
-    pacingExempt: "你可以寫入這個 repository，所以在這裡發布不受節奏限制",
+    pacing: ({ open, budget }) => `你在這裡開放中的 PR：${n(open)} / ${n(budget)}`,
+    pacingHelp: `這個上限是 ${product.name} 的預設值：在一個 repository，第一個 PR 被合併前為 1 個，之後為 2 個。`,
+    pacingExempt: "你可以寫入這個 repository，所以這裡不受開放中 PR 數量上限限制",
     doorClosed: "這個 repository 不接受你開的 Pull Request",
     ban: "專案規範不接受 AI 協助的貢獻",
     unknown: ({ part, reason }) => {
       const what = {
         door: "Pull Request 是否對你開放",
         issue: "這個 issue",
-        pacing: "你在這裡開著的 Pull Request",
+        pacing: "你在這裡開放中的 Pull Request",
         other: "一項 GitHub 資訊",
       }[part];
       return reason ? `無法確認${what}：${reason}` : `無法確認${what}`;
     },
     couldntCheck: ({ reason }) => `無法確認：${reason}`,
-    checkAgain: "再確認一次",
+    checkAgain: "重新檢查",
     sample: "示範資料，沒有讀取 GitHub。",
   },
   startConfirm: {
     title: "團隊開始之前",
     practise: {
-      "issue-closed": `你可以在本機練習；只要連結的 issue 仍是關閉的，${product.name} 就不會發布它。`,
-      door: `你可以在本機練習；只要這個 repository 不接受你開的 Pull Request，${product.name} 就不會發布它。`,
-      ban: `你可以在本機練習；只要專案規範不接受 AI 協助的貢獻，${product.name} 就不會發布它。`,
-      area: `你可以在本機練習；專案把有新手標籤的 issue 留給不靠 AI 工具學習的人，所以 ${product.name} 不會發布它。`,
+      "issue-closed": `只要連結的 issue 仍是關閉的，${product.name} 就不會發布這個任務。`,
+      door: `只要這個 repository 不接受你開的 Pull Request，${product.name} 就不會發布這個任務。`,
+      ban: `只要專案規範不接受 AI 協助的貢獻，${product.name} 就不會發布這個任務。`,
+      area: `專案把有新手標籤的 issue 留給不靠 AI 工具學習的人，所以 ${product.name} 不會發布這個任務。`,
     },
     otherPr: ({ author, number }) =>
-      `你可以在本機練習；只要 @${author} 的 Pull Request #${number} 會關閉同一個 issue，${product.name} 就不會發布它，除非你在發布時寫下理由。`,
+      `只要 @${author} 的 Pull Request #${number} 會關閉同一個 issue，${product.name} 就不會發布這個任務，除非你在發布時寫下理由。`,
     pacing: ({ open, budget }) =>
-      `你可以在本機練習；你在這裡有 ${n(open)} 個開著的 Pull Request，至少是上限 ${n(budget)} 的兩倍，在這之前 ${product.name} 不會發布它。`,
+      `你在這裡有 ${n(open)} 個開放中的 Pull Request，至少是上限 ${n(budget)} 的兩倍；降下來之前，${product.name} 不會發布這個任務。`,
     lesson:
-      "有新手標籤的 issue，是新手親手寫修正、認識專案的入口。交給 agent 團隊做，下一位新手就少了這個機會。可以考慮改做標有 help wanted 的 issue。",
+      "新手 issue 讓人親手修正、認識專案；交給 Agent 團隊，下一位新手就少了這個機會。可改做 help wanted 的 issue。",
     practiseLocally: "開始，在本機練習",
     startAnyway: "仍要開始",
     back: "返回",

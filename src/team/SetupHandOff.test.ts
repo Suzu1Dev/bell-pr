@@ -43,8 +43,8 @@ const settle = () => act(async () => new Promise((resolve) => setTimeout(resolve
 test("a blocked hand-off is a disabled button that says why, in words", () => {
   const html = renderEn(createElement(SetupHandOff, { needs: [need(1)], block: "A turn is already running.", async onStart() {} }));
   assertNoHan(html);
-  assert.match(html, /<button type="button" class="button secondary" disabled="" aria-describedby="([^"]+)">.*Let the agent set this up<\/button><p id="\1" class="field-help">A turn is already running\.<\/p>/);
-  assert.match(renderZh(createElement(SetupHandOff, { needs: [need(1)], async onStart() {} })), /讓 Agent 自動處理這些環境/);
+  assert.match(html, /<button type="button" class="button secondary" disabled="" aria-describedby="([^"]+)">.*Let the Agent set this up<\/button><p id="\1" class="field-help">A turn is already running\.<\/p>/);
+  assert.match(renderZh(createElement(SetupHandOff, { needs: [need(1)], async onStart() {} })), /讓 Agent 準備這些環境/);
 });
 
 test("the dialog lists every command to tick, at most 10, says whether sudo needs a password, and starts only the ticked ones", async () => {
@@ -54,10 +54,10 @@ test("the dialog lists every command to tick, at most 10, says whether sudo need
   const view = await mount(createElement(SetupHandOff, { needs, async onStart(commands) { started.push(commands); } }));
   try {
     const find = (match: (element: FakeElement) => boolean) => view.container.querySelectorAll(match);
-    await click(find((element) => element.nodeName === "BUTTON" && element.textContent === "Let the agent set this up")[0]);
+    await click(find((element) => element.nodeName === "BUTTON" && element.textContent === "Let the Agent set this up")[0]);
     await settle();
     assert.deepEqual(urls, ["/api/system/sudo"]);
-    assert.match(view.text(), /sudo asks octo for a password here, and the agent never enters one/);
+    assert.match(view.text(), /sudo asks octo for a password here, and the Agent never enters one/);
     assert.match(view.text(), /At most 10 items per turn/);
     const boxes = find((element) => element.nodeName === "INPUT");
     assert.equal(boxes.length, 12);
@@ -68,12 +68,12 @@ test("the dialog lists every command to tick, at most 10, says whether sudo need
     const actions = find((element) => element.getAttribute("class") === "modal-actions")[0];
     assert.deepEqual(actions.querySelectorAll((element) => element.nodeName === "BUTTON").map((button) => button.textContent), [
       "Cancel",
-      "Start the agent (10)",
+      "Start the Agent (10 commands)",
     ]);
     // Unticking one frees a place; ticking the last command takes it.
     await tick(boxes[0], false);
     await tick(boxes[11], true);
-    const confirm = find((element) => element.nodeName === "BUTTON" && element.textContent === "Start the agent (10)")[0];
+    const confirm = find((element) => element.nodeName === "BUTTON" && element.textContent === "Start the Agent (10 commands)")[0];
     await click(confirm);
     await settle();
     assert.deepEqual(started, [[...needs.slice(1, 10).map((entry) => entry.command), "corepack enable"]]);
@@ -96,12 +96,12 @@ test("a refused start keeps the dialog open with the reason, and an unreadable s
   );
   try {
     const find = (match: (element: FakeElement) => boolean) => view.container.querySelectorAll(match);
-    await click(find((element) => element.nodeName === "BUTTON" && element.textContent === "Let the agent set this up")[0]);
+    await click(find((element) => element.nodeName === "BUTTON" && element.textContent === "Let the Agent set this up")[0]);
     await settle();
     assert.match(view.text(), /BELL PR could not tell whether sudo needs a password here/);
     const box = find((element) => element.nodeName === "INPUT")[0];
     await tick(box, false);
-    const confirm = () => find((element) => element.nodeName === "BUTTON" && /^Start the agent/.test(element.textContent))[0];
+    const confirm = () => find((element) => element.nodeName === "BUTTON" && /^Start the Agent/.test(element.textContent))[0];
     assert.equal(handlers(confirm()).disabled, true);
     await tick(box, true);
     await click(confirm());
@@ -121,7 +121,7 @@ test("without sudo in the commands, the dialog does not ask about sudo", async (
     await click(button);
     await settle();
     assert.deepEqual(urls, []);
-    assert.match(view.text(), /要讓 Agent 準備這台機器的環境嗎？/);
+    assert.match(view.text(), /要讓 Agent 準備這台電腦的環境嗎？/);
     assert.match(view.text(), /開始處理（1 項）/);
   } finally {
     await view.unmount();
@@ -130,7 +130,7 @@ test("without sudo in the commands, the dialog does not ask about sudo", async (
 
 test("the sudo line says when sudo needs no password or is missing, and commands go in the list's order", async () => {
   for (const [status, line] of [
-    [{ user: "octo", available: true, installed: true, passwordless: true }, /sudo runs without a password for octo here, so the agent can run these sudo commands as root, unless a sudo rule limits/],
+    [{ user: "octo", available: true, installed: true, passwordless: true }, /octo has passwordless sudo here, so the Agent can run these sudo commands as root, unless a sudo rule restricts them/],
     [{ user: "octo", available: false, installed: false, passwordless: false }, /sudo is not installed here/],
   ] as const) {
     stubSudo(200, { sudo: status });
@@ -139,14 +139,14 @@ test("the sudo line says when sudo needs no password or is missing, and commands
     const view = await mount(createElement(SetupHandOff, { needs, async onStart(commands) { started.push(commands); } }));
     try {
       const find = (match: (element: FakeElement) => boolean) => view.container.querySelectorAll(match);
-      await click(find((element) => element.nodeName === "BUTTON" && element.textContent === "Let the agent set this up")[0]);
+      await click(find((element) => element.nodeName === "BUTTON" && element.textContent === "Let the Agent set this up")[0]);
       await settle();
       assert.match(view.text(), line);
       // Unticking and ticking the first again keeps it first.
       const boxes = find((element) => element.nodeName === "INPUT");
       await tick(boxes[0], false);
       await tick(boxes[0], true);
-      await click(find((element) => element.nodeName === "BUTTON" && element.textContent === "Start the agent (3)")[0]);
+      await click(find((element) => element.nodeName === "BUTTON" && element.textContent === "Start the Agent (3 commands)")[0]);
       await settle();
       assert.deepEqual(started, [needs.map((entry) => entry.command)]);
     } finally {
@@ -164,11 +164,11 @@ test("a command no longer listed is not sent, and the count says so", async () =
   const view = await mount(createElement(SetupHandOff, { needs: [need(1), need(2)], onStart }));
   try {
     const find = (match: (element: FakeElement) => boolean) => view.container.querySelectorAll(match);
-    await click(find((element) => element.nodeName === "BUTTON" && element.textContent === "Let the agent set this up")[0]);
+    await click(find((element) => element.nodeName === "BUTTON" && element.textContent === "Let the Agent set this up")[0]);
     await settle();
     // A poll closed the first item while the dialog was open.
     await view.rerender(createElement(SetupHandOff, { needs: [need(2)], onStart }));
-    await click(find((element) => element.nodeName === "BUTTON" && element.textContent === "Start the agent (1)")[0]);
+    await click(find((element) => element.nodeName === "BUTTON" && element.textContent === "Start the Agent (1 command)")[0]);
     await settle();
     assert.deepEqual(started, [[need(2).command]]);
   } finally {
@@ -181,7 +181,7 @@ test("the sudo line follows the ticked commands: none of them uses sudo, no line
   const view = await mount(createElement(SetupHandOff, { needs: [need(1), need(2, "corepack enable")], async onStart() {} }));
   try {
     const find = (match: (element: FakeElement) => boolean) => view.container.querySelectorAll(match);
-    await click(find((element) => element.nodeName === "BUTTON" && element.textContent === "Let the agent set this up")[0]);
+    await click(find((element) => element.nodeName === "BUTTON" && element.textContent === "Let the Agent set this up")[0]);
     await settle();
     assert.match(view.text(), /sudo asks octo for a password here/);
     await tick(find((element) => element.nodeName === "INPUT")[0], false);

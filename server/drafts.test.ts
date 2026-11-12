@@ -664,14 +664,14 @@ test("a project that asks for an AI trailer gets it on the suggested commit mess
   assert.deepEqual(suggested.sources, ["contributing"]);
   assert.match(
     suggested.rationale,
-    /^CONTRIBUTING\.md asks for Fixes lines\. CONTRIBUTING\.md asks for an AI trailer \(“4\. Disclose AI assistance[^”]+”\), so the message ends with Assisted-by: Claude Code, which names the agent that wrote this change\.$/,
+    /^CONTRIBUTING\.md asks for Fixes lines\. CONTRIBUTING\.md asks for an AI trailer \(“4\. Disclose AI assistance[^”]+”\), so the message ends with Assisted-by: Claude Code, naming the Agent\.$/,
   );
   // Without a message from the model the PR title is the subject, and the rule is the source.
   const made = parse(null, { assistant: "Codex" })!;
   assert.equal(made.message, `${proposal.title}\n\nAssisted-by: Codex`);
   assert.deepEqual(made.sources, ["contributing"]);
   assert.match(made.rationale, /^The subject is the PR title\. CONTRIBUTING\.md asks for an AI trailer/);
-  assert.match(parse(null, { assistant: "Codex" }, trailerRule, "zh-TW")!.rationale, /^主旨沿用 PR 標題。CONTRIBUTING\.md 要求加上 AI trailer/);
+  assert.match(parse(null, { assistant: "Codex" }, trailerRule, "zh-TW")!.rationale, /^主旨沿用 PR 標題。CONTRIBUTING\.md 要求 AI trailer/);
   // The trailer the rule names; none for a rule that refuses one or a project that does not ask.
   assert.equal(
     parse(null, undefined, "Add a `Generated-by:` trailer naming the tool.")?.message,
@@ -900,7 +900,7 @@ test("shutdown cancels draft generation and waits for temporary workspace cleanu
     await pending;
     assert.equal(f.run.status, "review");
     assert.equal(f.run.draftPreparation?.status, "failed");
-    assert.match(f.run.draftPreparation?.error ?? "", /中斷/);
+    assert.match(f.run.draftPreparation?.error ?? "", /已停止/);
     await assert.rejects(readdir(cwd), /ENOENT/);
     await assert.rejects(f.workbench.prepareDraft(f.run.id), /關閉/);
   } finally {
@@ -1358,7 +1358,7 @@ test("in English, draft rejections and the provisional-policy note carry no Han"
   );
   assert.match(
     provisional.summary,
-    /^Looking up the project's sources was limited or incomplete, so the Linux contribution writing principles are used for now\./,
+    /^Source lookup was limited or incomplete, so Linux contribution writing principles stand in\./,
   );
   assertNoHan(provisional.summary.split("\n")[0]);
 });
@@ -1597,7 +1597,7 @@ test("preflight blocks a credential in the PR text and asks to confirm local pat
   // Two addresses are listed the way the locale lists them.
   assert.match(
     draftPreflight({ body: "A fix.", commitEmails: ["a@company.dev", "b@company.dev"] })[0].message,
-    /addresses a@company\.dev and b@company\.dev,/,
+    /addresses a@company\.dev and b@company\.dev\./,
   );
   for (const address of [
     "12345+me@users.noreply.github.com",
@@ -1618,7 +1618,7 @@ test("preflight blocks a credential in the PR text and asks to confirm local pat
     "zh-TW",
   );
   assert.deepEqual(zh.map((check) => check.id), ["secret", "local-paths", "workflows", "author-email"]);
-  assert.equal(zh[0].message, "發佈前會擋下常見格式的 token 與私鑰。");
+  assert.equal(zh[0].message, "發布前會擋下常見格式的 token 與私鑰。");
   assert.deepEqual(zh[0].details, ["位於說明"]);
 });
 

@@ -129,6 +129,7 @@ const checkTopics = {
   issue: ["issue-closed", "issue-has-pr", "area-reserved", "issue-state"],
   pacing: ["pacing", "pacing-max"],
   others: ["group-own-overlap", "split-order"],
+  holds: ["held-by-other", "holds-unknown", "held-changed-upstream"],
   words: ["own-words", "disclosure-accuracy", "brevity", "reviewability", "tests-weakened", "placeholder", "unchecked"],
   safety: ["secret", "local-paths", "workflows", "author-email"],
 } as const satisfies Record<string, readonly DraftCheck["id"][]>;
@@ -525,7 +526,9 @@ export function PublishModal({
           {demo
             ? t.finishDemo
             : busy
-              ? t.sending
+              ? followUp
+                ? t.pushing
+                : t.sending
               : followUp
                 ? t.pushRound
                 : t.submit}
@@ -681,7 +684,7 @@ export function PublishChecks({
 const pullNumber = (url: string) => /\/pull\/(\d+)/.exec(url)?.[1] ?? "?";
 
 /**
- * "Close the loop first", shown when the pacing check says a maintainer is
+ * The "First read …" links, shown when the pacing check says a maintainer is
  * waiting: each pull request GitHub names as waiting on the person (up to
  * 3), as its BELL run whose feedback BELL reads or else as a link to
  * the review on GitHub; without that list, the person's other published

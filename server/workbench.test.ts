@@ -278,7 +278,7 @@ test("approval requires current per-file reviews and is invalidated by later edi
     );
     await assert.rejects(
       f.workbench.approve(f.run.id, { ...f.run.draft }),
-      /審閱所有/,
+      /審閱每個變更檔案/,
     );
     await f.workbench.review(
       f.run.id,
@@ -517,7 +517,7 @@ test("the base version around a modified file is served only for the current, re
       f.workbench.contextLines(f.run.id, "secret.ts", changed.fingerprint, f.run.baseSha!),
       (error: AppError) =>
         error.statusCode === 422 &&
-        error.message === "發佈前會擋下常見格式的 token 與私鑰。",
+        error.message === "發布前會擋下常見格式的 token 與私鑰。",
     );
 
     // A password assignment is not a blocking secret, but it is masked line by line.
@@ -569,14 +569,14 @@ test("a held-back file's reason follows the run's locale, so reading the diff in
           blocked:
             "Sensitive files and build artifacts are never added to the PR; remove this file from the changes first.",
           patch:
-            "Publishing this file is on hold: Sensitive files and build artifacts are never added to the PR; remove this file from the changes first.",
+            "This file is blocked from publishing: Sensitive files and build artifacts are never added to the PR; remove this file from the changes first.",
         },
         {
           path: "link.ts",
           blocked:
             "A new file must be a regular file; symbolic links need manual handling.",
           patch:
-            "Publishing this file is on hold: A new file must be a regular file; symbolic links need manual handling.",
+            "This file is blocked from publishing: A new file must be a regular file; symbolic links need manual handling.",
         },
       ],
     );
@@ -617,7 +617,7 @@ test("store preserves state and marks interrupted work as failed on restart", as
     await reopened.initialize();
     assert.equal(reopened.data.repos.length, 1);
     assert.equal(reopened.data.runs[0].status, "failed");
-    assert.match(reopened.data.runs[0].error!, /中斷/);
+    assert.match(reopened.data.runs[0].error!, /已停止/);
   } finally {
     await f.cleanup();
   }
@@ -919,7 +919,11 @@ test("HTTP errors follow X-Bell-Locale: validation, the guard, the error handler
     );
     assert.deepEqual(
       await errorOf("en", "/api/repos", { headers: { host: "invalid.example:4311" } }),
-      { status: 403, error: "This service address is not allowed." },
+      {
+        status: 403,
+        error:
+          "BELL PR rejects this address. Use the startup address (`bell-pr open` prints it again) or set BELLPR_PUBLIC_URL to use another.",
+      },
     );
     assert.deepEqual(
       await errorOf("en", "/api/repos", { headers: { origin: "https://invalid.example" } }),
@@ -927,7 +931,7 @@ test("HTTP errors follow X-Bell-Locale: validation, the guard, the error handler
     );
     assert.deepEqual(
       await errorOf("en", "/api/models?provider=unknown", { method: "GET" }),
-      { status: 400, error: "This agent type is not supported." },
+      { status: 400, error: "This AI provider is not supported." },
     );
     // Refusals from the Workbench and its modules.
     assert.deepEqual(await errorOf("en", "/api/runs/missing", { method: "GET" }), {
@@ -940,19 +944,19 @@ test("HTTP errors follow X-Bell-Locale: validation, the guard, the error handler
     });
     assert.deepEqual(await errorOf("zh-TW", `/api/runs/${f.run.id}/cancel`, { body: "{}" }), {
       status: 409,
-      error: "只有排隊、等待計畫核准或執行中的工作可取消。",
+      error: "只有排隊、等待計畫核准或執行中的任務可取消。",
     });
     assert.deepEqual(await errorOf("en", `/api/runs/${f.run.id}/approve`, {
       body: JSON.stringify({ draft: f.run.draft }),
     }), {
       status: 409,
-      error: "Review every latest change and remove the blocked files first.",
+      error: "Review the latest version of every changed file and mark it as reviewed, and remove the blocked files first.",
     });
     assert.deepEqual(await errorOf("en", `/api/runs/${f.run.id}/publish`, {
       body: JSON.stringify({ fingerprint: "a".repeat(64) }),
     }), {
       status: 409,
-      error: "The approved version changed or expired; reload, review and approve again before you send the PR.",
+      error: "The approved version changed or expired; reload, review and approve again.",
     });
     assert.deepEqual(await errorOf("en", "/api/repos", {
       body: JSON.stringify({ source: "./relative/path" }),
@@ -1209,7 +1213,7 @@ else if (args[0] === 'pr' && args[1] === 'create') {
     assert.equal(f.run.publishedBranch, f.run.branch);
     await assert.rejects(
       f.workbench.draft(f.run.id, { ...f.run.draft, publishBranch: "other-branch" }),
-      (error: AppError) => error.statusCode === 409 && /不能改分支/.test(error.message),
+      (error: AppError) => error.statusCode === 409 && /改名會另開 PR/.test(error.message),
     );
     // The pushed commit cannot take a different message; the person must restore it or start over.
     await f.workbench.draft(f.run.id, {
@@ -1733,7 +1737,7 @@ test("a Claude Code turn that lost the OAuth refresh lock and exited non-zero is
     const refreshRace =
       "Failed to refresh OAuth token: another Claude Code process is refreshing it or exited mid-refresh. This is usually transient; retry in a minute, and if it persists close other Claude Code processes or sign in again";
     const notice =
-      "Claude Code 正在更新登入憑證（其他行程持有更新鎖），15 秒後重試（第 2/3 次）。";
+      "Claude Code 正在等另一個行程更新完登入狀態，15 秒後重試（第 2/3 次）。";
     type Options = NonNullable<Parameters<typeof command>[2]>;
     const emit = (options: Options, event: unknown) =>
       options.onLine?.(JSON.stringify(event), "stdout");
@@ -1943,7 +1947,7 @@ test("agent turns use the Codex read budget by default and a longer, announced o
         error instanceof AppError &&
         error.statusCode === 504 &&
         error.message ===
-          "claude 執行逾時（已等待 37.5 分鐘）。較高的思考強度或大型專案需要更久；可降低思考強度、改用較快的模型，或提高 BELLPR_AGENT_TIMEOUT_SCALE。",
+          "claude 執行逾時（37.5 分鐘）。請調低思考強度、換較快的模型或提高 BELLPR_AGENT_TIMEOUT_SCALE；大型專案需要更久。",
     );
 
     const scaled = new Workbench(f.store, undefined, {

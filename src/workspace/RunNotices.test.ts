@@ -29,12 +29,12 @@ const run: Run = {
 test("a queued run says why it waits", () => {
   const html = renderEn(createElement(RunNotices, { run, queued: true }));
   assert.match(html, /role="status"/);
-  assert.match(html, /Queued: the limit of runs at once is reached; this one starts when another finishes/);
+  assert.match(html, /Queued: the limit of runs at once is reached\. This one starts when another finishes\./);
   assert.doesNotMatch(html, /pro-badge|run-notice-link|Free|Pro\b/);
   assertNoHan(html);
   assert.match(
     renderZh(createElement(RunNotices, { run, queued: true })),
-    /排隊中：同時執行的工作數已達上限，其他任務完成後才會開始/,
+    /排隊中：同時執行的任務數已達上限。其他任務完成後，這次任務才會開始。/,
   );
 });
 
@@ -63,7 +63,7 @@ test("the unsandboxed badge links to the safety settings and explains itself", (
   assert.match(html, /Ran without sandbox/);
   assert.match(
     html,
-    /<span id="unsandboxed-help" class="unsandboxed-help" role="tooltip">You allowed agents to run without the operating system&#x27;s sandbox/,
+    /<span id="unsandboxed-help" class="unsandboxed-help" role="tooltip">You let Agents skip the OS sandbox, so they could read or change files outside the working directory\./,
   );
   assertNoHan(html);
   assert.match(renderZh(createElement(UnsandboxedBadge)), /未使用沙箱執行/);
@@ -81,7 +81,7 @@ test("a run approved without the understanding check keeps a badge that says wha
   assert.match(approved, /<a href="#\/settings\/learning" aria-describedby="check-off-help">/);
   assertNoHan(approved);
   const setting = renderEn(createElement(UnderstandingOffBadge, { approved: false }));
-  assert.match(setting, /The understanding check is off, so you can approve without explaining the change back\./);
+  assert.match(setting, /You can approve without explaining the change back\. Runs approved this way stay marked\./);
   assert.match(renderZh(createElement(UnderstandingOffBadge, { approved: true })), /理解檢查已關閉/);
 });
 

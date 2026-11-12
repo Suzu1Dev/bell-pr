@@ -37,12 +37,13 @@ docker run -d --name bell-pr \
   bell-pr
 ```
 
-- The image's command is `bell-pr start`. If a required doctor check fails
-  (no Codex or Claude Code sign-in yet), the process exits before it
-  listens and prints each failed check with its fix command. Sign in as
-  below, or open the sample tour with `docker run ... bell-pr start --force`
-  (that replaces the image command). A real agent run is still refused
-  until a provider is signed in.
+- The image's command is `bell-pr start`. With no Codex or Claude Code
+  sign-in yet, and no other required check failing, it still listens. The
+  first time, Welcome shows how to install one. If another required check
+  fails, the process exits before it listens and prints each failed check
+  with its fix command. Sign in as below, or start anyway with
+  `docker run ... bell-pr start --force` (that replaces the image command).
+  A real agent run is still refused until a provider is signed in.
 - `-p 127.0.0.1:4311:4311` publishes BELL PR on this computer only. The
   image listens on `0.0.0.0` inside the container (an explicit setting; BELL
   PR prints a warning) and still requires the API token in `/data/api-token`.
@@ -90,7 +91,7 @@ BELL PR prints its address when it starts. Read it from the log:
 docker logs bell-pr
 ```
 
-or ask the running server for its address again, with your container's name
+or ask the running service for its address again, with your container's name
 in place of `bell-pr`:
 
 ```sh
@@ -133,9 +134,9 @@ against your own account. You can also pass `-e ANTHROPIC_API_KEY` to
 ## Agent sandbox in Docker
 
 Agents run their commands inside an operating-system sandbox: Codex uses
-its own bubblewrap-based sandbox for every agent (read-only or writing),
-and Claude Code uses bubblewrap with socat for agents that write code. Both need to create Linux namespaces, which Docker's default
-seccomp and AppArmor profiles and its masked `/proc` paths forbid.
+[its own bubblewrap-based sandbox](https://learn.chatgpt.com/docs/agent-approvals-security#os-level-sandbox) for every agent (read-only or writing),
+and Claude Code uses bubblewrap with socat for agents that write code. Both need to create Linux namespaces, which Docker's [default
+seccomp](https://docs.docker.com/engine/security/seccomp/#significant-syscalls-blocked-by-the-default-profile) and AppArmor profiles and its masked `/proc` paths forbid.
 
 Probe, run without any model call (Docker Engine 29.7 on an Ubuntu 26.04
 host, Codex CLI 0.159.0, in a fresh container of an image built from 1.0.1):
@@ -151,7 +152,7 @@ bwrap --ro-bind / / --dev /dev --proc /proc --unshare-all --die-with-parent true
 | `--security-opt seccomp=unconfined` | Fails: `bwrap: Failed to make / slave: Permission denied` |
 | `--security-opt apparmor=unconfined` | Fails: `bwrap: No permissions to create a new namespace` |
 | both of the above | Fails: `bwrap: Can't mount proc on /proc: Operation not permitted` |
-| both of the above and `--security-opt systempaths=unconfined` | Works: the agent writes inside its workspace (under `/data`, where BELL PR keeps checkouts), a write to `/home/node` fails with "Read-only file system", and network access fails |
+| both of the above and `--security-opt systempaths=unconfined` | Works: the agent writes inside its workspace (under `/data`, where BELL PR keeps working directories), a write to `/home/node` fails with "Read-only file system", and network access fails |
 
 The direct `bwrap` probe (what Claude Code's sandbox needs) gives the same
 results.
@@ -182,8 +183,9 @@ Docker stays **beta** because the agent sandbox needs the three
 29.7) with an image built from 1.0.1:
 
 - the image builds; with `bell-pr start --force` it reports healthy within
-  seconds and prints its address (without a provider signed in, plain
-  `bell-pr start` exits, as [Run it](#run-it) says);
+  seconds and prints its address. On that 1.0.1 image, plain `bell-pr start`
+  exited when no provider was signed in. Current behavior is in
+  [Run it](#run-it);
 - git, the GitHub CLI, the Codex CLI, bubblewrap and socat are in the
   image, and `bell-pr doctor` runs in it;
 - the sandbox probe in the table above: it fails with the default options

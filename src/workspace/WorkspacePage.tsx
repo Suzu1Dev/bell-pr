@@ -47,6 +47,7 @@ import { checkFooter } from "./checkFooter";
 import { DraftTab } from "./DraftTab";
 import { OverviewTab } from "./OverviewTab";
 import { RunNotices, showsCheckOff, UnderstandingOffBadge, UnsandboxedBadge } from "./RunNotices";
+import { HoldRecoveryNotice } from "./HoldRecoveryNotice";
 import "./workspace.css";
 import { limitationsRequest } from "../session/limitations";
 import { sessionAwaitsAnswer, sessionTurnBlock, setupHandOffShown, showSessionTab } from "../session/state";
@@ -346,6 +347,7 @@ export function WorkspacePage({
         </div>
       </section>
       <RunNotices run={run} queued={queued} />
+      <HoldRecoveryNotice run={run} busy={demo || busy || active || reviewRerunning} actions={actions} />
       <SplitNotices run={run} onOpen={actions.chooseRun} />
       <section className="workflow-strip" aria-label={t.progress}>
         {[
@@ -469,15 +471,13 @@ export function WorkspacePage({
               {t.tabs.commits}
             </button>
           </div>
-          <div className="review-totals">
-            {historical ? <span>{t.diffRounds.readOnly}</span> : <>
+          {!historical && <div className="review-totals">
             <span className="additions">+{additions}</span>
             <span className="deletions">−{deletions}</span>
             <span className="totals-divider" />
             <ShieldCheck size={15} />
             <span>{demo ? t.sampleReview : t.humanReview}</span>
-            </>}
-          </div>
+          </div>}
         </div>
         {sessionRunning && <p className="session-busy-note" role="status">{sessionMessages.busy}</p>}
         <div
@@ -636,17 +636,18 @@ export function WorkspacePage({
         </div>
         <footer className="review-footer">
           {historical ? <>
-            <span>{t.diffRounds.readOnly}</span>
+            <span>{t.diffRounds.notice}</span>
             <button type="button" className="button primary" onClick={showCurrent}>{t.diffRounds.back}</button>
           </> : <>
           <div>
             <span className="footer-spark">
               <Sparkles size={15} />
             </span>
-            <span>{published ? t.footer.publishedChanges : t.footer[footer.status]}</span>
+            {published ? <span>{t.footer.publishedChanges}</span>
+              : (footer.status === "passed" || footer.status === "checkOff") && <span>{t.footer[footer.status]}</span>}
             {prTextMissing && !byHand.writing && !reviewing && run.status !== "published" ? (
               <button type="button" className="mission-text-button" onClick={() => setTab("draft")}>{t.byHand.writePr}</button>
-            ) : <span className="footer-hint">{run.learnByHand ? t.footer.hintByHand : t.footer.hint}</span>}
+            ) : tab === "changes" && <span className="footer-hint">{run.learnByHand ? t.footer.hintByHand : t.footer.hint}</span>}
           </div>
           <div>
             {!published && <span className="footer-reviewed">
@@ -703,9 +704,7 @@ export function WorkspacePage({
                         ? t.footer.needsCommitMessage
                         : !demo && draftUnfinished
                           ? t.footer.needsFacts
-                          : followUp
-                            ? t.footer.previewPush
-                            : t.footer.previewSubmit
+                          : undefined
                 }
                 onClick={footer.explainFirst ? () => openCheckPanel(run.id) : approve}
               >

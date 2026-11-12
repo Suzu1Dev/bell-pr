@@ -77,18 +77,18 @@ export function ActivityTab({
         busy={busy}
         byHand={byHand}
       />
+      <details className="activity-details" open={active || reviewRerunning || run.status === "failed" || run.status === "cancelled"}>
+        <summary>{t.log}</summary>
       <div className="activity-layout">
         <div className="activity-main">
           <div className="section-heading">
             {run.team ? (
               <div>
                 <h2>{t.runTitle}</h2>
-                <p>{t.runText}</p>
               </div>
             ) : (
               <div>
                 <h2>{t.teamTitle}</h2>
-                <p>{t.teamText}</p>
               </div>
             )}
             {(active || reviewRerunning) && (
@@ -128,7 +128,7 @@ export function ActivityTab({
           )}
           <div className="activity-log-heading">
             <h3>{t.log}</h3>
-            <span>{demo ? t.demoLog : active ? t.live : t.taskLog}</span>
+            {(demo || active) && <span>{demo ? t.demoLog : t.live}</span>}
           </div>
           {!run.learnByHand && run.agents.length > 0 && run.logs.length > 0 && (
             <div
@@ -195,6 +195,7 @@ export function ActivityTab({
           )}
         </div>
       </div>
+      </details>
     </>
   );
 }

@@ -140,6 +140,10 @@ export function TeamBoard({
     !team.tasks.some((task) => task.id === recipient && canReceive(task));
   const messagingDisabled = !demo && (finished || team.phase === "planning");
   const done = team.tasks.filter((task) => task.status === "complete").length;
+  const taskStatusLabel = (task: TeamTask) =>
+    task.status === "ready" && ["failed", "cancelled"].includes(team.phase)
+      ? t.task.readyAfterRetry
+      : taskLabels[task.status];
   const revisions = team.planRevisions ?? [];
   const revisionsLeft = revisions.length < maxPlanRevisions;
   const retryable =
@@ -201,9 +205,7 @@ export function TeamBoard({
       {/* Learn by hand: no agent team to describe, split work for or talk to; the plan and the run's details stay. */}
       {!run.learnByHand && <div className="team-board-header">
         <div>
-          <span className="eyebrow">{t.eyebrow}</span>
           <h2>{t.title}</h2>
-          <p>{t.intro}</p>
         </div>
         <div className="team-runtime-badge">
           <Bot size={16} />
@@ -502,7 +504,6 @@ export function TeamBoard({
                     className={`team-task task-${task.status}`}
                   >
                     <div className="team-task-label">
-                      <span>{task.id}</span>
                       <span>
                         {task.status === "running" ? (
                           <Loader2 className="spin" size={13} />
@@ -511,7 +512,7 @@ export function TeamBoard({
                         ) : (
                           <Circle size={12} />
                         )}{" "}
-                        {taskLabels[task.status]}
+                        {taskStatusLabel(task)}
                       </span>
                     </div>
                     <h4>{task.title}</h4>
@@ -542,9 +543,12 @@ export function TeamBoard({
                           : t.task.showAll}
                       </button>
                     )}
+                    <details className="team-task-details">
+                      <summary>{t.task.details}</summary>
+                      <code>{task.id}</code>
                     <div className="team-task-owner">
                       <Bot size={13} />
-                      {task.owner}
+                      {run.agents.find((agent) => agent.id === task.owner)?.name ?? task.owner}
                       <span>
                         {task.worktreeRemoved
                           ? t.task.worktreeRemoved
@@ -558,6 +562,7 @@ export function TeamBoard({
                           t.task.filesPending}
                       </span>
                     </div>
+                    </details>
                     {overlapTitles(task).length > 0 && (
                       <div className="team-task-files team-task-overlap">
                         <TriangleAlert size={13} aria-hidden="true" />
@@ -570,9 +575,24 @@ export function TeamBoard({
                     )}
                     {task.dependsOn.length > 0 && (
                       <div className="team-task-deps">
-                        {t.task.dependsOn({
-                          tasks: fmt.list(task.dependsOn, { type: "unit" }),
-                        })}
+                        <span>{t.task.dependsOn}</span>
+                        <ul aria-label={t.task.dependsOn}>
+                          {task.dependsOn.map((dependencyId) => {
+                            const dependency = team.tasks.find(
+                              ({ id }) => id === dependencyId,
+                            );
+                            return (
+                              <li key={dependencyId}>
+                                <span>{dependency?.title ?? dependencyId}</span>
+                                <span>
+                                  {dependency
+                                    ? taskStatusLabel(dependency)
+                                    : t.task.dependencyUnknown}
+                                </span>
+                              </li>
+                            );
+                          })}
+                        </ul>
                       </div>
                     )}
                     {task.integratedFiles && task.integratedFiles.length > 0 && (

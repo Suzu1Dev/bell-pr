@@ -14,34 +14,34 @@ const modals = {
     subtitle: "Give each pull request one fix that a maintainer can review on its own.",
     creates: "Each contribution gets its own branch, files and PR draft from the same base commit.",
     original: "This contribution stays as it is, marked as split.",
-    filesOnly: `${product.name} gives a file to one contribution only and does not cut files into parts. Fixes that touch the same file cannot be separated here.`,
+    filesOnly: "A file goes to one contribution only, so fixes in the same file stay together.",
     testEach: `${product.name} cannot check that each part works alone. Run each part's tests before publishing.`,
     contribution: ({ number }: { number: number }) => `Contribution ${number}`,
     titleLabel: ({ number }: { number: number }) => `Contribution ${number} title`,
     add: "Add a contribution",
     remove: ({ number }: { number: number }) => `Remove contribution ${number}`,
     goesTo: ({ path }: { path: string }) => `Contribution for ${path}`,
-    leaveOut: "Leave out",
+    leaveOut: "Original only",
     titlePlaceholder: "Title of this contribution",
     empty: "No files yet. Move files here from the menu next to each file.",
-    leftOutTitle: "Left out",
-    leftOutHint: "These stay only in the original.",
+    leftOutTitle: "Only in the original",
     blocked: ({ reason }: { reason: string }) => `Held back from review, so it can't move: ${reason}`,
     summary: ({ contributions, leftOut }: { contributions: number; leftOut: number }) =>
-      `${contributions} ${plural(contributions) === "one" ? "contribution" : "contributions"}; ${leftOut} ${plural(leftOut) === "one" ? "file" : "files"} left out.`,
+      `${contributions} ${plural(contributions) === "one" ? "contribution" : "contributions"}; ${leftOut} ${plural(leftOut) === "one" ? "file" : "files"} only in the original.`,
     pathLimit: ({ count }: { count: number }) =>
       `Give each contribution at most ${count} ${plural(count) === "one" ? "file" : "files"}.`,
     suggestionLimit: ({ count }: { count: number }) =>
-      `Only the first ${count} ${plural(count) === "one" ? "part is" : "parts are"} assigned. Place the remaining files or leave them out.`,
+      `Only the first ${count} ${plural(count) === "one" ? "part is" : "parts are"} assigned. Place the remaining files or leave them only in the original.`,
     mixed: ({ paths, issues }: { paths: string[]; issues: string[] }) =>
-      `${list(paths)} ${plural(paths.length) === "one" ? "holds" : "hold"} changes for ${list(issues)}. ${product.name} cannot separate changes inside a file: split them by hand, or keep them together.`,
+      `${list(paths)} ${plural(paths.length) === "one" ? "holds" : "hold"} changes for ${list(issues)}; ${product.name} can't split a file. Split by hand, or keep them together.`,
     linked: ({ issues }: { issues: string[] }) =>
-      `The plan links the tasks for ${list(issues)}, so they form one part. If a fix works on its own, give its files their own contribution, or keep them together.`,
+      `The plan links the tasks for ${list(issues)} into one part. A fix that works alone can move to its own contribution.`,
     submit: "Split",
     submitting: "Splitting…",
   },
   help: {
-    title: "From an idea to your next PR.",
+    teamGuide: "How the AI team works",
+    title: "How to contribute",
     subtitle: "Four steps that connect building, reviewing and learning.",
     steps: {
       import: {
@@ -49,46 +49,46 @@ const modals = {
         text: "Import a GitHub link or a local path and pick the project to contribute to.",
       },
       team: {
-        title: "Direct the agent team",
+        title: "Direct the Agent team",
         text: "Describe what you need clearly, so the planning, building and review roles can split the work.",
       },
       understand: {
         title: "Understand every change",
-        text: "Switch files to read the diff; click a line number, or hold Shift to select a block of code, and ask the agent. Mark the file as reviewed once you understand it.",
+        text: "Read each diff; click a line number, or hold Shift to select a block, and ask the Agent. Mark files reviewed once understood.",
       },
       submit: {
-        title: "Edit and submit the PR",
-        text: "Adjust the title and description, save the draft, and confirm the submission once every file is reviewed.",
+        title: "Edit and publish the PR",
+        text: "Adjust the title and description, save the draft, and confirm publishing once every file is reviewed.",
       },
     },
     start: "Start exploring",
     about: `About ${product.name}`,
   },
   runs: {
-    title: "Every idea has its progress.",
-    subtitle: "Switch tasks to see their status, code changes and PR draft.",
+    title: "Contributions",
+    subtitle: "Switch contributions to see their status, code changes and PR draft.",
     demo: "Interactive demo",
     newContribution: "New contribution",
     freeSpace: "Free disk space",
     freeSpaceLabel: ({ title }: { title: string }) => `Free disk space: ${title}`,
-    freeConfirm: `Remove this contribution's working files: its Git worktree, its teammates' checkouts and its branch in ${product.name}'s own copy of the project? The contribution, its notes and its explanations stay, but its changes can no longer be shown.`,
+    freeConfirm: `Remove this contribution's Git worktree, teammates' working directories and branch in ${product.name}'s project copy? The contribution, notes and explanations stay; its changes can no longer be shown.`,
     /** The same for a published run, whose checkout follow-ups and syncing need. */
-    freeConfirmPublished: `Remove this published contribution's working files: its Git worktree, its teammates' checkouts and its branch in ${product.name}'s own copy of the project? Follow-up rounds and syncing stop working for it. The contribution, its notes and its explanations stay.`,
+    freeConfirmPublished: `Remove this published contribution's Git worktree, teammates' working directories and branch in ${product.name}'s project copy? Follow-up rounds and syncing stop working. The contribution, notes and explanations stay.`,
     freeYes: "Free disk space",
     /** Marks a run whose working files were removed. */
     filesRemoved: "Files removed",
-    deleteRun: "Delete run",
-    deleteRunLabel: ({ title }: { title: string }) => `Delete run: ${title}`,
+    deleteRun: "Delete contribution",
+    deleteRunLabel: ({ title }: { title: string }) => `Delete contribution: ${title}`,
     deleteConfirm:
       "Delete this contribution with its notes and working files? This cannot be undone.",
-    deleteYes: "Delete run",
+    deleteYes: "Delete contribution",
     working: "Working…",
     activeHint: "Stop this contribution before you free its space or delete it.",
     freed: "Disk space freed. The contribution and its notes stay.",
     deleted: "Contribution deleted.",
   },
   newTask: {
-    title: "Hand your idea to your agent team.",
+    title: "New contribution",
     subtitle: "Describe what you want to improve and how it should behave when it is done.",
     repo: "Target repository",
     chooseRepo: "Choose a repository",
@@ -96,7 +96,7 @@ const modals = {
     importOther: "Import another project",
     recommendations: "See AI-recommended directions first",
     demoNote:
-      "Demo settings can be changed freely; no real agent starts. The sample team plays its run again from the start. Import your repository to start building.",
+      "Try any setting: no real Agent starts, and the sample team replays its run. Import your repository to start building.",
     loadingSettings: "Loading this project's contribution settings…",
     reloadSettings: "Reload project settings",
     saveDefault: "Save as default settings",
@@ -105,15 +105,11 @@ const modals = {
     goal: "What do you want to get done?",
     goalPlaceholder:
       "Describe the need, related files, expected behavior and how to verify it…",
-    lead: "Team lead",
-    teammates: ({ count }: { count: number }) =>
-      plural(count) === "one" ? `${count} teammate` : `${count} teammates`,
-    reviewers: "Reviewer + Test analyst",
     usage: ({ provider }: { provider: string }) =>
-      `The task runs with the ${provider} CLI signed in on this computer and counts against that account's usage. When it finishes, it waits for your review.`,
+      `Uses the ${provider} CLI signed in on this computer; usage counts against that account. Then it awaits your review.`,
     saveDemo: "Play the sample team",
     planFirst: "Generate the team plan",
-    start: "Start the agent team",
+    start: "Start the Agent team",
   },
 };
 

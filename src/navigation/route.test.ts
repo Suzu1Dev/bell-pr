@@ -25,6 +25,7 @@ const canonical: [string, Route][] = [
   ["#/repos/demo-repo", { name: "repo", repoId: "demo-repo" }],
   ["#/discover", { name: "discover" }],
   ["#/team", { name: "team" }],
+  ["#/group", { name: "group" }],
   ["#/learning", { name: "learning" }],
   ["#/settings", { name: "settings" }],
   ["#/settings/environment", { name: "settings", section: "environment" }],
@@ -141,9 +142,9 @@ test("serializing writes file before the flags and never a flag named file", () 
 });
 
 const tabTitles = [
-  ["overview", "Overview & motivation"],
+  ["overview", "Overview"],
   ["changes", "Code changes"],
-  ["activity", "Agent activity"],
+  ["activity", "Activity"],
   ["draft", "PR draft"],
 ] as const;
 
@@ -156,11 +157,11 @@ test("titles name the page, then what it shows, then the product", () => {
     );
   assert.equal(
     titleFor({ name: "run", runId: "x" }, en),
-    "Overview & motivation — BELL PR",
+    "Overview — BELL PR",
   );
   assert.equal(
     titleFor({ name: "demo" }, en, { repoName }),
-    `Overview & motivation · ${repoName} — BELL PR`,
+    `Overview · ${repoName} — BELL PR`,
   );
   assert.equal(
     titleFor({ name: "repo", repoId: "demo-repo" }, en, { repoName }),
@@ -170,6 +171,7 @@ test("titles name the page, then what it shows, then the product", () => {
     [{ name: "repos" }, "Repositories"],
     [{ name: "discover" }, "Explore contributions"],
     [{ name: "team" }, "Agent team"],
+    [{ name: "group" }, "Group"],
     [{ name: "learning" }, "Learning notes"],
     [{ name: "settings", section: "general" }, "Settings"],
   ];

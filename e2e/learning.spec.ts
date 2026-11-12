@@ -81,7 +81,8 @@ async function axeProblems(page: Page) {
 test("the learning page shows the sample notes", async ({ page }) => {
   await page.goto("/#/learning?locale=en");
   await expect(page.getByRole("heading", { level: 1 })).toHaveText(learning.title);
-  const sample = page.locator("section.learning-demo");
+  const sample = page.locator("details.learning-demo");
+  await sample.locator("summary").click();
   await expect(sample.getByRole("heading", { level: 2, name: learning.demoTitle })).toBeVisible();
   const explained = demo.files.filter((file) => file.explanation);
   expect(explained.length).toBeGreaterThan(0);
@@ -145,7 +146,7 @@ test("seeded notes load from /api/learning, 20 contributions at a time", async (
       expect(run).not.toHaveProperty("notes");
     }
 
-    const own = page.locator(".learning-grid").first();
+    const own = page.locator(".learning-note-groups");
     const cards = own.locator(".note-card");
     const loadMore = page.getByRole("button", { name: learning.loadMore, exact: true });
     // The newest 20 contributions first.
@@ -390,17 +391,11 @@ test("the notes show each contribution's own explanation and mark runs approved 
       await expect(off.locator(".learning-check-off")).toHaveText(learning.runs.checkOff);
       await expect(off).toContainText(learning.runs.checkOffText);
       // The file notes still follow.
-      await expect(page.locator(".learning-grid").first().locator(".note-card")).toHaveCount(2);
+      await expect(page.locator(".learning-note-groups").locator(".note-card")).toHaveCount(2);
       expect(await axeProblems(page)).toEqual([]);
     },
   );
 });
-
-// MERGE-STEP: the next two tests run against the learning-loop routes
-// (GET /api/learning/practice, POST /api/runs/:id/practice,
-// GET /api/learning/counts, GET /api/learning/debriefs and
-// POST /api/learning/debrief). Before those routes exist they answer 404,
-// and the tests skip themselves; after the L2 merge they run.
 
 /** A run approved after its check, with a confident miss, and one approved with the check off. */
 function checkedState(dataDir: string) {
@@ -467,13 +462,12 @@ const checkedRun = {
   correction: "Only the written key's entry is dropped, not the whole cache.",
 };
 
-test("MERGE-STEP: the deck grades a seeded confident miss through the learning-loop routes, and the counts read every run", async ({ browser }) => {
+test("the deck grades a seeded confident miss through the learning-loop routes, and the counts read every run", async ({ browser }) => {
   await onServer(
     browser,
     { seed: (dataDir) => writeFile(path.join(dataDir, "state.json"), checkedState(dataDir)) },
     async (page) => {
       const probe = await page.request.get("/api/learning/practice");
-      test.skip(probe.status() === 404, "needs the learning-loop routes (L2A); runs after the L2 merge");
       expect(probe.status()).toBe(200);
 
       await page.goto("/#/learning?view=practice&locale=en");
@@ -519,7 +513,7 @@ test("MERGE-STEP: the deck grades a seeded confident miss through the learning-l
   );
 });
 
-test("MERGE-STEP: stored debriefs read through the learning-loop routes and show in the debrief view", async ({ browser }) => {
+test("stored debriefs read through the learning-loop routes and show in the debrief view", async ({ browser }) => {
   const stored = {
     at: "2026-10-06T12:00:00.000Z",
     locale: "en",
@@ -536,7 +530,6 @@ test("MERGE-STEP: stored debriefs read through the learning-loop routes and show
     },
     async (page) => {
       const read = await page.request.get(`/api/learning/debriefs?repoId=${debriefRepo.id}`);
-      test.skip(read.status() === 404, "needs the learning-loop routes (L2A); runs after the L2 merge");
       expect(read.status()).toBe(200);
       expect((await read.json()).debriefs).toMatchObject([{ nextStep: stored.nextStep }]);
 

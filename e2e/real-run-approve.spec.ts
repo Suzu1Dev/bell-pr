@@ -161,7 +161,7 @@ test("a seeded real run is approved through the UI and the publish dialog opens 
     // no file question, only what was not tested.
     await page.locator("#workspace-tab-changes").click();
     const check = workspace.check;
-    await page.getByRole("button", { name: workspace.footer.explainBack }).click();
+    await page.locator(".review-footer").getByRole("button", { name: workspace.footer.explainBack }).click();
     const panel = page.locator(".understanding-check");
     await expect(page.locator(".explain-panel")).toHaveCount(0);
     await panel
@@ -252,7 +252,7 @@ test("a passed check counts after the setting is turned off: publishing asks not
 
     // Explain it back while the check is on.
     const check = workspace.check;
-    await page.getByRole("button", { name: workspace.footer.explainBack }).click();
+    await page.locator(".review-footer").getByRole("button", { name: workspace.footer.explainBack }).click();
     const panel = page.locator(".understanding-check");
     await panel
       .getByRole("textbox", { name: check.explainPrompt })
@@ -290,7 +290,9 @@ test("a passed check counts after the setting is turned off: publishing asks not
     await page.keyboard.press("Escape");
     await expect(dialog).toHaveCount(0);
     await page.locator("#workspace-tab-draft").click();
-    await expect(page.locator('[data-row="understanding"]')).toContainText(draft.guidance.checklist.understandingPassed);
+    // The passed check is on the loaded guide's checklist. The fallback
+    // copy leaves once that guide is on the page.
+    await expect(page.locator(".draft-checklist")).toContainText(workspace.checklist.understandingPassed);
     await expect(page.locator('[data-row="rules"]')).not.toContainText("your understanding check is off");
   } finally {
     await context.close();

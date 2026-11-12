@@ -38,6 +38,7 @@ import {
   type Run,
 } from "./types.js";
 import { assertRemoteHead, prHasCommit, remoteBranchHead } from "./pr-branch.js";
+import { releasePublishRecovery } from "./cleanup.js";
 import { assertConflictsResolved, runBusy } from "./sync-runs.js";
 import { applyAiDisclosure } from "./drafts.js";
 import { assertReady } from "./by-hand.js";
@@ -58,6 +59,15 @@ import { outgoingPublishText } from "../shared/publish-payload.js";
 import { localPublishChecks } from "./group-local.js";
 
 const now = () => new Date().toISOString();
+
+/** Same repository lock as workspace cleanup, so two runs cannot each treat the other's ref as the remaining copy. */
+async function releasePublishedRecovery(ctx: WorkbenchContext, run: Run) {
+  const repo = ctx.store.data.repos.find((item) => item.id === run.repoId);
+  const release = () =>
+    releasePublishRecovery(ctx, run, repo?.path ?? run.worktreePath);
+  if (!repo) return release();
+  return ctx.lock(`repository:${repo.id}`, release);
+}
 
 const json = <T>(value: string) => JSON.parse(value) as T;
 
@@ -612,11 +622,31 @@ export async function recoverPublish(
 }
 
 /**
+ * Refuses a change that meets a file someone else in the group holds
+ * (hold-guard.ts). Given only when BELL PR runs with --group.
+ */
+export type HoldCheck = (
+  run: Run,
+  files: readonly DiffFile[],
+  acknowledged: readonly string[],
+) => void;
+
+export interface PublishHolds {
+  publishing: HoldCheck;
+  confirms?: (
+    run: Run,
+    repo: Repository | undefined,
+    runs: readonly Run[],
+  ) => Promise<DraftCheck[]>;
+}
+
+/**
  * `acknowledged` lists the preflight items the person confirmed in the
  * publish dialog. They are recomputed here from the saved draft, so a stale
  * or partial list is rejected before anything is pushed. The quoted
  * confirm's tick counts only with `rulesDigest`, the digest of the words
  * the dialog showed, when it matches the words the server shows now.
+ * `holds` is the group's write guard, when BELL PR runs with --group.
  */
 export async function publish(
   ctx: WorkbenchContext,
@@ -625,7 +655,10 @@ export async function publish(
   acknowledged: string[] = [],
   overrides: Pick<GuardOverride, "id" | "reason">[] = [],
   rulesDigest?: string,
+  holds?: HoldCheck | PublishHolds,
 ) {
+  const holdCheck = typeof holds === "function" ? holds : holds?.publishing;
+  const holdConfirms = typeof holds === "function" ? undefined : holds?.confirms;
   return ctx.lock(id, async () => {
     const run = ctx.run(id);
     if (
@@ -633,7 +666,10 @@ export async function publish(
       displayedFingerprint !== run.approvedFingerprint
     )
       throw new AppError((m) => m.run.publish.approvalStale, 409);
-    if (run.status === "published") return run;
+    if (run.status === "published") {
+      await releasePublishedRecovery(ctx, run);
+      return run;
+    }
     assertSessionIdle(run);
     const repo = ctx.repo(run.repoId);
     if (run.status !== "approved" || !run.approvedFingerprint)
@@ -661,6 +697,8 @@ export async function publish(
     // The current setting applies, also to runs approved while it was off
     // and to runs approved by builds before the check existed.
     assertUnderstood(run, files, repo);
+    // Before the follow-up branch, so a follow-up round is held to it too.
+    holdCheck?.(run, files, acknowledged);
     const round = activeFollowUp(run.followUps);
     if (round) return publishFollowUp(ctx, run, round, files);
     if (run.prUrl)
@@ -711,6 +749,7 @@ export async function publish(
         delete run.error;
         ctx.log(run, "system", sm().run.publish.prCreated);
         await ctx.store.save();
+        await releasePublishedRecovery(ctx, run);
         return run;
       }
     }
@@ -740,6 +779,8 @@ export async function publish(
       currentLocale(),
       { repo, overrides: guardOverrides, runs: ctx.store.data.runs },
     );
+    if (holdConfirms)
+      checks.push(...(await holdConfirms(run, repo, ctx.store.data.runs)));
     const blocking = checks.find((check) => check.kind === "block");
     if (blocking)
       throw new AppError(
@@ -948,6 +989,7 @@ export async function publish(
       run.publishing = false;
       await ctx.store.save();
     }
+    if (run.status === "published") await releasePublishedRecovery(ctx, run);
     return run;
   });
 }

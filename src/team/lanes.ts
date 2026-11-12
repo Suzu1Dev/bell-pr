@@ -9,9 +9,9 @@ export interface TeamLane {
   states: readonly TeamTaskStatus[];
 }
 
-/** The task board's lanes in display order. Failed tasks sit in the done lane. */
+/** The task board's lanes in display order. Only integrated work is done. */
 export const teamLanes: readonly TeamLane[] = [
-  { id: "todo", states: ["pending", "ready", "blocked"] },
+  { id: "todo", states: ["pending", "ready", "blocked", "failed"] },
   { id: "running", states: ["running"] },
-  { id: "done", states: ["complete", "failed"] },
+  { id: "done", states: ["complete"] },
 ];

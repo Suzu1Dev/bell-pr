@@ -79,7 +79,7 @@ test("BELL's clone of a GitHub repository updates to the latest default branch; 
       (error: AppError) =>
         error.statusCode === 409 &&
         /has no GitHub source/.test(error.message) &&
-        /import it again/.test(error.message),
+        /re-import the project/.test(error.message),
     );
     // A checkout an earlier build imported in place is the person's own.
     const legacy = { ...localRepo, id: "legacy-checkout", path: local, url: "https://github.com/octo/legacy" };
@@ -367,7 +367,7 @@ test("a sync whose conflicts cannot be marked, or after a publish that stopped h
     await assert.rejects(
       f.workbench.syncRun(f.run.id),
       (error: AppError) =>
-        error.statusCode === 409 && /無法用衝突標記表示/.test(error.message) && /other\.ts/.test(error.message),
+        error.statusCode === 409 && /衝突標記無法表示/.test(error.message) && /other\.ts/.test(error.message),
     );
     assert.equal(f.run.baseSha, oldBase);
     assert.equal(f.run.sync, undefined);
@@ -379,7 +379,7 @@ test("a sync whose conflicts cannot be marked, or after a publish that stopped h
     );
     // A commit left by a publish that failed after making it may be on GitHub already.
     f.run.publishCommit = oldBase;
-    await assert.rejects(f.workbench.syncRun(f.run.id), /先前的發佈已建立提交/);
+    await assert.rejects(f.workbench.syncRun(f.run.id), /先前發布的 commit 可能已在 GitHub/);
   } finally {
     await f.cleanup();
   }
@@ -592,14 +592,14 @@ test("an agent resolves sync conflicts for review, leftover markers keep blockin
     await f.write("hello.ts", "line one\nline two, mine\nline three\n");
     await f.github.upstreamCommit({ "hello.ts": "line one\nline two, theirs\nline three\n" });
     await f.workbench.syncRun(f.run.id);
-    // Leftover markers keep approval blocked and are named in the report.
+    // Leftover markers keep approval blocked and are named in the run log.
     behaviour = "partial";
     await f.workbench.resolveConflicts(f.run.id);
     assert.equal(f.run.status, "running");
     await until(() => f.run.status === "review");
     assert.match(prompt, /hello\.ts/);
     assert.match(prompt, /latest main/);
-    assert.match(f.run.sync!.report!, /仍有衝突標記：hello\.ts/);
+    assert.match(f.run.logs.at(-1)!.message, /仍有衝突標記：hello\.ts/);
     await f.reviewAll();
     await assert.rejects(f.workbench.approve(f.run.id, { ...f.run.draft }), /衝突標記/);
     // An agent that commits is undone; its resolution waits for review.
@@ -670,7 +670,7 @@ test("a conflict resolution works in the run's locale, whatever the locale of th
     assert.match(prompt, /labelled "latest main"/);
     assert.equal(
       f.run.logs.at(-1)?.message,
-      "The agent resolved the merge conflicts; review these files one by one.",
+      "The Agent resolved the merge conflicts; review these files one by one.",
     );
     const agent = f.run.agents.find((entry) => entry.id === "sync");
     assert.equal(agent?.detail, "Conflicts resolved; waiting for review");
@@ -812,7 +812,7 @@ test("a PR sync takes in files the target branch added, also after the agent com
     // The target deleting a file this PR changed cannot be marked: nothing moves.
     const pushed = f.run.publishCommit!;
     await f.github.upstreamCommit({ "hello.ts": null });
-    await assert.rejects(f.workbench.syncRun(f.run.id), /無法用衝突標記表示.*hello\.ts/);
+    await assert.rejects(f.workbench.syncRun(f.run.id), /衝突標記無法表示.*hello\.ts/);
     assert.equal(f.run.status, "published");
     assert.equal(f.run.followUps!.at(-1), round);
     assert.equal((await git(f.run.worktreePath, ["rev-parse", "HEAD"])).stdout.trim(), pushed);
@@ -881,7 +881,7 @@ test("commits pushed to the PR branch on GitHub are taken over before a round; r
     await git(f.repo.path, ["--git-dir", f.github.bare, "update-ref", "refs/heads/fix/sync0001", mainHead]);
     await assert.rejects(
       f.workbench.startFollowUp(f.run.id, { feedbackUrls: [feedbackUrl] }),
-      /改寫了 BELL PR 推送過的歷史/,
+      /改寫了 BELL PR 推送的歷史/,
     );
     assert.equal(f.run.status, "published");
   } finally {

@@ -20,23 +20,23 @@ const runStates: Record<RunStatus, string> = {
   cancelled: "cancelled",
 };
 const followUpAgentCommitted =
-  "The agent made its own commit or switched branches; the branch is back on the pushed PR, and the edits stay in the working directory for your review.";
+  "The Agent committed or switched branches; the branch is back on the pushed PR, with its edits in the working directory for review.";
 
 /** Run pipeline messages: run logs, agent details and run errors. */
 export default {
   /** Logged once on a run whose Claude agent ran without the OS sandbox. */
   unsandboxedNotice:
-    "This Claude agent ran without the OS sandbox because unsandboxed Claude agents are allowed (in Settings or with BELLPR_ALLOW_UNSANDBOXED_AGENTS=1).",
+    "This Claude Agent ran without the OS sandbox because unsandboxed Claude Agents are allowed (in Settings or with BELLPR_ALLOW_UNSANDBOXED_AGENTS=1).",
   /** What an agent card says the agent is doing (its `detail`). */
   agents: {
     lead: "Analysing the project and breaking down the request",
     reviewer: "Reviewing correctness and maintainability independently",
     tester: "Checking the test evidence and regression risk",
-    member: "Waiting to claim a shared task; works in its own directory",
+    member: "Waiting to claim a shared task; works in its own working directory",
     memberRetry: "Waiting to claim the task again in a new working directory",
     running: ({ cli }: { cli: string }) => `Running ${cli}…`,
     waitingForSlot: ({ queued }: { queued: number }) =>
-      `Waiting for other agents to finish (${queued} queued)`,
+      `Waiting for other Agents to finish (${queued} queued)`,
     complete: "Done; the report is ready to read",
     failed: "Stopped or failed",
     rerunWaiting: "Waiting to review again…",
@@ -64,7 +64,7 @@ export default {
     full: ({ max }: { max: number }) =>
       `Up to ${max} runs can be queued or in progress at once; wait for one to finish.`,
     teamStopped:
-      "The team has stopped working on this run; ask about the code in the follow-up chat instead.",
+      "The team has stopped working on this run; ask about the code in the Ask tab instead.",
     noPlanToApprove: "No team plan is waiting for approval.",
     planApproved:
       "Approved the task split and file scopes; the team is queued for development.",
@@ -72,11 +72,11 @@ export default {
     revisionLimit: ({ max }: { max: number }) =>
       `The plan was already revised ${count(max, "time", "times")}; approve the current plan, or cancel and start a new run with an adjusted request.`,
     planSentBack: ({ revision, max }: { revision: number; max: number }) =>
-      `Sent the plan back with feedback (revision ${revision} of ${max}); the lead will plan again.`,
+      `Sent the plan back with feedback (revision ${revision} of ${max}); the Lead will plan again.`,
     cancelNotAllowed:
       "Only runs that are queued, running or waiting for plan approval can be cancelled.",
     cancelRequested:
-      "Cancellation requested. The isolated working directories of failed or cancelled tasks are kept; those of integrated tasks were removed. Use “Retry failed subtasks” to continue.",
+      "Cancellation requested. Failed or cancelled tasks keep their own working directories. Use “Retry failed subtasks” to continue.",
   },
   /** The team's turns, tasks and phases in a run's log. */
   team: {
@@ -103,9 +103,9 @@ export default {
     }) =>
       `${name} started. Model: ${model ?? `${cli} CLI default (not recorded)`}; reasoning effort: ${effort ?? "model default"}${web ? "; web access allowed" : ""}${timeout ? `; ${timeout}` : ""}.${inbox ? ` ${count(inbox, "team message", "team messages")} arrived at the start of this turn.` : ""}`,
     waitingForSlot: ({ queued }: { queued: number }) =>
-      `Waiting for other agents to finish (${queued} queued).`,
+      `Waiting for other Agents to finish (${queued} queued).`,
     structuredResult:
-      "Structured result returned; checking its sources and content.",
+      "Answer received; checking its sources and content.",
     checkFinished: ({ outcome }: { outcome: string }) =>
       `Check finished (${outcome}).`,
     fileUpdated: ({ path }: { path: string }) => `Updated ${path}.`,
@@ -125,9 +125,9 @@ export default {
     }) =>
       `${cli} reported the model in use: ${model} (${requested ? `--model ${requested} was passed` : "no --model was passed"}${version ? `, CLI ${version}` : ""}).`,
     noReport: ({ cli }: { cli: string }) => `${cli} returned no report.`,
-    noTeam: "This run has no agent team.",
+    noTeam: "This run has no Agent team.",
     messageTargetClosed:
-      "This member or task has finished and cannot take messages; send it to the lead.",
+      "This teammate or task has finished and cannot take messages; send it to the Lead.",
     messageLength: "Team messages must be 1 to 4000 characters.",
     messageLimit: "This run has reached its limit of 200 team messages.",
     messageQueued: ({ to }: { to: string }) =>
@@ -137,27 +137,27 @@ export default {
     messageNotQueued: ({ reason }: { reason: string }) =>
       `Coordination message not queued: ${reason}`,
     turnLimit:
-      "Reached the limit of 3 turns per task; undelivered messages stay in the team inbox for the lead to review during integration.",
+      "Reached the limit of 3 turns per task; undelivered messages stay in the team inbox for the Lead to review during integration.",
     taskIntegrated: ({ title, files }: { title: string; files: string[] }) =>
       files.length
         ? `${title} is done; integrated ${count(files.length, "file", "files")} that passed the scope check: ${list(files)}.`
         : `${title} is done; it changed no files to integrate.`,
     checkoutRemoved: ({ owner }: { owner: string }) =>
-      `The integrated changes are now in this run's worktree, so ${owner}'s separate checkout was removed.`,
+      `${owner}'s changes are now in the run's working directory, so ${owner}'s own working directory was removed.`,
     checkoutNotRemoved: ({ task, reason }: { task: string; reason: string }) =>
-      `Could not remove the isolated working directory of ${task}; you can delete it by hand: ${reason}`,
+      `Could not remove ${task}'s own working directory; you can delete it by hand: ${reason}`,
     taskFailed: "The task failed.",
     stuck:
-      "Task dependencies or file assignments stop the team from continuing; check the shared task list.",
+      "Task dependencies or file assignments stop the team from continuing; check the task board.",
     creatingWorktree: "Creating a separate Git worktree.",
     legacyRun:
-      "Older runs cannot be assigned to a team again; start a new agent team run.",
+      "Older runs cannot be assigned to a team again; start a new Agent team run.",
     planCreated: ({ tasks, max }: { tasks: number; max: number }) =>
       `Created ${count(tasks, "task", "tasks")} with dependencies and file scopes; up to ${count(max, "teammate works", "teammates work")} at once.`,
     awaitingApproval:
       "Waiting for you to approve the plan; no code has been changed yet.",
     noChanges:
-      "The agent team produced no code changes. Check the task reports or adjust the direction.",
+      "The Agent team produced no code changes. Check the task reports or adjust the direction.",
     done: ({ files }: { files: number }) =>
       `Team development and the independent review are done: ${count(files, "changed file waits", "changed files wait")} for your file-by-file review.`,
     draftIncomplete: "The PR draft suggestion did not finish; try again.",
@@ -279,12 +279,12 @@ export default {
       attempt: number;
       total: number;
     }) =>
-      `Claude Code is refreshing its sign-in while another process holds the refresh lock; next try in ${count(seconds, "second", "seconds")} (attempt ${attempt} of ${total}).`,
+      `Claude Code is waiting for another process to finish refreshing its sign-in; next try in ${count(seconds, "second", "seconds")} (attempt ${attempt} of ${total}).`,
     /** Added to "started" lines when a turn may take longer than usual. */
     timeoutLimit: ({ minutes }: { minutes: number }) =>
       `waits up to ${count(minutes, "minute", "minutes")}`,
     timedOut: ({ executable, minutes }: { executable: string; minutes: number }) =>
-      `${executable} timed out after ${count(minutes, "minute", "minutes")}. A higher reasoning effort or a large project needs more time: lower the effort, choose a faster model, or raise BELLPR_AGENT_TIMEOUT_SCALE.`,
+      `${executable} timed out after ${count(minutes, "minute", "minutes")}. Lower the reasoning effort, use a faster model or raise BELLPR_AGENT_TIMEOUT_SCALE; large projects need more time.`,
   },
   /** Git, gh and agent CLI processes. */
   command: {
@@ -323,7 +323,7 @@ export default {
     },
     /** Shown in place of a held-back file's patch. */
     heldBack: ({ reason }: { reason: string }) =>
-      `Publishing this file is on hold: ${reason}`,
+      `This file is blocked from publishing: ${reason}`,
   },
   /** The unchanged code around a modified file's changes, read from the run's base. */
   context: {
@@ -352,8 +352,8 @@ export default {
   /** Checking the request's assumption again on a finished run. */
   premise: {
     tooEarly: "Wait for development to finish before checking the premise.",
-    busy: "An agent, a review or an explanation is still working on this run; check the premise once it finishes.",
-    incomplete: "The agent's premise check was incomplete.",
+    busy: "An Agent, a review or an explanation is still working on this run; check the premise once it finishes.",
+    incomplete: "The Agent's premise check was incomplete.",
     /** One line in the run's log; `changed` says whether the verdict is new. */
     checked: ({ verdict, changed }: { verdict: "holds" | "refuted" | "unclear"; changed: boolean }) =>
       `Premise check: ${{ holds: "the assumption holds", refuted: "the assumption does not hold", unclear: "the assumption could not be confirmed" }[verdict]}. ${changed ? "The code walkthroughs, and the explanations not answered yet, are made again with this verdict." : "The verdict did not change."}`,
@@ -362,13 +362,13 @@ export default {
   /** Function walkthroughs: the code around each change, step by step. */
   walkthrough: {
     wholeFile:
-      "An added or deleted file has no earlier logic to walk through; see the explanation.",
+      "An added or deleted file has no earlier logic to walk through; see the Explanation tab.",
     noFunctions: "This kind of file has no functions to walk through.",
     tooLarge:
       "The changes are larger than 100 KB, so no code walkthrough is made automatically.",
     overLimit: ({ limit }: { limit: number }) =>
-      `This change touches more than ${limit} code files, and code walkthroughs are made automatically for the first ${limit} only; ask about the others in the Ask tab.`,
-    incomplete: "The agent's code walkthrough was incomplete.",
+      `Only the first ${limit} code files get an automatic walkthrough; ask about the rest in the Ask tab.`,
+    incomplete: "The Agent's code walkthrough was incomplete.",
     tooEarly: "Wait for development to finish before generating code walkthroughs.",
     stopped: "The code walkthrough stopped; you can retry it.",
     failed: "Generating the code walkthrough failed; try again.",
@@ -381,11 +381,11 @@ export default {
   integration: {
     snapshotBlocked:
       "The integration snapshot contains files that cannot be reviewed, so no more tasks are assigned.",
-    noWorktree: "The task has no isolated working directory.",
+    noWorktree: "The task has no working directory of its own.",
     gitStateChanged:
-      "A teammate changed the Git commit state, so integration stopped.",
+      "A teammate made its own commit or moved to another commit, so integration stopped.",
     outOfScope: ({ path }: { path: string }) =>
-      `A teammate changed ${path}, which its task does not own; the change stays in its isolated working directory and was not integrated.`,
+      `A teammate changed ${path}, which its task does not own; the change stays in the task's own working directory and was not integrated.`,
     needsManualHandling: ({ path }: { path: string }) =>
       `A teammate's ${path} needs manual handling and was not integrated.`,
   },
@@ -428,14 +428,17 @@ export default {
     other: ({ path, reason }: { path: string; reason: string }) =>
       `${path}: ${reason}`,
     notJson:
-      "The lead did not return a valid task plan in JSON; adjust the request and try again.",
+      "The lead did not return a usable plan; adjust the request and try again.",
     invalid: ({ problem }: { problem: string }) =>
       `The lead's plan does not match the required format (${problem}); adjust the request and try again.`,
-    duplicateIds: "The lead's plan has duplicate or reserved task IDs.",
-    invalidDependency: "The lead's plan has an invalid task dependency.",
+    duplicateIds:
+      "The lead's plan has duplicate or reserved task IDs; adjust the request and try again.",
+    invalidDependency:
+      "The lead's plan has an invalid task dependency; adjust the request and try again.",
     invalidScope: ({ scope }: { scope: string }) =>
-      `The lead's plan has an invalid file scope: ${scope}`,
-    cycle: "The lead's plan has a dependency cycle.",
+      `The lead's plan has an invalid file scope (${scope}); adjust the request and try again.`,
+    cycle:
+      "The lead's plan has tasks that depend on each other in a circle; adjust the request and try again.",
   },
   /** A teammate's structured report as the one text the board and the lead read. */
   report: {
@@ -461,9 +464,9 @@ export default {
   /** Explanations, notes, questions, maintainer feedback and review reruns on a finished run. */
   review: {
     rerunNotAllowed:
-      "Only runs that are in review or approved can have their review run again.",
+      "Only runs that are in review or approved can have the independent review run again.",
     rerunRunning:
-      "The review of this run is already running again; wait for it to finish or stop it first.",
+      "The independent review of this run is already running again; wait for it to finish or stop it first.",
     nothingToReview: "There are no code changes to review.",
     rerunRequested: ({ files }: { files: number }) =>
       `Requested a new independent review of the ${count(files, "changed file", "changed files")} in the current working directory.`,
@@ -484,9 +487,9 @@ export default {
     chatTooEarly: "Wait for development to finish before asking questions.",
     chatUnavailable: "This file cannot be discussed right now.",
     feedbackUnpublished:
-      "The PR has not been sent yet, so there is no maintainer feedback to read.",
+      "The PR has not been published yet, so there is no maintainer feedback to read.",
     feedbackMismatch:
-      "The PR URL does not match this repository, so its feedback cannot be read.",
+      "The PR URL does not match this project, so its feedback cannot be read.",
     githubInvalidJson: "GitHub's response is not valid JSON.",
     feedbackRead: ({ number, items }: { number: number; items: number }) =>
       `Read the maintainer feedback on PR #${number}: ${count(items, "item", "items")}.`,
@@ -499,7 +502,7 @@ export default {
     stale:
       "The code changes were updated; generate a new PR draft suggestion that matches them.",
     applied:
-      "Put the PR draft suggestion in the editor. This is the model's own text: before you send it, check it in your own words and work through the checklist and checkboxes.",
+      "The model's suggestion is in the editor. Before you publish, put it in your own words and work through the checklist and checkboxes.",
     ready:
       "The PR draft suggestion is ready and your current draft is kept; review and apply it in the PR draft area.",
     stopped:
@@ -510,11 +513,11 @@ export default {
   /** Syncing a run onto the latest target branch and resolving its conflicts. */
   sync: {
     partlyPublished:
-      "An earlier publish already made a commit that may be on GitHub, so this run can no longer be synced or have a sync undone; start a new run from the latest version.",
+      "An earlier publish's commit may be on GitHub, so this run can't sync or undo a sync. Start a new run from the latest version.",
     unmarkedRun: ({ files }: { files: string[] }) =>
-      `These files conflict in a way conflict markers cannot show (deleted on one side and changed on the other, or a binary file changed on both), and ${product.name} does not pick a side for you: ${list(files)}. The run is unchanged; you can first undo this run's changes to them or deletions of them, sync, and then make those changes again.`,
+      `Conflict markers can't show these conflicts: ${list(files)}. One side deleted a file the other changed, or both changed a binary file. ${product.name} won't pick a side, so the run is unchanged. Undo this run's changes to or deletions of these files, sync, then redo them.`,
     unmarkedPr: ({ files, branch }: { files: string[]; branch: string }) =>
-      `These files conflict in a way conflict markers cannot show (deleted on one side and changed on the other, or a binary file changed on both), and ${product.name} does not pick a side for you: ${list(files)}. The PR is unchanged; merge ${branch} into the PR branch with git on your machine and push, and ${product.name} takes over those commits afterwards.`,
+      `Conflict markers can't show these conflicts: ${list(files)}. One side deleted a file the other changed, or both changed a binary file. ${product.name} won't pick a side, so the PR is unchanged. Merge ${branch} into the PR branch locally and push; ${product.name} then takes over those commits.`,
     notAllowed:
       "Only runs in review, approved or waiting for plan approval can sync to the latest target branch.",
     busy: "Agents, a review or explanations are still working on this run; wait for them to finish before you sync.",
@@ -540,7 +543,7 @@ export default {
       conflicts.length
         ? `Synced onto the latest ${branch} (${commit}); ${count(conflicts.length, "file has", "files have")} conflicts to resolve: ${list(conflicts)}.`
         : `Synced onto the latest ${branch} (${commit}) without conflicts; the changed files need another review.`,
-    prOnly: "Only a sent PR can take in its target branch.",
+    prOnly: "Only a published PR can take in its target branch.",
     roundOpen:
       "A follow-up round is in progress on this PR; finish or discard it before you sync.",
     prCheckoutDiffers:
@@ -548,7 +551,7 @@ export default {
     prUpToDate: ({ branch }: { branch: string }) =>
       `Checked: the PR already contains the latest ${branch}.`,
     nothingToMerge: ({ branch }: { branch: string }) =>
-      `${branch} already contains every change of this PR, so merging would change nothing and no sync was made; the PR is unchanged, and you may want to close it.`,
+      `${branch} already has every change in this PR, so nothing was synced. You may want to close the PR.`,
     prSynced: ({
       branch,
       commit,
@@ -566,36 +569,49 @@ export default {
       "Undid the sync; the run is back to the content and base it had before.",
     noConflicts: "There are no sync conflicts to resolve.",
     conflictsGone:
-      "Every conflict marker is already resolved; the agent is not needed.",
+      "Every conflict marker is already resolved; the Agent is not needed.",
     resolveRequested: ({ files }: { files: string[] }) =>
-      `Asked the agent to resolve the merge conflicts in ${count(files.length, "file", "files")}: ${list(files)}.`,
+      `Asked the Agent to resolve the merge conflicts in ${count(files.length, "file", "files")}: ${list(files)}.`,
     agentCommitted:
-      "The agent made its own commit or switched branches; that was undone, and its edits stay in the working directory for your review.",
-    markersLeft: ({ files }: { files: string[] }) =>
-      `Conflict markers remain: ${list(files)}.`,
+      "The Agent made its own commit or switched branches; that was undone, and its edits stay in the working directory for your review.",
     resolved:
-      "The agent resolved the merge conflicts; review these files one by one.",
+      "The Agent resolved the merge conflicts; review these files one by one.",
     stillConflicted: ({ files }: { files: string[] }) =>
-      `Conflict markers remain after the agent: ${list(files)}; edit them yourself or ask the agent again.`,
+      `Conflict markers remain after the Agent: ${list(files)}; edit them yourself or ask the Agent again.`,
     stopped:
-      "Stopped resolving the conflicts; the edited files are kept, and you can finish yourself or ask the agent again.",
+      "Stopped resolving the conflicts; the edited files are kept, and you can finish yourself or ask the Agent again.",
     /** `reason` is an error message without its final period. */
     failed: ({ reason }: { reason: string }) =>
-      `${reason}; the edited files are kept, and you can finish yourself or ask the agent again.`,
+      `${reason.replace(/[.\u3002]+$/u, "")}; the edited files are kept, and you can finish yourself or ask the Agent again.`,
     incompleteReason: "Resolving the conflicts did not finish",
     incomplete: "Resolving the conflicts did not finish.",
     conflictsOpen: ({ files }: { files: string[] }) =>
-      `These files still have merge conflict markers: ${list(files)}. Resolve the conflicts first (the agent can do it for you).`,
+      `These files still have merge conflict markers: ${list(files)}. Resolve the conflicts first (the Agent can do it for you).`,
     mergeFailed: "Could not compute the merge result.",
     answerIncomplete:
-      "The agent's answer about the conflict resolution is incomplete",
+      "The Agent's answer about the conflict resolution is incomplete",
+    heldChangedUpstream: ({
+      branch,
+      items,
+    }: {
+      branch: string;
+      items: readonly string[];
+    }) =>
+      `Commits on ${branch} changed files under your hold since you took it: ${items.join("; ")}.`,
+    heldChangedUpstreamItem: ({
+      path,
+      commits,
+    }: {
+      path: string;
+      commits: readonly string[];
+    }) => `${path} (${commits.join(", ")})`,
   },
   /** Follow-up rounds on a published PR, and its branch on GitHub. */
   followUp: {
     inProgress: "A follow-up round is already in progress on this run.",
-    busy: "A follow-up round or a review is already in progress on this run.",
+    busy: "A follow-up round or an independent review is already in progress on this run.",
     notPublished:
-      "Only a run whose PR has been sent can start a follow-up round from its review.",
+      "Only a run whose PR has been published can start a follow-up round.",
     feedbackNotInLatest:
       "The selected feedback is not in the latest feedback read; read the feedback again, then choose.",
     inputRequired:
@@ -616,7 +632,7 @@ export default {
         : `Requested follow-up round ${round} from ${count(feedback, "maintainer feedback item", "maintainer feedback items")}.`,
     agentCommitted: followUpAgentCommitted,
     noChanges:
-      "The agent changed no files; read its explanation below and, if needed, adjust the selected feedback or your note and try again.",
+      "The Agent changed no files; read its explanation below and, if needed, adjust the selected feedback or your note and try again.",
     done: ({
       round,
       agentCommitted,
@@ -624,12 +640,12 @@ export default {
       round: number;
       agentCommitted: boolean;
     }) =>
-      `Follow-up round ${round} is done; review the files this round changed one by one and check the commit message before you push.${agentCommitted ? ` ${followUpAgentCommitted}` : ""}`,
+      `Follow-up round ${round} is done. Review each changed file and the commit message before you push.${agentCommitted ? ` ${followUpAgentCommitted}` : ""}`,
     stoppedReason: "This round was stopped",
     incompleteReason: "This round did not finish",
     /** `reason` is one of the reasons above or an error message. */
     keptEdits: ({ reason }: { reason: string }) =>
-      `${reason}; some edits are kept in the working directory, and you can review them, write a commit message and push, or discard the round.`,
+      `${reason.replace(/[.\u3002]+$/u, "")}; some edits are kept in the working directory, and you can review them, write a commit message and push, or discard the round.`,
     nothingToDiscard: "There is no follow-up round to discard.",
     alreadyPushed:
       `This round is already on the PR; press Push again so ${product.name} records it as done.`,
@@ -638,18 +654,18 @@ export default {
     /** Discarding a round whose working files were already removed. */
     discardedWithoutFiles:
       "Discarded the follow-up round; its changes went with the working files removed earlier.",
-    answerIncomplete: "The agent's answer about the round is incomplete",
+    answerIncomplete: "The Agent's answer about the round is incomplete",
     pushUnknown: "Cannot confirm whether this round was pushed to the PR.",
     remoteMoved: ({ branch }: { branch: string }) =>
-      `The PR branch ${branch} on GitHub has commits from outside ${product.name} (for example a suggestion applied on GitHub, a maintainer's push or an updated branch). ${product.name} does not overwrite them and cannot continue the round; handle it on GitHub or discard the round.`,
+      `The PR branch ${branch} on GitHub has commits from outside ${product.name} (such as an applied suggestion, a maintainer's push or Update branch). ${product.name} won't overwrite them and can't continue the round; handle them on GitHub or discard the round.`,
     remoteMissing: ({ branch }: { branch: string }) =>
       `The PR branch ${branch} is not on GitHub, so the round cannot be pushed.`,
     historyRewritten: ({ branch }: { branch: string }) =>
-      `The PR branch ${branch} on GitHub rewrote history that ${product.name} pushed (for example with a force push), so ${product.name} cannot continue; handle it on GitHub.`,
+      `The PR branch ${branch} on GitHub rewrote history ${product.name} pushed (for example by force push). ${product.name} cannot continue; handle it on GitHub.`,
     adoptedReport: ({ commits }: { commits: number }) =>
       `Took over ${count(commits, "commit", "commits")} made on GitHub outside ${product.name}; their changes are reviewed with the next round.`,
     adopted: ({ branch, commits }: { branch: string; commits: number }) =>
-      `Took over ${count(commits, "commit", "commits")} on the PR branch ${branch} on GitHub (for example an applied suggestion or Update branch); their changes are reviewed with the next round.`,
+      `Took over ${count(commits, "commit", "commits")} on the GitHub PR branch ${branch}, such as an applied suggestion or Update branch; the next round reviews them.`,
   },
   /** What a run says after the service restarted in the middle of its work. */
   recovery: {
@@ -667,27 +683,27 @@ export default {
     review:
       "The service restarted, so the review rerun stopped; the earlier reports are kept",
     conflicts:
-      "The service restarted, so resolving the conflicts stopped; the edited files are kept, and you can finish yourself or ask the agent again.",
+      "The service restarted, so resolving the conflicts stopped; the edited files are kept, and you can finish yourself or ask the Agent again.",
     round:
-      "The service restarted, so this follow-up round stopped; you can review the edits kept in the working directory, write a commit message and push, or discard the round.",
-    run: "The service restarted, so the run stopped. Its working directory is kept and you can read the diff; for a team run, retry the failed subtasks on the task board, and integrated subtasks do not run again.",
-    task: "The service restarted, so the task stopped; its isolated working directory is kept, and a retry starts again from a fresh snapshot.",
+      "The service restarted, so this round stopped. Review the edits kept in the working directory, write a commit message and push, or discard the round.",
+    run: "The service restarted, so the run stopped. Its working directory and diff are kept. Team runs can retry failed subtasks on the task board; integrated ones don't rerun.",
+    task: "The service restarted, so the task stopped; its own working directory is kept, and a retry starts again from a fresh snapshot.",
   },
   /** The projects BELL works on and its own clones of them. */
   repos: {
-    notFound: "Repository not found.",
+    notFound: "Project not found.",
     importSource:
       "Enter a GitHub HTTPS URL or the absolute path of a local repository.",
     bare: "Choose a repository that has a working directory.",
     /** A local path that names no folder; `path` is absolute, with ~/ expanded. */
     pathMissing: ({ path }: { path: string }) =>
-      `There is no folder at ${path} on the computer ${product.name} runs on. Check the path; ~/ is the home directory of the user ${product.name} runs as.`,
+      `No folder at ${path} on ${product.name}'s computer. Check the path; ~/ is the home of the user it runs as.`,
     /** A local folder that Git does not see as part of a working tree. */
     notGitRepository: ({ path }: { path: string }) =>
       `${path} is not inside a Git repository. Enter the folder of a Git checkout, the one that holds its .git folder.`,
     /** A local-only project: BELL cloned it at import, and it has no GitHub source. */
     localNotUpdated:
-      `This project has no GitHub source, so ${product.name} has nothing to update its copy from. To work on newer code, update your own checkout, then remove the project here and import it again.`,
+      `This project has no GitHub source, so ${product.name} cannot update its copy. Update your own checkout, then remove and re-import the project.`,
     /** A checkout an earlier build imported in place: the person's own. */
     checkoutNotUpdated:
       `This is your own local repository, and ${product.name} never changes it; run git pull in a terminal yourself, then analyse the project again.`,
@@ -706,7 +722,7 @@ export default {
     duplicatePath: ({ path }: { path: string }) =>
       `"${path}" is in more than one contribution; a file goes to only one.`,
     heldBack: ({ path }: { path: string }) =>
-      `"${path}" is held back from review, so it cannot be moved; leave it out.`,
+      `"${path}" is held back from review, so it cannot be moved; leave it only in the original.`,
     notReproduced:
       "The copied files did not match the originals, so nothing was split. A Git setting that rewrites files, such as line-ending conversion, can cause this.",
     startedFrom: ({ title }: { title: string }) => `Split from "${title}".`,
@@ -724,22 +740,67 @@ export default {
     autoOverlap:
       "This plan covers files your other contributions to this project change, so it waits for your approval instead of starting on its own.",
     overlapChanged:
-      "Your other contributions or this plan changed since you confirmed the overlap. Look at the overlap on the plan again and confirm it, then approve again.",
+      "Your other contributions or this plan changed since you confirmed the overlap. Confirm it on the plan again, then approve.",
     approvedOverlap: ({ titles }: { titles: string[] }) =>
       `Approved although ${list(titles.map((title) => `"${title}"`))} ${titles.length === 1 ? "changes" : "change"} some of the same files.`,
     publishOverlap:
-      "Your other contributions to this project change some of the same files, so whichever is merged second may need its conflicts resolved. Publish them in the order you want them merged, or combine them.",
+      "Your other contributions here change some of the same files; whichever merges second may need conflicts resolved. Publish in your preferred merge order, or combine them.",
     splitOrder:
-      "This part of a split builds on other parts that are not merged yet. Publish those first, or this pull request may fail its checks until they are merged.",
+      "This split part builds on unmerged parts. Publish those first, or this pull request may fail checks until they merge.",
     buildsOn: ({ title, prUrl }: { title: string; prUrl?: string }) =>
       prUrl ? `"${title}": published at ${prUrl}, not seen merged` : `"${title}": not published yet`,
+    /** The publish dialog's block when the change meets someone else's hold (server/hold-guard.ts). */
+    heldByOther:
+      "Someone else holds files this change touches. Ask them to release the hold or a group admin to revoke it, or drop those files from the change.",
+    /** One changed file and the hold it meets, in the dialog and in the publish refusal. */
+    heldByOtherItem: ({ path, holder, title, since }: { path: string; holder: string; title: string; since: string }) =>
+      `${path} — held by ${holder} for “${title}” (since ${since})`,
+    holdsUnknown: ({ name }: { name: string }) =>
+      `Can't check file holds because group work has stopped. Fix group work on the host and restart ${name} before publishing.`,
+    /** An agent's write turn changed files someone else holds. */
+    turnHeldByOther: ({ items }: { items: readonly string[] }) =>
+      `The agent changed files someone else holds, so the run stopped. The changes are still in the checkout. ${items.join("; ")}. Ask them to release the hold, ask a group admin to revoke it, or undo the changes to these files, then try again.`,
+    /** A teammate's changes meet someone else's hold, so they were not brought into the contribution. */
+    taskHeldByOther: ({ items }: { items: readonly string[] }) =>
+      `A teammate changed files someone else holds, so those changes were not added to the contribution. ${items.join("; ")}. Ask them to release the hold, or ask a group admin to revoke it, then try again.`,
+    planHeldByOther: ({ items }: { items: readonly string[] }) =>
+      `Can't approve: someone else holds files this plan covers. ${items.join("; ")}. Send the plan back with feedback, or wait for the release.`,
+    autoHeld:
+      "This plan covers files someone else in the group holds, so it waits for your approval instead of starting on its own.",
+    agentsHoldsUnknown: ({ name }: { name: string }) =>
+      `Group work stopped, so file holds can't be checked and Agents can't change files. Fix it on the host and restart ${name}, or start ${name} without --group.`,
+    heldChangedUpstream: ({ branch }: { branch: string }) =>
+      `Commits on ${branch} changed files under your hold since you took it. Check those changes before publishing.`,
+    heldChangedUpstreamItem: ({
+      path,
+      commits,
+    }: {
+      path: string;
+      commits: readonly string[];
+    }) => `${path} (${commits.join(", ")})`,
+    holdRecoveryNotAllowed:
+      "Held files can only be restored or checked again on a finished run whose pull request has not merged.",
+    holdRecoveryBusy:
+      "Work is still running on this run. Wait for it to finish before restoring or checking held files.",
+    holdRecoveryCheckoutMissing:
+      "This run's working directory or base commit is unavailable.",
+    heldPathsRestored: ({ files }: { files: readonly string[] }) =>
+      files.length
+        ? `Put back ${count(files.length, "held file", "held files")} to the run's base: ${list([...files])}.`
+        : "No held files differed from the run's base.",
+    heldPathsRechecked:
+      "Checked file holds again: no changed files are held by someone else.",
   },
   /** The human review gate and publishing: draft, file reviews, approval and push. */
   publish: {
+    heldByOther: ({ items }: { items: readonly string[] }) =>
+      `Not published: someone else holds files this change touches. ${items.join("; ")}. Ask them to release the hold or a group admin to revoke it.`,
+    holdsUnknown: ({ name }: { name: string }) =>
+      `Not published: group work stopped, so file holds can't be checked. Fix it on the host and restart ${name}, or start ${name} without --group.`,
     recoveryStale: "The unfinished publish changed. Reload before recovering it.",
     recoveryNotAllowed: "Only an unfinished publish with no recorded push target or pull request can be recovered here.",
-    recoveryBusy: "Work is still running for this contribution. Wait for it to finish before recovering the publish.",
-    recoveryCheckout: "The local branch or saved commit does not match this contribution. Recovery stopped without changing the checkout.",
+    recoveryBusy: "Work is still running on this run. Wait for it to finish before recovering the publish.",
+    recoveryCheckout: "The local branch or saved commit does not match this run. Recovery stopped without changing the working directory.",
     recoveryUnknown: "Could not confirm that both GitHub repositories have no matching branch or pull request. Recovery stopped; try again when the repositories can be read.",
     recoveryRemoteBranch: ({ repository, branch }: { repository: string; branch: string }) => `GitHub branch ${repository}:${branch} already exists. The unfinished publish was kept for inspection.`,
     recoveryPrExists: ({ branch }: { branch: string }) => `A pull request already uses branch ${branch}, including closed or merged pull requests. The unfinished publish was kept for inspection.`,
@@ -754,47 +815,48 @@ export default {
     branchIsTarget: ({ branch }: { branch: string }) =>
       `The GitHub branch cannot be the target branch ${branch}: that would push straight to it instead of opening a PR. Use a new branch name.`,
     branchLocked: ({ branch }: { branch: string }) =>
-      `An earlier publish already pushed to the GitHub branch ${branch}. After a push the branch cannot change, so that no second PR is opened; restore the branch name or start a new run.`,
+      `An earlier publish pushed to the GitHub branch ${branch}. Changing it now would open a second PR: restore the branch name or start a new run.`,
     fileChanged:
       "This file's diff changed; reload and review the latest version before you mark it reviewed.",
     draftChanged:
       "The PR draft changed; reload, check the latest title and description, and approve again.",
     reviewAllFirst:
-      "Review every latest change and remove the blocked files first.",
+      "Review the latest version of every changed file and mark it as reviewed, and remove the blocked files first.",
     prTextRequired: "Fill in the PR title and description first.",
     roundMessageRequired:
       "Write this follow-up round's commit message and leave no placeholders in it.",
     approvalStale:
-      "The approved version changed or expired; reload, review and approve again before you send the PR.",
+      "The approved version changed or expired; reload, review and approve again.",
     approveFirst: "Finish the review and approve the PR first.",
     noGithubOrigin:
-      "This repository has no GitHub origin, so it cannot be published.",
+      "This project has no GitHub source, so it cannot be published.",
     diffChanged:
       "The changes differ from what you approved; review and approve them again.",
-    notAllReviewed: "Not every latest change has been reviewed.",
+    notAllReviewed:
+      "Review the latest version of every changed file and mark it as reviewed, and remove the blocked files first.",
     understandingRequired:
-      "Explain the change back before you approve or publish: finish the understanding check for the latest version of the changes. You can turn the check off in Settings → Learning; runs approved without it are marked.",
+      "Explain the change back before you approve or publish: finish the understanding check for the latest changes. Settings → Learning turns it off; runs approved without it are marked.",
     prAlreadySent:
-      "This PR was already sent; to push new changes, start a follow-up round from the maintainer feedback.",
+      "This PR was already published; to push new changes, start a follow-up round from the maintainer feedback.",
     branchIsTargetReapprove: ({ branch }: { branch: string }) =>
       `The GitHub branch cannot be the target branch ${branch}; change the branch name and approve again.`,
     branchLockedPublish: ({ branch }: { branch: string }) =>
       `An earlier publish already pushed to the GitHub branch ${branch}; restore the branch name or start a new run.`,
     /** `items` are the preflight messages, each a whole sentence. */
     confirmFirst: ({ items }: { items: string[] }) =>
-      `Before sending, confirm each item in the preview: ${items.join(" ")}`,
+      `Before publishing, confirm each item in the preview: ${items.join(" ")}`,
     githubUserInvalid: "The GitHub user information is not valid.",
     defaultBranchChanged:
       "The remote default branch changed; start a new run from the latest branch.",
     targetMoved:
-      "The target branch has new commits; first press “Sync to the latest target branch” on the PR draft tab, review, then send.",
+      "The target branch has new commits; first press “Sync to the latest target branch” on the PR draft tab, review, then publish.",
     targetMovedAfterCommit:
-      "The target branch has new commits. An earlier publish already made a commit that may be on GitHub, so this run can no longer be synced or have a sync undone; start a new run from the latest version.",
+      "The target branch has new commits, but an earlier publish's commit may be on GitHub, so this run can't sync. Start a new run from the latest version.",
     branchChanged: "The run's branch changed, so publishing stopped.",
     priorCommitDiffers:
-      "An earlier publish made a different commit. Return to the PR draft tab. If “Recover unfinished publish” is available, recover, review and approve again. Otherwise inspect the earlier branch or start a new run.",
+      "An earlier publish made a different commit. Use “Recover unfinished publish” on the PR draft tab if shown; otherwise inspect the earlier branch or start a new run.",
     priorMessageDiffers:
-      "The commit of an earlier publish has a different commit message, which cannot change after a push. Return to the PR draft tab. If “Recover unfinished publish” is available, recover, review and approve again. Otherwise restore the message or start a new run.",
+      "An earlier publish's commit has a different message, which can't change after a push. Use “Recover unfinished publish” on the PR draft tab if shown; otherwise restore the message or start a new run.",
     notAFork:
       "Your repository with this name is not a fork of the target project; sort out the GitHub fork first.",
     noPrUrl:
@@ -804,7 +866,7 @@ export default {
     failedAfterPush: ({ error }: { error: string }) =>
       `${error} If the push went through, the branch stays on GitHub; check the remote before you retry.`,
     roundReverts: ({ files }: { files: string[] }) =>
-      `This follow-up round puts pushed files back to their original version or deletes them: ${list(files)}. ${product.name} cannot show such changes for file-by-file review, so they are not pushed; restore these files or discard the round.`,
+      `This round reverts or deletes pushed files: ${list(files)}. File-by-file review can't show such changes, so they are not pushed. Restore these files or discard the round.`,
     roundMessageMissing: "Write this follow-up round's commit message.",
     roundMessagePlaceholders:
       "The commit message still has placeholders; complete it before pushing.",

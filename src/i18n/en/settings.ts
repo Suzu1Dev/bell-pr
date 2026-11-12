@@ -11,10 +11,8 @@ const fmt = formatters("en");
 const number = (value: number) => fmt.number(value);
 
 const settings = {
-  eyebrow: "SETTINGS",
-  title: "Get your workspace ready.",
-  intro:
-    "Language, AI provider, agent safety, learning, limits and data. Everything you set here stays on this computer.",
+  title: "Settings",
+  intro: "Everything you set here stays on this computer.",
   nav: { label: "Settings sections" },
   sections: {
     general: "General",
@@ -66,7 +64,7 @@ const settings = {
     },
     language: {
       title: "Language",
-      text: "The language of the interface, and of new contributions, analyses and answers to your questions. A contribution that already started keeps working in the language it started in, and existing text is not translated.",
+      text: "Used for the interface and for new contributions, analyses and answers to your questions. Contributions already started keep their language. Existing text is not translated.",
       label: "Language",
     },
     sample: {
@@ -90,7 +88,7 @@ const settings = {
     intro:
       "Agents work through an AI coding CLI on this computer: the Codex CLI, Claude Code or the Antigravity CLI, installed and signed in.",
     needOne:
-      "You need at least one provider. Install and sign in to the Codex CLI, Claude Code or the Antigravity CLI; the commands are below.",
+      "You need at least one provider. Install and sign in to one; the commands are below.",
     readyWith: ({ providers }: { providers: string[] }) =>
       `Ready to work with ${fmt.list(providers)}.`,
     description: {
@@ -115,26 +113,25 @@ const settings = {
     intro:
       "Agents run the project's code on this computer. These settings decide what they may reach.",
     sandbox: {
-      title: "Claude Code sandbox",
-      text: "Claude Code agents that edit files run every command in the operating-system sandbox: writes stay in the run's checkout and Claude Code's temporary folders, and the network is closed. Your own Claude Code user settings can widen it (proxy ports, allowed domains or paths, excluded commands, plugin language servers). The Codex CLI uses its own sandbox. Antigravity agents that edit files run their commands in the Antigravity CLI's terminal sandbox, which keeps writes in the checkout and closes the network.",
+      text: "File-editing Agents run every command sandboxed: Claude Code in the OS sandbox, Antigravity in its CLI's terminal sandbox. Writes stay in the working directory (plus Claude Code's temp folders). The network is closed. Your own Claude Code settings can widen its sandbox (proxy ports, allowed domains or paths, excluded commands, plugin language servers). Codex uses its own sandbox.",
     },
     unsandboxed: {
-      label: "Allow unsandboxed Claude Code and Antigravity agents",
+      label: "Allow unsandboxed Claude Code and Antigravity Agents",
       help: "Used only when the sandbox is unavailable. While this is off, a run that would need it is refused instead.",
-      confirmTitle: "Allow agents without the sandbox?",
+      confirmTitle: "Allow Agents without the sandbox?",
       confirmText:
-        "When the sandbox is unavailable, Claude Code and Antigravity agents that edit files will run without it. They can then read and change anything your user account can, such as other projects, your SSH keys and the sign-ins of your tools. Allow it only for projects you trust.",
+        "Without a working sandbox, file-editing Claude Code and Antigravity Agents run unsandboxed and can read and change anything your account can: other projects, SSH keys, tool sign-ins. Allow only for trusted projects.",
       confirmBadge:
-        "Every run where an agent worked without the sandbox carries a badge in the workspace, and its log says so.",
-      confirm: "Allow unsandboxed agents",
+        "Every run where an Agent worked without the sandbox carries a badge in the Workbench, and its log says so.",
+      confirm: "Allow unsandboxed Agents",
       cancel: "Keep the sandbox",
     },
     web: {
       title: "Web access",
-      text: "Off unless you turn it on under AI provider. While it is on, agents in contribution runs and follow-up chat can search the web and read pages through the AI CLI's own web tools; project analysis and discovery never get it.",
-      privacy:
-        "Search queries go to the provider's search service, and pages are fetched from the sites that host them. Leave web access off for confidential code.",
-      open: "Open the AI provider settings",
+      text: "Configure web access in AI providers. Codex and Claude Code only enable their web tools for tasks and follow-up questions when this setting is on.",
+      exception: "Antigravity can always search the web, including during project analysis and discovery. Turning this setting off only prevents its web-page fetching tool from reading pages.",
+      privacy: "Search queries go to the provider’s search service. For confidential work, choose a provider whose web search can be disabled and turn it off.",
+      open: "Open AI provider settings",
     },
     disclose: {
       title: "AI-assistance note",
@@ -148,9 +145,9 @@ const settings = {
     intro: `How ${product.name} asks you to understand a change before you approve it, and how it prompts you while you review.`,
     check: {
       title: "Understanding check",
-      text: "Before you approve a pull request, you explain the change back in your own words, answer a few questions about it and grade your answers against the reference yourself. No AI model grades you.",
+      text: "You explain the change back in your own words, answer a few questions and grade yourself against the reference. No AI model grades you.",
       label: "Ask me to explain each change back before approval",
-      help: "On by default. While it is on, approving and publishing wait until you have explained the latest version of the change back.",
+      help: "When enabled, complete the check for the latest changes before approving and publishing.",
       /** BELLPR_REQUIRE_UNDERSTANDING_CHECK=1 locks it on; no variable turns it off. */
       lockedBy: ({ variable }: { variable: string }) =>
         `Kept on by ${variable}. Remove the variable and restart ${product.name} to change this.`,
@@ -162,7 +159,7 @@ const settings = {
         "Every file still has to be reviewed, you still approve the pull request yourself, and every project-rule, issue and pacing check still applies.",
       /** What is recorded. */
       confirmRecorded:
-        "Runs approved without the check are marked “Check off” for good: in the workspace, your learning record and the export.",
+        "Runs approved without the check are marked “Check off” for good: in the Workbench, your learning record and the export.",
       confirmBack:
         "You can turn it back on any time; runs already approved are then held to it before they are published.",
       /** The first button of the dialog, so it has the focus. */
@@ -180,13 +177,13 @@ const settings = {
     },
     tryFirst: {
       title: "Try first",
-      label: "Try-first prompts during review",
-      help: "On by default: in each file's explanation you answer its question and guess another way to make the change, and in its code walkthrough you answer each Check yourself question, before the answers and the alternatives show. When this is off, they show behind a plain reveal, with nothing to fill in.",
+      label: "Ask me to answer before the answers show",
+      help: "On by default. Covers each file's question, a guess at another approach and each Check yourself question in the code walkthrough. When off, a click reveals the answers.",
     },
   },
   performance: {
     title: "Performance",
-    intro: "How much work runs at once, and how long an agent turn may take.",
+    intro: "How much work runs at once, and how long an Agent turn may take.",
     maxActiveRuns: {
       label: "Runs at the same time",
       help: "1 to 8. Runs beyond the limit wait in the queue.",
@@ -202,7 +199,7 @@ const settings = {
     queue: ({ count }: { count: number }) =>
       `Up to ${number(count)} runs can be running, queued or waiting for plan approval at once.`,
     usage:
-      "Running many agents at once uses your provider account faster. Heavy parallel use of a personal Claude plan may exceed its intended individual use.",
+      "Running many Agents at once uses your provider account faster. Heavy parallel use of a personal Claude plan may exceed its intended individual use.",
     save: "Save limits",
     saved: "Limits saved.",
     invalid: ({ min, max }: { min: number; max: number }) =>
@@ -220,7 +217,7 @@ const settings = {
     },
     advanced: {
       summary: "Advanced: environment variables",
-      text: `A variable set before ${product.name} starts wins over the setting here, which then shows as set by the environment. Restart ${product.name} after changing one.`,
+      text: `Variables set before ${product.name} starts override these settings (shown as set by the environment). Restart ${product.name} after changing one.`,
       /** The documentation link; hidden while the product has no docs URL. */
       documentation: "See the documentation.",
       variables: {
@@ -232,7 +229,7 @@ const settings = {
         BELLPR_AGENT_TIMEOUT_SCALE:
           "Agent timeout multiplier: 0.5 to 10, default 1.",
         BELLPR_ALLOW_UNSANDBOXED_AGENTS:
-          "1 allows unsandboxed Claude Code and Antigravity agents.",
+          "1 allows unsandboxed Claude Code and Antigravity Agents.",
         BELLPR_REQUIRE_UNDERSTANDING_CHECK:
           "1 keeps the understanding check on and locks the setting. No value turns it off.",
         BELLPR_RETENTION_DAYS:
@@ -244,7 +241,7 @@ const settings = {
   },
   data: {
     title: "Data & privacy",
-    intro: `${product.name} keeps everything in one data directory on this computer. There is no ${product.name} cloud and no telemetry.`,
+    intro: `${product.name} keeps everything in one data directory on this computer.`,
     dataDir: {
       title: "Data directory",
       copyLabel: "Copy the data directory's path",
@@ -262,10 +259,10 @@ const settings = {
       logs: "Logs",
       runs: "Run files",
       runsHelp:
-        "Each run's working copy and its teammates' checkouts. Freeing the space keeps the run's record, reports and notes.",
+        "Each run's working directory and its teammates' own working directories. Freeing the space keeps the run's record, reports and notes.",
       published: "Published runs",
       publishedHelp:
-        "Published runs keep their checkout, because follow-up rounds and syncing need it. Free one when you no longer need it.",
+        "Published runs keep their working directory, because follow-up rounds and syncing need it. Free one when you no longer need it.",
       others: "Other runs",
       noRuns: "No run has files on disk.",
       runMeta: ({ status, date }: { status: string; date: string }) =>
@@ -277,14 +274,14 @@ const settings = {
       confirmFree:
         "Free this run's files? Its changes can no longer be reviewed or published here.",
       confirmPublished:
-        "Free this published run's checkout? Follow-up rounds and syncing stop working for it.",
+        "Free this published run's working directory? Follow-up rounds and syncing stop working for it.",
       outside: "Outside the data directory",
       busy: "In progress",
     },
     retention: {
       title: "Automatic cleanup",
       label: "Days to keep the files of stopped and failed runs",
-      help: "1 to 365. After this many days without activity, a stopped or failed run's working files are removed; its record, reports and notes stay. Published runs are kept until you free them.",
+      help: "1 to 365, from the last activity. The run's record, reports and notes stay. Published runs are kept until you free them.",
       save: "Save",
     },
     erase: {
@@ -301,8 +298,8 @@ const settings = {
       none: `${product.name} sends no telemetry, analytics or crash reports, and has no account or cloud service of its own.`,
       ai: "Your code and questions go to the provider of the AI coding CLI you use, under your own account.",
       github:
-        "GitHub receives what the GitHub CLI and Git send under your account: clones and searches, and only after you approve, a branch and a draft pull request.",
-      web: "Web access for agents is off unless you turn it on.",
+        "GitHub gets clones and searches from the GitHub CLI and Git under your account; a branch and draft pull request only after you approve.",
+      web: "Web access for Agents is off unless you turn it on.",
       rest: "Everything else stays in the data directory.",
     },
   },
@@ -316,8 +313,7 @@ const settings = {
   },
   modelDialog: {
     title: "Set contribution models",
-    subtitle:
-      "The agent, model and reasoning effort that every project shares, used by the tasks and project analyses you create from now on.",
+    subtitle: "For new tasks and project analyses in every project.",
     loading: "Loading model settings…",
     reload: "Reload model settings",
     close: "Close",

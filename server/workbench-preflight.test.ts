@@ -140,10 +140,10 @@ test("a local path that is missing, not a folder or outside Git is refused with 
     await refused(
       source,
       "en",
-      new RegExp(`^There is no folder at ${escaped(source.replace(/^~/, home))} on the computer BELL PR runs on\\.`),
+      new RegExp(`^No folder at ${escaped(source.replace(/^~/, home))} on BELL PR's computer\\.`),
     );
-  await refused(file, "en", new RegExp(`^There is no folder at ${escaped(file)} `));
-  await refused(missing, "zh-TW", /^BELL PR 執行的電腦上沒有 .+ 這個資料夾。/);
+  await refused(file, "en", new RegExp(`^No folder at ${escaped(file)} `));
+  await refused(missing, "zh-TW", /^BELL PR 所在電腦上沒有 .+ 資料夾。/);
   await refused(plain, "en", new RegExp(`^${escaped(plain)} is not inside a Git repository\\.`));
   await refused(plain, "zh-TW", /不在任何 Git repository 中/);
   assert.equal(store.data.repos.length, 0);
@@ -704,6 +704,7 @@ const analysisAnswer = {
     { path: "hello.ts", why: "It holds the greeting.", lookFor: "The exported constant." },
   ],
   howItFitsTogether: "The command prints the constant that hello.ts exports.",
+  flow: [],
   evidence: [{ path: "README.md", note: "Describes the tool." }],
   recommendations: [],
 };

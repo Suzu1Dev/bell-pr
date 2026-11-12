@@ -19,7 +19,7 @@ const flow = {
   /** Draft preparation in a Learn-by-hand run (DESIGN v1.2 F11). */
   draftRefused: `In Learn by hand, the pull request text is yours; ${product.name} doesn't draft it.`,
   /** Ready for review with a change that moved since the dialog opened. */
-  changed: "The change moved since you opened this. Look at it again, then mark it ready.",
+  changed: "The change was updated after you opened this. Look at it again, then mark it ready for review.",
   /** The log line after the orientation turn. */
   guideRead: "The guide read the project. Write the steps of your own plan first.",
   /** Saving the plan once the change is marked ready, approved or published. */
@@ -47,7 +47,7 @@ const flow = {
   /** The log line of Ready for review with the guide's review. */
   readyReview: "You marked your change ready for review and asked the guide to review it.",
   /** The log line of handing the task to the agent team. */
-  left: "You handed this task to the agent team. This run stays as it is.",
+  left: "You handed this task to the Agent team. This run stays as it is.",
   /** The job of the guide's review at Ready (the review itself is server/by-hand-guide.ts). */
   review: {
     done: "The guide reviewed your change.",
@@ -60,16 +60,16 @@ const flow = {
     commitFirst: "Commit or discard your changes in the run's folder first.",
     switchBack: ({ branch }: { branch: string }) =>
       `The run's folder isn't on its branch ${branch}. Switch back to it first; ${product.name} takes over commits only from that branch.`,
-    pullFirst: `The pull request's branch has commits the run's folder doesn't have yet. Pull them into the run's folder first; ${product.name} takes your commits over once the folder matches the branch.`,
+    pullFirst: `The pull request's branch has commits the run's folder doesn't have yet. Pull them first; ${product.name} takes over your commits once the folder matches.`,
     adopted: ({ commits }: { commits: number }) =>
       `Took over ${fmt.number(commits)} ${fmt.plural(commits) === "one" ? "commit" : "commits"} you pushed from the run's folder to the pull request's branch.`,
   },
   /** Discarding a round of a published Learn-by-hand run, refused rather than losing the person's work. */
   discard: {
     committed:
-      "You committed in the run's folder after this round started, and discarding the round would drop those commits. Keep the round, or move your commits off the run's branch with your own Git first.",
+      "You committed in the run's folder after this round started; discarding it would drop those commits. Keep the round, or move them off the run's branch with Git first.",
     ownFiles: ({ files }: { files: string[] }) =>
-      `These files in the run's folder aren't this round's: ${list(files)}. ${product.name} never deletes them; move them out of the run's folder first, then discard the round.`,
+      `These files in the run's folder aren't this round's: ${list(files)}. ${product.name} never deletes them; move them out first, then discard the round.`,
   },
 };
 

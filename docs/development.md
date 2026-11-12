@@ -68,9 +68,10 @@ npm start
 `npm start` runs the built `bell-pr start --no-open`, so build first:
 without `dist/`, the server warns that the web interface is not built and
 only the API answers. It prints its address as an installed BELL PR does.
-`bell-pr start` exits when `bell-pr doctor` is not ready. To open the
-sample tour from a checkout that has no AI provider signed in, run
-`npm start -- --force`.
+`bell-pr start` still listens when the AI provider is the only required
+check that fails. The first time, Welcome shows how to install one. It exits when any
+other required check fails. To open the sample tour from a checkout where
+another required check fails, run `npm start -- --force`.
 
 In a source checkout, `npx bell-pr` and `bell-pr` run the checkout's own
 `bin/bellpr.mjs`, not the package from npm, and `build/` and `dist/` exist
@@ -96,9 +97,9 @@ builds, tests and packs on Linux with Node.js 22.
 | `BELLPR_E2E_PORT=<port> npm run test:e2e` | The Playwright tests against a real server |
 | `node scripts/check-i18n.mjs` | No user-facing text outside the translation dictionaries |
 | `node scripts/check-personal-info.mjs` (and `--pack`) | No personal details (a real person's home path, tailnet host names, private keys, access tokens) in the repository or the package |
-| `npx tsx scripts/render-generated-regions.ts --check` | The generated product links are current |
-| `node scripts/npm-readme.mjs --check-docs` | Every link in the READMEs and `docs/` resolves, every error code is in the troubleshooting guide, and every `bell-pr@<version>` pin (such as the mise command's) names the version in `package.json` |
-| `node site/check-site.mjs` | The landing site's links and resources, and its size |
+| `npx tsx scripts/render-generated-regions.ts --check` | The generated product links are current, and `publishedInstallVersion` is a stable `MAJOR.MINOR.PATCH` (no leading zeros, prerelease, or build metadata) that is not a lower semver than the stable version in `package.json` or `Formula/bell-pr.rb`. A prerelease in either file is not compared |
+| `node scripts/npm-readme.mjs --check-docs` | Every link in the READMEs and `docs/` resolves, every error code is in the troubleshooting guide, and every hand-written `bell-pr@<version>` pin names the version in `package.json`. A pin inside a generated region, such as the mise install command, comes from `publishedInstallVersion` and is not checked here |
+| `node site/check-site.mjs` | The landing site's links, resources and size; on the zh-tw pages, untranslated text, attributes and meta text, unclosed tags, Latin letters left after the kept English names, and missing CJK spaces; and English `zh` strings in `site.js` |
 | `node scripts/sync-installers.mjs --check` | Standalone installer identity and the published Homebrew formula |
 | `node --test scripts/install.test.mjs scripts/install-wsl.test.mjs` | Installer argument, failure and environment behavior with isolated tool fixtures |
 | `node --test scripts/install-powershell.test.mjs` | PowerShell installer behavior with WSL fixtures; needs PowerShell (Windows CI uses 5.1) |
@@ -157,7 +158,11 @@ This downloads the published version from `package.json`, verifies npm's SHA-512
 integrity, and records the tarball's SHA-256 in `Formula/bell-pr.rb`. Do not hash a
 local repack: npm's published bytes are what Homebrew downloads. Normal `--check`
 is offline and keeps the last published formula version while a new release is
-being prepared. The formula installs Node.js, Git and GitHub CLI; AI CLIs and
+being prepared. `publishedInstallVersion` may lead that formula. A prerelease
+formula version is not compared; the check fails when a stable formula version
+is a higher semver, so bump `scripts/published-version.mjs` and regenerate
+before the formula moves ahead.
+The formula installs Node.js, Git and GitHub CLI; AI CLIs and
 account sign-in remain user setup steps.
 
 ## Packaging
@@ -167,19 +172,30 @@ npm pack
 ```
 
 `prepack` builds the product and runs `node scripts/npm-readme.mjs --pre`,
-which readies `README.md` and `README.zh-TW.md` for npmjs.com. The package
+which readies `README.md` and `README-zh-TW.md` for the package. The package
 does not contain `docs/`, so a relative screenshot or link becomes an
 absolute URL under `homepageUrl` from `shared/product.ts` when the website
 (`site/`) holds a byte-identical copy of the file. Everything else, and
 everything while `homepageUrl` is empty, becomes plain text (`截圖：` marks
 a screenshot in the Chinese README).
-npm packs every `README.*` at the root, and `npm publish` takes the first
-Markdown one its file search returns as the package's README. That order is
-not fixed, and npmjs.com shows `README.zh-TW.md` for bell-pr 1.0.0, so both
-READMEs the package ships are readied. Any other root `README.*` is set
-aside during the pack. The originals wait in the folder `.README.md.orig`
-(gitignored) and `postpack` puts them back byte for byte. If a pack stops
-halfway, run `node scripts/npm-readme.mjs --post` before you pack again.
+
+npmjs.com shows the README that `npm publish` sends. Unless `package.json`
+has a `readme` field, npm 11 (the npm of Node.js 24, which the release
+workflow publishes with) reads it from the unpacked tarball: the `readme`
+step of `@npmcli/package-json` looks for root files named `README` or
+`README.*` in any case, in no fixed order, and takes the first Markdown one
+it finds. npm also packs every such root file, whatever `files` says. So
+npmjs.com showed the Chinese README for bell-pr 1.0.0 and 1.1.0, when it
+was named `README.zh-TW.md`. It is `README-zh-TW.md` now, a name npm never
+takes as a README, which leaves `README.md` as npm's only choice. Name any
+other translated README the same way (`README-<language>.md`).
+`node scripts/check-pack.mjs` fails when npm could send another README
+than `README.md`: when the package has another root `README` or
+`README.*` file, or `package.json` a non-empty `readme` field. During the
+pack, any other root `README` or `README.*` is set aside. The originals
+wait in the folder `.README.md.orig` (gitignored) and `postpack` puts
+them back byte for byte. If a pack stops halfway, run `node scripts/npm-readme.mjs --post`
+before you pack again.
 
 Official releases are published only by `.github/workflows/release.yml`,
 from a pushed `v*` tag that names the version in `package.json`; never run
@@ -188,7 +204,7 @@ tarball as it is with `node scripts/check-pack.mjs --tarball`, and
 checksums, uploads and publishes that same file. It publishes the tarball,
 not the folder: `npm publish` from the folder reads the README again after
 `postpack` has restored the originals, so npmjs.com would show the
-unprocessed README, possibly the Chinese one. The Docker image is pushed
+unprocessed README. The Docker image is pushed
 only after npm publish succeeded. Started by hand, the workflow only runs
 its dry run, and turning `dry_run` off makes it fail.
 
@@ -214,7 +230,7 @@ commit message body.
 | `server/workbench.ts` | 700 lines |
 | `server/run-executor.ts` | 900 lines |
 | Largest JS chunk | 116 kB gzip |
-| All JS, lazily loaded chunks included | 480 kB gzip |
+| All JS, lazily loaded chunks included | 500 kB gzip |
 | All CSS | 45 kB gzip |
 
 How the code stays within them:
@@ -238,6 +254,9 @@ How the code stays within them:
 - `vite.config.ts` gives React, the icons, the sample project's shared
   data and the Markdown stack (loaded on demand) chunks of their own, and
   builds for the browsers the stylesheets already require.
+  The app needs Chrome 111, Edge 111, Firefox 113 or Safari 16.2 or later,
+  because the stylesheets use `color-mix()`; those versions are `build.target`
+  in `vite.config.ts`.
 - The CSS ships as one file: split per lazy view, each small file was
   compressed on its own and cost more than the whole. To find style rules
   nothing uses, run `node scripts/unused-css.mjs`; with the classes an e2e
@@ -299,6 +318,9 @@ product.
 ## More
 
 - [Security model](security-model.md), including the agent sandbox canary.
+- [Team collaboration](team-collaboration.md): the design of the agent
+  team's task board, dependencies and blocked subtasks, and the questions
+  open for its next step.
 - [Brand](brand.md): the logo, colors and how to name other products.
 - [CONTRIBUTING.md](../CONTRIBUTING.md) and the
   [Code of Conduct](../CODE_OF_CONDUCT.md).

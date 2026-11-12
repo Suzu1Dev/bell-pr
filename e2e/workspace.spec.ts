@@ -325,7 +325,7 @@ test("an open follow-up round asks for its commit message and pushes through its
     // Approval waits for the understanding check: explain the round back in
     // the closed-book panel next to the diff.
     const check = workspace.check;
-    await page.getByRole("button", { name: workspace.footer.explainBack }).click();
+    await page.locator(".review-footer").getByRole("button", { name: workspace.footer.explainBack }).click();
     const panel = page.locator(".understanding-check");
     await expect(page.locator(".explain-panel")).toHaveCount(0);
     // A round asks what it changes and which review comment it answers.
@@ -483,7 +483,7 @@ test("the draft guide lists the checks publishing runs on the saved draft", asyn
   const checks = page.locator(".draft-guidance-preflight");
   try {
     await page.goto(`/#/runs/${seededRun.id}/draft?locale=en`);
-    await expect(checks.getByRole("heading", { name: preflight.title })).toBeVisible();
+    await expect(page.locator(".draft-checklist").getByRole("heading", { name: draftEn.guidance.checklist.title })).toBeVisible();
     const secret = checks.locator("li.is-block");
     await expect(secret).toContainText(preflight.block);
     await expect(secret).toContainText(security.draftChecks.secret);
@@ -493,8 +493,8 @@ test("the draft guide lists the checks publishing runs on the saved draft", asyn
     await page
       .getByRole("textbox", { name: workspace.draft.bodyLabel })
       .fill("Greets the whole world.");
-    await page.getByRole("button", { name: workspace.draft.save, exact: true }).click();
-    await expect(checks).toContainText(preflight.clear);
+    await page.locator(".draft-save-row").getByRole("button", { name: workspace.draft.save, exact: true }).click();
+    await expect(checks).toHaveCount(0);
     await expect(secret).toHaveCount(0);
 
     // The sample has no server to check with.

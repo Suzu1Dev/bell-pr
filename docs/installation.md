@@ -98,8 +98,13 @@ your AI CLI are still required for real work.
 
 With mise already installed:
 
+<!-- generated:install-commands method=mise -->
 ```sh
-MISE_NPM_PACKAGE_MANAGER=npm mise use -g node@24 npm:bell-pr@1.1.0
+MISE_NPM_PACKAGE_MANAGER=npm mise use -g node@24 npm:bell-pr@1.1.1
+```
+<!-- /generated:install-commands -->
+
+```sh
 mise exec -- bell-pr
 ```
 
@@ -196,9 +201,12 @@ counts against your own account. Credentials stay with the tools in this WSL
 distribution; signing in to Windows copies of the tools does not sign in the
 Linux copies.
 
-To explore before signing in, run `bell-pr start --force` and choose the sample
-project. It makes no AI call and sends nothing to GitHub. Real agent work waits
-until a provider is ready.
+To explore before signing in, run `bell-pr`. When the AI provider is the
+only required check that fails, it still starts. The first time, Welcome
+opens and shows how to install one; the sample project is on that screen.
+It makes no AI call and sends nothing to GitHub. If another required check
+fails, `bell-pr start --force` starts
+anyway. Real agent work waits until a provider is ready.
 
 ### Later launches and the browser
 

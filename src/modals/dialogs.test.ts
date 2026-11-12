@@ -20,14 +20,14 @@ const repo: Repo = {
 
 test("the guide reads in English with no Chinese left", () => {
   const html = renderEn(createElement(HelpModal, { closeModal() {} }));
-  assert.match(html, /<h2 id="modal-title">From an idea to your next PR\.<\/h2>/);
+  assert.match(html, /<h2 id="modal-title">How to contribute<\/h2>/);
   assert.match(html, /<strong>Understand every change<\/strong>/);
   assert.match(html, />Start exploring<\/button>/);
   assert.match(html, /aria-label="Close dialog"/);
   assertNoHan(html);
   assert.match(
     renderZh(createElement(HelpModal, { closeModal() {} })),
-    /<strong>理解每個改動<\/strong>/,
+    /<strong>理解每個變更<\/strong>/,
   );
   assert.doesNotMatch(html, /About BELL PR/);
   assert.match(
@@ -55,12 +55,12 @@ test("the runs list reads in English with no Chinese left", () => {
     closeModal() {},
   });
   const html = renderEn(element);
-  assert.match(html, /<h2 id="modal-title">Every idea has its progress\.<\/h2>/);
+  assert.match(html, /<h2 id="modal-title">Contributions<\/h2>/);
   assert.match(html, /<small>octo\/widgets · fix\/retry<\/small><\/span><em>In progress<\/em>/);
   assert.match(html, /<small>Interactive demo · /);
   assert.match(html, />New contribution<\/button>/);
   assertNoHan(html);
-  assert.match(renderZh(element), /<small>octo\/widgets · fix\/retry<\/small><\/span><em>開發中<\/em>/);
+  assert.match(renderZh(element), /<small>octo\/widgets · fix\/retry<\/small><\/span><em>進行中<\/em>/);
 });
 
 test("a run of the person's own can free its disk space or be deleted; the sample cannot", () => {
@@ -95,7 +95,7 @@ test("a run of the person's own can free its disk space or be deleted; the sampl
   );
   assert.match(
     html,
-    /<button type="button" class="run-list-action run-list-action-danger" data-run-action="run-1:delete" aria-label="Delete run: Retry timeouts"><svg[^]*?Delete run<\/button>/,
+    /<button type="button" class="run-list-action run-list-action-danger" data-run-action="run-1:delete" aria-label="Delete contribution: Retry timeouts"><svg[^]*?Delete contribution<\/button>/,
   );
   // One pair of actions: the sample's row has none.
   assert.equal(html.match(/run-list-actions/g)?.length, 1);
@@ -115,7 +115,7 @@ test("a run of the person's own can free its disk space or be deleted; the sampl
   const removed = render([own("published", { workspaceRemovedAt: "2026-10-02T08:00:00.000Z" })]);
   assert.match(removed, /<span class="run-files-removed">Files removed<\/span>/);
   assert.doesNotMatch(removed, /Free disk space/);
-  assert.match(removed, /Delete run/);
+  assert.match(removed, /Delete contribution/);
 
   assert.doesNotMatch(render([own("review")], false), /run-list-actions/);
   assert.match(

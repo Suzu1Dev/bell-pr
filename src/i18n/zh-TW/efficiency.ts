@@ -18,16 +18,16 @@ const m: Translation<typeof en> = {
     guide: "追問",
     walkthrough: "程式碼解說",
     premise: "前提查核",
-    followup: "Review 修正",
+    followup: "一輪修正",
     sync: "解衝突",
   },
   credit: {
     text: ({ version }) =>
-      `效率模式以 DietrichGebert 的 Ponytail ${version}（MIT 授權）為基礎：輕量模式提供 Agent 其原則的精簡改寫，完整模式提供完整規則，關閉則兩者都不加入。`,
+      `效率模式以 DietrichGebert 的 Ponytail ${version}（MIT 授權）為基礎：輕量給 Agent 精簡改寫的原則，完整給完整規則，關閉都不給。`,
     link: "Ponytail 原始專案",
   },
   inputTokens: "輸入 tokens",
-  cachedInputTokens: "其中快取命中",
+  cachedInputTokens: "其中快取",
   outputTokens: "輸出 tokens",
   agentTime: "累計 Agent 時間",
   running: "執行中",
@@ -37,7 +37,7 @@ const m: Translation<typeof en> = {
   usageNote: ({ calls, measured }) =>
     `${fmt.number(calls)} 次呼叫 · 用量回報 ${fmt.number(measured)} / ${fmt.number(calls)} 次${
       measured < calls ? "，僅加總已回報部分。" : "。"
-    }快取已包含於輸入；時間為各次執行加總，並非等待時間。`,
+    }輸入 tokens 含快取；時間為各呼叫總和，非等待時間。`,
   byRole: ({ count }) => `依角色分項（${fmt.number(count)} 類）`,
   columns: {
     role: "角色",
@@ -49,7 +49,7 @@ const m: Translation<typeof en> = {
   },
   partialCalls: ({ calls, measured }) =>
     `${fmt.number(calls)}（回報 ${fmt.number(measured)}）`,
-  byRoleNote: "同樣只列 CLI 回報的 tokens 與呼叫次數；Teammates 為所有成員合計。",
+  byRoleNote: "Teammates 為所有隊友合計。",
   noMeasurement: "尚無實測；執行後會顯示已回報的用量與時間。",
   noMeasurementSample: "尚無實測；示範內容未呼叫 AI。",
 };

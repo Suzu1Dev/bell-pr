@@ -23,7 +23,7 @@ import { readDiff } from "./git.js";
 import { Workbench } from "./workbench.js";
 import { Store } from "./store.js";
 import type { AppError, DiffFile, Run } from "./types.js";
-import type { AgentTeam } from "../shared/team.js";
+import type { AgentTeam, TeamTask } from "../shared/team.js";
 import type { ContributionSettings } from "../shared/insights.js";
 import { ProjectInsightsService } from "./insights.js";
 import { AgentSlots } from "./agent-slots.js";
@@ -98,6 +98,8 @@ const withAuxiliaryRoles =
             scenario: "使用者查看模組提供的文字。",
             before: "文字是各檔案原本的內容。",
             after: "文字更新為這次任務指定的內容。",
+            beforeSteps: [],
+            afterSteps: [],
           },
           alternatives: "也可以集中成一個常數；這次沒有，因為各模組獨立。",
           lookup: ["single source of truth"],
@@ -239,7 +241,7 @@ test("task ids are normalised before validation and format problems name the fie
         makePlan([{ id: "a", files: ["a.ts"], dependsOn: ["Missing Task"] }]),
         2,
       ),
-    /依賴/,
+    /相依/,
   );
   for (const reserved of ["LEAD", "Member 1", "User"])
     assert.throws(
@@ -275,7 +277,7 @@ test("task ids are normalised before validation and format problems name the fie
     () => parseTeamPlan(JSON.stringify(plan), 2),
     /（summary：應為 string，收到 undefined）/,
   );
-  assert.throws(() => parseTeamPlan("invented prose", 2), /JSON/);
+  assert.throws(() => parseTeamPlan("invented prose", 2), /沒有回傳可用的計畫/);
 });
 
 test("lead plan problems and member reports are worded in the locale in effect", () => {
@@ -314,15 +316,15 @@ test("lead plan problems and member reports are worded in the locale in effect",
   for (const [value, expected] of [
     [
       JSON.parse(makePlan([{ id: "a", files: ["a.ts"], dependsOn: ["a"] }])),
-      "The lead's plan has an invalid task dependency.",
+      "The lead's plan has an invalid task dependency; adjust the request and try again.",
     ],
     [
       JSON.parse(makePlan([{ id: "lead", files: ["a.ts"] }])),
-      "The lead's plan has duplicate or reserved task IDs.",
+      "The lead's plan has duplicate or reserved task IDs; adjust the request and try again.",
     ],
     [
       JSON.parse(makePlan([{ id: "a", files: ["src/*"] }])),
-      "The lead's plan has an invalid file scope: src/*",
+      "The lead's plan has an invalid file scope (src/*); adjust the request and try again.",
     ],
     [
       JSON.parse(
@@ -331,7 +333,7 @@ test("lead plan problems and member reports are worded in the locale in effect",
           { id: "b", files: ["b.ts"], dependsOn: ["a"] },
         ]),
       ),
-      "The lead's plan has a dependency cycle.",
+      "The lead's plan has tasks that depend on each other in a circle; adjust the request and try again.",
     ],
   ] as const)
     assert.equal(englishProblem(value), expected);
@@ -339,7 +341,7 @@ test("lead plan problems and member reports are worded in the locale in effect",
     () => withLocale("en", () => parseTeamPlan("invented prose", 2)),
     {
       message:
-        "The lead did not return a valid task plan in JSON; adjust the request and try again.",
+        "The lead did not return a usable plan; adjust the request and try again.",
     },
   );
 
@@ -394,7 +396,7 @@ test("team plans validate DAGs, concrete scopes, and preserve literal bracket fi
         makePlan([{ id: "a", files: ["a.ts"], dependsOn: ["missing"] }]),
         2,
       ),
-    /依賴/,
+    /相依/,
   );
   for (const invalid of [
     "../outside",
@@ -409,7 +411,7 @@ test("team plans validate DAGs, concrete scopes, and preserve literal bracket fi
       () => parseTeamPlan(makePlan([{ id: "a", files: [invalid] }]), 2),
       /範圍/,
     );
-  assert.throws(() => parseTeamPlan("invented prose", 2), /JSON/);
+  assert.throws(() => parseTeamPlan("invented prose", 2), /沒有回傳可用的計畫/);
   // revisionNotes is required-but-nullable in the CLI schema and optional for zod.
   const first = JSON.parse(makePlan([{ id: "a", files: ["a.ts"] }]));
   assert.equal(
@@ -549,6 +551,122 @@ test("shared scheduler enforces dependencies, file ownership locks, and member c
   tasks[3].status = "pending";
   claimReadyTasks(tasks, 0);
   assert.equal(tasks[3].status, "blocked");
+});
+
+/** A scheduler task; its owner and file are its own unless given. */
+const schedulerTask = (
+  id: string,
+  dependsOn: string[],
+  status: TeamTask["status"] = "pending",
+  owner = `member-${id}`,
+  files = [`${id}.ts`],
+): TeamTask => ({ id, title: id, description: id, owner, files, dependsOn, status });
+
+/** Every order of `items`. */
+function orders<T>(items: T[]): T[][] {
+  if (items.length <= 1) return [items];
+  return items.flatMap((item, index) =>
+    orders([...items.slice(0, index), ...items.slice(index + 1)]).map(
+      (rest) => [item, ...rest],
+    ),
+  );
+}
+
+const statuses = (tasks: TeamTask[]) =>
+  Object.fromEntries(tasks.map((task) => [task.id, task.status]));
+
+test("a failed task blocks every task downstream of it, whatever order the plan lists them in", () => {
+  // b and c hang off a in a chain; d also waits on finished work and was
+  // marked ready earlier. y depends only on finished work and is unaffected.
+  const plan = () => [
+    schedulerTask("a", [], "failed"),
+    schedulerTask("b", ["a"]),
+    schedulerTask("c", ["b"]),
+    schedulerTask("d", ["c", "x"], "ready"),
+    schedulerTask("x", [], "complete"),
+    schedulerTask("y", ["x"]),
+  ];
+  for (const order of orders(["a", "b", "c", "d", "x", "y"])) {
+    const byId = new Map(plan().map((task) => [task.id, task]));
+    const tasks = order.map((id) => byId.get(id)!);
+    assert.deepEqual(claimReadyTasks(tasks, 0), [], order.join(" "));
+    assert.deepEqual(
+      statuses(tasks),
+      { a: "failed", b: "blocked", c: "blocked", d: "blocked", x: "complete", y: "ready" },
+      order.join(" "),
+    );
+  }
+});
+
+test("an already blocked task blocks the tasks that depend on it", () => {
+  const tasks = [
+    schedulerTask("c", ["b"]),
+    schedulerTask("b", ["a"], "ready"),
+    schedulerTask("a", [], "blocked"),
+    schedulerTask("other", []),
+  ];
+  assert.deepEqual(
+    claimReadyTasks(tasks, 2).map((task) => task.id),
+    ["other"],
+  );
+  assert.deepEqual(statuses(tasks), {
+    c: "blocked",
+    b: "blocked",
+    a: "blocked",
+    other: "running",
+  });
+});
+
+test("a propagation-only call claims nothing and leaves running and finished work alone", () => {
+  const tasks = [
+    schedulerTask("late", ["failed"]),
+    schedulerTask("failed", ["done"], "failed"),
+    schedulerTask("done", [], "complete"),
+    schedulerTask("busy", ["failed"], "running"),
+    schedulerTask("next", ["done"]),
+    schedulerTask("waiting", [], "ready"),
+    // A dependency on a task that is no longer listed is never complete.
+    schedulerTask("orphan", ["removed"]),
+  ];
+  assert.deepEqual(claimReadyTasks(tasks, 0), []);
+  assert.deepEqual(statuses(tasks), {
+    late: "blocked",
+    failed: "failed",
+    done: "complete",
+    busy: "running",
+    next: "ready",
+    waiting: "ready",
+    orphan: "pending",
+  });
+  assert.ok(tasks.every((task) => task.startedAt === undefined));
+});
+
+test("claims after propagation still respect owners, file scopes and capacity", () => {
+  const tasks = [
+    schedulerTask("c", ["b"]),
+    schedulerTask("b", ["a"]),
+    schedulerTask("a", [], "failed"),
+    schedulerTask("busy", [], "running", "member-1", ["src/"]),
+    schedulerTask("same-owner", [], "ready", "member-1", ["docs/a.md"]),
+    schedulerTask("same-files", [], "pending", "member-2", ["src/a.ts"]),
+    schedulerTask("free", [], "pending", "member-2", ["test/a.ts"]),
+    schedulerTask("over-capacity", [], "pending", "member-3", ["lib/a.ts"]),
+  ];
+  assert.deepEqual(
+    claimReadyTasks(tasks, 2).map((task) => task.id),
+    ["free"],
+  );
+  assert.deepEqual(statuses(tasks), {
+    c: "blocked",
+    b: "blocked",
+    a: "failed",
+    busy: "running",
+    "same-owner": "ready",
+    "same-files": "ready",
+    free: "running",
+    "over-capacity": "ready",
+  });
+  assert.ok(tasks.find((task) => task.id === "free")?.startedAt);
 });
 
 test("broadcast inbox delivery is persisted separately for each recipient", () => {
@@ -888,7 +1006,7 @@ test("team execution waits for plan approval, runs isolated independent members 
       await assert.rejects(readFile(path.join(task.worktreePath!, "a.ts")));
       assert.ok(!registered.includes(task.worktreePath!));
     }
-    assert.ok(run.logs.some((log) => log.message.includes("已不需保留")));
+    assert.ok(run.logs.some((log) => log.message.includes("獨立工作目錄已移除")));
     assert.ok(
       run.team!.messages.every((message) => message.status === "delivered"),
     );
@@ -1195,7 +1313,7 @@ test("retrying a failed run reruns only the failed task with the previous error 
     assert.deepEqual((await readDiff(run)).map((file) => file.path), ["a.ts"]);
     await assert.rejects(
       f.workbench.sendTeamMessage(run.id, { to: "beta", content: "hi" }),
-      /已停止工作/,
+      /已停止處理/,
     );
 
     // Commands observed in the discarded attempt are not evidence for the retry.
@@ -1210,13 +1328,13 @@ test("retrying a failed run reruns only the failed task with the previous error 
     assert.equal(retried.error, undefined);
     assert.equal(
       beta.error,
-      "Teammate 修改了未分配的檔案 c.ts；差異保留在其隔離工作目錄，未整合。",
+      "隊友修改了未分配的檔案 c.ts；變更保留在該子任務的獨立工作目錄，未整合。",
     );
     assert.equal(beta.worktreePath, undefined);
     assert.equal(run.reports!.beta, undefined);
     assert.ok(
       run.logs.some((log) =>
-        log.message.includes("1 個已完成任務不重跑，1 個任務以新快照重新開始"),
+        log.message.includes("1 個已完成的子任務不重跑，1 個子任務以新快照重新開始"),
       ),
     );
     await waitUntil(
@@ -1232,7 +1350,7 @@ test("retrying a failed run reruns only the failed task with the previous error 
     assert.equal(scenario.memberInputs[2].cwd, betaPath);
     assert.match(
       scenario.memberInputs[2].prompt,
-      /^Previous attempt failed: Teammate 修改了未分配的檔案 c.ts/,
+      /^Previous attempt failed: 隊友修改了未分配的檔案 c.ts/,
     );
     assert.match(scenario.memberInputs[2].prompt, /只改 b.ts/);
     assert.doesNotMatch(
@@ -1363,6 +1481,33 @@ test("retrying with every task complete reruns only integration and review", asy
       ["alpha", "beta"],
     );
     assert.ok(run.reports!.reviewer);
+  } finally {
+    await f.cleanup();
+  }
+});
+
+test("a retried task whose dependency is no longer listed stops the run as stuck without starting it", async () => {
+  const scenario = retryScenario();
+  const f = await fixture(scenario.runner);
+  try {
+    const run = await startRetryRun(f);
+    await waitUntil(() => run.status === "failed", "ownership rejection");
+    const beta = run.team!.tasks[1];
+    // Only an edited state.json can do this; a lead's plan naming a missing task is rejected.
+    beta.dependsOn = ["removed"];
+    scenario.state.compliant = true;
+    await f.workbench.retryTeam(run.id);
+    await waitUntil(
+      () => run.status === "failed" || run.status === "review",
+      "retry completion",
+    );
+    assert.equal(run.status, "failed");
+    assert.equal(run.error, "子任務相依或檔案分工讓團隊無法繼續，請查看任務板。");
+    assert.equal(beta.status, "pending");
+    assert.deepEqual(
+      scenario.memberInputs.map((input) => input.taskId),
+      ["alpha", "beta"],
+    );
   } finally {
     await f.cleanup();
   }
@@ -1820,7 +1965,7 @@ test("the queue cap follows maxActiveRuns and the 429 message states the number"
     await assert.rejects(
       f.workbench.createRun(f.repo.id, "Overflow", undefined, settings),
       (error: AppError) =>
-        error.statusCode === 429 && /10 個工作/.test(error.message),
+        error.statusCode === 429 && /10 個任務/.test(error.message),
     );
   } finally {
     await f.cleanup();
@@ -2046,7 +2191,7 @@ test("reviewDiffContext attaches patches in order until 100 KB, then lists the r
     file("c.ts", "+after the budget"),
     file(
       ".env",
-      "此檔案已暫停發佈：敏感",
+      "此檔案已被擋下、不會發布：敏感",
       "敏感檔案或產物不會被加入 PR；請先從本次變更移除。",
     ),
   ]);
@@ -2118,7 +2263,7 @@ test("re-running the review on a hand-edited worktree stores fresh reports, keep
     // Nothing changed yet: the caller learns that immediately.
     await assert.rejects(f.workbench.rerunReview(run.id), {
       statusCode: 422,
-      message: /沒有程式碼差異/,
+      message: /沒有程式碼變更/,
     });
     assert.deepEqual(prompts, {});
 
@@ -2337,7 +2482,7 @@ if (prompt.includes('You are the team lead with read-only access')) {
     }
     assert.ok(reviewer);
     assert.doesNotMatch(reviewer.prompt, /application-observed/);
-    // Every team role ran with live search and the one-sentence web rule; isolated roles stay offline.
+    // Every team role ran with live search and the web rule; isolated roles stay offline.
     const member = prompts.find((entry) =>
       entry.prompt.includes("independent teammate working on task"),
     );
@@ -2519,7 +2664,7 @@ test("a run created under en records its locale, and its log, agent details and 
       cjk,
     );
     // The default locale (zh-TW in these tests) does not leak into the run.
-    assert.doesNotMatch(JSON.stringify(run.logs), /開始工作|領取任務/);
+    assert.doesNotMatch(JSON.stringify(run.logs), /開始工作|領取子任務/);
     // Every team agent was asked to answer in English: the plan, both
     // members (beta twice), integration, reviewer and test analyst.
     assert.equal(prompts.length, 7);

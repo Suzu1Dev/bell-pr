@@ -216,8 +216,8 @@ test("every team size, every effort and web access are open, without a chip, in 
     assert.equal(option(html, "max"), '<option value="max">Max</option>');
     assert.doesNotMatch(webAccess(html), /disabled/);
     assert.doesNotMatch(html, /pro-badge|mission-clamp-notice|mission-option-locked|mission-team-choice[^"]* locked/);
-    assert.match(html, /aria-describedby="([^"]*)-reasoning-default \1-reasoning-help"/);
-    assert.match(html, /<p id="[^"]*-reasoning-default" class="mission-field-note">Default uses the model&#x27;s own default effort\.<\/p>/);
+    assert.match(html, /aria-describedby="[^"]*-reasoning-help"/);
+    assert.doesNotMatch(html, /reasoning-default/);
   }
 });
 
@@ -353,7 +353,7 @@ test("the efficiency setting is named Efficiency mode, with the Ponytail credit 
   );
   assert.doesNotMatch(html, /development mode/);
   assert.match(renderZh(props()), />效率模式<\/label>/);
-  assert.match(renderZh(props()), /「模型預設」會使用模型本身的預設強度。/);
+  assert.doesNotMatch(renderZh(props()), /reasoning-default/);
 });
 
 test("the task dialog's form shows the Before-you-start facts under the issue field; the settings defaults do not", async () => {
@@ -455,11 +455,11 @@ test("switching to full access requires confirmation and switching back does not
   const actions = dialog.slice(dialog.indexOf("modal-actions"));
   assert.match(
     actions,
-    /<button type="button" class="button secondary">Keep the working directory<\/button><button type="button" class="button primary settings-danger-button">Use Full access<\/button>/,
+    /<button type="button" class="button secondary">Keep working directory access<\/button><button type="button" class="button primary settings-danger-button">Use Full access<\/button>/,
   );
   assert.doesNotMatch(renderEn(props({}, { modelsOnly: true, demo: true })), /role="dialog"/);
   const zh = renderZh(createElement(FullAccessConfirmDialog, { onCancel() {}, onConfirm() {} }));
   assert.match(zh, /要改用完整權限嗎？/);
   assert.match(zh, /「完整權限」預設關閉/);
-  assert.match(zh, /維持工作目錄（預設）/);
+  assert.match(zh, /維持工作目錄權限/);
 });

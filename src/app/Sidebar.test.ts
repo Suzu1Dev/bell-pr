@@ -39,7 +39,7 @@ const summary = (id: string, title: string, status: RunSummary["status"] = "revi
 
 test("the sidebar lists every page and marks the open one", () => {
   const html = render();
-  for (const label of ["首頁", "貢獻工作台", "Repositories", "探索貢獻", "Agent team", "學習筆記", "連線與設定", "使用指南"])
+  for (const label of ["首頁", "貢獻工作台", "專案", "探索貢獻", "學習筆記", "設定", "使用指南"])
     assert.ok(html.includes(`<span>${label}</span>`), label);
   assert.match(html, /<nav aria-label="主要導覽">/);
   assert.match(html, /class="nav-item active" title="貢獻工作台" aria-current="page"/);
@@ -51,8 +51,18 @@ test("the sidebar lists every page and marks the open one", () => {
   assert.match(learning, /class="nav-item active" title="學習筆記" aria-current="page"/);
   assert.doesNotMatch(learning, /class="nav-item active" title="貢獻工作台"/);
   // A repository's overview belongs to the repository list.
-  assert.match(render({ page: "explore" }), /class="nav-item active" title="Repositories" aria-current="page"/);
+  assert.match(render({ page: "explore" }), /class="nav-item active" title="專案" aria-current="page"/);
   assert.match(render({ page: "home" }), /class="nav-item active" title="首頁" aria-current="page"/);
+});
+
+test("the Group item shows only where group work is on, before the learning notes", () => {
+  const status = { codex: true, github: true };
+  assert.doesNotMatch(renderEn(element({ status })), /<span>Group<\/span>/);
+  const html = renderEn(element({ status: { ...status, collab: { state: "ready" } }, page: "group" }));
+  assert.match(html, /<span>Explore contributions<\/span><\/button><button class="nav-item active" title="Group" aria-current="page">/);
+  assert.match(html, /<span>Group<\/span><\/button><button class="nav-item" title="Learning notes">/);
+  assert.equal(html.match(/aria-current="page"/g)?.length, 1);
+  assert.match(render({ status: { ...status, collab: { state: "stopped" } } }), /<span>小組<\/span>/);
 });
 
 test("the workbench count leaves the sample out", () => {
@@ -75,7 +85,7 @@ test("recent contributions show the four newest runs, then the sample under its 
   assert.ok(!html.includes("第五個任務"));
   assert.match(
     html,
-    /更新使用文件<\/span><\/button><div class="recent-sample-heading">範例<\/div><button class="recent-item "><span class="small-status "><\/span><span>SDK 智慧重試機制<\/span><\/button>/,
+    /更新使用文件<\/span><\/button><div class="recent-sample-heading">示範<\/div><button class="recent-item "><span class="small-status "><\/span><span>SDK 智慧重試機制<\/span><\/button>/,
   );
   assert.match(html, /class="recent-item selected"><span class="small-status "><\/span><span>補上重試測試/);
   assert.match(html, /<span class="small-status running"><\/span><span>修正登入逾時/);
@@ -101,7 +111,7 @@ test("discovery is an ordinary item, without a badge", () => {
 
 test("the profile shows the GitHub user's initials, and only an icon while presenting", () => {
   assert.match(render(), /<span class="profile-avatar" aria-hidden="true"><svg/);
-  assert.match(render(), /<strong>My workspace<\/strong>/);
+  assert.match(render(), /<strong>我的工作空間<\/strong>/);
   const status = { codex: true, github: true, githubUser: "octo-cat" };
   const html = render({ status });
   assert.match(html, /<span class="profile-avatar" aria-hidden="true">OC<\/span>/);
@@ -130,7 +140,7 @@ test("the sidebar reads in English with no Chinese left", () => {
       sidebarOpen: true,
     }),
   );
-  for (const label of ["Home", "Workbench", "Repositories", "Explore contributions", "Agent team", "Learning notes", "Settings", "User guide", "About BELL PR"])
+  for (const label of ["Home", "Workbench", "Repositories", "Explore contributions", "Learning notes", "Settings", "User guide", "About BELL PR"])
     assert.ok(html.includes(`<span>${label}</span>`), label);
   assert.match(html, /<nav aria-label="Main navigation">/);
   assert.match(html, /<div class="recent-sample-heading">Sample<\/div><button class="recent-item selected"><span class="small-status "><\/span><span>SDK smart retries<\/span>/);

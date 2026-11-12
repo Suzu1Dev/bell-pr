@@ -56,16 +56,16 @@ const welcome = (step: WelcomeStep, props: Partial<WelcomeProps> = {}) =>
 
 test("every welcome step reads in English with no Chinese left, and in zh-TW", () => {
   assert.deepEqual([...welcomeSteps], ["language", "environment", "provider", "start"]);
-  for (const [position, step] of welcomeSteps.entries()) {
+  for (const step of welcomeSteps) {
     const html = renderEn(welcome(step));
     // The language switcher names each language in itself.
     assertNoHan(withoutOtherLanguages(html));
     assert.match(html, /<h1 id="welcome-title">Welcome to BELL PR<\/h1>/);
-    assert.match(html, new RegExp(`Step ${position + 1} of 4`));
+    assert.match(html, /aria-current="step"/);
     assert.equal(html.match(/aria-current="step"/g)?.length, 1);
     const zh = renderZh(welcome(step));
     assert.match(zh, /歡迎使用 BELL PR/);
-    assert.match(zh, new RegExp(`第 ${position + 1} 步，共 4 步`));
+    assert.equal(zh.match(/aria-current="step"/g)?.length, 1);
   }
   // The first step has no way back; the others do.
   assert.doesNotMatch(renderEn(welcome("language")), />Back</);
@@ -110,44 +110,134 @@ test("the provider step picks the only ready provider and lets the person choose
   };
   assert.deepEqual(readyProviders(untested), ["claude"]);
   const only = renderEn(welcome("provider"));
-  assert.match(only, /Claude Code is installed and signed in, so your agents use it\./);
+  assert.match(only, /<strong>Claude Code<\/strong>/);
   // Neutral wording about the person's own Claude Code sign-in.
   assert.match(only, /Uses the Claude Code CLI you installed and signed in to \(Claude plan or Anthropic API key\)\. Usage counts against your own account\./);
   assert.doesNotMatch(only, /subscription|API billing/i);
   const choice = renderEn(welcome("provider", { doctor: doctor(both) }));
-  assert.match(choice, /<legend>More than one provider is ready\. Which one should your agents use\?<\/legend>/);
+  assert.match(choice, /<legend>More than one AI provider is ready\. Which one should your Agents use\?<\/legend>/);
   assert.equal(choice.match(/type="radio" name="welcome-provider"/g)?.length, 2);
   const empty = renderEn(welcome("provider", { doctor: doctor(none) }));
-  assert.match(empty, /No provider is ready yet\./);
-  assert.match(empty, />Re-check</);
+  assert.match(empty, /No AI provider is ready yet\./);
+  assert.match(empty, />Check again</);
   const onlyCodex = report(base);
   const providerReady = onlyCodex.checks.find((check) => check.id === "provider-ready")!;
   providerReady.reason = "claude-only";
   providerReady.detail =
-    "Claude Code only in 1.0.0; Codex support is disabled\nPlease install Claude Code.";
+    "1.0.0 supports Claude Code only; Codex support is disabled.\nInstall Claude Code.";
   const blocked = renderEn(welcome("provider", { doctor: doctor(onlyCodex) }));
-  assert.match(blocked, /Claude Code only in 1\.0\.0; Codex support is disabled/);
-  assert.match(blocked, /Please install Claude Code\./);
-  assert.doesNotMatch(blocked, /No provider is ready yet/);
-  providerReady.detail = "1.0.0 只支援 Claude Code；Codex 暫時停用\n請安裝 Claude Code。";
+  assert.match(blocked, /1\.0\.0 supports Claude Code only; Codex support is disabled\./);
+  assert.match(blocked, /Install Claude Code\./);
+  assert.match(blocked, /See the <a[^>]*>Claude Code documentation<\/a> for other ways to install it\./);
+  assert.doesNotMatch(blocked, /See the Codex CLI/);
+  assert.doesNotMatch(blocked, /Antigravity documentation/);
+  assert.doesNotMatch(blocked, /No AI provider is ready yet/);
+  providerReady.detail = "1.0.0 只支援 Claude Code；Codex 已停用。\n請安裝 Claude Code。";
   const blockedZh = renderZh(welcome("provider", { doctor: doctor(onlyCodex) }));
-  assert.match(blockedZh, /1\.0\.0 只支援 Claude Code；Codex 暫時停用/);
+  assert.match(blockedZh, /1\.0\.0 只支援 Claude Code；Codex 已停用。/);
   assert.match(blockedZh, /請安裝 Claude Code。/);
   const loading = renderEn(welcome("provider", { doctor: doctor(null) }));
-  assert.match(loading, /Checking which providers are ready…/);
+  assert.match(loading, /Checking which AI providers are ready…/);
+});
+
+test("with no provider ready, Welcome shows how to install one", () => {
+  const missing = {
+    ...none,
+    checks: none.checks.map((check) =>
+      check.id === "provider-ready"
+        ? {
+            ...check,
+            status: "fail" as const,
+            reason: "none-ready",
+            detail:
+              "Install and sign in to the Codex CLI, Claude Code or the Antigravity CLI: BELL PR needs at least one.",
+            fixes: [
+              { label: "Install the Codex CLI", command: "npm install -g @openai/codex" },
+              { label: "Sign in to Codex", command: "codex login" },
+              { label: "Install Claude Code", command: "npm install -g @anthropic-ai/claude-code" },
+              { label: "Sign in to Claude Code", command: "claude auth login" },
+              {
+                label: "Install the Antigravity CLI",
+                command: "curl -fsSL https://antigravity.google/cli/install.sh | bash",
+              },
+              { label: "Start the Antigravity CLI once to sign in", command: "agy" },
+            ],
+          }
+        : check,
+    ),
+  };
+  const html = renderEn(welcome("provider", { doctor: doctor(missing) }));
+  assertNoHan(html);
+  assert.match(html, /<h1 id="welcome-title">Welcome to BELL PR<\/h1>/);
+  assert.match(html, /No AI provider is ready yet\./);
+  for (const command of [
+    "npm install -g @openai/codex",
+    "codex login",
+    "npm install -g @anthropic-ai/claude-code",
+    "claude auth login",
+    "curl -fsSL https://antigravity.google/cli/install.sh | bash",
+    "agy",
+  ])
+    assert.match(
+      html,
+      new RegExp(
+        `<code class="welcome-command" tabindex="0" role="region" aria-label="Scroll the command: ${command.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}">${command.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}</code>`,
+      ),
+      command,
+    );
+  assert.match(html, /href="https:\/\/github.com\/openai\/codex"/);
+  assert.match(html, /See the <a[^>]*>Codex CLI<\/a> for other ways to install it\./);
+  assert.match(html, /href="https:\/\/code\.claude\.com\/docs\/en\/overview"/);
+  assert.match(html, /See the <a[^>]*>Claude Code documentation<\/a> for other ways to install it\./);
+  assert.match(html, /href="https:\/\/antigravity.google\/docs"/);
+  assert.match(html, /See the <a[^>]*>Antigravity documentation<\/a> for other ways to install it\./);
+  const zh = renderZh(welcome("provider", { doctor: doctor(missing) }));
+  assert.match(zh, /歡迎使用 BELL PR/);
+  assert.match(
+    zh,
+    /<code class="welcome-command" tabindex="0" role="region" aria-label="左右捲動指令：npm install -g @openai\/codex">npm install -g @openai\/codex<\/code>/,
+  );
+  assert.match(zh, /其他安裝方式請見 <a[^>]*>Codex CLI<\/a>/);
+  assert.match(zh, /href="https:\/\/github.com\/openai\/codex"/);
+  assert.match(zh, /其他安裝方式請見 <a[^>]*>Claude Code 文件<\/a>/);
+  assert.match(zh, /href="https:\/\/code\.claude\.com\/docs\/en\/overview"/);
+  assert.match(zh, /其他安裝方式請見 <a[^>]*>Antigravity 文件<\/a>/);
+  assert.match(zh, /href="https:\/\/antigravity.google\/docs"/);
+});
+
+test("a provider that is not ready shows only that provider's install link", () => {
+  const chosen = {
+    ...none,
+    checks: none.checks.map((check) =>
+      check.id === "provider-ready"
+        ? {
+            ...check,
+            status: "fail" as const,
+            reason: "chosen-not-ready",
+            params: { provider: "claude" },
+            fixes: [{ label: "Sign in to Claude Code", command: "claude auth login" }],
+          }
+        : check,
+    ),
+  };
+  const html = renderEn(welcome("provider", { doctor: doctor(chosen) }));
+  assert.match(html, /claude auth login/);
+  assert.match(html, /Claude Code documentation/);
+  assert.doesNotMatch(html, /See the Codex CLI/);
+  assert.doesNotMatch(html, /Antigravity documentation/);
 });
 
 test("the last step offers the tour, an import and discovery, which waits for the GitHub CLI", () => {
   const html = renderEn(welcome("start"));
   assertNoHan(html);
   assert.match(html, /Take the 2-minute sample tour/);
-  assert.match(html, /Import a repository/);
+  assert.match(html, /Import a project/);
   // Every contribution ends with the understanding check, and the setting can change it.
   assert.match(
     html,
-    /Every contribution ends with you explaining the change back; you can change that in Settings → Learning\./,
+    /Each contribution ends with you explaining the change back; turn that off in Settings → Learning\./,
   );
-  assert.match(renderZh(welcome("start")), /每一份貢獻最後都由你用自己的話講一遍；可在「設定 → 學習」調整。/);
+  assert.match(renderZh(welcome("start")), /每份貢獻最後都由你用自己的話講一遍；可在「設定 → 學習」關閉。/);
   // While the variable keeps the check on, Settings can't change it, so Welcome doesn't say so.
   setCheckSettingsForTests({ settings: {}, lockedBy: { skipUnderstandingCheck: "BELLPR_REQUIRE_UNDERSTANDING_CHECK" } });
   try {
@@ -180,7 +270,7 @@ test("discovery is a plain choice that searches GitHub", () => {
   );
   assert.doesNotMatch(html, /pro-badge|sample results|Upgrade|trial/i);
   const zh = renderZh(welcome("start", { doctor: doctor(both) }));
-  assert.match(zh, /在 GitHub 上搜尋歡迎你提供這類協助的專案。/);
+  assert.match(zh, /在 GitHub 上搜尋歡迎你這類協助的專案。/);
 });
 
 test("the provider is saved without losing a model chosen for it", () => {

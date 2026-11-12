@@ -25,7 +25,7 @@ test("every demo file renders its name and diff lines", () => {
     const html = render(file);
     const name = file.path.split("/").pop();
     assert.ok(html.includes(`<strong>${name}</strong>`));
-    assert.ok(html.includes(`aria-label="${file.path} 的程式碼差異"`));
+    assert.ok(html.includes(`aria-label="${file.path} 的程式碼變更"`));
     assert.match(html, /rv-line-added/);
     assert.match(html, new RegExp(`\\+${file.additions}<`));
   }
@@ -33,7 +33,7 @@ test("every demo file renders its name and diff lines", () => {
 
 test("the idle footer carries the selection hint instead of a separate hint row", () => {
   const html = render(demoFiles[0]);
-  assert.match(html, /rv-diff-footer[^>]*>.*點選任何一行，讓 Agent 為你解說/);
+  assert.match(html, /rv-diff-footer[^>]*>.*點一行來追問/);
   assert.match(html, /rv-shift-hint/);
   assert.doesNotMatch(html, /rv-code-hint/);
 });
@@ -79,7 +79,7 @@ test("a published comparison hides review marks while keeping the code and quest
   }));
   assert.doesNotMatch(html, /rv-reviewed|rv-note-hint|type="checkbox"/);
   assert.match(html, /rv-line-added/);
-  assert.match(html, /Click any line and the agent will explain it/);
+  assert.match(html, /rv-diff-footer[^>]*>.*Click a line to ask about it/);
   assertNoHan(html);
 });
 
@@ -110,7 +110,7 @@ test("an English render of the diff view has no Han in its own text", () => {
       assertNoHan(html);
       assert.ok(html.includes(`aria-label="Code changes in ${file.path}"`));
       assert.match(html, /class="rv-note-hint">No note yet</);
-      assert.match(html, /Click any line and the agent will explain it/);
+      assert.match(html, /rv-diff-footer[^>]*>.*Click a line to ask about it/);
       assert.match(html, /<kbd>Shift<\/kbd> for several lines/);
       assert.match(html, /aria-label="Added, line \d+: /);
       if (view === "split") assert.match(html, />Before<\/span><span>After</);
@@ -232,7 +232,7 @@ test("the list of lines explains its keys and has a status for the selection", (
   const describedBy = /role="listbox"[^>]*aria-describedby="([^"]+)"/.exec(html)![1];
   assert.match(
     html,
-    new RegExp(`<p class="rv-visually-hidden" id="${describedBy}">Use the arrow keys to move between lines and Shift with an arrow key to select several\\. Press Enter to go to “Explain this code” for the selection, and Escape to clear it\\.</p>`),
+    new RegExp(`<p class="rv-visually-hidden" id="${describedBy}">Arrow keys move between lines; Shift plus an arrow selects several\\. Enter goes to “Explain this code” for the selection; Escape clears it\\.</p>`),
   );
   // Empty until lines are selected, so a screen reader hears the count change.
   assert.match(html, /<span class="rv-visually-hidden" role="status"><\/span>/);
@@ -246,7 +246,7 @@ test("the list of lines explains its keys and has a status for the selection", (
     }),
   );
   assert.match(zh, /aria-label="差異的各行"/);
-  assert.match(zh, /用方向鍵在各行之間移動.*按 Enter 前往選取範圍的「解說這段程式碼」/);
+  assert.match(zh, /方向鍵在各行間移動.*Enter 前往選取範圍的「解說這段程式碼」/);
   assert.match(zh, /aria-label="export function first\(\) \{ 中，從舊版第 1 行、新版第 1 行起的變更"/);
 });
 
@@ -407,11 +407,11 @@ test("in a Learn-by-hand run the selection's button and hint name the guide, nev
   const html = diff({ guide: true } as Partial<DiffViewProps>);
   assertNoHan(html);
   assert.match(html, /rv-diff-footer[^>]*>.*Click any line to ask the guide about it/);
-  assert.match(html, /Press Enter to go to “Ask the guide about these lines” for the selection/);
+  assert.match(html, /Enter goes to “Ask the guide about these lines” for the selection/);
   assert.doesNotMatch(html, /agent|Explain this code/);
   const zh = diff({ guide: true } as Partial<DiffViewProps>, renderZh);
   assert.match(zh, /點選任何一行，向嚮導提問/);
   assert.doesNotMatch(zh, /Agent/);
   // An agent run keeps the agent's words.
-  assert.match(diff({}), /Click any line and the agent will explain it/);
+  assert.match(diff({}), /Explain this code.*rv-diff-footer[^>]*>.*Click a line to ask about it/);
 });

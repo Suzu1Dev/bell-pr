@@ -27,7 +27,7 @@ function checkbox(html: string, label: string) {
 }
 
 const checkLabel = "Ask me to explain each change back before approval";
-const tryFirstLabel = "Try-first prompts during review";
+const tryFirstLabel = "Ask me to answer before the answers show";
 
 test("Learning shows the understanding check on by default, and the try-first prompts", () => {
   const html = renderEn(section({ settings: {}, lockedBy: {} }));
@@ -38,7 +38,7 @@ test("Learning shows the understanding check on by default, and the try-first pr
   const check = checkbox(html, checkLabel);
   assert.match(check, / checked=""/);
   assert.doesNotMatch(check, /disabled/);
-  assert.match(html, /On by default\. While it is on, approving and publishing wait/);
+  assert.match(html, /When enabled, complete the check for the latest changes before approving and publishing/);
   assert.match(checkbox(html, tryFirstLabel), / checked=""/);
   assert.match(html, /<h3>Try first<\/h3>/);
   // Nothing is locked, and no dialog shows until the switch is turned off.
@@ -47,7 +47,7 @@ test("Learning shows the understanding check on by default, and the try-first pr
   const zh = renderZh(section({ settings: {}, lockedBy: {} }));
   assert.match(zh, /<h3>理解檢查<\/h3>/);
   assert.match(zh, /核准前，請我用自己的話講一遍每個變更/);
-  assert.match(zh, /審查時先試著答/);
+  assert.match(zh, /先請我作答，再顯示答案/);
 });
 
 test("the switches show what is saved, and wait while the settings load", () => {
@@ -57,7 +57,6 @@ test("the switches show what is saved, and wait while the settings load", () => 
   assertNoHan(off);
   assert.doesNotMatch(checkbox(off, checkLabel), /checked/);
   assert.doesNotMatch(checkbox(off, tryFirstLabel), /checked/);
-
   const loading = renderEn(section(null));
   assert.match(checkbox(loading, checkLabel), /disabled=""/);
   assert.match(checkbox(loading, tryFirstLabel), /disabled=""/);
@@ -96,7 +95,7 @@ test("the confirmation says what is lost, kept and recorded, and Keep the check 
   for (const sentence of [
     "You will be able to approve a pull request you have not explained.",
     "Every file still has to be reviewed, you still approve the pull request yourself, and every project-rule, issue and pacing check still applies.",
-    "Runs approved without the check are marked “Check off” for good: in the workspace, your learning record and the export.",
+    "Runs approved without the check are marked “Check off” for good: in the Workbench, your learning record and the export.",
     "You can turn it back on any time; runs already approved are then held to it before they are published.",
   ])
     assert.ok(html.includes(`<p class="settings-dialog-text">${sentence}</p>`), sentence);

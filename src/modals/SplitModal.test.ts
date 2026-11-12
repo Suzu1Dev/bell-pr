@@ -86,7 +86,7 @@ test("a plan with independent parts starts one contribution per part, and a file
     ["src/a.ts", "src/b.ts", "docs/notes.md"].map((path) => goesTo(html, path)),
     ["1", "2", ""],
   );
-  assert.match(html, /2 contributions; 1 file left out\./);
+  assert.match(html, /2 contributions; 1 file only in the original\./);
   assert.match(html, /<button type="submit" class="button primary"><svg[\s\S]*?Split<\/button>/);
 });
 
@@ -96,7 +96,7 @@ test("without a plan the dialog opens two empty contributions, and Split waits u
   assert.match(html, /<input id="split-title-1"[^>]*value=""/);
   assert.match(html, /<input id="split-title-2"[^>]*value=""/);
   assert.match(html, /<button[^>]*disabled=""[^>]*aria-label="Remove contribution 1"/);
-  assert.match(html, /2 contributions; 2 files left out\./);
+  assert.match(html, /2 contributions; 2 files only in the original\./);
   assert.match(html, /<button type="submit" class="button primary" disabled="">/);
 });
 
@@ -106,7 +106,7 @@ test("a file held back from review names why it cannot move", () => {
   assertNoHan(html);
   assert.match(html, /<select[^>]*aria-label="Contribution for src\/secret\.ts"[^>]*disabled=""/);
   assert.ok(plain(html).includes(modals.split.blocked({ reason: "contains a secret" })));
-  assert.match(html, /2 contributions; 1 file left out\./);
+  assert.match(html, /2 contributions; 1 file only in the original\./);
 });
 
 test("a plan with more parts than a split takes assigns the first eight and leaves out the rest", () => {
@@ -115,7 +115,7 @@ test("a plan with more parts than a split takes assigns the first eight and leav
   const html = renderEn(element(withPlan(tasks), files));
   assertNoHan(html);
   assert.ok(plain(html).includes(modals.split.suggestionLimit({ count: 8 })));
-  assert.match(html, /8 contributions; 1 file left out\./);
+  assert.match(html, /8 contributions; 1 file only in the original\./);
   assert.equal(goesTo(html, "src/f9.ts"), "");
 });
 
@@ -134,7 +134,7 @@ test("tasks that cite the same issue start as one contribution, and a part that 
   const html = renderEn(element(byFile(), byFileFiles()));
   assertNoHan(html);
   // Two contributions, not three: #42 is not divided between two of them.
-  assert.match(html, /2 contributions; 0 files left out\./);
+  assert.match(html, /2 contributions; 0 files only in the original\./);
   assert.equal(titleOf(html, 1), "Runners: keep non-finite results (#41, #42 for JS and Python)");
   assert.deepEqual(
     ["src/runners.ts", "src/compiled.ts", "src/board.ts"].map((path) => goesTo(html, path)),
@@ -158,7 +158,7 @@ const sharedFileFiles = () => [file("src/index.js"), file("test/slugify.test.js"
 test("tasks for different issues that changed the same file are reported by that file", () => {
   const text = plain(renderEn(element(sharedFile(), sharedFileFiles())));
   assert.ok(text.includes(modals.split.mixed({ paths: ["src/index.js"], issues: ["#1", "#2"] })));
-  assert.match(text, /src\/index\.js holds changes for #1 and #2\. BELL PR cannot separate changes inside a file/);
+  assert.match(text, /src\/index\.js holds changes for #1 and #2; BELL PR can't split a file/);
   assert.doesNotMatch(text, /strips trailing dashes" cites/);
 });
 
@@ -206,8 +206,8 @@ test("the dialog reads in zh-TW", () => {
   const run = withPlan([task("retry", "Retry on timeout", ["src/a.ts"]), task("cache", "Cache the token", ["src/b.ts"])]);
   const html = renderZh(element(run, [file("src/a.ts"), file("src/b.ts"), file("docs/notes.md")]));
   assert.match(html, /拆分為不同的貢獻/);
-  assert.match(html, /不移動/);
-  assert.doesNotMatch(html, /Split into separate contributions|Leave out/);
+  assert.match(html, /只留在原本那份/);
+  assert.doesNotMatch(html, /Split into separate contributions|Original only/);
 });
 
 /** Calls the click handler React gave `element`: the fake DOM dispatches no events. */

@@ -45,6 +45,7 @@ export function SyncPanel({ run, busy, onSync, onResolve, onUndo }: Props) {
   const round = activeFollowUp(run.followUps);
   const syncRound = round?.kind === "sync" ? round : undefined;
   const holder = published ? syncRound : run.sync;
+  const heldChanges = holder?.heldChanges ?? run.heldChanges ?? [];
   const conflicts = holder?.conflicts ?? [];
   // Read by the server whenever the diff is; until then every conflict is open.
   const open = holder?.unresolved ?? conflicts;
@@ -190,6 +191,24 @@ export function SyncPanel({ run, busy, onSync, onResolve, onUndo }: Props) {
               {running ? t.resolving : t.resolve}
             </button>
           )}
+        </div>
+      )}
+      {heldChanges.length > 0 && (
+        <div className="sync-conflicts">
+          <strong>{t.heldChanges}</strong>
+          <p>
+            {rich(({ branch }: { branch: string }) => t.heldChangesNote.replaceAll("{branch}", branch), {
+              branch: <code>{run.baseBranch}</code>,
+            })}
+          </p>
+          <ul className="sync-conflict-files">
+            {heldChanges.map((item) => (
+              <li key={item.path}>
+                <code>{item.path}</code>{" "}
+                <span>{t.heldChangesCommits({ commits: item.commits })}</span>
+              </li>
+            ))}
+          </ul>
         </div>
       )}
     </section>

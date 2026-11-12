@@ -18,6 +18,11 @@ export interface LaunchServerOptions {
    * first start. Default true.
    */
   settingsPut?: boolean;
+  /**
+   * false starts without --force. Default true, so a failed provider check
+   * does not stop the shared servers.
+   */
+  force?: boolean;
 }
 
 export interface LaunchedServer {

@@ -33,7 +33,7 @@ cp -a ~/.bellpr ~/bellpr-backup-$(date +%Y%m%d)
 ```
 
 Copy all of it: the run records in `state.json` point at the clones and
-working copies next to them, which hold changes that exist nowhere else
+working directories next to them, which hold changes that exist nowhere else
 yet. Restore a backup to the **same path**: `state.json` and Git's
 worktree records contain absolute paths, so a data directory moved to
 another path or another computer does not work as it is. BELL PR also
@@ -53,7 +53,7 @@ BELL PR starts in a folder that still has old data in `./.bellpr`, it says
 so and moves nothing:
 
 ```text
-Found BELL PR data in ./.bellpr. BELL PR now uses /home/you/.bellpr and moved nothing. To keep using the old folder, start it with: bell-pr start --data-dir ./.bellpr
+BELL PR now uses /home/you/.bellpr. Older data in ./.bellpr was not moved; to keep using it, run: bell-pr start --data-dir ./.bellpr
 ```
 
 To keep working with that data, start BELL PR with it, from that folder:

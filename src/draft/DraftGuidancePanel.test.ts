@@ -3,7 +3,7 @@ import test from "node:test";
 import { createElement } from "react";
 import { getDemo } from "../demo";
 import { assertNoHan, renderEn, renderZh } from "../test-utils/render";
-import { DraftGuidancePanel, whyShownTimes } from "./DraftGuidancePanel";
+import { DraftGuidancePanel } from "./DraftGuidancePanel";
 import { draftPreflight, type DraftCheck } from "../../shared/draft-checks";
 import { reviewabilitySnapshot } from "../../shared/reviewability";
 import { sampleRules as buildSampleRules } from "../mission/respect";
@@ -62,7 +62,7 @@ test("an applied proposal says the editor holds its unrevised text and cannot be
   assert.match(pending, /套用建議草稿/);
   const applied = render(demoDraftPreparation, true);
   assert.match(applied, /已套用/);
-  assert.match(applied, /會原樣送到 GitHub/);
+  assert.match(applied, /說明會原樣發布/);
   assert.match(applied, /<button[^>]*disabled=""[^>]*>[\s\S]*?已套用/);
 });
 
@@ -107,7 +107,7 @@ test("the zh-TW template note and commit explanation keep their inline markup", 
     proposal: { ...demoDraftPreparation.proposal!, rules: [] },
   });
   assert.match(html, /依照「<strong>[^<]+<\/strong>」整理段落。/);
-  assert.match(html, /附上 <code>Signed-off-by: 姓名 &lt;email&gt;<\/code>，表示/);
+  assert.match(html, /附 <code>Signed-off-by: 姓名 &lt;email&gt;<\/code>，聲明/);
 });
 
 // English sample data with the demo's structure, so English renders carry no
@@ -192,14 +192,15 @@ test("the English panel renders every state, label and source kind without Han",
     assert.doesNotThrow(() => assertNoHan(html), name);
   }
   const html = renderEn(panel(english, { issueUrl: "https://github.com/acme/widgets/issues/7" }));
-  assert.match(html, /Write a PR that maintainers can follow/);
+  assert.match(html, /Draft suggestions/);
   assert.match(html, /Follows the project&#x27;s rules/);
   assert.match(html, /What was read and what to confirm/);
   assert.match(html, /No source to check against/);
   assert.match(html, /Apply the suggested draft/);
   assert.match(html, /Suggested commit message/);
   assert.match(html, /Based on:<a /);
-  assert.match(html, /Why do projects ask for <code>type\(scope\)<\/code> or a sign-off\?/);
+  assert.match(html, /<p class="draft-guidance-commit-why">This only shows the required format\. The sign-off is your own statement: type it into the commit message yourself\. The model never adds it\.<\/p>/);
+  assert.match(html, /<summary>Why do projects ask for <code>type\(scope\)<\/code> or a sign-off\?<\/summary>/);
   assert.match(html, /<code>Signed-off-by: Your Name &lt;email&gt;<\/code>/);
   assert.match(html, /Base <code>0123456<\/code>/);
   assert.match(html, /Checked <time dateTime="2026-10-03T01:36:00.000Z">/);
@@ -213,7 +214,7 @@ test("the English panel renders every state, label and source kind without Han",
   ])
     assert.match(html, new RegExp(kind), kind);
   assert.match(html, /aria-label="CONTRIBUTING.md, original text"/);
-  assert.match(html, /<h3 id="draft-checklist-[^"]+"><svg[\s\S]*?<\/svg> The maintainer checklist<\/h3>/);
+  assert.match(html, /<h3 id="draft-checklist-[^"]+"><svg[\s\S]*?<\/svg> Before you publish<\/h3>/);
   // The issue rule and the linked issue moved from the unsaved reminders to the issue row.
   assert.match(issueRow(html), /<strong>This project&#x27;s rule: <\/strong>“Every PR must reference an existing issue\.”/);
   assert.match(issueRow(html), /Source: CONTRIBUTING.md\. Without a linked issue/);
@@ -435,7 +436,7 @@ test("the preflight lists the secret block first, then the path, workflow and e-
   const html = renderEnglish(english, {
     checks: [...preflight.slice(1), preflight[0]],
   });
-  assert.match(html, /<h3 id="draft-preflight-[^"]+"><svg[\s\S]*?<\/svg> Checks before publishing<\/h3>/);
+  assert.match(html, /<div class="draft-guidance-preflight">/);
   const items = [
     ...html.matchAll(/<li class="is-(block|confirm)"><span class="draft-guidance-preflight-kind"><svg[\s\S]*?<\/svg>([^<]+)<\/span><strong>([^<]+)<\/strong>/g),
   ].map((match) => [match[1], match[2], match[3]]);
@@ -443,9 +444,9 @@ test("the preflight lists the secret block first, then the path, workflow and e-
     items.map(([kind, label]) => [kind, label]),
     [
       ["block", "Blocks publishing"],
-      ["confirm", "Confirm before publishing"],
-      ["confirm", "Confirm before publishing"],
-      ["confirm", "Confirm before publishing"],
+      ["confirm", "Needs your confirmation"],
+      ["confirm", "Needs your confirmation"],
+      ["confirm", "Needs your confirmation"],
     ],
   );
   for (const check of [preflight[0], ...preflight.slice(1)])
@@ -462,11 +463,8 @@ test("the preflight lists the secret block first, then the path, workflow and e-
   assert.match(zh, /阻擋發布/);
 });
 
-test("an empty preflight says nothing needs attention; without checks there is no section", () => {
-  assert.match(
-    renderEnglish(english, { checks: [] }),
-    /No check needs your attention in the saved draft\./,
-  );
+test("an empty text preflight does not claim unknown project checks passed", () => {
+  assert.doesNotMatch(renderEnglish(english, { checks: [] }), /draft-guidance-preflight/);
   assert.doesNotMatch(renderEnglish(english), /draft-guidance-preflight/);
 });
 
@@ -483,7 +481,7 @@ test("a published run shows the guidance read-only", () => {
   // The suggestion, its sources and the saved draft's checks stay readable.
   assert.match(preview(html), new RegExp(line));
   assert.match(html, /Source documents/);
-  assert.match(html, /Checks before publishing/);
+  assert.match(html, /Before you publish/);
   assert.doesNotMatch(renderEnglish(undefined, { readOnly: true }), /draft-guidance-empty/);
 });
 
@@ -511,8 +509,8 @@ test("without facts the checklist rows say Couldn't check, never OK", () => {
   assert.equal(html.match(/<span class="draft-checklist-status"><svg[^>]*lucide-circle-help[\s\S]*?<\/svg>Couldn&#x27;t check<\/span>/g)?.length, 8);
   assert.match(checklistRow(html, "rules"), /<strong>The project&#x27;s rules<\/strong><p>BELL PR hasn&#x27;t read this project&#x27;s rules yet\.<\/p>/);
   // Each row says why maintainers care, in one whole sentence.
-  assert.match(checklistRow(html, "pacing"), /<p class="draft-checklist-why">Every open pull request waits on a maintainer&#x27;s time/);
-  assert.equal(html.match(/<p class="draft-checklist-why">/g)?.length, 8);
+  assert.match(checklistRow(html, "pacing"), /<p>Every open pull request waits on a maintainer&#x27;s time/);
+  assert.equal(html.match(/<details class="draft-checklist-why">/g)?.length, 8);
 });
 
 test("with the sample's rules, facts and changes every row is green", () => {
@@ -526,7 +524,7 @@ test("with the sample's rules, facts and changes every row is green", () => {
     understanding: { required: true, passed: true, off: false },
   });
   assert.deepEqual(new Set(Object.values(rowStatuses(html))), new Set(["ok"]));
-  assert.match(checklistRow(html, "door"), /<p>Pull requests: open to you\.<\/p><ul class="draft-checklist-sources"><li>GitHub pull_request_creation_policy: all<\/li><\/ul>/);
+  assert.match(checklistRow(html, "door"), /<p>Pull requests: open to you\.<\/p><details class="draft-checklist-sources"><summary>Sources<\/summary><ul><li>GitHub pull_request_creation_policy: all<\/li><\/ul>/);
   assert.match(checklistRow(html, "pacing"), /Your open PRs here: 0 of 1/);
   assert.match(checklistRow(html, "understanding"), /You explained the change back\./);
   assert.match(html, /Rules read [^<]+2026/);
@@ -579,7 +577,7 @@ test("the respect checks move from the preflight list to the checklist rows", ()
   );
   assert.deepEqual(checks.map((check) => check.id), ["secret", "issue-closed"]);
   const html = renderEnglish(english, { checks, rules: sampleRules, facts, changes: sampleChanges, issueUrl: "#sample-issue-42" });
-  const list = /<section class="draft-guidance-preflight"[\s\S]*?<\/section>/.exec(html)?.[0] ?? "";
+  const list = /<div class="draft-guidance-preflight"[\s\S]*?<\/div>/.exec(html)?.[0] ?? "";
   assert.match(list, /<li class="is-block">[\s\S]*Blocks publishing/);
   assert.doesNotMatch(list, /linked issue is closed/);
   assert.equal(rowStatuses(html).issue, "block");
@@ -587,8 +585,7 @@ test("the respect checks move from the preflight list to the checklist rows", ()
   assert.match(checklistRow(html, "issue"), /GitHub state: CLOSED \(COMPLETED\)/);
   // Only respect checks left: the list says the text is clear and points below.
   const respectOnly = renderEnglish(english, { checks: checks.slice(1), rules: sampleRules, facts, issueUrl: "#sample-issue-42" });
-  assert.match(respectOnly, /The checks on the text are clear\. The maintainer checklist below shows the rest\./);
-  assert.doesNotMatch(respectOnly, /No check needs your attention/);
+  assert.doesNotMatch(respectOnly, /draft-guidance-preflight-clear/);
 });
 
 test("checks made without the facts still leave no row OK against the facts passed in", () => {
@@ -609,43 +606,20 @@ test("checks made without the facts still leave no row OK against the facts pass
   assert.match(checklistRow(off, "understanding"), /Off/);
 });
 
-test("a why sentence folds away after it has been shown 3 times", () => {
-  const storage = new Map<string, string>([
-    ["bellpr-checklist-why-seen", JSON.stringify({ rules: 3, door: 2 })],
-  ]);
-  const globals = globalThis as { localStorage?: unknown };
-  const saved = globals.localStorage;
-  globals.localStorage = {
-    getItem: (key: string) => storage.get(key) ?? null,
-    setItem: (key: string, value: string) => storage.set(key, value),
-  };
-  try {
-    const html = renderEnglish(english);
-    assert.match(
-      checklistRow(html, "rules"),
-      /<details class="draft-checklist-why"><summary>Why maintainers care<\/summary><p>Maintainers write their rules down/,
-    );
-    assert.match(checklistRow(html, "door"), /<p class="draft-checklist-why">Maintainers decide who may open pull requests/);
-  } finally {
-    globals.localStorage = saved;
-  }
-  // Blocked storage keeps every sentence open.
-  globals.localStorage = {
-    getItem() {
-      throw new Error("blocked");
-    },
-  };
-  try {
-    assert.equal(renderEnglish(english).match(/<p class="draft-checklist-why">/g)?.length, 8);
-  } finally {
-    globals.localStorage = saved;
-  }
-  assert.equal(whyShownTimes, 3);
+test("completed checks fold while blocked and unknown checks stay visible, with reasons available on demand", () => {
+  const html = renderEnglish(english, { rules: sampleRules, facts: { ...sampleEn.contributionFacts!, pacing: undefined }, changes: sampleChanges, understanding: { required: true, passed: false, off: false } });
+  const foldedAt = html.indexOf('<details class="draft-completed-checks">');
+  assert.ok(foldedAt > 0);
+  assert.ok(html.indexOf('data-row="understanding"') < foldedAt);
+  assert.ok(html.indexOf('data-row="pacing"') < foldedAt);
+  assert.ok(html.indexOf('data-row="door"') > foldedAt);
+  assert.equal(html.match(/<details class="draft-checklist-why">/g)?.length, 8);
+  assert.doesNotMatch(html, /<p class="draft-checklist-why">/);
 });
 
 test("the zh-TW checklist uses its own words", () => {
   const html = renderZh(panel(english));
-  assert.match(html, /維護者檢查清單/);
+  assert.match(html, /發布前待完成/);
   assert.match(html, /無法確認/);
   assert.match(html, /維護者為什麼在意|維護者把規範寫下來/);
 });
@@ -659,7 +633,7 @@ test("an unlinked description under an issue rule asks to confirm in the issue r
   assert.equal(html.match(/Every PR must reference an existing issue\./g)?.length, 2);
   // Once in the row's sources, once in the source document's own text.
   assert.doesNotMatch(checklistRow(html, "issue"), /draft-guidance-issue-rule/);
-  assert.match(html, /The checks on the text are clear\. The maintainer checklist below shows the rest\./);
+  assert.doesNotMatch(html, /draft-guidance-preflight-clear/);
 });
 
 /** A Learn-by-hand run whose history is clean (shared/by-hand.ts byHandClean), or not. */
@@ -742,7 +716,7 @@ test("a clean Learn-by-hand run's rule rows come only from the server's checks, 
       assert.match(waiting, /is-unknown/);
       assert.ok(waiting.includes("The saved draft hasn&#x27;t been checked yet."));
       // An unclean run gets the agent run's check, the same here as on the server.
-      assert.ok(checklistRow(render(undefined, byHandRun(false)), "rules").includes("AI agents wrote this change"));
+      assert.ok(checklistRow(render(undefined, byHandRun(false)), "rules").includes("AI Agents wrote this change"));
     } finally {
       byHandRulesDecisionInTests();
     }
@@ -776,7 +750,7 @@ test("a published Learn-by-hand run's rules row quotes the rules instead of wait
   const row = checklistRow(html, "rules");
   assert.ok(!row.includes("hasn&#x27;t been checked") && !/is-unknown|is-block/.test(row), row);
   assert.ok(row.includes("We decline AI-generated contributions."));
-  assert.ok(!html.includes("BELL PR won") && !html.includes("AI agents wrote this change"));
+  assert.ok(!html.includes("BELL PR won") && !html.includes("AI Agents wrote this change"));
 });
 
 test("a Learn-by-hand run published through the quoted confirm keeps its rules row on the confirm, never OK", () => {
@@ -807,7 +781,7 @@ test("a Learn-by-hand run published through the quoted confirm keeps its rules r
     const row = checklistRow(html, "rules");
     assert.ok(row.includes("You confirmed the project&#x27;s quoted rule when you published. The maintainers decide whether your change fits."), row);
     assert.ok(row.includes("We decline AI-generated contributions."));
-    assert.match(checklistRow(render(true, renderZh), "rules"), /你在送出時確認了專案引用的規則/);
+    assert.match(checklistRow(render(true, renderZh), "rules"), /你在發布時確認了專案引用的規則/);
     // In review the row still waits for the server's list.
     assert.ok(checklistRow(render(false), "rules").includes("The saved draft hasn&#x27;t been checked yet."));
   } finally {

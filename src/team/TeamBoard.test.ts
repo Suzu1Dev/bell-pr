@@ -68,9 +68,9 @@ test("a failed real run offers the retry form, opens failure reasons and marks c
   };
   const html = renderZh(board(run, false, async () => {}));
   assert.match(html, /重試失敗的子任務/);
-  assert.match(html, /1 個已整合的子任務不會重跑；1 個失敗或被阻擋的子任務/);
-  assert.match(html, /aria-label="給重試任務的補充說明"/);
-  assert.match(html, /獨立 worktree 已清理/);
+  assert.match(html, /1 個已整合的子任務不會重跑。1 個失敗或受阻的會丟棄舊工作目錄/);
+  assert.match(html, /aria-label="給重試子任務的補充說明"/);
+  assert.match(html, /獨立工作目錄已清理/);
   assert.match(html, /查看失敗原因/);
   assert.match(html, /aria-expanded="true"/);
   assert.match(html, /Teammate 修改了未分配的檔案 c.ts/);
@@ -110,7 +110,7 @@ test("a plan awaiting approval offers 退回並補充意見 with the revision hi
     },
     false,
   );
-  assert.match(html, /確認計畫並開始開發/);
+  assert.match(html, /核准計畫並開始開發/);
   assert.match(html, /aria-label="退回計畫的意見"/);
   assert.match(html, /已重擬 1\/3/);
   assert.match(html, /第 1 次退回/);
@@ -147,13 +147,18 @@ test("lanes keep their grouping and the empty running lane has its own message",
     false,
   );
   const [todo, running, done] = lanes(html);
-  assert.match(todo, /^<h3>待處理<span>2<\/span><\/h3>/);
-  assert.ok(todo.includes(first.title) && todo.includes(second.title));
+  assert.match(todo, /^<h3>待處理<span>3<\/span><\/h3>/);
+  assert.ok(
+    todo.includes(first.title) &&
+      todo.includes(second.title) &&
+      todo.includes(third.title),
+  );
+  assert.match(todo, /失敗/);
   assert.match(running, /^<h3>進行中<span>0<\/span><\/h3>/);
   assert.match(running, /目前沒有正在執行的子任務/);
-  // Failed tasks sit in the done lane.
-  assert.match(done, /^<h3>已完成<span>2<\/span><\/h3>/);
-  assert.ok(done.includes(third.title) && done.includes(fourth.title));
+  assert.match(done, /^<h3>已完成<span>1<\/span><\/h3>/);
+  assert.ok(done.includes(`<h4>${fourth.title}</h4>`));
+  assert.ok(!done.includes(`<h4>${third.title}</h4>`));
   const empty = lanes(
     render({ ...demoRun, team: { ...demoTeam, phase: "planning", tasks: [] } }, false),
   );
@@ -292,16 +297,18 @@ test("the English board renders every phase without Han", () => {
   assert.match(sample, /4 \/ 4 subtasks done/);
   assert.match(sample, /Up to 3 members work at the same time/);
   assert.match(sample, /Integrated: src\/utils\/retry.ts, src\/types.ts/);
-  assert.match(sample, /Waits for task-2, task-3/);
+  assert.match(sample, /Depends on/);
+  assert.doesNotMatch(sample, /Waits for/);
   assert.match(sample, /The app saw 2 commands run/);
   assert.match(sample, /Delivered · Sample/);
-  assert.match(sample, /BELL PR coordinates the team/);
+  assert.match(sample, /BELL PR runs its own coordination/);
   const integrating = renderEn(
     board(runs.find(([name]) => name === "integrating")![1], false),
   );
   assert.match(integrating, /The lead is integrating/);
   assert.match(integrating, /Plan runs automatically/);
-  assert.match(integrating, /Codex · BELL PR team engine/);
+  assert.match(integrating, /<h2>Agent team<\/h2>/);
+  assert.match(integrating, /<span>Codex<small>/);
 });
 
 test("English plan revisions and retries use whole sentences with English plurals", () => {
@@ -334,7 +341,7 @@ test("English plan revisions and retries use whole sentences with English plural
   assert.match(approval, /The previous plan had 2 tasks: Do it all, Ship it/);
   assert.match(approval, /<b>Your feedback: <\/b>Split the tests out\./);
   assert.match(approval, /The lead did not describe the changes/);
-  assert.match(approval, /Revised 1\/3\. Each revision is one read-only planning turn/);
+  assert.match(approval, /Revised 1\/3\. Each revision makes the Lead plan once more, without writing code\./);
   assert.match(approval, /aria-label="Feedback on the plan"/);
   const retry = renderEn(
     board(
@@ -353,7 +360,7 @@ test("English plan revisions and retries use whole sentences with English plural
   );
   assert.match(
     retry,
-    /1 subtask already integrated will not run again\. 1 subtask that failed or was blocked will discard its old isolated directory/,
+    /1 subtask already integrated won&#x27;t rerun\. 1 subtask that failed or was blocked restarts from a fresh snapshot, discarding its old working directory/,
   );
   assert.match(retry, /View the failure reason/);
   assert.match(retry, /Retry failed subtasks/);
@@ -376,7 +383,7 @@ test("the empty running lane message is chosen by lane id, not by its label", ()
     ),
   );
   const [todo, running, done] = lanes(html);
-  assert.match(todo, /^<h3>To do<span>0<\/span><\/h3>[\s\S]*Subtasks appear here once the lead&#x27;s plan is ready\./);
+  assert.match(todo, /^<h3>To do<span>0<\/span><\/h3>[\s\S]*Subtasks appear here once the Lead&#x27;s plan is ready\./);
   assert.match(running, /^<h3>Done<span>0<\/span><\/h3>[\s\S]*No subtask is running right now/);
   assert.match(done, /^<h3>In progress<span>0<\/span><\/h3>[\s\S]*No subtask has finished yet/);
   assert.doesNotMatch(done, /No subtask is running/);
@@ -402,6 +409,91 @@ const english = (run: Run) => {
   return html;
 };
 
+test("dependencies show every task title, live status and unknown references in both languages", () => {
+  const withDependencies = (run: Run): Run => {
+    const team = run.team!;
+    const [complete, failed, dependent] = team.tasks;
+    return {
+      ...run,
+      status: "running",
+      team: {
+        ...team,
+        phase: "developing",
+        tasks: [
+          { ...complete, status: "complete" },
+          { ...failed, status: "failed" },
+          {
+            ...dependent,
+            status: "ready",
+            dependsOn: [complete.id, failed.id, "missing-task"],
+          },
+        ],
+      },
+    };
+  };
+  const [zhComplete, zhFailed] = demoTeam.tasks;
+  const zh = render(withDependencies(demoRunZh), false);
+  assert.match(zh, /<div class="team-task-deps"><span>相依<\/span><ul aria-label="相依">/);
+  assert.ok(
+    zh.includes(`<li><span>${zhComplete.title}</span><span>已整合</span></li>`),
+  );
+  assert.ok(
+    zh.includes(`<li><span>${zhFailed.title}</span><span>失敗</span></li>`),
+  );
+  assert.ok(zh.includes("<li><span>missing-task</span><span>未知</span></li>"));
+  assert.doesNotMatch(zh, /先完成/);
+
+  const [enComplete, enFailed] = englishTeam.tasks;
+  const en = english(withDependencies(englishRun));
+  assert.match(en, /<div class="team-task-deps"><span>Depends on<\/span><ul aria-label="Depends on">/);
+  assert.ok(
+    en.includes(`<li><span>${enComplete.title}</span><span>Integrated</span></li>`),
+  );
+  assert.ok(
+    en.includes(
+      `<li><span>${enFailed.title.replace("'", "&#x27;")}</span><span>Failed</span></li>`,
+    ),
+  );
+  assert.ok(en.includes("<li><span>missing-task</span><span>Unknown</span></li>"));
+});
+
+test("stopped runs label ready tasks and their dependencies as ready after retry", () => {
+  const withReadyDependency = (
+    run: Run,
+    phase: "failed" | "cancelled" | "developing",
+  ): Run => {
+    const team = run.team!;
+    const [ready, dependent] = team.tasks;
+    return {
+      ...run,
+      status: phase === "developing" ? "running" : phase,
+      team: {
+        ...team,
+        phase,
+        tasks: [
+          { ...ready, status: "ready" },
+          { ...dependent, status: "blocked", dependsOn: [ready.id] },
+        ],
+      },
+    };
+  };
+  for (const phase of ["failed", "cancelled"] as const) {
+    const zh = render(withReadyDependency(demoRunZh, phase), false);
+    assert.equal(zh.match(/重試後可執行/g)?.length, 2, phase);
+    assert.doesNotMatch(zh, /可開始/, phase);
+    const en = english(withReadyDependency(englishRun, phase));
+    assert.equal(en.match(/Ready after retry/g)?.length, 2, phase);
+    assert.doesNotMatch(en, /Ready to start/, phase);
+  }
+
+  const zh = render(withReadyDependency(demoRunZh, "developing"), false);
+  assert.equal(zh.match(/可開始/g)?.length, 2);
+  assert.doesNotMatch(zh, /重試後可執行/);
+  const en = english(withReadyDependency(englishRun, "developing"));
+  assert.equal(en.match(/Ready to start/g)?.length, 2);
+  assert.doesNotMatch(en, /Ready after retry/);
+});
+
 test("a queued run says it waits to start, with no progress count yet", () => {
   const html = english({
     ...englishRun,
@@ -423,7 +515,7 @@ test("a team that stopped before its plan says so instead of planning", () => {
       status: phase,
       team: { ...englishTeam, phase, planSummary: "", tasks: [], messages: [] },
     });
-    assert.match(html, /The team stopped before the lead finished a plan\./, phase);
+    assert.match(html, /The team stopped before the Lead finished a plan\./, phase);
     assert.doesNotMatch(html, /Reading the project/, phase);
   }
 });
@@ -442,7 +534,7 @@ test("the English planning phase shows the lead at work and lane messages chosen
   assert.deepEqual(
     lanes(html).map((lane) => /team-lane-empty">([^<]*)</.exec(lane)?.[1]),
     [
-      "Subtasks appear here once the lead&#x27;s plan is ready.",
+      "Subtasks appear here once the Lead&#x27;s plan is ready.",
       "No subtask is running right now",
       "No subtask has finished yet",
     ],
@@ -521,16 +613,16 @@ test("the runtime badge shows the team size the run was configured with", () => 
   assert.match(english(withTeammates(4)), /Up to 4 members work at the same time/);
   // The badge states the configured size only: no limit line beside it.
   assert.doesNotMatch(english(withTeammates(4)), /team-plan-limit|Free|Pro\b|keeps the team size/);
-  assert.match(renderZh(board(run, false)), /最多 2 位成員同時工作/);
+  assert.match(renderZh(board(run, false)), /最多 2 位隊友同時工作/);
 });
 
 test("the protocol note sits in a How it works disclosure", () => {
   const html = english(englishRun);
   assert.match(
     html,
-    /<details class="team-how"><summary><svg[^>]*>[\s\S]*?<\/svg>How it works<svg[^>]*>[\s\S]*?<\/svg><\/summary><p class="team-protocol-note"><svg[^>]*>[\s\S]*?<\/svg>BELL PR coordinates the team[^<]*it is not Claude Code&#x27;s native Agent Teams\.<\/p><\/details>/,
+    /<details class="team-how"><summary><svg[^>]*>[\s\S]*?<\/svg>How it works<svg[^>]*>[\s\S]*?<\/svg><\/summary><p class="team-protocol-note"><svg[^>]*>[\s\S]*?<\/svg>BELL PR runs its own coordination[^<]*It is not Claude Code&#x27;s native Agent Teams\.<\/p><\/details>/,
   );
-  assert.match(renderZh(board(demoRunZh, true)), /<summary>[\s\S]*?運作方式[\s\S]*?並非 Claude Code 原生 Agent Teams/);
+  assert.match(renderZh(board(demoRunZh, true)), /<summary>[\s\S]*?運作方式[\s\S]*?這並非 Claude Code 原生 Agent Teams/);
 });
 
 test("the message list can take focus and is named for screen readers", () => {
@@ -623,7 +715,7 @@ test(
     );
     assert.match(seen.get("queued")!, /Waiting to start/);
     assert.match(seen.get("planning")!, /The lead is planning/);
-    assert.match(seen.get("planning")!, /Subtasks appear here once the lead&#x27;s plan is ready\./);
+    assert.match(seen.get("planning")!, /Subtasks appear here once the Lead&#x27;s plan is ready\./);
     // The sample's approve button calls onApprove, which 5B points at the playback.
     assert.match(seen.get("awaiting_approval")!, /Approve the plan and start development/);
     assert.match(seen.get("awaiting_approval")!, /Subtasks start once you approve the plan\./);
@@ -728,7 +820,7 @@ test("a learn-by-hand run plans with the guide instead of approving a team plan,
   // The premise check shows once, first in the plan panel (loading here), not on the board too.
   assert.doesNotMatch(planning, /Retries never stop\./);
   // No agent team here: no team header, flow, task lanes or team conversation, only the plan and the run's details.
-  assert.doesNotMatch(planning, /Shared tasks and team messages|Build together|Teammates work in parallel|team-kanban|Team conversation|Team message/);
+  assert.doesNotMatch(planning, /Shared tasks and team messages|<h2>Agent team<\/h2>|Teammates work in parallel|team-kanban|Team conversation|Team message/);
   assert.match(planning, /Run details/);
   // The plan panel loads with the byhand chunk; no team approval or "send back".
   assert.match(planning, /<svg[^>]*lucide-loader-circle[^>]*spin/);

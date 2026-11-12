@@ -36,19 +36,19 @@ const models = {
   }: {
     passed: string;
     reported: string;
-  }) => `Passed ${passed} → reported ${reported}`,
+  }) => `Requested ${passed} · CLI reported ${reported}`,
   /** No --model was passed; the CLI reported the model it chose. */
   defaultAndReported: ({ reported }: { reported: string }) =>
-    `No --model passed → reported ${reported}`,
+    `Default model · CLI reported ${reported}`,
   withCliVersion: ({ model, version }: { model: string; version: string }) =>
     `${model} (CLI ${version})`,
   /** The reasoning effort was left to the provider's default. */
   providerDefault: ({ provider }: { provider: string }) =>
     `${provider} default`,
   sourceReported: ({ provider }: { provider: string }) =>
-    `These are the settings ${product.name} passed to ${provider} and the model the ${provider} CLI reported. Reported values come from CLI events, not from your provider's billing.`,
+    `These are the settings ${product.name} sent to ${provider}. The model is what the ${provider} CLI reported, not your provider's billing.`,
   sourceUnreported: ({ provider }: { provider: string }) =>
-    `These are the settings ${product.name} passed to ${provider}. The model the service actually used was not reported.`,
+    `These are the settings ${product.name} sent to ${provider}. The CLI did not report which model was used.`,
 };
 
 export default models;

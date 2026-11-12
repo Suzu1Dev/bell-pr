@@ -52,7 +52,7 @@ test("the top bar reads in English with no Chinese left", () => {
   assert.match(html, /<span class="readiness-text">Ready<\/span>/);
   assert.match(html, /aria-label="Collapse the sidebar"/);
   assertNoHan(html);
-  for (const page of ["home", "repos", "explore", "discovery", "team", "learning", "settings"] as const)
+  for (const page of ["home", "repos", "explore", "discovery", "team", "group", "learning", "settings"] as const)
     assertNoHan(renderEn(element({ page, sidebarCollapsed: true, report: broken })));
   assert.match(renderEn(element({ page: "settings" })), /<span class="breadcrumb-page">Settings<\/span>/);
   assert.match(renderEn(element({ page: "home" })), /<span class="breadcrumb-page">Home<\/span>/);
@@ -113,9 +113,9 @@ test("the sample badge sits in the bar's row between the page name and the actio
 });
 
 test("the avatar shows the GitHub user's initials, and an icon otherwise or while presenting", () => {
-  assert.match(renderEn(element({ githubUser: "octo-cat" })), /aria-label="Profile settings">OC<\/button>/);
-  assert.match(renderEn(element()), /aria-label="Profile settings"><svg/);
-  assert.match(renderEn(element({ githubUser: "octo-cat", presenting: true })), /aria-label="Profile settings"><svg/);
+  assert.match(renderEn(element({ githubUser: "octo-cat" })), /aria-label="Settings">OC<\/button>/);
+  assert.match(renderEn(element()), /aria-label="Settings"><svg/);
+  assert.match(renderEn(element({ githubUser: "octo-cat", presenting: true })), /aria-label="Settings"><svg/);
 });
 
 test("a notice's close button reads in the UI language", () => {

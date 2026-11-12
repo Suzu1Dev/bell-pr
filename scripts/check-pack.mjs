@@ -21,11 +21,14 @@
 //   - ships web bundles over the gzip budgets below;
 //   - lacks a dist/ tree, or its bin is missing, not executable, or fails
 //     `bell-pr --help` after a temp-prefix install of the tarball;
-//   - with --tarball only: ships a root README (README.md, README.zh-TW.md
-//     or any other README.*) that still has a relative link or image, which
-//     npmjs.com cannot show, because prepack's
-//     `node scripts/npm-readme.mjs --pre` did not rewrite it. `npm publish`
-//     may take any of them as the package's README.
+//   - would let `npm publish` send another README than README.md as the
+//     package's: npm takes any root file named README or README.* (such
+//     as the old README.zh-TW.md), in no fixed order, unless package.json
+//     has a `readme` field;
+//   - with --tarball only: ships a README (README.md, README-zh-TW.md or
+//     any other root README.*) that still has a relative link or image,
+//     which the package cannot show, because prepack's
+//     `node scripts/npm-readme.mjs --pre` did not rewrite it.
 //
 // Make room before you raise a budget; a raise needs a reason in the commit
 // message body.
@@ -45,7 +48,11 @@
 // with Node.js 22.22.1: all JS 479.4 kB in 53 files, 481.4 kB on CI's
 // Node.js 24. The hand-off added 4.0 kB: its dialog and the en and zh-TW
 // texts it must show (no sandbox, your account, sudo, what Stop leaves),
-// so the all-JS budget rose from 480 kB to 490 kB.
+// so the all-JS budget rose from 480 kB to 490 kB. Measured with the Group
+// page (group work, part 3) with Node.js 22.22.1: all JS 489.7 kB in 54
+// files, 491.7 kB on CI's Node.js 24. The page added 9.2 kB: its own chunk
+// (6.6 kB) and its en and zh-TW texts, so the all-JS budget rose from
+// 490 kB to 500 kB.
 //
 // Exit status: 0 when every check passes, 1 when one fails, 2 on a usage or
 // setup error.
@@ -57,7 +64,7 @@ import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import { gzipSync } from "node:zlib";
 import { parsePackReport, shellArg, tarballReport } from "./npm-pack-report.mjs";
-import { isReadme, packageReadmeProblems } from "./npm-readme.mjs";
+import { packageReadmeProblems, publishReadmeProblems } from "./npm-readme.mjs";
 import { diffExpected, readExpected } from "./pack-expected.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -69,7 +76,7 @@ const budgets = {
   entries: 150,
   woff2: 12,
   largestJsGzip: 116 * kB,
-  totalJsGzip: 490 * kB,
+  totalJsGzip: 500 * kB,
   totalCssGzip: 45 * kB,
 };
 const required = [
@@ -87,7 +94,7 @@ const required = [
   "LICENSE",
   "NOTICE",
   "README.md",
-  "README.zh-TW.md",
+  "README-zh-TW.md",
 ];
 const forbidden = [
   { pattern: /(^|\/)\.codex-prompts(\/|$)/, reason: "private prompts" },
@@ -286,8 +293,9 @@ function check(tarball, { readme }) {
     problems.push(error instanceof Error ? error.message : String(error));
   }
 
-  // npm publish may take any root README as the package's, so all of them.
-  const readmes = files.filter(isReadme).sort();
+  // The file names are the same with or without prepack, so both modes
+  // check that npm publish can only send README.md.
+  problems.push(...publishReadmeProblems(report.contents));
   if (readme) problems.push(...packageReadmeProblems(report.contents));
 
   // Budget/forbidden findings still fail the check; still run the install smoke
@@ -299,7 +307,7 @@ function check(tarball, { readme }) {
     return 1;
   }
   console.error(
-    `check-pack: the package is within every budget; dist/ present; packed bin runs --help${readme ? `; ${readmes.join(", ")} ready for npmjs.com` : ""}.`,
+    `check-pack: the package is within every budget; dist/ present; packed bin runs --help; npm publish sends README.md as its README${readme ? `; the READMEs are ready for npmjs.com` : ""}.`,
   );
   return 0;
 }

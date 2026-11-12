@@ -9,9 +9,9 @@ const m: Translation<typeof en> = {
     citesUnsampledFile: ({ path }) => `引用了未抽樣的檔案 ${path}`,
     citesUnsuppliedFile: ({ path }) => `引用了未提供的檔案 ${path}`,
     quotePathNotInEvidence: ({ path, quote }) =>
-      `引文路徑 ${path} 不在這項建議的 evidence 清單：「${quote}」`,
+      `引文路徑 ${path} 不在這項建議的依據清單：「${quote}」`,
     quoteNotFound: ({ path, quote }) => `引文在 ${path} 找不到：「${quote}」`,
-    evidenceWithoutQuote: ({ path }) => `evidence 路徑 ${path} 缺對應引文`,
+    evidenceWithoutQuote: ({ path }) => `依據路徑 ${path} 缺對應引文`,
     incompleteAnswer: "AI 分析格式不完整，請重新分析；原有結果已保留。",
     sensitiveAnswer: "AI 回應疑似包含敏感內容，結果未儲存。",
     unsuppliedCitation: ({ field, path }) =>
@@ -19,7 +19,7 @@ const m: Translation<typeof en> = {
     readingPathTooShort: "AI 分析的建議閱讀順序過短，請重新分析；原有結果已保留。",
     duplicateIds: "AI 建議的識別碼重複，請重新分析。",
     repositoryNotFound: "找不到 Repository。",
-    cacheUnreadable: "專案分析資料無法讀取，請檢查本機 insights 資料檔。",
+    cacheUnreadable: "專案分析資料無法讀取，請檢查資料目錄裡 insights 資料夾的檔案。",
     modelSettingsUnreadable: "模型設定無法讀取，請檢查本機 model-settings.json。",
     analyzeFirst: "請先分析專案，再調整貢獻建議。",
     recommendationsChanged: "部分貢獻建議已更新，請重新整理後再調整。",
@@ -52,7 +52,7 @@ const m: Translation<typeof en> = {
     popularity: ({ stars, forks, pushedAt }) =>
       `GitHub 查詢快照：${stars} stars、${forks} forks，最近推送於 ${pushedAt}。人氣不能保證提案會被接受。`,
     popularityWithoutPush: ({ stars, forks }) =>
-      `GitHub 查詢快照：${stars} stars、${forks} forks，最近推送於 未提供。人氣不能保證提案會被接受。`,
+      `GitHub 查詢快照：${stars} stars、${forks} forks，未提供最近推送日期。人氣不能保證提案會被接受。`,
     skippedDifficulty: ({ count }) => `已略過 ${count} 項超出指定難度的建議。`,
     fileTooLarge: "探索結果檔案過大，無法安全載入。",
     interruptedError:
@@ -72,9 +72,9 @@ const m: Translation<typeof en> = {
     skippedSensitiveSource: "已略過疑似包含敏感資訊的來源。",
     sourcesTruncated: "來源超過 30 KB 範圍，已省略完整段落。",
     noEvidence: "這次未找到同時符合條件且具有可核對 issue 證據的機會。",
-    analyzing: "已取得真實 GitHub 來源，正在分析適合的貢獻機會",
+    analyzing: "已取得 GitHub 來源，正在分析適合的貢獻機會",
     analyzingWithWait: ({ wait }) =>
-      `已取得真實 GitHub 來源，正在分析適合的貢獻機會（${wait}）`,
+      `已取得 GitHub 來源，正在分析適合的貢獻機會（${wait}）`,
     unusableAnswer:
       "AI 探索分析未完成或回應無法安全使用，請重試；上一份結果仍保留。",
     found: ({ count }) =>
@@ -96,7 +96,7 @@ const m: Translation<typeof en> = {
     cancelled: "貢獻探索已取消。",
     limitReached: "探索達到請求或時間上限。",
     unreadableText: ({ title }) => `${title} 不是可安全讀取的文字，已略過。`,
-    maskedCredentials: (_title) => "發佈前會擋下常見格式的 token 與私鑰。",
+    maskedCredentials: (_title) => "發布前會擋下常見格式的 token 與私鑰。",
     truncatedSource: ({ title, bytes }) =>
       `${title} 僅保留前 ${bytes} bytes，尚未讀取完整內容。`,
     searching: "正在搜尋公開、未封存且符合條件的 GitHub 專案。",
@@ -104,15 +104,15 @@ const m: Translation<typeof en> = {
       "GitHub 搜尋未成功完成，可能受到權限、連線或 API 限制影響；尚不能判定沒有符合條件的專案。",
     partialResults: "GitHub 回傳部分搜尋結果，這次探索不是完整清單。",
     noRepositories:
-      "這次有界搜尋未找到符合條件的公開專案；可減少關鍵字、降低 stars 門檻或調整難度。",
+      "這次搜尋只看 GitHub 前 12 筆結果，未找到符合條件的公開專案；可減少關鍵字、降低 stars 門檻或調整難度。",
     samplingScope: ({ sort }) =>
-      `最多取樣 6 個${
+      `取樣：最多 6 個${
         {
           relevance: "GitHub 相關度（best match）最高",
           updated: "最近更新",
           stars: "星數最多",
         }[sort]
-      }的專案，每個最多 3 個開啟中的 issue 與每則最後 3 則留言；標籤不保證實際難度或仍可認領。文件僅讀取 GitHub community profile 識別的根目錄、.github、docs 內 README、CONTRIBUTING 與 PR 模板，未讀取帳號共用規範、多模板目錄及外部連結。`,
+      }的專案，各最多 3 個開放中 issue，每個 issue 最後 3 則留言。標籤不保證難度或仍可認領。讀取：GitHub community profile 在根目錄、.github、docs 找到的 README、CONTRIBUTING、PR 範本。未讀取：帳號共用規範、多範本目錄、外部連結。`,
     screening: ({ repository }) =>
       `正在檢查 ${repository} 的 issue、貢獻文件與維護者回應。`,
     repositoryUnconfirmed: ({ repository }) =>
@@ -124,7 +124,7 @@ const m: Translation<typeof en> = {
         {
           readme: "README",
           contributing: "CONTRIBUTING",
-          template: "PR 模板",
+          template: "PR 範本",
         }[document]
       } 未在本次允許的索引範圍找到，其他位置仍可能有規範。`,
     documentFailed: ({ path }) =>
@@ -133,11 +133,11 @@ const m: Translation<typeof en> = {
       `GitHub 狀態：OPEN；標籤：${labels || "無"}；更新時間：${updatedAt ?? "未確認"}；受指派人數：${assignees ?? "未確認"}；討論鎖定：${locked ? "是" : "否"}；表情回應總數：${reactions ?? "未確認"}（不代表支持票）。`,
     commentTitle: ({ number, association }) => `#${number} · ${association} 留言`,
     noMatchingIssue:
-      "本次取樣未取得符合難度標籤的開啟中 issue，尚不能確認具體需求或可認領性。",
+      "本次取樣未取得符合難度標籤的開放中 issue，尚不能確認具體需求或可認領性。",
     noPushTime: "GitHub 未提供可驗證的最後推送時間。",
     candidateBytesLimit: "來源已達每個專案 30 KB 上限，部分內容未讀取。",
     requestLimit:
-      "探索達到 36 次請求或 90 秒上限，已保留取得的結果；尚未完整讀取其餘候選來源。",
+      "探索達 36 次請求或 90 秒上限，已保留現有結果；其餘候選來源未讀完。",
     noCandidates:
       "候選資料未能通過公開狀態與來源驗證，這次沒有可分析的專案；可稍後重試或調整條件。",
   },
@@ -157,7 +157,7 @@ const m: Translation<typeof en> = {
     documentLimit: "文件取樣達到 16 份或 80 KB 上限；尚未完整檢查所有規範。",
     readFailed: ({ label }) => `${label} 讀取失敗，尚未確認其規範。`,
     searchScope:
-      "本機規範搜尋範圍為基準版本的根目錄、.github、docs 與 documentation 內常見貢獻指南、README、維護者文件及 PR 模板，根目錄的 AGENTS.md／CLAUDE.md，以及 .github/workflows 中會自動檢查 PR 的流程；未追蹤文件中的外部連結。",
+      "本機規範搜尋範圍（基準版本）：根目錄、.github、docs 與 documentation 內常見的貢獻指南、README、維護者文件及 PR 範本；根目錄的 AGENTS.md／CLAUDE.md；.github/workflows 中檢查 PR 的流程。未追蹤文件內的連結。",
     automationLimit: ({ max, remaining }) =>
       `自動檢查流程最多收錄 ${max} 份；其餘 ${remaining} 個 workflow 尚未檢查。`,
     workflowScanLimit: ({ total, max }) =>
@@ -168,7 +168,7 @@ const m: Translation<typeof en> = {
     noRemote:
       "未提供可驗證的 github.com 專案網址，尚未檢查 GitHub 維護者討論與帳號共用預設規範。",
     metadataFailed:
-      "GitHub 維護者討論與帳號共用資訊讀取失敗（可能是權限、連線或 API 限制）；不能據此判定沒有額外規範。",
+      "讀不到 GitHub 的維護者討論與帳號共用資訊（或因權限、連線、API 限制）；仍可能有其他規範。",
     defaultsTruncated:
       "帳號共用 .github 的檔案清單已截斷；尚未完整檢查預設規範。",
     defaultsNotPublic:
@@ -178,7 +178,7 @@ const m: Translation<typeof en> = {
     defaultsFailed:
       "帳號共用 .github 預設規範讀取失敗；尚未確認是否存在適用規範。",
     maintainerSample:
-      "維護者偏好僅取樣最近更新的 3 個已合併 PR，各最多 5 則留言及 5 則 review；已合併不等於規範認可，仍需人工確認適用性。",
+      "維護者偏好取自最近更新的 3 個已合併 PR，各最多 5 則留言與 5 則 review。已合併不代表認可，請逐項確認。",
     maintainerComment: ({ number, association }) =>
       `PR #${number} · ${association} 留言`,
     maintainerReview: ({ number, association }) =>
@@ -192,7 +192,7 @@ const m: Translation<typeof en> = {
       "提交訊息建議不能包含 Signed-off-by 等署名欄位；簽署只能由本人輸入。",
     commitMessageSource: "提交訊息建議引用的來源不存在，請重新產生。",
     commitTrailer: ({ label, quote, line, title }) =>
-      `${title ? "主旨沿用 PR 標題。" : ""}${label} 要求加上 AI trailer（「${quote}」），所以訊息最後一行是 ${line}，寫明這次變更由哪個 Agent 撰寫。`,
+      `${title ? "主旨沿用 PR 標題。" : ""}${label} 要求 AI trailer（「${quote}」），所以訊息以 ${line} 結尾，註明撰寫的 Agent。`,
     ruleQuoteMismatch: "PR 草稿的規範引用無法對應來源，請重新產生。",
     templateNotUsed: "PR 草稿未採用目標專案提供的範本，請重新產生。",
     templateHeadingsMissing: "PR 草稿缺少專案範本的段落標題，請重新產生。",
@@ -200,11 +200,11 @@ const m: Translation<typeof en> = {
     linuxOverridesRules:
       "已有適用的專案規範，不能以 Linux 預設取代，請重新產生。",
     certifiesForPerson:
-      "PR 草稿不能代替使用者簽署、背書或勾選已完成的確認項目。",
+      "PR 草稿不能代替你簽署、背書或勾選確認項目。",
     placeholdersInBody: ({ lines }) =>
       `PR 草稿把待辦事項或未填的範本欄位寫進了會送到 GitHub 的說明（第 ${lines} 行），請重新產生。`,
     provisionalLinuxPolicy:
-      "來源查找有範圍限制或未完成項目，暫用 Linux 投稿寫作原則；送出前請人工確認專案規定。",
+      "來源查找受限或未完成，暫用 Linux 投稿寫作原則；發布前請確認專案規定。",
     noSafeDiff: "目前沒有可用來撰寫 PR 的安全程式碼差異。",
     diffTooLarge: "差異超過 PR 草稿的 100 KB 上限；請拆分變更後重試。",
   },
@@ -219,7 +219,7 @@ const m: Translation<typeof en> = {
   prFeedback: {
     githubError: ({ message }) => `GitHub 回傳錯誤：${message}`,
     notFound: "在 GitHub 找不到這個 PR。",
-    urlMismatch: "GitHub 回傳的 PR 網址與工作紀錄不一致。",
+    urlMismatch: "GitHub 回傳的 PR 網址與任務紀錄不一致。",
     partialReviews: ({ shown, total }) =>
       `Review 只讀取最近 ${shown} 則，共 ${total} 則。`,
     partialComments: ({ shown, total }) =>
@@ -242,13 +242,13 @@ const m: Translation<typeof en> = {
       "暫時無法讀取 Codex 模型目錄。請確認 CLI 已安裝並登入，稍後再試。",
     antigravityCatalogUnavailable:
       "暫時無法讀取 Antigravity 模型目錄。請確認 agy CLI 已安裝並登入，稍後再試。",
-    antigravityModel: "由 Antigravity CLI 依你的帳號列出；它提供的思考強度列在思考強度選項中。",
+    antigravityModel: "由 Antigravity CLI 依你的帳號列出；它提供的思考層級會列為思考強度選項。",
     claudeOpus: "適合複雜的程式修改、審查與多步驟推理。",
     claudeSonnet: "速度與能力較平衡，適合日常開發與分析。",
     claudeFable: "能力最強，單次工作可能較久；需方案支援。",
     claudeHaiku: "最快、用量最低；不支援思考強度設定。",
     invalidSettings: "模型設定格式不正確，請重新選擇。",
-    providerMismatch: "模型目錄與所選 Agent 不一致，請重新載入後再選擇。",
+    providerMismatch: "模型目錄與所選 AI 服務不一致，請重新載入後再選擇。",
     unknownModel: "無法確認這組模型設定，請重新載入模型目錄並選擇。",
     unsupportedEffort: "所選模型不支援這個思考強度，請重新選擇。",
   },

@@ -1,5 +1,6 @@
 import { lazy, Suspense, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import {
+  ArrowDown,
   ArrowRight,
   ArrowUpRight,
   BookOpen,
@@ -13,6 +14,7 @@ import {
   FileSearch,
   FolderTree,
   GitBranch,
+  Globe,
   GripVertical,
   Languages,
   Lightbulb,
@@ -204,6 +206,9 @@ const sectionAnchor = (section: OverviewSection) => `overview-${section}`;
 
 /** Scrolls `target` to the top, below the sticky section nav, and focuses it. */
 function showSection(target: HTMLElement) {
+  for (let parent = target.parentElement; parent; parent = parent.parentElement) {
+    if (parent instanceof HTMLDetailsElement) parent.open = true;
+  }
   target.scrollIntoView({
     block: "start",
     behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
@@ -463,7 +468,6 @@ function Brief({
     >
       <div className="mission-section-heading">
         <div>
-          <span className="mission-kicker">{t.kicker}</span>
           <h2 id="mission-contribution-title">{t.title}</h2>
         </div>
         <span className="mission-section-icon">
@@ -495,11 +499,11 @@ function Brief({
               <span>{t.problem}</span>
               <BriefText text={brief.problem} />
             </div>
-            <div>
+            {brief.motivation && brief.motivation !== brief.after && <div>
               <span>{t.motivation}</span>
               {tag && <em className="mission-premise-tag">{tag}</em>}
               <BriefText text={brief.motivation} />
-            </div>
+            </div>}
           </div>
           {brief.beneficiaries.length > 0 && (
             <div className="mission-beneficiaries">
@@ -510,28 +514,29 @@ function Brief({
               ))}
             </div>
           )}
-          <div className="mission-before-after">
-            <article className="mission-before">
+          {(brief.before || brief.after) && <div className="mission-before-after">
+            {brief.before && <article className="mission-before">
               <span className="mission-change-label">
                 {t.before} <span>{t.beforeCaption}</span>
               </span>
               <BriefText text={brief.before} />
-            </article>
-            <div className="mission-change-arrow" aria-hidden="true">
+            </article>}
+            {brief.before && brief.after && <div className="mission-change-arrow" aria-hidden="true">
               <ArrowRight size={20} />
-            </div>
-            <article className="mission-after">
+            </div>}
+            {brief.after && <article className="mission-after">
               <span className="mission-change-label">
                 {t.after} <span>{t.afterCaption}</span>
               </span>
               {/* Under the label, never squeezed by its mono caps. */}
               {tag && <em className="mission-premise-tag">{tag}</em>}
               <BriefText text={brief.after} />
-            </article>
-          </div>
+            </article>}
+          </div>}
           <p className="mission-impact-note">
             {verdict === "refuted" ? t.impactRefuted : t.impactNote}
           </p>
+          {!brief.validation.length && <p className="mission-field-note">{t.missingAcceptance}</p>}
           <div className="mission-validation-grid">
             {brief.validation.length > 0 && (
               <div>
@@ -865,7 +870,6 @@ export function ProjectOverview({
         >
           <div className="mission-section-heading">
             <div>
-              <span className="mission-kicker">{t.journey.kicker}</span>
               <h2 id="mission-journey-title">
                 <Route size={18} />
                 {t.journey.title}
@@ -894,7 +898,6 @@ export function ProjectOverview({
         >
           <div className="mission-section-heading">
             <div>
-              <span className="mission-kicker">{t.reading.kicker}</span>
               <h2 id="mission-reading-title">
                 <BookOpen size={18} />
                 {t.reading.title}
@@ -902,11 +905,60 @@ export function ProjectOverview({
               <p>{t.reading.lead}</p>
             </div>
           </div>
-          {insights.howItFitsTogether && (
-            <div className="mission-reading-flow">
+          {insights.flow && insights.flow.length >= 2 ? (
+            // The flow as a diagram; the prose is its caption, not a second copy.
+            <figure
+              className={`mission-reading-flow mission-flow${insights.flow.length <= 4 ? " mission-flow-few" : ""}`}
+            >
               <span>{t.reading.flow}</span>
-              <p>{insights.howItFitsTogether}</p>
-            </div>
+              <ol>
+                {insights.flow.map((step, index, steps) => (
+                  <li key={index}>
+                    <div
+                      className={`mission-flow-step${step.path ? "" : " mission-flow-outside"}`}
+                    >
+                      <span className="mission-journey-number">
+                        {String(index + 1).padStart(2, "0")}
+                      </span>
+                      <strong>
+                        {!step.path && <Globe size={13} aria-hidden="true" />}
+                        {step.label}
+                        {!step.path && (
+                          <span className="visually-hidden">
+                            {" "}
+                            {t.reading.flowOutside}
+                          </span>
+                        )}
+                      </strong>
+                      {step.path && <code>{step.path}</code>}
+                    </div>
+                    {index < steps.length - 1 && (
+                      <div className="mission-flow-link">
+                        <ArrowDown size={16} aria-hidden="true" />
+                        {step.passes && (
+                          <span>
+                            <span className="visually-hidden">
+                              {t.reading.flowPasses}{" "}
+                            </span>
+                            {step.passes}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </li>
+                ))}
+              </ol>
+              {insights.howItFitsTogether && (
+                <figcaption>{insights.howItFitsTogether}</figcaption>
+              )}
+            </figure>
+          ) : (
+            insights.howItFitsTogether && (
+              <div className="mission-reading-flow">
+                <span>{t.reading.flow}</span>
+                <p>{insights.howItFitsTogether}</p>
+              </div>
+            )
           )}
           <ol className="mission-reading-steps" id="mission-reading-steps">
             {insights.readingPath.map((step, index) => {
@@ -1043,14 +1095,37 @@ export function ProjectOverview({
           checkingPremise={checkingPremise}
         />
       )}
+      {run && (
+        <div className="mission-next-step">
+          <div>
+            <span className="mission-next-icon">
+              <Code2 size={20} />
+            </span>
+            <div>
+              <strong>
+                {t.nextStep.codeTitle}
+              </strong>
+              <p>{t.nextStep.codeLead}</p>
+            </div>
+          </div>
+          <button
+            type="button"
+            className="mission-button mission-button-primary"
+            onClick={onReadCode}
+          >
+            {t.nextStep.codeAction}
+            <ArrowRight size={15} />
+          </button>
+        </div>
+      )}
+      <Suspense fallback={null}>
+        <ContributionRulesCard repoId={repo.id} rules={repo.contributionRules} demo={sampleRepo} byHandRun={run?.learnByHand ? run : undefined} />
+      </Suspense>
+      <details className="mission-context" open={!run || !!error || loading || stale || !!analysisLocale}>
+        <summary>{t.overview.background}</summary>
       <div className="mission-overview-heading">
         <div>
-          <span className="mission-kicker">
-            <BookOpen size={14} />
-            {t.overview.kicker}
-          </span>
           <h2>{t.overview.title}</h2>
-          <p>{t.overview.lead}</p>
         </div>
         <div className="mission-overview-actions">
           {onUpdateRepo && (
@@ -1145,9 +1220,6 @@ export function ProjectOverview({
         <AnalysisProgress progress={progress} />
       )}
 
-      <Suspense fallback={null}>
-        <ContributionRulesCard repoId={repo.id} rules={repo.contributionRules} demo={sampleRepo} byHandRun={run?.learnByHand ? run : undefined} />
-      </Suspense>
 
       {!insights ? (
         // Not busy once the steps show, or their notice could be held back until they are gone.
@@ -1310,7 +1382,6 @@ export function ProjectOverview({
         >
           <div className="mission-section-heading">
             <div>
-              <span className="mission-kicker">{t.ideas.kicker}</span>
               <h2 id="mission-ideas-title">
                 <Lightbulb size={18} />
                 {t.ideas.title}
@@ -1719,25 +1790,26 @@ export function ProjectOverview({
 
       {!run && projectContext}
 
-      {(run || onStartContribution) && (
+      </details>
+      {!run && onStartContribution && (
         <div className="mission-next-step">
           <div>
             <span className="mission-next-icon">
-              {run ? <Code2 size={20} /> : <Target size={20} />}
+              <Target size={20} />
             </span>
             <div>
               <strong>
-                {run ? t.nextStep.codeTitle : t.nextStep.ideaTitle}
+                {t.nextStep.ideaTitle}
               </strong>
-              <p>{run ? t.nextStep.codeLead : t.nextStep.ideaLead}</p>
+              <p>{t.nextStep.ideaLead}</p>
             </div>
           </div>
           <button
             type="button"
             className="mission-button mission-button-primary"
-            onClick={run ? onReadCode : onStartContribution}
+            onClick={onStartContribution}
           >
-            {run ? t.nextStep.codeAction : t.nextStep.ideaAction}
+            {t.nextStep.ideaAction}
             <ArrowRight size={15} />
           </button>
         </div>

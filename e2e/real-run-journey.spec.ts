@@ -139,7 +139,7 @@ test.describe("the contribution journey on a seeded real run with a fake gh", ()
         await reviewed.click();
         await expect(reviewed).toBeChecked();
       }
-      await page.getByRole("button", { name: en.workspace.footer.explainBack }).click();
+      await page.locator(".review-footer").getByRole("button", { name: en.workspace.footer.explainBack }).click();
       const panel = page.locator(".understanding-check");
       await expect(page.locator(".explain-panel")).toHaveCount(0);
       const answers = panel.getByRole("region", { name: c.answerTitle }).getByRole("listitem");
@@ -204,7 +204,7 @@ test.describe("the contribution journey on a seeded real run with a fake gh", ()
       const draftSaved = page.waitForResponse(
         (response) => response.url().endsWith(`/api/runs/${runId}/draft`) && response.request().method() === "PATCH",
       );
-      await page.getByRole("button", { name: en.workspace.draft.save }).click();
+      await page.locator(".draft-save-row").getByRole("button", { name: en.workspace.draft.save }).click();
       expect((await draftSaved).status()).toBe(200);
       const weakened = page.locator(".reviewability-weakened");
       await expect(weakened.locator(".reviewability-weakened-text")).toHaveText('expect(greeting("Ada")).toBe("Hello, Ada!");');

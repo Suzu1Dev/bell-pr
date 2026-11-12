@@ -90,7 +90,7 @@ test("bell-pr open without a running instance exits 1 and says how to start", as
     assert.equal(result.stdout, "");
     assert.equal(
       result.stderr,
-      `No BELL PR is running with the data directory ${dataDir}. Start it with \`bell-pr\`, or, for a BELL PR started with another data directory, run \`bell-pr open --data-dir <dir>\`.\n`,
+      `No BELL PR is running with the data directory ${dataDir}. Start it with \`bell-pr\`; for another data directory, run \`bell-pr open --data-dir <dir>\`.\n`,
     );
 
     // A lock left by a process that is gone, or one whose pid now runs
@@ -329,7 +329,7 @@ test("bell-pr help lists every command, and mistakes exit 2", async () => {
   for (const argv of [["help"], ["--help"], ["-h"]]) {
     const result = await cli(argv);
     assert.equal(result.code, 0);
-    for (const command of ["start", "open", "doctor", "token", "version", "help"])
+    for (const command of ["start", "open", "doctor", "token", "group", "version", "help"])
       assert.match(result.stdout, new RegExp(`^  ${command} `, "m"));
     for (const option of ["--port", "--host", "--data-dir", "--no-open", "--force", "--env-file", "--print", "--print-token"])
       assert.ok(result.stdout.includes(option), option);
@@ -359,6 +359,7 @@ test("every command shows the help for --help, and argument mistakes read in the
     ["start", "--help"],
     ["open", "-h"],
     ["version", "--help"],
+    ["group", "invite", "--help"],
     ["--port", "4400", "--help"],
   ]) {
     const result = await cli(argv);
@@ -560,7 +561,7 @@ test("bell-pr start explains a data directory it cannot create, then frees the p
       path.join(readOnly, "data"),
     ], { startOptions: { handleExit: false } });
     assert.equal(result.code, 1);
-    assert.match(result.stderr, /Warning: --force skips the readiness check/);
+    assert.match(result.stderr, /Warning: --force skipped the readiness check/);
     assert.match(result.stderr, /BELL PR did not start: EACCES: permission denied, mkdir/);
     // A system error needs no stack trace.
     assert.doesNotMatch(result.stderr, /\n\s+at /);
@@ -577,8 +578,8 @@ const readyCodex = `case "$1" in
   *) exit 1 ;;
 esac`;
 
-test("bell-pr start exits 1 before it listens when doctor is not ready", async () => {
-  await withStandInClis({ git: standInGit }, async (directory) => {
+test("bell-pr start exits 1 before it listens when a required check other than the provider fails", async () => {
+  await withStandInClis({}, async (directory) => {
     const dataDir = path.join(directory, "data");
     const port = await freePort();
     const result = await cli(
@@ -587,6 +588,7 @@ test("bell-pr start exits 1 before it listens when doctor is not ready", async (
     );
     assert.equal(result.code, 1, result.stderr);
     assert.equal(result.stdout, "");
+    assert.match(result.stderr, /✗ Git/);
     assert.match(result.stderr, /✗ AI provider/);
     const sample = "No AI provider yet? See the sample tour: bell-pr start --force";
     const headlineAt = result.stderr.indexOf("Not ready:");
@@ -621,7 +623,7 @@ test("bell-pr start exits 1 before it listens when doctor is not ready", async (
       ),
     );
     assert.equal(zhCode, 1);
-    const zhSample = "還沒有 AI 服務？先看範例導覽：bell-pr start --force";
+    const zhSample = "還沒有 AI 服務？先看示範導覽：bell-pr start --force";
     const zhHeadlineAt = zh.indexOf("尚未就緒");
     const zhSampleAt = zh.indexOf(zhSample);
     const zhFixAt = zh.indexOf("\n        npm install -g @openai/codex\n");
@@ -648,7 +650,7 @@ test("bell-pr start --force starts when doctor is not ready, so the sample tour 
     );
     try {
       assert.equal(result.code, undefined, result.stderr);
-      assert.match(result.stderr, /Warning: --force skips the readiness check/);
+      assert.match(result.stderr, /Warning: --force skipped the readiness check/);
       assert.match(result.stderr, /sample tour/);
       assert.match(result.stdout, new RegExp(`→ http://127\\.0\\.0\\.1:${port}\\n`));
       assert.equal(running?.url, `http://127.0.0.1:${port}`);
@@ -805,6 +807,74 @@ test("service, CI and explicit different endpoint starts do not silently reuse a
         assert.equal(result.stdout.includes("bell_token"), false);
         assert.deepEqual(result.opened, []);
       }
+    } finally { await server.shutdown(); }
+  });
+});
+
+test("start --group never reuses an instance that runs without group work, and says to stop it first", async () => {
+  await withDataDir(async (dataDir) => {
+    const server = await inProcessServer(dataDir);
+    const lockFile = path.join(dataDir, "bellpr.lock");
+    const lock = readFileSync(lockFile, "utf8");
+    const refusal = `BELL PR is already running at ${server.url} without group work. Stop it first, then start it with \`bell-pr start --group\`.\n`;
+    try {
+      const alternatives = [
+        { args: ["--group"], env: {} },
+        { args: [], env: { BELLPR_GROUP: "1" } },
+        { args: ["--group", "--no-open"], env: {} },
+        { args: ["--group"], env: { CI: "1" } },
+        { args: ["--group", "--force", "--port", String(await freePort())], env: {} },
+      ];
+      for (const alternative of alternatives) {
+        const result = await cli(["start", "--data-dir", dataDir, ...alternative.args], {
+          env: alternative.env,
+          startServer: async () => { assert.fail("a refused start must not start another listener"); },
+        });
+        assert.equal(result.code, 1, alternative.args.join(" "));
+        assert.equal(result.stderr, refusal);
+        assert.equal(result.stdout, "");
+        assert.deepEqual(result.opened, []);
+      }
+      let zhError = "";
+      const zh = await withLocale("zh-TW", () =>
+        main(["start", "--group", "--data-dir", dataDir], {
+          env: {},
+          stdout: { write: () => true },
+          stderr: { write: (text: string) => (zhError += text) },
+        }),
+      );
+      assert.equal(zh, 1);
+      assert.equal(zhError, `BELL PR 已在 ${server.url} 執行，但沒有開啟小組協作。請先停止它，再用 \`bell-pr start --group\` 啟動。\n`);
+      // The running instance and its lock are left as they were.
+      assert.equal(readFileSync(lockFile, "utf8"), lock);
+      assert.equal((await cli(["open", "--print", "--data-dir", dataDir])).stdout, `${server.url}\n`);
+    } finally { await server.shutdown(); }
+  });
+});
+
+test("an instance that hosts group work is reused by a plain start and by start --group", async () => {
+  await withDataDir(async (dataDir) => {
+    const server = await inProcessServer(dataDir, undefined, { BELLPR_GROUP: "1" });
+    const { port, strict } = JSON.parse(readFileSync(path.join(dataDir, "bellpr.lock"), "utf8"));
+    assert.equal(strict, true);
+    try {
+      for (const args of [["start"], ["start", "--group"]]) {
+        const result = await cli(args, {
+          env: { BELLPR_DATA_DIR: dataDir },
+          startServer: async () => { assert.fail("an existing instance must not start another listener"); },
+        });
+        assert.equal(result.code, 0, result.stderr);
+        assert.equal(result.stdout, `BELL PR is running → ${server.url}\n`);
+        assert.equal(result.stderr, "");
+      }
+      // A service start still means "run a server": refused as before, not as a missing group.
+      const service = await cli(
+        ["start", "--group", "--no-open", "--force", "--data-dir", dataDir, "--port", String(port)],
+        { env: {}, startOptions: { handleExit: false } },
+      );
+      assert.equal(service.code, 1, service.stderr);
+      assert.match(service.stderr, /already running/);
+      assert.doesNotMatch(service.stderr, /without group work/);
     } finally { await server.shutdown(); }
   });
 });

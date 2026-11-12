@@ -29,27 +29,27 @@ const m: Translation<typeof en> = {
   },
   recovery: {
     publishingInterrupted: "發布中斷了。請先到 GitHub 確認狀態，再重新發布。",
-    resumed: "服務重新啟動；這個工作已重新排隊。",
-    retryPlanning: "重試這個工作：Lead 會重新規劃任務。",
+    resumed: "服務重新啟動；這個任務已重新排隊。",
+    retryPlanning: "重試這個任務：Lead 會重新規劃子任務。",
   },
   workspace: {
-    removed: "為了釋出磁碟空間，這個工作的檔案已清除。報告與筆記仍保留。",
+    removed: "為了釋放磁碟空間，這個任務的檔案已清除。報告與筆記仍保留。",
     removedPublished:
-      "為了釋出磁碟空間，這個工作的檔案已移除，因此無法再在這裡同步它的 Pull Request 或進行後續修改回合。報告與筆記仍保留。請直接在 GitHub 上更新 Pull Request 的分支。",
+      "為釋放磁碟空間，已移除任務檔案，這裡不能再同步這個 Pull Request 或進行一輪修正。報告與筆記保留；請到 GitHub 更新分支。",
     removedLog: ({ bytes }) =>
-      `已移除這個工作的工作檔案，釋出 ${size(bytes)}；報告、筆記與解說仍保留。`,
+      `已移除這個任務的工作檔案，釋放 ${size(bytes)}；報告、筆記與解說仍保留。`,
     retentionLog: ({ bytes, days }) =>
-      `這個工作結束 ${days} 天後已移除工作檔案，釋出 ${size(bytes)}；報告、筆記與解說仍保留。`,
-    busy: "這個工作仍在進行中。請先停止或等它完成，再試一次。",
-    roundOpen: "這個工作還有一輪修正尚未結束。請先推送或放棄這輪修正，再釋放磁碟空間。",
-    outsideData: `這個工作的工作目錄不在 ${product.name} 的資料目錄內，因此不會移除。`,
+      `這個任務結束 ${days} 天後已移除工作檔案，釋放 ${size(bytes)}；報告、筆記與解說仍保留。`,
+    busy: "這個任務仍在進行中。請先停止或等它完成，再試一次。",
+    roundOpen: "這個任務還有一輪修正尚未結束。請先推送或放棄這一輪，再釋放磁碟空間。",
+    outsideData: `這個任務的工作目錄不在 ${product.name} 的資料目錄內，因此不會移除。`,
   },
   repos: {
-    busy: "這個專案仍有工作在進行中。請先停止或等它完成，再刪除專案。",
+    busy: "這個專案仍有任務在進行中。請先停止或等它完成，再刪除專案。",
   },
   erase: {
     confirm: "請輸入 ERASE，確認要刪除所有資料。",
-    busy: "仍有工作在進行中。請先停止所有工作與探索搜尋，再刪除所有資料。",
+    busy: "仍有任務在進行中。請先停止所有任務與探索搜尋，再刪除所有資料。",
   },
   learning: {
     invalidCursor: "這一頁學習筆記已過期，請重新載入清單。",

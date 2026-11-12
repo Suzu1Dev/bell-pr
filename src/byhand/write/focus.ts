@@ -32,7 +32,7 @@ export function useFocusHome<T extends HTMLElement>() {
 /**
  * After Mark it ready the Ready dialog and the footer's button give way (the
  * footer waits while the guide reviews): the focus goes to what comes next,
- * Explain it back ("Take the check now"), else to the run's title, once the
+ * Explain it back ("Explain it back now"), else to the run's title, once the
  * dialog has gone.
  */
 export const focusAfterReady = () =>

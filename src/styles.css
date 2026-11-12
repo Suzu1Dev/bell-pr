@@ -1928,7 +1928,7 @@ button {
   padding: 4px 7px;
   border-radius: 3px;
 }
-.note-card h2 {
+.note-card h3 {
   font-size: var(--text-xl);
   font-weight: 550;
 }
@@ -2189,10 +2189,6 @@ button {
 .split-card-head h3 {
   margin: 0;
   font-size: var(--text-sm);
-}
-.split-hint {
-  font-size: var(--text-2xs);
-  color: var(--color-text-muted);
 }
 .split-badge {
   display: grid;
@@ -3049,6 +3045,9 @@ button {
   }
   .section-heading {
     align-items: flex-start;
+    /* A heading action such as "View publishing checklist" stays inside
+       the heading when the title and the button no longer fit on one line. */
+    flex-wrap: wrap;
   }
   .section-heading h2 {
     font-size: var(--text-lg);

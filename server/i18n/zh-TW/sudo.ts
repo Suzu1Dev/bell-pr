@@ -1,7 +1,7 @@
 import type { Translation } from "../../../shared/i18n/locale.js";
 import type en from "../en/sudo.js";
 const messages: Translation<typeof en> = {
-  fullAccessNotice: "這個 Claude Agent 未在作業系統沙箱中執行，因為這次工作已選擇完整權限。",
+  fullAccessNotice: "這個 Claude Agent 未在作業系統沙箱中執行，因為這個任務已選擇完整權限。",
   hostOnly: "免密碼 sudo 只能在這台電腦上的 BELL PR 以安裝 token 登入後變更。",
   busy: "正在設定免密碼 sudo，請稍候。",
   alreadyOn: "免密碼 sudo 已經開啟。請先移除 BELL PR 的規則或等它自動關閉，再輸入密碼重新啟用。",

@@ -142,7 +142,7 @@ test("discovery results require repository-specific issue and contribution-rule 
       [{ ...candidate, pushedAt: "" }],
       defaultDiscoveryPreferences,
     ).opportunities[0].popularity,
-    /最近推送於 未提供/,
+    /未提供最近推送日期/,
   );
   assert.throws(() =>
     parseDiscoveryResult(
@@ -724,7 +724,7 @@ test("restart words the interruption in the job's locale, or the current one for
     const { job } = await withLocale("zh-TW", () => english.get());
     assert.equal(job?.status, "failed");
     assert.equal(job?.message, "The last discovery was interrupted");
-    assert.match(job?.error ?? "", /^The server restarted and interrupted the discovery\./);
+    assert.match(job?.error ?? "", /^The service restarted and interrupted the discovery\./);
     await english.shutdown();
     delete saved.job.locale;
     await writeFile(file, JSON.stringify(saved));
@@ -974,7 +974,7 @@ test("discovery retries a Claude Code analysis that lost the OAuth refresh lock 
     assert.equal(calls, 2);
     assert.deepEqual(waits, [15_000]);
     assert.deepEqual(messages, [
-      "Claude Code 正在更新登入憑證（其他行程持有更新鎖），15 秒後重試（第 2/3 次）。",
+      "Claude Code 正在等另一個行程更新完登入狀態，15 秒後重試（第 2/3 次）。",
     ]);
     assert.equal(job.modelExecution?.provider, "claude");
     assert.equal(job.efficiency?.calls, 2);
@@ -1128,7 +1128,7 @@ test("discovery passes the Codex baseline timeout and a longer, announced wait f
     // 240 s × 2.5 (Claude) × 1.5 (xhigh) = 900 s.
     assert.deepEqual(timeouts, [900_000]);
     assert.deepEqual(messages, [
-      "已取得真實 GitHub 來源，正在分析適合的貢獻機會（最多等待 15 分鐘）",
+      "已取得 GitHub 來源，正在分析適合的貢獻機會（最多等待 15 分鐘）",
     ]);
     timeOut = true;
     await claude.service.start({
@@ -1140,7 +1140,7 @@ test("discovery passes the Codex baseline timeout and a longer, announced wait f
     assert.equal(failed.status, "failed");
     assert.equal(
       failed.error,
-      "claude 執行逾時（已等待 15 分鐘）。較高的思考強度或大型專案需要更久；可降低思考強度、改用較快的模型，或提高 BELLPR_AGENT_TIMEOUT_SCALE。",
+      "claude 執行逾時（15 分鐘）。請調低思考強度、換較快的模型或提高 BELLPR_AGENT_TIMEOUT_SCALE；大型專案需要更久。",
     );
   } finally {
     await claude.cleanup();

@@ -152,7 +152,7 @@ test("a queued run says why it waits; the sample's playback does not", () => {
   const queued = { ...realRun, status: "queued" as const };
   assert.match(
     renderEn(element({ run: queued, active: true })),
-    /Queued: the limit of runs at once is reached; this one starts when another finishes/,
+    /Queued: the limit of runs at once is reached\. This one starts when another finishes\./,
   );
   // The sample's playback is queued for a moment behind no other run.
   assert.doesNotMatch(
@@ -180,7 +180,7 @@ test("a published sample keeps its approve button off and links to no PR", () =>
   assert.doesNotMatch(html, /href="#demo-pr"/);
   assert.match(
     html,
-    /<button class="button primary" disabled=""[^>]*>.*?Approve and prepare the PR/,
+    /<button class="button primary" disabled=""[^>]*>.*?Approve and preview the PR/,
   );
   assertNoHan(html);
   // A real published run links to its pull request.
@@ -192,8 +192,8 @@ test("a published sample keeps its approve button off and links to no PR", () =>
   assert.match(real, /href="https:\/\/github\.com\/acme\/widgets\/pull\/3"/);
   assert.match(real, /View pull request/);
   assert.match(real, /Published PR changes/);
-  assert.doesNotMatch(real, /footer-reviewed|Not just a review: a lesson in code, too\./);
-  assert.match(renderZh(element({ run: { ...realRun, status: "published" } })), /已推送的 PR 變更/);
+  assert.doesNotMatch(real, /footer-reviewed/);
+  assert.match(renderZh(element({ run: { ...realRun, status: "published" } })), /已發布的 PR 變更/);
   assert.match(html, /footer-reviewed/);
 });
 
@@ -209,15 +209,15 @@ test("once every file is ticked, the footer asks to explain the change back firs
   assert.match(button, /Explain it back/);
   assert.doesNotMatch(button, /disabled=""/);
   assert.match(button, /title="Explain the change back in your own words: a short, closed-book check next to the code"/);
-  assert.match(html, /<span>Every file reviewed\.<\/span>/);
+  assert.doesNotMatch(html, /Understanding check off:/);
   assert.match(html, /Read it, then explain it back/);
   assertNoHan(html);
   // Before every file is ticked, the tooltip names both remaining steps.
   const partial = primary(renderEn(element({ run: realRun, files })));
   assert.match(partial, /disabled=""/);
   assert.match(partial, /title="Mark every file as reviewed, then explain the change back in your own words"/);
-  assert.match(partial, /Approve and prepare the PR/);
-  assert.match(renderZh(element({ run: ticked, files })), /<span>每一個檔案都已審閱。<\/span>/);
+  assert.match(partial, /Approve and preview the PR/);
+  assert.doesNotMatch(renderZh(element({ run: ticked, files })), /理解檢查已關閉：/);
 });
 
 test("a path reviewed in an older round does not count toward approving the current diff", () => {
@@ -232,10 +232,10 @@ test("published runs offer a round selector with the current review selected, an
   const round = { id: "now", requestedAt: realRun.createdAt, feedbackUrls: [], status: "review" as const, parentCommit: "b".repeat(40) };
   const run = { ...realRun, prUrl: "https://github.com/acme/widgets/pull/3", publishCommit: round.parentCommit, followUps: [round] };
   const html = renderEn(element({ run, tab: "changes" }));
-  assert.match(html, /<option value="current" selected="">This review round/);
+  assert.match(html, /<option value="current" selected="">This round/);
   assert.match(html, /Initial contribution/);
   assert.match(html, /All changes \(cumulative\)/);
-  assert.match(renderZh(element({ run, tab: "changes" })), /本輪修正/);
+  assert.match(renderZh(element({ run, tab: "changes" })), /這一輪/);
   assert.doesNotMatch(renderEn(element({ run, tab: "changes", demo: true })), /id="diff-round"/);
 });
 
@@ -245,13 +245,13 @@ test("with the check turned off, approval needs the ticks only, and the run says
   try {
     setCheckSettingsForTests({ settings: { skipUnderstandingCheck: true }, lockedBy: {} });
     const html = renderEn(element({ run: ticked, files }));
-    assert.match(primary(html), /Approve and prepare the PR/);
+    assert.match(primary(html), /Approve and preview the PR/);
     assert.match(
       html,
-      /<span>Every file reviewed · Understanding check off\. Approval needs your reviewed ticks only\.<\/span>/,
+      /<span>Understanding check off: approval needs only your reviewed ticks\.<\/span>/,
     );
     assert.match(html, /class="unsandboxed-badge check-off-badge"/);
-    assert.match(html, /The understanding check is off, so you can approve without explaining the change back\./);
+    assert.match(html, /You can approve without explaining the change back\. Runs approved this way stay marked\./);
     assertNoHan(html);
   } finally {
     setCheckSettingsForTests(undefined);
@@ -274,7 +274,7 @@ test("a learn-by-hand run carries its badge, and while the person writes the foo
   assertNoHan(html);
   assert.match(html, /<span class="status-badge"><svg[^>]*lucide-hand[\s\S]*?<\/svg>Learn by hand<\/span>/);
   assert.match(html, /<button class="button primary"><svg[^>]*lucide-check-check[\s\S]*?<\/svg>Ready for review<svg/);
-  assert.doesNotMatch(html, /Approve and prepare the PR/);
+  assert.doesNotMatch(html, /Approve and preview the PR/);
   // While the person writes, the run's status says so; at the version marked ready, it waits for their review.
   assert.match(html, /<span class="status-badge "><span><\/span>Your turn<\/span>/);
   assert.doesNotMatch(html, /Ready for your review/);
@@ -307,13 +307,13 @@ test("a learn-by-hand run waiting for the person's plan says it's their turn, an
   const html = renderEn(element({ run: byHand, files: [], tab: "overview" }));
   assertNoHan(html);
   assert.match(html, /<span class="status-badge "><span><\/span>Your turn<\/span>/);
-  assert.doesNotMatch(html, /Awaiting plan approval|Build together|The agent team splits the work/);
+  assert.doesNotMatch(html, /Awaiting plan approval|Build together|The Agent team splits the work/);
   assert.match(html, /title="02 Write it yourself: The guide plans with you and gives hints"><span class="step-icon"><svg[^>]*lucide-hand/);
   assert.match(renderZh(element({ run: byHand, files: [], tab: "overview" })), /title="02 親手寫：嚮導和你一起規劃、給提示"/);
   // An agent run waiting for its plan's approval is as it was.
   const agent = renderEn(element({ run: { ...realRun, status: "awaiting_plan" }, files: [], tab: "overview" }));
   assert.match(agent, /<span><\/span>Awaiting plan approval<\/span>/);
-  assert.match(agent, /title="02 Build together: The agent team splits the work"/);
+  assert.match(agent, /title="02 Build together: The Agent team splits the work"/);
 });
 
 test("a learn-by-hand run's approval waits for the person's PR title and description, and the footer leads to the PR draft tab", () => {
@@ -357,10 +357,12 @@ test("a learn-by-hand run's approval waits for the person's PR title and descrip
 
 test("a learn-by-hand run's footer hint asks the guide, not the agent", () => {
   const byHand: Run = { ...realRun, learnByHand: true, agents: realRun.agents.filter((agent) => agent.id === "lead") };
-  const html = renderEn(element({ run: byHand, tab: "overview" }));
+  const html = renderEn(element({ run: byHand, tab: "changes" }));
   assert.match(html, /<span class="footer-hint">Select code to ask the guide about it\.<\/span>/);
-  assert.match(renderZh(element({ run: byHand, tab: "overview" })), /<span class="footer-hint">選取程式碼，就能向嚮導提問。<\/span>/);
-  assert.match(renderEn(element({ tab: "overview" })), /<span class="footer-hint">Select code to ask the agent about it\.<\/span>/);
+  assert.match(renderZh(element({ run: byHand, tab: "changes" })), /<span class="footer-hint">選取程式碼，就能向嚮導提問。<\/span>/);
+  assert.match(renderEn(element({ tab: "changes" })), /<span class="footer-hint">Select code to ask the Agent about it\.<\/span>/);
+  // A tab that shows no code has nothing to select.
+  assert.doesNotMatch(renderEn(element({ tab: "overview" })), /footer-hint/);
 });
 
 test("a contribution split from another says so and links back to the original", () => {
@@ -403,7 +405,7 @@ test("collaboration is offered for an agent-built run, but never a Learn-by-hand
 test("a running collaboration turn blocks approval even when the explanation check is next", () => {
   const run = { ...realRun, session: { running: true, revision: 0, messages: [], updatedAt: "2026-10-28T00:00:00Z" } };
   const html = renderEn(element({ run }));
-  assert.match(html, /The agent is working in this checkout/);
+  assert.match(html, /The Agent is working in this working directory/);
   assert.match(html, /<button class="button primary" disabled=""/);
   assert.match(html, /session-tab-dot/);
 });

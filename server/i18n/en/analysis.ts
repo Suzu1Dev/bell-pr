@@ -37,7 +37,7 @@ export default {
     duplicateIds: "The AI returned duplicate recommendation ids. Analyze again.",
     repositoryNotFound: "Repository not found.",
     cacheUnreadable:
-      "The project analysis data cannot be read. Check the local insights data file.",
+      "The project analysis data cannot be read. Check the files in the insights folder of the data directory.",
     modelSettingsUnreadable:
       "The model settings cannot be read. Check the local model-settings.json file.",
     analyzeFirst:
@@ -49,7 +49,7 @@ export default {
     noTextFiles:
       "No tracked text files to analyze were found. Add a README or code and commit it first.",
     shuttingDown:
-      "The server is shutting down, so a new project analysis cannot start.",
+      "The service is shutting down, so a new project analysis cannot start.",
     alreadyRunning:
       "This project is already being analyzed. Wait for the current analysis to finish.",
     tooManyRunning:
@@ -129,9 +129,9 @@ export default {
     fileTooLarge: "The saved discovery results file is too large to load safely.",
     /** A discovery job that was running when the server stopped. */
     interruptedError:
-      "The server restarted and interrupted the discovery. The sources collected so far and the previous result are kept; you can run discovery again.",
+      "The service restarted and interrupted the discovery. The sources collected so far and the previous result are kept; you can run discovery again.",
     interrupted: "The last discovery was interrupted",
-    shuttingDown: "The server is shutting down. Try discovery again later.",
+    shuttingDown: "The service is shutting down. Try discovery again later.",
     alreadyRunning:
       "A discovery is already running. Wait for it to finish or cancel it first.",
     searching: "Looking for GitHub projects that match your criteria",
@@ -151,9 +151,9 @@ export default {
     noEvidence:
       "No opportunity this time both matched your criteria and had issue evidence that can be checked.",
     analyzing:
-      "Found real GitHub sources; analyzing which contribution opportunities fit",
+      "Found GitHub sources; analyzing which contribution opportunities fit",
     analyzingWithWait: ({ wait }: { wait: string }) =>
-      `Found real GitHub sources; analyzing which contribution opportunities fit (${wait})`,
+      `Found GitHub sources; analyzing which contribution opportunities fit (${wait})`,
     unusableAnswer:
       "The AI discovery analysis did not finish, or its response cannot be used safely. Try again; the previous result is kept.",
     found: ({ count }: { count: number }) =>
@@ -193,16 +193,16 @@ export default {
     partialResults:
       "GitHub returned partial search results, so this discovery is not a complete list.",
     noRepositories:
-      "This bounded search found no public project that matches. Try fewer keywords, a lower stars threshold or another difficulty.",
+      "This search reads only GitHub's first 12 results and found no public project that matches. Try fewer keywords, a lower stars threshold or another difficulty.",
     /** What discovery sampled, in the GitHub search order the person chose. */
     samplingScope: ({ sort }: { sort: DiscoverySort }) =>
-      `At most 6 projects were sampled (${
+      `Sampled: up to 6 projects (${
         {
           relevance: "GitHub's best matches first",
           updated: "most recently updated first",
           stars: "most stars first",
         }[sort]
-      }), with up to 3 open issues each and the last 3 comments on each issue. Labels do not guarantee the actual difficulty or that the work is still available. Only the README, CONTRIBUTING and PR template that GitHub's community profile finds in the root, .github or docs were read; account-wide defaults, folders of several templates and external links were not.`,
+      }), up to 3 open issues each, the last 3 comments per issue. Labels don't prove difficulty or that work is unclaimed. Read: README, CONTRIBUTING and PR template found by GitHub's community profile in the root, .github or docs. Not read: account-wide defaults, multi-template folders, external links.`,
     screening: ({ repository }: { repository: string }) =>
       `Checking the issues, contribution documents and maintainer replies of ${repository}.`,
     repositoryUnconfirmed: ({ repository }: { repository: string }) =>
@@ -252,7 +252,7 @@ export default {
     candidateBytesLimit:
       "The sources reached the 30 KB limit for each project; some content was not read.",
     requestLimit:
-      "Discovery reached its limit of 36 requests or 90 seconds. The results so far are kept; the sources of the remaining candidates were not fully read.",
+      "Discovery hit its limit of 36 requests or 90 seconds. Results so far are kept; remaining candidates' sources were not fully read.",
     noCandidates:
       "No candidate passed the public status and source checks, so there is no project to analyze this time. Try again later or adjust the criteria.",
   },
@@ -279,7 +279,7 @@ export default {
     readFailed: ({ label }: { label: string }) =>
       `${label} could not be read; its rules were not checked.`,
     searchScope:
-      "The local rule search covers the common contribution guides, READMEs, maintainer documents and PR templates in the base commit's root, .github, docs and documentation folders, AGENTS.md and CLAUDE.md in the root, and the .github/workflows files that check pull requests automatically. Links to other places in those documents are not followed.",
+      "Rules searched locally in the base commit: common contribution guides, READMEs, maintainer documents and PR templates in the root, .github, docs and documentation; AGENTS.md and CLAUDE.md in the root; .github/workflows files that check pull requests. Links were not followed.",
     automationLimit: ({ max, remaining }: { max: number; remaining: number }) =>
       fmt.plural(remaining) === "one"
         ? `At most ${max} pull request check workflows are included; 1 more workflow was not checked.`
@@ -293,7 +293,7 @@ export default {
     noRemote:
       "No verifiable github.com project URL is available, so maintainer discussions and account-wide default rules on GitHub were not checked.",
     metadataFailed:
-      "Maintainer discussions and account-wide information could not be read from GitHub, possibly because of permissions, the connection or API limits; this does not mean there are no further rules.",
+      "Couldn't read maintainer discussions or account-wide information from GitHub (perhaps permissions, the connection or API limits). More rules may still apply.",
     defaultsTruncated:
       "The file list of the account-wide .github repository was truncated; its default rules were not fully checked.",
     defaultsNotPublic:
@@ -303,7 +303,7 @@ export default {
     defaultsFailed:
       "The default rules in the account-wide .github repository could not be read; whether any of them apply was not checked.",
     maintainerSample:
-      "Maintainer preferences come from the 3 most recently updated merged PRs, with up to 5 comments and 5 reviews each. A merged PR is not an endorsed rule; check whether each preference applies.",
+      "Maintainer preferences: the 3 most recently updated merged PRs, up to 5 comments and 5 reviews each. A merged PR isn't an endorsed rule; check that each applies.",
     maintainerComment: ({
       number,
       association,
@@ -343,7 +343,7 @@ export default {
       line: string;
       title: boolean;
     }) =>
-      `${title ? "The subject is the PR title. " : ""}${label} asks for an AI trailer (“${quote}”), so the message ends with ${line}, which names the agent that wrote this change.`,
+      `${title ? "The subject is the PR title. " : ""}${label} asks for an AI trailer (“${quote}”), so the message ends with ${line}, naming the Agent.`,
     ruleQuoteMismatch:
       "A rule quoted in the PR draft does not match its source. Generate it again.",
     templateNotUsed:
@@ -360,7 +360,7 @@ export default {
       `The PR draft put to-dos or unfilled template fields into the description that is sent to GitHub (${fmt.plural(count) === "one" ? "line" : "lines"} ${lines}). Generate it again.`,
     /** Put above the summary when the Linux defaults stand in for rules not found. */
     provisionalLinuxPolicy:
-      "Looking up the project's sources was limited or incomplete, so the Linux contribution writing principles are used for now. Check the project's own rules before you publish.",
+      "Source lookup was limited or incomplete, so Linux contribution writing principles stand in. Check the project's rules before you publish.",
     noSafeDiff: "There is no safe code diff to write a PR from yet.",
     diffTooLarge:
       "The diff is over the 100 KB limit for PR drafts. Split the change and try again.",
@@ -436,7 +436,7 @@ export default {
       "The fastest, with the lowest usage. It does not support reasoning effort settings.",
     invalidSettings: "The model settings are not valid. Choose them again.",
     providerMismatch:
-      "The model list does not match the selected agent. Reload, then choose again.",
+      "The model list does not match the selected AI provider. Reload, then choose again.",
     unknownModel:
       "These model settings cannot be confirmed. Reload the model list and choose again.",
     unsupportedEffort:

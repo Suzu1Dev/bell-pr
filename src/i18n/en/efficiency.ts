@@ -36,13 +36,13 @@ const efficiency = {
   /** The credit behind the mode chip: its tooltip and the panel it opens. */
   credit: {
     text: ({ version }: { version: string }) =>
-      `The efficiency modes build on Ponytail ${version} by DietrichGebert (MIT license). Lean gives the agents a short adaptation of its principles, Full gives them its complete rules, and Off adds neither.`,
+      `Efficiency modes build on Ponytail ${version} by DietrichGebert (MIT license). Lean gives Agents a short adaptation of its principles; Full, its complete rules; Off, neither.`,
     link: "Ponytail upstream project",
   },
   inputTokens: "Input tokens",
   cachedInputTokens: "Of which cached",
   outputTokens: "Output tokens",
-  agentTime: "Total agent time",
+  agentTime: "Total Agent time",
   running: "Running",
   /** A count the CLI did not report; never shown as zero. */
   notReported: "Not reported",
@@ -51,7 +51,7 @@ const efficiency = {
   usageNote: ({ calls, measured }: { calls: number; measured: number }) =>
     `${fmt.number(calls)} ${fmt.plural(calls) === "one" ? "call" : "calls"} · usage reported for ${fmt.number(measured)} of ${fmt.number(calls)}${
       measured < calls ? ", so the totals include only the reported calls." : "."
-    } Cached input is included in the input tokens. The time is the sum of all calls, not the time you waited.`,
+    } Input tokens include cached input. Time adds up all calls, not your wait.`,
   byRole: ({ count }: { count: number }) =>
     `By role (${fmt.number(count)} ${fmt.plural(count) === "one" ? "group" : "groups"})`,
   columns: {
@@ -65,8 +65,7 @@ const efficiency = {
   /** A role's call count when only some calls reported their usage. */
   partialCalls: ({ calls, measured }: { calls: number; measured: number }) =>
     `${fmt.number(calls)} (${fmt.number(measured)} reported)`,
-  byRoleNote:
-    "Like the totals above, this lists only the tokens and calls the CLI reported. Teammates is the total of all members.",
+  byRoleNote: "Teammates is the total of all members.",
   noMeasurement:
     "No measurements yet. Reported usage and time appear after a run.",
   noMeasurementSample: "No measurements yet. The sample did not call AI.",

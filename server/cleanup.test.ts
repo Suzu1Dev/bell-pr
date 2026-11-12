@@ -244,7 +244,7 @@ test("freeing a run's workspace removes its directories, Git records, branch and
     assert.equal(refused.status, 410, action);
     assert.equal(refused.body.code, "workspace_removed", action);
     // The published PR's checkout is gone: say what that means for it.
-    assert.match(refused.body.error, /can no longer be synced or given a follow-up round here/, action);
+    assert.match(refused.body.error, /can't be synced or get a follow-up round here/, action);
   }
   // Freeing it again changes nothing.
   const again = await f.call("DELETE", `/api/runs/${value.id}/workspace`, {});
@@ -463,7 +463,7 @@ test("retention frees only failed and cancelled runs past the period and never t
   assert.equal(neverStarted.workspaceRemovedAt, undefined);
   assert.deepEqual(neverStarted.logs.map((entry) => entry.message), ["Last activity"]);
   // The log line is in the run's own language.
-  assert.match(eligible[0].logs.at(-1)!.message, /^這個工作結束 30 天後已移除工作檔案/);
+  assert.match(eligible[0].logs.at(-1)!.message, /^這個任務結束 30 天後已移除工作檔案/);
   // An invalid source falls back to the environment, then 14 days.
   setRetentionDaysSource(() => 0);
   assert.equal(retentionDays(), 60);

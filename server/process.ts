@@ -558,7 +558,7 @@ const execFileAsync = promisify(execFile);
  */
 async function repoDriverOverrides(cwd: string, gitDir?: string): Promise<string[]> {
   if (!existsSync(cwd)) return [];
-  let stdout = "";
+  let stdout: string;
   try {
     const result = await execFileAsync(
       "git",
@@ -830,6 +830,13 @@ const gitNetworkEnvKeys = [
 ];
 
 /**
+ * The only graft file a caller may give Git: none. Git reads a
+ * repository's info/grafts unless GIT_GRAFT_FILE names another file;
+ * Git for Windows opens /dev/null as NUL, as for gitSafetyArgs.
+ */
+export const noGraftFile = "/dev/null";
+
+/**
  * Environment for a server Git process. Not the server's full environment.
  * `GH_TOKEN` and `GITHUB_TOKEN` are included only for `gitNetwork`, whose
  * credential helper is `gh auth git-credential`. `GIT_ASKPASS` and
@@ -853,6 +860,8 @@ export function gitChildEnv(
     if (value) env[key] = value;
   }
   if (source.GIT_INDEX_FILE) env.GIT_INDEX_FILE = source.GIT_INDEX_FILE;
+  // Grafts off when the caller asks; any other graft file stays out.
+  if (explicit?.GIT_GRAFT_FILE === noGraftFile) env.GIT_GRAFT_FILE = noGraftFile;
   if (network) {
     env.GCM_INTERACTIVE = "never";
     for (const key of gitNetworkEnvKeys) {

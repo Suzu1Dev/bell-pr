@@ -235,7 +235,12 @@ export async function runTests(
       ...(untracked ? { untracked } : {}),
     });
     await ctx.store.save();
-    return { run };
+    // The command can finish during the save. Its completion is already
+    // queued on this lock and clears `busy` on the live run before the
+    // caller reads the return, so a 202 built from that object can say the
+    // tests never started. The body is a copy of the run with the mark set,
+    // taken before this lock is released.
+    return { run: structuredClone(run) };
   });
 }
 
@@ -370,9 +375,14 @@ async function execute(
       if (note) ctx.log(run, "system", note);
       log.info("by-hand.tests.finished", { runId: run.id, outcome, ms });
     } finally {
-      if (run.byHand?.busy?.kind === "tests") delete run.byHand.busy;
-      release();
-      await ctx.store.save();
+      // Write the result while busy, then write again with busy cleared.
+      try {
+        await ctx.store.save();
+      } finally {
+        if (run.byHand?.busy?.kind === "tests") delete run.byHand.busy;
+        release();
+        await ctx.store.save();
+      }
     }
   });
 }

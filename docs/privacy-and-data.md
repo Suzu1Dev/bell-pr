@@ -27,7 +27,7 @@ Gemini API key or Google Cloud project). It receives:
 - source code and other files of the project you imported: the files the
   agents open, the excerpts BELL PR selects for project analysis, the
   diffs, and the project's contribution guides and templates;
-- the output of the commands agents run in the working copy, such as
+- the output of the commands agents run in the working directory, such as
   builds and tests;
 - your follow-up questions about a change, with the code and notes they
   refer to, and the review comments on that file once you have read your
@@ -97,13 +97,18 @@ that CLI needs, plus these opt-outs when they are set in the environment
 BELL PR runs in:
 
 - `DO_NOT_TRACK`, passed to every CLI;
-- for Claude Code, the variables it documents: `DISABLE_TELEMETRY`,
+- for Claude Code, the variables
+  [it documents](https://code.claude.com/docs/en/data-usage): `DISABLE_TELEMETRY`,
   `DISABLE_ERROR_REPORTING`, `DISABLE_BUG_COMMAND`,
   `CLAUDE_CODE_DISABLE_FEEDBACK_SURVEY`, and
   `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC`, which turns off all of its
-  non-essential traffic.
+  non-essential traffic. The current name of `DISABLE_BUG_COMMAND` is
+  `DISABLE_FEEDBACK_COMMAND`. Claude Code
+  [also accepts the older name](https://code.claude.com/docs/en/env-vars),
+  and the older name is the one BELL PR passes on.
 
-BELL PR starts each Codex agent with `codex exec --ignore-user-config`, which
+BELL PR starts each Codex agent with
+[`codex exec --ignore-user-config`](https://learn.chatgpt.com/docs/non-interactive-mode), which
 does not load `$CODEX_HOME/config.toml` (sign-in still uses `CODEX_HOME`). This
 keeps your personal Codex settings out of the agents' work, but it also
 means that a setting you made only in that file, such as
@@ -143,15 +148,17 @@ with mode 0600.
 | `state.json` | Your projects and runs: contribution directions, plans, agent logs and reports, review progress, explanations, follow-up questions and answers, collaboration conversations with the setup results agents reported, notes, PR drafts and the links between a run and the parts split from it, including which parts each part builds on. Also your learning records: your understanding checks (explanation, answers, confidence, grades, corrections, forecast and how long each check took), try-first answers and the approaches you chose, your tags and lessons on maintainer comments, your restatements for follow-up rounds, your practice schedule (grades and due dates only; practice answers are never saved), the reasons you gave for weakened tests or for publishing past someone else's pull request, and coach debriefs. And the GitHub facts BELL PR read: the rules quoted from each project's files, its pull request settings and recent merged pull request sizes, and for each run the linked issue's facts (including the GitHub logins of people assigned to it, claiming it or with a pull request for it, and the latest maintainer comment) and your pull request counts there, with links to up to 10 of your pull requests waiting on your answer. Token-shaped strings are masked in logs and questions before they are saved. |
 | `state.json.bak.1` to `.bak.3`, `state.quarantine.json` | The last three versions of `state.json`, and records a damaged file could not load, so a crash or a bad write loses nothing. |
 | `repositories/` | BELL PR's own clones of the projects you imported. A project imported from a folder on your computer is cloned too; your folder is never changed. |
-| `worktrees/`, `team-worktrees/` | A working copy for each run and each teammate, with the changes the agents made. A part split from a run gets its own working copy, started from the same base commit and holding its own files. |
+| `worktrees/`, `team-worktrees/` | A working directory for each run and each teammate, with the changes the agents made. A part split from a run gets its own working directory, started from the same base commit and holding its own files. |
 | `insights/` | Project analyses and recommendations. |
 | `discovery.json` | Discovery preferences and results. |
-| `model-settings.json` | The agent, model, reasoning effort and web-access choice. |
+| `model-settings.json` | The AI provider, model, reasoning effort and web-access choice. |
 | `app-settings.json` | Language, limits, onboarding progress, safety settings and the retention period. |
 | `api-token` | The installation's API token, also used to authorize browser sessions. Rotating it invalidates every existing session and old token URL. |
 | `author-emails.json` | SHA-256 digests of the commit e-mail addresses you confirmed when publishing, never the addresses themselves. |
 | `logs/` | Daily log files, at most 7 files and 50 MB, with secrets redacted. Prompts and page contents are never logged. |
 | `children.json`, `bellpr.lock` | The agent processes that are running (so a crash leaves none behind), and the running instance's process id and port, with the computer's uptime (on Linux also its host name, PID namespace and boot id). |
+| `coordination.json`, `collab.json` | Only with [group work](group-work.md), from set-up on (a set-up that fails halfway can leave `coordination.json` alone). `coordination.json`: each person's id, role (admin or member), when they were added and the SHA-256 of their participant token, never the token; each repository of the group, with the folder of its bare copy and the commit it was copied at; each task, with who made it and when; and every hold, ended ones included, with its paths, who holds it, when it was taken, and when and by whom it ended. `collab.json`: the group's id and set-up time; for each person the name they were invited under, when they joined, whether they are an admin, when they were removed, and, when they joined from a paired device, that device's id; for each repository its name, its id in this BELL PR and when it was added; and for each task its title. Invite codes (as their SHA-256) and who is looking at a board are kept in memory only. |
+| `collab/` | Only with group work, from the first repository an admin adds to the group. One bare Git copy for each such repository, `collab/<project id>.git`: the commits and files of its default branch as BELL PR's clone had them at that moment, no other branch and no tag. It is made once and not refreshed. |
 
 Your browser keeps, for this local site only: the language you chose,
 layout preferences such as the code font size and the collapsed sidebar,
@@ -167,7 +174,7 @@ this reaches the server's data directory.
   notes stay.
 - Runs in review, approved runs and published runs keep their working
   files until you free them: maintainers may answer weeks later, and
-  syncing and follow-up rounds need the checkout.
+  syncing and follow-up rounds need the working directory.
 - Logs rotate daily and keep at most 7 files and 50 MB.
 
 ## Deleting data
@@ -175,13 +182,14 @@ this reaches the server's data directory.
 | To delete | Do this |
 | --- | --- |
 | A run's working files | **Settings → Data & privacy → Storage → Free space**, or **Free disk space** in the contributions list. The record and notes stay. While a follow-up round is open, push or discard it first. |
-| A run | **Delete run** in the contributions list (Workbench → View all contributions). |
-| A project | **Delete repository** on the Repositories page. Its runs, notes and analysis go too, and so does BELL PR's clone. A folder you imported from your computer stays where it is. |
+| A run | **Delete contribution** in the contributions list (Workbench → View all contributions). |
+| A project | **Delete project** on the Repositories page. Its runs, notes and analysis go too, and so does BELL PR's clone. A folder you imported from your computer stays where it is. |
 | Everything | **Settings → Data & privacy → Delete all data**, then type `ERASE`. Every project, run, analysis, discovery result, log and backup is deleted; your settings stay. Stop running work first. |
+| The group's record and its bare copies ([group work](group-work.md)) | BELL PR never deletes them: **Delete project** and **Delete all data** leave `coordination.json`, `collab.json` and `collab/` as they are, so a deleted project stays in the group under its name, with its holds and its bare copy. To remove one bare copy, stop BELL PR and delete `collab/<project id>.git` in the data directory (`GET /api/collab/projects` and `collab.json` name each repository's id). The repository stays in the group, and its board and holds keep working: nothing reads the copy after the repository is added. To remove the whole record, holds and their history included, follow [Group storage is full](troubleshooting.md#group-storage-is-full). |
 | The sample project's progress | **Settings → General → Reset sample project** (this browser only). |
 | BELL PR itself | Stop it, delete the data directory (`~/.bellpr` by default), and uninstall with `npm uninstall -g bell-pr`. A copy run through `npx` sits in npm's cache. |
 | Antigravity conversations of BELL PR's agents | BELL PR never deletes them, and deleting its data directory does not remove them. Delete them in the Antigravity CLI (`agy`, then `/resume`), or remove the files under `~/.gemini/antigravity-cli/conversations`. |
-| Claude Code memory notes from earlier BELL PR versions | BELL PR never deletes them, and deleting its data directory does not remove them. In `~/.claude/projects/` (or `projects/` in the folder `CLAUDE_CONFIG_DIR` names), delete the folders named after BELL PR's checkouts and clones: the path with each `/` and `.` written as `-`, so for `~/.bellpr` the name contains `--bellpr-`. |
+| Claude Code memory notes from earlier BELL PR versions | BELL PR never deletes them, and deleting its data directory does not remove them. In `~/.claude/projects/` (or `projects/` in the folder `CLAUDE_CONFIG_DIR` names), delete the folders named after BELL PR's working directories and clones: the path with each `/` and `.` written as `-`, so for `~/.bellpr` the name contains `--bellpr-`. |
 
 Data you sent to GitHub or to your AI provider is under that service's
 control: delete it there, for example by closing a pull request or deleting

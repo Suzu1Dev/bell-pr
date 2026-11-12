@@ -215,17 +215,20 @@ export async function enforceAgentSandbox(
     label: messages.allowFix,
     command: `BELLPR_ALLOW_UNSANDBOXED_AGENTS=1 ${product.binNames[0]}`,
   };
-  if (provider === "antigravity")
+  if (provider === "antigravity") {
+    const restricted = detection.reason?.startsWith("restricted:");
     throw new AppError(
-      detection.reason?.startsWith("restricted:")
-        ? messages.antigravityRestricted
-        : messages.antigravityUnavailable,
+      restricted ? messages.antigravityRestricted : messages.antigravityUnavailable,
       503,
       {
         code: "antigravity_sandbox_unavailable",
-        fixes: [{ label: messages.claudeFix, command: "claude auth login" }, allowFix],
+        // Claude Code's sandbox can need the same Ubuntu setting, so switching is not offered there.
+        fixes: restricted
+          ? [allowFix]
+          : [{ label: messages.claudeFix, command: "claude auth login" }, allowFix],
       },
     );
+  }
   // Installed but blocked, as in a container: installing it again or
   // switching to Codex, whose sandbox is blocked the same way, cannot help.
   if (detection.reason === "unusable:bwrap")
@@ -301,15 +304,16 @@ function dataDirectoryOf(cwd: string) {
 }
 
 /**
- * A Read rule for an absolute path, in permission-rule syntax (`//` starts
- * an absolute path), followed by an optional glob such as `/**`. Glob
+ * A Read rule (or another tool's) for an absolute path, in permission-rule
+ * syntax (`//` starts an absolute path), followed by an optional glob such
+ * as `/**`. Glob
  * characters in the path itself are escaped; a path Claude Code could not
  * parse inside a rule is left out rather than risk the whole settings value
  * being rejected.
  */
-function absoluteRule(directory: string, glob = ""): string | undefined {
+function absoluteRule(directory: string, glob = "", tool = "Read"): string | undefined {
   if (/[()\\\n\r\0]/.test(directory)) return undefined;
-  return `Read(/${directory.replace(/[*?[\]!#]/g, (char) => `\\${char}`)}${glob})`;
+  return `${tool}(/${directory.replace(/[*?[\]!#]/g, (char) => `\\${char}`)}${glob})`;
 }
 
 function entries(directory: string) {
@@ -664,4 +668,103 @@ export function agentGitWriteDenials(cwd: string): string[] {
     /* No worktrees recorded. */
   }
   return [...new Set(rules)];
+}
+
+/** The most held paths one turn's sandbox is given; the rest wait for the check after the turn. */
+export const maxHeldWriteTargets = 200;
+
+/**
+ * Where in the checkout `cwd` an agent write turn must not write because
+ * other people in the group hold it (docs/design/collab-write-guard.md,
+ * S3): absolute paths, as the checkout spells them, for the sandbox to make
+ * read-only. Holds fold ASCII case and the file system on Linux does not,
+ * so each held path is looked up one folder at a time and every spelling
+ * found there counts. A held file that does not exist yet is named too,
+ * when its folder exists: the sandbox then refuses to create it. Left out,
+ * so that the turn still starts and only the check after it applies:
+ *
+ * - a held path whose folder does not exist (Codex 0.167 would make the
+ *   first missing folder read-only, other people's files in it included);
+ * - a path with a symbolic link on the way or at its end (bubblewrap
+ *   refuses to start: "cannot enforce sandbox read-only path … because it
+ *   crosses writable symlink");
+ * - anything in `.git`, which is already read-only, and paths with `..`;
+ * - a path below another one in the list, and paths past
+ *   maxHeldWriteTargets.
+ *
+ * Not covered either: renaming a folder above a held path. That needs write
+ * access only to the folder that contains it, which stays writable for the
+ * files of other people in it, and the next command's fresh sandbox no
+ * longer guards the file at its new place; the check after the turn stops
+ * the turn, since the held path changed.
+ *
+ * Each sandbox may leave out more (codexSandboxConfig: glob characters;
+ * heldSandboxWriteDenials: paths that do not exist; heldEditDenials:
+ * parentheses, backslashes and line breaks).
+ *
+ * Verified with codex-cli 0.167.0 (`codex sandbox`) on Linux with
+ * bubblewrap 0.11.1: a read-only file cannot be written, deleted or
+ * renamed over, a read-only folder takes no new file, and its neighbours
+ * stay writable.
+ */
+export function heldWriteTargets(cwd: string, scopes: readonly string[]): string[] {
+  const fold = (value: string) => value.replace(/[A-Z]/g, (letter) => letter.toLowerCase());
+  const found = new Set<string>();
+  for (const scope of scopes) {
+    const parts = scope.split("/").filter((part) => part && part !== ".");
+    if (!parts.length || parts.includes("..") || fold(parts[0]) === ".git") continue;
+    let folders = [cwd];
+    parts.forEach((part, index) => {
+      const last = index === parts.length - 1;
+      const next: string[] = [];
+      for (const folder of folders) {
+        let names;
+        try {
+          names = readdirSync(folder, { withFileTypes: true });
+        } catch {
+          continue;
+        }
+        const matches = names.filter((entry) => fold(entry.name) === fold(part));
+        if (!matches.length && last) found.add(path.join(folder, part));
+        for (const entry of matches) {
+          if (entry.isSymbolicLink()) continue;
+          const target = path.join(folder, entry.name);
+          if (last) found.add(target);
+          else if (entry.isDirectory()) next.push(target);
+        }
+      }
+      folders = next;
+    });
+  }
+  const sorted = [...found].sort();
+  return sorted
+    .filter((target) => !sorted.some((other) => inside(target, other)))
+    .slice(0, maxHeldWriteTargets);
+}
+
+/**
+ * The Claude Code Edit rules for heldWriteTargets: each path and everything
+ * under it. Edit rules cover every tool that edits files (Edit, Write,
+ * NotebookEdit); the sandbox's denyWrite covers Bash. They apply with or
+ * without the sandbox. A path absoluteRule cannot write as a rule gets
+ * none and is left to the check after the turn.
+ */
+export function heldEditDenials(targets: readonly string[]): string[] {
+  return targets.flatMap((target) =>
+    [absoluteRule(target, "", "Edit"), absoluteRule(target, "/**", "Edit")].filter(
+      (rule): rule is string => !!rule,
+    ),
+  );
+}
+
+/**
+ * heldWriteTargets as Claude Code's sandbox takes them for Bash. A path with
+ * glob characters would be read as a pattern, and a path that does not
+ * exist yet was not verified with its bubblewrap (on the Linux host where
+ * this was written, Claude Code 2.1.321 could not start its sandbox at all,
+ * with or without these paths), so both are left out: the Edit rules and
+ * the check after the turn still cover them.
+ */
+export function heldSandboxWriteDenials(targets: readonly string[]): string[] {
+  return targets.filter((target) => !/[*?[\]{}]/.test(target) && existsSync(target));
 }

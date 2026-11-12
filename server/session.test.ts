@@ -305,7 +305,7 @@ test("a session needs an unpublished finished run and a message", async () => {
     await assert.rejects(
       f.workbench.startSession(f.run.id, "補測試"),
       (error: AppError) =>
-        error.statusCode === 409 && /依 review 修正/.test(error.message),
+        error.statusCode === 409 && /依回饋繼續修正/.test(error.message),
     );
     assert.equal(f.run.session, undefined);
   } finally {

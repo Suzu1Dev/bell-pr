@@ -2,15 +2,14 @@ import { fullAccessDisclosure, sudoDisclosure } from "../../../shared/i18n/discl
 import { product } from "../../../shared/product";
 export default {
   label: "Agent permissions",
-  workspace: "Working directory (default)",
+  workspace: "Working directory access (default)",
   full: "Full access",
   fullAccessDisclosure,
   fullConfirmTitle: "Use Full access?",
   fullConfirm: "Use Full access",
-  fullCancel: "Keep the working directory",
+  fullCancel: "Keep working directory access",
   summary: "Full access (sandbox and command deny rules lifted)",
-  workspaceHelp: "Codex uses its working-directory sandbox. Claude Code and Antigravity keep their OS sandbox and command deny rules unless you separately allowed them without a sandbox. Read-only roles remain restricted.",
-  fullHelp: "Writable agents run as your account without a sandbox or command deny rules. They may install packages, change system settings and use passwordless sudo. Untrusted project text could influence them and affect this computer. Use this only for projects you trust. Read-only roles keep their restrictions.",
+  workspaceHelp: "Codex: its working-directory sandbox. Claude Code and Antigravity: their OS sandbox and command deny rules, unless you allowed unsandboxed Agents. Read-only roles stay restricted.",
   sudoTitle: "Passwordless sudo",
   sudoDisclosure,
   loadFailed: ({ message }: { message: string }) => `Could not read sudo status: ${message}`,
@@ -27,6 +26,6 @@ export default {
   enabling: "Configuring…",
   remove: `Remove ${product.name}'s sudo rule`,
   removing: "Removing…",
-  help: ({ user }: { user: string }) => `Enter the password each time to create /etc/sudoers.d/bell-pr-agent for ${user}, for the time chosen above (8 hours at most). ${product.name} removes the rule when that time is up. This works only in ${product.name} on this computer. The password is sent only to sudo for this setup and is never saved or logged. This rule grants ${user} root privileges without a password, including every program and agent running as that account.`,
+  help: ({ user }: { user: string }) => `Enter the password each time to create /etc/sudoers.d/bell-pr-agent for ${user}, for the time chosen above (8 hours at most). ${product.name} removes the rule when that time is up. This works only in ${product.name} on this computer. The password goes only to sudo and is never saved or logged. Every program and Agent running as ${user} then gets passwordless root.`,
   failed: "The operation did not finish. Please try again.",
 };

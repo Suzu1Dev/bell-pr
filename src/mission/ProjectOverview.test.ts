@@ -69,6 +69,32 @@ test("the reading path lists each step with the matching module purpose and evid
   assert.match(legacy, /主要模組怎麼分工？/);
 });
 
+test("a flow of two steps or more is a figure captioned by the prose; a shorter or missing one keeps the prose block", () => {
+  const html = render();
+  const prose = demoInsights.howItFitsTogether!;
+  const figure = /<figure class="mission-reading-flow mission-flow mission-flow-few">([\s\S]*?)<\/figure>/.exec(html)?.[1];
+  assert.ok(figure, "the sample draws its flow");
+  assert.ok(figure.includes(`<figcaption>${prose}</figcaption>`));
+  // The prose is the caption, not a second copy.
+  assert.equal(html.split(prose).length, 2);
+  assert.equal(figure.match(/<li>/g)?.length, 4);
+  assert.equal(figure.match(/<code>src\/client\.ts<\/code>/g)?.length, 2);
+  // Steps outside the repository are dashed and say so to screen readers.
+  assert.equal(figure.match(/mission-flow-step mission-flow-outside/g)?.length, 2);
+  assert.equal(figure.match(/<span class="visually-hidden"> 在這個 repository 之外<\/span>/g)?.length, 2);
+  // Three arrows between four steps, each naming what passes on; the last step passes nothing.
+  assert.equal(figure.match(/class="mission-flow-link"/g)?.length, 3);
+  for (const passes of ["要 GET 的路徑", "HTTP 請求", "回應"])
+    assert.ok(figure.includes(`<span class="visually-hidden">傳給下一步： </span>${passes}`), passes);
+
+  const block = `<div class="mission-reading-flow"><span>模組怎麼串起來</span><p>${prose}</p></div>`;
+  for (const flow of [undefined, [], demoInsights.flow!.slice(0, 1)]) {
+    const plain = render({ insights: { ...demoInsights, flow } });
+    assert.doesNotMatch(plain, /<figure/);
+    assert.ok(plain.includes(block));
+  }
+});
+
 test("the stale notice reports changed and cited files, and never suggests skipping re-analysis", () => {
   const unknown = render({ insights: analyzed, stale: true });
   assert.match(unknown, /無法列出變更明細；重新分析後再確認貢獻方向/);
@@ -80,7 +106,7 @@ test("the stale notice reports changed and cited files, and never suggests skipp
   });
   assert.match(
     cited,
-    /自分析版本 0123456後有至少 3 個檔案變動，其中 1 個是本份分析引用的檔案：src\/client\.ts。重新分析後再確認貢獻方向。/,
+    /自分析版本 0123456後至少 3 個檔案有變動，其中 1 個被引用：src\/client\.ts。重新分析後再選方向。/,
   );
 
   const uncited = render({
@@ -88,22 +114,22 @@ test("the stale notice reports changed and cited files, and never suggests skipp
     stale: true,
     staleDetail: { changedFiles: 2, citedChanged: [] },
   });
-  assert.match(uncited, /分析引用的檔案未變動，但全貌仍可能受其他變更影響/);
-  assert.match(uncited, /重新分析後再確認貢獻方向/);
+  assert.match(uncited, /都未被引用，但仍可能影響全貌/);
+  assert.match(uncited, /重新分析後再選方向/);
 
   const sameContent = render({
     insights: analyzed,
     stale: true,
     staleDetail: { changedFiles: 0, citedChanged: [] },
   });
-  assert.match(sameContent, /版本已變更，但分析引用的檔案內容相同/);
-  assert.match(sameContent, /重新分析後再確認貢獻方向/);
+  assert.match(sameContent, /版本已變更，但引用的檔案沒變/);
+  assert.match(sameContent, /重新分析後再選方向/);
 
   for (const html of [unknown, cited, uncited, sameContent]) {
     assert.match(html, /專案版本已更新，請先重新分析專案，再產出更多建議。/);
     assert.match(html, /disabled="" aria-describedby="mission-more-description"/);
   }
-  assert.doesNotMatch(render({ insights: analyzed }), /重新分析後再確認貢獻方向/);
+  assert.doesNotMatch(render({ insights: analyzed }), /重新分析後再(確認貢獻方向|選方向)/);
 });
 
 test("unsampled reading steps are marked and dropped citations are listed; old caches show neither", () => {
@@ -336,7 +362,7 @@ test("the English overview words counts, dates and the update help in English", 
   assert.match(html, />Update to the latest version<\/button>/);
   assert.ok(
     html.includes(
-      `Fetches the latest main from GitHub, and the overview and analysis follow it. New contributions always start from the latest version. Last updated: ${en.dateTime("2026-10-13T00:00:00.000Z")}`,
+      `Fetches the latest main from GitHub for the overview and analysis. New contributions start from the latest version either way. Last updated: ${en.dateTime("2026-10-13T00:00:00.000Z")}`,
     ),
   );
   const analyzed = en.dateTime("2026-10-07T08:00:00.000Z", {
@@ -378,7 +404,7 @@ test("the English stale notices name the changed and cited files in one sentence
   });
   assert.match(
     cited,
-    /At least 3 files changed since the analyzed version 0123456, including 2 files that this analysis cites: src\/client\.ts, src\/retry\.ts\. Re-analyze before you settle on a direction\./,
+    /At least 3 files changed since the analyzed version 0123456, including 2 cited files: src\/client\.ts, src\/retry\.ts\. Re-analyze before choosing a direction\./,
   );
   assert.match(cited, /The project has a newer version\. Re-analyze it before you generate more recommendations\./);
 
@@ -389,7 +415,7 @@ test("the English stale notices name the changed and cited files in one sentence
   });
   assert.match(
     one,
-    /At least 1 file changed since the analyzed version, including 1 file that this analysis cites: src\/client\.ts\./,
+    /At least 1 file changed since the analyzed version, including 1 cited file: src\/client\.ts\./,
   );
 
   const capped = renderEnglish({
@@ -399,7 +425,7 @@ test("the English stale notices name the changed and cited files in one sentence
       citedChanged: Array.from({ length: 12 }, (_, index) => `f${index}.ts`),
     },
   });
-  assert.match(capped, /At least 1,250 files changed .*, including 12 or more files that this analysis cites: f0\.ts, f1\.ts/);
+  assert.match(capped, /At least 1,250 files changed .*, including 12 or more cited files: f0\.ts, f1\.ts/);
 });
 
 /** The "Generate 5 more" button, as rendered. */
@@ -416,12 +442,12 @@ test("Generate 5 more is always open on a real analysis, with no chip and no upg
   assertNoHan(html);
   assert.match(moreButton(html), /Generate 5 more<\/button>$/);
   assert.doesNotMatch(moreButton(html), /disabled|pro-badge/);
-  assert.match(moreReason(html) ?? "", /^The Agent uses the model settings saved for this project/);
+  assert.match(moreReason(html) ?? "", /^Uses the saved model settings\./);
   assert.doesNotMatch(html, /pro-badge|mission-upgrade-button|See what Pro adds/);
   const zh = render({ insights: analyzed });
   assert.match(moreButton(zh), /產出 5 個新建議<\/button>$/);
   assert.doesNotMatch(moreButton(zh), /disabled|pro-badge/);
-  assert.match(moreReason(zh) ?? "", /^Agent 會沿用這個專案已儲存的模型設定/);
+  assert.match(moreReason(zh) ?? "", /^沿用已儲存的模型設定。/);
 });
 
 test("Generate 5 more waits for a newer analysis, and stops at 30 recommendations per project", () => {
@@ -759,9 +785,9 @@ test("the contribution brief shows the premise verdict and labels what still sta
   assert.match(refuted, /前提查核：假設不成立/);
   assert.match(refuted, /src\/web\/interviews\.rs:195/);
   // The request's wording is kept but labelled on both cards that copy it.
-  assert.equal(refuted.match(/依你的假設，查證後不成立/g)?.length, 2);
+  assert.equal(refuted.match(/依你的假設，查證後不成立/g)?.length, 1);
   assert.match(refuted, /若此假設成立，候選人重新整理後就無法開始面試。/);
-  assert.match(refuted, /上面依假設描述的問題與影響實際上不會發生/);
+  assert.match(refuted, /上述問題與影響不會發生/);
   // A check can be made again; the button appears only with the action.
   assert.doesNotMatch(refuted, /重新查核前提/);
   const recheck = render({
@@ -774,7 +800,7 @@ test("the contribution brief shows the premise verdict and labels what still sta
 
   // A run made before premise checks offers one; without the action, nothing is offered.
   const missing = render({ run: { ...base, team }, brief, onCheckPremise() {} });
-  assert.match(missing, /這個貢獻建立時還沒有前提查核/);
+  assert.match(missing, /這個貢獻早於前提查核/);
   assert.match(missing, /依審查結果查核前提/);
   assert.doesNotMatch(missing, /依你的假設/);
   assert.doesNotMatch(render({ run: { ...base, team }, brief }), /依審查結果查核前提/);
@@ -815,7 +841,7 @@ test("the premise check in the brief reads in English", () => {
   const html = renderEnglish({ run, brief, onCheckPremise() {} });
   assertNoHan(html);
   assert.match(html, /Premise check: the assumption could not be confirmed/);
-  assert.equal(html.match(/Based on an unconfirmed assumption/g)?.length, 2);
+  assert.equal(html.match(/Based on an unconfirmed assumption/g)?.length, 1);
   // In the after card the tag is on a line of its own, outside the label's mono caps.
   assert.match(
     html,
@@ -841,8 +867,8 @@ test("an open contribution leads with its brief, which does not repeat the title
     reviewedFiles: [],
   } as unknown as NonNullable<ProjectOverviewProps["run"]>;
   const html = render({ run });
-  const brief = html.indexOf("這次改動，會帶來什麼不同？");
-  assert.ok(brief >= 0 && brief < html.indexOf("先看懂專案，再決定怎麼改。"));
+  const brief = html.indexOf("這次變更，會帶來什麼不同？");
+  assert.ok(brief >= 0 && brief < html.indexOf('<details class="mission-context"'));
   assert.ok(brief < html.indexOf('id="mission-purpose-title"'));
   // The header shows the title; the brief does not repeat it.
   assert.doesNotMatch(html, /mission-contribution-name|確認呼叫端使用回傳的 id/);
@@ -851,10 +877,10 @@ test("an open contribution leads with its brief, which does not repeat the title
   // While the analysis loads, or before there is one, the brief still leads.
   for (const props of [{ loading: true, insights: null }, { insights: null }]) {
     const pending = render({ run, ...props });
-    assert.ok(pending.indexOf("這次改動，會帶來什麼不同？") < pending.indexOf("mission-overview-empty"));
+    assert.ok(pending.indexOf("這次變更，會帶來什麼不同？") < pending.indexOf("mission-overview-empty"));
   }
   // The project page has no brief.
-  assert.doesNotMatch(render(), /這次改動，會帶來什麼不同？/);
+  assert.doesNotMatch(render(), /這次變更，會帶來什麼不同？/);
 });
 
 test("a request written in labelled sections renders as Markdown with its labels in bold", () => {

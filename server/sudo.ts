@@ -160,8 +160,6 @@ export class PasswordlessSudo {
       const reason = error instanceof SudoError ? error.reason : "failed";
       await this.audit.record({ event: "enable", ok: false, reason, ...context, ttlSeconds: ttl });
       throw error;
-    } finally {
-      password = "";
     }
   }
 
@@ -307,7 +305,6 @@ export class PasswordlessSudo {
           timeoutMs: 30_000,
           allowedCodes: [0, 1],
         }).catch(() => undefined);
-      password = "";
       this.busy = false;
       if (directory) await rm(directory, { recursive: true, force: true });
     }
