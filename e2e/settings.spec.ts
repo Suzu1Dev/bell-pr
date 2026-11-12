@@ -667,7 +667,7 @@ for (const locale of locales)
         await expect(page.locator("html")).toHaveAttribute("lang", htmlLang(locale));
         await settle(page);
         await page.evaluate(() => document.fonts.ready);
-        // Finite animations only: a spinner does not finish, and axe reads the settled colors.
+        // Finite animations only, for at most 5s. A spinner does not finish.
         await page.evaluate(async () => {
           const moving = () =>
             document
@@ -677,8 +677,34 @@ for (const locale of locales)
                   animation.playState === "running" &&
                   animation.effect?.getComputedTiming().endTime !== Infinity,
               );
-          for (let running = moving(); running.length > 0; running = moving())
-            await Promise.allSettled(running.map((animation) => animation.finished));
+          const label = (animation: Animation) => {
+            const effect = animation.effect;
+            const target = effect && "target" in effect ? effect.target : null;
+            const element = target instanceof Element ? target : null;
+            const where = element?.id
+              ? `#${element.id}`
+              : element
+                ? element.tagName.toLowerCase()
+                : "unknown";
+            const named = animation as CSSAnimation | CSSTransition;
+            const what =
+              "animationName" in named && named.animationName
+                ? named.animationName
+                : "transitionProperty" in named && named.transitionProperty
+                  ? named.transitionProperty
+                  : animation.id || "animation";
+            return `${where} ${what}`;
+          };
+          const deadline = performance.now() + 5000;
+          for (let running = moving(); running.length > 0; running = moving()) {
+            const left = deadline - performance.now();
+            if (left <= 0)
+              throw new Error(`Animations still running after 5s: ${running.map(label).join(", ")}`);
+            await Promise.race([
+              Promise.allSettled(running.map((animation) => animation.finished)),
+              new Promise((resolve) => setTimeout(resolve, left)),
+            ]);
+          }
         });
         const results = await new AxeBuilder({ page })
           .options({ rules: { "color-contrast": { enabled: true } } })
