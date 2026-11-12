@@ -29,12 +29,12 @@ const run: Run = {
 test("a queued run says why it waits", () => {
   const html = renderEn(createElement(RunNotices, { run, queued: true }));
   assert.match(html, /role="status"/);
-  assert.match(html, /Queued: the limit of runs at once is reached; this one starts when another finishes/);
+  assert.match(html, /Queued: the limit of runs at once is reached\. This one starts when another finishes\./);
   assert.doesNotMatch(html, /pro-badge|run-notice-link|Free|Pro\b/);
   assertNoHan(html);
   assert.match(
     renderZh(createElement(RunNotices, { run, queued: true })),
-    /排隊中：同時執行的工作數已達上限，其他任務完成後才會開始/,
+    /排隊中：同時執行的任務數已達上限。其他任務完成後，這次任務才會開始。/,
   );
 });
 
@@ -63,7 +63,7 @@ test("the unsandboxed badge links to the safety settings and explains itself", (
   assert.match(html, /Ran without sandbox/);
   assert.match(
     html,
-    /<span id="unsandboxed-help" class="unsandboxed-help" role="tooltip">You allowed agents to run without the operating system&#x27;s sandbox/,
+    /<span id="unsandboxed-help" class="unsandboxed-help" role="tooltip">You allowed Agents to run without the operating system&#x27;s sandbox/,
   );
   assertNoHan(html);
   assert.match(renderZh(createElement(UnsandboxedBadge)), /未使用沙箱執行/);

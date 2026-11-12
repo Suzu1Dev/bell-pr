@@ -310,7 +310,7 @@ test("in English, source labels and warnings carry no Han", async () => {
     );
     assert.ok(
       context.warnings.some((warning) =>
-        warning.startsWith("The local rule search covers"),
+        warning.startsWith("Rules were searched locally"),
       ),
     );
     assert.ok(

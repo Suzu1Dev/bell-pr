@@ -237,8 +237,39 @@ test("the explanation panel's tabs move with the arrow keys and keep one tab sto
 /** Serious and critical axe issues inside the changes tab, one line each. */
 async function axeProblems(page: Page) {
   await page.evaluate(() => document.fonts.ready);
-  // Let transitions (focus rings, selection colors) settle before colors are read.
-  await page.waitForTimeout(300);
+  // Finite animations (focus rings, selection colors) only; a spinner does not finish.
+  await page.evaluate(async () => {
+    const moving = () =>
+      document
+        .getAnimations()
+        .filter(
+          (animation) =>
+            animation.playState === "running" &&
+            animation.effect?.getComputedTiming().endTime !== Infinity,
+        );
+    const label = (animation: Animation) => {
+      const name = animation instanceof CSSAnimation ? animation.animationName : "";
+      const target = animation.effect instanceof KeyframeEffect ? animation.effect.target : null;
+      let selector = "";
+      if (target instanceof Element) {
+        const classes = [...target.classList].join(".");
+        selector = target.id
+          ? `#${target.id}`
+          : `${target.tagName.toLowerCase()}${classes ? `.${classes}` : ""}`;
+      }
+      return [name, selector].filter(Boolean).join(" ") || "animation";
+    };
+    const deadline = performance.now() + 5000;
+    for (let running = moving(); running.length > 0; running = moving()) {
+      const remaining = deadline - performance.now();
+      if (remaining <= 0)
+        throw new Error(`Animations still running after 5s: ${running.map(label).join(", ")}`);
+      await Promise.race([
+        Promise.allSettled(running.map((animation) => animation.finished)),
+        new Promise((resolve) => setTimeout(resolve, remaining)),
+      ]);
+    }
+  });
   const results = await new AxeBuilder({ page })
     .include("#workspace-panel")
     .options({ rules: { "color-contrast": { enabled: true } } })

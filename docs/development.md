@@ -239,6 +239,9 @@ How the code stays within them:
 - `vite.config.ts` gives React, the icons, the sample project's shared
   data and the Markdown stack (loaded on demand) chunks of their own, and
   builds for the browsers the stylesheets already require.
+  The app needs Chrome 111, Edge 111, Firefox 113 or Safari 16.2 or later,
+  because the stylesheets use `color-mix()`; those versions are `build.target`
+  in `vite.config.ts`.
 - The CSS ships as one file: split per lazy view, each small file was
   compressed on its own and cost more than the whole. To find style rules
   nothing uses, run `node scripts/unused-css.mjs`; with the classes an e2e

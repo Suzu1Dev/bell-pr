@@ -31,7 +31,7 @@ test("the premise check reads in English, and a verdict word from a later build 
   const english = renderEn(createElement(PremiseNotice, { premise: { ...premise, statement: "The caller hands over an id it made.", evidence: "src/web/interviews.rs:195 returns interview.id." } }));
   assertNoHan(english);
   assert.match(english, /Premise check: the assumption does not hold/);
-  assert.match(english, /Found by the lead reading the code/);
+  assert.match(english, /Found by the Lead reading the code/);
   const later = render({ ...premise, verdict: "partly" as PremiseCheck["verdict"] });
   assert.match(later, /premise-unclear/);
   assert.match(later, /無法確認假設/);

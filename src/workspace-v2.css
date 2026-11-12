@@ -442,7 +442,7 @@
     margin-left: 0;
   }
   /* Focus mode hides the tab row (it comes back with Esc or the 離開專注模式
-     button); the review footer stays so the reviewed count and 確認並準備 PR
+     button); the review footer stays so the reviewed count and 核准並預覽 PR
      remain visible. */
   .is-focused .review-toolbar {
     display: none;

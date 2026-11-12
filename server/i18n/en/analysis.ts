@@ -37,7 +37,7 @@ export default {
     duplicateIds: "The AI returned duplicate recommendation ids. Analyze again.",
     repositoryNotFound: "Repository not found.",
     cacheUnreadable:
-      "The project analysis data cannot be read. Check the local insights data file.",
+      "The project analysis data cannot be read. Check the files in the insights folder of the data directory.",
     modelSettingsUnreadable:
       "The model settings cannot be read. Check the local model-settings.json file.",
     analyzeFirst:
@@ -49,7 +49,7 @@ export default {
     noTextFiles:
       "No tracked text files to analyze were found. Add a README or code and commit it first.",
     shuttingDown:
-      "The server is shutting down, so a new project analysis cannot start.",
+      "The service is shutting down, so a new project analysis cannot start.",
     alreadyRunning:
       "This project is already being analyzed. Wait for the current analysis to finish.",
     tooManyRunning:
@@ -129,9 +129,9 @@ export default {
     fileTooLarge: "The saved discovery results file is too large to load safely.",
     /** A discovery job that was running when the server stopped. */
     interruptedError:
-      "The server restarted and interrupted the discovery. The sources collected so far and the previous result are kept; you can run discovery again.",
+      "The service restarted and interrupted the discovery. The sources collected so far and the previous result are kept; you can run discovery again.",
     interrupted: "The last discovery was interrupted",
-    shuttingDown: "The server is shutting down. Try discovery again later.",
+    shuttingDown: "The service is shutting down. Try discovery again later.",
     alreadyRunning:
       "A discovery is already running. Wait for it to finish or cancel it first.",
     searching: "Looking for GitHub projects that match your criteria",
@@ -151,9 +151,9 @@ export default {
     noEvidence:
       "No opportunity this time both matched your criteria and had issue evidence that can be checked.",
     analyzing:
-      "Found real GitHub sources; analyzing which contribution opportunities fit",
+      "Found GitHub sources; analyzing which contribution opportunities fit",
     analyzingWithWait: ({ wait }: { wait: string }) =>
-      `Found real GitHub sources; analyzing which contribution opportunities fit (${wait})`,
+      `Found GitHub sources; analyzing which contribution opportunities fit (${wait})`,
     unusableAnswer:
       "The AI discovery analysis did not finish, or its response cannot be used safely. Try again; the previous result is kept.",
     found: ({ count }: { count: number }) =>
@@ -193,16 +193,16 @@ export default {
     partialResults:
       "GitHub returned partial search results, so this discovery is not a complete list.",
     noRepositories:
-      "This bounded search found no public project that matches. Try fewer keywords, a lower stars threshold or another difficulty.",
+      "This search reads only GitHub's first 12 results and found no public project that matches. Try fewer keywords, a lower stars threshold or another difficulty.",
     /** What discovery sampled, in the GitHub search order the person chose. */
     samplingScope: ({ sort }: { sort: DiscoverySort }) =>
-      `At most 6 projects were sampled (${
+      `Sampled: at most 6 projects (${
         {
           relevance: "GitHub's best matches first",
           updated: "most recently updated first",
           stars: "most stars first",
         }[sort]
-      }), with up to 3 open issues each and the last 3 comments on each issue. Labels do not guarantee the actual difficulty or that the work is still available. Only the README, CONTRIBUTING and PR template that GitHub's community profile finds in the root, .github or docs were read; account-wide defaults, folders of several templates and external links were not.`,
+      }), up to 3 open issues each, the last 3 comments per issue. Labels do not guarantee the actual difficulty or that the work is still available. Read: only the README, CONTRIBUTING and PR template that GitHub's community profile finds in the root, .github or docs. Not read: account-wide defaults, folders of several templates, external links.`,
     screening: ({ repository }: { repository: string }) =>
       `Checking the issues, contribution documents and maintainer replies of ${repository}.`,
     repositoryUnconfirmed: ({ repository }: { repository: string }) =>
@@ -279,7 +279,7 @@ export default {
     readFailed: ({ label }: { label: string }) =>
       `${label} could not be read; its rules were not checked.`,
     searchScope:
-      "The local rule search covers the common contribution guides, READMEs, maintainer documents and PR templates in the base commit's root, .github, docs and documentation folders, AGENTS.md and CLAUDE.md in the root, and the .github/workflows files that check pull requests automatically. Links to other places in those documents are not followed.",
+      "Rules were searched locally in the base commit: the common contribution guides, READMEs, maintainer documents and PR templates in the root, .github, docs and documentation folders; AGENTS.md and CLAUDE.md in the root; the .github/workflows files that check pull requests automatically. Links in those documents were not followed.",
     automationLimit: ({ max, remaining }: { max: number; remaining: number }) =>
       fmt.plural(remaining) === "one"
         ? `At most ${max} pull request check workflows are included; 1 more workflow was not checked.`
@@ -343,7 +343,7 @@ export default {
       line: string;
       title: boolean;
     }) =>
-      `${title ? "The subject is the PR title. " : ""}${label} asks for an AI trailer (“${quote}”), so the message ends with ${line}, which names the agent that wrote this change.`,
+      `${title ? "The subject is the PR title. " : ""}${label} asks for an AI trailer (“${quote}”), so the message ends with ${line}, which names the Agent that wrote this change.`,
     ruleQuoteMismatch:
       "A rule quoted in the PR draft does not match its source. Generate it again.",
     templateNotUsed:
@@ -436,7 +436,7 @@ export default {
       "The fastest, with the lowest usage. It does not support reasoning effort settings.",
     invalidSettings: "The model settings are not valid. Choose them again.",
     providerMismatch:
-      "The model list does not match the selected agent. Reload, then choose again.",
+      "The model list does not match the selected AI provider. Reload, then choose again.",
     unknownModel:
       "These model settings cannot be confirmed. Reload the model list and choose again.",
     unsupportedEffort:

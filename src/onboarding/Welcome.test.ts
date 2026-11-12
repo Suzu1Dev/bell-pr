@@ -115,26 +115,26 @@ test("the provider step picks the only ready provider and lets the person choose
   assert.match(only, /Uses the Claude Code CLI you installed and signed in to \(Claude plan or Anthropic API key\)\. Usage counts against your own account\./);
   assert.doesNotMatch(only, /subscription|API billing/i);
   const choice = renderEn(welcome("provider", { doctor: doctor(both) }));
-  assert.match(choice, /<legend>More than one provider is ready\. Which one should your agents use\?<\/legend>/);
+  assert.match(choice, /<legend>More than one AI provider is ready\. Which one should your Agents use\?<\/legend>/);
   assert.equal(choice.match(/type="radio" name="welcome-provider"/g)?.length, 2);
   const empty = renderEn(welcome("provider", { doctor: doctor(none) }));
-  assert.match(empty, /No provider is ready yet\./);
-  assert.match(empty, />Re-check</);
+  assert.match(empty, /No AI provider is ready yet\./);
+  assert.match(empty, />Check again</);
   const onlyCodex = report(base);
   const providerReady = onlyCodex.checks.find((check) => check.id === "provider-ready")!;
   providerReady.reason = "claude-only";
   providerReady.detail =
-    "Claude Code only in 1.0.0; Codex support is disabled\nPlease install Claude Code.";
+    "1.0.0 supports Claude Code only; Codex support is disabled.\nInstall Claude Code.";
   const blocked = renderEn(welcome("provider", { doctor: doctor(onlyCodex) }));
-  assert.match(blocked, /Claude Code only in 1\.0\.0; Codex support is disabled/);
-  assert.match(blocked, /Please install Claude Code\./);
-  assert.doesNotMatch(blocked, /No provider is ready yet/);
-  providerReady.detail = "1.0.0 只支援 Claude Code；Codex 暫時停用\n請安裝 Claude Code。";
+  assert.match(blocked, /1\.0\.0 supports Claude Code only; Codex support is disabled\./);
+  assert.match(blocked, /Install Claude Code\./);
+  assert.doesNotMatch(blocked, /No AI provider is ready yet/);
+  providerReady.detail = "1.0.0 只支援 Claude Code；Codex 已停用。\n請安裝 Claude Code。";
   const blockedZh = renderZh(welcome("provider", { doctor: doctor(onlyCodex) }));
-  assert.match(blockedZh, /1\.0\.0 只支援 Claude Code；Codex 暫時停用/);
+  assert.match(blockedZh, /1\.0\.0 只支援 Claude Code；Codex 已停用。/);
   assert.match(blockedZh, /請安裝 Claude Code。/);
   const loading = renderEn(welcome("provider", { doctor: doctor(null) }));
-  assert.match(loading, /Checking which providers are ready…/);
+  assert.match(loading, /Checking which AI providers are ready…/);
 });
 
 test("with no provider ready, Welcome shows how to install one", () => {
@@ -166,7 +166,7 @@ test("with no provider ready, Welcome shows how to install one", () => {
   const html = renderEn(welcome("provider", { doctor: doctor(missing) }));
   assertNoHan(html);
   assert.match(html, /<h1 id="welcome-title">Welcome to BELL PR<\/h1>/);
-  assert.match(html, /No provider is ready yet\./);
+  assert.match(html, /No AI provider is ready yet\./);
   for (const command of [
     "npm install -g @openai/codex",
     "codex login",
@@ -202,7 +202,7 @@ test("the last step offers the tour, an import and discovery, which waits for th
   const html = renderEn(welcome("start"));
   assertNoHan(html);
   assert.match(html, /Take the 2-minute sample tour/);
-  assert.match(html, /Import a repository/);
+  assert.match(html, /Import a project/);
   // Every contribution ends with the understanding check, and the setting can change it.
   assert.match(
     html,
@@ -241,7 +241,7 @@ test("discovery is a plain choice that searches GitHub", () => {
   );
   assert.doesNotMatch(html, /pro-badge|sample results|Upgrade|trial/i);
   const zh = renderZh(welcome("start", { doctor: doctor(both) }));
-  assert.match(zh, /在 GitHub 上搜尋歡迎你提供這類協助的專案。/);
+  assert.match(zh, /在 GitHub 上搜尋歡迎你這類協助的專案。/);
 });
 
 test("the provider is saved without losing a model chosen for it", () => {

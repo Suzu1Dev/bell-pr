@@ -268,7 +268,7 @@ test("a run whose Claude agent ran unsandboxed is marked once, with one notice",
       (entry) =>
         entry.kind === "notice" &&
         entry.message ===
-          "This Claude agent ran without the OS sandbox because unsandboxed Claude agents are allowed (in Settings or with BELLPR_ALLOW_UNSANDBOXED_AGENTS=1).",
+          "This Claude Agent ran without the OS sandbox because unsandboxed Claude Agents are allowed (in Settings or with BELLPR_ALLOW_UNSANDBOXED_AGENTS=1).",
     );
     assert.equal(notices.length, 1);
   } finally {

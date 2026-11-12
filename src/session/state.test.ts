@@ -46,10 +46,10 @@ test("a new agent turn is blocked with the reason the server would give", () => 
   assert.equal(sessionTurnBlock(run({ status: "approved" })), undefined);
   assert.match(
     sessionTurnBlock(run({ session: session({ running: true, startedAt: "t" }) })) ?? "",
-    /agent is working in this checkout/,
+    /next turn can start when this one finishes/,
   );
-  assert.match(sessionTurnBlock(run({ publishing: true })) ?? "", /PR is being submitted/);
-  assert.match(sessionTurnBlock(run({ status: "published" })) ?? "", /review follow-up/);
+  assert.match(sessionTurnBlock(run({ publishing: true })) ?? "", /PR is being published/);
+  assert.match(sessionTurnBlock(run({ status: "published" })) ?? "", /Keep fixing from feedback/);
   assert.match(sessionTurnBlock(run({ status: "failed" })) ?? "", /has ended/);
   assert.match(sessionTurnBlock(run({ status: "running" })) ?? "", /Agents or review are still running/);
   assert.match(

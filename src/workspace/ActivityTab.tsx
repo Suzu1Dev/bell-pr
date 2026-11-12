@@ -128,7 +128,7 @@ export function ActivityTab({
           )}
           <div className="activity-log-heading">
             <h3>{t.log}</h3>
-            <span>{demo ? t.demoLog : active ? t.live : t.taskLog}</span>
+            {(demo || active) && <span>{demo ? t.demoLog : t.live}</span>}
           </div>
           {!run.learnByHand && run.agents.length > 0 && run.logs.length > 0 && (
             <div

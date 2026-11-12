@@ -382,7 +382,7 @@ test("the shared models are edited in place in the AI provider section", async (
     });
     await page.goto("/#/settings/provider");
     await expect(panel(page)).toContainText(settings.provider.readyWith({ providers: [providerLabels.codex] }));
-    const agent = panel(page).getByLabel(mission.settings.model.agent, { exact: true });
+    const agent = panel(page).getByRole("combobox", { name: mission.settings.model.agent, exact: true });
     await expect(agent).toHaveValue("codex");
     await agent.selectOption("claude");
     await panel(page).getByRole("button", { name: settings.provider.models.save }).click();
@@ -667,8 +667,45 @@ for (const locale of locales)
         await expect(page.locator("html")).toHaveAttribute("lang", htmlLang(locale));
         await settle(page);
         await page.evaluate(() => document.fonts.ready);
-        // Let transitions settle before colors are read.
-        await page.waitForTimeout(300);
+        // Finite animations only, for at most 5s. A spinner does not finish.
+        await page.evaluate(async () => {
+          const moving = () =>
+            document
+              .getAnimations()
+              .filter(
+                (animation) =>
+                  animation.playState === "running" &&
+                  animation.effect?.getComputedTiming().endTime !== Infinity,
+              );
+          const label = (animation: Animation) => {
+            const effect = animation.effect;
+            const target = effect && "target" in effect ? effect.target : null;
+            const element = target instanceof Element ? target : null;
+            const where = element?.id
+              ? `#${element.id}`
+              : element
+                ? element.tagName.toLowerCase()
+                : "unknown";
+            const named = animation as CSSAnimation | CSSTransition;
+            const what =
+              "animationName" in named && named.animationName
+                ? named.animationName
+                : "transitionProperty" in named && named.transitionProperty
+                  ? named.transitionProperty
+                  : animation.id || "animation";
+            return `${where} ${what}`;
+          };
+          const deadline = performance.now() + 5000;
+          for (let running = moving(); running.length > 0; running = moving()) {
+            const left = deadline - performance.now();
+            if (left <= 0)
+              throw new Error(`Animations still running after 5s: ${running.map(label).join(", ")}`);
+            await Promise.race([
+              Promise.allSettled(running.map((animation) => animation.finished)),
+              new Promise((resolve) => setTimeout(resolve, left)),
+            ]);
+          }
+        });
         const results = await new AxeBuilder({ page })
           .options({ rules: { "color-contrast": { enabled: true } } })
           .analyze();

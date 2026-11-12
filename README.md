@@ -60,7 +60,7 @@ npx bell-pr
 
 BELL PR checks your environment, then opens `http://127.0.0.1:4311` in your
 browser. In Welcome, choose your language and AI provider, then import a
-repository or explore contribution ideas. When the AI provider is the only
+project or explore contribution ideas. When the AI provider is the only
 required check that fails, it still opens. The first time, Welcome shows
 how to install one; the tour is on that screen. If another required check
 fails, startup stops and prints the commands to fix it.
@@ -94,7 +94,7 @@ are in [Installation](docs/installation.md).
 
 ## Contribution workflow
 
-1. **Understand the project.** Import a repository or discover one on GitHub.
+1. **Understand the project.** Import a project or discover one on GitHub.
    BELL PR explains its structure, quotes its contribution rules and suggests
    contribution ideas with references to the code.
 2. **Plan and build.** Describe the change and approve the Lead's plan.
@@ -131,8 +131,13 @@ and limits, or follow [Getting started](docs/getting-started.md) for a full walk
   operations use your GitHub account. The CLIs have their own data policies.
 - **Sandbox limits.** Agents use their CLI's sandbox by default. Import
   only projects whose code you are willing to run. Your Claude Code settings
-  can widen its sandbox, and GitHub credentials in the system keyring are
+  [can widen its sandbox](https://code.claude.com/docs/en/sandboxing#configure-sandboxing),
+  and GitHub credentials in the system keyring are
   not protected by its file restrictions; use a token with minimal permissions.
+  [GitHub documents](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens#personal-access-tokens-classic)
+  that only classic personal access tokens have write access to public
+  repositories that you or your organizations do not own. If publishing fails
+  with a fine-grained token, use a classic token.
 - **Broader access is optional.** Full access or allowing unsandboxed agents
   gives writable agents your user permissions. Linux's optional passwordless
   sudo grants root access to every process under that user. Use these options

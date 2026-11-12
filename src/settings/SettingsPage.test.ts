@@ -147,7 +147,7 @@ const text = (html: string) => html.replace(/<[^>]+>/g, " ");
 test("the settings page lists its sections, each at its own address, and opens on General", () => {
   const html = renderEn(page(status));
   assertNoHan(withoutOtherLanguages(html));
-  assert.match(html, /<span class="eyebrow">SETTINGS<\/span><h1 tabindex="-1">Get your workspace ready\.<\/h1>/);
+  assert.match(html, /<h1 tabindex="-1">Settings<\/h1>/);
   assert.match(html, /<nav class="settings-nav" aria-label="Settings sections">/);
   const links = [...html.matchAll(/<a href="([^"]+)"[^>]*data-section="(\w+)"/g)].map(
     ([, href, section]) => [href, section],
@@ -189,7 +189,7 @@ test("General has the language, the sample project switch and its reset", () => 
   // While the settings load, the switch waits.
   const loading = renderEn(createElement(GeneralSection, { settings: appSettings(null) }));
   assert.match(loading, /type="checkbox" disabled=""/);
-  assert.match(renderZh(createElement(GeneralSection, { settings: appSettings(view) })), /顯示範例專案/);
+  assert.match(renderZh(createElement(GeneralSection, { settings: appSettings(view) })), /顯示示範專案/);
 });
 
 test("AI provider shows each CLI's state, needs one provider, and keeps the Claude copy neutral", () => {
@@ -276,7 +276,7 @@ test("Agent safety shows the sandbox, the unsandboxed opt-in, web access and the
   assert.match(html, /<h3>Claude Code sandbox<\/h3><span class="service-status">Check<\/span>/);
   assert.match(html, /Not available: install bubblewrap and socat\./);
   assert.match(html, /<code>sudo apt install bubblewrap socat<\/code>/);
-  assert.match(html, /<input id="[^"]+" type="checkbox" aria-describedby="[^"]+"\/><div class="settings-switch-body"><label for="[^"]+">Allow unsandboxed Claude Code and Antigravity agents<\/label>/);
+  assert.match(html, /<input id="[^"]+" type="checkbox" aria-describedby="[^"]+"\/><div class="settings-switch-body"><label for="[^"]+">Allow unsandboxed Claude Code and Antigravity Agents<\/label>/);
   assert.match(html, /<h3>Web access<\/h3>/);
   assert.doesNotMatch(html, /pro-badge|Pro feature|needs Pro/);
   assert.match(html, /<a class="settings-link" href="#\/settings\/provider\?present=1">Open AI provider settings<\/a>/);
@@ -364,7 +364,7 @@ test("Environment shows the GitHub connection without the brand icon, the checkl
   assert.match(html, /lucide-git-pull-request/);
   assert.doesNotMatch(html, /lucide-github/);
   assert.match(html, /class="setup-checklist"/);
-  assert.match(html, />Re-check</);
+  assert.match(html, />Check again</);
   const advanced = html.match(/<details class="settings-advanced">.*?<\/details>/)?.[0] ?? "";
   assert.match(advanced, /<summary>Advanced: environment variables<\/summary>/);
   for (const variable of [

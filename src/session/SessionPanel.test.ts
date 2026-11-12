@@ -15,8 +15,8 @@ const props = {
 
 test("the collaboration composer follows both UI languages", () => {
   const en = renderEn(createElement(SessionPanel, props));
-  assert.match(en, /Collaborate with the agent/);
-  assert.match(en, /Message to the agent/);
+  assert.match(en, /Collaborate with the Agent/);
+  assert.match(en, /Message to the Agent/);
   assertNoHan(en);
   const zh = renderZh(createElement(SessionPanel, props));
   assert.match(zh, /和 Agent 協作/);
@@ -26,7 +26,7 @@ test("the collaboration composer follows both UI languages", () => {
 test("a running turn offers cancellation and disables the composer", () => {
   const run = { ...props.run, session: { running: true, messages: [], revision: 0, updatedAt: "2026-10-28T00:00:00Z", startedAt: "2026-10-28T00:00:00Z" } };
   const html = renderEn(createElement(SessionPanel, { ...props, run }));
-  assert.match(html, /Current agent progress/);
+  assert.match(html, /Current Agent progress/);
   assert.match(html, />Stop<\/button>/);
   assert.match(html, /<textarea[^>]*disabled=""/);
 });

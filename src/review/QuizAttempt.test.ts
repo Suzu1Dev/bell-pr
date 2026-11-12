@@ -214,7 +214,7 @@ test("the zh-TW quiz uses the shared vocabulary", () => {
   const after = renderZh(
     createElement(QuizAttempt, { question, reference, demo: false, saved: { answer, confidence: "sure" } }),
   );
-  for (const text of ["答對", "部分對", "沒答到", "AI 撰寫；以 diff 為準", "參考答案"])
+  for (const text of ["答對", "部分對", "沒答到", "AI 撰寫；以差異為準", "參考答案"])
     assert.ok(after.includes(text), text);
   const miss = renderZh(
     createElement(QuizAttempt, {
@@ -225,5 +225,5 @@ test("the zh-TW quiz uses the shared vocabulary", () => {
     }),
   );
   assert.ok(miss.includes("你的評分：沒答到。"));
-  assert.ok(miss.includes("練習卡組"));
+  assert.ok(miss.includes("它會回到「練習」。"));
 });

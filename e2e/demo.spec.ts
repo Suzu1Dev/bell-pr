@@ -77,7 +77,7 @@ test("the sample goes from reviewing every file to its published sample PR", asy
   // Every file is ticked: approval waits for the understanding check.
   await tab(page, "draft").click();
   await expectTab(page, "draft");
-  await page.getByRole("button", { name: workspace.footer.explainBack }).click();
+  await page.locator(".review-footer").getByRole("button", { name: workspace.footer.explainBack }).click();
   await expectTab(page, "changes");
   await passCheck(page);
   await expect(page.locator(".review-footer")).toContainText(workspace.footer.passed);

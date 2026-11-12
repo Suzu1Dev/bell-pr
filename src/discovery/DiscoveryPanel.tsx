@@ -534,7 +534,6 @@ export default function DiscoveryPanel({
         <section className="discovery-progress" aria-label={t.progress.label}>
           <div className="discovery-progress-top">
             <div>
-              <span className="eyebrow">{t.progress.eyebrow}</span>
               <h2 role="status">{job.message}</h2>
             </div>
             <button
@@ -623,9 +622,6 @@ export default function DiscoveryPanel({
         >
           <div className="discovery-results-heading">
             <div>
-              <span className="eyebrow">
-                {previous ? t.results.previousEyebrow : t.results.eyebrow}
-              </span>
               <h2>{previous ? t.results.previousTitle : t.results.title}</h2>
               <p>
                 {previous

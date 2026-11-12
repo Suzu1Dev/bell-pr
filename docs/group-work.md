@@ -137,13 +137,13 @@ the paths, one per line. A moment after the last key the page asks
 [`check`](#check-first), and it asks again whenever the board changes, so
 the box under the paths updates by itself:
 
-- "Nothing in the way, in what BELL checked": at the time shown, no hold
+- "No one holds these paths, as far as BELL PR checked": at the time shown, no hold
   met the paths typed. That is an answer and not a hold: someone can take
   a path a moment later. **Take hold** then takes the hold, or it is
   refused whole and the box says who holds what, after "Not taken" when
   the refusal reaches the page before the board with that hold does.
-- "**Ada** holds `src/api` — Fix pagination, since 13:40": that hold is in
-  the way. A hold of your own is in the way too ("You hold …"). **Take
+- "**Ada** holds `src/api` — Fix pagination, since 13:40": that hold
+  overlaps the typed paths. A hold of your own counts too ("You hold …"). **Take
   hold** is off until the paths change or the hold ends.
 - "Cannot be held: …" names the typed paths that
   [cannot be held](#paths-that-cannot-be-held). **Take hold** is off.
@@ -336,7 +336,7 @@ every later request names the repository by that `id` (`p-…`).
   and counts towards the 100.
 - A repository cannot be taken out of the group again, and it keeps the
   name it had when it was added (its first 200 characters). Deleting it
-  from BELL PR (**Delete repository**, or **Delete all data**) leaves it
+  from BELL PR (**Delete project**, or **Delete all data**) leaves it
   in the group under that name, with its holds and its bare copy.
 
 What cannot be added:
@@ -395,7 +395,7 @@ default branch's current commit in `collab.json` when the hold is taken,
 so commits that land on the target branch while you hold those paths can
 be [reported at sync and publish](#changes-on-the-target-branch-under-your-hold).
 
-**A folder holds everything inside it.** A hold of `src/api` meets a hold
+**Holding a folder holds everything inside it.** A hold of `src/api` meets a hold
 of `src/api/users.ts`, of `src/api` and of `src`. **Letter case is
 ignored** (for the letters A to Z): `SRC/API/Users.ts` meets `src/api`.
 
@@ -405,10 +405,10 @@ released or revoked, or the person who holds it is removed.
 ### When a path is already held
 
 BELL PR refuses a hold that meets one already held: 409 `conflict`, with
-`conflicts` naming, for each held path in the way, the path, the holder's
+`conflicts` naming, for each held path that overlaps, the path, the holder's
 name, the title and since when. A hold is taken whole or refused whole:
-when one path is in the way, nothing is held. A person's own hold is in the
-way too. To hold more paths, release the hold and take a new one with all
+when one path overlaps, nothing is held. A person's own hold counts
+too. To hold more paths, release the hold and take a new one with all
 of them; between the two, anyone else can take them.
 
 When two people ask for paths that meet at the same moment, one gets the
@@ -419,8 +419,8 @@ the group's record ([Limits](#limits)); no board shows it.
 
 `POST /api/collab/projects/<project id>/check` with `{ "scopes": […] }`
 asks the same question and takes nothing. The answer (200) is
-`{ asOf, invalid, meets, changing }`: `meets` lists each held path in the
-way with its `claimId`, `taskId`, title and the holder's name, `invalid`
+`{ asOf, invalid, meets, changing }`: `meets` lists each held path that
+meets an asked path, with its `claimId`, `taskId`, title and the holder's name, `invalid`
 lists the asked paths that cannot be held, and `changing` lists other
 people's unfinished runs whose files, active plans or unmerged pull
 requests already meet the valid asked paths. The answer is true at
@@ -533,12 +533,12 @@ everyone else:
   Code turn that may change files gets the paths other people hold as
   read-only, read again for each turn, so writing, deleting or renaming
   them fails as the agent tries. That covers each spelling of the path
-  the checkout has (holds ignore ASCII letter case) and a held file that
+  the working directory has (holds ignore ASCII letter case) and a held file that
   does not exist yet, when its folder does. Claude Code's edit tools are
   refused those paths with or without its sandbox; its shell commands only
   inside the sandbox, and only for paths that already exist. Left to the
   check after the turn: a held path that goes through a symbolic link or
-  whose folder does not exist yet, a spelling the checkout does not have
+  whose folder does not exist yet, a spelling the working directory does not have
   yet, a renamed folder above a held path (the held file can be changed
   at its new place), Claude Code's edit tools on a path with a
   parenthesis, a backslash or a line break in it, Codex with full access,
@@ -553,8 +553,8 @@ everyone else:
   teammate's task is integrated, its changed files are compared with the
   holds right after the check that they stay inside the task. A change
   over someone else's hold is not added: the run stops with the files,
-  and the teammate's own checkout keeps the change.
-- **A turn in the run's checkout is checked after it ends.** After a
+  and the teammate's own working directory keeps the change.
+- **A turn in the run's working directory is checked after it ends.** After a
   turn from the **Collaborate** tab, a follow-up round or a turn that
   resolves sync conflicts, every file the run changed since its base (new
   files too, and a moved file at both of its paths) is compared with the
@@ -562,7 +562,7 @@ everyone else:
   checked then: what it changed is checked after the next turn that
   completes, and at publish.
   A change over someone else's hold stops the turn with the files.
-  Nothing is undone: the changes stay in the checkout for review, a
+  Nothing is undone: the changes stay in the working directory for review, a
   follow-up round keeps them without a commit message, and BELL PR saves
   the conflicting paths on the run as `heldPaths` (paths only, never
   holder names or hold titles; exposed on `GET /api/runs/<id>` and
@@ -571,7 +571,7 @@ everyone else:
   conflicts). The person sees who holds each file; the run's later turns,
   a retried teammate task, and the PR draft written from the run, are
   told only the paths.
-- **Recovering a stopped checkout.** The page of a run that stopped this
+- **Recovering a stopped run's working directory.** The page of a run that stopped this
   way lists the files with two actions, **Put these files back** (**Put
   this file back** for one file; after one question) and **Check again**.
   They are two API routes:
@@ -586,19 +586,19 @@ everyone else:
     back, and the run page lists the new files to be confirmed. A run saved before `heldPaths` existed gets every changed
     file put back that meets someone else's active hold. When reviewable
     changes remain on a completed solo or team run that a hold stopped as
-    `failed`, its status returns to `review`. A checkout BELL PR cannot
+    `failed`, its status returns to `review`. A working directory BELL PR cannot
     show as a diff (more than 150 changed files, for one) is answered 422
     after the files were put back, and the stop stays until the diff can
     be read and **Check again** is pressed.
   - `POST /api/runs/<id>/holds/recheck` with `{}` re-checks the
-    checkout's changed files against the current holds without modifying
+    working directory's changed files against the current holds without modifying
     any file: it answers 409 `heldByOther` (updating `heldPaths`) while a
     conflict remains, and 200 `{ run }` once the hold is released or
     revoked, clearing the hold-stop state and returning a run that a
     hold stopped as `failed` to `review` when reviewable changes remain.
 
 Turns that only read or review, and turns that work outside the run's
-checkout, are not checked. While group work
+working directory, are not checked. While group work
 [has stopped](#when-group-work-stops), turns that may change files, plan
 approvals, `holds/restore` and `holds/recheck` in a repository of the
 group are answered 503 with
@@ -645,7 +645,7 @@ it is refused, the reason BELL PR does not
 most writes to held paths, any other change an agent makes is found when
 its turn ends (after a turn that failed: when the next one completes, or
 at publish), an editor or a tool outside BELL PR is not checked, and
-nothing is locked in a checkout or on GitHub. A push made outside BELL PR
+nothing is locked in a working directory or on GitHub. A push made outside BELL PR
 is not checked at all. A hold says nothing about a path nobody named, and
 nothing about two changes in different files that do not work together.
 
@@ -829,7 +829,7 @@ toward the 100. Add it again. When it happens in a release with
 its task is not done, and it cannot be marked done any more. Work that
 waits for it has to name another task.
 
-`bell-pr group status` prints the reason, and the server log has it in a
+`bell-pr group status` prints the reason, and the log on the host has it in a
 "Group work stopped" line;
 [Group work has stopped](troubleshooting.md#group-work-has-stopped) says
 what each one means and what to do.
@@ -880,7 +880,7 @@ Promised:
   work has stopped it publishes nothing in a repository of the group.
 - In a repository of the group, BELL PR approves no plan that covers a
   path someone else holds, adds no teammate's change over such a path, and
-  stops a turn whose changes in the run's checkout touch one. While group
+  stops a turn whose changes in the run's working directory touch one. While group
   work has stopped, no agent turn there changes files.
 - No participant token and no invite code is put in a URL or written to a
   log.

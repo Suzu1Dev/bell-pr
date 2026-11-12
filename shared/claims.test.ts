@@ -38,7 +38,7 @@ const pattern = new RegExp(forbidden.map((phrase) => phrase.replace(/[.*+?^${}()
 const allowlist: { file: string; line: string; reason: string }[] = [
   {
     file: "server/i18n/en/run.ts",
-    line: '      "The agent team produced no code changes. Check the task reports or adjust the direction.",',
+    line: '      "The Agent team produced no code changes. Check the task reports or adjust the direction.",',
     reason: "An agent run's error: the agents made no changes at all; it claims nothing about a person's code.",
   },
 ];

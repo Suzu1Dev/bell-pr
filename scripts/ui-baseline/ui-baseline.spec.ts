@@ -129,10 +129,9 @@ test("learning notes", async ({ page }) => {
 
 test("settings", async ({ page }) => {
   await sidebar(page)
-    .getByRole("button", { name: "連線與設定", exact: true })
+    .getByRole("button", { name: "設定", exact: true })
+    .first()
     .click();
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText(
-    "讓工作環境準備就緒。",
-  );
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("設定");
   await expectScreen(page, "settings");
 });

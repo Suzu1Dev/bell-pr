@@ -593,7 +593,7 @@ test("a queued run resumes after a restart, oldest first, while a started one fa
   );
   assert.deepEqual(order, [older.id, newer.id]);
   assert.equal(byId(orphaned.id).status, "failed");
-  assert.equal(byId(orphaned.id).error, "Repository not found.");
+  assert.equal(byId(orphaned.id).error, "Project not found.");
   const resumed = byId(older.id);
   assert.equal(resumed.baseSha, f.baseSha);
   assert.equal(resumed.team?.tasks.length, 1);
@@ -634,7 +634,7 @@ test("a run left without a plan retries from planning", async (t) => {
   const run = store.data.runs[0];
   await withLocale("en", () => workbench.retryTeam(run.id, "Keep the change small."));
   assert.equal(run.error, undefined);
-  assert.equal(run.logs.at(-1)?.message, "Retrying the run: the lead plans the task again.");
+  assert.equal(run.logs.at(-1)?.message, "Retrying the run: the Lead plans the task again.");
   await waitUntil(() => run.status === "awaiting_plan", "the new plan");
   assert.equal(run.team?.phase, "awaiting_approval");
   assert.match(prompts[0], /Keep the change small\./);
@@ -889,7 +889,7 @@ test("a restart during a conflict resolution reopens the run in review and the c
   assert.equal(loaded.sync?.resolving, false);
   assert.equal(
     loaded.sync?.report,
-    "The service restarted, so resolving the conflicts stopped; the edited files are kept, and you can finish yourself or ask the agent again.",
+    "The service restarted, so resolving the conflicts stopped; the edited files are kept, and you can finish yourself or ask the Agent again.",
   );
   assert.equal(loaded.agents[0].status, "failed");
   const workbench = new Workbench(store);

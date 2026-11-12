@@ -689,7 +689,7 @@ test("stopping or restarting during a follow-up round keeps the PR published and
     // The previous commit's message is not reused for this round.
     assert.equal(f.run.draft.commitMessage, undefined);
     await f.reviewAll();
-    await assert.rejects(f.workbench.approve(f.run.id, { ...f.run.draft }), /請填好這輪修正的提交訊息/);
+    await assert.rejects(f.workbench.approve(f.run.id, { ...f.run.draft }), /請填好這一輪的提交訊息/);
 
     // A restart in the middle of a round leaves it reviewable, not a failed run.
     f.run.status = "running";

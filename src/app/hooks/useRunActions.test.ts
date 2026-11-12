@@ -276,7 +276,7 @@ test("stopping the sample's team stops it where it was, and a finished sample st
     const done = { ...playing, status };
     assert.equal(stopSampleRun(done), done);
   }
-  assert.equal(zh.demoStopped, "範例團隊已停止。可從「新增貢獻」重新開始。");
+  assert.equal(zh.demoStopped, "示範團隊已停止。可從「新增貢獻」重新開始。");
   assertNoHan(en.workspace.notices.demoStopped);
 });
 

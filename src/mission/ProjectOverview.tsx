@@ -1,5 +1,6 @@
 import { lazy, Suspense, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import {
+  ArrowDown,
   ArrowRight,
   ArrowUpRight,
   BookOpen,
@@ -13,6 +14,7 @@ import {
   FileSearch,
   FolderTree,
   GitBranch,
+  Globe,
   GripVertical,
   Languages,
   Lightbulb,
@@ -868,7 +870,6 @@ export function ProjectOverview({
         >
           <div className="mission-section-heading">
             <div>
-              <span className="mission-kicker">{t.journey.kicker}</span>
               <h2 id="mission-journey-title">
                 <Route size={18} />
                 {t.journey.title}
@@ -897,7 +898,6 @@ export function ProjectOverview({
         >
           <div className="mission-section-heading">
             <div>
-              <span className="mission-kicker">{t.reading.kicker}</span>
               <h2 id="mission-reading-title">
                 <BookOpen size={18} />
                 {t.reading.title}
@@ -905,11 +905,60 @@ export function ProjectOverview({
               <p>{t.reading.lead}</p>
             </div>
           </div>
-          {insights.howItFitsTogether && (
-            <div className="mission-reading-flow">
+          {insights.flow && insights.flow.length >= 2 ? (
+            // The flow as a diagram; the prose is its caption, not a second copy.
+            <figure
+              className={`mission-reading-flow mission-flow${insights.flow.length <= 4 ? " mission-flow-few" : ""}`}
+            >
               <span>{t.reading.flow}</span>
-              <p>{insights.howItFitsTogether}</p>
-            </div>
+              <ol>
+                {insights.flow.map((step, index, steps) => (
+                  <li key={index}>
+                    <div
+                      className={`mission-flow-step${step.path ? "" : " mission-flow-outside"}`}
+                    >
+                      <span className="mission-journey-number">
+                        {String(index + 1).padStart(2, "0")}
+                      </span>
+                      <strong>
+                        {!step.path && <Globe size={13} aria-hidden="true" />}
+                        {step.label}
+                        {!step.path && (
+                          <span className="visually-hidden">
+                            {" "}
+                            {t.reading.flowOutside}
+                          </span>
+                        )}
+                      </strong>
+                      {step.path && <code>{step.path}</code>}
+                    </div>
+                    {index < steps.length - 1 && (
+                      <div className="mission-flow-link">
+                        <ArrowDown size={16} aria-hidden="true" />
+                        {step.passes && (
+                          <span>
+                            <span className="visually-hidden">
+                              {t.reading.flowPasses}{" "}
+                            </span>
+                            {step.passes}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </li>
+                ))}
+              </ol>
+              {insights.howItFitsTogether && (
+                <figcaption>{insights.howItFitsTogether}</figcaption>
+              )}
+            </figure>
+          ) : (
+            insights.howItFitsTogether && (
+              <div className="mission-reading-flow">
+                <span>{t.reading.flow}</span>
+                <p>{insights.howItFitsTogether}</p>
+              </div>
+            )
           )}
           <ol className="mission-reading-steps" id="mission-reading-steps">
             {insights.readingPath.map((step, index) => {
@@ -1333,7 +1382,6 @@ export function ProjectOverview({
         >
           <div className="mission-section-heading">
             <div>
-              <span className="mission-kicker">{t.ideas.kicker}</span>
               <h2 id="mission-ideas-title">
                 <Lightbulb size={18} />
                 {t.ideas.title}

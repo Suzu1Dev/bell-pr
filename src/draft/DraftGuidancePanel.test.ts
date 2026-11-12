@@ -199,7 +199,8 @@ test("the English panel renders every state, label and source kind without Han",
   assert.match(html, /Apply the suggested draft/);
   assert.match(html, /Suggested commit message/);
   assert.match(html, /Based on:<a /);
-  assert.match(html, /Why do projects ask for <code>type\(scope\)<\/code> or a sign-off\?/);
+  assert.match(html, /<p class="draft-guidance-commit-why">This suggestion only lays out the format the rules ask for\. The sign-off is your own statement: type it into the commit message field yourself; the model never fills it in\.<\/p>/);
+  assert.match(html, /<summary>Why do projects ask for <code>type\(scope\)<\/code> or a sign-off\?<\/summary>/);
   assert.match(html, /<code>Signed-off-by: Your Name &lt;email&gt;<\/code>/);
   assert.match(html, /Base <code>0123456<\/code>/);
   assert.match(html, /Checked <time dateTime="2026-10-03T01:36:00.000Z">/);
@@ -443,9 +444,9 @@ test("the preflight lists the secret block first, then the path, workflow and e-
     items.map(([kind, label]) => [kind, label]),
     [
       ["block", "Blocks publishing"],
-      ["confirm", "Confirm before publishing"],
-      ["confirm", "Confirm before publishing"],
-      ["confirm", "Confirm before publishing"],
+      ["confirm", "Needs your confirmation"],
+      ["confirm", "Needs your confirmation"],
+      ["confirm", "Needs your confirmation"],
     ],
   );
   for (const check of [preflight[0], ...preflight.slice(1)])
@@ -585,7 +586,6 @@ test("the respect checks move from the preflight list to the checklist rows", ()
   // Only respect checks left: the list says the text is clear and points below.
   const respectOnly = renderEnglish(english, { checks: checks.slice(1), rules: sampleRules, facts, issueUrl: "#sample-issue-42" });
   assert.doesNotMatch(respectOnly, /draft-guidance-preflight-clear/);
-  assert.doesNotMatch(respectOnly, /No check needs your attention/);
 });
 
 test("checks made without the facts still leave no row OK against the facts passed in", () => {
@@ -619,7 +619,7 @@ test("completed checks fold while blocked and unknown checks stay visible, with 
 
 test("the zh-TW checklist uses its own words", () => {
   const html = renderZh(panel(english));
-  assert.match(html, /送出前待完成/);
+  assert.match(html, /發布前待完成/);
   assert.match(html, /無法確認/);
   assert.match(html, /維護者為什麼在意|維護者把規範寫下來/);
 });
@@ -716,7 +716,7 @@ test("a clean Learn-by-hand run's rule rows come only from the server's checks, 
       assert.match(waiting, /is-unknown/);
       assert.ok(waiting.includes("The saved draft hasn&#x27;t been checked yet."));
       // An unclean run gets the agent run's check, the same here as on the server.
-      assert.ok(checklistRow(render(undefined, byHandRun(false)), "rules").includes("AI agents wrote this change"));
+      assert.ok(checklistRow(render(undefined, byHandRun(false)), "rules").includes("AI Agents wrote this change"));
     } finally {
       byHandRulesDecisionInTests();
     }
@@ -750,7 +750,7 @@ test("a published Learn-by-hand run's rules row quotes the rules instead of wait
   const row = checklistRow(html, "rules");
   assert.ok(!row.includes("hasn&#x27;t been checked") && !/is-unknown|is-block/.test(row), row);
   assert.ok(row.includes("We decline AI-generated contributions."));
-  assert.ok(!html.includes("BELL PR won") && !html.includes("AI agents wrote this change"));
+  assert.ok(!html.includes("BELL PR won") && !html.includes("AI Agents wrote this change"));
 });
 
 test("a Learn-by-hand run published through the quoted confirm keeps its rules row on the confirm, never OK", () => {
@@ -781,7 +781,7 @@ test("a Learn-by-hand run published through the quoted confirm keeps its rules r
     const row = checklistRow(html, "rules");
     assert.ok(row.includes("You confirmed the project&#x27;s quoted rule when you published. The maintainers decide whether your change fits."), row);
     assert.ok(row.includes("We decline AI-generated contributions."));
-    assert.match(checklistRow(render(true, renderZh), "rules"), /你在送出時確認了專案引用的規則/);
+    assert.match(checklistRow(render(true, renderZh), "rules"), /你在發布時確認了專案引用的規則/);
     // In review the row still waits for the server's list.
     assert.ok(checklistRow(render(false), "rules").includes("The saved draft hasn&#x27;t been checked yet."));
   } finally {

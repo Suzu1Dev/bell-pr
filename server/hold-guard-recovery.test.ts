@@ -505,7 +505,7 @@ test("POST /api/runs/:id/holds/restore restores modified, deleted, untracked, st
   assert.equal((zhReply.json as HoldRestoreResponse).run.approvedFingerprint, undefined);
   assert.equal(
     s.f.workbench.run(approvedRun.id).logs.at(-1)?.message,
-    "已將 1 個佔用檔案還原到工作基準：src/api/users.ts。",
+    "已將 1 個佔用檔案還原到任務基準：src/api/users.ts。",
   );
 
   // Failed run whose ONLY change was the held file stays failed (no empty review), and incomplete team run stays failed.
@@ -1182,7 +1182,7 @@ test("recheck and restore work during refreshAfterSession background draft/expla
             reason: "Testing users",
             concept: "Array literal",
             tip: "Check users",
-            example: { scenario: "Users list", before: "[]", after: "['session-conflict']" },
+            example: { scenario: "Users list", before: "[]", after: "['session-conflict']", beforeSteps: [], afterSteps: [] },
             alternatives: "Keep empty",
             lookup: ["array"],
             selfCheck: { question: "What changed?", answer: "Users list." },
@@ -1193,7 +1193,7 @@ test("recheck and restore work during refreshAfterSession background draft/expla
             reason: "Testing keep",
             concept: "Constant export",
             tip: "Check keep",
-            example: { scenario: "Keep value", before: "1", after: "77" },
+            example: { scenario: "Keep value", before: "1", after: "77", beforeSteps: [], afterSteps: [] },
             alternatives: "Leave 1",
             lookup: ["const"],
             selfCheck: { question: "What is keep?", answer: "77." },
