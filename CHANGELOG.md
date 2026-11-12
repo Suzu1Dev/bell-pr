@@ -227,6 +227,14 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   Statements about Claude Code, Codex, Antigravity, the GitHub CLI,
   GitHub tokens, Ubuntu and Docker now link to the vendor's own page that
   states them, and the docs quote the current interface labels.
+- **The project overview's Agent text reads as it was written.** The
+  summary, how the modules fit together, how people use the project, why
+  each reading step comes where it does, and each recommendation's
+  problem, approach and acceptance checks keep their paragraphs, numbered
+  steps and `code`, as the change explanations already did. The summary's
+  first line heads the card and the rest reads as text below it. A single
+  asterisk, as in `*_read` or `src/*.c`, stays as written instead of
+  turning text into italics; `**bold**` stays bold.
 
 ### Fixed
 

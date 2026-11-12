@@ -209,7 +209,9 @@ Open the project and choose **Analyze the project**. An agent reads a
 sample of the source code, read-only, and writes what the project does,
 who uses it, how its parts fit together and where to start reading. When
 the Agent traces a main flow through the modules, it is also drawn as a
-diagram, step by step, with that prose as its caption. It
+diagram, step by step, with that prose as its caption. The Agent's text
+keeps its paragraphs, numbered steps and `code` as written, and the
+summary's first line heads the card. It
 also suggests up to five contribution directions. Each one quotes the code
 or documents it is based on, and BELL PR checks that every quote really is
 in the files the agent read; a recommendation whose quotes do not match is

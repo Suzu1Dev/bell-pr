@@ -69,12 +69,17 @@ test("the reading path lists each step with the matching module purpose and evid
   assert.match(legacy, /主要模組怎麼分工？/);
 });
 
-test("a flow of two steps or more is a figure captioned by the prose; a shorter or missing one keeps the prose block", () => {
+test("a flow of two steps or more is a figure captioned by the prose; a shorter or missing one keeps the prose block", async () => {
+  // The prose is Markdown, which loads with its first use.
+  render();
+  await import("../review/MarkdownContent");
+  await new Promise((resolve) => setImmediate(resolve));
   const html = render();
   const prose = demoInsights.howItFitsTogether!;
+  const markdown = `<div class="mission-brief-text"><div class="markdown-content"><p>${prose}</p></div></div>`;
   const figure = /<figure class="mission-reading-flow mission-flow mission-flow-few">([\s\S]*?)<\/figure>/.exec(html)?.[1];
   assert.ok(figure, "the sample draws its flow");
-  assert.ok(figure.includes(`<figcaption>${prose}</figcaption>`));
+  assert.ok(figure.includes(`<figcaption>${markdown}</figcaption>`));
   // The prose is the caption, not a second copy.
   assert.equal(html.split(prose).length, 2);
   assert.equal(figure.match(/<li>/g)?.length, 4);
@@ -87,12 +92,40 @@ test("a flow of two steps or more is a figure captioned by the prose; a shorter 
   for (const passes of ["要 GET 的路徑", "HTTP 請求", "回應"])
     assert.ok(figure.includes(`<span class="visually-hidden">傳給下一步： </span>${passes}`), passes);
 
-  const block = `<div class="mission-reading-flow"><span>模組怎麼串起來</span><p>${prose}</p></div>`;
+  const block = `<div class="mission-reading-flow"><span>模組怎麼串起來</span>${markdown}</div>`;
   for (const flow of [undefined, [], demoInsights.flow!.slice(0, 1)]) {
     const plain = render({ insights: { ...demoInsights, flow } });
     assert.doesNotMatch(plain, /<figure/);
     assert.ok(plain.includes(block));
   }
+});
+
+test("Agent text keeps its paragraphs, numbered steps and code; the summary's first line heads the card", async () => {
+  render();
+  await import("../review/MarkdownContent");
+  await new Promise((resolve) => setImmediate(resolve));
+  const [idea] = analyzed.recommendations;
+  const html = render({
+    insights: {
+      ...analyzed,
+      summary: "A RISC-V emulator.\n\nOnly 32 files were read.\n\nThe proposals:\n1. Check the shift.\n2. Read the key once.",
+      howItFitsTogether: "Starts in `main()`.\n\nThen:\n1. Load.\n2. Bind.",
+      userJourney: ["Run `make check`."],
+      recommendations: [{ ...idea, problem: "First.\n\nSecond.", approach: "Guard `value < 32`.", acceptance: ["`make check` passes"] }],
+    },
+  });
+  // Only the first line is the heading; the rest is text below it, list and all.
+  assert.match(html, /<h3 id="mission-purpose-title">A RISC-V emulator\.<\/h3><div class="mission-brief-text mission-project-summary"><div class="markdown-content"><p>Only 32 files were read\.<\/p>/);
+  // A line opening with a short label ("The proposals:") is a section, its label bold.
+  assert.match(html, /<p><strong>The proposals<\/strong>:<\/p>\s*<ol>\s*<li>Check the shift\.<\/li>\s*<li>Read the key once\.<\/li>\s*<\/ol>/);
+  assert.match(html, /<p>Starts in <code>main\(\)<\/code>\.<\/p>\s*<p><strong>Then<\/strong>:<\/p>\s*<ol>\s*<li>Load\.<\/li>/);
+  assert.match(html, /<p>Run <code>make check<\/code>\.<\/p>/);
+  assert.match(html, /<div class="mission-brief-text mission-idea-problem"><div class="markdown-content"><p>First\.<\/p>\s*<p>Second\.<\/p>/);
+  assert.match(html, /<p>Guard <code>value &lt; 32<\/code>\.<\/p>/);
+  assert.match(html, /<li><div class="mission-brief-text"><div class="markdown-content"><p><code>make check<\/code> passes<\/p>/);
+  // A one-line summary is all heading, as before.
+  const short = render({ insights: { ...analyzed, summary: "A RISC-V emulator." } });
+  assert.match(short, /<h3 id="mission-purpose-title">A RISC-V emulator\.<\/h3><div class="mission-brief-text mission-project-purpose">/);
 });
 
 test("the stale notice reports changed and cited files, and never suggests skipping re-analysis", () => {
@@ -938,6 +971,8 @@ test("a request's generics, tags, dunder names and paths show as written, while 
     "Problem: Make get() return Promise<Response> instead of Promise<any>, and fix the import in src/__init__.py.",
     "The <Dialog> component closes on Escape; make <Select> do the same for Result<Vec<u8>, Error> & Array<string>.",
     "Keep snake_case_names and C:\\Users\\me\\new_dir; see https://example.com/a_b/c_d.",
+    "Devices use *_read/*_write in src/*.c; **this** stays bold.",
+    "* a list item",
     "Run `make <target> __all__` first.",
     "```",
     "Problem: <b>kept</b> __as__ written",
@@ -949,8 +984,11 @@ test("a request's generics, tags, dunder names and paths show as written, while 
     "Make get() return Promise<Response> instead of Promise<any>, and fix the import in src/__init__.py.",
     "The <Dialog> component closes on Escape; make <Select> do the same for Result<Vec<u8>, Error> & Array<string>.",
     "Keep snake_case_names and C:\\Users\\me\\new_dir; see https://example.com/a_b/c_d.",
+    "Devices use *_read/*_write in src/*.c; this stays bold.",
   ])
     assert.ok(text.includes(written), written);
+  assert.match(html, /<strong>this<\/strong> stays bold/);
+  assert.match(html, /<ul>\s*<li>a list item\n/);
   // Nothing became emphasis, and the label is still bold.
   assert.doesNotMatch(html, /<em>|<strong>init/);
   assert.match(html, /<p><strong>Problem<\/strong>: Make get\(\)/);
