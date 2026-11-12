@@ -624,7 +624,11 @@ function selfTest(): number {
       assert.ok(html.text.includes(`bun add --global ${product.npmPackage}`));
       assert.ok(!html.text.includes(`bun add --global ${product.npmPackage}@`));
     }
-    if (method === "mise") assert.ok(html.text.includes(`npm:${product.npmPackage}@${publishedInstallVersion}`));
+    if (method === "mise") {
+      const command = `MISE_NPM_PACKAGE_MANAGER=npm mise use -g node@24 npm:${product.npmPackage}@${publishedInstallVersion}`;
+      assert.ok(html.text.includes(command));
+      assert.ok(rendered.text.includes("```sh\n" + command + "\n```"));
+    }
   }
   const hostedInstaller = { product: { ...installerContext.product, homepageUrl: "https://install.example.test" } };
   assert.match(renderText(install("curl"), "install.md", hostedInstaller).text, /https:\/\/install\.example\.test\/install \| sh/);
