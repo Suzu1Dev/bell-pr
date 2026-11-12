@@ -6,13 +6,13 @@ const fmt = formatters("zh-TW");
 const m: Translation<typeof en> = {
   eyebrow: "LEARN BY CONTRIBUTING",
   title: "學習筆記",
-  intro: "每個任務審查時產生的解說都會留在這裡，可以跨任務回顧同一個觀念。",
+  intro: "審閱每個貢獻時產生的解說都會留在這裡，可以跨貢獻回顧同一個觀念。",
   aiNote:
     "這些解說由審查各項變更的 AI Agent 產生，可能有誤；採用前請對照程式碼確認。",
   keyword: "關鍵字",
-  keywordPlaceholder: "搜尋觀念、提示、檔案或任務",
-  run: "任務",
-  allRuns: "全部任務",
+  keywordPlaceholder: "搜尋觀念、提示、檔案或貢獻",
+  run: "貢獻",
+  allRuns: "全部貢獻",
   noteCount: ({ visible, total }) =>
     `${fmt.number(visible)} / ${fmt.number(total)} 則筆記`,
   noteCountMore: ({ visible, total }) =>
@@ -26,11 +26,11 @@ const m: Translation<typeof en> = {
   noRealNotes: "尚無真實任務的筆記",
   emptyTitle: "還沒有屬於你的學習筆記",
   emptyBody:
-    "先在「專案」頁匯入專案並新增貢獻；進入審查後，每個檔案的解說會自動彙整到這裡。",
+    "先在「專案」頁匯入專案並新增貢獻；進入審閱後，每個檔案的解說會自動彙整到這裡。",
   noMatches: "沒有符合篩選條件的筆記。",
   demoTitle: "示範筆記",
   demoTag: "示範",
-  demoIntro: "來自內建示範任務的解說，用來預覽真實筆記的樣子。",
+  demoIntro: "來自內建示範貢獻的解說，用來預覽真實筆記的樣子。",
   tip: "提示",
   aiGenerated: "AI 生成",
   yourNote: "你的筆記",
@@ -71,7 +71,7 @@ const m: Translation<typeof en> = {
       guess: "用猜的",
     },
     chooseConfidence: "看答案之前，先選你有多確定。",
-    show: "顯示答案",
+    show: "看答案",
     reference: "參考答案",
     aiWritten: "由 AI 撰寫，以程式碼為準",
     noReference: "沒有參考答案：請自己對照程式碼。",
@@ -88,9 +88,9 @@ const m: Translation<typeof en> = {
       missed: "沒答到",
     },
     gradeHelp: {
-      got: "你說出了相同的原因與結果。",
+      got: "你說出了一樣的原因和結果。",
       partly: "你答對了一部分。",
-      missed: "答案是別的東西。",
+      missed: "答案是別的。",
     },
     saving: "正在儲存評分…",
     saveFailed: ({ error }) => `評分沒有儲存：${error}`,
@@ -99,7 +99,7 @@ const m: Translation<typeof en> = {
     next: "下一題",
     finish: "完成",
     sampleTitle: "示範練習",
-    sampleIntro: "來自內建示範任務的題目，讓你試試練習的方式。評分不會被儲存。",
+    sampleIntro: "來自內建示範貢獻的題目，讓你試試練習的方式。評分不會被儲存。",
     sampleDone: "這是最後一題示範題目。",
   },
   debrief: {
@@ -130,7 +130,7 @@ const m: Translation<typeof en> = {
     tradeOff: "取捨",
     nextStep: "下一步",
     sampleTitle: "示範回顧",
-    sampleIntro: "針對內建示範任務的回顧，讓你看看回顧長什麼樣子。",
+    sampleIntro: "針對內建示範貢獻的回顧，讓你看看回顧長什麼樣子。",
   },
   runs: {
     title: "你自己講的說明",

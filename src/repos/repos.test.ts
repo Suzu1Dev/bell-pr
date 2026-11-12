@@ -31,7 +31,7 @@ test("the repository list reads in English with no Chinese left", () => {
   assert.match(html, /<span class="demo-pill">Sample project<\/span>/);
   assert.match(html, /Open the sample workbench/);
   assert.match(html, /Open project/);
-  assert.match(html, /<strong>Add your repository<\/strong>/);
+  assert.match(html, /<strong>Import a project<\/strong>/);
   assertNoHan(html);
   assert.match(renderZh(element), /<span class="demo-pill">示範專案<\/span>/);
 });
@@ -51,7 +51,7 @@ test("an imported repository can be deleted, the sample cannot, and paths mask w
   const html = renderEn(element);
   assert.match(
     html,
-    /<button type="button" class="run-list-action run-list-action-danger" data-repo-delete="repo-1" aria-label="Delete repository: octo\/widgets"><svg[^]*?Delete repository<\/button>/,
+    /<button type="button" class="run-list-action run-list-action-danger" data-repo-delete="repo-1" aria-label="Delete project: octo\/widgets"><svg[^]*?Delete project<\/button>/,
   );
   assert.equal(html.match(/repository-delete/g)?.length, 1);
   // One line that keeps the end of the path; the full (masked) path is its title.
@@ -81,7 +81,7 @@ test("the import dialog reads in English with no Chinese left", () => {
   };
   const html = renderEn(createElement(ImportRepoModal, props));
   assert.match(html, /<h2 id="modal-title">Import a project<\/h2>/);
-  assert.match(html, /<label class="field-label" for="repo-source">Repository source<\/label>/);
+  assert.match(html, /<label class="field-label" for="repo-source">Project source<\/label>/);
   assert.match(html, /placeholder="owner\/repository or https:\/\/github\.com\/owner\/repository"/);
   assert.match(html, /Paste a GitHub link, owner\/repository, or the full path of a local Git project, such as ~\/projects\/repository<\/p>/);
   assert.match(html, />Not now<\/button>/);

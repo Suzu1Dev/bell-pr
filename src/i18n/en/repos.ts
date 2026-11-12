@@ -6,10 +6,9 @@ import { product } from "../../../shared/product";
 
 const repos = {
   list: {
-    eyebrow: "YOUR REPOSITORIES",
     title: "Projects",
     intro: "Open an imported project or add one.",
-    import: "Import repository",
+    import: "Import project",
     discoveryTitle: "Not sure which project to contribute to yet?",
     discoveryText:
       "Let AI find projects on GitHub with real needs that suit your first steps.",
@@ -21,10 +20,10 @@ const repos = {
     languageFallback: "Git repository",
     openDemo: "Open the sample workbench",
     explore: "Open project",
-    addTitle: "Add your repository",
+    addTitle: "Import a project",
     addText: "A GitHub link or a local Git project",
-    delete: "Delete repository",
-    deleteLabel: ({ name }: { name: string }) => `Delete repository: ${name}`,
+    delete: "Delete project",
+    deleteLabel: ({ name }: { name: string }) => `Delete project: ${name}`,
     deleteConfirm: ({ name }: { name: string }) =>
       `Delete ${name} from ${product.name}? Its contributions, their notes and the project analysis are deleted too. A copy ${product.name} downloaded is removed; a folder you imported from this computer stays where it is.`,
     deleteYes: "Delete",
@@ -40,7 +39,7 @@ const repos = {
   import: {
     title: "Import a project",
     subtitle: "From GitHub or from this computer.",
-    source: "Repository source",
+    source: "Project source",
     placeholder: "owner/repository or https://github.com/owner/repository",
     /** `example` is a path under the home directory, such as ~/projects/repository. */
     localPathHint: ({ example }: { example: string }) =>
@@ -54,7 +53,7 @@ const repos = {
       "GitHub projects are downloaded to this computer; development then uses separate worktrees and leaves the original checkout as it is.",
     later: "Not now",
     importing: "Importing…",
-    import: "Import repository",
+    import: "Import project",
     cloning: "Cloning… large repositories can take a few minutes.",
     /** Names the list of the sample import's progress lines. */
     sampleProgress: "Importing the sample project",

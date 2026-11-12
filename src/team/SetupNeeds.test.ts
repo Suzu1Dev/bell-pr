@@ -23,7 +23,7 @@ test("missing setup becomes a checklist of commands to verify and copy, and noth
       { from: "Teammate 2", needs: [glib("同上。")] },
     ]),
   );
-  assert.match(html, /需要你在這台機器準備的環境/);
+  assert.match(html, /需要你在這台電腦準備的環境/);
   assert.match(html, /<code>sudo apt install libglib2\.0-dev<\/code>/);
   assert.match(html, /aria-label="複製指令：sudo apt install libglib2\.0-dev"/);
   assert.match(html, /回報者：Teammate 1、Teammate 2/);
@@ -65,7 +65,7 @@ test("the checklist reads in English and names teammates and follow-up rounds", 
   assert.deepEqual(needs.map((need) => need.from), [["Teammate 1 (member-1)", "Follow-up round 1"]]);
   const html = renderEn(createElement(SetupNeeds, { needs }));
   assertNoHan(html);
-  assert.match(html, /Setup this machine needs from you/);
+  assert.match(html, /Setup this computer needs from you/);
   assert.match(html, /Reported by Teammate 1 \(member-1\), Follow-up round 1/);
   assert.match(html, /aria-label="Copy the command: rustup component add rustfmt"/);
 });

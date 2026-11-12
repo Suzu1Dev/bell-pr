@@ -34,7 +34,7 @@ const app = {
     navigationHeading: "WORKSPACE",
     mainNavigation: "Main navigation",
     recent: "Recent contributions",
-    newTask: "New task",
+    newTask: "New contribution",
     /** Heads the sample project's row below the person's own runs. */
     sampleHeading: "Sample",
     /** The demo run's short name in the recent list. */
@@ -52,7 +52,7 @@ const app = {
     /** Shown in place of the GitHub user while none is signed in. */
     profileFallback: "My workspace",
     localWorkspace: "Local workspace",
-    workspaceSettings: "Workspace settings",
+    workspaceSettings: "Settings",
   },
   topbar: {
     openNavigation: "Open navigation",
@@ -75,7 +75,7 @@ const app = {
     },
     /** A text link to the open project's repository on GitHub. */
     openOnGitHub: "Open on GitHub",
-    profile: "Profile settings",
+    profile: "Settings",
   },
   /** Presentation mode (present=1). */
   presentation: {

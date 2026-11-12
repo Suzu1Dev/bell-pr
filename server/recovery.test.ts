@@ -593,7 +593,7 @@ test("a queued run resumes after a restart, oldest first, while a started one fa
   );
   assert.deepEqual(order, [older.id, newer.id]);
   assert.equal(byId(orphaned.id).status, "failed");
-  assert.equal(byId(orphaned.id).error, "Repository not found.");
+  assert.equal(byId(orphaned.id).error, "Project not found.");
   const resumed = byId(older.id);
   assert.equal(resumed.baseSha, f.baseSha);
   assert.equal(resumed.team?.tasks.length, 1);

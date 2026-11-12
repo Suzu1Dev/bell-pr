@@ -17,7 +17,7 @@ const messages: Translation<typeof en> = {
   sudoDisclosure,
   loadFailed: ({ message }) => `無法讀取 sudo 狀態：${message}`,
   loading: "正在讀取 sudo 狀態…",
-  unavailable: "這台機器沒有 sudo 指令，無法設定免密碼 sudo。",
+  unavailable: "這台電腦沒有 sudo 指令，無法設定免密碼 sudo。",
   installed: ({ user }) => `已啟用：帳號 ${user} 使用 sudo 不需要密碼。這是 ${product.name} 建立的規則，可在這裡移除。`,
   external: ({ user }) => `帳號 ${user} 使用 sudo 已不需要密碼，但規則不是 ${product.name} 建立的，${product.name} 不會移除它。`,
   password: ({ user }) => `sudo 密碼（${user}）`,

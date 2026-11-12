@@ -12,7 +12,7 @@ export default {
   checklist: {
     title: "Environment",
     intro: `What ${product.name} needs on this computer, and how to fix what is missing.`,
-    recheck: "Re-check",
+    recheck: "Check again",
     rechecking: "Checking…",
     checking: "Checking your environment…",
     checkedAt: ({ time }: { time: string }) => `Checked at ${time}`,

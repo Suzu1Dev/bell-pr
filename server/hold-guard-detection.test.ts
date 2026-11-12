@@ -276,7 +276,7 @@ test("outside-BELL-PR commits on held paths are detected and reported to the hol
   assert.deepEqual(resyncedZh.json.heldChanges, expectedHeld);
   assert.equal(
     s.f.workbench.run(run.id).logs.at(-1)?.message,
-    `在你佔用期間，main 上有提交改到你佔用的檔案：docs/old.md（${c2.slice(0, 7)}）；src/api/users.ts（${c1.slice(0, 7)}）。`,
+    `在你佔用期間，main 上有 commit 改到你佔用的檔案：docs/old.md（${c2.slice(0, 7)}）；src/api/users.ts（${c1.slice(0, 7)}）。`,
   );
 
   // Preflight in English and zh-TW includes held-changed-upstream as a confirm check.
@@ -298,7 +298,7 @@ test("outside-BELL-PR commits on held paths are detected and reported to the hol
   assert.deepEqual(checkZh, {
     id: "held-changed-upstream",
     kind: "confirm",
-    message: "在你佔用期間，main 上有提交改到你佔用的檔案。發佈前請先確認這些變更。",
+    message: "在你佔用期間，main 上有 commit 改到你佔用的檔案。發布前請先確認這些變更。",
     details: [
       `docs/old.md（${c2.slice(0, 7)}）`,
       `src/api/users.ts（${c1.slice(0, 7)}）`,

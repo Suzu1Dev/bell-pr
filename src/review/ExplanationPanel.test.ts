@@ -126,7 +126,7 @@ test("maintainer thread comments add the response preset and a read-only section
   assert.match(reports, /第 4 行/);
   // Comment text is escaped plain text, never interpreted as markup.
   assert.match(reports, /Use a named constant &lt;here&gt;\./);
-  assert.match(reports, /這次工作還沒有審查報告/);
+  assert.match(reports, /這個貢獻還沒有審查報告/);
 });
 
 test("saved answers about an older diff are marked instead of dropped", () => {
@@ -200,7 +200,7 @@ test("the reports tab renders demo reports with the static-review label and per-
   const empty = renderZh(
     createElement(ReviewReports, { file: demoFiles[0], reports: {}, demo: false }),
   );
-  assert.match(empty, /這次工作還沒有審查報告/);
+  assert.match(empty, /這個貢獻還沒有審查報告/);
   assert.equal(reportMentionCount("a\n\nsrc/a.ts here\n\nand a.ts\n\nnope", "src/a.ts"), 2);
 });
 
@@ -300,12 +300,12 @@ test("the note editor renders with the saved text and flags a note written for a
   assert.match(current, /我的理解/);
   assert.match(current, /我的筆記內容<\/textarea>/);
   assert.match(current, /maxLength="2000"/i);
-  assert.doesNotMatch(current, /diff 已更新/);
+  assert.doesNotMatch(current, /差異已更新/);
   // The save button stays disabled until the text changes.
   assert.match(current, /儲存筆記/);
   assert.match(current, /<button[^>]*class="explain-note-save"[^>]*disabled/);
   const stale = withNote("a".repeat(64));
-  assert.match(stale, /diff 已更新/);
+  assert.match(stale, /差異已更新/);
   assert.match(stale, /我的筆記內容<\/textarea>/);
   // A stale note can be re-saved as is to refresh its fingerprint.
   assert.doesNotMatch(stale, /<button[^>]*class="explain-note-save"[^>]*disabled/);
@@ -614,7 +614,7 @@ test("an English render of the reports tab has no Han in its own text", () => {
     }),
   );
   assertNoHan(busy);
-  assert.match(busy, /No review reports for this run yet/);
+  assert.match(busy, /No review reports for this contribution yet/);
   assert.match(busy, /Running the review again…/);
 });
 

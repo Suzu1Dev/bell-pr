@@ -39,7 +39,7 @@ export default {
     `This repository's Git configuration sets ${list(keys)}, which can make Git run other programs or send credentials elsewhere. ${product.name} does not run Git in it. Remove these settings from its .git/config, or import the project again.`,
   /** A teammate checkout whose .git file points somewhere else (409). */
   worktreeForged:
-    "A teammate's checkout no longer points to this run's Git repository, so it is not used. Retry the task to give it a fresh checkout.",
+    "A teammate's working directory no longer points to this run's Git repository, so it is not used. Retry the task to give it a fresh working directory.",
   /** A recorded GitHub repository or branch name that is not valid (409). */
   invalidRemote:
     "The GitHub repository or branch recorded for this run is not a valid name, so nothing was fetched or pushed.",

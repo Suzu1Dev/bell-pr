@@ -23,11 +23,11 @@ const messages: Translation<typeof en> = {
   "failed": "這一輪沒有完成",
   "loading": "正在載入內容…",
   "questions": "Agent 需要你回答",
-  "changedFiles": "改動的檔案",
-  "checks": "BELL 實際看到執行的指令",
+  "changedFiles": "變更的檔案",
+  "checks": "實際執行的指令",
   "notRun": "尚未執行的檢查",
   "draftUpdated": "已更新 PR 草稿的驗證與限制",
-  "draftUpdatedNote": "Validation 列出已執行的檢查，Limitations 列出還沒驗證的項目與限制。送出前請到「PR 草稿」分頁確認更新內容。",
+  "draftUpdatedNote": "Validation 列出已執行的檢查，Limitations 列出還沒驗證的項目與限制。發布前請到「PR 草稿」分頁確認更新內容。",
   "compare": "查看更新前後",
   "before": "更新前",
   "after": "更新後",
@@ -39,12 +39,12 @@ const messages: Translation<typeof en> = {
   "limitationsIntro": "PR 草稿的 Limitations 寫到以下項目尚未完成或沒有驗證，請在可以做到的範圍內補做（修正程式碼、補測試、執行檢查），做不到的請說明原因並問我需要什麼。請將已執行的驗證寫入 Validation，Limitations 只保留尚未覆蓋的項目與實際限制，並修正兩段中過時的說明：\n\n",
   "blocks": {
     "running": "這輪對話完成後才能開始下一輪。",
-    "publishing": "正在送出 PR，完成後才能和 Agent 協作。",
-    "published": "PR 已送出；之後的 review 回饋請在「PR 草稿」分頁用「依 review 修正」處理。",
-    "ended": "這個工作已結束，不能再和 Agent 協作。",
-    "active": "這個工作還有 Agent 或審查在進行；請等它完成再繼續對話。",
+    "publishing": "正在發布 PR，完成後才能和 Agent 協作。",
+    "published": "PR 已發布；之後的回饋請到「PR 草稿」分頁用「依回饋繼續修正」處理。",
+    "ended": "這個貢獻已結束，不能再和 Agent 協作。",
+    "active": "還有 Agent 或審查在進行；請等它完成再繼續對話。",
     "followUp": "這個 PR 已有一輪修正在進行，請先完成或放棄它。",
-    "byHand": "親手學習由你修改程式碼；需要協助時請使用引導。"
+    "byHand": "親手學由你自己改程式碼；需要協助時請問嚮導。"
   },
   elapsed: ({ seconds }: { seconds: number }) => `已執行 ${seconds} 秒`,
 };

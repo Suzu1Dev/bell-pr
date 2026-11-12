@@ -382,7 +382,7 @@ test("the shared models are edited in place in the AI provider section", async (
     });
     await page.goto("/#/settings/provider");
     await expect(panel(page)).toContainText(settings.provider.readyWith({ providers: [providerLabels.codex] }));
-    const agent = panel(page).getByLabel(mission.settings.model.agent, { exact: true });
+    const agent = panel(page).getByRole("combobox", { name: mission.settings.model.agent, exact: true });
     await expect(agent).toHaveValue("codex");
     await agent.selectOption("claude");
     await panel(page).getByRole("button", { name: settings.provider.models.save }).click();

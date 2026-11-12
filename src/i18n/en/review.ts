@@ -256,8 +256,8 @@ const review = {
     rerun: "Run the review again",
     rerunBusy: "Running the review again…",
     rerunNote:
-      "Runs the Reviewer and Test analyst again on the current diff in the workspace (read-only; it counts toward your CLI usage). Reports are only suggestions and don't change what you have reviewed or approved.",
-    emptyTitle: "No review reports for this run yet",
+      "Runs the Reviewer and Test analyst again on the current diff in the working directory (read-only; it counts toward your CLI usage). Reports are only suggestions and don't change what you have reviewed or approved.",
+    emptyTitle: "No review reports for this contribution yet",
     emptyBody:
       "Once the Lead's integration, the Reviewer and the Test analyst have finished, their full reports appear here.",
     intro:
@@ -380,7 +380,7 @@ const review = {
       } satisfies Record<SelfGrade, string>,
       /** Partly or Missed at Sure or Think so. */
       confidentMiss:
-        "This is the most useful kind of miss: it comes back in your practice deck.",
+        "This is the most useful kind of miss: it comes back in Practice.",
     },
     road: {
       guessLabel: "Before you look: how else could this be done?",
@@ -462,7 +462,7 @@ const review = {
         : `${count} more files are past the display limit; see the full diff on GitHub.`,
     unpublished: `This contribution has not sent its PR yet. ${product.name} keeps the changes uncommitted until you publish and makes the first commit then; every review round and every sync with the target branch adds one more commit here.`,
     unpublishedDemo:
-      "The sample has not sent a PR, so it has no commits yet. Below is the sample's history as it looks after the first push, one review round and a merge of the target branch.",
+      "The sample has not published a PR, so it has no commits yet. Below is the sample's history as it looks after the first push, one review round and a merge of the target branch.",
     publishedDemo:
       "The sample PR's commits: the first push, one review round and a merge of the target branch. Nothing was sent to GitHub.",
     loading: "Reading the commit history…",

@@ -48,7 +48,7 @@ const discovery = {
       "Recently updated: reflects recent activity, but the results change as projects are updated. Relevance: GitHub's best match. It can include projects that have not been maintained for a while; archived projects are left out and the last push date is shown. Stars: well-known projects, with more competition and a higher review bar.",
     minStars: "Minimum stars",
     advanced: "Model and efficiency settings",
-    agent: "Agent",
+    agent: "AI provider",
     model: "Analysis model",
     defaultModel: ({ provider }: { provider: string }) =>
       `Use the ${provider} default model`,
@@ -206,7 +206,7 @@ const discovery = {
     legend: "Who writes the code?",
     agents: "The agent team writes it",
     hand: "You write it (Learn by hand)",
-    handText: `The guide plans with you, gives hints and reviews your change when you ask. ${product.name}'s agents can't edit your files in this run. You'll explain the change back without help before you send it.`,
+    handText: `The guide plans with you, gives hints and reviews your change when you ask. ${product.name}'s agents can't edit your files in this run. You'll explain the change back without help before you publish it.`,
     sample: "The sample shows the agent team. Learn by hand works on your own projects.",
     start: "Plan with the guide",
     fit: "Fit the guide to the project's rules",

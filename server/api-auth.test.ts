@@ -183,7 +183,7 @@ test("API routes require the token, and a bad host, origin or body changes nothi
 
     const zh = await send("GET", "/api/app-settings", { ...local, "x-bell-locale": "zh-TW" });
     assert.equal(zh.status, 401);
-    assert.match(zh.body, /API 權杖/);
+    assert.match(zh.body, /API token/);
 
     for (const [method, urlPath] of [
       ["PUT", "/api/app-settings"],

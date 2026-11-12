@@ -704,9 +704,7 @@ export function WorkspacePage({
                         ? t.footer.needsCommitMessage
                         : !demo && draftUnfinished
                           ? t.footer.needsFacts
-                          : followUp
-                            ? t.footer.previewPush
-                            : t.footer.previewSubmit
+                          : undefined
                 }
                 onClick={footer.explainFirst ? () => openCheckPanel(run.id) : approve}
               >

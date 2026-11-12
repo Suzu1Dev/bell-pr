@@ -461,7 +461,7 @@ test("remote content cannot redirect requests and sensitive or foreign evidence 
   );
   assert.ok(
         result.candidates[0].warnings.some((warning) =>
-          warning.includes("發佈前會擋下常見格式的 token 與私鑰"),
+          warning.includes("發布前會擋下常見格式的 token 與私鑰"),
         ),
   );
 });
@@ -498,7 +498,7 @@ test("a credential in an issue title is masked in the warnings that name the sou
     2,
   );
   assert.ok(
-    candidate.warnings.includes("發佈前會擋下常見格式的 token 與私鑰。"),
+    candidate.warnings.includes("發布前會擋下常見格式的 token 與私鑰。"),
   );
   assert.ok(candidate.warnings.every((warning) => !warning.includes("ghp_")));
   assert.ok(candidate.sources.every((source) => !source.title.includes("ghp_")));

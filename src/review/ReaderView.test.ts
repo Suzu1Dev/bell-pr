@@ -139,7 +139,7 @@ test("the reader view says to answer first, then offers the request, in English"
   assert.match(loading, /<button type="button" class="explain-retry" disabled="">.*Show how a reader sees it<\/button>/);
   assert.doesNotMatch(loading, /Explain it back/);
   const zh = renderZh(createElement(ReaderView, { file, reader: reader(check([])), busy: false }));
-  assert.match(zh, /讀者會怎麼看你的改動/);
+  assert.match(zh, /讀者會怎麼看你的變更/);
   assert.match(zh, />用自己的話講一遍<\/button>/);
 });
 

@@ -29,11 +29,11 @@ const size = (bytes: number) => {
 const m: Translation<typeof en> = {
   settings: {
     names: {
-      maxActiveRuns: "同時執行的工作數",
-      maxAgentProcesses: "同時執行的 Agent 程序數",
+      maxActiveRuns: "同時執行的任務數",
+      maxAgentProcesses: "同時執行的 Agent 行程數",
       agentTimeoutScale: "Agent 時間上限倍數",
       allowUnsandboxedAgents: "允許 Claude Code 與 Antigravity Agent 不用沙箱",
-      retentionDays: "已結束工作的檔案保留天數",
+      retentionDays: "已結束任務的檔案保留天數",
     },
     locked: ({ setting, variable }) =>
       `「${setting}」這項設定來自環境變數 ${variable}。請修改或移除這個變數，再重新啟動 ${product.name}。`,
@@ -51,7 +51,7 @@ const m: Translation<typeof en> = {
     ghUnauthenticated: "GitHub CLI 尚未登入，或登入已失效。請重新登入後再試一次。",
     githubAuthRequired: "GitHub 要求登入。請用 GitHub CLI 登入後再試一次。",
     gitIdentityMissing:
-      "Git 還不知道你的名字與電子郵件地址，而每個提交都需要它們。請先設定，再試一次。",
+      "Git 還不知道你的名字與電子郵件地址，而每個 commit 都需要它們。請先設定，再試一次。",
     ghWorkflowScope:
       "這次修改涉及 GitHub Actions 工作流程（.github/workflows），但你的 GitHub 登入沒有推送它們的權限。請加上 workflow 權限後再試一次。",
     codexUnauthenticated: "Codex 尚未登入，或登入已失效。請重新登入後再試一次。",
@@ -118,13 +118,13 @@ const m: Translation<typeof en> = {
     versionFailedWith: ({ command, output }) =>
       `已安裝，但執行 \`${command}\` 失敗：${output}`,
     gitTooOld: ({ version }) =>
-      `Git ${version} 可以使用，但要把工作移到目標分支的最新版本，需要 Git 2.40 以上。其他功能都能正常使用。`,
+      `Git ${version} 可以使用，但要把任務移到目標分支的最新版本，需要 Git 2.40 以上。其他功能都能正常使用。`,
     claudeVersionUnsupported: ({ version, min, below }) =>
       `Claude Code ${version} 不在 ${product.name} 支援的版本範圍內（${min} 以上、${below} 之前）。Agent 仍會啟動，但 ${product.name} 尚未確認這個版本會套用它的沙箱與 hooks 設定。`,
     identityMissing:
-      "尚未設定：Git 不知道你的名字與電子郵件地址，因此無法提交或發佈任何內容。",
+      "尚未設定：Git 不知道你的名字與電子郵件地址，因此無法提交或發布任何內容。",
     identityAutodetected: ({ email }) =>
-      `尚未設定電子郵件地址。Git 推測為 ${email}，它會隨你的提交一起公開。`,
+      `尚未設定電子郵件地址。Git 推測為 ${email}，它會隨你的 commit 一起公開。`,
     identityUnknown: "Git 無法回報你的身分。",
     signedOut: "尚未登入。",
     githubOffline: "已登入，但無法連上 GitHub。請檢查網路連線。",
@@ -133,7 +133,7 @@ const m: Translation<typeof en> = {
       "這個登入無法推送到儲存庫：需要 repo 或 public_repo 權限。",
     scopesMissingWorkflow:
       "沒有 workflow 權限時，無法推送修改 GitHub Actions 工作流程的 Pull Request。",
-    scopesUnknown: "這種權杖不會回報它的權限，因此不檢查。",
+    scopesUnknown: "這種 token 不會回報它的權限，因此不檢查。",
     sandboxReady: "可以使用：會修改檔案的 Claude Code Agent 會在沙箱中執行。",
     sandboxMissing:
       "無法使用：缺少 bubblewrap 或 socat，因此 Claude Code Agent 無法修改檔案。",
@@ -142,13 +142,13 @@ const m: Translation<typeof en> = {
     sandboxUnsupported:
       "這個平台無法使用，因此 Claude Code Agent 無法修改檔案。",
     sandboxAllowed:
-      "無法使用。你已允許 Claude Code Agent 不用沙箱修改檔案；這類工作會有標示。",
+      "無法使用。你已允許 Claude Code Agent 不用沙箱修改檔案；這類任務會有標示。",
     antigravitySandboxReady: "可以使用：會修改檔案的 Antigravity Agent 會在它的終端機沙箱中執行指令。",
     antigravitySandboxRestricted:
       "無法使用：這個 Linux 系統不允許 Antigravity CLI 建立 user namespace（kernel.apparmor_restrict_unprivileged_userns），因此 Antigravity Agent 無法修改檔案。docs/troubleshooting.md 說明可行的做法。",
     antigravitySandboxUnsupported: "這個平台無法使用，因此 Antigravity Agent 無法修改檔案。",
     antigravitySandboxAllowed:
-      "無法使用。你已允許 Antigravity Agent 不用沙箱修改檔案與執行指令；這類工作會有標示。",
+      "無法使用。你已允許 Antigravity Agent 不用沙箱修改檔案與執行指令；這類任務會有標示。",
     fullAccessDisclosure,
     sudoDisclosure,
     passwordlessSudoInstalled: `已安裝 BELL PR 的免密碼 sudo 規則。${sudoDisclosure}`,
@@ -164,12 +164,12 @@ const m: Translation<typeof en> = {
     dataDirWritable: "可以寫入。",
     dataDirNew: "會在第一次啟動時建立。",
     dataDirLowSpace: ({ free }) =>
-      `可以寫入，但只剩 ${size(free)}。每個工作都需要空間存放專案的複本。`,
+      `可以寫入，但只剩 ${size(free)}。每個任務都需要空間存放專案的複本。`,
     dataDirReadOnly: `無法寫入：${product.name} 無法在這裡儲存資料。`,
     app: ({ port, runs, processes }) => {
       const parts = [
         port === undefined ? undefined : `連接埠 ${port}`,
-        runs === undefined ? undefined : `同時執行 ${runs} 個工作`,
+        runs === undefined ? undefined : `同時執行 ${runs} 個任務`,
         processes === undefined ? undefined : `${processes} 個 Agent 行程`,
       ].filter(Boolean);
       return parts.length ? `${parts.join("，")}。` : "";

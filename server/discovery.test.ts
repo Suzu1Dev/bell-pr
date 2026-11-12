@@ -724,7 +724,7 @@ test("restart words the interruption in the job's locale, or the current one for
     const { job } = await withLocale("zh-TW", () => english.get());
     assert.equal(job?.status, "failed");
     assert.equal(job?.message, "The last discovery was interrupted");
-    assert.match(job?.error ?? "", /^The server restarted and interrupted the discovery\./);
+    assert.match(job?.error ?? "", /^The service restarted and interrupted the discovery\./);
     await english.shutdown();
     delete saved.job.locale;
     await writeFile(file, JSON.stringify(saved));

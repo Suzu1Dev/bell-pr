@@ -121,7 +121,7 @@ test("without sudo in the commands, the dialog does not ask about sudo", async (
     await click(button);
     await settle();
     assert.deepEqual(urls, []);
-    assert.match(view.text(), /要讓 Agent 準備這台機器的環境嗎？/);
+    assert.match(view.text(), /要讓 Agent 準備這台電腦的環境嗎？/);
     assert.match(view.text(), /開始處理（1 項）/);
   } finally {
     await view.unmount();

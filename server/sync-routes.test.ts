@@ -111,7 +111,7 @@ test("sync, follow-up and clone update routes validate input and answer refusals
 
   const missing = await call(port, "POST", "/api/runs/nope/sync", {});
   assert.equal(missing.status, 404);
-  assert.equal(missing.json.error, "找不到工作。");
+  assert.equal(missing.json.error, "找不到任務。");
   const running = await call(port, "POST", "/api/runs/running/sync", {});
   assert.equal(running.status, 409);
   assert.match(String(running.json.error), /只有審閱中/);

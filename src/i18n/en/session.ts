@@ -1,9 +1,9 @@
 const messages = {
   "tab": "Collaborate",
   "attention": "Needs attention",
-  "busy": "The agent is working in this checkout. Wait until it finishes before making changes.",
+  "busy": "The agent is working in this working directory. Wait until it finishes before making changes.",
   "label": "Collaborate with the agent",
-  "empty": "Describe the next change. The agent can edit this unpublished checkout and run checks; review its results after each turn.",
+  "empty": "Describe the next change. The agent can edit this unpublished working directory and run checks; review its results after each turn.",
   "progress": "Current agent progress",
   "working": "The agent is working",
   "stop": "Stop",
@@ -21,10 +21,10 @@ const messages = {
   "loading": "Loading content…",
   "questions": "The agent needs your answer",
   "changedFiles": "Changed files",
-  "checks": "Commands BELL observed",
+  "checks": "Commands that actually ran",
   "notRun": "Checks not run",
   "draftUpdated": "PR draft verification and limitations updated",
-  "draftUpdatedNote": "Validation lists the checks that ran. Limitations lists the remaining gaps and constraints. Read the updated text on the PR draft tab before submitting.",
+  "draftUpdatedNote": "Validation lists the checks that ran. Limitations lists the remaining gaps and constraints. Read the updated text on the PR draft tab before publishing.",
   "compare": "Compare before and after",
   "before": "Before",
   "after": "After",
@@ -36,12 +36,12 @@ const messages = {
   "limitationsIntro": "The PR draft’s Limitations section lists unfinished or unverified work. Please address what you can (code fixes, tests, checks), explain what remains and ask for what you need. Put completed verification in Validation, keep only remaining gaps and constraints in Limitations, and correct outdated claims in both sections:\n\n",
   "blocks": {
     "running": "The next turn can start when this one finishes.",
-    "publishing": "The PR is being submitted. Wait until it finishes.",
-    "published": "This PR was submitted. Use the review follow-up action in the PR draft tab for later feedback.",
-    "ended": "This run has ended and cannot start another collaboration turn.",
+    "publishing": "The PR is being published. Wait until it finishes.",
+    "published": "This PR was published. For later feedback, use \"Keep fixing from feedback\" on the PR draft tab.",
+    "ended": "This contribution has ended, so you can't start another turn.",
     "active": "Agents or review are still running. Wait until they finish.",
     "followUp": "A follow-up round is in progress. Finish or discard it first.",
-    "byHand": "Learn by hand keeps code changes with you. Use the guide for help."
+    "byHand": "In Learn by hand you change the code yourself. Ask the guide for help."
   },
   elapsed: ({ seconds }: { seconds: number }) => `${seconds}s elapsed`,
 };

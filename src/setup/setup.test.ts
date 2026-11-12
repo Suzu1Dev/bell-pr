@@ -121,7 +121,7 @@ test("the checklist shows each check with its state, version, detail and the fix
   // A problem keeps its explanation.
   assert.match(html, /data-check="gh-auth".*?<p class="setup-check-detail">Not signed in\.<\/p>/);
   assert.match(html, /data-check="claude-auth".*?<p class="setup-check-detail">Not signed in\.<\/p>/);
-  assert.match(html, />Re-check</);
+  assert.match(html, />Check again</);
   assert.match(html, /Checked at /);
   // Every fix, also on rows that are fine or not used, on request.
   const all = renderEn(createElement(SetupChecklist, { report: notReady, fixes: "all" }));

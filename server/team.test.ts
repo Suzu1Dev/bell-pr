@@ -1004,7 +1004,7 @@ test("team execution waits for plan approval, runs isolated independent members 
       await assert.rejects(readFile(path.join(task.worktreePath!, "a.ts")));
       assert.ok(!registered.includes(task.worktreePath!));
     }
-    assert.ok(run.logs.some((log) => log.message.includes("已不需保留")));
+    assert.ok(run.logs.some((log) => log.message.includes("獨立工作目錄已移除")));
     assert.ok(
       run.team!.messages.every((message) => message.status === "delivered"),
     );
@@ -1326,13 +1326,13 @@ test("retrying a failed run reruns only the failed task with the previous error 
     assert.equal(retried.error, undefined);
     assert.equal(
       beta.error,
-      "Teammate 修改了未分配的檔案 c.ts；差異保留在其隔離工作目錄，未整合。",
+      "隊友修改了未分配的檔案 c.ts；變更保留在該子任務的獨立工作目錄，未整合。",
     );
     assert.equal(beta.worktreePath, undefined);
     assert.equal(run.reports!.beta, undefined);
     assert.ok(
       run.logs.some((log) =>
-        log.message.includes("1 個已完成任務不重跑，1 個任務以新快照重新開始"),
+        log.message.includes("1 個已完成的子任務不重跑，1 個子任務以新快照重新開始"),
       ),
     );
     await waitUntil(
@@ -1348,7 +1348,7 @@ test("retrying a failed run reruns only the failed task with the previous error 
     assert.equal(scenario.memberInputs[2].cwd, betaPath);
     assert.match(
       scenario.memberInputs[2].prompt,
-      /^Previous attempt failed: Teammate 修改了未分配的檔案 c.ts/,
+      /^Previous attempt failed: 隊友修改了未分配的檔案 c.ts/,
     );
     assert.match(scenario.memberInputs[2].prompt, /只改 b.ts/);
     assert.doesNotMatch(
@@ -1500,7 +1500,7 @@ test("a retried task whose dependency is no longer listed stops the run as stuck
       "retry completion",
     );
     assert.equal(run.status, "failed");
-    assert.equal(run.error, "任務依賴或檔案分工阻止團隊繼續，請檢視共享任務清單。");
+    assert.equal(run.error, "子任務相依或檔案分工讓團隊無法繼續，請查看任務板。");
     assert.equal(beta.status, "pending");
     assert.deepEqual(
       scenario.memberInputs.map((input) => input.taskId),
@@ -1963,7 +1963,7 @@ test("the queue cap follows maxActiveRuns and the 429 message states the number"
     await assert.rejects(
       f.workbench.createRun(f.repo.id, "Overflow", undefined, settings),
       (error: AppError) =>
-        error.statusCode === 429 && /10 個工作/.test(error.message),
+        error.statusCode === 429 && /10 個任務/.test(error.message),
     );
   } finally {
     await f.cleanup();
@@ -2189,7 +2189,7 @@ test("reviewDiffContext attaches patches in order until 100 KB, then lists the r
     file("c.ts", "+after the budget"),
     file(
       ".env",
-      "此檔案已暫停發佈：敏感",
+      "此檔案已被擋下、不會發布：敏感",
       "敏感檔案或產物不會被加入 PR；請先從本次變更移除。",
     ),
   ]);
@@ -2261,7 +2261,7 @@ test("re-running the review on a hand-edited worktree stores fresh reports, keep
     // Nothing changed yet: the caller learns that immediately.
     await assert.rejects(f.workbench.rerunReview(run.id), {
       statusCode: 422,
-      message: /沒有程式碼差異/,
+      message: /沒有程式碼變更/,
     });
     assert.deepEqual(prompts, {});
 
@@ -2662,7 +2662,7 @@ test("a run created under en records its locale, and its log, agent details and 
       cjk,
     );
     // The default locale (zh-TW in these tests) does not leak into the run.
-    assert.doesNotMatch(JSON.stringify(run.logs), /開始工作|領取任務/);
+    assert.doesNotMatch(JSON.stringify(run.logs), /開始工作|領取子任務/);
     // Every team agent was asked to answer in English: the plan, both
     // members (beta twice), integration, reviewer and test analyst.
     assert.equal(prompts.length, 7);

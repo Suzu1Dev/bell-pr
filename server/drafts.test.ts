@@ -900,7 +900,7 @@ test("shutdown cancels draft generation and waits for temporary workspace cleanu
     await pending;
     assert.equal(f.run.status, "review");
     assert.equal(f.run.draftPreparation?.status, "failed");
-    assert.match(f.run.draftPreparation?.error ?? "", /中斷/);
+    assert.match(f.run.draftPreparation?.error ?? "", /已停止/);
     await assert.rejects(readdir(cwd), /ENOENT/);
     await assert.rejects(f.workbench.prepareDraft(f.run.id), /關閉/);
   } finally {
@@ -1618,7 +1618,7 @@ test("preflight blocks a credential in the PR text and asks to confirm local pat
     "zh-TW",
   );
   assert.deepEqual(zh.map((check) => check.id), ["secret", "local-paths", "workflows", "author-email"]);
-  assert.equal(zh[0].message, "發佈前會擋下常見格式的 token 與私鑰。");
+  assert.equal(zh[0].message, "發布前會擋下常見格式的 token 與私鑰。");
   assert.deepEqual(zh[0].details, ["位於說明"]);
 });
 

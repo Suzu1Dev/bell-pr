@@ -49,7 +49,7 @@ export default {
     noTextFiles:
       "No tracked text files to analyze were found. Add a README or code and commit it first.",
     shuttingDown:
-      "The server is shutting down, so a new project analysis cannot start.",
+      "The service is shutting down, so a new project analysis cannot start.",
     alreadyRunning:
       "This project is already being analyzed. Wait for the current analysis to finish.",
     tooManyRunning:
@@ -129,9 +129,9 @@ export default {
     fileTooLarge: "The saved discovery results file is too large to load safely.",
     /** A discovery job that was running when the server stopped. */
     interruptedError:
-      "The server restarted and interrupted the discovery. The sources collected so far and the previous result are kept; you can run discovery again.",
+      "The service restarted and interrupted the discovery. The sources collected so far and the previous result are kept; you can run discovery again.",
     interrupted: "The last discovery was interrupted",
-    shuttingDown: "The server is shutting down. Try discovery again later.",
+    shuttingDown: "The service is shutting down. Try discovery again later.",
     alreadyRunning:
       "A discovery is already running. Wait for it to finish or cancel it first.",
     searching: "Looking for GitHub projects that match your criteria",
@@ -436,7 +436,7 @@ export default {
       "The fastest, with the lowest usage. It does not support reasoning effort settings.",
     invalidSettings: "The model settings are not valid. Choose them again.",
     providerMismatch:
-      "The model list does not match the selected agent. Reload, then choose again.",
+      "The model list does not match the selected AI provider. Reload, then choose again.",
     unknownModel:
       "These model settings cannot be confirmed. Reload the model list and choose again.",
     unsupportedEffort:

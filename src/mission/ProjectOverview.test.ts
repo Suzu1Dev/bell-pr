@@ -841,7 +841,7 @@ test("an open contribution leads with its brief, which does not repeat the title
     reviewedFiles: [],
   } as unknown as NonNullable<ProjectOverviewProps["run"]>;
   const html = render({ run });
-  const brief = html.indexOf("這次改動，會帶來什麼不同？");
+  const brief = html.indexOf("這次變更，會帶來什麼不同？");
   assert.ok(brief >= 0 && brief < html.indexOf('<details class="mission-context"'));
   assert.ok(brief < html.indexOf('id="mission-purpose-title"'));
   // The header shows the title; the brief does not repeat it.
@@ -851,10 +851,10 @@ test("an open contribution leads with its brief, which does not repeat the title
   // While the analysis loads, or before there is one, the brief still leads.
   for (const props of [{ loading: true, insights: null }, { insights: null }]) {
     const pending = render({ run, ...props });
-    assert.ok(pending.indexOf("這次改動，會帶來什麼不同？") < pending.indexOf("mission-overview-empty"));
+    assert.ok(pending.indexOf("這次變更，會帶來什麼不同？") < pending.indexOf("mission-overview-empty"));
   }
   // The project page has no brief.
-  assert.doesNotMatch(render(), /這次改動，會帶來什麼不同？/);
+  assert.doesNotMatch(render(), /這次變更，會帶來什麼不同？/);
 });
 
 test("a request written in labelled sections renders as Markdown with its labels in bold", () => {

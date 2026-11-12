@@ -60,7 +60,7 @@ const m: Translation<typeof en> = {
   keep: "保留",
   nothingHeld: ({ time }) => `截至 ${time}，沒有任何路徑被佔用。`,
   honesty:
-    `${product.name} 會拒絕重疊的佔用、不會發布改到他人佔用路徑的變更，並在 Agent 改到被佔用的路徑時停止該任務；改動仍留在工作目錄裡。它無法攔截編輯器、終端機工具或直接 git push。`,
+    `${product.name} 會拒絕重疊的佔用、不會發布改到他人佔用路徑的變更，並在 Agent 改到被佔用的路徑時停止該任務；變更仍留在工作目錄裡。它無法攔截編輯器、終端機工具或直接 git push。`,
   join: {
     title: "加入這個小組",
     body: "請向這個小組的管理員索取邀請碼。邀請碼只能用一次，10 分鐘內有效。",

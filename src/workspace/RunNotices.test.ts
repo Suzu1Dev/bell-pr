@@ -34,7 +34,7 @@ test("a queued run says why it waits", () => {
   assertNoHan(html);
   assert.match(
     renderZh(createElement(RunNotices, { run, queued: true })),
-    /排隊中：同時執行的工作數已達上限，其他任務完成後才會開始/,
+    /排隊中：同時執行的任務數已達上限，其他任務完成後才會開始/,
   );
 });
 
@@ -63,7 +63,7 @@ test("the unsandboxed badge links to the safety settings and explains itself", (
   assert.match(html, /Ran without sandbox/);
   assert.match(
     html,
-    /<span id="unsandboxed-help" class="unsandboxed-help" role="tooltip">You allowed agents to run without the operating system&#x27;s sandbox/,
+    /<span id="unsandboxed-help" class="unsandboxed-help" role="tooltip">You allowed Agents to run without the operating system&#x27;s sandbox/,
   );
   assertNoHan(html);
   assert.match(renderZh(createElement(UnsandboxedBadge)), /未使用沙箱執行/);

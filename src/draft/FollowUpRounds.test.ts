@@ -58,11 +58,11 @@ test("rounds read newest first, link pushed commits, and offer discard only on t
   assert.match(html, /maintainer · hello\.ts:1/);
   assert.match(html, /href="https:\/\/github\.com\/acme\/widgets\/commit\/b{40}"/);
   assert.match(html, /你的補充說明<\/span>需要維護者決定測試範圍/);
-  assert.equal(html.match(/放棄這輪修改/g)?.length, 1);
+  assert.equal(html.match(/放棄這一輪/g)?.length, 1);
   // Without a discard handler, for example while the agent is still running, no button is shown.
   assert.doesNotMatch(
     renderZh(createElement(FollowUpRounds, { rounds })),
-    /放棄這輪修改/,
+    /放棄這一輪/,
   );
 });
 
@@ -143,10 +143,10 @@ test("English rounds show every status, section and commit state without Han", (
       status,
     );
   assert.match(html, /<svg[^>]*class="[^"]*spin[^"]*"[^>]*>[\s\S]*?<\/svg>Making changes</);
-  assert.match(html, /<h3>Round 2 · Target branch sync<\/h3>/);
+  assert.match(html, /<h3>Round 2 · Merged the target branch<\/h3>/);
   assert.ok(html.indexOf("Round 6") < html.indexOf("Round 1"));
-  assert.match(html, /Round 2 · Target branch sync/);
-  assert.match(html, /Round 3 · Picked up from GitHub/);
+  assert.match(html, /Round 2 · Merged the target branch/);
+  assert.match(html, /Round 3 · Taken over from GitHub/);
   assert.match(html, /maintainer · hello\.ts:1/);
   assert.match(html, />Feedback <svg/);
   assert.match(html, /Your note: Reply to the test question separately\./);

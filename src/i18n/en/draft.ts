@@ -467,9 +467,9 @@ const draft = {
     } satisfies Record<FollowUpRound["status"], string>,
     round: ({ number }: { number: number }) => `Round ${number}`,
     /** Follows the round number for commits made on GitHub that the app took over. */
-    adopted: "Picked up from GitHub",
+    adopted: "Taken over from GitHub",
     /** Follows the round number for a round that merged the target branch. */
-    syncRound: "Target branch sync",
+    syncRound: "Merged the target branch",
     /** Names an item that came from the person's own note rather than a review. */
     yourNote: "Your note",
     /** Names a review item that is no longer in the latest feedback. */

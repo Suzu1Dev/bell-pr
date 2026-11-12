@@ -619,7 +619,7 @@ test("completed checks fold while blocked and unknown checks stay visible, with 
 
 test("the zh-TW checklist uses its own words", () => {
   const html = renderZh(panel(english));
-  assert.match(html, /送出前待完成/);
+  assert.match(html, /發布前待完成/);
   assert.match(html, /無法確認/);
   assert.match(html, /維護者為什麼在意|維護者把規範寫下來/);
 });
@@ -781,7 +781,7 @@ test("a Learn-by-hand run published through the quoted confirm keeps its rules r
     const row = checklistRow(html, "rules");
     assert.ok(row.includes("You confirmed the project&#x27;s quoted rule when you published. The maintainers decide whether your change fits."), row);
     assert.ok(row.includes("We decline AI-generated contributions."));
-    assert.match(checklistRow(render(true, renderZh), "rules"), /你在送出時確認了專案引用的規則/);
+    assert.match(checklistRow(render(true, renderZh), "rules"), /你在發布時確認了專案引用的規則/);
     // In review the row still waits for the server's list.
     assert.ok(checklistRow(render(false), "rules").includes("The saved draft hasn&#x27;t been checked yet."));
   } finally {

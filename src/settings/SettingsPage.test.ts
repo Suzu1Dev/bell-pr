@@ -189,7 +189,7 @@ test("General has the language, the sample project switch and its reset", () => 
   // While the settings load, the switch waits.
   const loading = renderEn(createElement(GeneralSection, { settings: appSettings(null) }));
   assert.match(loading, /type="checkbox" disabled=""/);
-  assert.match(renderZh(createElement(GeneralSection, { settings: appSettings(view) })), /顯示範例專案/);
+  assert.match(renderZh(createElement(GeneralSection, { settings: appSettings(view) })), /顯示示範專案/);
 });
 
 test("AI provider shows each CLI's state, needs one provider, and keeps the Claude copy neutral", () => {
@@ -364,7 +364,7 @@ test("Environment shows the GitHub connection without the brand icon, the checkl
   assert.match(html, /lucide-git-pull-request/);
   assert.doesNotMatch(html, /lucide-github/);
   assert.match(html, /class="setup-checklist"/);
-  assert.match(html, />Re-check</);
+  assert.match(html, />Check again</);
   const advanced = html.match(/<details class="settings-advanced">.*?<\/details>/)?.[0] ?? "";
   assert.match(advanced, /<summary>Advanced: environment variables<\/summary>/);
   for (const variable of [

@@ -25,7 +25,7 @@ test("every demo file renders its name and diff lines", () => {
     const html = render(file);
     const name = file.path.split("/").pop();
     assert.ok(html.includes(`<strong>${name}</strong>`));
-    assert.ok(html.includes(`aria-label="${file.path} 的程式碼差異"`));
+    assert.ok(html.includes(`aria-label="${file.path} 的程式碼變更"`));
     assert.match(html, /rv-line-added/);
     assert.match(html, new RegExp(`\\+${file.additions}<`));
   }

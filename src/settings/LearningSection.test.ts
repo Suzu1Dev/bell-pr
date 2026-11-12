@@ -47,7 +47,7 @@ test("Learning shows the understanding check on by default, and the try-first pr
   const zh = renderZh(section({ settings: {}, lockedBy: {} }));
   assert.match(zh, /<h3>理解檢查<\/h3>/);
   assert.match(zh, /核准前，請我用自己的話講一遍每個變更/);
-  assert.match(zh, /審查時先試著答/);
+  assert.match(zh, /審閱時先試著答/);
 });
 
 test("the switches show what is saved, and wait while the settings load", () => {
@@ -95,7 +95,7 @@ test("the confirmation says what is lost, kept and recorded, and Keep the check 
   for (const sentence of [
     "You will be able to approve a pull request you have not explained.",
     "Every file still has to be reviewed, you still approve the pull request yourself, and every project-rule, issue and pacing check still applies.",
-    "Runs approved without the check are marked “Check off” for good: in the workspace, your learning record and the export.",
+    "Runs approved without the check are marked “Check off” for good: in the Workbench, your learning record and the export.",
     "You can turn it back on any time; runs already approved are then held to it before they are published.",
   ])
     assert.ok(html.includes(`<p class="settings-dialog-text">${sentence}</p>`), sentence);

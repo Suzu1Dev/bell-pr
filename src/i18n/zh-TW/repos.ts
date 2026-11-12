@@ -5,7 +5,6 @@ import type en from "../en/repos";
 
 const m: Translation<typeof en> = {
   list: {
-    eyebrow: "你的專案",
     title: "專案",
     intro: "開啟已匯入的專案，或加入新專案。",
     import: "匯入專案",
@@ -14,11 +13,11 @@ const m: Translation<typeof en> = {
     discoveryAction: "尋找貢獻項目",
     demoBadge: "示範專案",
     imported: "已匯入",
-    demoDescription: "透過 SDK 智慧重試的範例，體驗一次完整的貢獻與審查。",
+    demoDescription: "透過 SDK 智慧重試的示範，體驗一次完整的貢獻與審查。",
     languageFallback: "Git 專案",
     openDemo: "開啟示範工作台",
     explore: "開啟專案",
-    addTitle: "加入你的專案",
+    addTitle: "匯入專案",
     addText: "GitHub 連結或本機 Git 專案",
     delete: "刪除專案",
     deleteLabel: ({ name }) => `刪除專案：${name}`,

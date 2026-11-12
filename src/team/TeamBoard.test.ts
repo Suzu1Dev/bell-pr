@@ -69,7 +69,7 @@ test("a failed real run offers the retry form, opens failure reasons and marks c
   const html = renderZh(board(run, false, async () => {}));
   assert.match(html, /重試失敗的子任務/);
   assert.match(html, /1 個已整合的子任務不會重跑；1 個失敗或被阻擋的子任務/);
-  assert.match(html, /aria-label="給重試任務的補充說明"/);
+  assert.match(html, /aria-label="給重試子任務的補充說明"/);
   assert.match(html, /獨立 worktree 已清理/);
   assert.match(html, /查看失敗原因/);
   assert.match(html, /aria-expanded="true"/);
@@ -110,7 +110,7 @@ test("a plan awaiting approval offers 退回並補充意見 with the revision hi
     },
     false,
   );
-  assert.match(html, /確認計畫並開始開發/);
+  assert.match(html, /核准計畫並開始開發/);
   assert.match(html, /aria-label="退回計畫的意見"/);
   assert.match(html, /已重擬 1\/3/);
   assert.match(html, /第 1 次退回/);
@@ -433,7 +433,7 @@ test("dependencies show every task title, live status and unknown references in 
   };
   const [zhComplete, zhFailed] = demoTeam.tasks;
   const zh = render(withDependencies(demoRunZh), false);
-  assert.match(zh, /<div class="team-task-deps"><span>依賴<\/span><ul aria-label="依賴">/);
+  assert.match(zh, /<div class="team-task-deps"><span>相依<\/span><ul aria-label="相依">/);
   assert.ok(
     zh.includes(`<li><span>${zhComplete.title}</span><span>已整合</span></li>`),
   );
@@ -613,7 +613,7 @@ test("the runtime badge shows the team size the run was configured with", () => 
   assert.match(english(withTeammates(4)), /Up to 4 members work at the same time/);
   // The badge states the configured size only: no limit line beside it.
   assert.doesNotMatch(english(withTeammates(4)), /team-plan-limit|Free|Pro\b|keeps the team size/);
-  assert.match(renderZh(board(run, false)), /最多 2 位成員同時工作/);
+  assert.match(renderZh(board(run, false)), /最多 2 位隊友同時工作/);
 });
 
 test("the protocol note sits in a How it works disclosure", () => {

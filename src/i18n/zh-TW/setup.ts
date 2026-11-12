@@ -60,7 +60,7 @@ const m: Translation<typeof en> = {
     checking: "正在檢查你的工作環境…",
     provider: "這需要 AI 服務：請安裝並登入 Codex CLI、Claude Code 或 Antigravity CLI。",
     gh: "這需要已安裝並登入的 GitHub CLI。",
-    "git-identity": "這需要你的 Git 名字與電子郵件地址，每個提交都會帶有它們。",
+    "git-identity": "這需要你的 Git 名字與電子郵件地址，每個 commit 都會帶有它們。",
     detail: ({ check, detail }) => `${check}：${detail}`,
   },
 };

@@ -20,10 +20,10 @@ const m: Translation<typeof en> = {
   },
   runStatus: {
     queued: "等待執行",
-    awaiting_plan: "等待確認計畫",
+    awaiting_plan: "等待核准計畫",
     running: "進行中",
-    review: "等待你的審查",
-    approved: "已確認",
+    review: "等待你的審閱",
+    approved: "已核准",
     published: "已送出 PR",
     failed: "執行失敗",
     cancelled: "已停止",
@@ -70,7 +70,7 @@ const m: Translation<typeof en> = {
   errors: {
     serverUnreachable: `無法連線至本機 ${product.name} 服務，請確認它仍在執行。`,
     generic: "操作未完成，請再試一次。",
-    apiTokenRequired: `請在執行 ${product.name} 的電腦上執行 \`${product.binNames[0]}\`，重新開啟工作台。`,
+    apiTokenRequired: `請在執行 ${product.name} 的電腦上執行 \`${product.binNames[0]}\`，重新開啟你的工作空間。`,
   },
   failureText: {
     label: ({ label, fullWidth }) => (fullWidth ? `${label}。` : `${label}.`),

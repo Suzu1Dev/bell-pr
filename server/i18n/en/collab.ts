@@ -6,7 +6,7 @@ const bin = product.binNames[0];
 /** Group work: the people who share one running BELL PR (collab-host.ts, routes/collab.ts). */
 export default {
   notSetUp: `Group work is not set up yet on this ${name}.`,
-  stopped: `Group work has stopped. Fix the cause on the host (\`${bin} group status\` or the server log names it), then restart ${name}.`,
+  stopped: `Group work has stopped. Fix the cause on the host (\`${bin} group status\` or the log on the host names it), then restart ${name}.`,
   hostOnly: `Only the computer that runs ${name} can set group work up.`,
   notJoined: "You have not joined this group on this device, or you were removed from it.",
   adminOnly: "Only a group admin can do this.",

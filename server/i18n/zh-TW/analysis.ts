@@ -96,7 +96,7 @@ const m: Translation<typeof en> = {
     cancelled: "貢獻探索已取消。",
     limitReached: "探索達到請求或時間上限。",
     unreadableText: ({ title }) => `${title} 不是可安全讀取的文字，已略過。`,
-    maskedCredentials: (_title) => "發佈前會擋下常見格式的 token 與私鑰。",
+    maskedCredentials: (_title) => "發布前會擋下常見格式的 token 與私鑰。",
     truncatedSource: ({ title, bytes }) =>
       `${title} 僅保留前 ${bytes} bytes，尚未讀取完整內容。`,
     searching: "正在搜尋公開、未封存且符合條件的 GitHub 專案。",
@@ -124,7 +124,7 @@ const m: Translation<typeof en> = {
         {
           readme: "README",
           contributing: "CONTRIBUTING",
-          template: "PR 模板",
+          template: "PR 範本",
         }[document]
       } 未在本次允許的索引範圍找到，其他位置仍可能有規範。`,
     documentFailed: ({ path }) =>
@@ -133,7 +133,7 @@ const m: Translation<typeof en> = {
       `GitHub 狀態：OPEN；標籤：${labels || "無"}；更新時間：${updatedAt ?? "未確認"}；受指派人數：${assignees ?? "未確認"}；討論鎖定：${locked ? "是" : "否"}；表情回應總數：${reactions ?? "未確認"}（不代表支持票）。`,
     commentTitle: ({ number, association }) => `#${number} · ${association} 留言`,
     noMatchingIssue:
-      "本次取樣未取得符合難度標籤的開啟中 issue，尚不能確認具體需求或可認領性。",
+      "本次取樣未取得符合難度標籤的開放中 issue，尚不能確認具體需求或可認領性。",
     noPushTime: "GitHub 未提供可驗證的最後推送時間。",
     candidateBytesLimit: "來源已達每個專案 30 KB 上限，部分內容未讀取。",
     requestLimit:
@@ -204,7 +204,7 @@ const m: Translation<typeof en> = {
     placeholdersInBody: ({ lines }) =>
       `PR 草稿把待辦事項或未填的範本欄位寫進了會送到 GitHub 的說明（第 ${lines} 行），請重新產生。`,
     provisionalLinuxPolicy:
-      "來源查找有範圍限制或未完成項目，暫用 Linux 投稿寫作原則；送出前請人工確認專案規定。",
+      "來源查找有範圍限制或未完成項目，暫用 Linux 投稿寫作原則；發布前請人工確認專案規定。",
     noSafeDiff: "目前沒有可用來撰寫 PR 的安全程式碼差異。",
     diffTooLarge: "差異超過 PR 草稿的 100 KB 上限；請拆分變更後重試。",
   },
@@ -219,7 +219,7 @@ const m: Translation<typeof en> = {
   prFeedback: {
     githubError: ({ message }) => `GitHub 回傳錯誤：${message}`,
     notFound: "在 GitHub 找不到這個 PR。",
-    urlMismatch: "GitHub 回傳的 PR 網址與工作紀錄不一致。",
+    urlMismatch: "GitHub 回傳的 PR 網址與任務紀錄不一致。",
     partialReviews: ({ shown, total }) =>
       `Review 只讀取最近 ${shown} 則，共 ${total} 則。`,
     partialComments: ({ shown, total }) =>
@@ -248,7 +248,7 @@ const m: Translation<typeof en> = {
     claudeFable: "能力最強，單次工作可能較久；需方案支援。",
     claudeHaiku: "最快、用量最低；不支援思考強度設定。",
     invalidSettings: "模型設定格式不正確，請重新選擇。",
-    providerMismatch: "模型目錄與所選 Agent 不一致，請重新載入後再選擇。",
+    providerMismatch: "模型目錄與所選 AI 服務不一致，請重新載入後再選擇。",
     unknownModel: "無法確認這組模型設定，請重新載入模型目錄並選擇。",
     unsupportedEffort: "所選模型不支援這個思考強度，請重新選擇。",
   },

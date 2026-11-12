@@ -114,7 +114,7 @@ const settings = {
       "Agents run the project's code on this computer. These settings decide what they may reach.",
     sandbox: {
       title: "Claude Code sandbox",
-      text: "Claude Code agents that edit files run every command in the operating-system sandbox: writes stay in the run's checkout and Claude Code's temporary folders, and the network is closed. Your own Claude Code user settings can widen it (proxy ports, allowed domains or paths, excluded commands, plugin language servers). The Codex CLI uses its own sandbox. Antigravity agents that edit files run their commands in the Antigravity CLI's terminal sandbox, which keeps writes in the checkout and closes the network.",
+      text: "Claude Code agents that edit files run every command in the operating-system sandbox: writes stay in the run's working directory and Claude Code's temporary folders, and the network is closed. Your own Claude Code user settings can widen it (proxy ports, allowed domains or paths, excluded commands, plugin language servers). The Codex CLI uses its own sandbox. Antigravity agents that edit files run their commands in the Antigravity CLI's terminal sandbox, which keeps writes in the working directory and closes the network.",
     },
     unsandboxed: {
       label: "Allow unsandboxed Claude Code and Antigravity agents",
@@ -123,7 +123,7 @@ const settings = {
       confirmText:
         "When the sandbox is unavailable, Claude Code and Antigravity agents that edit files will run without it. They can then read and change anything your user account can, such as other projects, your SSH keys and the sign-ins of your tools. Allow it only for projects you trust.",
       confirmBadge:
-        "Every run where an agent worked without the sandbox carries a badge in the workspace, and its log says so.",
+        "Every run where an agent worked without the sandbox carries a badge in the Workbench, and its log says so.",
       confirm: "Allow unsandboxed agents",
       cancel: "Keep the sandbox",
     },
@@ -160,7 +160,7 @@ const settings = {
         "Every file still has to be reviewed, you still approve the pull request yourself, and every project-rule, issue and pacing check still applies.",
       /** What is recorded. */
       confirmRecorded:
-        "Runs approved without the check are marked “Check off” for good: in the workspace, your learning record and the export.",
+        "Runs approved without the check are marked “Check off” for good: in the Workbench, your learning record and the export.",
       confirmBack:
         "You can turn it back on any time; runs already approved are then held to it before they are published.",
       /** The first button of the dialog, so it has the focus. */
@@ -260,10 +260,10 @@ const settings = {
       logs: "Logs",
       runs: "Run files",
       runsHelp:
-        "Each run's working copy and its teammates' checkouts. Freeing the space keeps the run's record, reports and notes.",
+        "Each run's working directory and its teammates' own working directories. Freeing the space keeps the run's record, reports and notes.",
       published: "Published runs",
       publishedHelp:
-        "Published runs keep their checkout, because follow-up rounds and syncing need it. Free one when you no longer need it.",
+        "Published runs keep their working directory, because follow-up rounds and syncing need it. Free one when you no longer need it.",
       others: "Other runs",
       noRuns: "No run has files on disk.",
       runMeta: ({ status, date }: { status: string; date: string }) =>
@@ -275,7 +275,7 @@ const settings = {
       confirmFree:
         "Free this run's files? Its changes can no longer be reviewed or published here.",
       confirmPublished:
-        "Free this published run's checkout? Follow-up rounds and syncing stop working for it.",
+        "Free this published run's working directory? Follow-up rounds and syncing stop working for it.",
       outside: "Outside the data directory",
       busy: "In progress",
     },

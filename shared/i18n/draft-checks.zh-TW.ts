@@ -40,7 +40,7 @@ const messages: Translation<typeof en> = {
       factsUnknown: `${product.name} 從不把未知當成通過；發布前請自己到 GitHub 確認這些事實。`,
     },
     prClosed: `這個 repository 目前不接受你開的 Pull Request，所以 ${product.name} 不會發布這一份。你仍可以在本機繼續練習這份變更。`,
-    aiBan: `專案規範不接受 AI 協助完成的貢獻，而這份變更是由 AI agent 撰寫的。${product.name} 不會發布它；你仍可以在本機繼續練習。`,
+    aiBan: `專案規範不接受 AI 協助完成的貢獻，而這份變更是由 AI Agent 撰寫的。${product.name} 不會發布它；你仍可以在本機繼續練習。`,
     aiDisclosure: "專案要求貢獻者揭露 AI 協助，但說明裡還沒有提到。請用自己的話寫，或打開 AI 協助說明那一行。",
     ownWordsRequired: `專案要求用貢獻者自己的話寫說明，而這份仍是 ${product.name} 的建議文字。發布前請改寫。`,
     ownWords: `這份說明仍是 ${product.name} 建議的文字。許多專案要求用貢獻者自己的話寫說明。`,
@@ -79,7 +79,7 @@ const messages: Translation<typeof en> = {
     agent: ({ path, line, quote }) =>
       `${path}:${line}：「${quote}」（寫給 AI agent 的話；作者是你，請自行判斷是否適用）`,
     issueFirst: ({ path, line, quote }) =>
-      `${path}:${line}：「${quote}」（這份工作沒有連結 issue）`,
+      `${path}:${line}：「${quote}」（這個任務沒有連結 issue）`,
     assigned: ({ names }) =>
       `已指派給 ${fmt.list(names.map((name) => `@${name}`))}。`,
     claimed: ({ author, date, bot }) =>
@@ -95,9 +95,9 @@ const messages: Translation<typeof en> = {
     split: ({ lines, files }) =>
       `${files} 個檔案共 ${lines} 行變更，超過 ${product.name} 預設的 1,000 行或 20 個檔案。能不能拆成幾份獨立的變更？`,
     parts: ({ count }) =>
-      `計畫有 ${count} 組彼此不相依的檔案。維護者審閱單一修正比較快：若每一組各是一項獨立的修正，請考慮拆成獨立的貢獻。`,
+      `計畫有 ${count} 組彼此不相依的檔案。維護者審查單一修正比較快：若每一組各是一項獨立的修正，請考慮拆成獨立的貢獻。`,
     noTests: "程式碼有變更，但測試沒有。",
-    outsidePlan: ({ files }) => `不在計畫任何任務範圍內的檔案：${fmt.list(files)}。`,
+    outsidePlan: ({ files }) => `不在計畫任何子任務範圍內的檔案：${fmt.list(files)}。`,
     whitespace: ({ files }) => `只改了空白的變更：${fmt.list(files)}。`,
     dependencies: ({ names }) => `新增的相依套件：${fmt.list(names)}。`,
     mergedSizes: ({ sizes }) =>
@@ -126,7 +126,7 @@ const messages: Translation<typeof en> = {
       "no-github-origin": "這個專案沒有 GitHub 來源，所以沒有可以在 GitHub 上檢查的事。",
       "not-an-issue": "這個連結不是 GitHub issue。",
       "files-unreadable": "無法在專案目前的 commit 讀取它的檔案。",
-      "folder-import": "從資料夾匯入專案時不會讀取這項資料。按「再確認一次」即可從 GitHub 讀取。",
+      "folder-import": "從資料夾匯入專案時不會讀取這項資料。按「重新檢查」即可從 GitHub 讀取。",
     },
     byHand: {
       claim,
@@ -143,9 +143,9 @@ const messages: Translation<typeof en> = {
         "no-carve-out": "它的文字沒有說哪些 AI 用法可以",
         "kind-not-named": ({ kinds }) => `它的文字沒有提到${kinds}`,
         "registry-stale": ({ date }) => `${product.name} 檢查清單上的這一項已超過 90 天（${date}）`,
-        "rules-unread": "這個工作開始後還沒讀過它的規範（請重新檢查）",
-        "not-fitted": "這個工作開始時沒有配合它的規範",
-        "rules-changed": "這個工作開始後，它的規範改過了",
+        "rules-unread": "這個任務開始後還沒讀過它的規範（請重新檢查）",
+        "not-fitted": "這個任務開始時沒有配合它的規範",
+        "rules-changed": "這個任務開始後，它的規範改過了",
         "too-few-kinds": "它的文字沒有提到解說與回答",
         held: "它的另一條 AI 規則也適用",
       },
@@ -153,15 +153,15 @@ const messages: Translation<typeof en> = {
       aiBan: ({ condition }) =>
         condition
           ? `專案的規範不接受 AI 產生的內容。${claim}${product.name} 只依據專案自己的文字在這裡發布，而${condition}。`
-          : `專案的規範限制 AI 協助本身，所以 ${product.name} 不會發布嚮導幫過忙的工作。`,
+          : `專案的規範限制 AI 協助本身，所以 ${product.name} 不會發布嚮導幫過忙的任務。`,
       areaReserved: ({ condition }) =>
         condition
           ? `專案會關閉這類 issue 上由 AI 產生的 Pull Request。${product.name} 只依據專案自己的文字發布它們，而${condition}。`
-          : `專案把這個 issue 留給不靠 AI 工具學習的人，所以 ${product.name} 不會發布嚮導幫過忙的工作。`,
+          : `專案把這個 issue 留給不靠 AI 工具學習的人，所以 ${product.name} 不會發布嚮導幫過忙的任務。`,
       ambiguousBan: ({ path, line, quote, kinds }) =>
         `${path}:${line}：「${quote}」（可能涵蓋你用到的協助：${kinds}）`,
       agent: ({ path, line, quote }) => `${path}:${line}：「${quote}」（寫給 AI agent 的話。${claim}）`,
-      aiDisclosure: ({ kinds }) => `專案要求說明怎麼使用 AI。這個工作用了 ${product.name} 的嚮導：${kinds}。`,
+      aiDisclosure: ({ kinds }) => `專案要求說明怎麼使用 AI。這個任務用了 ${product.name} 的嚮導：${kinds}。`,
       rulesConfirm: ({ area }) =>
         `${area ? "專案會關閉這類 issue 上由 AI 產生的 Pull Request" : "專案不接受 AI 產生的貢獻"}，而它自己的文字說某些 AI 用法可以。${product.name} 只是引用專案的文字，不替專案決定：你的變更是否符合，由維護者決定。`,
       sameRules: ({ path, line, quote }) => `同一份規範也說：${path}:${line}：「${quote}」`,
@@ -170,7 +170,7 @@ const messages: Translation<typeof en> = {
         `${fitted ? `開始時就配合了那段文字，嚮導只提供${fitted}。` : ""}你用到的協助：${used}。`,
       noHelp: "沒有",
       denial: ({ line, kinds }) =>
-        `你的文字寫著「${line}」。在這個工作裡，${product.name} 的嚮導給了你${kinds}。如果那句話指的是別的事，請確認；否則請改寫。`,
+        `你的文字寫著「${line}」。在這個任務裡，${product.name} 的嚮導給了你${kinds}。如果那句話指的是別的事，請確認；否則請改寫。`,
     },
   },
 };

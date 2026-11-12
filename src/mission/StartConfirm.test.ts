@@ -27,7 +27,7 @@ test("each reason is one whole sentence: BELL won't publish this while …", () 
     "BELL PR won&#x27;t publish this while this repository doesn&#x27;t take pull requests from you.",
     "BELL PR won&#x27;t publish this while the project&#x27;s rules don&#x27;t accept AI-assisted contributions.",
     "BELL PR won&#x27;t publish this: the project keeps issues labelled for newcomers for people learning without AI tools.",
-    "BELL PR won&#x27;t publish this while you have 2 open pull requests here, at least twice your budget of 1.",
+    "BELL PR won&#x27;t publish this while you have 2 open pull requests here, at least twice your limit of 1.",
   ]);
   assert.match(html, /<button type="button" class="button secondary">Back<\/button><button type="button" class="button primary"><svg[\s\S]*?<\/svg>Start and practise locally<\/button>/);
 });

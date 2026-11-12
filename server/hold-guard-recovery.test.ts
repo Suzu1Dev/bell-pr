@@ -505,7 +505,7 @@ test("POST /api/runs/:id/holds/restore restores modified, deleted, untracked, st
   assert.equal((zhReply.json as HoldRestoreResponse).run.approvedFingerprint, undefined);
   assert.equal(
     s.f.workbench.run(approvedRun.id).logs.at(-1)?.message,
-    "已將 1 個佔用檔案還原到工作基準：src/api/users.ts。",
+    "已將 1 個佔用檔案還原到任務基準：src/api/users.ts。",
   );
 
   // Failed run whose ONLY change was the held file stays failed (no empty review), and incomplete team run stays failed.

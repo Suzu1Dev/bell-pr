@@ -67,7 +67,7 @@ const understanding = {
   /** A learning-loop feature this build does not have yet. */
   notImplemented: "This part of BELL PR is not available in this build yet.",
   feedbackTagUnpublished:
-    "Maintainer feedback can be tagged once the pull request is sent and its feedback is read.",
+    "Maintainer feedback can be tagged once the pull request is published and its feedback is read.",
   feedbackTagEmpty:
     "Send a taste dimension, Saw it coming or Surprised me, or a lesson.",
   feedbackTagUnknown:

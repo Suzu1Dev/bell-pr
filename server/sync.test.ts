@@ -379,7 +379,7 @@ test("a sync whose conflicts cannot be marked, or after a publish that stopped h
     );
     // A commit left by a publish that failed after making it may be on GitHub already.
     f.run.publishCommit = oldBase;
-    await assert.rejects(f.workbench.syncRun(f.run.id), /先前的發佈已建立提交/);
+    await assert.rejects(f.workbench.syncRun(f.run.id), /先前的發布已建立 commit/);
   } finally {
     await f.cleanup();
   }

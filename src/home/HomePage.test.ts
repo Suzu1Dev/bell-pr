@@ -78,7 +78,7 @@ test("Home reads in English with no Chinese left", () => {
     html,
     /Walk through a finished contribution: the project&#x27;s rules, the agent team&#x27;s plan, explaining the change back and the pull request draft\. No setup needed\./,
   );
-  assert.match(html, /<strong class="home-choice-title">Import a repository<\/strong>/);
+  assert.match(html, /<strong class="home-choice-title">Import a project<\/strong>/);
   assert.match(html, /<strong class="home-choice-title">Find a project to contribute to<\/strong>/);
   assert.match(html, /<h2 id="home-continue-heading">Continue where you left off<\/h2>/);
   assert.match(html, /<small>octo\/widgets · Ready for your review<\/small>/);

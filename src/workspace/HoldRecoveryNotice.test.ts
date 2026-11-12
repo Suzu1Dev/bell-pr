@@ -217,7 +217,7 @@ test("restore asks for confirmation with TriangleAlert mark, blocks close while 
     assert.doesNotMatch(view.text(), /Stopped: this run/);
     const heading = view.container.querySelectorAll((node) => node.nodeName === "H1")[0]!;
     assert.equal((globalThis.document as unknown as { activeElement: FakeElement | null }).activeElement, heading);
-    assert.deepEqual(notes, [{ message: "1 file restored. Other changes were kept.", tone: "success" }]);
+    assert.deepEqual(notes, [{ message: "1 file put back. Other changes were kept.", tone: "success" }]);
   } finally {
     await view.unmount();
   }

@@ -98,7 +98,7 @@ test("export carries every section, marks stale Q&A and flags unreported usage",
     },
     repo,
   );
-  assert.match(markdown, /^# 學習紀錄：Improve retry\n\n> .*由 agent 產生，可能有誤/);
+  assert.match(markdown, /^# 學習紀錄：Improve retry\n\n> .*由 Agent 產生，可能有誤/);
   assert.match(markdown, /- Repository：example\/retry\n- 分支：bell\/retry → main/);
   for (const heading of [
     "## 任務描述\n\nAdd exponential backoff to withRetry.",
@@ -128,7 +128,7 @@ test("a bare run exports placeholders instead of empty sections", () => {
   assert.doesNotMatch(markdown, /## 團隊計畫|Repository：/);
   assert.match(markdown, /## 檔案解說\n\n尚未產生解說。/);
   assert.match(markdown, /## 問答紀錄\n\n沒有問答紀錄。/);
-  assert.match(markdown, /## Pull Request\n\n尚未送出 PR。/);
+  assert.match(markdown, /## Pull Request\n\n尚未發布 PR。/);
   assert.match(markdown, /## Agent 用量\n\n沒有用量紀錄。/);
   const complete = learningExport({
     ...base,

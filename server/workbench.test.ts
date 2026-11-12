@@ -517,7 +517,7 @@ test("the base version around a modified file is served only for the current, re
       f.workbench.contextLines(f.run.id, "secret.ts", changed.fingerprint, f.run.baseSha!),
       (error: AppError) =>
         error.statusCode === 422 &&
-        error.message === "發佈前會擋下常見格式的 token 與私鑰。",
+        error.message === "發布前會擋下常見格式的 token 與私鑰。",
     );
 
     // A password assignment is not a blocking secret, but it is masked line by line.
@@ -569,14 +569,14 @@ test("a held-back file's reason follows the run's locale, so reading the diff in
           blocked:
             "Sensitive files and build artifacts are never added to the PR; remove this file from the changes first.",
           patch:
-            "Publishing this file is on hold: Sensitive files and build artifacts are never added to the PR; remove this file from the changes first.",
+            "This file is blocked from publishing: Sensitive files and build artifacts are never added to the PR; remove this file from the changes first.",
         },
         {
           path: "link.ts",
           blocked:
             "A new file must be a regular file; symbolic links need manual handling.",
           patch:
-            "Publishing this file is on hold: A new file must be a regular file; symbolic links need manual handling.",
+            "This file is blocked from publishing: A new file must be a regular file; symbolic links need manual handling.",
         },
       ],
     );
@@ -617,7 +617,7 @@ test("store preserves state and marks interrupted work as failed on restart", as
     await reopened.initialize();
     assert.equal(reopened.data.repos.length, 1);
     assert.equal(reopened.data.runs[0].status, "failed");
-    assert.match(reopened.data.runs[0].error!, /中斷/);
+    assert.match(reopened.data.runs[0].error!, /已停止/);
   } finally {
     await f.cleanup();
   }
@@ -931,7 +931,7 @@ test("HTTP errors follow X-Bell-Locale: validation, the guard, the error handler
     );
     assert.deepEqual(
       await errorOf("en", "/api/models?provider=unknown", { method: "GET" }),
-      { status: 400, error: "This agent type is not supported." },
+      { status: 400, error: "This AI provider is not supported." },
     );
     // Refusals from the Workbench and its modules.
     assert.deepEqual(await errorOf("en", "/api/runs/missing", { method: "GET" }), {
@@ -944,7 +944,7 @@ test("HTTP errors follow X-Bell-Locale: validation, the guard, the error handler
     });
     assert.deepEqual(await errorOf("zh-TW", `/api/runs/${f.run.id}/cancel`, { body: "{}" }), {
       status: 409,
-      error: "只有排隊、等待計畫核准或執行中的工作可取消。",
+      error: "只有排隊、等待計畫核准或執行中的任務可取消。",
     });
     assert.deepEqual(await errorOf("en", `/api/runs/${f.run.id}/approve`, {
       body: JSON.stringify({ draft: f.run.draft }),
@@ -956,7 +956,7 @@ test("HTTP errors follow X-Bell-Locale: validation, the guard, the error handler
       body: JSON.stringify({ fingerprint: "a".repeat(64) }),
     }), {
       status: 409,
-      error: "The approved version changed or expired; reload, review and approve again before you send the PR.",
+      error: "The approved version changed or expired; reload, review and approve again before you publish the PR.",
     });
     assert.deepEqual(await errorOf("en", "/api/repos", {
       body: JSON.stringify({ source: "./relative/path" }),

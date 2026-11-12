@@ -9,7 +9,7 @@ const m: Translation<typeof en> = {
   guidance: {
     eyebrow: "CONTRIBUTION GUIDE",
     title: "草稿建議",
-    intro: "先看投稿規範與範本，再把這次貢獻整理成清楚的草稿。",
+    intro: "先看貢獻規範與範本，再把這次貢獻整理成清楚的草稿。",
     status: {
       generating:
         "正在閱讀貢獻規範與 PR 範本，並對照本次變更整理建議。你可以繼續編輯上方草稿。",
@@ -59,7 +59,7 @@ const m: Translation<typeof en> = {
     preview: "預覽建議草稿",
     apply: {
       appliedNote:
-        "上方編輯區就是這份建議的原文。說明會原樣送到 GitHub，請用自己的話確認後再送出。",
+        "上方編輯區就是這份建議的原文。說明會原樣送到 GitHub，請用自己的話確認後再發布。",
       note: "套用後仍可編輯，儲存後才更新草稿。",
       applied: "已套用",
       apply: "套用建議草稿",
@@ -97,7 +97,7 @@ const m: Translation<typeof en> = {
     checklist: {
       sources: "查看依據",
       completed: ({ passed, off }) => `已通過 ${passed} 項${off ? `・已關閉 ${off} 項` : ""}`,
-      title: "送出前待完成",
+      title: "發布前待完成",
       intro: "維護者花時間看一個 Pull Request 之前會確認的事，依專案規範、GitHub 與這次的變更即時整理。發布時會執行相同的檢查。",
       rulesRead: ({ date }) => `規範讀取於 ${date}`,
       factsRead: ({ date }) => `GitHub 讀取於 ${date}`,
@@ -131,12 +131,12 @@ const m: Translation<typeof en> = {
       whySummary: "維護者為什麼在意",
       rulesFound: ({ count }) =>
         `從專案檔案中引用了 ${fmt.number(count)} 條規範，下方各項會拿這次的變更逐一對照。`,
-      rulesConfirmed: "你在送出時確認了專案引用的規則；你的變更是否合適，由維護者決定。",
+      rulesConfirmed: "你在發布時確認了專案引用的規則；你的變更是否合適，由維護者決定。",
       rulesNotFound: ({ files }) =>
         `在 ${product.name} 讀過的 ${fmt.number(files)} 個檔案中沒有找到。有些專案把規範放在網站或 wiki 上，發布前請自行確認。`,
       doorOpen: "Pull Request：對你開放。",
       doorClosed: "這個 repository 不接受你開的 Pull Request，所以會阻擋發布。",
-      noIssue: "這次的工作沒有連結 issue。",
+      noIssue: "這個任務沒有連結 issue。",
       issueClosed: "連結的 issue 已關閉，所以會阻擋發布。",
       issueOpen: ({ number }) =>
         number === undefined
@@ -155,10 +155,10 @@ const m: Translation<typeof en> = {
       disclosureChoice: `${product.name} 讀過的檔案沒有要求揭露；要不要加上由你決定。`,
       understandingPassed: "你已經用自己的話講過一遍。",
       understandingRequired: "核准前，請先用自己的話把這次的變更講一遍。",
-      understandingOff: "已在設定中關閉。沒有經過理解檢查就核准的工作會被標示。",
+      understandingOff: "已在設定中關閉。沒有經過理解檢查就核准的任務會被標示。",
       notChecked: "尚未確認。",
       rulesUnknown: `${product.name} 還沒讀取專案規範。`,
-      factsUnknown: "這次的工作還沒讀取 GitHub；發布對話框會讀取。",
+      factsUnknown: "這個任務還沒讀取 GitHub；發布對話框會讀取。",
       draftUnknown: "已儲存的草稿還沒檢查。",
       changesUnknown: "還沒計算這次的變更規模。",
       couldntCheckAny: "無法在 GitHub 上確認這一項。",
@@ -170,7 +170,7 @@ const m: Translation<typeof en> = {
       ruleQuote: ({ quote }) => `「${quote}」`,
       ruleFrom: ({ label, quote }) => `${label}：「${quote}」`,
       ruleSource: ({ source }) =>
-        `來源：${source}。沒有連結 issue 時，送出前會請你再確認一次。`,
+        `來源：${source}。沒有連結 issue 時，發布前會請你再確認一次。`,
       openIssue: "開啟你填寫的 issue",
     },
     linux: {
@@ -304,7 +304,7 @@ const m: Translation<typeof en> = {
     lastSync: ({ from, to, date }) => `上次同步：${from} 到 ${to}，${date}`,
     waitConflicts: "上一次同步的衝突解決前不能再同步。",
     waitStatus:
-      "只有審閱中、已核准或等待計畫核准的工作可以同步到最新目標分支。",
+      "只有審閱中、已核准或等待計畫核准的任務可以同步到最新目標分支。",
     roundOpen: "這個 PR 有一輪修正在進行；完成或放棄後才能同步。",
     sync: "同步到最新目標分支",
     undo: "復原同步",
@@ -334,11 +334,11 @@ const m: Translation<typeof en> = {
     },
     heldChanges: "你佔用範圍內的變更",
     heldChangesNote:
-      "在你佔用期間，{branch} 上有提交改到這些檔案；發布前請先確認。",
+      "在你佔用期間，{branch} 上有 commit 改到這些檔案；發布前請先確認。",
     heldChangesCommits: ({ commits }) => `（${commits.join("、")}）`,
   },
   followUps: {
-    title: "依 review 修正的紀錄",
+    title: "依回饋修正的紀錄",
     intro:
       "每一輪經你審閱、核准後，會成為 PR 分支上的一個新 commit；PR 標題與說明維持原樣，回覆 reviewer 仍由你在 GitHub 上處理。",
     status: {
@@ -350,7 +350,7 @@ const m: Translation<typeof en> = {
       discarded: "已放棄",
     },
     round: ({ number }) => `第 ${number} 輪`,
-    adopted: "接續 GitHub 上的提交",
+    adopted: "接續 GitHub 上的 commit",
     syncRound: "同步目標分支",
     yourNote: "你的補充說明",
     feedback: "回饋",
@@ -361,8 +361,8 @@ const m: Translation<typeof en> = {
     checks: "實際執行的指令",
     pushed: ({ commit, date }) => `${commit} 已推送 ${date}`,
     notPushed: ({ commit }) => `${commit} 已建立，尚未確認推送`,
-    discard: "放棄這輪修改",
-    ownGit: `請在這個工作的資料夾裡用你自己的 Git 推送後續的 commit；${product.name} 會在下次讀取回饋時接手。`,
+    discard: "放棄這一輪",
+    ownGit: `請在這個任務的資料夾裡用你自己的 Git 推送後續的 commit；${product.name} 會在下次讀取回饋時接手。`,
   },
 };
 

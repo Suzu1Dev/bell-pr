@@ -15,9 +15,9 @@ const m: Translation<typeof en> = {
       "",
       "指令：",
       `  start      啟動 ${name}，或開啟執行中的工作區（預設指令）`,
-      "  open       印出執行中伺服器的位址，並在瀏覽器開啟",
+      "  open       印出執行中服務的位址，並在瀏覽器開啟",
       `  doctor     檢查這台電腦是否具備 ${name} 需要的環境（加 --json 輸出機器可讀格式）`,
-      "  token      更換 API 權杖，並登出已配對的裝置（`token rotate`）",
+      "  token      更換 API token，並登出已配對的裝置（`token rotate`）",
       "  pair       產生一次性配對碼，讓手機或另一台電腦配對",
       "  devices    列出已配對裝置（`devices list`）或撤銷其中一台（`devices revoke <id>`）",
       "  group      小組協作：`group status`、`group setup`、`group invite <名稱>`",
@@ -25,7 +25,7 @@ const m: Translation<typeof en> = {
       "  help       顯示這份說明",
       "",
       "start 的選項：",
-      "  --port <埠>         監聽的埠（BELLPR_PORT，預設 4311）",
+      "  --port <連接埠>     監聽的連接埠（BELLPR_PORT，預設 4311）",
       "  --host <主機>       監聽的位址（BELLPR_HOST，預設 127.0.0.1）",
       "  --data-dir <目錄>   資料目錄（BELLPR_DATA_DIR，預設 ~/.bellpr）",
       "  --no-open           不開啟瀏覽器（BELLPR_NO_OPEN=1）",
@@ -34,8 +34,8 @@ const m: Translation<typeof en> = {
       "  --env-file <檔案>   先從檔案載入 BELLPR_PORT 等設定",
       "",
       "open 的選項：",
-      "  --print             只印出位址，不含 API 權杖",
-      "  --print-token       印出含 API 權杖的位址",
+      "  --print             只印出位址，不含 API token",
+      "  --print-token       印出含 API token 的位址",
       "  --no-open           不開啟瀏覽器",
       `  --data-dir <目錄>   執行中 ${name} 的資料目錄`,
       "",
@@ -86,7 +86,7 @@ const m: Translation<typeof en> = {
     alreadyRunning: ({ url }) =>
       `${name} 已在 ${url} 執行。執行 \`${bin} open\` 即可開啟；若那個 ${name} 用其他資料目錄啟動，請加上 --data-dir <dir>。`,
     portInUse: ({ port }) =>
-      `埠 ${port} 已被其他程式使用。請用 \`${bin} start --port <埠>\` 在可用的埠啟動 ${name}。`,
+      `連接埠 ${port} 已被其他程式使用。請用 \`${bin} start --port <連接埠>\` 在可用的連接埠啟動 ${name}。`,
     dataDirInUse: ({ dataDir, pid }) =>
       `${name} 已使用資料目錄 ${dataDir} 執行中（行程 ${pid}）。執行 \`${bin} open\` 即可開啟，或先停止該行程。`,
     dataDirHolderUnconfirmed: ({ dataDir, file }) =>
@@ -113,7 +113,7 @@ const m: Translation<typeof en> = {
     uiMissingPage:
       `${name} 的網頁介面尚未建置。請在 ${name} 原始碼資料夾執行 npm run build，再重新啟動 ${name}。`,
     exposedHost: ({ host }) =>
-      `${name} 正在 ${host} 上監聽，而非只在 127.0.0.1。這是 --host 或 BELLPR_HOST 明確指定的位址。API 權杖仍然必要。`,
+      `${name} 正在 ${host} 上監聽，而非只在 127.0.0.1。這是 --host 或 BELLPR_HOST 明確指定的位址。API token 仍然必要。`,
     wildcardHostNeedsPublicUrl: ({ host }) =>
       `${name} 正在 ${host} 上監聽，但尚未設定 BELLPR_PUBLIC_URL。遠端連線會收到 HTTP 403；請把 BELLPR_PUBLIC_URL 設為瀏覽器使用的 HTTPS 來源（例如 https://bell.example.com）。`,
   },
@@ -123,8 +123,8 @@ const m: Translation<typeof en> = {
   },
   token: {
     rotated: ({ path }) =>
-      `已更換 ${path} 的 API 權杖。執行中的 ${name} 會在下一個請求使用新權杖。執行 \`${bin} open\` 即可用它開啟。`,
-    usage: `執行 \`${bin} token rotate\` 以更換 API 權杖。`,
+      `已更換 ${path} 的 API token。執行中的 ${name} 會在下一個請求使用新 token。執行 \`${bin} open\` 即可用它開啟。`,
+    usage: `執行 \`${bin} token rotate\` 以更換 API token。`,
     devicesCleared: "已配對的裝置都已登出，配對碼也已作廢。請用新的配對碼重新配對。",
   },
   pair: {
@@ -146,7 +146,7 @@ const m: Translation<typeof en> = {
     line: ({ id, name, createdAt, lastUsedAt }) =>
       `${id}  ${name}  配對於 ${createdAt}  最後使用 ${lastUsedAt}`,
     neverUsed: "從未使用",
-    revoked: ({ id }) => `已撤銷 ${id}，它的權杖不再有效。`,
+    revoked: ({ id }) => `已撤銷 ${id}，它的 token 不再有效。`,
     notFound: ({ id }) => `沒有 id 為 ${id} 的已配對裝置。執行 \`${bin} devices list\` 查看。`,
   },
   group: {

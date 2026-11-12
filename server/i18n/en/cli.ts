@@ -15,7 +15,7 @@ export default {
       "",
       "Commands:",
       `  start      Start ${name}, or open its running workspace (the default command)`,
-      "  open       Print the address of the running server and open it in the browser",
+      "  open       Print the address of the running service and open it in the browser",
       `  doctor     Check that this computer has what ${name} needs (--json for machine output)`,
       "  token      Replace the API token and sign out paired devices (`token rotate`)",
       "  pair       Make a one-time code to pair a phone or another computer",

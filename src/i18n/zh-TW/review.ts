@@ -9,7 +9,7 @@ const lineSpan = ({ first, last }: { first: number; last: number }) =>
 
 const m: Translation<typeof en> = {
   diff: {
-    regionLabel: ({ path }) => `${path} 的程式碼差異`,
+    regionLabel: ({ path }) => `${path} 的程式碼變更`,
     lineLabel: {
       added: ({ line, text }) => `新增，第 ${line} 行：${text}`,
       removed: ({ line, text }) => `刪除，第 ${line} 行：${text}`,
@@ -81,7 +81,7 @@ const m: Translation<typeof en> = {
   },
   panel: {
     label: "程式碼學習助手",
-    title: "讀懂每一次改變",
+    title: "讀懂每一項變更",
     subtitle: "從發生什麼，到為什麼這樣做",
     demoBadge: "示範",
     liveBadge: "AI",
@@ -128,18 +128,18 @@ const m: Translation<typeof en> = {
     retry: "重新整理解說",
     failedNote: "重試後會直接出現在這裡",
     generatingTitle: "正在把變更整理成白話",
-    generatingBody: "對照實際 diff，整理具體情境、設計原因與審閱重點。",
+    generatingBody: "對照實際差異，整理具體情境、設計原因與審閱重點。",
     pendingTitle: "解說會自動準備好",
     pendingBody: "Agents 完成變更後，就會在這裡整理解說。",
   },
   note: {
     label: "我的理解",
-    staleBadge: "diff 已更新",
+    staleBadge: "差異已更新",
     intro:
-      "用自己的話寫下這份變更做了什麼、為什麼；筆記會和寫下時的 diff 版本一起保存。",
+      "用自己的話寫下這份變更做了什麼、為什麼；筆記會和寫下時的差異版本一起保存。",
     placeholder: "例如：這次把固定等待改成指數退避，是為了……",
     stale:
-      "這段筆記寫於較早的 diff 版本，文字已保留；確認後重新儲存即可更新。",
+      "這段筆記寫於較早的差異版本，文字已保留；確認後重新儲存即可更新。",
     demo: "示範模式的筆記不會保存，重新整理後會消失",
     saved: ({ time }) => `已儲存 · ${time}`,
     unsaved: "尚未儲存",
@@ -156,7 +156,7 @@ const m: Translation<typeof en> = {
     rerunBusy: "正在重新審查…",
     rerunNote:
       "依工作目錄目前的差異重新執行 Reviewer 與 Test analyst（唯讀，會使用 CLI 用量）。報告只是建議，不會改變已審閱與核准狀態。",
-    emptyTitle: "這次工作還沒有審查報告",
+    emptyTitle: "這個貢獻還沒有審查報告",
     emptyBody:
       "Lead 整合、Reviewer 與 Test analyst 完成後，報告全文會放在這裡。",
     intro:
@@ -200,7 +200,7 @@ const m: Translation<typeof en> = {
     inputLabel: "向 Agent 提問",
     placeholder: "想更深入了解哪個部分？",
     placeholderBlocked: "此檔案目前無法提供解說",
-    contextAttached: "已附上檔案 diff",
+    contextAttached: "已附上檔案差異",
     contextBlocked: "無法附上檔案上下文",
     send: "送出問題",
     disclaimerDemo: "示範回覆為預寫內容，未呼叫 AI 模型",
@@ -218,7 +218,7 @@ const m: Translation<typeof en> = {
     fill: "填入示範答案",
     saving: "儲存中…",
     fileChanged:
-      "這次沒有存下：在你開啟後，這個檔案、你已存的作答或這次工作有了變動。這裡顯示的是最新版本。",
+      "這次沒有存下：在你開啟後，這個檔案、你已存的作答或這個任務有了變動。這裡顯示的是最新版本。",
     quiz: {
       answerLabel: "你的答案",
       answerPlaceholder: "用自己的話寫一兩句",
@@ -230,15 +230,15 @@ const m: Translation<typeof en> = {
       skipped: "你跳過了這一題，所以沒有要評分的答案。",
       dontKnowAnswer: "你選了「我不知道」。",
       reference: "參考答案",
-      referenceLabel: "AI 撰寫；以 diff 為準",
-      referenceLabelDemo: "AI 撰寫答案的示範；以 diff 為準",
+      referenceLabel: "AI 撰寫；以差異為準",
+      referenceLabelDemo: "AI 撰寫答案的示範；以差異為準",
       gradeLabel: "和參考答案比起來，你答得如何？",
       graded: {
         got: "你的評分：答對。",
         partly: "你的評分：部分對。",
         missed: "你的評分：沒答到。",
       },
-      confidentMiss: "這是最有價值的一種答錯：它會回到你的練習卡組。",
+      confidentMiss: "這是最有價值的一種答錯：它會回到「練習」。",
     },
     road: {
       guessLabel: "先別看：這件事還能怎麼做？",
@@ -285,23 +285,23 @@ const m: Translation<typeof en> = {
   commits: {
     title: "Commit 歷程",
     sources: {
-      initial: "初次送出",
-      review: ({ round }) => `依 review 修正第 ${round} 輪`,
+      initial: "初次發布",
+      review: ({ round }) => `第 ${round} 輪修正`,
       sync: "同步目標分支",
-      adopted: "接續 GitHub 上的提交",
-      other: "其他提交",
+      adopted: "接續 GitHub 上的 commit",
+      other: "其他 commit",
     },
     files: ({ count }) => `${count} 個檔案`,
-    mergeNote: "合併 commit：下面是相對於 PR 前一版的差異，包含目標分支帶進來的改動。",
+    mergeNote: "合併 commit：下面是相對於 PR 前一版的差異，包含目標分支帶進來的變更。",
     show: "查看改了什麼",
     hide: "收起",
-    loadingDetail: "讀取這個 commit 的改動…",
+    loadingDetail: "讀取這個 commit 的變更…",
     omitted: ({ count }) => `另外 ${count} 個檔案超過顯示上限，請到 GitHub 查看完整差異。`,
     unpublished:
       `這個貢獻還沒送出 PR。${product.name} 在送出前把修改保留為未提交的變更，送出時才建立第一個 commit；之後每一輪依 review 修正、同步目標分支，都會在這裡多一個 commit。`,
     unpublishedDemo:
-      "示範資料還沒有送出 PR，所以還沒有 commit。下面是示範 PR 在初次送出、一輪依 review 修正與同步目標分支之後的歷程。",
-    publishedDemo: "示範 PR 的 commit：初次送出、一輪依 review 修正與同步目標分支。沒有送出任何內容到 GitHub。",
+      "示範資料還沒有發布 PR，所以還沒有 commit。下面是示範 PR 在初次發布、一輪修正與同步目標分支之後的歷程。",
+    publishedDemo: "示範 PR 的 commit：初次發布、一輪修正與同步目標分支。沒有送出任何內容到 GitHub。",
     loading: "讀取 commit 歷程…",
     intro: ({ count }) => `PR 分支上的 ${count} 個 commit，依時間順序；標籤說明它在 ${product.name} 裡的來源。`,
   },

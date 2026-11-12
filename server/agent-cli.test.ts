@@ -1099,7 +1099,7 @@ test("Claude Code retries, rate limits and denied tools are notices, never error
   assert.equal(rejected.length, 1);
   assert.equal(rejected[0].kind, "notice");
   const message = rejected[0].kind === "notice" ? rejected[0].message : "";
-  assert.match(message, /^Claude 額度已達上限，等待重置中（5 小時滾動視窗/);
+  assert.match(message, /^Claude 用量已達上限，等待重置中（5 小時滾動視窗/);
   assert.match(message, /已用 100%/);
   // The reset time is formatted for the locale, never with a hard-coded tag.
   assert.ok(
@@ -1113,7 +1113,7 @@ test("Claude Code retries, rate limits and denied tools are notices, never error
       type: "rate_limit_event",
       rate_limit_info: { status: "allowed_warning", rateLimitType: "unknown_window" },
     }),
-    [{ kind: "notice", message: "Claude 額度接近上限（unknown_window）。" }],
+    [{ kind: "notice", message: "Claude 用量接近上限（unknown_window）。" }],
   );
   assert.deepEqual(read({ type: "rate_limit_event" }), []);
   assert.deepEqual(

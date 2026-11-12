@@ -388,7 +388,7 @@ const mission = {
     model: {
       heading: "Model and reasoning effort",
       note: "Defaults apply to new tasks across projects. Existing tasks keep their settings.",
-      agent: "Agent",
+      agent: "AI provider",
       providerHelp: {
         codex: "Uses the Codex CLI you installed and signed in to.",
         claude:
@@ -451,7 +451,7 @@ const mission = {
       summary: ({ count }: { count: number }) => `${count} teammates`,
       legend: "Team size",
       teammates: "teammates",
-      note: "Sets the most teammates the team may use; the run's plan decides the actual split.",
+      note: "The most teammates the team may use; the task's plan decides the actual split.",
     },
     planApproval: {
       label: "Let me approve the plan before development",
@@ -593,7 +593,7 @@ const mission = {
       `Labelled for newcomers: ${fmt.list(labels)}`,
     pacing: ({ open, budget }: { open: number; budget: number }) =>
       `Your open PRs here: ${n(open)} of ${n(budget)}`,
-    pacingHelp: `The budget is a ${product.name} default: 1 open pull request before your first one is merged in a repository, 2 after.`,
+    pacingHelp: `The limit is a ${product.name} default: 1 open pull request before your first one is merged in a repository, 2 after.`,
     pacingExempt: "You can write to this repository, so publishing isn't paced here",
     doorClosed: "This repository doesn't take pull requests from you",
     ban: "The project's rules don't accept AI-assisted contributions",
@@ -622,7 +622,7 @@ const mission = {
     otherPr: ({ author, number }: { author: string; number: number }) =>
       `${product.name} won't publish this while @${author}'s pull request #${number} would close the same issue, unless you give your reason when you publish.`,
     pacing: ({ open, budget }: { open: number; budget: number }) =>
-      `${product.name} won't publish this while you have ${n(open)} open pull requests here, at least twice your budget of ${n(budget)}.`,
+      `${product.name} won't publish this while you have ${n(open)} open pull requests here, at least twice your limit of ${n(budget)}.`,
     lesson:
       "Issues labelled for newcomers are how people learn a project by writing the fix themselves. When an agent team takes one, the next newcomer loses that chance. Consider a help-wanted issue instead.",
     practiseLocally: "Start and practise locally",

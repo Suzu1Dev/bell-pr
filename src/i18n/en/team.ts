@@ -187,7 +187,7 @@ const team = {
    * run's overview: one list, each command once, with who reported it.
    */
   setupNeeds: {
-    title: "Setup this machine needs from you",
+    title: "Setup this computer needs from you",
     intro:
       "The checks below could not finish with the permissions and environment available to the agent. In full-access mode, the agent can attempt required installation first; a password prompt or other unresolved requirement still needs you. Each command is an agent's suggestion: check it against the project's documentation before you run it. Once it is installed, you can rerun these checks in the working directory yourself, and later contributions can run them directly.",
     reportedBy: ({ names }: { names: string }) => `Reported by ${names}`,
@@ -214,7 +214,7 @@ const team = {
       unreported: "no result",
     },
     dialog: {
-      title: "Let the agent set up this machine?",
+      title: "Let the agent set up this computer?",
       intro:
         "Earlier agents suggested these commands while reading the project, so check them. The agent runs only the ones you tick and only when they match the project's documentation. It may add non-interactive flags such as -y, run sudo as sudo -n and refresh the package index, but never swaps in another command. It then verifies each item, reruns the checks they blocked and reports each one.",
       choose: "Commands to hand over",

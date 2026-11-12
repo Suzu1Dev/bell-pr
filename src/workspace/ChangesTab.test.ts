@@ -167,7 +167,7 @@ test("the diff view buttons form a labelled group with the pressed one marked", 
   assert.match(html, /<div class="view-toggle" role="group" aria-label="Diff view mode">/);
   assert.match(tag(html, /aria-label="Unified view"/), /aria-pressed="false"/);
   assert.match(tag(html, /aria-label="Split view"/), /aria-pressed="true"/);
-  assert.match(renderZh(element()), /只看尚未審查/);
+  assert.match(renderZh(element()), /只看未審閱/);
 });
 
 test("the diff toolbar is one labelled tab stop", () => {
@@ -186,7 +186,7 @@ test("the diff toolbar is one labelled tab stop", () => {
   assert.match(html, /<div class="diff-toolbar-actions" role="toolbar" aria-label="Diff tools">/);
   assert.deepEqual(stops, ["0", "-1", "-1", "-1", "-1", "-1", "-1", "-1"]);
   assertNoHan(html);
-  assert.match(renderZh(element()), /role="toolbar" aria-label="Diff 工具"/);
+  assert.match(renderZh(element()), /role="toolbar" aria-label="差異工具"/);
 });
 
 test("the premise check sits in the diff's top bar and no row is left above the code", () => {
@@ -259,10 +259,10 @@ test("the Changes header offers the check before every file is ticked", () => {
   const html = renderEn(element({ understanding: understanding() }));
   // Under the file list's heading, before the files: it adds no stop between
   // the file list and the explanation.
-  assert.match(html, /<\/div><button type="button" class="check-link">.*Take the check now<\/button><label class="file-search">/);
+  assert.match(html, /<\/div><button type="button" class="check-link">.*Explain it back now<\/button><label class="file-search">/);
   assert.match(
     renderEn(element({ understanding: understanding({ passed: true }) })),
-    /class="check-link">.*Open your check<\/button>/,
+    /class="check-link">.*Open your answers<\/button>/,
   );
   // Only a run waiting for review or approval takes the check.
   assert.doesNotMatch(
@@ -334,9 +334,9 @@ test("while the person writes a learn-by-hand change, the guide takes the explan
   // An agent run keeps its explanation panel and its empty state.
   assert.match(renderEn(element({ files: [], file: undefined })), /No code changes yet/);
   // Explain it back opens after Ready (DESIGN v1.2 F10), not while the person writes.
-  assert.doesNotMatch(renderEn(element({ run: byHandRun, byHand: writing, understanding: understanding() })), /Take the check now/);
+  assert.doesNotMatch(renderEn(element({ run: byHandRun, byHand: writing, understanding: understanding() })), /Explain it back now/);
   const ready = { writing: false, openReady() {}, ask() {}, guide: {} } as unknown as Props["byHand"];
-  assert.match(renderEn(element({ run: byHandRun, byHand: ready, understanding: understanding() })), /Take the check now/);
+  assert.match(renderEn(element({ run: byHandRun, byHand: ready, understanding: understanding() })), /Explain it back now/);
 });
 
 test("before a learn-by-hand run's first change, Code changes says the guide reads and the person plans, never the agent team", () => {
@@ -345,12 +345,12 @@ test("before a learn-by-hand run's first change, Code changes says the guide rea
   const reading = empty("running", true, true);
   assertNoHan(reading);
   assert.match(reading, /<h3>The guide is reading the code<\/h3>/);
-  assert.doesNotMatch(reading, /agent team|once it finishes/);
+  assert.doesNotMatch(reading, /Agent team|once it finishes/);
   const planning = empty("awaiting_plan", false, true);
   assert.match(planning, /Write your own plan in “Activity” first; then you write the change\./);
   assert.doesNotMatch(planning, /once it finishes/);
   assert.match(empty("running", true, true, renderZh), /嚮導正在閱讀程式碼/);
   // An agent run's team prepares the changes, as before.
-  assert.match(empty("running", true), /The agent team is preparing your changes/);
+  assert.match(empty("running", true), /The Agent team is preparing your changes/);
   assert.match(empty("awaiting_plan", false), /once it finishes, you can review it here/);
 });

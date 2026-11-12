@@ -70,7 +70,7 @@ test("a run fitted to rules that don't name planning help offers no question on 
   assert.match(card({ helpLock: lock(["explain", "answer", "plan"]) }), /Ask how to split it/);
   assert.match(card({}), /Ask how to split it/);
   // Whoever answers (the agent or the guide), the card names no agent.
-  assert.doesNotMatch(card({}), /ask the agent/);
+  assert.doesNotMatch(card({}), /ask the agent/i);
 });
 
 test("an open contribution of two files or more offers to split; the sample, learn-by-hand, published and removed runs do not", () => {

@@ -32,7 +32,7 @@ export default {
     lead: "Analysing the project and breaking down the request",
     reviewer: "Reviewing correctness and maintainability independently",
     tester: "Checking the test evidence and regression risk",
-    member: "Waiting to claim a shared task; works in its own directory",
+    member: "Waiting to claim a shared task; works in its own working directory",
     memberRetry: "Waiting to claim the task again in a new working directory",
     running: ({ cli }: { cli: string }) => `Running ${cli}…`,
     waitingForSlot: ({ queued }: { queued: number }) =>
@@ -127,7 +127,7 @@ export default {
     noReport: ({ cli }: { cli: string }) => `${cli} returned no report.`,
     noTeam: "This run has no agent team.",
     messageTargetClosed:
-      "This member or task has finished and cannot take messages; send it to the lead.",
+      "This teammate or task has finished and cannot take messages; send it to the lead.",
     messageLength: "Team messages must be 1 to 4000 characters.",
     messageLimit: "This run has reached its limit of 200 team messages.",
     messageQueued: ({ to }: { to: string }) =>
@@ -143,12 +143,12 @@ export default {
         ? `${title} is done; integrated ${count(files.length, "file", "files")} that passed the scope check: ${list(files)}.`
         : `${title} is done; it changed no files to integrate.`,
     checkoutRemoved: ({ owner }: { owner: string }) =>
-      `The integrated changes are now in this run's worktree, so ${owner}'s separate checkout was removed.`,
+      `${owner}'s changes are now in the run's working directory, so ${owner}'s own working directory was removed.`,
     checkoutNotRemoved: ({ task, reason }: { task: string; reason: string }) =>
-      `Could not remove the isolated working directory of ${task}; you can delete it by hand: ${reason}`,
+      `Could not remove ${task}'s own working directory; you can delete it by hand: ${reason}`,
     taskFailed: "The task failed.",
     stuck:
-      "Task dependencies or file assignments stop the team from continuing; check the shared task list.",
+      "Task dependencies or file assignments stop the team from continuing; check the task board.",
     creatingWorktree: "Creating a separate Git worktree.",
     legacyRun:
       "Older runs cannot be assigned to a team again; start a new agent team run.",
@@ -323,7 +323,7 @@ export default {
     },
     /** Shown in place of a held-back file's patch. */
     heldBack: ({ reason }: { reason: string }) =>
-      `Publishing this file is on hold: ${reason}`,
+      `This file is blocked from publishing: ${reason}`,
   },
   /** The unchanged code around a modified file's changes, read from the run's base. */
   context: {
@@ -362,7 +362,7 @@ export default {
   /** Function walkthroughs: the code around each change, step by step. */
   walkthrough: {
     wholeFile:
-      "An added or deleted file has no earlier logic to walk through; see the explanation.",
+      "An added or deleted file has no earlier logic to walk through; see the Explanation tab.",
     noFunctions: "This kind of file has no functions to walk through.",
     tooLarge:
       "The changes are larger than 100 KB, so no code walkthrough is made automatically.",
@@ -381,11 +381,11 @@ export default {
   integration: {
     snapshotBlocked:
       "The integration snapshot contains files that cannot be reviewed, so no more tasks are assigned.",
-    noWorktree: "The task has no isolated working directory.",
+    noWorktree: "The task has no working directory of its own.",
     gitStateChanged:
       "A teammate changed the Git commit state, so integration stopped.",
     outOfScope: ({ path }: { path: string }) =>
-      `A teammate changed ${path}, which its task does not own; the change stays in its isolated working directory and was not integrated.`,
+      `A teammate changed ${path}, which its task does not own; the change stays in the task's own working directory and was not integrated.`,
     needsManualHandling: ({ path }: { path: string }) =>
       `A teammate's ${path} needs manual handling and was not integrated.`,
   },
@@ -464,9 +464,9 @@ export default {
   /** Explanations, notes, questions, maintainer feedback and review reruns on a finished run. */
   review: {
     rerunNotAllowed:
-      "Only runs that are in review or approved can have their review run again.",
+      "Only runs that are in review or approved can have the independent review run again.",
     rerunRunning:
-      "The review of this run is already running again; wait for it to finish or stop it first.",
+      "The independent review of this run is already running again; wait for it to finish or stop it first.",
     nothingToReview: "There are no code changes to review.",
     rerunRequested: ({ files }: { files: number }) =>
       `Requested a new independent review of the ${count(files, "changed file", "changed files")} in the current working directory.`,
@@ -487,9 +487,9 @@ export default {
     chatTooEarly: "Wait for development to finish before asking questions.",
     chatUnavailable: "This file cannot be discussed right now.",
     feedbackUnpublished:
-      "The PR has not been sent yet, so there is no maintainer feedback to read.",
+      "The PR has not been published yet, so there is no maintainer feedback to read.",
     feedbackMismatch:
-      "The PR URL does not match this repository, so its feedback cannot be read.",
+      "The PR URL does not match this project, so its feedback cannot be read.",
     githubInvalidJson: "GitHub's response is not valid JSON.",
     feedbackRead: ({ number, items }: { number: number; items: number }) =>
       `Read the maintainer feedback on PR #${number}: ${count(items, "item", "items")}.`,
@@ -543,7 +543,7 @@ export default {
       conflicts.length
         ? `Synced onto the latest ${branch} (${commit}); ${count(conflicts.length, "file has", "files have")} conflicts to resolve: ${list(conflicts)}.`
         : `Synced onto the latest ${branch} (${commit}) without conflicts; the changed files need another review.`,
-    prOnly: "Only a sent PR can take in its target branch.",
+    prOnly: "Only a published PR can take in its target branch.",
     roundOpen:
       "A follow-up round is in progress on this PR; finish or discard it before you sync.",
     prCheckoutDiffers:
@@ -609,7 +609,7 @@ export default {
   /** Follow-up rounds on a published PR, and its branch on GitHub. */
   followUp: {
     inProgress: "A follow-up round is already in progress on this run.",
-    busy: "A follow-up round or a review is already in progress on this run.",
+    busy: "A follow-up round or an independent review is already in progress on this run.",
     notPublished:
       "Only a run whose PR has been published can start a follow-up round.",
     feedbackNotInLatest:
@@ -687,11 +687,11 @@ export default {
     round:
       "The service restarted, so this follow-up round stopped; you can review the edits kept in the working directory, write a commit message and push, or discard the round.",
     run: "The service restarted, so the run stopped. Its working directory is kept and you can read the diff; for a team run, retry the failed subtasks on the task board, and integrated subtasks do not run again.",
-    task: "The service restarted, so the task stopped; its isolated working directory is kept, and a retry starts again from a fresh snapshot.",
+    task: "The service restarted, so the task stopped; its own working directory is kept, and a retry starts again from a fresh snapshot.",
   },
   /** The projects BELL works on and its own clones of them. */
   repos: {
-    notFound: "Repository not found.",
+    notFound: "Project not found.",
     importSource:
       "Enter a GitHub HTTPS URL or the absolute path of a local repository.",
     bare: "Choose a repository that has a working directory.",
@@ -722,7 +722,7 @@ export default {
     duplicatePath: ({ path }: { path: string }) =>
       `"${path}" is in more than one contribution; a file goes to only one.`,
     heldBack: ({ path }: { path: string }) =>
-      `"${path}" is held back from review, so it cannot be moved; leave it out.`,
+      `"${path}" is blocked from review, so it cannot be moved; leave it out.`,
     notReproduced:
       "The copied files did not match the originals, so nothing was split. A Git setting that rewrites files, such as line-ending conversion, can cause this.",
     startedFrom: ({ title }: { title: string }) => `Split from "${title}".`,
@@ -826,10 +826,10 @@ export default {
     roundMessageRequired:
       "Write this follow-up round's commit message and leave no placeholders in it.",
     approvalStale:
-      "The approved version changed or expired; reload, review and approve again before you send the PR.",
+      "The approved version changed or expired; reload, review and approve again before you publish the PR.",
     approveFirst: "Finish the review and approve the PR first.",
     noGithubOrigin:
-      "This repository has no GitHub origin, so it cannot be published.",
+      "This project has no GitHub source, so it cannot be published.",
     diffChanged:
       "The changes differ from what you approved; review and approve them again.",
     notAllReviewed:
@@ -837,19 +837,19 @@ export default {
     understandingRequired:
       "Explain the change back before you approve or publish: finish the understanding check for the latest version of the changes. You can turn the check off in Settings → Learning; runs approved without it are marked.",
     prAlreadySent:
-      "This PR was already sent; to push new changes, start a follow-up round from the maintainer feedback.",
+      "This PR was already published; to push new changes, start a follow-up round from the maintainer feedback.",
     branchIsTargetReapprove: ({ branch }: { branch: string }) =>
       `The GitHub branch cannot be the target branch ${branch}; change the branch name and approve again.`,
     branchLockedPublish: ({ branch }: { branch: string }) =>
       `An earlier publish already pushed to the GitHub branch ${branch}; restore the branch name or start a new run.`,
     /** `items` are the preflight messages, each a whole sentence. */
     confirmFirst: ({ items }: { items: string[] }) =>
-      `Before sending, confirm each item in the preview: ${items.join(" ")}`,
+      `Before publishing, confirm each item in the preview: ${items.join(" ")}`,
     githubUserInvalid: "The GitHub user information is not valid.",
     defaultBranchChanged:
       "The remote default branch changed; start a new run from the latest branch.",
     targetMoved:
-      "The target branch has new commits; first press “Sync to the latest target branch” on the PR draft tab, review, then send.",
+      "The target branch has new commits; first press “Sync to the latest target branch” on the PR draft tab, review, then publish.",
     targetMovedAfterCommit:
       "The target branch has new commits. An earlier publish already made a commit that may be on GitHub, so this run can no longer be synced or have a sync undone; start a new run from the latest version.",
     branchChanged: "The run's branch changed, so publishing stopped.",

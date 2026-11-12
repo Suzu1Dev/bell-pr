@@ -113,9 +113,9 @@ test("the sample badge sits in the bar's row between the page name and the actio
 });
 
 test("the avatar shows the GitHub user's initials, and an icon otherwise or while presenting", () => {
-  assert.match(renderEn(element({ githubUser: "octo-cat" })), /aria-label="Profile settings">OC<\/button>/);
-  assert.match(renderEn(element()), /aria-label="Profile settings"><svg/);
-  assert.match(renderEn(element({ githubUser: "octo-cat", presenting: true })), /aria-label="Profile settings"><svg/);
+  assert.match(renderEn(element({ githubUser: "octo-cat" })), /aria-label="Settings">OC<\/button>/);
+  assert.match(renderEn(element()), /aria-label="Settings"><svg/);
+  assert.match(renderEn(element({ githubUser: "octo-cat", presenting: true })), /aria-label="Settings"><svg/);
 });
 
 test("a notice's close button reads in the UI language", () => {

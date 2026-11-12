@@ -101,7 +101,7 @@ test("the new-task dialog asks for the repository, the goal and the team setting
   assert.match(html, /儲存為預設設定/);
   assert.match(html, /任務名稱 <span>選填<\/span>/);
   assert.match(html, /這次想完成什麼？/);
-  assert.match(html, /3 位協作成員/);
+  assert.match(html, /3 位隊友/);
   assert.match(html, /任務會使用本機已登入的 Codex CLI 執行/);
   assert.doesNotMatch(html, /示範設定可以自由調整/);
 });

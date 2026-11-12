@@ -224,7 +224,7 @@ test("重新審查途中當機時，已完成工作的審查者會被標記失�
   assert.equal(loaded.error, undefined);
   assert.equal(loaded.agents[0].status, "complete");
   assert.equal(loaded.agents[1].status, "failed");
-  assert.match(loaded.agents[1].detail, /重新審查已中斷/);
+  assert.match(loaded.agents[1].detail, /重新審查已停止/);
   assert.equal(loaded.agents[2].status, "waiting");
 });
 
@@ -251,14 +251,14 @@ test("restart recovery explains each interrupted run in the run's own locale", a
   const [zh, older] = first.data.runs;
   assert.equal(
     zh.error,
-    "服務重新啟動，先前工作已中斷。工作目錄仍保留，可檢視差異；團隊工作可在任務板重試失敗的子任務，已整合的子任務不會重跑。",
+    "服務重新啟動，任務已停止。工作目錄仍保留，可檢視差異；團隊任務可在任務板重試失敗的子任務，已整合的子任務不會重跑。",
   );
   assert.equal(
     zh.team?.tasks[0].error,
-    "服務重新啟動，任務已中斷；隔離工作目錄保留，重試時會以新快照重新開始。",
+    "服務重新啟動，子任務已停止；獨立工作目錄保留，重試時會以新快照重新開始。",
   );
-  assert.match(zh.draftPreparation?.error ?? "", /^服務重新啟動，PR 草稿建議已中斷/);
-  assert.match(zh.explanations?.["hello.ts"].error ?? "", /^服務重新啟動，解說產生已中斷/);
+  assert.match(zh.draftPreparation?.error ?? "", /^服務重新啟動，PR 草稿建議已停止/);
+  assert.match(zh.explanations?.["hello.ts"].error ?? "", /^服務重新啟動，變更解說產生已停止/);
   // A run saved before runs had a locale follows the server default.
   assert.match(older.error ?? "", /^The service restarted, so the run stopped\./);
   assert.equal(older.locale, undefined);
@@ -282,7 +282,7 @@ test("restart recovery explains each interrupted run in the run's own locale", a
   );
   assert.equal(
     en.team?.tasks[0].error,
-    "The service restarted, so the task stopped; its isolated working directory is kept, and a retry starts again from a fresh snapshot.",
+    "The service restarted, so the task stopped; its own working directory is kept, and a retry starts again from a fresh snapshot.",
   );
   assert.equal(
     en.draftPreparation?.error,
@@ -354,7 +354,7 @@ test("an interrupted conflict resolution or follow-up round is explained in the 
   assert.equal(round.followUps?.[0].status, "review");
   assert.equal(
     round.followUps?.[0].error,
-    "服務重新啟動，這輪修正已中斷；工作目錄保留的修改可以審閱、寫好提交訊息後推送，或放棄這輪修正。",
+    "服務重新啟動，這一輪已停止；工作目錄保留的修改可以審閱、寫好提交訊息後推送，或放棄這一輪。",
   );
 });
 

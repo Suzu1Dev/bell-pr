@@ -110,7 +110,7 @@ test("an unpublished run that cannot sync says why", () => {
   for (const status of ["running", "failed", "cancelled"] as const) {
     const html = render({ ...base, status });
     assert.equal(button(html, "同步到最新目標分支"), "disabled", status);
-    assert.match(html, /只有審閱中、已核准或等待計畫核准的工作可以同步/, status);
+    assert.match(html, /只有審閱中、已核准或等待計畫核准的任務可以同步/, status);
   }
   assert.doesNotMatch(render(base), /只有審閱中/);
 });
