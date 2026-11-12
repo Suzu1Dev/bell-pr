@@ -121,10 +121,13 @@ const team = {
   /** The running lane while the plan waits for approval. */
   laneEmptyAwaiting: "Subtasks start once you approve the plan.",
   task: {
+    details: "Assignment and files",
     worktree: "Isolated worktree",
     worktreeRemoved: "Isolated worktree cleaned up",
     filesPending: "Being planned",
-    dependsOn: ({ tasks }: { tasks: string }) => `Waits for ${tasks}`,
+    dependsOn: "Depends on",
+    dependencyUnknown: "Unknown",
+    readyAfterRetry: "Ready after retry",
     integrated: ({ files }: { files: string }) => `Integrated: ${files}`,
     /** The toggle of a long task description, folded to its first lines. */
     showAll: "Show the whole description",

@@ -68,7 +68,7 @@ test("unfinished publish recovery waits for saved edits, reports refusal, and re
     await expect(recover).toBeDisabled();
     await expect(page.getByText(workspace.draft.recoveryNeedsSave, { exact: true })).toBeVisible();
     expect(recoveryCalls).toBe(0);
-    await page.getByRole("button", { name: workspace.draft.save, exact: true }).click();
+    await page.locator(".draft-save-row").getByRole("button", { name: workspace.draft.save, exact: true }).click();
     await expect(recover).toBeEnabled();
 
     await recover.click();

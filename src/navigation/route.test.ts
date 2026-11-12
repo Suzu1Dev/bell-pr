@@ -25,6 +25,7 @@ const canonical: [string, Route][] = [
   ["#/repos/demo-repo", { name: "repo", repoId: "demo-repo" }],
   ["#/discover", { name: "discover" }],
   ["#/team", { name: "team" }],
+  ["#/group", { name: "group" }],
   ["#/learning", { name: "learning" }],
   ["#/settings", { name: "settings" }],
   ["#/settings/environment", { name: "settings", section: "environment" }],
@@ -170,6 +171,7 @@ test("titles name the page, then what it shows, then the product", () => {
     [{ name: "repos" }, "Repositories"],
     [{ name: "discover" }, "Explore contributions"],
     [{ name: "team" }, "Agent team"],
+    [{ name: "group" }, "Group"],
     [{ name: "learning" }, "Learning notes"],
     [{ name: "settings", section: "general" }, "Settings"],
   ];

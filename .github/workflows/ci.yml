@@ -20,7 +20,9 @@ jobs:
   build-and-test:
     name: Build and test (${{ matrix.os }}, Node.js 24.22.1)
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 20
+    # The macOS runner takes about twice as long as Ubuntu for the same tests
+    # and has run past 20 minutes; Ubuntu keeps the 20-minute limit.
+    timeout-minutes: ${{ matrix.os == 'macos-latest' && 30 || 20 }}
     strategy:
       fail-fast: false
       matrix:

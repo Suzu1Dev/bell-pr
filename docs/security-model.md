@@ -68,6 +68,35 @@ what BELL PR trusts, what it does not, and the limits of each protection.
 - **Same-user programs.** Any program running as your OS user can read the
   token file and call the API. Agents you allowed to run without the
   sandbox are fully trusted.
+- **Group work: a second credential, not a boundary.** Only a BELL PR
+  started with `--group` has it ([Group work](group-work.md)). A group
+  request carries the install token or a paired device credential as every
+  request does, and says who is asking within the group with a participant
+  token (`bpc_…`) in the `x-bell-participant` header.
+  - The token is returned when the person joins, and again when they
+    redeem a code they made for themself to use another device. On disk
+    BELL PR stores only its SHA-256 (`coordination.json`, mode 0600); it
+    holds the token in memory only while such a code waits, at most 10
+    minutes. It never puts the token in a URL and masks it in logs. An
+    invite code is kept as its SHA-256 in memory, works once and lasts 10
+    minutes.
+  - Where a request needs a participant, a missing, unknown or removed
+    participant token is answered 403 and never signs a device out
+    (`GET /api/collab` answers 200 without `me`). Removing a person
+    unpairs their device only when the admin asks for that.
+  - Roles are not a security boundary. Everyone in the group uses a paired
+    device or sits at the host, and a paired device can use everything in
+    that BELL PR: start agents, read every project, publish. Admin and
+    member only decide who may invite and remove people, add repositories
+    to the group and revoke someone else's hold. A removed person whose
+    device is still paired keeps all of that.
+  - A hold is a record, not a lock. BELL PR refuses a second hold that
+    meets one already held, publishes no change over someone else's hold
+    and holds its own agents to them: held paths are read-only in the
+    sandbox, and each turn that may change files is checked when it ends
+    ([What a hold does not do](group-work.md#what-a-hold-does-not-do)). It
+    does not stop an editor, a tool or a push outside BELL PR from writing
+    to a held path, and nothing is locked in a checkout or on GitHub.
 - **Browser hardening.** Every response carries
   `Content-Security-Policy: default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'`,
   `Cross-Origin-Resource-Policy: same-origin`, `X-Frame-Options: DENY`,
@@ -353,6 +382,12 @@ Full access changes writable roles as described [below](#explicit-full-access).
   full access is on. Reads of other files your user can read are still
   allowed. The profile does not name the system keyring (Secret Service,
   D-Bus, or Keychain).
+- **Web access** (off until you turn it on) sets Codex's web search to
+  `live`; otherwise every turn sets it to `disabled`, because Codex
+  searches a cached index by default. ChatGPT apps (connectors) are off on
+  every turn (`features.apps=false`), full access included: with a ChatGPT
+  sign-in they add a web search tool that stays available with web search
+  disabled (seen with Codex CLI 0.167).
 
 ### Antigravity
 

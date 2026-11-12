@@ -13,10 +13,11 @@ const m: Translation<typeof en> = {
   pages: {
     home: "首頁",
     workspace: "貢獻工作台",
-    repos: "Repositories",
+    repos: "專案",
     explore: "專案全貌",
     discovery: "探索貢獻",
-    team: "Agent team",
+    team: "AI 團隊分工",
+    group: "小組",
     learning: "學習筆記",
     settings: "連線與設定",
   },
@@ -101,6 +102,15 @@ const m: Translation<typeof en> = {
     openHint: "開啟",
     switchProjectHint: "切換專案",
     closeHint: "關閉",
+  },
+  suite: {
+    open: "切換 BELL 產品",
+    title: "BELL 產品",
+    personal: { name: "BELL Personal", summary: "今日與收件匣" },
+    explain: { name: "BELL Explain", summary: "理解與複習" },
+    prSummary: "貢獻與審查",
+    current: "目前",
+    notLinked: "尚未連結",
   },
 };
 

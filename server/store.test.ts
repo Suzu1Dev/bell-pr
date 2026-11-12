@@ -24,6 +24,7 @@ import { z } from "zod";
 import { lenientRead } from "./persisted-schema.js";
 import { persistedDatabaseSchema, repositoryReadSchema, runReadSchema } from "./store.js";
 import { withStoredReach } from "../shared/project-policy.js";
+import type { TeamTask } from "../shared/team.js";
 
 async function dataDirectory() {
   const directory = await mkdtemp(path.join(os.tmpdir(), "bell-store-test-"));
@@ -164,6 +165,47 @@ test("既有 version 1 的 state.json 可載入，中斷的工作仍會被標記
   assert.equal(run.explanations?.["hello.ts"].status, "failed");
   assert.deepEqual(run.contributionSettings, defaultContributionSettings);
   assert.equal(run.logs[0].message, "開始分析");
+});
+
+test("restart recovery blocks the tasks downstream of an interrupted task, whatever their order", async (t) => {
+  const run = interruptedRun();
+  const [interrupted] = run.team!.tasks;
+  const task = (
+    id: string,
+    dependsOn: string[],
+    status: TeamTask["status"],
+  ): TeamTask => ({ ...interrupted, id, title: id, owner: `member-${id}`, files: [`${id}.ts`], dependsOn, status });
+  // Dependents come first, so one pass in plan order would miss task-3.
+  run.team!.tasks = [
+    task("task-3", ["task-2"], "pending"),
+    task("task-2", ["task-1"], "pending"),
+    interrupted,
+    task("task-0", [], "complete"),
+    task("task-4", ["task-0"], "pending"),
+    // A dependency on a task no longer listed must not stop the service starting.
+    task("task-5", ["removed"], "pending"),
+  ];
+  const { directory, cleanup } = await stateWith([run]);
+  t.after(cleanup);
+  const store = new Store(directory);
+  await store.initialize();
+  const [loaded] = store.data.runs;
+  assert.equal(loaded.status, "failed");
+  assert.equal(loaded.team?.phase, "failed");
+  const tasks = loaded.team!.tasks;
+  assert.deepEqual(
+    Object.fromEntries(tasks.map((entry) => [entry.id, entry.status])),
+    {
+      "task-3": "blocked",
+      "task-2": "blocked",
+      "task-1": "failed",
+      "task-0": "complete",
+      "task-4": "ready",
+      "task-5": "pending",
+    },
+  );
+  assert.match(tasks[2].error ?? "", /服務重新啟動/);
+  assert.ok(tasks.every((entry) => entry.startedAt === undefined));
 });
 
 test("重新審查途中當機時，已完成工作的審查者會被標記失敗而工作狀態不變", async (t) => {
@@ -987,6 +1029,24 @@ test("a v1.1 field this build cannot read is left out instead of quarantining th
     32,
   );
   assert.equal(store.data.runs[0].understandingCheckOff, true);
+});
+
+test("a run's owners load and save as written, and owners this build cannot read are left out", async (t) => {
+  const owned = { ...runWithV11Fields(), id: "run-owned", owners: ["person-a", "person-b"] };
+  const damaged = { ...runWithV11Fields(), id: "run-damaged", owners: "person-a" } as unknown as Run;
+  const { directory, cleanup } = await stateWith([owned, damaged]);
+  t.after(cleanup);
+  const store = new Store(directory);
+  await store.initialize();
+  assert.equal(store.recovery, undefined);
+  const owners = [
+    ["run-owned", ["person-a", "person-b"]],
+    ["run-damaged", undefined],
+  ];
+  assert.deepEqual(store.data.runs.map((run) => [run.id, run.owners]), owners);
+  await store.save();
+  const saved = JSON.parse(await readFile(path.join(directory, "state.json"), "utf8")) as Database;
+  assert.deepEqual(saved.runs.map((run) => [run.id, run.owners]), owners);
 });
 
 // Fields ported from upstream 1fb6329 (PRs #15-#28), under the same rules:
