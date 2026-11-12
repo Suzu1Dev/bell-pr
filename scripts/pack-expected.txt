@@ -69,7 +69,7 @@ dist/assets/respect-bQVAA_BB.js
 dist/assets/reviewability-BML-nniR.js
 dist/assets/rolldown-runtime-XKyaHtl9.js
 dist/assets/route-CI21VSyj.js
-dist/assets/style-BBCCALrS.css
+dist/assets/style-WWpiAlPL.css
 dist/assets/understanding-t91ZAsi9.js
 dist/assets/understandingDemo-BryIdRLa.js
 dist/assets/version-Bex31jD3.js
