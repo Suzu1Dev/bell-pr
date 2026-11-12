@@ -50,8 +50,13 @@
  *   - an ErrorCode of shared/errors.ts has no heading in
  *     docs/troubleshooting.md;
  *   - a document pins the package to another version than package.json's
- *     (`npm:bell-pr@1.0.0` in the mise command while the release is
- *     1.0.1), code included: the packed READMEs keep the pin;
+ *     (`npm:bell-pr@1.0.0` while the release is 1.0.1), code included:
+ *     the packed READMEs keep a hand-written pin. A pin inside a generated
+ *     region is skipped; the mise install command is rendered from
+ *     publishedInstallVersion and can lead package.json.
+ *     render-generated-regions --check fails when that version is not a
+ *     stable MAJOR.MINOR.PATCH, or is a lower semver than the stable
+ *     version in package.json or the Homebrew formula;
  *   - README.md or README.zh-TW.md, rewritten as --pre would, still has a
  *     relative path, or, rewritten with the current or a stand-in
  *     `homepageUrl`, links to a path that site/ does not serve.
@@ -702,9 +707,14 @@ export function checkDocs(root, env = process.env) {
         }
       }
     }
-    // A pin is written by hand (the mise command), and the packed READMEs
-    // keep it: it must name the version being released, not the last one.
-    for (const pin of versionPins(text, manifest.name))
+    // A hand-written pin must name the version being released; the packed
+    // READMEs keep it. Generated regions are rendered, so their pins are not
+    // checked here (the mise command uses publishedInstallVersion).
+    const handwritten = text.replace(
+      /<!--\s*generated:\S[^]*?<!--\s*\/generated:\S[^]*?-->/g,
+      (region) => region.replace(/[^\n]/g, " "),
+    );
+    for (const pin of versionPins(handwritten, manifest.name))
       if (pin.version !== manifest.version)
         problems.push(
           `${name}:${pin.line}: pins ${manifest.name}@${pin.version}, but package.json is version ${manifest.version}.`,
@@ -1065,7 +1075,11 @@ function selfTest() {
       "README.zh-TW.md",
       "# 範例\n\n[English](README.md) [Ignored](ignored.md)\n\n```sh\nmise use -g npm:bell-pr@1.2.2\n```\n",
     );
-    write("docs/installation.md", "# Install\n\n```sh\nmise use -g npm:bell-pr@1.2.3\nnpx bell-pr@latest\n```\n");
+    write(
+      "docs/installation.md",
+      "# Install\n\n```sh\nmise use -g npm:bell-pr@1.2.3\nnpx bell-pr@latest\n```\n\n" +
+        "<!-- generated:install-commands method=mise -->\n```sh\nnpm:bell-pr@9.9.9\n```\n<!-- /generated:install-commands -->\n",
+    );
     write(
       "docs/start.md",
       "# Start\n\n## Install\n\n[Back](../README.md#fixture) [Up](../../x.md)\n[Bad escape](#100%) [Bad file](../README.md#%zz)\n",
