@@ -13,6 +13,7 @@ import path from "node:path";
 import { assertGitConfigSafe, git, redact } from "./process.js";
 import { AppError, withRunLocale, type Run } from "./types.js";
 import { activeFollowUp, type FollowUpRound } from "../shared/followups.js";
+import type { HeldUpstreamChange } from "../shared/sync.js";
 import {
   checkoutTreeOnto,
   conflictJsonSchema,
@@ -31,6 +32,9 @@ import {
   restoreAgentHead,
   worktreeDirty,
 } from "./pr-branch.js";
+import { assertRunAgentAllowed } from "./codex-guard.js";
+import { changedPaths, heldPathsOf, type HoldsAsker } from "./hold-guard.js";
+import { comparablePath, pathsMeet } from "./scope-paths.js";
 import { runAgent } from "./run-executor.js";
 import { contributionContext } from "./prompts/team.js";
 import { conflictPrompt } from "./prompts/sync.js";
@@ -76,6 +80,14 @@ export function runBusy(
   );
 }
 
+function heldUpstreamLog(branch: string, heldChanges: readonly HeldUpstreamChange[]) {
+  const m = sm().run.sync;
+  return m.heldChangedUpstream({
+    branch,
+    items: heldChanges.map((item) => m.heldChangedUpstreamItem(item)),
+  });
+}
+
 /**
  * Moves an unpublished run onto the latest commit of its target branch.
  * The checkout is saved as a local snapshot commit first, then three-way
@@ -83,15 +95,16 @@ export function runBusy(
  * the person reviews it like any change. Conflicts are left as markers that
  * block approval until resolved, and the sync can be undone.
  */
-export async function syncRun(ctx: WorkbenchContext, id: string) {
+export async function syncRun(ctx: WorkbenchContext, id: string, asker?: HoldsAsker) {
   if (ctx.stopping()) throw new AppError(shuttingDown(), 503);
-  return logged("sync", { runId: id }, () => syncRunLocked(ctx, id));
+  return logged("sync", { runId: id }, () => syncRunLocked(ctx, id, asker));
 }
 
-async function syncRunLocked(ctx: WorkbenchContext, id: string) {
+async function syncRunLocked(ctx: WorkbenchContext, id: string, asker?: HoldsAsker) {
   return ctx.lock(id, async () => {
     const run = ctx.run(id);
-    if (run.prUrl) return syncPublishedRun(ctx, run);
+    ctx.holds?.assertAsker?.(run, asker);
+    if (run.prUrl) return syncPublishedRun(ctx, run, asker);
     if (
       !["review", "approved", "awaiting_plan"].includes(run.status) ||
       run.publishing
@@ -113,10 +126,28 @@ async function syncRunLocked(ctx: WorkbenchContext, id: string) {
     const target = await ctx.lock(`repository:${repo.id}`, () =>
       fetchBranchCommit(repo, run.baseBranch),
     );
+    const heldChanges =
+      (await ctx.holds?.upstreamChanges?.(run, repo, target, asker)) ?? [];
     if (target === run.baseSha) {
+      if (heldChanges.length) {
+        run.heldChanges = heldChanges;
+        if (run.sync) run.sync.heldChanges = heldChanges;
+      } else {
+        delete run.heldChanges;
+        if (run.sync) delete run.sync.heldChanges;
+      }
       ctx.log(run, "user", sm().run.sync.upToDate({ branch: run.baseBranch }));
+      if (heldChanges.length)
+        ctx.log(run, "system", heldUpstreamLog(run.baseBranch, heldChanges), {
+          kind: "notice",
+        });
       await ctx.store.save();
-      return { run, updated: false, conflicts: [] as string[] };
+      return {
+        run,
+        updated: false,
+        conflicts: [] as string[],
+        ...(heldChanges.length ? { heldChanges } : {}),
+      };
     }
     const snapshot = await snapshotCheckout(
       run.worktreePath,
@@ -184,7 +215,9 @@ async function syncRunLocked(ctx: WorkbenchContext, id: string) {
       snapshot,
       conflicts: merged.conflicts,
       reviewedFingerprints: { ...run.reviewedFingerprints },
+      ...(heldChanges.length ? { heldChanges } : {}),
     };
+    delete run.heldChanges;
     run.baseSha = target;
     if (run.status === "approved") run.status = "review";
     delete run.approvedFingerprint;
@@ -198,9 +231,18 @@ async function syncRunLocked(ctx: WorkbenchContext, id: string) {
         conflicts: merged.conflicts,
       }),
     );
+    if (heldChanges.length)
+      ctx.log(run, "system", heldUpstreamLog(run.baseBranch, heldChanges), {
+        kind: "notice",
+      });
     await ctx.store.save();
     if (unfinished !== undefined) throw unfinished;
-    return { run, updated: true, conflicts: merged.conflicts };
+    return {
+      run,
+      updated: true,
+      conflicts: merged.conflicts,
+      ...(heldChanges.length ? { heldChanges } : {}),
+    };
   });
 }
 
@@ -209,7 +251,7 @@ async function syncRunLocked(ctx: WorkbenchContext, id: string) {
  * merge result waits in the checkout for review like any round, and goes
  * out as one merge commit on top of the PR head, without force.
  */
-async function syncPublishedRun(ctx: WorkbenchContext, run: Run) {
+async function syncPublishedRun(ctx: WorkbenchContext, run: Run, asker?: HoldsAsker) {
   if (
     run.status !== "published" ||
     run.publishing ||
@@ -234,6 +276,8 @@ async function syncPublishedRun(ctx: WorkbenchContext, run: Run) {
   const target = await ctx.lock(`repository:${repo.id}`, () =>
     fetchBranchCommit(repo, run.baseBranch),
   );
+  const heldChanges =
+    (await ctx.holds?.upstreamChanges?.(run, repo, target, asker)) ?? [];
   const contained =
     (
       await git(
@@ -243,9 +287,20 @@ async function syncPublishedRun(ctx: WorkbenchContext, run: Run) {
       )
     ).code === 0;
   if (contained) {
+    if (heldChanges.length) run.heldChanges = heldChanges;
+    else delete run.heldChanges;
     ctx.log(run, "user", sm().run.sync.prUpToDate({ branch: run.baseBranch }));
+    if (heldChanges.length)
+      ctx.log(run, "system", heldUpstreamLog(run.baseBranch, heldChanges), {
+        kind: "notice",
+      });
     await ctx.store.save();
-    return { run, updated: false, conflicts: [] as string[] };
+    return {
+      run,
+      updated: false,
+      conflicts: [] as string[],
+      ...(heldChanges.length ? { heldChanges } : {}),
+    };
   }
   const merged = await mergeCommits(run.worktreePath, run.publishCommit, target);
   const unmarked = await conflictsWithoutMarkers(
@@ -286,7 +341,9 @@ async function syncPublishedRun(ctx: WorkbenchContext, run: Run) {
     mergeParent: target,
     previousBase: run.baseSha,
     conflicts: merged.conflicts,
+    ...(heldChanges.length ? { heldChanges } : {}),
   };
+  delete run.heldChanges;
   (run.followUps ??= []).push(round);
   // The PR's diff is now measured from the target branch it contains.
   run.baseSha = target;
@@ -307,13 +364,28 @@ async function syncPublishedRun(ctx: WorkbenchContext, run: Run) {
       conflicts: merged.conflicts,
     }),
   );
+  if (heldChanges.length)
+    ctx.log(run, "system", heldUpstreamLog(run.baseBranch, heldChanges), {
+      kind: "notice",
+    });
   await ctx.store.save();
-  return { run, updated: true, conflicts: merged.conflicts };
+  return {
+    run,
+    updated: true,
+    conflicts: merged.conflicts,
+    ...(heldChanges.length ? { heldChanges } : {}),
+  };
 }
 
 /** Returns an unpublished run to the checkout and base it had before the last sync. */
 export async function undoSync(ctx: WorkbenchContext, id: string) {
-  return logged("sync.undo", { runId: id }, () => undoSyncLocked(ctx, id));
+  return logged("sync.undo", { runId: id }, async () => {
+    const run = ctx.store.data.runs.find((item) => item.id === id);
+    if (run && !run.sync?.resolving && !run.followUps?.some((round) => round.resolving)) {
+      await ctx.conflictJobs.get(id)?.catch(() => undefined);
+    }
+    return undoSyncLocked(ctx, id);
+  });
 }
 
 async function undoSyncLocked(ctx: WorkbenchContext, id: string) {
@@ -352,6 +424,24 @@ async function undoSyncLocked(ctx: WorkbenchContext, id: string) {
     // Marks come back for files whose diff is the one reviewed before the sync.
     run.reviewedFingerprints = { ...(sync.reviewedFingerprints ?? {}) };
     delete run.sync;
+    delete run.heldChanges;
+    if (run.heldPaths) {
+      try {
+        const remaining = await changedPaths(run);
+        const stillHeld = ctx.holds
+          ? ctx.holds.conflicts(run, remaining).map(({ path: heldPath }) => heldPath)
+          : remaining.filter((candidate) =>
+              run.heldPaths!.some(
+                (scope) =>
+                  !comparablePath(scope) || !comparablePath(candidate) || pathsMeet(scope, candidate),
+              ),
+            );
+        if (stillHeld.length) run.heldPaths = [...new Set(stillHeld)];
+        else delete run.heldPaths;
+      } catch {
+        /* Group work stopped (holdsUnknown), or the checkout could not be compared: keep run.heldPaths intact without aborting local undo. */
+      }
+    }
     if (run.status === "approved") run.status = "review";
     delete run.approvedFingerprint;
     await ctx.diff(id);
@@ -370,6 +460,7 @@ export async function resolveConflicts(ctx: WorkbenchContext, id: string) {
   if (ctx.stopping()) throw new AppError(shuttingDown(), 503);
   return ctx.lock(id, async () => {
     const run = ctx.run(id);
+    assertRunAgentAllowed(run);
     // No conflict agent in Learn by hand: the person resolves the markers.
     if (run.learnByHand) throw new AppError((m) => m.byHand.resolveByHand, 409);
     const target = conflictHolder(run);
@@ -453,6 +544,7 @@ async function runConflictResolution(
         task: { title: run.title, prompt: run.prompt },
         baseBranch: run.baseBranch,
         conflicts: files,
+        agentAccess: run.modelExecution?.agentAccess,
       }),
       controller.signal,
       false,
@@ -486,15 +578,15 @@ async function runConflictResolution(
   } catch (error) {
     await ctx.lock(run.id, async () => {
       await restoreSyncHead(run, head).catch(() => undefined);
+      const reason = redact(
+        error instanceof Error ? error.message : sm().run.sync.incompleteReason,
+      );
+      // A stop over other people's holds already says the changes are kept.
       holder.report = controller.signal.aborted
         ? sm().run.sync.stopped
-        : sm().run.sync.failed({
-            reason: redact(
-              error instanceof Error
-                ? error.message
-                : sm().run.sync.incompleteReason,
-            ),
-          });
+        : heldPathsOf(error)
+          ? reason
+          : sm().run.sync.failed({ reason });
       await ctx.diff(run.id).catch(() => undefined);
       run.status = "review";
       ctx.log(run, "system", holder.report ?? sm().run.sync.incomplete);

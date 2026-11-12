@@ -6,6 +6,7 @@
 //
 //   BELLPR_E2E_PORT=<port> npx playwright test e2e/real-run-journey.spec.ts
 import { expect, test, type Browser, type Locator, type Page } from "@playwright/test";
+import { e2eApiHeaders } from "./api-token.mjs";
 import checkMessages from "../shared/i18n/draft-checks.en";
 import { messages } from "./helpers/messages";
 import { expectNoOverflow } from "./helpers/overflow";
@@ -39,6 +40,7 @@ test.describe("the contribution journey on a seeded real run with a fake gh", ()
 
   async function openPage(browser: Browser) {
     const context = await browser.newContext({
+      extraHTTPHeaders: e2eApiHeaders,
       baseURL: project.baseURL,
       viewport: { width: 1440, height: 900 },
       locale: "en-US",
@@ -202,7 +204,7 @@ test.describe("the contribution journey on a seeded real run with a fake gh", ()
       const draftSaved = page.waitForResponse(
         (response) => response.url().endsWith(`/api/runs/${runId}/draft`) && response.request().method() === "PATCH",
       );
-      await page.getByRole("button", { name: en.workspace.draft.save }).click();
+      await page.locator(".draft-save-row").getByRole("button", { name: en.workspace.draft.save }).click();
       expect((await draftSaved).status()).toBe(200);
       const weakened = page.locator(".reviewability-weakened");
       await expect(weakened.locator(".reviewability-weakened-text")).toHaveText('expect(greeting("Ada")).toBe("Hello, Ada!");');
@@ -633,6 +635,7 @@ test("with the check off a real run is approved and marked; turned back on, publ
   const en = messages.en;
   const project = await startRealProject({ appSettings: { skipUnderstandingCheck: true } });
   const context = await browser.newContext({
+    extraHTTPHeaders: e2eApiHeaders,
     baseURL: project.baseURL,
     viewport: { width: 1440, height: 900 },
     locale: "en-US",

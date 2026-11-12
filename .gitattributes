@@ -1,0 +1,6 @@
+/install.sh text eol=lf
+/scripts/install-wsl.sh text eol=lf
+/install.ps1 text eol=lf
+/site/install text eol=lf
+/site/install.ps1 text eol=lf
+/site/install-wsl.sh text eol=lf

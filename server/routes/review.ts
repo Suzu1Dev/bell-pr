@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { z } from "zod";
 import {
   overridableCheckIds,
@@ -8,6 +8,8 @@ import { runDraftSchema } from "../drafts.js";
 import { learningExport } from "../learning-export.js";
 import { publishChecks, resumesPublish } from "../publish.js";
 import { currentLocale } from "../i18n/index.js";
+import { participantHeader } from "../coordination-routes.js";
+import { holdGuard } from "../hold-guard.js";
 import type { RouteDeps } from "./types.js";
 
 // The commit message is passed to git verbatim, so newline is the only control character allowed.
@@ -18,7 +20,19 @@ const commitMessageField = runDraftSchema.shape.commitMessage;
  * diff, chat and explanations, the PR draft, notes, per-file review and the
  * review rerun, approval, maintainer feedback and publishing.
  */
-export function registerReviewRoutes(app: Express, { workbench }: RouteDeps) {
+export function registerReviewRoutes(
+  app: Express,
+  { workbench, options }: RouteDeps,
+) {
+  // The group's write guard, only with --group: who is asking is the
+  // participant token if the request sends one, else the device it comes from.
+  const holds = (req: Request, res: Response) =>
+    options.collab
+      ? holdGuard(options.collab, {
+          participant: req.get(participantHeader),
+          deviceId: res.locals.deviceId,
+        })
+      : undefined;
   app.get("/api/runs/:id/export.md", (req, res) => {
     const run = workbench.run(req.params.id);
     const repo = workbench.store.data.repos.find(
@@ -36,6 +50,13 @@ export function registerReviewRoutes(app: Express, { workbench }: RouteDeps) {
       workbench.diff(req.params.id),
     );
     res.json({ files });
+  });
+  app.get("/api/runs/:id/diff-view", async (req, res) => {
+    const { round } = z
+      .object({ round: z.string().min(1).max(100) })
+      .strict()
+      .parse(req.query);
+    res.json(await workbench.diffView(req.params.id, round));
   });
   app.post("/api/runs/:id/chat", async (req, res) => {
     const { filePath, question } = z
@@ -87,8 +108,15 @@ export function registerReviewRoutes(app: Express, { workbench }: RouteDeps) {
       files,
       workbench.store.directory,
       currentLocale(),
-      { repo },
+      { repo, runs: workbench.store.data.runs },
     );
+    const guard = holds(req, res);
+    if (guard) {
+      const holdChecks = guard.preflight(run, files);
+      checks.push(...holdChecks);
+      if (!holdChecks.some((check) => check.id === "holds-unknown"))
+        checks.push(...(await guard.confirms(run, repo, workbench.store.data.runs)));
+    }
     // After an attempt that pushed but recorded no PR, GitHub's open count
     // may include the PR that attempt opened. publish() records that PR
     // before its checks and still refuses with this block when there is no
@@ -150,6 +178,13 @@ export function registerReviewRoutes(app: Express, { workbench }: RouteDeps) {
   app.post("/api/runs/:id/pr/feedback", async (req, res) => {
     res.json({ run: await workbench.fetchPrFeedback(req.params.id) });
   });
+  app.post("/api/runs/:id/publish/recover", async (req, res) => {
+    const { commit } = z
+      .object({ commit: z.string().regex(/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/) })
+      .strict()
+      .parse(req.body);
+    res.json({ run: await workbench.recoverPublish(req.params.id, commit) });
+  });
   app.post("/api/runs/:id/publish", async (req, res) => {
     const { fingerprint, acknowledged, overrides, rulesDigest } = z
       .object({
@@ -184,6 +219,7 @@ export function registerReviewRoutes(app: Express, { workbench }: RouteDeps) {
         acknowledged,
         overrides,
         rulesDigest,
+        holds(req, res),
       ),
     });
   });

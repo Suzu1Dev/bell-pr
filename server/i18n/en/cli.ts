@@ -5,6 +5,7 @@ const name = product.name;
 const bin = product.binNames[0];
 
 export default {
+  browserOpenHint: `Could not open the browser. Run \`${bin} open --print --print-token\` to get the address.`,
   /** `bell-pr help`. */
   help: ({ version }: { version: string }) =>
     [
@@ -13,9 +14,13 @@ export default {
       `Usage: ${bin} [command] [options]`,
       "",
       "Commands:",
-      `  start      Start ${name} (the default command)`,
+      `  start      Start ${name}, or open its running workspace (the default command)`,
       "  open       Print the address of the running server and open it in the browser",
       "  doctor     Check git, gh and the agent CLIs (--json for machine output)",
+      "  token      Replace the API token and sign out paired devices (`token rotate`)",
+      "  pair       Make a one-time code to pair a phone or another computer",
+      "  devices    List paired devices (`devices list`) or revoke one (`devices revoke <id>`)",
+      "  group      Group work: `group status`, `group setup`, `group invite <name>`",
       "  version    Show the version, Node.js, platform and data directory",
       "  help       Show this help",
       "",
@@ -24,12 +29,23 @@ export default {
       "  --host <host>       Address to listen on (BELLPR_HOST, default 127.0.0.1)",
       "  --data-dir <dir>    Data directory (BELLPR_DATA_DIR, default ~/.bellpr)",
       "  --no-open           Do not open the browser (BELLPR_NO_OPEN=1)",
+      "  --force             Start even when doctor reports Not ready",
+      `  --group             Host group work for the people who share this ${name} (BELLPR_GROUP=1)`,
       "  --env-file <file>   Load settings such as BELLPR_PORT from a file first",
       "",
       "Options for open:",
-      "  --print             Only print the address",
+      "  --print             Only print the address, without the API token",
+      "  --print-token       Print the address including the API token",
       "  --no-open           Do not open the browser",
       `  --data-dir <dir>    Data directory of the running ${name}`,
+      "",
+      "Options for pair:",
+      "  --name <name>       Suggested name for the new device",
+      "  --no-qr             Do not draw the QR code",
+      "  --unlock            Clear the pairing lock and the failure count",
+      "",
+      "Options for group invite:",
+      "  --admin             The invited person joins as a group admin",
       "",
       `Lost the address? Run \`${bin} open\` on this computer to print and open it again.`,
     ].join("\n"),
@@ -90,6 +106,7 @@ export default {
     /** The startup line with the address. */
     startup: ({ version, url }: { version: string; url: string }) =>
       `${name} ${version} → ${url}`,
+    reusing: ({ url }: { url: string }) => `${name} is running → ${url}`,
     /** Data left by an older version in the current folder; nothing moves. */
     legacyDataDir: ({ dataDir }: { dataDir: string }) =>
       `Found ${name} data in ./.bellpr. ${name} now uses ${dataDir} and moved nothing. To keep using the old folder, start it with: ${bin} start --data-dir ./.bellpr`,
@@ -99,20 +116,117 @@ export default {
       `Port ${port} is already in use by another program. Start ${name} on a free port with \`${bin} start --port <port>\`.`,
     dataDirInUse: ({ dataDir, pid }: { dataDir: string; pid: number }) =>
       `${name} is already running with the data directory ${dataDir} (process ${pid}). Run \`${bin} open\` to open it, or stop that process first.`,
+    /** Strict rule (coordination): a lock whose holder cannot be shown to have stopped. */
+    dataDirHolderUnconfirmed: ({ dataDir, file }: { dataDir: string; file: string }) =>
+      `${name} cannot tell whether the process holding the data directory ${dataDir} has stopped: its lock ${file} comes from another container, another machine or an older version, or cannot be read. This start does not replace such a lock by itself. Make sure nothing uses this data directory any more, then remove ${file} and start again.`,
+    /** No holder to name: the lock was gone, or not a lock, each time the start looked. */
+    dataDirLockUnsettled: ({ dataDir, file }: { dataDir: string; file: string }) =>
+      `${name} could not take the lock ${file} of the data directory ${dataDir}: each time it tried, the file had just changed or could not be read. Start again in a moment. If this keeps happening and no ${name} is running with this data directory, remove ${file}.`,
+    /** A lock, or what lies in its place, that cannot be read: no start replaces it. `reason` is the system's. */
+    lockUnreadable: ({ file, reason }: { file: string; reason: string }) =>
+      `${name} cannot read the lock file ${file}: ${reason}. It may belong to a ${name} that is still running, so it is not replaced. Make sure no ${name} is running with this data directory, then remove ${file} and start again.`,
+    /** Another start's claim on a stale lock, which this start could not clear. */
+    takeoverClaimed: ({ file }: { file: string }) =>
+      `Another ${name} start is replacing a lock left behind in this data directory, or stopped while doing so: its claim file ${file} is still there. Wait about half a minute and start again. If this keeps happening and no ${name} is starting, remove ${file}.`,
+    /** Strict rule (coordination): a claim whose start cannot be shown to have stopped. */
+    takeoverClaimUnconfirmed: ({ file }: { file: string }) =>
+      `${name} cannot tell whether the start that was replacing a lock left behind in this data directory has stopped: its claim file ${file} is still there. This start does not remove such a claim by itself. Make sure no ${name} is starting on this data directory, then remove ${file} and start again.`,
+    /** `start --group` or a `group` command: the running instance was started without group work. */
+    withoutGroup: ({ url }: { url: string }) =>
+      `${name} is already running at ${url} without group work. Stop it first, then start it with \`${bin} start --group\`.`,
     listenFailed: ({ address, reason }: { address: string; reason: string }) =>
       `${name} could not listen on ${address}: ${reason}`,
     failed: ({ reason }: { reason: string }) =>
       `${name} did not start: ${reason}`,
+    /** `--force`: the readiness gate is skipped. */
+    forced: `Warning: --force skips the readiness check and starts ${name} anyway. Run \`${bin} doctor\` to see what is missing. The sample tour needs no AI provider; a real agent run still does.`,
+    /** A required doctor check failed, so start did not listen. */
+    notReady: `${name} did not start. The checklist above names each failed required check and the command that fixes it. To start anyway and take the sample tour, run \`${bin} start --force\`.`,
+    /** Right under the Not ready headline, before the fix commands. */
+    sampleTour: `No AI provider yet? See the sample tour: ${bin} start --force`,
     uiMissing: ({ path }: { path: string }) =>
       `The web interface is not built: ${path} has no index.html. Run \`npm run build\` in the ${name} source folder and start ${name} again; until then only the API answers.`,
     /** Title and text of the page served while the web interface is missing. */
     uiMissingTitle: `${name}: web interface not built`,
     uiMissingPage:
       `The ${name} web interface is not built. Run npm run build in the ${name} source folder, then start ${name} again.`,
+    /** --host or BELLPR_HOST is not 127.0.0.1 (and not another loopback address). */
+    exposedHost: ({ host }: { host: string }) =>
+      `${name} is listening on ${host}, not only on 127.0.0.1. That address is an explicit setting (--host or BELLPR_HOST). The API token is still required.`,
+    /** 0.0.0.0 / :: without BELLPR_PUBLIC_URL: remote clients are refused by the Host guard. */
+    wildcardHostNeedsPublicUrl: ({ host }: { host: string }) =>
+      `${name} is listening on ${host} without BELLPR_PUBLIC_URL. Remote connections receive HTTP 403 until you set BELLPR_PUBLIC_URL to the HTTPS origin browsers use (for example https://bell.example.com).`,
   },
   /** `bell-pr open`. */
   open: {
     notRunning: ({ dataDir }: { dataDir: string }) =>
       `No ${name} is running with the data directory ${dataDir}. Start it with \`${bin}\`, or, for a ${name} started with another data directory, run \`${bin} open --data-dir <dir>\`.`,
   },
+  /** `bell-pr token rotate`. The new token is not included. */
+  token: {
+    rotated: ({ path }: { path: string }) =>
+      `Replaced the API token in ${path}. A running ${name} uses the new token on the next request. Run \`${bin} open\` to open the app with it.`,
+    usage: `Run \`${bin} token rotate\` to replace the API token.`,
+    /** Printed after `rotated`. */
+    devicesCleared: "Paired devices are signed out and any pairing code is void. Pair them again with a new code.",
+  },
+  /** `bell-pr pair`. The code is shown; no token ever is. */
+  pair: {
+    created: ({ pairUrl, code, expiresAt }: { pairUrl: string; code: string; expiresAt: string }) =>
+      [
+        `On the other device, open ${pairUrl}`,
+        `and enter the pairing code: ${code}`,
+        `The code works once and expires at ${expiresAt} (in 5 minutes). A new code replaces it.`,
+      ].join("\n"),
+    locked: ({ lockedUntil }: { lockedUntil: string }) =>
+      `Pairing is locked until ${lockedUntil} after too many wrong codes.`,
+    /** The failure record is missing or damaged, so pairing stays locked. */
+    lockedDamaged: "Pairing is locked: its record of failed attempts is missing or damaged.",
+    /** Also sent with every 423 response. */
+    unlockHint: `If you made the failed attempts yourself, run \`${bin} pair --unlock\` on the computer running ${name}.`,
+    unlocked: "Pairing is unlocked and its failure count is cleared.",
+    /** A device paired without a name. */
+    defaultDeviceName: "Paired device",
+  },
+  /** `bell-pr devices`. */
+  devices: {
+    usage: `Run \`${bin} devices list\` or \`${bin} devices revoke <id>\`.`,
+    none: "No paired devices.",
+    line: ({ id, name, createdAt, lastUsedAt }: { id: string; name: string; createdAt: string; lastUsedAt: string }) =>
+      `${id}  ${name}  paired ${createdAt}  last used ${lastUsedAt}`,
+    neverUsed: "never",
+    revoked: ({ id }: { id: string }) => `Revoked ${id}. Its token no longer works.`,
+    notFound: ({ id }: { id: string }) => `No paired device has the id ${id}. Run \`${bin} devices list\` to see them.`,
+  },
+  /** `bell-pr group`. The invite code is shown; no token ever is. */
+  group: {
+    usage: `Run \`${bin} group status\`, \`${bin} group setup\` or \`${bin} group invite <name> [--admin]\`.`,
+    notSetUp: `Group work is not set up yet. Run \`${bin} group setup\`.`,
+    ready: "Group work is set up and ready.",
+    /** `reason` is the stable word the server gives, such as sideMissing. */
+    stopped: ({ reason }: { reason: string }) =>
+      `Group work has stopped (reason: ${reason}). docs/troubleshooting.md explains each reason. Fix the cause, then restart ${name}.`,
+    setUp: `Group work is set up. Invite the first admin with \`${bin} group invite <name> --admin\`.`,
+    alreadySetUp: "Group work is already set up.",
+    invited: ({
+      person,
+      admin,
+      code,
+      expiresAt,
+      minutes,
+    }: {
+      person: string;
+      admin: boolean;
+      code: string;
+      expiresAt: string;
+      minutes: number;
+    }) =>
+      [
+        `Invite code for ${person}${admin ? " (admin)" : ""}: ${code}`,
+        `The code works once and expires at ${expiresAt} (in ${minutes} minutes). Restarting ${name} voids it.`,
+      ].join("\n"),
+  },
+  /** A pair, devices or group request the running server refused. */
+  requestFailed: ({ status, error }: { status: number; error: string }) =>
+    `${name} answered ${status}: ${error}`,
 };

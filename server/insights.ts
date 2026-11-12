@@ -33,7 +33,8 @@ import {
   secretInPatch,
   sensitivePath,
 } from "./git.js";
-import { agentEnvironment, command, git, redact } from "./process.js";
+import { agentEnvironment, command, git } from "./process.js";
+import { redact } from "./secrets.js";
 import { Store } from "./store.js";
 import { writeDurable } from "./fs-atomic.js";
 import { log } from "./log.js";
@@ -55,7 +56,12 @@ import { respondIn } from "./prompt-language.js";
 import { AppError, type Repository } from "./types.js";
 import { lenientRead } from "./persisted-schema.js";
 import { locales, type Locale } from "../shared/i18n/locale.js";
-import { setupError, withCliSetupHint } from "./cli-errors.js";
+import { setupError, signInFixes, unauthenticatedCode, withCliSetupHint } from "./cli-errors.js";
+import {
+  activeProvider,
+  codexSelectionBlocked,
+  presentedModelSettings,
+} from "../shared/codex-switch.js";
 import { defaultProviderFrom, knownDoctorReport } from "./doctor.js";
 import { agentSpawn, parseAgentOutput } from "./run-events.js";
 import {
@@ -78,6 +84,7 @@ import {
   modelExecutionSchema,
   modelSettingsSchema,
   resolveModelExecution,
+  splitAntigravityModel,
 } from "./models.js";
 import {
   addEfficiency,
@@ -338,6 +345,7 @@ function withoutModel(settings: ContributionSettings) {
     model: _model,
     reasoningEffort: _effort,
     webAccess: _webAccess,
+    agentAccess: _agentAccess,
     ...project
   } = settings;
   return project;
@@ -444,7 +452,7 @@ function validateAnalysis<
   try {
     value = schema.parse(JSON.parse(raw)) as z.infer<S>;
   } catch (error) {
-    // The person reads one sentence; parseAgentOutput logs which part did not fit.
+    // The person reads one sentence. The log records the kind and length, not this answer.
     throw new AppError((m) => m.analysis.insights.incompleteAnswer, 422, {
       cause: error,
     });
@@ -794,16 +802,40 @@ export class ProjectInsightsService {
    * one the environment has ready (Claude Code when it is the only CLI
    * signed in, else Codex), and nothing is written.
    */
+  /** The provider saved on disk, before the switch rewrites what the UI shows. */
+  async storedModelProvider(): Promise<string | undefined> {
+    try {
+      const parsed = JSON.parse(await readFile(this.modelSettingsPath, "utf8")) as {
+        provider?: unknown;
+      };
+      return typeof parsed?.provider === "string" ? parsed.provider : undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
+  /** 422 when the saved provider is Codex and this build cannot start it. */
+  async assertSavedProviderRunnable(): Promise<void> {
+    if (codexSelectionBlocked(await this.storedModelProvider()))
+      throw new AppError((m) => m.setup.doctor.codexDisabled, 422);
+  }
+
   async getModelSettings(): Promise<ModelSettings> {
     await this.modelWrite.catch(() => undefined);
     try {
-      return persistedModelSettingsSchema.parse(
-        JSON.parse(await readFile(this.modelSettingsPath, "utf8")),
+      return splitAntigravityModel(
+        presentedModelSettings(
+          persistedModelSettingsSchema.parse(
+            JSON.parse(await readFile(this.modelSettingsPath, "utf8")),
+          ),
+        ),
       );
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === "ENOENT") {
         const provider = await this.defaultProvider().catch(() => undefined);
-        return sharedModelSettingsSchema.parse(provider ? { provider } : {});
+        return presentedModelSettings(
+          sharedModelSettingsSchema.parse(provider ? { provider } : {}),
+        );
       }
       throw new AppError(
         (m) => m.analysis.insights.modelSettingsUnreadable,
@@ -814,6 +846,8 @@ export class ProjectInsightsService {
 
   async setModelSettings(input: unknown): Promise<ModelSettings> {
     const settings = sharedModelSettingsSchema.parse(input);
+    if (codexSelectionBlocked(settings.provider))
+      throw new AppError((m) => m.setup.doctor.codexDisabled, 422);
     if (settings.model || settings.reasoningEffort)
       resolveModelExecution(
         settings,
@@ -853,6 +887,9 @@ export class ProjectInsightsService {
       ...(settings.webAccess === undefined
         ? {}
         : { webAccess: settings.webAccess }),
+      ...(settings.agentAccess === undefined
+        ? {}
+        : { agentAccess: settings.agentAccess }),
     });
     await this.update(repoId, (cache) => {
       // A project deleted meanwhile (or all data) gets no cache again.
@@ -1131,6 +1168,7 @@ export class ProjectInsightsService {
    * in it. The locale is not part of the fingerprint.
    */
   private async analyze(repoId: string, more: boolean) {
+    await this.assertSavedProviderRunnable();
     return withLocale(currentLocale(), () => this.analyzeInLocale(repoId, more));
   }
 
@@ -1203,11 +1241,13 @@ export class ProjectInsightsService {
           )
         : projectRecommendationBatchSize;
       const settings = await this.getSettings(repoId);
-      const provider = settings.provider ?? "codex";
+      if (codexSelectionBlocked(settings.provider))
+        throw new AppError((m) => m.setup.doctor.codexDisabled, 422);
+      const provider = activeProvider(settings.provider);
       const login = agentLoginCheck(provider);
       try {
         await this.execute(login.executable, login.args, {
-          timeoutMs: 10_000,
+          timeoutMs: login.timeoutMs ?? 10_000,
           maxBytes: 20_000,
           env: agentEnvironment(provider),
           signal,
@@ -1222,22 +1262,12 @@ export class ProjectInsightsService {
           (m) =>
             m.analysis.insights.agentUnavailable({
               agent: agentLabel(provider),
-              login:
-                login.executable === "claude"
-                  ? "claude auth login"
-                  : "codex login",
+              login: signInFixes(provider)[0].command,
             }),
           503,
           {
-            code:
-              provider === "claude"
-                ? "claude_unauthenticated"
-                : "codex_unauthenticated",
-            fixes: setupError(
-              provider === "claude"
-                ? "claude_unauthenticated"
-                : "codex_unauthenticated",
-            ).fixes,
+            code: unauthenticatedCode(provider),
+            fixes: setupError(unauthenticatedCode(provider)).fixes,
             cause: error,
           },
         );
@@ -1354,7 +1384,7 @@ export class ProjectInsightsService {
               timeoutMs,
             );
             await this.execute(cli.executable, cli.args, {
-              input,
+              input: cli.stdin?.(input) ?? input,
               cwd: temporary,
               env: agentEnvironment(modelExecution.provider ?? "codex"),
               signal,
@@ -1414,6 +1444,8 @@ export class ProjectInsightsService {
         },
       );
       this.assertActive(signal);
+      // A project removed while the agent ran is not analyzed.
+      this.repository(repoId);
       progress.phase = "checking";
       progress.attemptStartedAt = undefined;
       progress.notice = undefined;
@@ -1426,6 +1458,7 @@ export class ProjectInsightsService {
           more
             ? validateAnalysis(answer, context.files, safePaths, recommendationsSchema, locale)
             : validateAnalysis(answer, context.files, safePaths, analysisSchema, locale),
+        { length: Buffer.byteLength(answer) },
       );
       if (
         (await this.version(repo, signal)).fingerprint !== version.fingerprint

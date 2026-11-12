@@ -7,7 +7,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { lstat, mkdir, realpath, rm, stat } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { command, git, gitNetwork } from "./process.js";
+import { command, git, gitNetwork, recordedGitDir } from "./process.js";
 import {
   assertRefName,
   normalizeRepositorySource,
@@ -616,6 +616,9 @@ export async function createRunWorktree(
       signal,
       timeoutMs: 60_000,
     });
+    const gitDir = recordedGitDir(run.worktreePath);
+    if (!gitDir) throw new AppError((m) => m.security.worktreeForged, 409);
+    run.gitDir = gitDir;
   } catch (error) {
     // Without the signal: once a run is cancelled, a command given it does not start.
     await discardCheckout(repo, run.branch, run.worktreePath);

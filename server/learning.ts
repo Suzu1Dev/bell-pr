@@ -1,3 +1,4 @@
+import { assertSessionIdle } from "./session.js";
 /**
  * What helps the person learn from a finished run: explanations of each
  * changed file, follow-up questions to a mentor, their own notes, the
@@ -11,8 +12,10 @@
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { assertRunAgentAllowed } from "./codex-guard.js";
 import { command, redact } from "./process.js";
 import { baseFileLines, parseGitHubSource, readDiff } from "./git.js";
+import { reviewBaseSha } from "../shared/followups.js";
 import {
   conversationContentLimit,
   conversationMessageLimit,
@@ -66,10 +69,12 @@ const readableStatuses: Run["status"][] = [
 export async function rerunReview(ctx: WorkbenchContext, id: string) {
   if (ctx.stopping()) throw new AppError(shuttingDown(), 503);
   const run = ctx.run(id);
+  assertRunAgentAllowed(run);
   // Learn by hand: the guide's review of the ready version (409 before Ready), never the team's prompts.
   if (run.learnByHand) return reviewAgain(ctx, id);
   if (!["review", "approved"].includes(run.status) || run.publishing)
     throw new AppError((m) => m.run.review.rerunNotAllowed, 409);
+  assertSessionIdle(run);
   if (ctx.reviewJobs.has(id) || ctx.controllers.has(id))
     throw new AppError((m) => m.run.review.rerunRunning, 409);
   // Registering the controller first makes a concurrent request a 409 and
@@ -153,6 +158,7 @@ export async function explanations(
 ) {
   if (ctx.stopping()) throw new AppError(shuttingDown(), 503);
   const run = ctx.run(id);
+  assertRunAgentAllowed(run);
   if (!readableStatuses.includes(run.status) || run.publishing)
     throw new AppError((m) => m.run.review.explanationsTooEarly, 409);
   const files = await ctx.lock(id, () => ctx.diff(id));
@@ -332,7 +338,7 @@ export async function contextLines(
 ) {
   return ctx.lock(id, async () => {
     const run = ctx.run(id);
-    if (run.baseSha !== baseSha)
+    if (reviewBaseSha(run) !== baseSha)
       throw new AppError((m) => m.run.context.baseMoved, 409);
     const file = (await readDiff(run)).find((entry) => entry.path === filePath);
     if (!file) throw new AppError((m) => m.run.review.fileNotFound, 404);
@@ -341,7 +347,7 @@ export async function contextLines(
       throw new AppError((m) => m.run.context.stale, 409);
     if (file.status !== "modified")
       throw new AppError((m) => m.run.context.wholeFile, 409);
-    return { lines: await baseFileLines(run, filePath) };
+    return { lines: await baseFileLines({ ...run, baseSha }, filePath) };
   });
 }
 
@@ -358,6 +364,7 @@ export async function saveNote(
 ) {
   return ctx.lock(id, async () => {
     const run = ctx.run(id);
+    assertSessionIdle(run);
     if (!readableStatuses.includes(run.status))
       throw new AppError((m) => m.run.review.notesTooEarly, 409);
     const file = (await ctx.diff(id)).find(
@@ -388,6 +395,7 @@ export async function chat(
   filePath: string,
   question: string,
 ) {
+  assertRunAgentAllowed(ctx.run(id));
   if (ctx.run(id).learnByHand) return chatByHand(ctx, id, filePath, question);
   return ctx.lock(id, async () => {
     const run = ctx.run(id);

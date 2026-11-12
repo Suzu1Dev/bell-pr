@@ -1,3 +1,4 @@
+import { safeLink, WebLink } from "../review/MarkdownContent";
 import { GitPullRequest } from "lucide-react";
 import type { DoctorReport } from "../../shared/doctor";
 import { productLink } from "../../shared/product";
@@ -83,9 +84,9 @@ export function EnvironmentSection({
           {docsUrl && (
             <>
               {" "}
-              <a href={docsUrl} target="_blank" rel="noreferrer">
+              <WebLink href={safeLink(docsUrl) || undefined} target="_blank" rel="noreferrer">
                 {e.advanced.documentation}
-              </a>
+              </WebLink>
             </>
           )}
         </p>

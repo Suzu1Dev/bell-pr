@@ -1,4 +1,5 @@
-import { lazy, Suspense, type Dispatch, type SetStateAction } from "react";
+import { safeLink, WebLink } from "../review/MarkdownContent";
+import { lazy, Suspense, useState, type Dispatch, type SetStateAction } from "react";
 import {
   Activity,
   ArrowDownToLine,
@@ -15,6 +16,10 @@ import {
   GitPullRequest,
   Globe2,
   History,
+  MessageSquare,
+  Maximize2,
+  Minimize2,
+  PanelLeftClose,
   Plus,
   ShieldCheck,
   Split,
@@ -26,7 +31,8 @@ import type { useProjectInsights } from "../mission/useProjectInsights";
 import type { ContributionRecommendation } from "../../shared/insights";
 import type { Tab } from "../app/AppShell";
 import type { DraftEditor } from "../app/hooks/useDraftEditor";
-import type { RunActions } from "../app/hooks/useRunActions";
+import { runPath, type RunActions } from "../app/hooks/useRunActions";
+import { api, send } from "../api";
 import type { RunRounds } from "../app/hooks/useRunRounds";
 import type { Walkthroughs } from "../app/hooks/useWalkthroughs";
 import { useRunRecords } from "../app/hooks/useRunRecords";
@@ -35,11 +41,23 @@ import { premiseCheckable, usePremiseCheck } from "../app/hooks/usePremiseCheck"
 import { openCheckPanel, useUnderstanding } from "../app/hooks/useUnderstanding";
 import { ErrorBoundary } from "../app/ErrorBoundary";
 import { ChangesTab } from "./ChangesTab";
+import { isFileReviewed } from "../review/reviewed";
+import { diffRoundKey, diffRoundOptions } from "./diffRounds";
 import { checkFooter } from "./checkFooter";
 import { DraftTab } from "./DraftTab";
 import { OverviewTab } from "./OverviewTab";
 import { RunNotices, showsCheckOff, UnderstandingOffBadge, UnsandboxedBadge } from "./RunNotices";
+import { HoldRecoveryNotice } from "./HoldRecoveryNotice";
 import "./workspace.css";
+import { limitationsRequest } from "../session/limitations";
+import { sessionAwaitsAnswer, sessionTurnBlock, setupHandOffShown, showSessionTab } from "../session/state";
+import "../session/session.css";
+
+const SessionPanel = lazy(() =>
+  withMessages(import("../session/SessionPanel")).then((module) => ({
+    default: module.SessionPanel,
+  })),
+);
 
 // The activity tab carries the team board, which most reviews never open;
 // it loads with its first visit.
@@ -56,8 +74,14 @@ const CommitHistory = lazy(() =>
     default: module.CommitHistory,
   })),
 );
+const HistoricalDiff = lazy(() =>
+  import("./HistoricalDiff").then((module) => ({ default: module.HistoricalDiff })),
+);
 
 interface WorkspacePageProps {
+  sessionDraft?: string;
+  onSessionDraftChange?: (text: string) => void;
+  onSessionRun?: (run: Run) => void;
   run: Run;
   files: DiffFile[];
   /** The changed file open in the code view. */
@@ -127,6 +151,9 @@ interface WorkspacePageProps {
  * four tabs and the review footer with the approve button.
  */
 export function WorkspacePage({
+  sessionDraft = "",
+  onSessionDraftChange,
+  onSessionRun,
   run,
   files,
   file,
@@ -142,7 +169,7 @@ export function WorkspacePage({
   additions,
   deletions,
   tab,
-  setTab,
+  setTab: setWorkspaceTab,
   focusMode,
   setFocusMode,
   showFiles,
@@ -176,6 +203,54 @@ export function WorkspacePage({
   updatingRepo,
 }: WorkspacePageProps) {
   const t = useT("workspace");
+  const roundKey = diffRoundKey(run);
+  const [diffSelection, setDiffSelection] = useState({ key: roundKey, round: "current" });
+  const hasHistory = !demo && !!run.prUrl && !!run.publishCommit;
+  const roundOptions = diffRoundOptions(run, t.diffRounds);
+  const selectedRound = hasHistory && diffSelection.key === roundKey &&
+    roundOptions.some((option) => option.value === diffSelection.round)
+    ? diffSelection.round : "current";
+  const historical = tab === "changes" && selectedRound !== "current";
+  const published = !demo && run.status === "published";
+  const showCurrent = () => setDiffSelection({ key: roundKey, round: "current" });
+  const diffRoundPicker = hasHistory ? (
+    <div className="diff-round-picker">
+      <select id="diff-round" className="text-input" value={selectedRound}
+        aria-label={t.diffRounds.label} title={historical ? t.diffRounds.notice : t.diffRounds.label}
+        aria-describedby={historical ? "diff-round-notice" : undefined}
+        onChange={(event) => setDiffSelection({ key: roundKey, round: event.target.value })}>
+        {roundOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+      </select>
+      {historical && <span hidden id="diff-round-notice">{t.diffRounds.notice}</span>}
+    </div>
+  ) : undefined;
+  const historyToolbar = <>
+    {diffRoundPicker}
+    <small className="diff-round-readonly" title={t.diffRounds.notice}>{t.diffRounds.readOnly}</small>
+    <div className="diff-toolbar-actions">
+      <button type="button" className="icon-button"
+        aria-label={showFiles ? t.changes.hideFiles : t.changes.showFiles}
+        aria-pressed={showFiles} onClick={() => setShowFiles(!showFiles)}>
+        <PanelLeftClose size={16} />
+      </button>
+      <button type="button" className="icon-button"
+        aria-label={focusMode ? t.changes.exitFocus : t.changes.enterFocus}
+        onClick={() => setFocusMode(!focusMode)}>
+        {focusMode ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+      </button>
+    </div>
+  </>;
+  // A request to open a current file (from feedback, learning or another tab)
+  // must not leave a historical file on screen instead.
+  function setTab(value: SetStateAction<Tab>) {
+    const next = typeof value === "function" ? value(tab) : value;
+    if (next === "changes") showCurrent();
+    setWorkspaceTab(next);
+  }
+  const sessionMessages = useT("session");
+  const sessionRunning = !!run.session?.running;
+  const sessionVisible = showSessionTab(run, demo);
+  const sessionNeedsAttention = sessionRunning || sessionAwaitsAnswer(run.session);
   const statusLabels = useT("common").runStatus;
   const { draftDirty, draftUnfinished, followUp, commitMessageUnfinished } =
     draft;
@@ -205,7 +280,7 @@ export function WorkspacePage({
     </button>
   );
   const reviewedCount = files.filter((f) =>
-    run.reviewedFiles.includes(f.path),
+    isFileReviewed(run, f, demo),
   ).length;
   const allReviewed = files.length > 0 && reviewedCount === files.length;
   const footer = checkFooter(run, allReviewed, understanding);
@@ -272,6 +347,7 @@ export function WorkspacePage({
         </div>
       </section>
       <RunNotices run={run} queued={queued} />
+      <HoldRecoveryNotice run={run} busy={demo || busy || active || reviewRerunning} actions={actions} />
       <SplitNotices run={run} onOpen={actions.chooseRun} />
       <section className="workflow-strip" aria-label={t.progress}>
         {[
@@ -361,6 +437,14 @@ export function WorkspacePage({
               {t.tabs.activity}{" "}
               {active && <span className="activity-pulse" />}
             </button>
+            {sessionVisible && (
+              <button role="tab" id="workspace-tab-session" aria-controls="workspace-panel"
+                tabIndex={tab === "session" ? 0 : -1} aria-selected={tab === "session"}
+                className={tab === "session" ? "selected" : ""} onClick={() => setTab("session")}>
+                <MessageSquare size={16} />{sessionMessages.tab}
+                {sessionNeedsAttention && <><span className="session-tab-dot" aria-hidden="true" /><span className="session-sr-only">{sessionMessages.attention}</span></>}
+              </button>
+            )}
             <button
               role="tab"
               id="workspace-tab-draft"
@@ -388,18 +472,31 @@ export function WorkspacePage({
             </button>
           </div>
           <div className="review-totals">
+            {historical ? <span>{t.diffRounds.readOnly}</span> : <>
             <span className="additions">+{additions}</span>
             <span className="deletions">−{deletions}</span>
             <span className="totals-divider" />
             <ShieldCheck size={15} />
             <span>{demo ? t.sampleReview : t.humanReview}</span>
+            </>}
           </div>
         </div>
+        {sessionRunning && <p className="session-busy-note" role="status">{sessionMessages.busy}</p>}
         <div
           role="tabpanel"
           id="workspace-panel"
           aria-labelledby={`workspace-tab-${tab}`}
         >
+          {tab === "session" && sessionVisible && onSessionDraftChange && onSessionRun && (
+            <ErrorBoundary resetKey={run.id}>
+              <Suspense fallback={<p>{sessionMessages.loading}</p>}>
+                <SessionPanel key={run.id} run={run} draft={sessionDraft}
+                  onDraftChange={onSessionDraftChange} onRun={onSessionRun}
+                  onOpenFile={(path) => { setSelectedPath(path); setTab("changes"); }}
+                  />
+              </Suspense>
+            </ErrorBoundary>
+          )}
           {tab === "overview" && currentRepo && (
             <OverviewTab
               currentRepo={currentRepo}
@@ -416,10 +513,38 @@ export function WorkspacePage({
                   : undefined
               }
               checkingPremise={premise.checkingPremise}
+              onSetupTurn={
+                // The Collaborate tab it opens needs both.
+                setupHandOffShown(run, demo) && onSessionRun && onSessionDraftChange
+                  ? async (commands) => {
+                      const { run: updated } = await api<{ run: Run }>(
+                        `${runPath(run.id)}/session/setup`,
+                        send("POST", { commands }),
+                      );
+                      onSessionRun(updated);
+                      setTab("session");
+                    }
+                  : undefined
+              }
+              setupTurnBlock={
+                premise.checkingPremise ? sessionMessages.blocks.active : sessionTurnBlock(run, sessionMessages.blocks)
+              }
             />
           )}
-          {tab === "changes" && (
+          {historical && (
+            <ErrorBoundary resetKey={`${roundKey}:${selectedRound}`}>
+              <Suspense fallback={<section className="diff-panel">
+                <div className="diff-topbar">{historyToolbar}</div>
+                <p className="historical-diff-status" role="status">{t.diffRounds.loading}</p>
+              </section>}>
+                <HistoricalDiff key={roundKey} runId={run.id} round={selectedRound}
+                  toolbar={historyToolbar} showFiles={showFiles} />
+              </Suspense>
+            </ErrorBoundary>
+          )}
+          {tab === "changes" && !historical && (
             <ChangesTab
+              diffRoundPicker={diffRoundPicker}
               run={run}
               files={files}
               file={file}
@@ -504,39 +629,47 @@ export function WorkspacePage({
               currentRepo={currentRepo}
               understanding={understanding}
               records={records}
+              onAddressLimitations={sessionVisible && onSessionDraftChange ? (section) => {
+                onSessionDraftChange(limitationsRequest(section, sessionMessages.limitationsIntro));
+                setTab("session");
+              } : undefined}
             />
           )}
         </div>
         <footer className="review-footer">
+          {historical ? <>
+            <span>{t.diffRounds.readOnly}</span>
+            <button type="button" className="button primary" onClick={showCurrent}>{t.diffRounds.back}</button>
+          </> : <>
           <div>
             <span className="footer-spark">
               <Sparkles size={15} />
             </span>
-            <span>{t.footer[footer.status]}</span>
+            {(published || footer.status !== "learning") && <span>{published ? t.footer.publishedChanges : t.footer[footer.status]}</span>}
             {prTextMissing && !byHand.writing && !reviewing && run.status !== "published" ? (
               <button type="button" className="mission-text-button" onClick={() => setTab("draft")}>{t.byHand.writePr}</button>
             ) : <span className="footer-hint">{run.learnByHand ? t.footer.hintByHand : t.footer.hint}</span>}
           </div>
           <div>
-            <span className="footer-reviewed">
+            {!published && <span className="footer-reviewed">
               <CheckCheck size={15} />
               {t.footer.reviewed({
                 reviewed: reviewedCount,
                 total: files.length,
               })}
-            </span>
+            </span>}
             {/* The sample PR exists nowhere: its button just stays off. */}
-            {run.status === "published" && run.prUrl && !demo ? (
-              <a
+            {published ? run.prUrl && (
+              <WebLink
                 className="button primary"
-                href={run.prUrl}
+                href={safeLink(run.prUrl) || undefined}
                 target="_blank"
                 rel="noreferrer"
               >
                 <GitPullRequest size={16} />
                 {t.footer.viewPullRequest}
                 <ExternalLink size={14} />
-              </a>
+              </WebLink>
             ) : byHand.writing || reviewing ? (
               // Learn by hand: the person says when the change is ready (DESIGN v1.2 F5).
               <button className="button primary" disabled={busy || reviewing || !files.length} title={files.length ? undefined : t.byHand.writeFirst}
@@ -549,7 +682,7 @@ export function WorkspacePage({
               <button
                 className="button primary"
                 disabled={
-                  !footer.explainFirst && (!allReviewed ||
+                  sessionRunning || (!footer.explainFirst && (!allReviewed ||
                   active ||
                   busy ||
                   !!run.publishing ||
@@ -557,7 +690,7 @@ export function WorkspacePage({
                   prTextMissing ||
                   (!demo &&
                     (followUp ? commitMessageUnfinished : !!draftUnfinished)) ||
-                  !["review", "approved"].includes(run.status))
+                  !["review", "approved"].includes(run.status)))
                 }
                 title={
                   !allReviewed
@@ -586,6 +719,7 @@ export function WorkspacePage({
               </button>
             )}
           </div>
+          </>}
         </footer>
       </section>
       {byHand.readyOpen && (

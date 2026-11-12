@@ -6,6 +6,7 @@
  */
 import { z } from "zod";
 import { log } from "./log.js";
+import { redact } from "./secrets.js";
 import { AppError, type Run } from "./types.js";
 import type { AgentTeam } from "../shared/team.js";
 
@@ -118,25 +119,46 @@ function answerProblem(error: unknown): string | undefined {
 }
 
 /**
+ * Issue text for the server log: `redact()`, so a credential in the
+ * sentence is masked and the rest stays. A parser's own message must not
+ * be passed here: it quotes the answer (see parseAgentOutput).
+ */
+export function describeIssue(text: string): string {
+  return redact(text);
+}
+
+/**
  * Parses an agent's structured answer. When the answer does not fit its
  * schema, logs agent.output_retry with the run id and the schema name (the
- * "format incomplete, retry" path the person then has to retry), and a
- * `problem` when the error carries one (see answerProblem), then rethrows.
+ * "format incomplete, retry" path the person then has to retry). A parse
+ * failure logs describeIssue of the kind (and the answer's byte length when
+ * the caller measured one), never the parser message or the answer. Any
+ * other failure logs describeIssue of its message. Then rethrows.
  */
 export function parseAgentOutput<T>(
   run: Pick<Run, "id">,
   schema: string,
   parse: () => T,
+  logged?: { length?: number },
 ): T {
   try {
     return parse();
   } catch (error) {
     const problem = answerProblem(error);
+    const summary =
+      problem === undefined
+        ? errorMessage(error)
+        : logged?.length === undefined
+          ? problem
+          : `${problem} length=${logged.length}`;
     log.warn("agent.output_retry", {
       runId: run.id,
       schema,
-      reason: errorMessage(error),
-      ...(problem ? { problem } : {}),
+      reason: describeIssue(summary),
+      ...(problem ? { problem: describeIssue(problem) } : {}),
+      ...(problem && logged?.length !== undefined
+        ? { length: logged.length }
+        : {}),
     });
     throw error;
   }
@@ -164,7 +186,7 @@ export async function logged<T>(
       ...fields,
       durationMs: Date.now() - started,
       ...(refused ? { status: error.statusCode } : {}),
-      error: errorMessage(error),
+      error: redact(errorMessage(error)),
     });
     throw error;
   }

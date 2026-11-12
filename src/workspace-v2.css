@@ -435,10 +435,7 @@
   }
   .is-focused .sidebar,
   .is-focused .topbar,
-  .is-focused .workspace-heading,
-  .is-focused .file-panel,
-  .is-focused .explanation-wrap,
-  .is-focused .pane-resizer {
+  .is-focused .workspace-heading {
     display: none;
   }
   .is-focused .main-shell {
@@ -454,12 +451,6 @@
     margin: 0;
     border-radius: 0;
   }
-  .is-focused .review-grid,
-  .is-focused .review-grid.files-hidden,
-  .is-focused .review-grid.explanation-hidden,
-  .is-focused .review-grid.files-hidden.explanation-hidden {
-    grid-template-columns: minmax(0, 1fr);
-  }
   .is-focused .diff-topbar > span {
     font-size: var(--text-xs);
   }
@@ -473,9 +464,6 @@
         --explanation-width,
         340px
       );
-  }
-  .is-focused .review-grid {
-    grid-template-columns: minmax(0, 1fr);
   }
 }
 @media (min-width: 761px) and (max-width: 1100px) {
@@ -542,12 +530,6 @@
   }
   .is-reading .rv-shift-hint {
     display: none;
-  }
-  .is-focused .review-grid,
-  .is-focused .review-grid.files-hidden,
-  .is-focused .review-grid.explanation-hidden,
-  .is-focused .review-grid.files-hidden.explanation-hidden {
-    grid-template-columns: minmax(0, 1fr);
   }
   .is-focused .diff-topbar > span {
     display: flex;
@@ -636,9 +618,7 @@
     display: none;
   }
   .is-focused .workspace-heading,
-  .is-focused .topbar,
-  .is-focused .file-panel,
-  .is-focused .explanation-wrap {
+  .is-focused .topbar {
     display: none;
   }
   .is-focused .review-area {

@@ -17,6 +17,7 @@ import {
   Play,
   RotateCcw,
   ShieldCheck,
+  TriangleAlert,
   Users,
 } from "lucide-react";
 import {
@@ -31,6 +32,7 @@ import { ModelSummary } from "../models/ModelSummary";
 import { providerLabels } from "../../shared/models";
 import { teamLanes, type TeamLaneId } from "./lanes";
 import { PremiseNotice } from "./PremiseNotice";
+import { OverlapNotice, usePlanOverlaps } from "./OverlapNotice";
 import { ErrorBoundary } from "../app/ErrorBoundary";
 import type { PlanWithGuideProps } from "../byhand/lazy";
 import "./team.css";
@@ -61,8 +63,11 @@ export function TeamBoard({
 }: {
   run: Run;
   demo: boolean;
-  /** Approves the plan; in the demo, the playback's approvePlan. */
-  onApprove: () => void;
+  /**
+   * Approves the plan; in the demo, the playback's approvePlan.
+   * `overlapDigest` once the person ticked the overlap with their other contributions.
+   */
+  onApprove: (options?: { overlapDigest?: string }) => void;
   /** Sends the plan back to the lead with feedback; rejects with the server's message. */
   onRevise: (feedback: string) => Promise<void>;
   onMessage: (to: string, content: string) => Promise<void>;
@@ -72,6 +77,7 @@ export function TeamBoard({
   byHand?: Omit<PlanWithGuideProps, "run"> & { writing?: boolean };
 }) {
   const t = useT("team");
+  const overlapText = useT("workspace").overlap;
   const byHandText = useT("discovery").byHand;
   const taskLabels = useT("common").teamTaskStatus;
   const fmt = useFormat();
@@ -93,6 +99,19 @@ export function TeamBoard({
   >({});
   const isExpanded = (task: TeamTask) =>
     toggled[task.id] ?? (task.status === "failed" && !!task.error);
+  const { read: overlapRead, reading: readingOverlaps } = usePlanOverlaps(
+    run,
+    run.team?.phase === "awaiting_approval" && !run.learnByHand && !demo,
+    busy,
+  );
+  const overlaps = overlapRead?.overlaps;
+  // A tick counts only for the overlaps it was given on: the server checks the digest too.
+  const [confirmedOverlap, setConfirmedOverlap] = useState<string>();
+  const overlapPending = !!overlaps?.length && confirmedOverlap !== overlapRead?.digest;
+  const overlapTitles = (task: TeamTask) =>
+    (overlaps ?? [])
+      .filter((overlap) => overlap.taskIds?.includes(task.id))
+      .map((overlap) => overlapText.quoted({ title: overlap.title }));
   const team = run.team;
   if (!team)
     return (
@@ -121,6 +140,10 @@ export function TeamBoard({
     !team.tasks.some((task) => task.id === recipient && canReceive(task));
   const messagingDisabled = !demo && (finished || team.phase === "planning");
   const done = team.tasks.filter((task) => task.status === "complete").length;
+  const taskStatusLabel = (task: TeamTask) =>
+    task.status === "ready" && ["failed", "cancelled"].includes(team.phase)
+      ? t.task.readyAfterRetry
+      : taskLabels[task.status];
   const revisions = team.planRevisions ?? [];
   const revisionsLeft = revisions.length < maxPlanRevisions;
   const retryable =
@@ -182,9 +205,7 @@ export function TeamBoard({
       {/* Learn by hand: no agent team to describe, split work for or talk to; the plan and the run's details stay. */}
       {!run.learnByHand && <div className="team-board-header">
         <div>
-          <span className="eyebrow">{t.eyebrow}</span>
           <h2>{t.title}</h2>
-          <p>{t.intro}</p>
         </div>
         <div className="team-runtime-badge">
           <Bot size={16} />
@@ -225,7 +246,8 @@ export function TeamBoard({
         <i />
         <span {...step("approve")}>
           <ShieldCheck size={18} aria-hidden="true" />
-          {team.config.requirePlanApproval
+          {/* The overlap check can hold an automatic plan for approval too. */}
+          {team.config.requirePlanApproval || team.phase === "awaiting_approval"
             ? t.flow.approve
             : t.flow.autoApprove}
         </span>
@@ -317,12 +339,18 @@ export function TeamBoard({
         )}
         {team.phase === "awaiting_approval" && !run.learnByHand && (
           <>
+            <OverlapNotice
+              overlaps={overlaps}
+              confirmed={!overlapPending}
+              onConfirm={(confirmed) => setConfirmedOverlap(confirmed ? overlapRead?.digest : undefined)}
+              disabled={busy || revising}
+            />
             <div className="team-plan-action">
               <span>{t.approval.hint}</span>
               <button
                 className="button primary"
-                onClick={onApprove}
-                disabled={busy || revising}
+                onClick={() => onApprove(overlaps?.length ? { overlapDigest: overlapRead?.digest } : {})}
+                disabled={busy || revising || overlapPending || readingOverlaps}
               >
                 {busy ? (
                   <Loader2 size={15} className="spin" />
@@ -476,7 +504,6 @@ export function TeamBoard({
                     className={`team-task task-${task.status}`}
                   >
                     <div className="team-task-label">
-                      <span>{task.id}</span>
                       <span>
                         {task.status === "running" ? (
                           <Loader2 className="spin" size={13} />
@@ -485,7 +512,7 @@ export function TeamBoard({
                         ) : (
                           <Circle size={12} />
                         )}{" "}
-                        {taskLabels[task.status]}
+                        {taskStatusLabel(task)}
                       </span>
                     </div>
                     <h4>{task.title}</h4>
@@ -516,9 +543,12 @@ export function TeamBoard({
                           : t.task.showAll}
                       </button>
                     )}
+                    <details className="team-task-details">
+                      <summary>{t.task.details}</summary>
+                      <code>{task.id}</code>
                     <div className="team-task-owner">
                       <Bot size={13} />
-                      {task.owner}
+                      {run.agents.find((agent) => agent.id === task.owner)?.name ?? task.owner}
                       <span>
                         {task.worktreeRemoved
                           ? t.task.worktreeRemoved
@@ -532,11 +562,37 @@ export function TeamBoard({
                           t.task.filesPending}
                       </span>
                     </div>
+                    </details>
+                    {overlapTitles(task).length > 0 && (
+                      <div className="team-task-files team-task-overlap">
+                        <TriangleAlert size={13} aria-hidden="true" />
+                        <span>
+                          {overlapText.chip({
+                            titles: fmt.list(overlapTitles(task), { type: "unit" }),
+                          })}
+                        </span>
+                      </div>
+                    )}
                     {task.dependsOn.length > 0 && (
                       <div className="team-task-deps">
-                        {t.task.dependsOn({
-                          tasks: fmt.list(task.dependsOn, { type: "unit" }),
-                        })}
+                        <span>{t.task.dependsOn}</span>
+                        <ul aria-label={t.task.dependsOn}>
+                          {task.dependsOn.map((dependencyId) => {
+                            const dependency = team.tasks.find(
+                              ({ id }) => id === dependencyId,
+                            );
+                            return (
+                              <li key={dependencyId}>
+                                <span>{dependency?.title ?? dependencyId}</span>
+                                <span>
+                                  {dependency
+                                    ? taskStatusLabel(dependency)
+                                    : t.task.dependencyUnknown}
+                                </span>
+                              </li>
+                            );
+                          })}
+                        </ul>
                       </div>
                     )}
                     {task.integratedFiles && task.integratedFiles.length > 0 && (

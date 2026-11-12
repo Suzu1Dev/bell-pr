@@ -1,3 +1,4 @@
+import { safeLink, WebLink } from "../review/MarkdownContent";
 import { useEffect, useMemo, useState } from "react";
 import {
   ChevronRight,
@@ -266,7 +267,7 @@ export default function ContributionRulesCard({
                       {finding.source ? (
                         <>
                           <span>{byHand.registry({ date: fmt.date(finding.source.checkedOn) })}</span>
-                          <a href={finding.source.url} target="_blank" rel="noreferrer">{finding.source.url}</a>
+                          <WebLink href={safeLink(finding.source.url) || undefined} target="_blank" rel="noreferrer">{finding.source.url}</WebLink>
                         </>
                       ) : (
                         <code>{`${finding.path}:${finding.line}`}</code>

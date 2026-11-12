@@ -1,4 +1,5 @@
 import type { DoctorCheckId } from "../../../shared/doctor.js";
+import { fullAccessDisclosure, sudoDisclosure } from "../../../shared/i18n/disclosures.en.js";
 import { formatters, intlLocale } from "../../../shared/i18n/locale.js";
 import { product } from "../../../shared/product.js";
 
@@ -33,10 +34,15 @@ const labels: Record<DoctorCheckId, string> = {
   claude: "Claude Code",
   "claude-auth": "Claude Code sign-in",
   "claude-sandbox": "Claude Code sandbox",
+  antigravity: "Antigravity CLI",
+  "antigravity-auth": "Antigravity sign-in",
+  "antigravity-sandbox": "Antigravity sandbox",
   "provider-ready": "AI provider",
   "data-dir": "Data directory",
   app: product.name,
   platform: "Platform",
+  "full-access": "Full access",
+  "passwordless-sudo": "Passwordless sudo",
 };
 
 /** Environment checks (doctor), setup errors and app settings messages. */
@@ -48,7 +54,7 @@ export default {
       maxActiveRuns: "Runs at a time",
       maxAgentProcesses: "Agent processes at a time",
       agentTimeoutScale: "Agent time limit scale",
-      allowUnsandboxedAgents: "Allow unsandboxed Claude Code agents",
+      allowUnsandboxedAgents: "Allow unsandboxed Claude Code and Antigravity agents",
       retentionDays: "Days to keep a finished run's files",
     },
     locked: ({ setting, variable }: { setting: string; variable: string }) =>
@@ -67,6 +73,7 @@ export default {
     ghMissing: `The GitHub CLI (gh) is not installed, or ${product.name} cannot find it on its PATH.`,
     codexMissing: `The Codex CLI is not installed, or ${product.name} cannot find it on its PATH.`,
     claudeMissing: `Claude Code is not installed, or ${product.name} cannot find it on its PATH.`,
+    antigravityMissing: `The Antigravity CLI (agy) is not installed, or ${product.name} cannot find it on its PATH.`,
     ghUnauthenticated:
       "The GitHub CLI is not signed in, or its sign-in expired. Sign in again, then retry.",
     githubAuthRequired:
@@ -79,6 +86,8 @@ export default {
       "Codex is not signed in, or its sign-in expired. Sign in again, then retry.",
     claudeUnauthenticated:
       "Claude Code is not signed in, or its sign-in expired. Sign in again, then retry.",
+    antigravityUnauthenticated:
+      "The Antigravity CLI is not signed in, or its sign-in expired. Run agy in a terminal to sign in, then retry.",
     cloneTimeout:
       "Cloning took longer than 10 minutes, so it was stopped. Clone the repository yourself, then import the path of your clone.",
   },
@@ -94,6 +103,8 @@ export default {
     signInCodex: "Sign in to Codex",
     installClaude: "Install Claude Code",
     signInClaude: "Sign in to Claude Code",
+    installAntigravity: "Install the Antigravity CLI",
+    signInAntigravity: "Start the Antigravity CLI once to sign in",
     setGitName: "Set your name",
     setGitEmail: "Set your e-mail address",
     setNoreplyEmail: "Use your private GitHub no-reply address",
@@ -120,6 +131,16 @@ export default {
       `Installed, but \`${command}\` failed: ${output}`,
     gitTooOld: ({ version }: { version: string }) =>
       `Git ${version} works, but moving a run onto the latest target branch needs Git 2.40 or later. Everything else works.`,
+    claudeVersionUnsupported: ({
+      version,
+      min,
+      below,
+    }: {
+      version: string;
+      min: string;
+      below: string;
+    }) =>
+      `Claude Code ${version} is outside the versions ${product.name} supports (${min} or later, before ${below}). Agents still start, but ${product.name} has not checked that this release applies its sandbox and hook settings.`,
     identityMissing:
       "Not set: Git does not know your name and e-mail address, so nothing can be committed or published.",
     identityAutodetected: ({ email }: { email: string }) =>
@@ -144,12 +165,29 @@ export default {
       "Not available on this platform, so Claude Code agents cannot edit files.",
     sandboxAllowed:
       "Not available. Claude Code agents may edit files without it because you allowed that; such runs are marked.",
+    antigravitySandboxReady:
+      "Available: Antigravity agents that edit files run their commands in its terminal sandbox.",
+    antigravitySandboxRestricted:
+      "Not available: this Linux system does not let the Antigravity CLI create user namespaces (kernel.apparmor_restrict_unprivileged_userns), so Antigravity agents cannot edit files. docs/troubleshooting.md explains the options.",
+    antigravitySandboxUnsupported:
+      "Not available on this platform, so Antigravity agents cannot edit files.",
+    antigravitySandboxAllowed:
+      "Not available. Antigravity agents may edit files and run commands without it because you allowed that; such runs are marked.",
+    fullAccessDisclosure,
+    sudoDisclosure,
+    passwordlessSudoInstalled: `BELL PR's passwordless sudo rule is installed. ${sudoDisclosure}`,
+    passwordlessSudoExternal: `Passwordless sudo is available through another rule. ${sudoDisclosure}`,
     providersReady: ({ providers }: { providers: string[] }) =>
       `Ready: ${fmt.list(providers)}.`,
     noProvider:
-      `Install and sign in to the Codex CLI or Claude Code: ${product.name} needs at least one.`,
+      `Install and sign in to the Codex CLI, Claude Code or the Antigravity CLI: ${product.name} needs at least one.`,
     savedProviderNotReady: ({ provider }: { provider: string }) =>
       `${provider} is chosen in the model settings but is not ready.`,
+    /** Codex when the release switch `codexEnabled` is false. Not a failure. */
+    codexDisabled: "Disabled. Codex is turned off in this build.",
+    /** Only Codex is installed, and the release switch leaves it off. */
+    claudeOnlyRelease: "Claude Code only in 1.0.0; Codex support is disabled",
+    installClaudeCode: "Please install Claude Code.",
     dataDirReady: ({ free }: { free: number }) => `Writable, ${size(free)} free.`,
     dataDirWritable: "Writable.",
     dataDirNew: "Will be created at the first start.",

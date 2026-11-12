@@ -396,12 +396,15 @@ test("analysis and discovery follow a changed agent timeout scale", async (t) =>
 
 /** Stand-ins for a machine where only Claude Code is installed and signed in. */
 const claudeOnly = {
-  git: `case "$1" in
-  --version) echo "git version 2.45.1" ;;
-  var) echo "Test User <test@example.com> 1760000000 +0000" ;;
-  config) echo "test@example.com" ;;
-  *) echo "fatal: not supported here" >&2; exit 1 ;;
-esac`,
+  git: `for arg in "$@"; do
+  case "$arg" in
+    --version) echo "git version 2.45.1"; exit 0 ;;
+    var) echo "Test User <test@example.com> 1760000000 +0000"; exit 0 ;;
+    config) echo "test@example.com"; exit 0 ;;
+  esac
+done
+echo "fatal: not supported here" >&2
+exit 1`,
   claude: `case "$1" in
   --version) echo "2.1.292 (Claude Code)" ;;
   auth) echo '{"loggedIn": true, "authMethod": "claude.ai", "subscriptionType": "max"}' ;;

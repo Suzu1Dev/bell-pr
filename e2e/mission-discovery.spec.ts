@@ -3,6 +3,7 @@
 // section nav, and text that fits.
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Browser, type Page } from "@playwright/test";
+import { e2eApiHeaders } from "./api-token.mjs";
 import { locales } from "../shared/i18n/locale";
 import { playbackTiming } from "../src/demo/playback";
 import { getDemo } from "../src/demo/all";
@@ -19,6 +20,7 @@ const widths = [1440, 390];
 /** A page on a spec-local server; closed with `close()`. */
 async function openOn(browser: Browser, server: LaunchedServer) {
   const context = await browser.newContext({
+    extraHTTPHeaders: e2eApiHeaders,
     baseURL: server.baseURL,
     locale: "en-US",
   });
@@ -171,7 +173,7 @@ test("#overview-directions and the section nav scroll to the directions and keep
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/#/runs/demo-run/overview?locale=en");
   const directions = page.locator("#overview-directions");
-  await expect(directions).toBeVisible();
+  await expect(directions).toBeHidden();
   await expect(directions).not.toBeInViewport();
 
   // A link to the anchor, as a person follows it.
@@ -192,6 +194,7 @@ test("#overview-directions and the section nav scroll to the directions and keep
   await page.goto("/#/runs/demo-run/overview?locale=en");
   await page.evaluate(() => window.scrollTo(0, 0));
   await expect(directions).not.toBeInViewport();
+  if (await page.locator(".mission-context").getAttribute("open") === null) await page.locator(".mission-context > summary").click();
   const link = nav.getByRole("link", { name: mission.sections.directions });
   await link.click();
   await expect(directions).toBeInViewport();
@@ -203,7 +206,7 @@ test("a repository without a run lists the directions right after the project ca
   await page.goto("/#/repos/demo-repo?locale=en");
   await expect(page.locator("#overview-purpose")).toBeVisible();
   const ids = await page
-    .locator('.mission-overview > section[id^="overview-"]')
+    .locator('.mission-context > section[id^="overview-"]')
     .evaluateAll((sections) => sections.map((section) => section.id));
   expect(ids.slice(0, 2)).toEqual(["overview-purpose", "overview-directions"]);
 });
@@ -214,6 +217,7 @@ for (const width of widths)
       await page.setViewportSize({ width, height: 900 });
       for (const hash of ["#/runs/demo-run/overview", "#/repos/demo-repo"]) {
         await page.goto(`/${hash}?locale=${locale}`);
+        if (await page.locator(".mission-context").getAttribute("open") === null) await page.locator(".mission-context > summary").click();
         await expect(page.locator("#overview-purpose")).toBeVisible();
         await page.waitForLoadState("networkidle");
         await page.evaluate(() => document.fonts.ready);

@@ -5,6 +5,9 @@ complete the requested behavior with the smallest clear change. The upstream
 skill is in `.agents/skills/ponytail/SKILL.md`; pinned provenance and licensing are
 in `vendor/ponytail/`. Explicit user requirements take precedence.
 
+Do not append AI-assistance or Codex attribution to BELL PR commit messages.
+Keep the DCO `Signed-off-by` trailer required by `CONTRIBUTING.md`.
+
 Before editing, understand the affected flow and inspect existing callers. Reuse
 existing code first, then the standard library, native platform capabilities,
 and installed dependencies. Add abstractions or dependencies only when the task

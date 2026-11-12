@@ -1,4 +1,5 @@
 import test from "node:test";
+import { codexAccessMode } from "./agent-cli.js";
 import assert from "node:assert/strict";
 import { once } from "node:events";
 import { request } from "node:http";
@@ -31,9 +32,10 @@ import { lenientRead } from "./persisted-schema.js";
 import { closeLog, initLog, recentLogLines } from "./log.js";
 import { assertNoHan } from "../src/test-utils/render.js";
 import { command, git } from "./process.js";
+import { assertSecretsHidden, redactSamples } from "./redact-samples.js";
 import { AppError } from "./types.js";
 import { Store } from "./store.js";
-import { withLocale } from "./i18n/index.js";
+import { sm, withLocale } from "./i18n/index.js";
 import { respondIn } from "./prompt-language.js";
 
 /** The JSON data object sent after the prompt sentences and before the Ponytail guidance. */
@@ -314,7 +316,7 @@ test("analysis uses bounded read-only structured Codex context and excludes secr
       ]);
       assert.match(options.input!, /source\.tree .* only proves those paths exist/);
       assert.notEqual(options.cwd, f.repository);
-      assert.equal(args[args.indexOf("--sandbox") + 1], "read-only");
+      assert.equal(codexAccessMode(args), "read-only");
       assert.ok(args.includes("--ignore-user-config"));
       assert.ok(args.includes("--skip-git-repo-check"));
       assert.equal(options.timeoutMs, 240_000);
@@ -892,6 +894,69 @@ test("a rejected analysis logs which fields did not fit, never their values", as
   }
 });
 
+test("a malformed analysis answer is logged as kind and length, without the answer or a secret", async () => {
+  const f = await fixture();
+  const secret = `ghp_${"FAKE".padEnd(20, "a")}`;
+  const phrase = "ordinary-phrase-keep-out";
+  const raw = `${secret} ${phrase} GITHUB_TOKEN=fakeplaintextvalue`;
+  initLog(f.store.directory, { stderr: { write: () => true } });
+  try {
+    const service = new ProjectInsightsService(f.store, {
+      getModelCatalog: async () => ({ models: [], source: "codex" }),
+      command: async (_executable, args, options = {}) => {
+        if (args[0] === "exec") {
+          options.onLine?.(
+            JSON.stringify({
+              type: "item.completed",
+              item: { type: "agent_message", text: raw },
+            }),
+            "stdout",
+          );
+        }
+        return { stdout: "", stderr: "", code: 0 };
+      },
+    });
+    await assert.rejects(
+      service.generate(f.repo.id),
+      (error: unknown) => error instanceof AppError && error.statusCode === 422,
+    );
+    const lines = await recentLogLines(f.store.directory);
+    const text = lines.join("\n");
+    assert.ok(!text.includes(secret), "the secret must not be logged");
+    assert.ok(!text.includes("FAKE"), "a fragment of the secret must not be logged");
+    assert.ok(!text.includes(phrase), "the raw answer must not be logged");
+    assert.ok(!text.includes("fakeplaintextvalue"));
+    const retry = lines
+      .map((line) => JSON.parse(line) as Record<string, unknown>)
+      .find((entry) => entry.msg === "agent.output_retry");
+    assert.ok(retry);
+    assert.equal(retry.schema, "analysis");
+    assert.equal(retry.problem, "json_syntax");
+    assert.equal(retry.length, Buffer.byteLength(raw));
+    assert.equal(retry.reason, `json_syntax length=${Buffer.byteLength(raw)}`);
+    const cited = `src/SOME_KEY=fakeplaintextvalue`;
+    const serviceWithPath = new ProjectInsightsService(f.store, {
+      getModelCatalog: async () => ({ models: [], source: "codex" }),
+      command: fakeCodex(() => ({
+        ...validAnalysis(),
+        modules: [{ path: cited, purpose: "組合問候文字" }],
+      })).execute,
+    });
+    await assert.rejects(
+      serviceWithPath.generate(f.repo.id),
+      (error: unknown) => error instanceof AppError && error.statusCode === 422,
+    );
+    const after = (await recentLogLines(f.store.directory)).join("\n");
+    // The assignment is rejected as sensitive content, so the path is not logged.
+    assert.ok(!after.includes("fakeplaintextvalue"));
+    assert.ok(!after.includes("SOME_KEY="));
+    assert.match(after, new RegExp(sm().analysis.insights.sensitiveAnswer.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  } finally {
+    closeLog();
+    await f.cleanup();
+  }
+});
+
 test("recommendations whose quotes do not match are dropped and reported while the rest of the analysis is saved", async () => {
   const f = await fixture();
   try {
@@ -1410,6 +1475,11 @@ test("analysis sends and persists the chosen model even when repository settings
 
 test("Claude Code analysis uses the signed-in CLI without tools, an inline schema and Claude usage fields", async () => {
   const f = await fixture();
+  // Host may export an Anthropic key for other tools; this case asserts the
+  // analysis spawn omits it so Claude Code uses its signed-in CLI session.
+  const previousAnthropicKey = process.env.ANTHROPIC_API_KEY;
+  delete process.env.ANTHROPIC_API_KEY;
+  try {
   const calls: {
     executable: string;
     args: string[];
@@ -1492,6 +1562,10 @@ test("Claude Code analysis uses the signed-in CLI without tools, an inline schem
     await service.shutdown();
     await f.cleanup();
   }
+  } finally {
+    if (previousAnthropicKey === undefined) delete process.env.ANTHROPIC_API_KEY;
+    else process.env.ANTHROPIC_API_KEY = previousAnthropicKey;
+  }
 });
 
 test("more recommendations request five new proposals per call, append atomically and retain original analysis", async () => {
@@ -1536,7 +1610,7 @@ test("more recommendations request five new proposals per call, append atomicall
       if (beforeBatch)
         assert.deepEqual((await service.get(f.repo.id)).insights, beforeBatch);
       if (inspect) {
-        assert.equal(args[args.indexOf("--sandbox") + 1], "read-only");
+        assert.equal(codexAccessMode(args), "read-only");
         assert.ok(args.includes("--ignore-user-config"));
         assert.ok(args.includes('approval_policy="never"'));
         assert.notEqual(options.cwd, f.repository);
@@ -2060,6 +2134,54 @@ test("a running analysis reports its step, try, wait against the limit and the C
     assert.equal(started?.notice, undefined);
     assert.match(noticed?.notice ?? "", /rate_limit/);
     assert.equal(service.analysisProgress(f.repo.id), undefined);
+  } finally {
+    await service.shutdown();
+    await f.cleanup();
+  }
+});
+
+test("analysis notices and errors hide the shared secret samples", async () => {
+  const f = await fixture();
+  const notices: string[] = [];
+  const service: ProjectInsightsService = new ProjectInsightsService(f.store, {
+    command: async (executable, args, options = {}) => {
+      if (executable === "claude" && args[0] === "-p") {
+        const emit = (event: unknown) => options.onLine?.(JSON.stringify(event), "stdout");
+        for (const sample of redactSamples) {
+          emit({
+            type: "system",
+            subtype: "api_retry",
+            attempt: 1,
+            max_retries: 2,
+            error: sample.text,
+          });
+          notices.push(service.analysisProgress(f.repo.id)?.notice ?? "");
+        }
+        emit({
+          type: "result",
+          subtype: "success",
+          is_error: true,
+          result: redactSamples.map((sample) => sample.text).join("\n"),
+        });
+        throw new AppError("claude failed before redaction", 422);
+      }
+      return { stdout: "", stderr: "", code: 0 };
+    },
+  });
+  try {
+    await service.setSettings(f.repo.id, {
+      ...defaultContributionSettings,
+      provider: "claude",
+    });
+    const error = await service.generate(f.repo.id).then(
+      () => assert.fail("the analysis should fail"),
+      (caught: unknown) => caught,
+    );
+    assert.ok(error instanceof Error);
+    assertSecretsHidden(notices.join("\n"));
+    assertSecretsHidden(error.message);
+    assert.match(notices.join("\n"), /\[REDACTED\]/);
+    assert.match(error.message, /\[REDACTED\]/);
   } finally {
     await service.shutdown();
     await f.cleanup();

@@ -17,14 +17,47 @@ other than `~/.bellpr`; when you started it with `npx`, run
 runs with that data directory, even one started with `--port`, or, while
 none runs, the port that a start would use.
 
+A warning does not by itself change that exit code or make `bell-pr start`
+refuse to listen; of the checks, only a failed required one does. For
+example, the Claude Code check warns when Claude Code is outside the
+versions BELL PR supports (2.1.292 or later, before 2.2); agents still
+start, and the [security model](security-model.md#claude-code) says why
+the version matters.
+
 Contents:
 
 - [I lost the address](#i-lost-the-address)
 - [Error codes](#error-codes), one section per code
+- [An earlier publish made a different commit](#an-earlier-publish-made-a-different-commit)
 - [Publishing was blocked by a project rule, an issue or pacing](#publishing-was-blocked-by-a-project-rule-an-issue-or-pacing)
 - [BELL PR does not start](#bell-pr-does-not-start)
+- [Group work has stopped](#group-work-has-stopped)
+- [Group storage is full](#group-storage-is-full)
+- [Group work asks you to wait](#group-work-asks-you-to-wait)
 - [Runs that wait, stop or cannot be reviewed](#runs-that-wait-stop-or-cannot-be-reviewed)
 - [Collecting details for a support request](#collecting-details-for-a-support-request)
+
+## An earlier publish made a different commit
+
+If a publish failed and you have not changed the code or commit message,
+retry **Submit Draft PR** after resolving the error. BELL PR reuses the saved
+commit; recovery is needed when that commit no longer matches your changes.
+
+A failed publish can leave a local commit. If you later change the files or
+commit message, retrying cannot reuse that commit. On the **Draft** tab, save
+your edits and choose **Recover unfinished publish**. This option appears
+only for attempts that stopped before pushing began.
+
+Recovery checks the project and your signed-in account's fork for matching
+branches, and checks the project for matching PRs in any state. If no branch
+or PR exists, it backs up the old commit locally, keeps your files and draft,
+and returns the contribution to review. Review and approve it again, then
+submit the Draft PR as usual.
+
+If GitHub cannot be checked, fix the connection or sign-in and try recovery
+again. If a branch or PR already exists, recovery leaves everything unchanged;
+check that branch or PR on GitHub. Attempts where pushing may have begun
+cannot use this recovery action.
 
 ## I lost the address
 
@@ -37,15 +70,31 @@ bell-pr open
 ```
 
 - **Started with `npx`:** run `npx bell-pr open`.
-- **No browser on that machine** (a server, SSH): `bell-pr open --print`
-  only prints the address; open it in a browser that reaches BELL PR.
+- **No browser on that machine** (a server, SSH): prefer pairing from a
+  device that can open `/pair`. As a fallback,
+  `bell-pr open --print --print-token` only prints the address; open it in
+  a browser that reaches BELL PR. The address includes `#bell_token=`.
+  The line printed at start does not, and neither does `bell-pr open`
+  without `--print-token`. Do not share the `--print-token` address.
+- **Pairing locked (HTTP 423)**: on the host run `bell-pr pair --unlock`,
+  then `bell-pr pair`. A paired device cannot unlock.
+- **Lost or stolen device**: revoke it from the device list in Settings on
+  another paired device, or on the host with
+  `bell-pr devices revoke <id>`. If your own device was revoked, run
+  `bell-pr token rotate` on the host and pair again.
 - **Another data directory:** `bell-pr open --data-dir <dir>`, with the
   directory you started BELL PR with.
-- **Docker:** `docker exec <container> bell-pr open --print`.
+- **Docker:** `docker exec <container> bell-pr open --print --print-token`.
 - **systemd service:** run `bell-pr open` in a terminal on that machine.
 
 If `bell-pr open` says that no BELL PR is running with that data directory,
 start BELL PR (`bell-pr`) and use the address it prints.
+
+The page says the request needs the API token when it was opened from the
+startup line, or from a bookmark, instead of from `bell-pr open`. Run
+`bell-pr open` on that computer (same user, same `--data-dir`). The token
+file is `<data dir>/api-token`. A restart reuses it. `bell-pr token rotate`
+replaces it; then run `bell-pr open` again.
 
 ## Error codes
 
@@ -158,7 +207,8 @@ codex login
 ```
 
 See the [Codex CLI](https://github.com/openai/codex) for other ways to
-install it. You need the Codex CLI or Claude Code, not both.
+install it. You need one of the Codex CLI, Claude Code or the Antigravity
+CLI, not all of them.
 
 ### `codex_unauthenticated`
 
@@ -217,6 +267,83 @@ the agent starts (HTTP 503). Pick one:
 
 `bell-pr doctor` shows whether the sandbox works ("Claude Code sandbox").
 See the [security model](security-model.md) for what the sandbox allows.
+
+### `antigravity_missing`
+
+"The Antigravity CLI (agy) is not installed, or BELL PR cannot find it on
+its PATH." Google's installer puts `agy` in `~/.local/bin`; add that folder
+to the PATH BELL PR starts with if `agy --version` is not found.
+
+```sh
+curl -fsSL https://antigravity.google/cli/install.sh | bash
+agy
+```
+
+On Windows, PowerShell: `irm https://antigravity.google/cli/install.ps1 | iex`.
+Started without arguments, `agy` signs you in. BELL PR uses the Antigravity
+CLI you installed and signed in to (Google account, Gemini API key or Google
+Cloud credentials); usage counts against your own account.
+
+### `antigravity_unauthenticated`
+
+"The Antigravity CLI is not signed in, or its sign-in expired." Start it
+once in a terminal and sign in:
+
+```sh
+agy
+```
+
+BELL PR checks the sign-in with `agy models`, which lists models without
+starting a model turn. A Gemini API key (`GEMINI_API_KEY` with
+`"modelProvider": "gemini"` in `~/.gemini/antigravity-cli/settings.json`)
+and Application Default Credentials (`AGY_ADC_AUTH=true`) reach the CLI
+when they are set in the environment BELL PR starts with. A sign-in that
+the CLI keeps only in the system keyring may not reach agents, because
+BELL PR does not pass the desktop session's variables to them; `agy models`
+then fails in `bell-pr doctor` too.
+
+### `antigravity_sandbox_unavailable`
+
+An Antigravity agent that edits files and runs commands needs the
+Antigravity CLI's terminal sandbox, and it cannot start here, so the run
+stops before the agent starts (HTTP 503). On Linux that sandbox needs user
+namespaces. Ubuntu 24.04 and later withhold them from programs without an
+AppArmor profile (`kernel.apparmor_restrict_unprivileged_userns = 1`), and
+the Antigravity CLI then reports "Terminal sandbox unavailable" in its own
+log. BELL PR reads the same settings. Pick one:
+
+- **Allow user namespaces** for every program, which lowers a protection
+  Ubuntu turned on for the whole system:
+  `sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0` (until
+  the next restart; a file in `/etc/sysctl.d/` keeps it). Then press
+  **Re-check** in **Settings → Environment**.
+- **Use Claude Code or Codex** for this work: choose it in the model
+  settings. Claude Code's bubblewrap has its own AppArmor profile on
+  Ubuntu, and Codex brings its own sandbox.
+- **Allow unsandboxed agents** under **Settings → Agent safety**, or start
+  BELL PR with `BELLPR_ALLOW_UNSANDBOXED_AGENTS=1`. Antigravity's commands
+  then run with your full user rights, as described for
+  `claude_sandbox_unavailable` above, and every such run carries a "Ran
+  without sandbox" badge.
+
+`bell-pr doctor` shows the state as "Antigravity sandbox". macOS needs
+`sandbox-exec`, which it has built in; other platforms have no sandbox for
+Antigravity.
+
+### `antigravity_workspace_config`
+
+The project contains Antigravity customizations: a `hooks.json`,
+`mcp_config.json`, `plugins`, `plugins.json`, `agents`, `skills` or
+`skills.json` in an `.agents`, `.agent`, `_agents` or `_agent` folder,
+in the working folder or a folder above it up to the repository root. The
+Antigravity CLI has no setting that skips them: it would load them for
+every agent, run their hooks and start their MCP servers outside any
+sandbox, also in a folder it was never asked to trust. So BELL PR does not
+start Antigravity there (HTTP 422); the error names what it found. Choose
+Claude Code or Codex in the model settings for this project. An agent that
+creates such a file during a run stops the run's next Antigravity turn the
+same way. See the [security model](security-model.md#antigravity) for
+what else the Antigravity CLI loads.
 
 ### `clone_timeout`
 
@@ -426,6 +553,13 @@ there, then publish again.
 
 ## BELL PR does not start
 
+- **"Not ready: fix the required check…"**: `bell-pr doctor` failed a
+  required check, so `bell-pr start` exited before it listened. The message
+  is the doctor's checklist: each failed check and the command that fixes
+  it, then how to start anyway. `bell-pr start --force` starts and prints a
+  warning. The sample tour needs no AI provider; a real agent run still
+  waits until Codex CLI, Claude Code or the Antigravity CLI is installed
+  and signed in.
 - **"BELL PR needs Node.js 22 or later"**: install the current Node.js LTS
   from [nodejs.org](https://nodejs.org/en) (or `nvm install 22`).
 - **"Port 4311 is already in use by another program"**: start on a free
@@ -433,13 +567,73 @@ there, then publish again.
 - **"BELL PR is already running at …"** or **"… already running with the
   data directory …"**: one BELL PR runs per data directory. Use it with
   `bell-pr open`, or stop that process first. A lock left behind by a crash
-  is detected and replaced at the next start.
+  is detected and replaced at the next start; with
+  [group work](group-work.md), only when the next start can confirm that
+  its holder stopped (the next item).
+- **"BELL PR cannot tell whether the process holding the data directory …
+  has stopped"** (`dataDirHolderUnconfirmed` in the dictionaries): a BELL
+  PR crashed or was killed and left its lock, and this start cannot
+  confirm that its holder is gone. The lock was written in another
+  container or on another machine, by an older build, or cannot be read.
+  With group work such a lock is never replaced automatically, whatever
+  its age. When the BELL PR that left it ran with group work, a start
+  without `--group` is refused in the same way. When it ran without group
+  work, only a start with `--group` is refused: the first one after such
+  a crash, for example.
+  1. Make sure that no BELL PR still uses this data directory: no process,
+     no container, no other machine.
+  2. Remove the file the message names (`<data dir>/bellpr.lock`).
+  3. Start BELL PR again.
+
+  Removing the lock while its BELL PR still runs lets two processes write
+  the same data directory; the one that lost the lock then stops group
+  work (`notSingleWriter` below).
+- **"Another BELL PR start is replacing a lock left behind in this data
+  directory …"**: before a start replaces a lock left by a crash, it
+  writes a claim file beside it, `bellpr.lock.takeover-…`, and removes it
+  a moment later. This one is still there: another start is at work, or
+  one stopped part-way. Wait about half a minute and start again: a start
+  clears a claim once the process that wrote it is gone, and an empty one,
+  as after a power cut, 30 seconds after it was written. A claim whose
+  process id now belongs to another running Node.js program stays, because
+  a start that is only suspended looks the same. If the message keeps
+  coming back and no BELL PR is starting, remove the file the message
+  names. On a file system without hard links, the same refusal can come
+  where there is no lock, only a leftover claim, and it can leave an empty
+  `bellpr.lock` behind: once the claim is gone, the next start clears
+  that by itself.
+- **"BELL PR cannot tell whether the start that was replacing a lock left
+  behind in this data directory has stopped …"**: the same claim file, on
+  a data directory used with [group work](group-work.md). There a claim
+  stays, however old it is, until the process that wrote it is shown to
+  have stopped. Make
+  sure no BELL PR is starting on this data directory, then remove the file
+  the message names and start again.
+- **"BELL PR cannot read the lock file …"**: a lock is there that this
+  user may not read (its owner or mode was changed, or a start as another
+  user was killed before it removed its lock), or a directory lies in its
+  place. The message gives the system's reason. A
+  lock that cannot be read is never replaced: it may belong to a BELL PR
+  that is still running. Make sure none runs with this data directory,
+  remove it yourself, then start again.
+- **"BELL PR could not take the lock … of the data directory …"**: each
+  time the start looked, the lock file had just changed or could not be
+  read, so there is no running process to name. Start again in a moment.
+  If it keeps happening and no BELL PR is running with this data
+  directory, remove the file the message names.
+- **"BELL PR is already running at … without group work"**:
+  `bell-pr start --group` (or `BELLPR_GROUP=1`) found a BELL PR that runs
+  with this data directory but was started without group work, and never
+  uses it in place of one. Stop that BELL PR, then run
+  `bell-pr start --group`. The `bell-pr group` commands print the same
+  message for such a BELL PR.
 - **"The data directory … belongs to another user"**: start BELL PR as that
   user, or choose your own directory with `--data-dir`.
 - **"To listen on …, set BELLPR_PUBLIC_URL …"** or **"BELLPR_PUBLIC_URL
   must be the address browsers use …"**: BELL PR listens on 127.0.0.1 by
-  default. To reach it from other machines, put an HTTPS reverse proxy in
-  front and set `BELLPR_PUBLIC_URL`, as [Self-hosting](self-hosting.md)
+  default. For another machine or phone, use Tailscale serve (not Funnel)
+  with `BELLPR_PUBLIC_URL`, then pair with `bell-pr pair`, as
+  [Self-hosting](self-hosting.md#reach-bell-pr-from-another-machine)
   describes.
 - **"Could not load the settings file …"**: check the path given to
   `--env-file`.
@@ -450,7 +644,118 @@ there, then publish again.
   "BELLPR_MAX_ACTIVE_RUNS must be between 1 and 8": fix or remove the
   variable. [Configuration](configuration.md) lists every range.
 
+## Group work has stopped
+
+Only for a BELL PR started with `--group` ([Group work](group-work.md)).
+`bell-pr group status` prints "Group work has stopped (reason: …)".
+Group requests answer 503 with `reason: "stopped"` (set-up answers 409), and
+`GET /api/collab` and `GET /api/status` carry the reason. The one request
+whose write stopped group work can answer 503 with the reason itself,
+`notSingleWriter` or `unavailable`. The server log has a "Group work
+stopped" line with the cause. When the lock file itself is gone,
+`bell-pr group status` finds no running BELL PR and cannot print the
+reason: read it in the log or in `GET /api/collab`. The rest of BELL PR
+keeps working, except that nothing in a repository of the group is
+published: the publish dialog shows a block, and publishing answers 503
+with `reason: "holdsUnknown"`
+([Publishing over someone else's hold](group-work.md#publishing-over-someone-elses-hold)).
+Agent turns that may change files there, and plan approvals, are answered
+503 `holdsUnknown` too
+([BELL PR's agents and someone else's hold](group-work.md#bell-prs-agents-and-someone-elses-hold)).
+
+A stopped group stays stopped until BELL PR is restarted, and BELL PR
+never creates or repairs the group's files by itself. Fix the cause below,
+then restart BELL PR.
+
+| Reason | What happened | What to do |
+| --- | --- | --- |
+| `sideDamaged` | `<data dir>/collab.json` cannot be read, or is not a file BELL PR wrote | Restore `collab.json` and `coordination.json` together from one backup |
+| `sideMissing` | `coordination.json` exists, but `collab.json` is missing or does not say that the group was set up. Also when set-up could not write `collab.json` | Restore both files together from one backup |
+| `missing` | `collab.json` says the group was set up, but `coordination.json` is gone | Restore both files together from one backup |
+| `damaged` | `coordination.json` cannot be read or is not consistent | Restore both files together from one backup |
+| `notSingleWriter` | The data directory's lock is no longer this process's: it was removed or replaced while BELL PR ran, or could not be read when BELL PR checked it | Make sure only one BELL PR uses the data directory, then restart it |
+| `unavailable` | Writing `coordination.json` failed, for example on a full disk | Fix what stopped the write, then restart; BELL PR reads the file back from disk |
+| `closed` | BELL PR is shutting down | Start it again |
+
+With no backup, the group has to start again: stop BELL PR, move
+`coordination.json`, `collab.json` and the `collab/` folder out of the data
+directory, start BELL PR with `--group`, run `bell-pr group setup` and
+invite everyone again. Their earlier participant tokens no longer work,
+and the group's repositories, holds and their history are gone with the
+files.
+
+## Group storage is full
+
+Only with [group work](group-work.md). A request that would add to the
+group's record is answered 409 with `reason: "full"` and "The group's
+record is full. Ask the host to reset group storage.": taking a hold,
+joining, and adding a repository. It is the same for everyone, and a
+restart does not change it. Holds can still be released and revoked, and
+the boards can still be read.
+
+First find out which limit it is ([Limits](group-work.md#limits) lists
+them). A group admin reads `storage` in the answer of
+`GET /api/collab/projects`:
+
+- **`used` is far below `max`.** A limit on what is held at a time was
+  reached: 100 holds or 2000 paths for one person over all repositories,
+  or 1000 holds or 20 000 paths in one repository. Release or revoke holds
+  that are no longer needed, and the next one is taken. Nothing has to be
+  reset.
+- **`used` is near `max`** (8 MiB). The record itself is full. It keeps
+  every hold that has ended and every task, and no clean-up is built, so
+  releasing holds makes room for a few more at most. `full` comes before
+  `used` reaches `max`: BELL PR keeps about 3 KB free for each hold held
+  now and 0.1 KB for each task, so that what is held can still end. The
+  same reset is the way out when a group has had 1000 people, 100
+  repositories, or 10 000 tasks in one repository.
+
+To reset group storage, on the computer that runs BELL PR:
+
+1. Tell the group. Every hold and its history will be gone.
+2. Stop BELL PR.
+3. Move `coordination.json`, `collab.json` and the `collab/` folder out of
+   the data directory (`~/.bellpr` by default). Keep them somewhere else
+   until the new group works, then delete them.
+4. Start BELL PR with `--group`.
+5. Run `bell-pr group setup`, then `bell-pr group invite` for each person.
+   Everyone joins again with a new code and gets a new id and a new
+   participant token. The earlier tokens are answered 403 `notJoined`.
+6. An admin adds the group's repositories again.
+
+The holds, the tasks and their history are gone: nothing copies them into
+the new group. Everything else is untouched: projects, contributions and
+their runs, notes, settings and paired devices.
+
+## Group work asks you to wait
+
+Only with [group work](group-work.md). Both answers are 429, and nothing
+was changed by the refused request.
+
+- **"Too many requests in a short time. Try again in N seconds."**
+  (`reason: "slowDown"`): one person sent more than 30 requests to take a
+  hold within 10 minutes, taken or refused, or more than 120 checks within
+  a minute. `retryAfter` in the answer is the same number of seconds. Wait
+  that long and send the request again; the refused one was not counted.
+  The count is per person, over all their devices, and starts again when
+  BELL PR restarts.
+- **"Too many pages are open on the group's boards. Close one, then try
+  again."** (`reason: "tooManyWaiters"`): a request that follows a
+  [live feed](group-work.md#the-live-feed) would have waited, and that
+  person already has 2 requests waiting, or the group has 64. Close a
+  page, or stop a script that follows the feed. Until then, the same
+  request with `wait=0` is still answered, so a board can be read by asking
+  again every few seconds. The same answer, with `wait=0` too, goes to a
+  person whose connections have left 8 feed answers unread: a script that
+  sends requests and does not read the answers. It ends when the answers
+  are read or those connections close.
+
 ## Runs that wait, stop or cannot be reviewed
+
+Worktree identity checks resolve symbolic links in the data directory, including
+macOS temporary paths under `/var/folders`. Using the same directory through its
+physical path or a symbolic link keeps the recorded Git directory; a different
+checkout with a copied `.git` pointer is still refused.
 
 - **A run is queued**: only as many contributions execute at once as
   **Settings → Performance → Runs at a time** allows
@@ -470,9 +775,9 @@ there, then publish again.
 - **"The changes cover more than 150 files"** or **"… larger than 2 MB"**:
   make the task smaller and run it again.
 - **A file is held back from the pull request**: binary files, symbolic
-  links, new files over 512 KB, sensitive files (such as `.env` files and
-  private keys) and changes that look like credentials need a manual
-  review. Remove them from the changes, or handle them outside BELL PR.
+  links, new files over 512 KB, and sensitive files (such as `.env` files)
+  need a manual review. Blocks common token formats and private keys before publishing.
+  Remove them from the changes, or handle them outside BELL PR.
 - **A run stopped when BELL PR restarted**: a restart stops the agents.
   Interrupted runs show what happened; retry the failed subtasks from the
   task board.
@@ -495,8 +800,9 @@ there, then publish again.
   for that analysis (or for **Generate 5 more**) has a `problem` field. It
   lists the fields that did not fit and the kind of problem, such as
   `recommendations: too_big`, or `json_syntax` when the answer was not JSON.
-  It never contains the answer's text. Analyze again; the previous result is
-  kept.
+  `length` is the answer's size in bytes. The line never contains the
+  answer's text; credential-shaped text in it is masked. Analyze again; the
+  previous result is kept.
 
 <!-- generated:product-link key=supportEmail text="Contact support by e-mail" -->
 <!-- /generated:product-link -->

@@ -136,7 +136,7 @@ test("environment variables win, are reported in lockedBy and cannot be changed"
     withLocale("zh-TW", () => service.update({ allowUnsandboxedAgents: true })),
     (error: unknown) => {
       assert.ok(error instanceof AppError);
-      assert.match(error.message, /^「允許 Claude Code Agent 不用沙箱」這項設定來自環境變數 BELLPR_ALLOW_UNSANDBOXED_AGENTS。/);
+      assert.match(error.message, /^「允許 Claude Code 與 Antigravity Agent 不用沙箱」這項設定來自環境變數 BELLPR_ALLOW_UNSANDBOXED_AGENTS。/);
       assert.equal(error.params?.setting, "allowUnsandboxedAgents");
       return true;
     },

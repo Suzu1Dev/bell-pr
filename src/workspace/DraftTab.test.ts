@@ -125,7 +125,7 @@ const element = (
         async loadPublishChecks() {},
         ...draft,
       },
-      actions: { feedbackLoading: false, async fetchPrFeedback() {}, openSplit() {} },
+      actions: { feedbackLoading: false, async fetchPrFeedback() {}, openSplit() {}, async recoverPublish() {} },
       rounds: {
         followUpSelection: [],
         setFollowUpSelection() {},
@@ -148,6 +148,40 @@ const render = (
   draft: Partial<Props["draft"]> = {},
   rounds: Partial<Props["rounds"]> = {},
 ) => renderZh(element(props, draft, rounds));
+
+test("only an unfinished local publish offers recovery, with a save-first and busy guard", () => {
+  const interrupted: Run = {
+    ...published, status: "review", publishCommit: "d".repeat(40),
+    prUrl: undefined, publishedBranch: undefined, headRepository: undefined, followUps: undefined,
+  };
+  const available = render({ run: interrupted });
+  assert.match(available, /恢復未完成的發佈/);
+  assert.match(available, /檢查遠端，保留程式碼與草稿/);
+  assert.doesNotMatch(tag(available, /aria-describedby="publish-recovery-help"/), /disabled=""/);
+  const dirty = render({ run: interrupted }, { draftDirty: true });
+  assert.match(dirty, /請先儲存草稿的修改/);
+  assert.match(tag(dirty, /aria-describedby="publish-recovery-help publish-recovery-unsaved"/), /disabled=""/);
+  for (const props of [
+    { busy: true }, { active: true },
+    { run: { ...interrupted, publishing: true } },
+    { run: { ...interrupted, session: { revision: 0, updatedAt: "2026-10-29T00:00:00Z", messages: [], running: true } } },
+  ]) {
+    assert.match(tag(render({ run: interrupted, ...props }), /aria-describedby="publish-recovery-help"/), /disabled=""/);
+  }
+  for (const props of [
+    { demo: true },
+    { run: { ...interrupted, publishCommit: undefined } },
+    { run: { ...interrupted, prUrl } },
+    { run: { ...interrupted, publishedBranch: "fix/run1" } },
+    { run: { ...interrupted, headRepository: "acme/widgets" } },
+    { run: { ...interrupted, followUps: [open] } },
+    { run: { ...interrupted, status: "running" as const } },
+  ]) assert.doesNotMatch(render({ run: interrupted, ...props }), /恢復未完成的發佈/);
+  const english = renderEn(element({ run: interrupted }));
+  assert.match(english, /Recover unfinished publish/);
+  assert.match(english, /checks the remote, keeps your code and draft/);
+  assertNoHan(english);
+});
 
 /** The opening tag of the first element whose attributes match `marker`. */
 const tag = (html: string, marker: RegExp) =>
@@ -187,7 +221,7 @@ test("an open follow-up round keeps the PR text as published and asks for this r
     },
   );
   assert.match(sync, /這次同步會在 PR 分支加上一個合併 commit/);
-  assert.match(sync, /checklist-item checked[^>]*>.*?這輪的提交訊息已填好<small>推送時會成為 PR 分支上的新 commit/);
+  assert.match(sync, /checklist-item checked[^>]*>.*?這輪的提交訊息已填好<small><\/small>/);
 });
 
 test("maintainer feedback on a published PR can be picked for the next round, up to the limit", () => {
@@ -268,9 +302,9 @@ test("before publishing the draft tab leads with the editor, then the guide, the
     return index;
   };
   const draft = renderEn(element({ run: unpublished }));
-  const editor = at(draft, 'class="draft-layout"');
-  assert.ok(editor < at(draft, "Loading the draft guidelines…"));
-  assert.ok(at(draft, "Loading the draft guidelines…") < at(draft, 'class="sync-panel"'));
+  const editor = at(draft, 'class="draft-layout is-focused"');
+  assert.ok(editor < at(draft, "Before you publish"));
+  assert.ok(at(draft, "Before you publish") < at(draft, 'class="sync-panel"'));
   // Copy that points at the guide or the editor follows the order.
   assert.match(
     renderEn(element({ run: { ...unpublished, draft: { title: "t", body: "" } } }, { draftBody: "" })),
@@ -278,7 +312,7 @@ test("before publishing the draft tab leads with the editor, then the guide, the
   );
   const sent = renderEn(element());
   assert.ok(at(sent, 'class="sync-panel"') < at(sent, 'class="follow-up-rounds"'));
-  assert.ok(at(sent, 'class="follow-up-rounds"') < at(sent, 'class="draft-layout"'));
+  assert.ok(at(sent, 'class="follow-up-rounds"') < at(sent, 'class="draft-layout is-focused"'));
   assert.equal(sent.match(/class="sync-panel"/g)?.length, 1);
 });
 
@@ -340,7 +374,7 @@ test("maintainer feedback and the next round's form read in English with no Chin
       { draftBody: "", draftDirty: true },
     ),
   );
-  assert.match(draft, /Loading the draft guidelines…/);
+  assert.match(draft, /Before you publish/);
   assert.match(draft, /There is no PR description yet\./);
   assert.match(draft, /0 \/ 0 files/);
   assert.match(draft, /There are unsaved edits/);
@@ -568,4 +602,67 @@ test("a Learn-by-hand run asks for its own PR title and description while either
   // An agent run's title comes from its task: with a description, no notice.
   assert.doesNotMatch(renderEn(element({ run: { ...review, learnByHand: undefined } }, { draftTitle: "", draftBody: "Greets." })), /draft-origin-notice/);
   assert.match(renderZh(element({ run: review }, { draftTitle: "", draftBody: "" })), /請用自己的話寫下 PR 標題與說明/);
+});
+
+test("SyncPanel lists upstream changes under your hold for unpublished runs, no-op syncs, and published PR sync rounds", () => {
+  const unpublishedSynced: Run = {
+    ...published,
+    status: "review",
+    prUrl: undefined,
+    followUps: [],
+    prFeedback: undefined,
+    sync: {
+      at: "2026-11-10T10:00:00Z",
+      from: "a".repeat(40),
+      to: "b".repeat(40),
+      snapshot: "c".repeat(40),
+      conflicts: [],
+      heldChanges: [{ path: "src/api/users.ts", commits: ["abc1234", "def5678"] }],
+    },
+  };
+  const enSynced = renderEn(element({ run: unpublishedSynced }));
+  assertNoHan(enSynced);
+  assert.match(enSynced, /Changes under your hold/);
+  assert.match(
+    enSynced,
+    /Commits on <code>main<\/code> changed these files since you took your hold\. Check them before you publish\./,
+  );
+  assert.match(enSynced, /<code>src\/api\/users\.ts<\/code>\s*<span>\(abc1234, def5678\)<\/span>/);
+
+  const zhSynced = renderZh(element({ run: unpublishedSynced }));
+  assert.match(zhSynced, /你佔用範圍內的變更/);
+  assert.match(zhSynced, /在你佔用期間，<code>main<\/code> 上有提交改到這些檔案；發布前請先確認。/);
+  assert.match(zhSynced, /<code>src\/api\/users\.ts<\/code>\s*<span>（abc1234、def5678）<\/span>/);
+
+  const noOpRun: Run = {
+    ...published,
+    status: "review",
+    prUrl: undefined,
+    followUps: [],
+    prFeedback: undefined,
+    heldChanges: [{ path: "docs/guide.md", commits: ["1234567"] }],
+  };
+  assert.match(renderEn(element({ run: noOpRun })), /<code>docs\/guide\.md<\/code>\s*<span>\(1234567\)<\/span>/);
+
+  const prSyncRound: Run = {
+    ...inRound,
+    followUps: [
+      {
+        id: "sync-1",
+        kind: "sync",
+        requestedAt: "2026-11-10T10:00:00Z",
+        feedbackUrls: [],
+        status: "review",
+        parentCommit: "a".repeat(40),
+        mergeParent: "b".repeat(40),
+        previousBase: "c".repeat(40),
+        conflicts: [],
+        heldChanges: [{ path: "src/api/users.ts", commits: ["fedcba9"] }],
+      },
+    ],
+  };
+  assert.match(
+    renderEn(element({ run: prSyncRound }, { followUp: prSyncRound.followUps![0] })),
+    /<code>src\/api\/users\.ts<\/code>\s*<span>\(fedcba9\)<\/span>/,
+  );
 });

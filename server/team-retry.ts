@@ -10,6 +10,7 @@ import { sm } from "./i18n/index.js";
 import { queueTeamMessage } from "./run-executor.js";
 import { assertWorkspacePresent } from "./cleanup.js";
 import { logRunQueued } from "./run-events.js";
+import { assertRunAgentAllowed } from "./codex-guard.js";
 import type { WorkbenchContext } from "./workbench.js";
 
 /**
@@ -27,6 +28,7 @@ export async function retryTeam(
 ) {
   return ctx.lock(id, async () => {
     const run = ctx.run(id);
+    assertRunAgentAllowed(run);
     const team = run.team;
     if (!["failed", "cancelled"].includes(run.status) || !team)
       throw new AppError((m) => m.run.team.retryNotAllowed, 409);
@@ -78,7 +80,8 @@ export async function retryTeam(
           queueTeamMessage(ctx, run, "user", task.id, message);
       else queueTeamMessage(ctx, run, "user", "lead", message);
     }
-    if (team.config.requirePlanApproval && !team.approvedAt) {
+    // Also a plan the overlap check held back from starting on its own.
+    if (!team.approvedAt) {
       team.phase = "awaiting_approval";
       run.status = "awaiting_plan";
       ctx.log(run, "user", sm().run.team.retryAwaitingApproval);

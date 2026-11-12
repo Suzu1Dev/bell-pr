@@ -9,7 +9,7 @@ import {
   Languages,
   Stethoscope,
 } from "lucide-react";
-import type { DoctorReport } from "../../shared/doctor";
+import { toolUsable, type DoctorReport } from "../../shared/doctor";
 import {
   agentProviders,
   providerLabels,
@@ -64,9 +64,10 @@ export function providerUpdate(
 /** The providers that are installed and signed in, from the report. */
 export function readyProviders(report: DoctorReport | null): AgentProvider[] {
   if (!report) return [];
-  const ok = (id: string) =>
-    report.checks.find((check) => check.id === id)?.status === "ok";
-  return agentProviders.filter((provider) => ok(provider) && ok(`${provider}-auth`));
+  const find = (id: string) => report.checks.find((check) => check.id === id);
+  return agentProviders.filter(
+    (provider) => toolUsable(find(provider)) && find(`${provider}-auth`)?.status === "ok",
+  );
 }
 
 export interface WelcomeProps {
@@ -159,9 +160,6 @@ export function Welcome({
         ))}
       </ol>
       <div className="welcome-card">
-        <p className="welcome-step-of">
-          {t.stepOf({ step: index + 1, total: welcomeSteps.length })}
-        </p>
         <h2 ref={heading} tabIndex={-1}>
           <StepIcon size={22} aria-hidden="true" />
           <span>
@@ -302,7 +300,7 @@ function ProviderStep({
   }, [onlyOne, choose]);
 
   const note = (provider: AgentProvider) =>
-    provider === "claude" ? t.claudeNote : t.codexNote;
+    ({ codex: t.codexNote, claude: t.claudeNote, antigravity: t.antigravityNote })[provider];
 
   return (
     <div className="welcome-body">
@@ -310,7 +308,12 @@ function ProviderStep({
       {!report && <p role="status">{t.checking}</p>}
       {report && !ready.length && (
         <div className="welcome-provider-none">
-          <p>{t.none}</p>
+          {(report.checks.find((check) => check.id === "provider-ready" && check.reason === "claude-only")
+            ?.detail ?? t.none)
+            .split("\n")
+            .map((line) => (
+              <p key={line}>{line}</p>
+            ))}
           <button type="button" className="button secondary" onClick={() => void refresh()}>
             {recheck}
           </button>
@@ -318,7 +321,7 @@ function ProviderStep({
       )}
       {onlyOne && (
         <div className="welcome-provider-card">
-          <strong>{t.auto({ provider: providerLabels[onlyOne] })}</strong>
+          <strong>{providerLabels[onlyOne]}</strong>
           <p>{note(onlyOne)}</p>
         </div>
       )}

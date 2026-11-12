@@ -13,6 +13,8 @@ import { parseActiveRunLimit, parseAgentProcessLimit } from "./agent-slots.js";
 import { parseAgentTimeoutScale } from "./agent-timeouts.js";
 import { parseAllowedOrigins } from "./http-guard.js";
 import { sm } from "./i18n/index.js";
+import { parseSuiteLinks } from "./suite-contract.js";
+import type { SuiteLinks } from "../shared/suite.js";
 
 /** Command-line flags of `bell-pr start`; every field is optional. */
 export interface StartFlags {
@@ -26,6 +28,8 @@ export interface StartFlags {
   dev?: boolean;
   /** false for --no-open. */
   open?: boolean;
+  /** --group: host group work for the people who share this instance. */
+  group?: boolean;
 }
 
 /** How much agent work runs at once and how long turns may take. */
@@ -51,6 +55,8 @@ export interface Config {
   staticDir: string;
   /** BELLPR_ALLOWED_ORIGINS plus the BELLPR_PUBLIC_URL origin. */
   allowedOrigins: string[];
+  /** BELLPR_SUITE_LINKS: the other BELL products' origins; empty when unset. */
+  suiteLinks: SuiteLinks;
   /** --dev or BELLPR_DEV=1: the dev server port is trusted. */
   dev: boolean;
   /** The Vite dev server port (BELLPR_FRONTEND_PORT, 4310); only in dev. */
@@ -58,6 +64,8 @@ export interface Config {
   /** Open the address in a browser: not --no-open, BELLPR_NO_OPEN, CI or dev. */
   open: boolean;
   limits: Limits;
+  /** --group or BELLPR_GROUP=1: this instance hosts group work (collab-host.ts). */
+  collab?: true;
   /**
    * ./.bellpr in the working directory when it holds data from an older
    * version and is not the data directory in use. Only a hint is printed.
@@ -113,6 +121,20 @@ export function dataPaths(dataDir: string) {
     lock: path.join(dataDir, "bellpr.lock"),
     /** The agent CLI process groups that are running. */
     children: path.join(dataDir, "children.json"),
+    /** The per-install API token (mode 0600). Not a setting and not logged. */
+    apiToken: path.join(dataDir, "api-token"),
+    /** Paired devices: token hashes and metadata, never a token (mode 0600). */
+    devices: path.join(dataDir, "devices.json"),
+    /** The active pairing code's hash, expiry and failures (mode 0600). */
+    pairCode: path.join(dataDir, "pair-code.json"),
+    /** Pairing failures and lock; survives restarts (mode 0600). */
+    pairLock: path.join(dataDir, "pair-lock.json"),
+    /** Project coordination: participants, tasks, claims (coordination.ts). */
+    coordination: path.join(dataDir, "coordination.json"),
+    /** Group work beside coordination.json: the group's id and people's names (collab-host.ts). */
+    collab: path.join(dataDir, "collab.json"),
+    /** Group work's own bare copy of each of the group's repositories (collab-projects.ts). */
+    collabRepos: path.join(dataDir, "collab"),
   };
 }
 
@@ -269,6 +291,13 @@ export function resolveConfig(
       ),
     ),
   ];
+  const suiteLinks = parsed(() =>
+    parseSuiteLinks(
+      env.BELLPR_SUITE_LINKS,
+      allowedOrigins,
+      frontendPort === undefined ? [port] : [port, frontendPort],
+    ),
+  );
   const limits: Limits = {
     maxAgentProcesses: parsed(() =>
       parseAgentProcessLimit(env.BELLPR_MAX_AGENT_PROCESSES),
@@ -295,6 +324,7 @@ export function resolveConfig(
     dataDir,
     staticDir,
     allowedOrigins,
+    suiteLinks,
     dev,
     ...(frontendPort !== undefined ? { frontendPort } : {}),
     open:
@@ -303,6 +333,7 @@ export function resolveConfig(
       !envFlag(env.BELLPR_NO_OPEN) &&
       !envFlag(env.CI),
     limits,
+    ...(flags.group === true || envFlag(env.BELLPR_GROUP) ? { collab: true as const } : {}),
     ...(legacyDataDir ? { legacyDataDir } : {}),
   };
 }

@@ -4,11 +4,16 @@ This guide takes you from installing BELL PR to your first Draft PR. It
 takes a few minutes to set up, and the sample project lets you try every
 step before you touch a real project.
 
+Choose an [installation method](installation.md): npm, the shell installer,
+Homebrew, Bun or mise. On Windows, the [PowerShell setup](installation.md#windows-with-wsl2)
+prepares the tools inside WSL2; finish the sign-in steps there before continuing.
+
 ## Before you start
 
 You need:
 
-- **Node.js 22 or later** ([nodejs.org](https://nodejs.org/en)).
+- **Node.js 22 or later** ([nodejs.org](https://nodejs.org/en)). The shell
+  installer can prepare Node.js 24 when needed.
 - **Git**. Syncing a run onto the latest target branch needs Git 2.40 or
   later. Set your name and e-mail address once:
   `git config --global user.name "Your Name"` and
@@ -16,6 +21,9 @@ You need:
 - **The GitHub CLI** (`gh`), signed in with `gh auth login`, to import from
   GitHub, publish pull requests and find projects
   ([cli.github.com](https://cli.github.com/)).
+  To check, run `gh auth status`. Tokens in your system keyring are not covered:
+  the agent can still read your GitHub token via `gh auth token`. Your main
+  protection is a fine-grained token with the minimum permissions you need.
 - **An AI coding CLI**, installed and signed in, as the same user that runs
   BELL PR. Either one is enough:
   - the Codex CLI: `npm install -g @openai/codex`, then `codex login`.
@@ -29,12 +37,36 @@ You need:
   run in the operating-system sandbox (`sudo apt-get install bubblewrap
   socat` on Debian and Ubuntu). macOS has its sandbox built in.
 
-BELL PR runs on macOS and Linux, and on Windows inside WSL2
-([install WSL](https://learn.microsoft.com/windows/wsl/install), then
-install everything above inside your WSL distribution).
+BELL PR runs on macOS and Linux. Windows uses WSL2, with every tool above
+installed and signed in inside the same distribution; native Windows is not
+supported. The WSL2 setup has not been verified on a real Windows host.
+See [Windows setup](installation.md#windows-with-wsl2).
 
 `bell-pr doctor` checks all of this and prints the command that fixes each
-problem. You can also skip it: the Welcome screen runs the same check.
+problem.
+
+### With no AI provider
+
+`bell-pr start` does not listen until every required check passes. With
+none of the Codex CLI, Claude Code and the Antigravity CLI installed and
+signed in, it exits
+and prints **Not ready**, then this line, before the commands that fix
+each check:
+
+```text
+No AI provider yet? See the sample tour: bell-pr start --force
+```
+
+`bell-pr start --force` opens BELL PR so you can take the sample tour. The
+tour makes no AI call and sends nothing to GitHub. A real agent run still
+waits until a provider is ready. Install and sign in to one, as the same
+user that runs BELL PR:
+
+- Codex CLI: `npm install -g @openai/codex`, then `codex login`
+- Claude Code: `npm install -g @anthropic-ai/claude-code`, then
+  `claude auth login`
+
+The Welcome screen runs the same check once BELL PR is open.
 
 ## Start BELL PR
 
@@ -49,25 +81,43 @@ npm install -g bell-pr
 bell-pr
 ```
 
+If you used another [installation method](installation.md), start with `bell-pr`
+(`mise exec -- bell-pr` for mise). After Windows setup, you can launch it from
+PowerShell each time with:
+
+```powershell
+wsl -d Ubuntu -- bash -lc '$HOME/.local/bin/bell-pr'
+```
+
 BELL PR starts on your computer, prints its address and opens BELL PR in your
 browser:
 
 ```text
-BELL PR 1.0.0-rc.1 → http://127.0.0.1:4311
+BELL PR <version> → http://127.0.0.1:4311
 ```
 
-Keep the terminal open: BELL PR runs until you stop it with Ctrl+C. BELL PR has
-no sign-in of its own: anyone who can reach its address can use it. By default
+Keep the terminal open: BELL PR runs until you stop it with Ctrl+C. The API
+needs a token. It lives at `<data dir>/api-token`. `bell-pr open` passes it
+to the browser. `bell-pr token rotate` replaces it, and the old one stops
+working immediately. By default
 only this computer can reach it; see [Security model](security-model.md).
 
 > **Lost the address?** Run `bell-pr open` (or `npx bell-pr open`) on the same
-> computer. It prints the address again and opens it. More in
+> computer. It prints the address again, without the API token, and opens it.
+> More in
 > [Troubleshooting](troubleshooting.md#i-lost-the-address).
 
+In WSL2, browser launch depends on your Windows/WSL setup. If no browser opens,
+run `bell-pr open --print --print-token` in another terminal in the same WSL
+distribution and open that link in your Windows browser. The link contains a
+credential; keep it private.
+
 BELL PR listens on `127.0.0.1:4311`, so only this computer can reach it.
-`bell-pr start --port <port>` picks another port. To run it as a service,
-in Docker or behind a reverse proxy, see [Self-hosting](self-hosting.md)
-and [Docker](docker.md).
+`bell-pr start --port <port>` picks another port. To run it as a service or
+in Docker, see [Self-hosting](self-hosting.md) and [Docker](docker.md). For
+remote use, see
+[Self-hosting: Reach BELL PR from another machine](self-hosting.md#reach-bell-pr-from-another-machine)
+(Tailscale serve + pairing, with `BELLPR_PUBLIC_URL`).
 
 ## The Welcome steps
 
@@ -104,8 +154,9 @@ On **Repositories**, import a project in any of these forms:
 - a GitHub link, such as `https://github.com/owner/repo`;
 - the path of a Git folder on your computer, such as
   `~/projects/repository` (`~/` is your home directory). On Windows, use
-  the path inside WSL2, where BELL PR runs; a Windows folder is under
-  `/mnt/c/`, for example `/mnt/c/projects/repository`.
+  the path inside WSL2, where BELL PR runs. Keep projects in the Linux filesystem
+  such as `~/projects`; an existing Windows folder is mounted under `/mnt/c/`,
+  for example `/mnt/c/projects/repository`. Do not enter a `C:\…` path.
 
 BELL PR makes its own full clone in its data directory. Your own folder is
 never changed: runs never add branches or worktrees to it. A clone that
@@ -161,7 +212,10 @@ same.
 
 ## 3. Choose a direction
 
-**Choose a contribution direction**, or start from a recommendation. Pick
+Choose **New contribution**, or start from a recommendation. Enter the task
+goal and completion criteria first. **Additional requirements** holds the
+beneficiaries, outcome and boundaries; **AI and team settings** shows the
+current configuration and expands for changes. Pick
 one main direction (fix a bug, add a feature, improve performance, user
 experience, add tests, improve docs or maintenance) and describe:
 
@@ -211,6 +265,31 @@ Start the run with **Generate the team plan** (with plan approval) or
 - With plan approval on, you read the plan first. **Approve the plan and
   start development**, or **Send back with feedback** for a new plan (up
   to 3 times).
+- When your other contributions to the same project change files the plan
+  covers, the plan lists each of them with its status and the files it
+  shares, and each task that touches those files says **Also changed in**
+  and names them. This counts contributions in progress, in review or
+  approved (their plan while it is still to be carried out, and what their
+  working copy changed), and ones with a pull request for what it changes,
+  until their change to a file is in this run's base commit, also after a
+  squash merge. A pull request you read as merged or closed (**Read
+  feedback**) no longer counts, nor does a contribution whose working copy
+  was removed before it was published. The parts of one split never count
+  against each other or the original, and an original that was split counts
+  only for the files none of its parts holds.
+  Whichever of two overlapping changes is merged second may need its
+  conflicts resolved, so approving needs the tick **I know these overlap;
+  approve anyway**. The tick counts only for what it was given on: when the
+  overlap or the plan changes before you approve, you confirm again. A run
+  started without plan approval waits for your approval instead, also after
+  **Stop** and a retry. A Learn by hand plan's files are checked the same
+  way at **This is my plan**. BELL PR only reads its own records and
+  working copies for this, without changing them; nothing is saved or
+  sent, and the temporary copy of a working copy's Git index it reads
+  through is deleted right after.
+- A file scope the Lead writes without a trailing `/` that is a directory
+  in the base commit, such as `src`, is read as `src/`, so it covers the
+  files inside; the activity log says so.
 - **Teammates** work at the same time, each in its own Git worktree, and
   share findings through the team inbox. You can message the Lead, one
   task or everyone.
@@ -223,12 +302,26 @@ Start the run with **Generate the team plan** (with plan approval) or
   the overall conclusion; the Reviewer opens by saying whether it agrees
   and adds only what the summary lacks, and the Test analyst keeps the one
   list of checks still to run.
-- Agents are told never to change your machine: no `sudo`, no global or
+- With the default **Working directory (default)** access, agents are told not to change
+  your machine: no `sudo`, no global or
   user-level installs. When a check needs something the machine lacks, the
   teammate reports it, and **Overview & motivation** lists it under "Setup
   this machine needs from you" with a suggested command and who reported
   it. Check the command against the project's documentation before you run
-  it; BELL PR never runs it.
+  it; the checklist itself never runs a command. Explicit **Full access** in the model
+  settings lets writable agents install required tools and use available sudo
+  privileges outside the checkout. Read the [access settings](security-model.md#explicit-full-access)
+  before enabling it; read-only roles keep their restrictions. On a Full
+  access run in review or approved, **Let the agent set this up** opens the commands for
+  you to tick and confirm, at most 10 per turn, then hands them to one
+  Collaborate turn, which runs without the sandbox and with your account.
+  The agent is told to run only the ticked commands that match the
+  project's documentation, adding at most non-interactive flags, `sudo -n`
+  and a package-index refresh. It verifies them, reruns the checks they
+  blocked and reports each item as installed, already present, failed or
+  needs you; an item it does not report shows as no result, and a turn
+  that is stopped or fails reports none. sudo works only when it needs no
+  password, and stopping the turn does not undo installs.
 - **Run details** folds the model and the AI usage: its line names the
   agent, the model, the calls and the input and output tokens, marks
   partial reports and says when usage was not reported, never 0.
@@ -238,6 +331,42 @@ BELL PR runs as many contributions at the same time as **Settings →
 Performance** allows (1 to 8, 2 by default); the others wait in the queue.
 
 ## 5. Review every change
+
+The code toolbar's focus button expands the reading area and initially hides
+both side panels. Its file-list and explanation buttons still open or close
+each panel. Leaving focus mode with the button or Escape restores the panel
+layout from before you entered it.
+
+Before publishing an agent contribution, the **Collaborate** tab lets you ask
+an agent to finish missing checks, add tests or fix failures in the run's working
+copy. The draft's Limitations shortcut fills the message box for you to review
+and send. The setup checklist's **Let the agent set this up** (Full access runs
+only) starts its turn once you confirm the commands; the agent is told not to
+change code in that turn, and when the turn finishes, its per-item results
+appear in the conversation and on the checklist. Each message starts a fresh agent call with recent conversation and
+the existing reports as context; it uses your own CLI account.
+
+The conversation lists changed files, commands BELL actually observed, checks
+the agent says it did not run, and any questions or missing setup. A command's
+exit status alone does not establish that a test was meaningful. A changed file
+loses its review mark and gets fresh explanations, and an approved contribution
+returns to review. The agent may update existing Validation and Limitations
+sections together: completed checks and their scope go in Validation, while
+Limitations keeps remaining gaps and constraints. Outdated claims are corrected
+in both. Other draft sections stay as written, and before-and-after text is shown
+in the conversation for your review. If the draft has no separate, recognizable
+Validation section, completed results stay in the reply and draft suggestion
+instead of being added to Limitations. Sections with nested headings are also
+left intact to preserve the template. Code changes, observed commands or section
+updates also refresh draft suggestions,
+without replacing your edited draft. Reviewer and Test analyst reports need a
+separate rerun.
+
+While a turn runs, editing the draft, marking files reviewed, approval,
+publication and syncing are blocked. **Stop** cancels the turn and preserves
+its edits; a restart interrupts the turn too. The agent cannot commit, push or
+publish for you. Published contributions use their feedback workflow, and
+Learn by hand does not offer a writable agent conversation.
 
 When the team is done, the run waits for your review in **Code changes**:
 
@@ -303,7 +432,8 @@ against the code.
 **Overview & motivation** leads with this contribution's brief: the premise
 check, the problem and the motivation, before and after, and how to
 validate it, in Markdown as written. The project's analysis follows as its
-background, and the directions come last. On a finished run you can check
+background in an expandable section, together with other contribution
+directions. The review action stays next to the current brief. On a finished run you can check
 the premise again (or for the first time, on a run made before premise
 checks); a changed verdict has the walkthroughs written again, and the
 explanations you have not answered from yet.
@@ -438,16 +568,27 @@ or approved that is not published, is not a Learn-by-hand run and still has
 its working copy; it is not offered on the sample run. Conflicts a sync left
 must be resolved before the split, as before approval. BELL PR cannot check
 that a part works on its own, because one part's tests may need another
-part, so run each part's tests.
+part, so run each part's tests. When a plan task of one part depends on a
+task with files in another part, the part remembers that it builds on the
+other. Publishing it while the other is not merged asks you to confirm
+(`split-order`): publish that part first. A part counts as merged when you
+read its pull request as merged or when its change is in this part's base
+commit. Deleting a part removes it from the parts that build on it, and
+splitting a part again passes what it builds on to its new parts; deleting
+those new parts makes the parts that built on them build on that part again.
 
 **The maintainer checklist** shows, row by row, the project's rules,
 whether pull requests are open to you, the linked issue, your pace in this
 repository, your own words, reviewability, disclosing AI help and the
-understanding check, each with its source and one sentence on why
-maintainers care.
+understanding check, together with file review and draft-saving status.
+Unfinished, blocked and unknown items stay visible. Completed checks are
+collapsed, with separate counts for passed and turned-off checks. Sources and
+explanations can be expanded. **View publishing checklist** jumps there from
+the editor. Commit messages and branch names are under **Commit message and
+branch**.
 
-Before you can approve, BELL PR checks what will be sent: a credential in
-the text, or placeholders such as `TODO:` or an empty `Fixes #`, block it;
+Before you can approve, BELL PR checks what will be sent. Blocks common token formats and private keys before publishing.
+Placeholders such as `TODO:` or an empty `Fixes #` block it;
 a path from your computer, a change to CI workflows and a commit e-mail
 address that is not your GitHub no-reply address need your confirmation.
 The description mentions AI assistance only if the project's rules require
@@ -481,6 +622,16 @@ and safety. When the dialog opens, BELL PR reads the GitHub facts once.
 (to a fork under your account when you cannot push to the project) and
 opens a Draft PR. Nothing is ever force-pushed.
 
+If a failed attempt left a local commit and you then changed the files or
+commit message, save the draft and choose **Recover unfinished publish** on
+the Draft tab. This is available only when that attempt stopped before
+pushing began. BELL PR checks the project and your fork for matching branches
+and PRs, including closed PRs. If those checks succeed and find none, it
+keeps your files and draft, backs up the old commit locally and returns the
+contribution to review. Review and approve again before submitting. Recovery
+does not publish anything; if a branch or PR exists, or the checks cannot
+finish, it leaves the contribution unchanged.
+
 ## 8. After publishing
 
 - **Sync to the latest target branch** when the project moved on: BELL PR
@@ -505,6 +656,16 @@ opens a Draft PR. Nothing is ever force-pushed.
   maintainer's comment only as context, then changes the code. You review
   each file, explain the round back (while the understanding check is on),
   and push the round as one new commit to the same PR.
+- **Choose which changes to read**: the Changes tab defaults to the current
+  feedback round, compared with the previous PR head. Files unchanged in
+  that round do not need another review, and reverting an earlier edit or
+  deleting a file added in the PR appears in this round's diff. The selector in the code toolbar
+  also offers the initial submission, each published round and the cumulative
+  PR changes. Those views are read-only and do not alter the current round's
+  review marks or approval; return to the current round to review and approve.
+  Failed or discarded rounds have no published snapshot to select. A sync
+  with the target branch keeps its existing review against the updated target;
+  published syncs can also be inspected separately.
 - **Commit history**: the tab lists every commit of the pull request,
   oldest first, labelled by where it came from (the first push, a review
   round, a sync with the target branch, a commit taken over from GitHub),
@@ -515,6 +676,9 @@ opens a Draft PR. Nothing is ever force-pushed.
   short note in your own words.
 
 ## Keep learning
+
+Learning notes are grouped by contribution. Sample notes can be expanded
+separately. The AI team role reference is available from **User guide**.
 
 - **Learning notes** in the sidebar collects the explanations and your
   notes from every contribution, with a search, so you can come back to a
@@ -552,3 +716,8 @@ opens a Draft PR. Nothing is ever force-pushed.
 
 Next: [Configuration](configuration.md), [Troubleshooting](troubleshooting.md)
 and [FAQ](faq.md).
+
+Prefer `bell-pr pair` when the other device can open `/pair`. Interactive
+SSH and headless starts may hint `bell-pr open --print --print-token` as a
+fallback when you cannot pair; run it explicitly if you need that private
+authorized URL. Desktop launches use a temporary private `file://` redirect.

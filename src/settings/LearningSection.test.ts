@@ -38,7 +38,7 @@ test("Learning shows the understanding check on by default, and the try-first pr
   const check = checkbox(html, checkLabel);
   assert.match(check, / checked=""/);
   assert.doesNotMatch(check, /disabled/);
-  assert.match(html, /On by default\. While it is on, approving and publishing wait/);
+  assert.match(html, /When enabled, complete the check for the latest changes before approving and publishing/);
   assert.match(checkbox(html, tryFirstLabel), / checked=""/);
   assert.match(html, /<h3>Try first<\/h3>/);
   // Nothing is locked, and no dialog shows until the switch is turned off.
@@ -57,7 +57,6 @@ test("the switches show what is saved, and wait while the settings load", () => 
   assertNoHan(off);
   assert.doesNotMatch(checkbox(off, checkLabel), /checked/);
   assert.doesNotMatch(checkbox(off, tryFirstLabel), /checked/);
-
   const loading = renderEn(section(null));
   assert.match(checkbox(loading, checkLabel), /disabled=""/);
   assert.match(checkbox(loading, tryFirstLabel), /disabled=""/);

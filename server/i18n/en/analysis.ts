@@ -182,8 +182,8 @@ export default {
     limitReached: "Discovery reached its request or time limit.",
     unreadableText: ({ title }: { title: string }) =>
       `Skipped ${title}: it is not text that can be read safely.`,
-    maskedCredentials: ({ title }: { title: string }) =>
-      `Masked what looks like a credential in ${title}.`,
+    maskedCredentials: (_title: { title: string }) =>
+      "Blocks common token formats and private keys before publishing.",
     truncatedSource: ({ title, bytes }: { title: string; bytes: string }) =>
       `Kept only the first ${bytes} bytes of ${title}; the rest was not read.`,
     searching:
@@ -420,6 +420,11 @@ export default {
   models: {
     catalogUnavailable:
       "The Codex model list cannot be read right now. Check that the CLI is installed and signed in, then try again later.",
+    antigravityCatalogUnavailable:
+      "The Antigravity model list cannot be read right now. Check that the agy CLI is installed and signed in, then try again later.",
+    /** The description of every model the Antigravity CLI lists. */
+    antigravityModel:
+      "Listed by the Antigravity CLI for your account, with the thinking levels it offers as reasoning efforts.",
     /** Descriptions of the Claude Code model aliases. */
     claudeOpus:
       "Suited to complex code changes, reviews and multi-step reasoning.",

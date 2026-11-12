@@ -800,7 +800,7 @@ button {
   color: var(--color-brand-600);
   font-weight: 550;
 }
-.review-tabs > button > span:not(.activity-pulse) {
+.review-tabs > button > span:not(.activity-pulse, .session-tab-dot, .session-sr-only) {
   font-family: var(--font-mono);
   font-size: var(--text-2xs);
   background: var(--color-surface-muted);
@@ -1928,7 +1928,7 @@ button {
   padding: 4px 7px;
   border-radius: 3px;
 }
-.note-card h2 {
+.note-card h3 {
   font-size: var(--text-xl);
   font-weight: 550;
 }
@@ -2917,7 +2917,7 @@ button {
   .review-tabs > button > svg {
     width: 14px;
   }
-  .review-tabs > button > span:not(.activity-pulse) {
+  .review-tabs > button > span:not(.activity-pulse, .session-tab-dot, .session-sr-only) {
     font-size: var(--text-2xs);
     padding: 1px 4px;
   }
@@ -3049,6 +3049,9 @@ button {
   }
   .section-heading {
     align-items: flex-start;
+    /* A heading action such as "View publishing checklist" stays inside
+       the heading when the title and the button no longer fit on one line. */
+    flex-wrap: wrap;
   }
   .section-heading h2 {
     font-size: var(--text-lg);
@@ -3835,4 +3838,19 @@ button {
     white-space: normal;
     text-align: left;
   }
+}
+
+.pair-page form {
+  display: grid;
+  gap: 12px;
+  width: min(100%, 350px);
+  text-align: left;
+}
+.pair-page input {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-surface);
+  color: var(--color-text);
 }

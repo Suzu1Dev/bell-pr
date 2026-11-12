@@ -15,16 +15,16 @@ const discovery = {
   eyebrow: "FIND YOUR NEXT CONTRIBUTION",
   /** The page heading in two lines; the second line is emphasized. */
   title: {
-    lead: "Find the next contribution",
-    emphasis: "worth your time.",
+    lead: "Find a project",
+    emphasis: "to contribute to",
   },
   /**
    * The introduction in two parts. Wide screens break the line between them;
    * narrow screens do not, so `lead` ends with the space that separates them.
    */
   intro: {
-    lead: "Start from real user needs, and let AI help you read the rules and judge the effort, ",
-    rest: "so you find work that teaches you something and makes a difference.",
+    lead: "Search GitHub for projects that match your interests. ",
+    rest: "AI checks contribution rules and suggests a starting task.",
   },
   heroCaption: "GitHub → your next step",
   form: {
@@ -43,6 +43,7 @@ const discovery = {
       any: "Any difficulty",
     } satisfies Record<DiscoveryPreferences["difficulty"], string>,
     sort: "Sort search by",
+    sortHelp: "About sorting",
     sortHint:
       "Recently updated: reflects recent activity, but the results change as projects are updated. Relevance: GitHub's best match. It can include projects that have not been maintained for a while; archived projects are left out and the last push date is shown. Stars: well-known projects, with more competition and a higher review bar.",
     minStars: "Minimum stars",
@@ -119,8 +120,8 @@ const discovery = {
   limitations: ({ count }: { count: number }) =>
     `Scope and limits of this search · ${fmt.number(count)}`,
   empty: {
-    title: "Good contributions start with understanding the need.",
-    body: "When you ask for recommendations, we read public GitHub projects and issues and weigh each opportunity from these four angles.",
+    title: "No search results yet",
+    body: "Set your interests above, then choose Recommend contributions.",
     /** After a discovery that found nothing suitable. */
     retryTitle: "Change the criteria and look for the next opportunity.",
     retryBody:
@@ -148,7 +149,7 @@ const discovery = {
     label: "Recommended contributions",
     eyebrow: "YOUR CONTRIBUTION SHORTLIST",
     previousEyebrow: "PREVIOUS RESULTS",
-    title: "Take your first step with one of these.",
+    title: "Suggested contributions",
     previousTitle: "Your previous recommendations are still here.",
     note: ({ sort }: { sort: string }) =>
       `We took 12 candidates in the "${sort}" order you chose and kept at most 6 after checking them. The order comes from the analysis, not from a GitHub-wide ranking. Before you start, check the issue's latest status and whether the maintainers want the change.`,

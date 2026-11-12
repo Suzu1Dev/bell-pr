@@ -1,3 +1,4 @@
+import { safeLink, WebLink } from "../review/MarkdownContent";
 import {
   CircleCheck,
   CircleStop,
@@ -57,13 +58,13 @@ export function FollowUpRounds({
   };
   const commitLink = (commit: string) =>
     headRepository ? (
-      <a
-        href={`https://github.com/${headRepository}/commit/${commit}`}
+      <WebLink
+        href={safeLink(`https://github.com/${headRepository}/commit/${commit}`) || undefined}
         target="_blank"
         rel="noreferrer"
       >
         {commit.slice(0, 7)}
-      </a>
+      </WebLink>
     ) : (
       <code>{commit.slice(0, 7)}</code>
     );
@@ -105,9 +106,9 @@ export function FollowUpRounds({
                 <ul className="follow-up-feedback">
                   {round.feedbackUrls.map((url) => (
                     <li key={url}>
-                      <a href={url} target="_blank" rel="noreferrer">
+                      <WebLink href={safeLink(url) || undefined} target="_blank" rel="noreferrer">
                         {label(url)} <ExternalLink size={11} />
-                      </a>
+                      </WebLink>
                     </li>
                   ))}
                 </ul>

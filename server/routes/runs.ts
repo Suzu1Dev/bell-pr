@@ -2,6 +2,10 @@ import type { Express } from "express";
 import { z } from "zod";
 import { summarizeRun } from "../../shared/runs.js";
 import { splitLimits } from "../../shared/split.js";
+import { codexSelectionBlocked, startsCodex } from "../../shared/codex-switch.js";
+import { participantHeader } from "../coordination-routes.js";
+import { runOwners } from "../hold-guard.js";
+import { AppError } from "../types.js";
 import { contributionSettingsSchema } from "../insights.js";
 import { sm } from "../i18n/index.js";
 import type { RouteDeps } from "./types.js";
@@ -12,11 +16,23 @@ import type { RouteDeps } from "./types.js";
  */
 export function registerRunsRoutes(
   app: Express,
-  { workbench, insights }: RouteDeps,
+  { workbench, insights, options }: RouteDeps,
 ) {
-  app.post("/api/runs/:id/plan/approve", async (req, res) =>
-    res.json({ run: await workbench.approvePlan(req.params.id) }),
-  );
+  app.post("/api/runs/:id/plan/approve", async (req, res) => {
+    // Builds before the overlap check sent no body. The digest is the one
+    // GET …/overlaps returned with the overlaps the person confirmed.
+    const { overlapDigest } = z
+      .object({ overlapDigest: z.string().regex(/^[a-f0-9]{64}$/).optional() })
+      .strict()
+      .parse(req.body ?? {});
+    res.json({ run: await workbench.approvePlan(req.params.id, { overlapDigest }) });
+  });
+  // The person's other contributions of this project whose files meet this
+  // run's plan, and their digest; read from their records and checkouts,
+  // nothing is stored.
+  app.get("/api/runs/:id/overlaps", async (req, res) => {
+    res.json(await workbench.planOverlaps(req.params.id));
+  });
   app.post("/api/runs/:id/plan/revise", async (req, res) => {
     const input = z
       .object({ feedback: z.string().trim().min(1).max(4000) })
@@ -41,6 +57,20 @@ export function registerRunsRoutes(
       .parse(req.body ?? {});
     res.json({ run: await workbench.retryTeam(req.params.id, message) });
   });
+  app.post("/api/runs/:id/holds/restore", async (req, res) => {
+    z.object({}).strict().parse(req.body ?? {});
+    const asker = options.collab
+      ? { participant: req.get(participantHeader), deviceId: res.locals.deviceId }
+      : undefined;
+    res.json(await workbench.restoreHeldPaths(req.params.id, asker));
+  });
+  app.post("/api/runs/:id/holds/recheck", async (req, res) => {
+    z.object({}).strict().parse(req.body ?? {});
+    const asker = options.collab
+      ? { participant: req.get(participantHeader), deviceId: res.locals.deviceId }
+      : undefined;
+    res.json(await workbench.recheckHeldPaths(req.params.id, asker));
+  });
   app.get("/api/runs", (_req, res) => {
     // Lists are polled every few seconds; the open run fetches its full record.
     res.json({ runs: workbench.store.data.runs.map(summarizeRun) });
@@ -63,11 +93,21 @@ export function registerRunsRoutes(
         path: ["byHandFit"],
       })
       .parse(req.body);
+    if (codexSelectionBlocked(settings?.provider))
+      throw new AppError((m) => m.setup.doctor.codexDisabled, 422);
+    if (startsCodex(settings?.provider)) await insights.assertSavedProviderRunnable();
+    // With group work: who starts the run, as the publish guard works it
+    // out (the participant token, else the device); its agents may change
+    // these people's held files and no one else's.
+    const owners = options.collab
+      ? runOwners(options.collab, repoId, { participant: req.get(participantHeader), deviceId: res.locals.deviceId })
+      : undefined;
     const selected = settings ?? (await insights.getSettings(repoId));
     res.status(202).json({
       run: await workbench.createRun(repoId, prompt, title, selected, {
         learnByHand: learnByHand === true,
         ...(byHandFit ? { byHandFit } : {}),
+        ...(owners ? { owners } : {}),
       }),
     });
   });

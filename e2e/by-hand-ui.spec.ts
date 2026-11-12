@@ -13,14 +13,17 @@ import { appendFile, mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Browser, type Page, type Route } from "@playwright/test";
+import { e2eApiHeaders } from "./api-token.mjs";
 import { changeFingerprint } from "../shared/change-fingerprint";
 import type { DiscoveryJob } from "../shared/discovery";
 import type { Locale } from "../shared/i18n/locale";
 import { readDiff } from "../server/git";
+import { git as bellGit } from "../server/process";
 import byHandText from "../src/byhand/write/i18n/en";
 import byHandZh from "../src/byhand/write/i18n/zh-TW";
 import { getSampleDiscoveryJob } from "../src/demo/discovery";
 import discovery from "../src/i18n/en/discovery";
+import modals from "../src/i18n/en/modals";
 import workspace from "../src/i18n/en/workspace";
 import { findOverflow } from "./helpers/overflow";
 import { startReadyServer } from "./helpers/ready-server";
@@ -44,6 +47,10 @@ const git = (cwd: string, ...args: string[]) =>
     env: { ...process.env, GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_NOSYSTEM: "1" },
   }).trim();
 
+// Worktrees go through BELL's git so this process's readDiff accepts them,
+// with the same isolation as `git` above (BELL's git sets GIT_CONFIG_NOSYSTEM).
+const seedGit = { env: { GIT_CONFIG_GLOBAL: "/dev/null" } };
+
 const longPath = "packages/http-client/src/policies/retry/exponential-backoff-with-full-jitter.ts";
 const retryBase = "export const maxRetries = Infinity;\n\nexport function shouldRetry(attempt: number) {\n  return attempt < maxRetries;\n}\n";
 const retryAfter = retryBase.replace("Infinity", "3");
@@ -59,7 +66,7 @@ async function seed(dataDir: string) {
   const baseSha = git(checkout, "rev-parse", "HEAD");
   const worktree = async (id: string) => {
     const worktreePath = path.join(dataDir, "worktrees", id);
-    git(checkout, "worktree", "add", "-q", "-b", `by-hand/${id}`, worktreePath, baseSha);
+    await bellGit(checkout, ["worktree", "add", "-q", "-b", `by-hand/${id}`, worktreePath, baseSha], seedGit);
     await writeFile(path.join(worktreePath, source), retryAfter);
     const files = await readDiff({ worktreePath, baseSha, locale: "en" });
     return { worktreePath, fingerprint: changeFingerprint(files.map((file) => ({ path: file.path, fingerprint: file.fingerprint }))) };
@@ -233,6 +240,7 @@ test.afterAll(async () => {
 
 async function open(browser: Browser, hash: string, { locale = "en", width = 1440 }: { locale?: Locale; width?: number } = {}) {
   const context = await browser.newContext({
+    extraHTTPHeaders: e2eApiHeaders,
     baseURL: server.baseURL,
     viewport: { width, height: width < 760 ? 844 : 900 },
     locale: locale === "en" ? "en-US" : locale,
@@ -585,7 +593,7 @@ test("the task dialog says why BELL won't publish a learn-by-hand run on a banni
     await dialog.locator("#task-repo").selectOption(banRepoId);
     // A banning project is never a reason to preselect Learn by hand.
     await expect(dialog.getByRole("radio", { name: mode.agents })).toBeChecked();
-    await expect(page.getByRole("dialog", { name: "Hand your idea to your agent team." })).toBeVisible();
+    await expect(page.getByRole("dialog", { name: modals.newTask.title })).toBeVisible();
     await dialog.getByText(mode.hand).click();
     // The person writes it: the dialog no longer hands it to the agent team.
     await expect(page.getByRole("dialog", { name: mode.start })).toBeVisible();

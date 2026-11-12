@@ -20,11 +20,13 @@ import {
   draftPrompt,
   parseDraftProposal,
 } from "./drafts.js";
+import { sessionReport } from "./session.js";
 import { agentLabel } from "./agent-cli.js";
 import { AppError, type Run } from "./types.js";
 import { sameDraftProse } from "../shared/draft-checks.js";
 import { activeFollowUp } from "../shared/followups.js";
 import { editable } from "./publish.js";
+import { assertRunAgentAllowed } from "./codex-guard.js";
 import { runAgent } from "./run-executor.js";
 import { parseAgentOutput } from "./run-events.js";
 import type { WorkbenchContext } from "./workbench.js";
@@ -52,6 +54,7 @@ export async function prepareRunDraft(
   options: DraftOptions = {},
 ) {
   if (ctx.stopping()) throw new AppError(shuttingDown(), 503);
+  assertRunAgentAllowed(ctx.run(id));
   // Learn by hand: the pull request text is the person's own (DESIGN v1.2 F11).
   if (ctx.run(id).learnByHand)
     throw new AppError((m) => m.byHand.flow.draftRefused, 409);
@@ -129,7 +132,11 @@ async function generateDraft(
     )(repo, run, { signal: controller.signal });
     if (controller.signal.aborted)
       throw new AppError((m) => m.run.draft.cancelled, 409);
-    const prompt = draftPrompt(run, files, preparation.context, repo.url);
+    const evidence = run.session && sessionReport(run.session.messages);
+    const prompt = draftPrompt(
+      evidence ? { ...run, reports: { ...run.reports, session: evidence } } : run,
+      files, preparation.context, repo.url,
+    );
     temporary = await mkdtemp(path.join(os.tmpdir(), "bell-draft-"));
     const outputSchema = path.join(temporary, "response-schema.json");
     await writeFile(outputSchema, JSON.stringify(draftJsonSchema), {

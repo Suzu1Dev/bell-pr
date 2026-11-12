@@ -1,5 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import {
+  assertSecretsHidden,
+  fakeAssignment,
+  fakeBearer,
+  fakeHex,
+  fakeSlack,
+  redactSamples,
+} from "./redact-samples.js";
 import { redact, secretInPatch } from "./secrets.js";
 
 interface Row {
@@ -135,6 +143,78 @@ const rows: Row[] = [
     masked: "see https://github.com/owner/repo/issues/1",
     blocks: false,
   },
+  {
+    name: "Slack bot token",
+    input: `bot ${fakeSlack} leaked`,
+    masked: "bot [REDACTED] leaked",
+    blocks: true,
+  },
+  {
+    name: "Slack token shorter than ten characters after the hyphen",
+    input: `xox${"b"}-${"FAKE".repeat(2)}`,
+    masked: `xox${"b"}-${"FAKE".repeat(2)}`,
+    blocks: false,
+  },
+  {
+    name: "64-hex install token",
+    input: `id ${fakeHex} end`,
+    masked: "id [REDACTED] end",
+    blocks: false,
+  },
+  {
+    name: "63-hex near miss",
+    input: fakeHex.slice(0, 63),
+    masked: fakeHex.slice(0, 63),
+    blocks: false,
+  },
+  {
+    name: "bell_token fragment",
+    input: `open http://127.0.0.1:9/#bell_token=${fakeHex}`,
+    masked: "open http://127.0.0.1:9/[REDACTED]",
+    blocks: false,
+  },
+  {
+    name: "bell_token query",
+    input: `http://127.0.0.1:9/?bell_token=${fakeHex.slice(0, 8)}`,
+    masked: "http://127.0.0.1:9/[REDACTED]",
+    blocks: false,
+  },
+  {
+    name: "X-Bell-Token header",
+    input: `X-Bell-Token: ${fakeBearer}`,
+    masked: "X-Bell-Token: [REDACTED]",
+    blocks: false,
+  },
+  {
+    name: "hyphenated token assignment",
+    input: `bell-token-id=${fakeAssignment}`,
+    masked: "bell-token-id=[REDACTED]",
+    blocks: false,
+  },
+  {
+    name: "camelCase key assignment",
+    input: `apiKey=${fakeAssignment}`,
+    masked: "apiKey=[REDACTED]",
+    blocks: false,
+  },
+  {
+    name: "monkey assignment is not a secret key",
+    input: "monkey=bananas123",
+    masked: "monkey=bananas123",
+    blocks: false,
+  },
+  {
+    name: "Bearer header",
+    input: `Authorization: Bearer ${fakeBearer}`,
+    masked: "Authorization: Bearer [REDACTED]",
+    blocks: false,
+  },
+  {
+    name: "GITHUB_TOKEN assignment",
+    input: `GITHUB_TOKEN=${fakeAssignment}`,
+    masked: `GITHUB_TOKEN=[REDACTED]`,
+    blocks: false,
+  },
 ];
 
 for (const row of rows) {
@@ -147,6 +227,14 @@ for (const row of rows) {
     assert.equal(secretInPatch(row.input), row.blocks);
   });
 }
+
+test("secrets: redact hides every shared sample", () => {
+  for (const sample of redactSamples) {
+    const masked = redact(`see ${sample.text} now`);
+    assertSecretsHidden(masked);
+    assert.match(masked, /\[REDACTED\]/, sample.name);
+  }
+});
 
 test("secrets: redact masks every shape in one text", () => {
   const text = [
@@ -173,4 +261,43 @@ test("secrets: the URL-credential shape takes linear time on a crafted line", ()
   assert.ok(elapsed < 50, `${elapsed.toFixed(1)} ms`);
   // A user name never holds a colon, so the password takes the rest: the whole pair is still masked.
   assert.equal(redact("https://user:pass:word@host/"), "https://[REDACTED]@host/");
+});
+
+test("secrets: device tokens and pairing codes are masked; ids that only look alike stay", () => {
+  const token = `bpd_${fakeHex}`;
+  assert.equal(redact(`device ${token} paired`), "device [REDACTED] paired");
+  assert.equal(redact(`Bearer ${token}`), "Bearer [REDACTED]");
+  assert.equal(redact(`bpd_${"A1b2-_".repeat(4)}`), "[REDACTED]");
+  assert.equal(secretInPatch(`+const t = "${token}";`), true);
+  assert.equal(redact("code FAKE-C0DE, then 0000-ZZZZ."), "code [REDACTED], then [REDACTED].");
+  assert.equal(redact("GET /pair?code=FAKEC0DE&x=1"), "GET /pair?code=[REDACTED]&x=1");
+  assert.equal(redact("https://bell.example/pair?code=FAKE-C0DE#top"), "https://bell.example/pair?code=[REDACTED]#top");
+  assert.equal(redact("https://bell.example/pair#code=FAKE-C0DE"), "https://bell.example/pair#code=[REDACTED]");
+  assert.equal(secretInPatch("code FAKE-C0DE"), false);
+  // UUID runs, lowercase words and longer ids are not pairing codes.
+  for (const text of ["abababab-7777-4777-8777-777777777777", "ABABABAB-7777-4777-8777-777777777777", "test-1234", "ABCD-EFGH-JK", "bpd_short"])
+    assert.equal(redact(text), text);
+});
+
+test("secrets: participant tokens are masked and block a patch; look-alikes stay", () => {
+  const token = `bpc_${"A1b2-_x".repeat(6)}Z`;
+  assert.equal(redact(`x-bell-participant: ${token}`), "x-bell-participant: [REDACTED]");
+  assert.equal(redact(`group: joined with ${token}.`), "group: joined with [REDACTED].");
+  assert.equal(secretInPatch(`+const t = "${token}";`), true);
+  // Only the token's own length: identifiers a project may use, and longer tails, stay.
+  for (const text of [
+    "bpc_short",
+    `abpc_${"a".repeat(43)}`,
+    "bpc_attribCache_init(ac);",
+    "bpc_frame_buffer_config",
+    "bpc_max_requested_value",
+    "bpc_poolWrite_unmarkPendingDelete",
+    "+  u32 bpc_default_bits_per_component;",
+    `bpc_${"a".repeat(42)}`,
+    `bpc_${"a".repeat(44)}`,
+    `${token}_copy`,
+  ]) {
+    assert.equal(redact(text), text);
+    assert.equal(secretInPatch(text), false, text);
+  }
 });

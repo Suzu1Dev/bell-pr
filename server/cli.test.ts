@@ -9,6 +9,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { doctorCheckIds, type DoctorReport } from "../shared/doctor.js";
 import { version } from "./build-info.js";
+import { loadOrCreateApiToken } from "./api-token.js";
 import { canOpenBrowser, main, type CliDeps } from "./cli.js";
 import { resolveConfig } from "./config.js";
 import { withLocale } from "./i18n/index.js";
@@ -21,6 +22,12 @@ async function freePort() {
   const { port } = probe.address() as AddressInfo;
   await new Promise<void>((resolve) => probe.close(() => resolve()));
   return port;
+}
+
+/** The address the browser opens: the base URL plus the token fragment. */
+function signedUrl(dataDir: string, url: string) {
+  const token = readFileSync(path.join(dataDir, "api-token"), "utf8").trim();
+  return `${url}#bell_token=${token}`;
 }
 
 function output() {
@@ -132,18 +139,37 @@ test("bell-pr open prints the address of the running server and opens it where a
     const server = await inProcessServer(dataDir);
     try {
       const printed = await cli(["open", "--data-dir", dataDir, "--print"]);
+      const signedIn = signedUrl(dataDir, server.url);
+      const token = signedIn.split("bell_token=")[1];
       assert.equal(printed.code, 0, printed.stderr);
       assert.equal(printed.stdout, `${server.url}\n`);
+      assert.equal(printed.stdout.includes(token), false);
+      assert.equal(printed.stdout.includes("bell_token"), false);
       assert.equal(printed.stderr, "");
       assert.deepEqual(printed.opened, []);
+      assert.equal(readFileSync(path.join(dataDir, "bellpr.lock"), "utf8").includes(token), false);
 
-      // A terminal that allows it gets the browser.
+      const withToken = await cli(["open", "--data-dir", dataDir, "--print", "--print-token"]);
+      assert.equal(withToken.code, 0, withToken.stderr);
+      assert.equal(withToken.stdout, `${signedIn}\n`);
+      assert.deepEqual(withToken.opened, []);
+
+      // A terminal that allows it gets the browser. Stdout stays token-free.
+      let terminal = "";
       const second = await cli(["open", "--data-dir", dataDir], {
-        env: {},
-        stdout: { write: () => true, isTTY: true },
+        env: { DISPLAY: ":99" },
+        stdout: {
+          write: (text: string) => {
+            terminal += text;
+            return true;
+          },
+          isTTY: true,
+        },
       });
       assert.equal(second.code, 0);
-      if (!existsSync("/.dockerenv")) assert.deepEqual(second.opened, [server.url]);
+      assert.equal(terminal, `${server.url}\n`);
+      assert.equal(terminal.includes(token), false);
+      if (!existsSync("/.dockerenv") && !existsSync("/run/.containerenv")) assert.match(second.opened[0], /^file:\/\//);
     } finally {
       await server.shutdown();
     }
@@ -164,6 +190,7 @@ test("bell-pr open prints the address browsers use: the public URL when BELL PR 
         const result = await cli(["open", "--data-dir", dataDir, "--print"]);
         assert.equal(result.code, 0, result.stderr);
         assert.equal(result.stdout, `${expected ?? server.url}\n`);
+        assert.equal(result.stdout.includes("bell_token"), false);
         assert.equal(JSON.parse(readFileSync(path.join(dataDir, "bellpr.lock"), "utf8")).url, server.url);
       } finally {
         await server.shutdown();
@@ -186,6 +213,7 @@ test("bell-pr open falls back to the local address for a lock without a usable w
         const result = await cli(["open", "--data-dir", dataDir, "--print"]);
         assert.equal(result.code, 0, result.stderr);
         assert.equal(result.stdout, `http://127.0.0.1:${lock.port}\n`, String(url));
+        assert.equal(result.stdout.includes("bell_token"), false);
       }
     } finally {
       await server.shutdown();
@@ -222,8 +250,8 @@ test(
       let printed = "";
       try {
         const code = await withLocale("en", () =>
-          main(["start", "--port", String(port), "--data-dir", dataDir], {
-            env: { BELLPR_STATIC_DIR: path.join(directory, "ui") },
+          main(["start", "--force", "--port", String(port), "--data-dir", dataDir], {
+            env: { BELLPR_STATIC_DIR: path.join(directory, "ui"), DISPLAY: ":99" },
             stdout: { write: (text: string) => (printed += text), isTTY: true },
             startOptions: { handleExit: false },
             onStarted: (server) => (running = server),
@@ -235,8 +263,16 @@ test(
         while (!existsSync(argvFile) && Date.now() < deadline)
           await new Promise((resolve) => setTimeout(resolve, 25));
         const argv = readFileSync(argvFile, "utf8").trimEnd().split("\n");
-        assert.deepEqual(argv, [running.url]);
+        // Opener argv is only a private file:// redirect; the token stays in that file.
+        assert.equal(argv.length, 1);
+        assert.match(argv[0], /^file:\/\//);
+        assert.equal(argv[0].includes("bell_token"), false);
+        assert.equal(argv.join("\n").includes(signedUrl(dataDir, running.url)), false);
+        const handoff = readFileSync(new URL(argv[0]), "utf8");
+        assert.match(handoff, /location\.replace\(/);
+        assert.ok(handoff.includes(JSON.stringify(signedUrl(dataDir, running.url)).replaceAll("<", "\\u003c")));
         assert.ok(printed.includes(`→ ${running.url}\n`), printed);
+        assert.equal(printed.includes("bell_token"), false);
       } finally {
         process.env.PATH = previousPath;
         await running?.shutdown();
@@ -264,6 +300,7 @@ test("bell-pr open reaches a server that listens on ::1 only", async (t) => {
       const result = await cli(["open", "--data-dir", dataDir, "--print"]);
       assert.equal(result.code, 0, result.stderr);
       assert.equal(result.stdout, `${server.url}\n`);
+      assert.equal(result.stdout.includes("bell_token"), false);
     } finally {
       await server.shutdown();
     }
@@ -292,9 +329,9 @@ test("bell-pr help lists every command, and mistakes exit 2", async () => {
   for (const argv of [["help"], ["--help"], ["-h"]]) {
     const result = await cli(argv);
     assert.equal(result.code, 0);
-    for (const command of ["start", "open", "doctor", "version", "help"])
+    for (const command of ["start", "open", "doctor", "token", "group", "version", "help"])
       assert.match(result.stdout, new RegExp(`^  ${command} `, "m"));
-    for (const option of ["--port", "--host", "--data-dir", "--no-open", "--env-file", "--print"])
+    for (const option of ["--port", "--host", "--data-dir", "--no-open", "--force", "--env-file", "--print", "--print-token"])
       assert.ok(result.stdout.includes(option), option);
   }
   let zhText = "";
@@ -322,6 +359,7 @@ test("every command shows the help for --help, and argument mistakes read in the
     ["start", "--help"],
     ["open", "-h"],
     ["version", "--help"],
+    ["group", "invite", "--help"],
     ["--port", "4400", "--help"],
   ]) {
     const result = await cli(argv);
@@ -375,12 +413,14 @@ async function withStandInClis<T>(
   });
 }
 
-const standInGit = `case "$1" in
-  --version) echo "git version 2.45.1" ;;
-  var) echo "Test User <test@example.com> 1760000000 +0000" ;;
-  config) echo "test@example.com" ;;
-  *) exit 1 ;;
-esac`;
+const standInGit = `for arg in "$@"; do
+  case "$arg" in
+    --version) echo "git version 2.45.1"; exit 0 ;;
+    var) echo "Test User <test@example.com> 1760000000 +0000"; exit 0 ;;
+    config) echo "test@example.com"; exit 0 ;;
+  esac
+done
+exit 1`;
 
 test("bell-pr doctor exits 1 when no provider is ready and prints the fix commands", async () => {
   await withStandInClis({ git: standInGit }, async (directory) => {
@@ -389,7 +429,7 @@ test("bell-pr doctor exits 1 when no provider is ready and prints the fix comman
     assert.equal(result.code, 1, result.stderr);
     assert.match(result.stdout, /^BELL PR environment check\n/);
     assert.match(result.stdout, /✓ Git +2\.45\.1/);
-    assert.match(result.stdout, /✗ AI provider +Install and sign in to the Codex CLI or Claude Code/);
+    assert.match(result.stdout, /✗ AI provider +Install and sign in to the Codex CLI, Claude Code or the Antigravity CLI/);
     for (const command of [
       "npm install -g @openai/codex",
       "codex login",
@@ -480,7 +520,7 @@ test("bell-pr start runs the server with the flags and --env-file settings", asy
     const stdout = output();
     try {
       const code = await withLocale("en", () =>
-        main(["--port", String(port), "--data-dir", dataDir, "--env-file", envFile, "--no-open"], {
+        main(["--force", "--port", String(port), "--data-dir", dataDir, "--env-file", envFile, "--no-open"], {
           stdout: stdout.stream,
           stderr: output().stream,
           startOptions: { handleExit: false },
@@ -514,13 +554,15 @@ test("bell-pr start explains a data directory it cannot create, then frees the p
     const port = await freePort();
     const result = await cli([
       "start",
+      "--force",
       "--port",
       String(port),
       "--data-dir",
       path.join(readOnly, "data"),
     ], { startOptions: { handleExit: false } });
     assert.equal(result.code, 1);
-    assert.match(result.stderr, /^BELL PR did not start: EACCES: permission denied, mkdir/);
+    assert.match(result.stderr, /Warning: --force skips the readiness check/);
+    assert.match(result.stderr, /BELL PR did not start: EACCES: permission denied, mkdir/);
     // A system error needs no stack trace.
     assert.doesNotMatch(result.stderr, /\n\s+at /);
     // The port is released again.
@@ -530,12 +572,404 @@ test("bell-pr start explains a data directory it cannot create, then frees the p
   });
 });
 
-test("the browser opens only in an interactive terminal outside CI and containers", () => {
+const readyCodex = `case "$1" in
+  --version) echo "codex-cli 0.159.0" ;;
+  login) echo "Logged in using ChatGPT" ;;
+  *) exit 1 ;;
+esac`;
+
+test("bell-pr start exits 1 before it listens when doctor is not ready", async () => {
+  await withStandInClis({ git: standInGit }, async (directory) => {
+    const dataDir = path.join(directory, "data");
+    const port = await freePort();
+    const result = await cli(
+      ["start", "--port", String(port), "--data-dir", dataDir, "--no-open"],
+      { startOptions: { handleExit: false } },
+    );
+    assert.equal(result.code, 1, result.stderr);
+    assert.equal(result.stdout, "");
+    assert.match(result.stderr, /✗ AI provider/);
+    const sample = "No AI provider yet? See the sample tour: bell-pr start --force";
+    const headlineAt = result.stderr.indexOf("Not ready:");
+    const sampleAt = result.stderr.indexOf(sample);
+    const fixAt = result.stderr.indexOf("\n        npm install -g @openai/codex\n");
+    assert.ok(headlineAt >= 0 && sampleAt === headlineAt + result.stderr.slice(headlineAt).indexOf("\n") + 1);
+    assert.ok(sampleAt < fixAt, result.stderr);
+    for (const command of [
+      "npm install -g @openai/codex",
+      "codex login",
+      "npm install -g @anthropic-ai/claude-code",
+      "claude auth login",
+    ])
+      assert.ok(result.stderr.includes(`\n        ${command}\n`), command);
+    // Nothing listened, and the data directory was not created.
+    assert.equal(existsSync(dataDir), false);
+    const probe = createServer().listen(port, "127.0.0.1");
+    await once(probe, "listening");
+    await new Promise<void>((resolve) => probe.close(() => resolve()));
+
+    let zh = "";
+    const zhPort = await freePort();
+    const zhCode = await withLocale("zh-TW", () =>
+      main(
+        ["start", "--port", String(zhPort), "--data-dir", path.join(directory, "data-zh"), "--no-open"],
+        {
+          env: { BELLPR_NO_OPEN: "1" },
+          stdout: { write: () => {} },
+          stderr: { write: (text: string) => (zh += text) },
+          startOptions: { handleExit: false },
+        },
+      ),
+    );
+    assert.equal(zhCode, 1);
+    const zhSample = "還沒有 AI 服務？先看範例導覽：bell-pr start --force";
+    const zhHeadlineAt = zh.indexOf("尚未就緒");
+    const zhSampleAt = zh.indexOf(zhSample);
+    const zhFixAt = zh.indexOf("\n        npm install -g @openai/codex\n");
+    assert.ok(zhHeadlineAt >= 0 && zhSampleAt === zhHeadlineAt + zh.slice(zhHeadlineAt).indexOf("\n") + 1);
+    assert.ok(zhSampleAt < zhFixAt, zh);
+  });
+});
+
+test("bell-pr start --force starts when doctor is not ready, so the sample tour can open", async () => {
+  await withStandInClis({ git: standInGit }, async (directory) => {
+    const dataDir = path.join(directory, "data");
+    const port = await freePort();
+    let running: RunningServer | undefined;
+    const result = await cli(
+      ["start", "--force", "--port", String(port), "--data-dir", dataDir, "--no-open"],
+      {
+        env: {
+          BELLPR_NO_OPEN: "1",
+          BELLPR_STATIC_DIR: path.join(directory, "ui"),
+        },
+        startOptions: { handleExit: false },
+        onStarted: (server) => (running = server),
+      },
+    );
+    try {
+      assert.equal(result.code, undefined, result.stderr);
+      assert.match(result.stderr, /Warning: --force skips the readiness check/);
+      assert.match(result.stderr, /sample tour/);
+      assert.match(result.stdout, new RegExp(`→ http://127\\.0\\.0\\.1:${port}\\n`));
+      assert.equal(running?.url, `http://127.0.0.1:${port}`);
+      assert.equal(existsSync(path.join(dataDir, "bellpr.lock")), true);
+    } finally {
+      await running?.shutdown();
+    }
+  });
+});
+
+test("bell-pr start listens when every required doctor check passed", async () => {
+  await withStandInClis({ git: standInGit, codex: readyCodex }, async (directory) => {
+    const dataDir = path.join(directory, "data");
+    const port = await freePort();
+    let running: RunningServer | undefined;
+    const result = await cli(
+      ["start", "--port", String(port), "--data-dir", dataDir, "--no-open"],
+      {
+        env: {
+          BELLPR_NO_OPEN: "1",
+          BELLPR_STATIC_DIR: path.join(directory, "ui"),
+        },
+        startOptions: { handleExit: false },
+        onStarted: (server) => (running = server),
+      },
+    );
+    try {
+      assert.equal(result.code, undefined, result.stderr);
+      assert.equal(result.stderr, "");
+      assert.doesNotMatch(result.stdout, /Not ready|--force/);
+      assert.match(result.stdout, new RegExp(`→ http://127\\.0\\.0\\.1:${port}\\n`));
+      assert.equal(running?.url, `http://127.0.0.1:${port}`);
+    } finally {
+      await running?.shutdown();
+    }
+  });
+});
+
+test("the browser opens only in a local graphical session outside CI and containers", () => {
   const tty = { write: () => true, isTTY: true };
   const inContainer = existsSync("/.dockerenv") || existsSync("/run/.containerenv");
-  assert.equal(canOpenBrowser({}, tty), !inContainer);
+  assert.equal(canOpenBrowser({ DISPLAY: ":99" }, tty, "linux"), !inContainer);
+  assert.equal(canOpenBrowser({ WAYLAND_DISPLAY: "wayland-0" }, tty, "linux"), !inContainer);
+  assert.equal(canOpenBrowser({}, tty, "linux"), false);
+  assert.equal(canOpenBrowser({}, tty, "darwin"), !inContainer);
+  assert.equal(canOpenBrowser({}, tty, "win32"), !inContainer);
+  assert.equal(canOpenBrowser({ DISPLAY: ":99", SSH_CONNECTION: "remote" }, tty, "linux"), false);
+  assert.equal(canOpenBrowser({ SSH_TTY: "/dev/pts/1" }, tty, "darwin"), false);
   assert.equal(canOpenBrowser({ BELLPR_NO_OPEN: "1" }, tty), false);
   assert.equal(canOpenBrowser({ CI: "true" }, tty), false);
-  assert.equal(canOpenBrowser({ CI: "0" }, tty), !inContainer);
+  assert.equal(canOpenBrowser({ CI: "0", DISPLAY: ":99" }, tty), !inContainer);
   assert.equal(canOpenBrowser({}, { write: () => true, isTTY: false }), false);
+});
+
+test("normal launch reuses its existing instance before readiness checks, including a nondefault saved port", async () => {
+  await withStandInClis({ git: standInGit }, async (directory) => {
+    const dataDir = path.join(directory, "data");
+    const server = await inProcessServer(dataDir, undefined, { BELLPR_PUBLIC_URL: "https://bell.example.com" });
+    try {
+      const token = readFileSync(path.join(dataDir, "api-token"), "utf8").trim();
+      for (const args of [[], ["start"], ["start", "--force"]]) {
+        const result = await cli(args, {
+          env: { BELLPR_DATA_DIR: dataDir },
+          startServer: async () => { assert.fail("an existing instance must not start another listener"); },
+        });
+        assert.equal(result.code, 0, result.stderr);
+        assert.equal(result.stdout, "BELL PR is running → https://bell.example.com\n");
+        assert.equal(result.stderr, "");
+        assert.equal(`${result.stdout}${result.stderr}`.includes(token), false);
+        assert.deepEqual(result.opened, []);
+      }
+    } finally { await server.shutdown(); }
+  });
+});
+
+test("normal desktop launch opens the authorized running workspace without printing the token", {
+  skip: existsSync("/.dockerenv") || existsSync("/run/.containerenv"),
+}, async () => {
+  await withDataDir(async (dataDir) => {
+    const server = await inProcessServer(dataDir);
+    const stdout = output();
+    stdout.stream.isTTY = true;
+    try {
+      const result = await cli(["start", "--data-dir", dataDir], {
+        env: { DISPLAY: ":99" }, stdout: stdout.stream,
+      });
+      assert.equal(result.code, 0, result.stderr);
+      assert.match(result.opened[0], /^file:\/\//);
+      assert.equal(stdout.text(), `BELL PR is running → ${server.url}\n`);
+      assert.equal(result.stderr, "");
+    } finally { await server.shutdown(); }
+  });
+});
+
+test("headless interactive launch prints its usable link directly, while nonTTY output stays token-free", async () => {
+  await withDataDir(async (dataDir) => {
+    const server = await inProcessServer(dataDir);
+    try {
+      for (const isTTY of [true, false]) {
+        const stdout = output();
+        stdout.stream.isTTY = isTTY;
+        const result = await cli(["start", "--data-dir", dataDir], {
+          env: { SSH_CONNECTION: "remote" }, stdout: stdout.stream, platform: "linux",
+        });
+        assert.equal(result.code, 0, result.stderr);
+        assert.deepEqual(result.opened, []);
+        assert.equal(stdout.text().includes("#bell_token="), false);
+        assert.equal(stdout.text().includes("open --print --print-token"), isTTY);
+        assert.equal(result.stderr, "");
+      }
+    } finally { await server.shutdown(); }
+  });
+});
+
+test("headless first start provides the authorized link without a second open command", async () => {
+  await withDataDir(async (dataDir, directory) => {
+    const stdout = output();
+    stdout.stream.isTTY = true;
+    let running: RunningServer | undefined;
+    try {
+      const result = await cli(["start", "--force", "--data-dir", dataDir, "--port", String(await freePort())], {
+        env: { BELLPR_STATIC_DIR: path.join(directory, "ui") },
+        platform: "linux", stdout: stdout.stream,
+        startOptions: { handleExit: false }, onStarted: (server) => { running = server; },
+      });
+      assert.equal(result.code, undefined, result.stderr);
+      assert.ok(running);
+      assert.deepEqual(result.opened, []);
+      assert.ok(stdout.text().includes("open --print --print-token"));
+      assert.equal(stdout.text().includes("#bell_token="), false);
+    } finally { await running?.shutdown(); }
+  });
+});
+
+test("service, CI and explicit different endpoint starts do not silently reuse another listener", async () => {
+  await withDataDir(async (dataDir) => {
+    const server = await inProcessServer(dataDir);
+    const port = JSON.parse(readFileSync(path.join(dataDir, "bellpr.lock"), "utf8")).port;
+    try {
+      const alternatives = [
+        { args: ["--no-open"], env: {} },
+        { args: [], env: { BELLPR_NO_OPEN: "1" } },
+        { args: [], env: { CI: "1" } },
+        { args: ["--dev"], env: {} },
+        { args: ["--port", String(await freePort())], env: {} },
+        { args: ["--host", "localhost"], env: {} },
+      ];
+      for (const alternative of alternatives) {
+        const result = await cli(["start", "--force", "--data-dir", dataDir, "--port", String(port), ...alternative.args], {
+          env: alternative.env, startOptions: { handleExit: false },
+        });
+        assert.equal(result.code, 1, result.stderr);
+        assert.match(result.stderr, /already running/);
+        assert.equal(result.stdout.includes("bell_token"), false);
+        assert.deepEqual(result.opened, []);
+      }
+    } finally { await server.shutdown(); }
+  });
+});
+
+test("start --group never reuses an instance that runs without group work, and says to stop it first", async () => {
+  await withDataDir(async (dataDir) => {
+    const server = await inProcessServer(dataDir);
+    const lockFile = path.join(dataDir, "bellpr.lock");
+    const lock = readFileSync(lockFile, "utf8");
+    const refusal = `BELL PR is already running at ${server.url} without group work. Stop it first, then start it with \`bell-pr start --group\`.\n`;
+    try {
+      const alternatives = [
+        { args: ["--group"], env: {} },
+        { args: [], env: { BELLPR_GROUP: "1" } },
+        { args: ["--group", "--no-open"], env: {} },
+        { args: ["--group"], env: { CI: "1" } },
+        { args: ["--group", "--force", "--port", String(await freePort())], env: {} },
+      ];
+      for (const alternative of alternatives) {
+        const result = await cli(["start", "--data-dir", dataDir, ...alternative.args], {
+          env: alternative.env,
+          startServer: async () => { assert.fail("a refused start must not start another listener"); },
+        });
+        assert.equal(result.code, 1, alternative.args.join(" "));
+        assert.equal(result.stderr, refusal);
+        assert.equal(result.stdout, "");
+        assert.deepEqual(result.opened, []);
+      }
+      let zhError = "";
+      const zh = await withLocale("zh-TW", () =>
+        main(["start", "--group", "--data-dir", dataDir], {
+          env: {},
+          stdout: { write: () => true },
+          stderr: { write: (text: string) => (zhError += text) },
+        }),
+      );
+      assert.equal(zh, 1);
+      assert.equal(zhError, `BELL PR 已在 ${server.url} 執行，但沒有開啟小組協作。請先停止它，再用 \`bell-pr start --group\` 啟動。\n`);
+      // The running instance and its lock are left as they were.
+      assert.equal(readFileSync(lockFile, "utf8"), lock);
+      assert.equal((await cli(["open", "--print", "--data-dir", dataDir])).stdout, `${server.url}\n`);
+    } finally { await server.shutdown(); }
+  });
+});
+
+test("an instance that hosts group work is reused by a plain start and by start --group", async () => {
+  await withDataDir(async (dataDir) => {
+    const server = await inProcessServer(dataDir, undefined, { BELLPR_GROUP: "1" });
+    const { port, strict } = JSON.parse(readFileSync(path.join(dataDir, "bellpr.lock"), "utf8"));
+    assert.equal(strict, true);
+    try {
+      for (const args of [["start"], ["start", "--group"]]) {
+        const result = await cli(args, {
+          env: { BELLPR_DATA_DIR: dataDir },
+          startServer: async () => { assert.fail("an existing instance must not start another listener"); },
+        });
+        assert.equal(result.code, 0, result.stderr);
+        assert.equal(result.stdout, `BELL PR is running → ${server.url}\n`);
+        assert.equal(result.stderr, "");
+      }
+      // A service start still means "run a server": refused as before, not as a missing group.
+      const service = await cli(
+        ["start", "--group", "--no-open", "--force", "--data-dir", dataDir, "--port", String(port)],
+        { env: {}, startOptions: { handleExit: false } },
+      );
+      assert.equal(service.code, 1, service.stderr);
+      assert.match(service.stderr, /already running/);
+      assert.doesNotMatch(service.stderr, /without group work/);
+    } finally { await server.shutdown(); }
+  });
+});
+
+test("a competing start after the initial lookup reopens only the same data directory's proven live instance", async () => {
+  await withDataDir(async (dataDir, directory) => {
+    let winner: RunningServer | undefined;
+    let starts = 0;
+    const port = await freePort();
+    try {
+      const result = await cli(["start", "--force", "--data-dir", dataDir, "--port", String(port)], {
+        env: { BELLPR_STATIC_DIR: path.join(directory, "ui") },
+        startOptions: { handleExit: false },
+        startServer: async (options = {}) => {
+          starts++;
+          winner = await startServer({ ...options, print: () => {}, openBrowser: undefined });
+          return startServer(options);
+        },
+      });
+      assert.equal(starts, 1);
+      assert.equal(result.code, 0, result.stderr);
+      assert.equal(result.stdout, `BELL PR is running → http://127.0.0.1:${port}\n`);
+      assert.equal(result.stdout.includes("bell_token"), false);
+    } finally { await winner?.shutdown(); }
+  });
+});
+
+test("a foreign occupied port is not reused through a stale lock", async () => {
+  await withDataDir(async (dataDir, directory) => {
+    const other = await inProcessServer(path.join(directory, "other-data"));
+    const port = Number(new URL(other.url).port);
+    mkdirSync(dataDir);
+    writeFileSync(path.join(dataDir, "bellpr.lock"), JSON.stringify({ pid: process.pid, port, version }));
+    try {
+      const result = await cli(["start", "--force", "--data-dir", dataDir, "--port", String(port)], {
+        env: {}, startOptions: { handleExit: false },
+      });
+      assert.equal(result.code, 1, result.stderr);
+      assert.match(result.stderr, /already running/);
+      assert.equal(result.stdout, "");
+      assert.deepEqual(result.opened, []);
+    } finally { await other.shutdown(); }
+  });
+});
+
+test("a live unrelated Node process cannot receive a login link by imitating or relaying health", async () => {
+  for (const relay of [false, true]) {
+    await withDataDir(async (dataDir, directory) => {
+      const other = relay ? await inProcessServer(path.join(directory, "other-data")) : undefined;
+      const requestsFile = path.join(directory, "requests.jsonl");
+      const token = await loadOrCreateApiToken(path.join(dataDir, "api-token"));
+      // Even a relay to a server with the same key must prove the socket's endpoint.
+      if (other) writeFileSync(path.join(directory, "other-data", "api-token"), `${token}\n`);
+      const stranger = spawn(process.execPath, ["-e", `
+        const http = require("node:http");
+        const fs = require("node:fs");
+        const server = http.createServer((req, res) => {
+          fs.appendFileSync(process.argv[1], JSON.stringify({url: req.url, headers: req.headers}) + "\\n");
+          res.setHeader("Content-Type", "application/json");
+          if (process.argv[2]) {
+            http.get(process.argv[2] + req.url, (upstream) => upstream.pipe(res))
+              .on("error", () => { res.statusCode = 502; res.end("{}"); });
+          } else res.end(JSON.stringify({name: "bell-pr", version: "1.0.0", proof: "0".repeat(64)}));
+        });
+        server.listen(0, "127.0.0.1", () => process.send(server.address().port));
+      `, requestsFile, other?.url ?? ""], { stdio: ["ignore", "ignore", "ignore", "ipc"] });
+      try {
+        const [port] = await once(stranger, "message");
+        const lockFile = path.join(dataDir, "bellpr.lock");
+        writeFileSync(lockFile, JSON.stringify({ pid: stranger.pid, port, version }));
+        for (const args of [["start", "--force", "--port", String(port)], ["open"]]) {
+          const stdout = output();
+          stdout.stream.isTTY = true;
+          const result = await cli([...args, "--data-dir", dataDir], {
+            env: { DISPLAY: ":99" }, stdout: stdout.stream,
+            startOptions: { handleExit: false },
+          });
+          assert.equal(result.code, 1, result.stderr);
+          assert.equal(stdout.text(), "");
+          assert.deepEqual(result.opened, []);
+          assert.equal(result.stderr.includes(token), false);
+        }
+        const requests = readFileSync(requestsFile, "utf8").trim().split("\n")
+          .map((line) => JSON.parse(line) as { url: string; headers: Record<string, string> });
+        assert.ok(requests.some((request) => /^\/api\/health\?challenge=[0-9a-f]{64}$/.test(request.url)));
+        assert.equal(JSON.stringify(requests).includes(token), false);
+        for (const request of requests) {
+          assert.equal(request.headers.authorization, undefined);
+          assert.equal(request.headers["x-bell-token"], undefined);
+        }
+      } finally {
+        const exited = once(stranger, "exit");
+        stranger.kill();
+        await exited;
+        await other?.shutdown();
+      }
+    });
+  }
 });

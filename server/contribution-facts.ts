@@ -1,3 +1,4 @@
+import { assertSessionIdle } from "./session.js";
 /**
  * The respect facts on the server: the project's quoted rules
  * (`Repository.contributionRules`), the run's GitHub facts
@@ -426,6 +427,7 @@ export function contributionFacade(ctx: WorkbenchContext): ContributionFacade {
     async saveTestReasons(runId, reasons) {
       return ctx.lock(runId, async () => {
         const run = ctx.run(runId);
+        assertSessionIdle(run);
         if (!["review", "approved"].includes(run.status) || run.publishing)
           throw new AppError((m) => m.run.publish.notEditable, 409);
         const current = new Set(

@@ -9,6 +9,7 @@ import type { AgentProvider, ModelCatalog } from "../shared/models.js";
 import { setupError } from "./cli-errors.js";
 import type { CliStatus } from "./doctor.js";
 import { currentLocale, sm } from "./i18n/index.js";
+import { codexSelectionBlocked, presentedModelSettings } from "../shared/codex-switch.js";
 import { resolveModelExecution } from "./models.js";
 import { logRunQueued } from "./run-events.js";
 import { enforceAgentSandbox } from "./sandbox.js";
@@ -35,6 +36,8 @@ const newId = () => randomUUID();
 export interface NewRunMode {
   learnByHand?: boolean;
   byHandFit?: { learningIssue: boolean };
+  /** With group work set up: who counts as "you" for the request (hold-guard.ts runOwners), saved as the run's owners. */
+  owners?: string[];
 }
 
 export interface NewRunSources {
@@ -45,41 +48,50 @@ export interface NewRunSources {
 
 /**
  * Refuses a new run before it is queued when its provider is not
- * installed or not signed in, or when it is Claude Code and its sandbox
- * cannot start (unless unsandboxed agents are allowed). Each refusal has
- * a code and the commands that fix it.
+ * installed or not signed in, or when it is Claude Code or Antigravity and
+ * its sandbox cannot start (unless unsandboxed agents are allowed). Each
+ * refusal has a code and the commands that fix it.
  */
 async function assertProviderReady(
   sources: NewRunSources,
   provider: AgentProvider,
   access: "read" | "write",
+  full = false,
 ) {
   const capability = await sources.status();
-  if (provider === "claude") {
-    if (!capability.claude)
-      throw new AppError((m) => m.run.queue.claudeMissing, 503, {
-        code: "claude_missing",
-        fixes: setupError("claude_missing").fixes,
-      });
-    if (!capability.claudeAuthenticated)
-      throw new AppError((m) => m.run.queue.claudeSignedOut, 503, {
-        code: "claude_unauthenticated",
-        fixes: setupError("claude_unauthenticated").fixes,
-      });
-    // An agent run's teammates edit files; a Learn-by-hand run's agents only read.
-    await enforceAgentSandbox("claude", access);
-  } else {
-    if (!capability.codex)
-      throw new AppError((m) => m.run.queue.codexMissing, 503, {
-        code: "codex_missing",
-        fixes: setupError("codex_missing").fixes,
-      });
-    if (!capability.codexAuthenticated)
-      throw new AppError((m) => m.run.queue.codexSignedOut, 503, {
-        code: "codex_unauthenticated",
-        fixes: setupError("codex_unauthenticated").fixes,
-      });
-  }
+  const queue = sm().run.queue;
+  const { installed, signedIn, missing, signedOut } = {
+    codex: {
+      installed: capability.codex,
+      signedIn: capability.codexAuthenticated,
+      missing: queue.codexMissing,
+      signedOut: queue.codexSignedOut,
+    },
+    claude: {
+      installed: capability.claude,
+      signedIn: capability.claudeAuthenticated,
+      missing: queue.claudeMissing,
+      signedOut: queue.claudeSignedOut,
+    },
+    antigravity: {
+      installed: capability.antigravity,
+      signedIn: capability.antigravityAuthenticated,
+      missing: queue.antigravityMissing,
+      signedOut: queue.antigravitySignedOut,
+    },
+  }[provider];
+  if (!installed)
+    throw new AppError(missing, 503, {
+      code: `${provider}_missing`,
+      fixes: setupError(`${provider}_missing`).fixes,
+    });
+  if (!signedIn)
+    throw new AppError(signedOut, 503, {
+      code: `${provider}_unauthenticated`,
+      fixes: setupError(`${provider}_unauthenticated`).fixes,
+    });
+  // An agent run's teammates edit files; a Learn-by-hand run's agents only read.
+  if (!full || access !== "write") await enforceAgentSandbox(provider, access);
 }
 
 /**
@@ -117,14 +129,18 @@ export async function createRun(
 ) {
   const repo = ctx.repo(repoId);
   const byHand = mode.learnByHand === true;
+  if (codexSelectionBlocked(settings?.provider))
+    throw new AppError((m) => m.setup.doctor.codexDisabled, 422);
+  const used = presentedModelSettings(settings ?? {});
   const modelExecution = resolveModelExecution(
-    settings ?? {},
-    await sources.models(settings?.provider),
+    used,
+    await sources.models(used.provider),
   );
   await assertProviderReady(
     sources,
     modelExecution.provider ?? "codex",
     byHand ? "read" : "write",
+    modelExecution.agentAccess === "full",
   );
   ctx.assertQueueCapacity();
   const createdAt = now();
@@ -180,6 +196,7 @@ export async function createRun(
     modelExecution,
     ...(byHand ? { learnByHand: true as const } : {}),
     ...(helpLock ? { byHand: { helpLock } } : {}),
+    ...(mode.owners?.length ? { owners: [...mode.owners] } : {}),
     team: {
       config: {
         maxTeammates,

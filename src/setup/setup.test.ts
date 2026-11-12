@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createElement } from "react";
-import type { DoctorCheck, DoctorReport } from "../../shared/doctor";
+import { doctorCheckIds, type DoctorCheck, type DoctorReport } from "../../shared/doctor";
 import { chooseLocale, saveLocale } from "../i18n/LanguageSwitcher";
 import { assertNoHan, renderEn, renderZh } from "../test-utils/render";
 import { CopyCommand } from "./CopyCommand";
@@ -261,7 +261,7 @@ test("the checklist says it is checking while the first report loads, and report
   assertNoHan(html);
   assert.match(html, /Checking your environment…/);
   assert.match(html, /aria-busy="true"/);
-  assert.equal(html.match(/setup-check-checking/g)?.length, 15);
+  assert.equal(html.match(/setup-check-checking/g)?.length, doctorCheckIds.length);
   assert.doesNotMatch(html, /Not installed|Not ready/);
   assert.match(html, /<button type="button" class="button secondary setup-recheck" disabled="">/);
   const failed = renderEn(
@@ -354,7 +354,7 @@ test("the readiness notice explains the requirement with fixes, and renders noth
     createElement(ReadinessNotice, { requires: ["provider", "gh"], doctor: doctor(notReady), maskUser: () => "you" }),
   );
   assertNoHan(html);
-  assert.match(html, /This needs an AI provider: install and sign in to the Codex CLI or Claude Code\./);
+  assert.match(html, /This needs an AI provider: install and sign in to the Codex CLI, Claude Code or the Antigravity CLI\./);
   assert.match(html, /This needs the GitHub CLI, installed and signed in\./);
   assert.match(html, /Unavailable until this is fixed\./);
   assert.match(html, /AI provider: Install and sign in to the Codex CLI or Claude Code\./);

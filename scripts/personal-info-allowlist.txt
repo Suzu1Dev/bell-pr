@@ -11,4 +11,5 @@ server/cli-errors.test.ts:token  # invented secret that the redaction test must 
 server/contribution-policy.test.ts:token  # invented secret that the redaction test must catch
 server/draft-sources.test.ts:token  # invented secret that the redaction test must catch
 server/secrets.test.ts:token  # invented secrets that the redaction tests must catch
+.gitleaks.toml:token  # same invented fixture shapes the tests already use
 server/secrets.test.ts:key  # a key header with no key body, as the redaction test input

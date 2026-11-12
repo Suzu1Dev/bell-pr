@@ -223,7 +223,8 @@ test("AI provider shows each CLI's state, needs one provider, and keeps the Clau
     createElement(ProviderSection, { doctor: doctor(null), ...plain, showCurrentRun() {} }),
   );
   assert.doesNotMatch(checking, /Not installed|Not signed in/);
-  assert.equal(checking.match(/>Checking…<\/span>/g)?.length, 2);
+  // One state per provider card: Codex, Claude Code and Antigravity.
+  assert.equal(checking.match(/>Checking…<\/span>/g)?.length, 3);
 });
 
 test("the retired plan and billing wording is gone from every section, in both languages", () => {
@@ -275,10 +276,10 @@ test("Agent safety shows the sandbox, the unsandboxed opt-in, web access and the
   assert.match(html, /<h3>Claude Code sandbox<\/h3><span class="service-status">Check<\/span>/);
   assert.match(html, /Not available: install bubblewrap and socat\./);
   assert.match(html, /<code>sudo apt install bubblewrap socat<\/code>/);
-  assert.match(html, /<input id="[^"]+" type="checkbox" aria-describedby="[^"]+"\/><div class="settings-switch-body"><label for="[^"]+">Allow unsandboxed Claude Code agents<\/label>/);
+  assert.match(html, /<input id="[^"]+" type="checkbox" aria-describedby="[^"]+"\/><div class="settings-switch-body"><label for="[^"]+">Allow unsandboxed Claude Code and Antigravity agents<\/label>/);
   assert.match(html, /<h3>Web access<\/h3>/);
   assert.doesNotMatch(html, /pro-badge|Pro feature|needs Pro/);
-  assert.match(html, /<a class="settings-link" href="#\/settings\/provider\?present=1">Open the AI provider settings<\/a>/);
+  assert.match(html, /<a class="settings-link" href="#\/settings\/provider\?present=1">Open AI provider settings<\/a>/);
   assert.match(html, /type="checkbox"[^>]* checked=""\/><div class="settings-switch-body"><label for="[^"]+">Always add an AI-assistance note to my pull requests<\/label>/);
   assert.match(html, /pull request drafts mention AI only when the project&#x27;s own rules ask for it/);
   // No confirmation is open until the switch is turned on.
@@ -489,19 +490,31 @@ test("Data & privacy has the data directory, storage, retention, erasing and the
   assert.match(renderZh(createElement(DataSection, { doctor: doctor(report), settings: appSettings(null), ...plain })), /資料與隱私/);
 });
 
-test("About shows the version and the About link", () => {
+test("About shows the version, About link and configured website", () => {
   const about = renderEn(
     createElement(AboutSection, { aboutHref: "#/about?present=1", openAbout() {} }),
   );
   assertNoHan(about);
   assert.ok(about.includes(`<code>${appVersion}</code>`));
   assert.match(about, /<a class="button secondary" href="#\/about\?present=1">.*?About BELL PR<\/a>/);
-  // Product links show only once they are set.
-  assert.doesNotMatch(about, /Documentation|Website/);
+  assert.match(about, /<a class="settings-link" href="https:\/\/bell-pr\.suzu\.tw\/" target="_blank" rel="noreferrer">Website<svg/);
+  assert.doesNotMatch(about, /Documentation/);
   assert.match(
     renderZh(createElement(AboutSection, { aboutHref: "#/about", openAbout() {} })),
     /關於 BELL PR/,
   );
+});
+
+test("About hides product links when their metadata is explicitly empty", () => {
+  const saved = { homepageUrl: product.homepageUrl, docsUrl: product.docsUrl };
+  try {
+    Object.assign(product, { homepageUrl: "", docsUrl: "" });
+    const about = createElement(AboutSection, { aboutHref: "#/about", openAbout() {} });
+    for (const html of [renderEn(about), renderZh(about)])
+      assert.doesNotMatch(html, /class="settings-link"/);
+  } finally {
+    Object.assign(product, saved);
+  }
 });
 
 test("a plain click on the About link opens the dialog over Settings; a modified one keeps the link", async () => {

@@ -175,6 +175,17 @@ test("a CLI's state follows its install and sign-in checks", () => {
     ).state,
     "ready",
   );
+  // A release outside the supported versions still works; the checklist warns.
+  assert.equal(
+    providerState(
+      report([
+        { id: "claude", status: "warn", reason: "unsupported-version", required: false },
+        { id: "claude-auth", status: "ok", required: false },
+      ]),
+      "claude",
+    ).state,
+    "ready",
+  );
   assert.deepEqual(githubState(null), { state: "checking" });
   assert.deepEqual(githubState(report([{ id: "gh", status: "skip", required: false }])), {
     state: "missing",

@@ -1,3 +1,4 @@
+import { safeLink, WebLink } from "../review/MarkdownContent";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import {
   CircleAlert,
@@ -266,9 +267,9 @@ export default function BeforeYouStart({
           (sample ? (
             <span className="before-start-issue">{issueLabel}</span>
           ) : (
-            <a className="before-start-issue" href={url} target="_blank" rel="noopener noreferrer">
+            <WebLink className="before-start-issue" href={safeLink(url) || undefined} target="_blank" rel="noopener noreferrer">
               {issueLabel}
-            </a>
+            </WebLink>
           ))}
       </h4>
       {sample ? (

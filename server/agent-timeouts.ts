@@ -24,8 +24,11 @@ const baseSeconds: Record<AgentTimeoutKind, number> = {
   write: 1800,
 };
 
-/** Claude Code with thinking is slower per call than the Codex defaults above. */
-const providerFactors = { codex: 1, claude: 2.5 } as const;
+/**
+ * Claude Code with thinking is slower per call than the Codex defaults
+ * above; Antigravity's models think too and get the same allowance.
+ */
+const providerFactors = { codex: 1, claude: 2.5, antigravity: 2.5 } as const;
 /** Only the two highest efforts stretch a turn enough to matter; others keep ×1. */
 const effortFactors: Partial<Record<string, number>> = { xhigh: 1.5, max: 2 };
 export const maxAgentTimeoutMs = 2 * 60 * 60 * 1000;
@@ -50,7 +53,7 @@ export function hasExtendedAgentTimeout(
   execution: Pick<ModelExecution, "provider" | "reasoningEffort">,
 ): boolean {
   return (
-    execution.provider === "claude" ||
+    (execution.provider ?? "codex") !== "codex" ||
     (!!execution.reasoningEffort && execution.reasoningEffort in effortFactors)
   );
 }

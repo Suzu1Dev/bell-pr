@@ -1,9 +1,21 @@
 import { formatters, type Translation } from "../../../shared/i18n/locale.js";
 import { product } from "../../../shared/product.js";
+import type { RunStatus } from "../../../shared/types.js";
 import type en from "../en/run.js";
 
 const list = (items: readonly string[]) =>
   formatters("zh-TW").list(items, { type: "unit" });
+/** 另一個貢獻目前的狀態，重疊確認用。 */
+const runStates: Record<RunStatus, string> = {
+  queued: "排隊中",
+  running: "進行中",
+  awaiting_plan: "等待核准計畫",
+  review: "審閱中",
+  approved: "已核准、尚未發佈",
+  published: "已發佈、尚未看到合併",
+  failed: "失敗",
+  cancelled: "已取消",
+};
 const followUpAgentCommitted =
   "Agent 自行建立了 commit 或切換了分支；已還原到已推送的 PR，修改保留在工作目錄供你審閱。";
 
@@ -35,6 +47,9 @@ const m: Translation<typeof en> = {
     claudeSignedOut: "Claude Code 尚未登入。請先在終端機執行 claude auth login。",
     codexMissing: "尚未安裝 Codex CLI。請先安裝並執行 codex login。",
     codexSignedOut: "Codex 尚未登入。請先在終端機執行 codex login。",
+    antigravityMissing:
+      "尚未安裝 Antigravity CLI（agy）。請先安裝，再在終端機執行一次 agy 完成登入。",
+    antigravitySignedOut: "Antigravity CLI 尚未登入。請先在終端機執行 agy 並登入。",
     full: ({ max }) => `最多可同時排入 ${max} 個工作；請等待現有工作完成。`,
     teamStopped: "團隊已停止工作，請使用程式碼追問功能。",
     noPlanToApprove: "目前沒有等待核准的團隊計畫。",
@@ -98,15 +113,21 @@ const m: Translation<typeof en> = {
       `重試失敗的子任務：${kept} 個已完成任務不重跑，${retried} 個任務以新快照重新開始。`,
     retryIntegration: "重試：所有子任務都已完成，直接重跑整合與獨立審查。",
     retryPending: "重試：繼續執行尚未開始的子任務。",
+    scopeDirectories: ({ scopes }) =>
+      `${list(scopes)} 在基準版本中是資料夾，已當成資料夾處理，計畫涵蓋其中的檔案。`,
   },
   agentCli: {
     commandSucceeded: "成功",
     commandFailed: "失敗",
+    commandUnreported: "已結束，未回報結束代碼",
     commandUnverified: ({ outcome }) =>
       `${outcome}，未經確認：一起執行的其他指令可能掩蓋失敗`,
     codexTurnFailed: "Codex 工作回合失敗。",
     codexError: "Codex 回報執行錯誤。",
     claudeTurnFailed: ({ subtype }) => `Claude Code 工作回合失敗（${subtype}）。`,
+    antigravityTurnFailed: ({ status }) => `Antigravity 工作回合失敗（${status}）。`,
+    antigravityEndedOnDenial:
+      "Antigravity 拒絕了這個回合不允許的動作，接著在沒有回答的情況下結束了回合。",
     apiRetry: ({ attempt, maxRetries, reason, delaySeconds }) => {
       const details = [
         attempt === undefined
@@ -155,6 +176,7 @@ const m: Translation<typeof en> = {
     failed: ({ executable, output }) => `${executable} 執行失敗：${output}`,
   },
   diff: {
+    viewUnavailable: "此輪次在這個工作目錄中沒有可讀取的已發佈歷史。",
     unparsable: "無法解析 Git 差異。",
     renameFirst: "檔案名稱包含不支援的字元，請先重新命名。",
     unsupportedName: "檔案名稱包含不支援的字元。",
@@ -166,7 +188,7 @@ const m: Translation<typeof en> = {
       notRegularFile: "新檔案必須是一般檔案；符號連結需要手動處理。",
       newFileTooLarge: "新檔案超過 512 KB，請手動檢視或拆分。",
       binary: "二進位檔案需要另外人工檢視，無法透過此工作流程發佈。",
-      credentials: "差異疑似包含憑證，內容已隱藏；請移除後重新審閱。",
+      credentials: "發佈前會擋下常見格式的 token 與私鑰。",
     },
     heldBack: ({ reason }) => `此檔案已暫停發佈：${reason}`,
   },
@@ -174,7 +196,7 @@ const m: Translation<typeof en> = {
     notAFile: "子模組或特殊項目沒有可展開的程式碼。",
     tooLarge: "檔案超過 512 KB，無法展開周圍的程式碼。",
     binary: "二進位檔案無法展開周圍的程式碼。",
-    credentials: "檔案疑似包含憑證，周圍的程式碼不會顯示。",
+    credentials: "發佈前會擋下常見格式的 token 與私鑰。",
     blocked: "這個檔案目前無法審閱，也不會顯示周圍的程式碼。",
     stale: "檔案差異已更新，請重新整理差異。",
     baseMoved: "工作的基準已更新，請重新整理差異。",
@@ -187,7 +209,7 @@ const m: Translation<typeof en> = {
     sensitive: "敏感檔案或產物，不顯示內容。",
     binary: "二進位檔案，不顯示內容。",
     tooLarge: "差異超過 600 KB，不顯示內容。",
-    credentials: "差異疑似包含憑證，不顯示內容。",
+    credentials: "發佈前會擋下常見格式的 token 與私鑰。",
   },
   premise: {
     tooEarly: "請等待開發完成後再查核前提。",
@@ -326,13 +348,17 @@ const m: Translation<typeof en> = {
       `Agent 處理後仍有衝突標記：${list(files)}；可以自行修改，或再請 Agent 處理。`,
     stopped: "已停止解衝突；已改的檔案保留，可以自行完成，或再請 Agent 處理。",
     failed: ({ reason }) =>
-      `${reason}；已改的檔案保留，可以自行完成，或再請 Agent 處理。`,
+      `${reason.replace(/[.。]+$/u, "")}；已改的檔案保留，可以自行完成，或再請 Agent 處理。`,
     incompleteReason: "解衝突未完成",
     incomplete: "解衝突未完成。",
     conflictsOpen: ({ files }) =>
       `這些檔案還有合併衝突標記：${list(files)}。請先解決衝突（也可以請 Agent 解決）。`,
     mergeFailed: "無法計算合併結果。",
     answerIncomplete: "Agent 回傳的解衝突結果格式不完整",
+    heldChangedUpstream: ({ branch, items }) =>
+      `在你佔用期間，${branch} 上有提交改到你佔用的檔案：${items.join("；")}。`,
+    heldChangedUpstreamItem: ({ path, commits }) =>
+      `${path}（${commits.join("、")}）`,
   },
   followUp: {
     inProgress: "這個工作已有一輪修正在進行。",
@@ -353,7 +379,7 @@ const m: Translation<typeof en> = {
     stoppedReason: "這輪修正已停止",
     incompleteReason: "這輪修正未完成",
     keptEdits: ({ reason }) =>
-      `${reason}；工作目錄保留了部分修改，可以審閱、寫好提交訊息後推送，或放棄這輪修正。`,
+      `${reason.replace(/[.。]+$/u, "")}；工作目錄保留了部分修改，可以審閱、寫好提交訊息後推送，或放棄這輪修正。`,
     nothingToDiscard: "目前沒有可以放棄的修正。",
     alreadyPushed: `這輪修正已推送到 PR；請再按一次推送，讓 ${product.name} 記錄完成。`,
     discarded: "已放棄這輪修正，工作目錄回到已推送的 PR 內容。",
@@ -413,8 +439,65 @@ const m: Translation<typeof en> = {
       "複製出來的檔案與原檔不一致，所以沒有拆分。改寫檔案內容的 Git 設定（例如換行轉換）可能造成這種情況。",
     startedFrom: ({ title }) => `拆分自「${title}」。`,
     wasSplit: ({ count }) => `已拆成 ${count} 個貢獻。`,
+    tooManyEdges: ({ limit }) => `這樣拆分會讓一個貢獻建立在超過 ${limit} 個其他貢獻上，請拆成較少的貢獻。`,
+  },
+  local: {
+    overlapWith: ({ title, status, paths }) => `「${title}」（${runStates[status]}）：${list(paths)}`,
+    planOverlap: ({ titles }) =>
+      `你在這個專案的其他貢獻也改了這個計畫涵蓋的檔案：${list(titles.map((title) => `「${title}」`))}。請先在計畫上查看並確認重疊，再核准一次。`,
+    autoOverlap: "這個計畫涵蓋的檔案也被你在這個專案的其他貢獻修改，所以改為等待你核准，不會自動開始。",
+    overlapChanged: "你確認重疊之後，你的其他貢獻或這個計畫有了變化。請在計畫上重新查看並確認重疊，再核准一次。",
+    approvedOverlap: ({ titles }) =>
+      `已核准；${list(titles.map((title) => `「${title}」`))}也改了其中部分檔案。`,
+    publishOverlap:
+      "你在這個專案的其他貢獻也改了部分相同的檔案，較晚合併的那一個可能需要解決衝突。請依你希望的合併順序發佈，或把它們合併成一個。",
+    splitOrder:
+      "這個拆分出來的部分建立在同一次拆分中尚未合併的其他部分上。請先發佈那些部分，否則這個 PR 在它們合併前可能無法通過檢查。",
+    buildsOn: ({ title, prUrl }) =>
+      prUrl ? `「${title}」：已發佈於 ${prUrl}，尚未看到合併` : `「${title}」：尚未發佈`,
+    heldByOther:
+      "小組裡有人佔用了這次變更動到的檔案。請對方釋出、請小組管理員收回佔用，或先把這些檔案移出這次變更再發佈。",
+    heldByOtherItem: ({ path, holder, title, since }) => `${path}：由 ${holder} 為「${title}」佔用（${since} 起）`,
+    holdsUnknown: ({ name }) =>
+      `小組協作已停止，無法確認檔案佔用狀態。發佈前請先在主機修復小組協作並重新啟動 ${name}。`,
+    turnHeldByOther: ({ items }) =>
+      `Agent 改到別人佔用的檔案，所以這項工作已停止。改動仍留在工作目錄裡。${items.join("；")}。請對方釋出、請小組管理員收回佔用，或把這些檔案的改動還原，再試一次。`,
+    taskHeldByOther: ({ items }) =>
+      `隊友改到別人佔用的檔案，所以這些改動沒有加入這份貢獻。${items.join("；")}。請對方釋出，或請小組管理員收回佔用，再試一次。`,
+    planHeldByOther: ({ items }) =>
+      `這個計畫涵蓋別人佔用的檔案，所以無法核准。${items.join("；")}。請附上意見退回計畫，或等對方釋出。`,
+    autoHeld: "這個計畫涵蓋小組裡別人佔用的檔案，所以改為等待你核准，不會自動開始。",
+    agentsHoldsUnknown: ({ name }) =>
+      `小組協作已停止，無法確認檔案佔用狀態，所以 Agent 不能修改檔案。請先在主機修復小組協作並重新啟動 ${name}，或改以不帶 --group 的方式啟動 ${name}。`,
+    heldChangedUpstream: ({ branch }) =>
+      `在你佔用期間，${branch} 上有提交改到你佔用的檔案。發佈前請先確認這些變更。`,
+    heldChangedUpstreamItem: ({ path, branch, commits }) =>
+      `${path}：在你佔用期間，${branch} 上有變更（${commits.join("、")}）`,
+    holdRecoveryNotAllowed:
+      "只有已完成且尚未合併 PR 的工作，才能還原佔用檔案或重新檢查佔用狀態。",
+    holdRecoveryBusy:
+      "這個工作還有作業在進行；請等完成後再還原佔用檔案或重新檢查。",
+    holdRecoveryCheckoutMissing: "找不到這個工作的工作目錄或基準提交。",
+    heldPathsRestored: ({ files }) =>
+      files.length
+        ? `已將 ${files.length} 個佔用檔案還原到工作基準：${list([...files])}。`
+        : "沒有佔用檔案與工作基準不同。",
+    heldPathsRechecked: "已重新檢查檔案佔用：目前改到的檔案都沒有被其他人佔用。",
   },
   publish: {
+    heldByOther: ({ items }) =>
+      `這次變更動到別人佔用的檔案，所以沒有發佈。${items.join("；")}。請對方釋出，或請小組管理員收回這項佔用。`,
+    holdsUnknown: ({ name }) =>
+      `小組協作已停止，無法確認檔案佔用狀態，所以沒有發佈。請先在主機修復小組協作並重新啟動 ${name}，或改以不帶 --group 的方式啟動 ${name}。`,
+    recoveryStale: "未完成的發佈記錄已變更；請重新載入後再恢復。",
+    recoveryNotAllowed: "只能恢復尚未記錄推送目標或 PR 的未完成發佈。",
+    recoveryBusy: "這個工作仍有作業進行中；請等完成後再恢復發佈。",
+    recoveryCheckout: "本機分支或已儲存的提交與這個工作不符；已停止恢復，工作目錄沒有變更。",
+    recoveryUnknown: "無法確認兩個 GitHub Repository 都沒有對應分支或 PR；已停止恢復，請待 Repository 可以讀取後重試。",
+    recoveryRemoteBranch: ({ repository, branch }) => `GitHub 分支 ${repository}:${branch} 已存在；未完成的發佈記錄已保留，請先檢查。`,
+    recoveryPrExists: ({ branch }) => `分支 ${branch} 已有 PR，包括已關閉或合併的 PR；未完成的發佈記錄已保留，請先檢查。`,
+    recovered: ({ commit }) => `已恢復未完成的發佈；提交 ${commit} 已保留在本機恢復參照，請重新審閱與核准目前草稿後再發佈。`,
+
     commitMessageInvalid: "提交訊息只能包含文字與換行。",
     invalidBranch:
       "GitHub 分支名稱只能用英數字與 . _ - /，不能有 ..，也不能以 . 或 .lock 結尾。",
@@ -452,9 +535,9 @@ const m: Translation<typeof en> = {
       "目標分支已有新提交；先前的發佈已建立提交，可能已推送到 GitHub，因此不能再同步或復原同步；請從最新版本建立新工作。",
     branchChanged: "工作分支已改變，已停止發佈。",
     priorCommitDiffers:
-      "先前發佈已建立不同的提交。請建立新工作，以避免覆寫可能已推送的分支。",
+      "先前發佈已建立不同的提交。請返回 PR 草稿頁；若顯示「恢復未完成的發佈」，請先恢復再重新審閱與核准。若無此選項，請檢查先前分支或建立新工作。",
     priorMessageDiffers:
-      "先前發佈的提交已帶有不同的提交訊息，推送後無法更改。請還原提交訊息，或建立新工作。",
+      "先前發佈的提交已帶有不同的提交訊息，推送後無法更改。請返回 PR 草稿頁；若顯示「恢復未完成的發佈」，請先恢復再重新審閱與核准。若無此選項，請還原提交訊息或建立新工作。",
     notAFork: "同名 Repository 不是目標專案的 fork，請先處理 GitHub fork。",
     noPrUrl: "GitHub 未回傳 PR URL，請先到 GitHub 確認，避免重複發佈。",
     prCreated: "已建立 GitHub Draft PR。",

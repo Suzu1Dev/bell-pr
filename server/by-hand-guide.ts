@@ -26,6 +26,7 @@ import { guideAnswerJsonSchema, guideAnswerSchema, parseByHandAnswer, reviewerAn
 import { readDiff } from "./git.js";
 import { currentLocale, shuttingDown, sm } from "./i18n/index.js";
 import { byHandReviewerPrompt, byHandTesterPrompt, guidePrompt, latestTest, planQuestionsPrompt, stepDiff, testTail, type GuidePromptInput } from "./prompts/by-hand.js";
+import { assertRunAgentAllowed } from "./codex-guard.js";
 import { runAgent, runIndependentReview } from "./run-executor.js";
 import { reviewDiffContext } from "./team.js";
 import { AppError, withRunLocale, type DiffFile, type Run } from "./types.js";
@@ -169,6 +170,7 @@ export async function storedGuideAnswer(run: GuideRun, request: GuideRequest, an
 
 /** One guide turn (DESIGN v1.2 F6, F7): read-only and isolated, under the guide's schema; the caller records it. */
 export async function runGuideTurn(ctx: WorkbenchContext, run: Run, request: GuideRequest, signal: AbortSignal) {
+  assertRunAgentAllowed(run);
   const prompt = await guideTurnPrompt(run, request, currentLocale());
   const answer = await withSchemaFile(guideAnswerJsonSchema, (outputSchema) =>
     runAgent(ctx, run, "lead", prompt, signal, true, { isolated: true, outputSchema }),
@@ -256,6 +258,7 @@ export async function guide(ctx: WorkbenchContext, id: string, input: ByHandGuid
   if (ctx.stopping()) throw new AppError(shuttingDown(), 503);
   return ctx.lock(id, async () => {
     const run = ctx.run(id);
+    assertRunAgentAllowed(run);
     if (run.status !== "review" || run.publishing) throw new AppError((m) => m.byHand.guide.notNow, 409);
     // "My change" goes to the ladder (DESIGN v1.2 F6).
     const routed = input.kind === "ask" && input.entry === "change";

@@ -1,4 +1,5 @@
-import type { Dispatch, SetStateAction } from "react";
+import { safeLink, WebLink } from "../review/MarkdownContent";
+import type { Dispatch, ReactNode, SetStateAction } from "react";
 import {
   ChevronRight,
   ExternalLink,
@@ -65,6 +66,8 @@ interface TopbarProps {
    * the bar's own row, so it never covers the page name or the actions.
    */
   sampleBadge?: boolean;
+  /** The product switcher's button, when another BELL product is linked. */
+  suiteTrigger?: ReactNode;
 }
 
 /** The top bar: menu toggles, breadcrumb, quick switch, readiness and profile. */
@@ -82,6 +85,7 @@ export function Topbar({
   repoUrl,
   githubUser,
   sampleBadge = false,
+  suiteTrigger,
 }: TopbarProps) {
   const t = useT("app");
   const commandShortcut = /Mac|iPhone|iPad|iPod/.test(navigator.platform) ? "⌘ K" : "Ctrl K";
@@ -105,6 +109,7 @@ export function Topbar({
         >
           <Menu size={18} />
         </button>
+        {suiteTrigger}
         <button
           className="icon-button sidebar-toggle"
           aria-label={
@@ -160,9 +165,9 @@ export function Topbar({
           </a>
         )}
         {repoLink && (
-          <a
+          <WebLink
             className="topbar-repo-link"
-            href={repoLink}
+            href={safeLink(repoLink) || undefined}
             target="_blank"
             rel="noreferrer"
             aria-label={t.topbar.openOnGitHub}
@@ -170,7 +175,7 @@ export function Topbar({
           >
             <ExternalLink size={14} aria-hidden="true" />
             <span className="topbar-repo-text">{t.topbar.openOnGitHub}</span>
-          </a>
+          </WebLink>
         )}
         <button
           className="top-avatar"

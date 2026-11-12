@@ -24,6 +24,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { expect, test, type Page } from "@playwright/test";
+import { e2eApiHeaders } from "./api-token.mjs";
 import { htmlLang, locales, type Locale } from "../shared/i18n/locale";
 import { getDemo } from "../src/demo/all";
 import reviewEn from "../src/i18n/en/review";
@@ -222,6 +223,7 @@ for (const locale of locales)
   for (const route of routes)
     test(`${route.name} in ${locale} fits and is captured at every width`, async ({ browser }) => {
       const context = await browser.newContext({
+        extraHTTPHeaders: e2eApiHeaders,
         baseURL: server!.baseURL,
         locale: "en-US",
         timezoneId: "UTC",
@@ -257,6 +259,7 @@ for (const locale of locales)
 for (const locale of locales)
   test(`run-check in ${locale} fits and is captured at every width once the check passed`, async ({ browser }) => {
     const context = await browser.newContext({
+      extraHTTPHeaders: e2eApiHeaders,
       baseURL: server!.baseURL,
       locale: "en-US",
       timezoneId: "UTC",

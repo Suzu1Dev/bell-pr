@@ -96,7 +96,7 @@ const m: Translation<typeof en> = {
     cancelled: "貢獻探索已取消。",
     limitReached: "探索達到請求或時間上限。",
     unreadableText: ({ title }) => `${title} 不是可安全讀取的文字，已略過。`,
-    maskedCredentials: ({ title }) => `${title} 已遮蔽疑似憑證。`,
+    maskedCredentials: (_title) => "發佈前會擋下常見格式的 token 與私鑰。",
     truncatedSource: ({ title, bytes }) =>
       `${title} 僅保留前 ${bytes} bytes，尚未讀取完整內容。`,
     searching: "正在搜尋公開、未封存且符合條件的 GitHub 專案。",
@@ -240,6 +240,9 @@ const m: Translation<typeof en> = {
   models: {
     catalogUnavailable:
       "暫時無法讀取 Codex 模型目錄。請確認 CLI 已安裝並登入，稍後再試。",
+    antigravityCatalogUnavailable:
+      "暫時無法讀取 Antigravity 模型目錄。請確認 agy CLI 已安裝並登入，稍後再試。",
+    antigravityModel: "由 Antigravity CLI 依你的帳號列出；它提供的思考強度列在思考強度選項中。",
     claudeOpus: "適合複雜的程式修改、審查與多步驟推理。",
     claudeSonnet: "速度與能力較平衡，適合日常開發與分析。",
     claudeFable: "能力最強，單次工作可能較久；需方案支援。",

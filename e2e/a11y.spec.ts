@@ -11,6 +11,7 @@
 import { readFileSync } from "node:fs";
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
+import { e2eApiHeaders } from "./api-token.mjs";
 import { locales, type Locale } from "../shared/i18n/locale";
 import { startRealProject, type RealProject } from "./helpers/real-project";
 import { stateViews, type StateView } from "./helpers/views";
@@ -207,6 +208,7 @@ for (const view of stateViews.filter((entry) => entry.real))
       for (const width of widths)
         test(`${view.name} has no serious or critical issue (${locale}, ${width} px)`, async ({ browser }) => {
           const context = await browser.newContext({
+            extraHTTPHeaders: e2eApiHeaders,
             baseURL: project!.baseURL,
             locale: "en-US",
             timezoneId: "UTC",

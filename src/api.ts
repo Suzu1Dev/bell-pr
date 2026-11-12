@@ -85,9 +85,11 @@ function errorFromBody(status: number, body: unknown) {
     ...details
   } = raw;
   const message =
-    typeof text === "string" && text.trim()
-      ? text
-      : getCurrentMessages().common.errors.generic;
+    status === 401
+      ? getCurrentMessages().common.errors.apiTokenRequired
+      : typeof text === "string" && text.trim()
+        ? text
+        : getCurrentMessages().common.errors.generic;
   const code = isErrorCode(rawCode) ? rawCode : undefined;
   const init: ApiErrorInit = {
     status,
@@ -100,6 +102,80 @@ function errorFromBody(status: number, body: unknown) {
 }
 
 const plainTextType = /^text\/(?!html\b)/i;
+const apiTokenStorageKey = "bellpr-api-token";
+// Raw paired-device credential; install credentials remain tab-scoped.
+export const deviceTokenStorageKey = "bellpr-device-token";
+export const deviceInfoStorageKey = "bellpr-device-info";
+const apiTokenPattern = /^[0-9a-f]{64}$/i;
+
+function decodePart(value: string) {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
+
+function browserSession(): Storage | undefined {
+  try {
+    return typeof sessionStorage === "undefined" ? undefined : sessionStorage;
+  } catch {
+    return undefined;
+  }
+}
+
+/** Install credentials take precedence over this browser's paired credential. */
+export function currentApiToken(): string | undefined {
+  try {
+    const install = browserSession()?.getItem(apiTokenStorageKey);
+    if (install) return install;
+  } catch { /* Try device storage even if tab storage is blocked. */ }
+  try {
+    return localStorage.getItem(deviceTokenStorageKey) ?? undefined;
+  } catch { return undefined; }
+}
+
+/** Remove the tab-scoped install credential. */
+export function clearApiToken(): void {
+  try {
+    browserSession()?.removeItem(apiTokenStorageKey);
+  } catch {
+    // Storage may be unavailable; later requests simply omit the header.
+  }
+}
+
+
+/**
+ * Reads `#bell_token=` from the fragment into session storage and removes
+ * that fragment. A `?bell_token=` query is ignored.
+ */
+export interface ApiTokenWindow {
+  location: { hash: string; search: string; pathname: string };
+  history: {
+    state: unknown;
+    replaceState(state: unknown, title: string, url?: string | URL | null): void;
+  };
+  sessionStorage: { setItem(key: string, value: string): void };
+}
+
+export function adoptApiToken(win: ApiTokenWindow): void {
+  const hash = win.location.hash.startsWith("#")
+    ? win.location.hash.slice(1)
+    : win.location.hash;
+  if (!hash.startsWith("bell_token=")) return;
+  const token = decodePart(hash.slice("bell_token=".length));
+  if (!apiTokenPattern.test(token)) return;
+  try {
+    win.sessionStorage.setItem(apiTokenStorageKey, token.toLowerCase());
+  } catch {
+    // Storage can refuse the write. The fragment is still removed below.
+  }
+  win.history.replaceState(
+    win.history.state,
+    "",
+    `${win.location.pathname}${win.location.search}`,
+  );
+}
 
 /**
  * Calls the BELL PR API at `/api${path}` with the UI locale in the
@@ -113,16 +189,29 @@ const plainTextType = /^text\/(?!html\b)/i;
  *   page while the service is down), gives code `server_unreachable`.
  * Aborting through `options.signal` rejects with the abort error unchanged.
  */
-export async function api<T>(path: string, options?: RequestInit): Promise<T> {
-  const headers = new Headers(options?.headers);
+export async function api<T>(
+  path: string,
+  options?: RequestInit & { browserSessionOnly?: boolean },
+): Promise<T> {
+  const { browserSessionOnly, ...requestOptions } = options ?? {};
+  const headers = new Headers(requestOptions.headers);
   if (!headers.has("Content-Type"))
     headers.set("Content-Type", "application/json");
   if (!headers.has("X-Bell-Locale"))
     headers.set("X-Bell-Locale", getCurrentLocale());
+  // browserSessionOnly: omit stored credentials (pairing must not send an
+  // existing install/device token). Name kept for callers; no cookie session.
+  const token = browserSessionOnly ? undefined : currentApiToken();
+  if (browserSessionOnly) {
+    headers.delete("Authorization");
+    headers.delete("X-Bell-Token");
+  }
+  if (token && !headers.has("Authorization") && !headers.has("X-Bell-Token"))
+    headers.set("Authorization", `Bearer ${token}`);
   let response: Response;
   let text: string;
   try {
-    response = await fetch(`/api${path}`, { ...options, headers });
+    response = await fetch(`/api${path}`, { ...requestOptions, headers });
     text = await response.text();
   } catch (error) {
     if (isAbort(error, options?.signal)) throw error;
@@ -139,7 +228,20 @@ export async function api<T>(path: string, options?: RequestInit): Promise<T> {
   } catch (error) {
     throw unreachable(response.status, error);
   }
-  if (!response.ok) throw errorFromBody(response.status, body);
+  if (!response.ok) {
+    const presented = headers.get("Authorization")?.replace(/^Bearer /i, "") ?? headers.get("X-Bell-Token");
+    if (response.status === 401 && token && presented === token) {
+      if (token.startsWith("bpd_")) {
+        try {
+          if (localStorage.getItem(deviceTokenStorageKey) === token)
+            localStorage.removeItem(deviceTokenStorageKey);
+        } catch { /* Storage may be unavailable. */ }
+        if (typeof window !== "undefined" && window.location.pathname !== "/pair")
+          window.location.replace("/pair");
+      } else clearApiToken();
+    }
+    throw errorFromBody(response.status, body);
+  }
   return body as T;
 }
 

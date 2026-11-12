@@ -4,6 +4,7 @@ import {
   type RefObject,
   type SetStateAction,
 } from "react";
+import { sessionMovedFiles } from "../../session/state";
 import { api } from "../../api";
 import type { DiffFile, Run, RunSummary } from "../../types";
 import { summarizeRun } from "../../../shared/runs";
@@ -46,11 +47,13 @@ export function useRunPolling({
   setTab,
   setApiError,
 }: RunPollingOptions) {
+  const sessionRunning = !!run.session?.running;
   const byHandBusy = !!run.byHand?.busy;
   useEffect(() => {
-    if (demo || (!active && !preparingDraft && !reviewRerunning && !byHandBusy)) return;
+    if (demo || (!active && !preparingDraft && !reviewRerunning && !byHandBusy && !sessionRunning)) return;
     let cancelled = false;
     let observedStatus = run.status;
+    let observedSession = run.session;
     let polling = false;
     const poll = async () => {
       if (polling) return;
@@ -64,13 +67,15 @@ export function useRunPolling({
           observedStatus !== "awaiting_plan"
         )
           setTab("activity");
+        const sessionMoved = sessionMovedFiles(observedSession, updated.session);
+        observedSession = updated.session;
         const wasActive = ["running", "queued", "awaiting_plan"].includes(
           observedStatus,
         );
         observedStatus = updated.status;
         if (
-          wasActive &&
-          !["running", "queued", "awaiting_plan"].includes(updated.status)
+          sessionMoved || (wasActive &&
+          !["running", "queued", "awaiting_plan"].includes(updated.status))
         ) {
           const { files: changed } = await api<{ files: DiffFile[] }>(
             `/runs/${run.id}/diff`,
@@ -78,8 +83,8 @@ export function useRunPolling({
           // A draft saved meanwhile leaves the diff as it is: show it all the same.
           if (!cancelled) {
             setFiles(changed);
-            setSelectedPath(changed[0]?.path || "");
-            if (updated.status === "review")
+            if (!sessionMoved) setSelectedPath(changed[0]?.path || "");
+            if (!sessionMoved && updated.status === "review")
               setTab(
                 activeFollowUp(updated.followUps) || updated.sync
                   ? "draft"
@@ -113,6 +118,7 @@ export function useRunPolling({
     preparingDraft,
     reviewRerunning,
     byHandBusy,
+    sessionRunning,
     // Refs and state setters never change; listed for the hooks lint rule.
     draftMutationEpoch,
     setRun,

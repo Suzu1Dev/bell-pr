@@ -1,6 +1,8 @@
 node_modules
 dist/
 .bellpr/
+# Local deployment backups, archives and operational notes
+/.local/
 .env
 .env.*
 !.env.example
@@ -28,3 +30,6 @@ playwright-report/
 
 # Landing site build output (deployed separately, never committed)
 site/dist/
+
+# Local agent prompts (never ship)
+.codex-prompts/

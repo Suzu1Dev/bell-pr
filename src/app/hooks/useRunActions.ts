@@ -8,6 +8,7 @@ import {
   type SetStateAction,
 } from "react";
 import { api, ApiError, send } from "../../api";
+import { participantHeaders } from "../../collab/participant";
 import { demoAnswer, getDemo, type DemoContent } from "../../demo";
 import { demoLearningExport } from "../../demo/export";
 import {
@@ -21,6 +22,7 @@ import type { Locale } from "../../../shared/i18n/locale";
 import type { ContributionSettings } from "../../../shared/insights";
 import { summarizeRun } from "../../../shared/runs";
 import { activeFollowUp } from "../../../shared/followups";
+import { isFileReviewed } from "../../review/reviewed";
 import type { SplitRequest } from "../../../shared/split";
 import type { ModalName, Notify, Page, Tab } from "../AppShell";
 import { usePresentation, type PresentationFlags } from "../presentation";
@@ -41,6 +43,13 @@ import type { TaskSetup } from "./useTaskSetup";
  * escaped: a crafted one cannot reach another route.
  */
 export const runPath = (id: string) => `/runs/${encodeURIComponent(id)}`;
+
+/** Recovery is available only before a publish attempt records a push target. */
+export function recoverablePublish(run: Run) {
+  return !!run.publishCommit && !run.prUrl && !run.headRepository &&
+    !run.publishedBranch && !activeFollowUp(run.followUps) &&
+    ["review", "approved"].includes(run.status);
+}
 
 /**
  * The run's changed files. A run whose working files were cleaned up
@@ -311,6 +320,7 @@ export function useRunActions({
     acknowledged,
     setAcknowledged,
     overrides,
+    setOverrides,
     loadPublishChecks,
     followUp,
   } = draft;
@@ -335,6 +345,7 @@ export function useRunActions({
   const [messages, setMessages] = useState<Record<string, ChatMessage[]>>({});
   const [loadingChats, setLoadingChats] = useState<Set<string>>(new Set());
   const pendingChats = useRef(new Set<string>());
+  const recoveringPublish = useRef(false);
   const [chatRequests, setChatRequests] = useState<Record<string, number>>({});
   const rerunPending = useRef(new Set<string>());
   const [rerunRequests, setRerunRequests] = useState<Set<string>>(new Set());
@@ -477,14 +488,18 @@ export function useRunActions({
       // The open-run poll and the next action report connection problems.
     }
   }
-  async function approveTeamPlan() {
+  /** `overlapDigest` only after the person ticked the overlap with their other contributions. */
+  async function approveTeamPlan(options?: { overlapDigest?: string }) {
     if (demo) {
       playback.current?.player.approvePlan();
       return;
     }
     setBusy(true);
     try {
-      const result = await api<{ run: Run }>(`/runs/${run.id}/plan/approve`, send("POST"));
+      const result = await api<{ run: Run }>(
+        `/runs/${run.id}/plan/approve`,
+        send("POST", typeof options?.overlapDigest === "string" ? { overlapDigest: options.overlapDigest } : undefined),
+      );
       if (runIdRef.current === result.run.id) setRun(result.run);
       // Learn by hand: the person's turn to write starts in the Changes tab.
       if (runIdRef.current === result.run.id && result.run.learnByHand) setTab("changes");
@@ -696,16 +711,16 @@ export function useRunActions({
     setBusy(true);
     setFormError("");
     try {
-      const { run: created } = await api<{ run: Run }>(
-        "/runs",
-        send("POST", {
+      const { run: created } = await api<{ run: Run }>("/runs", {
+        ...send("POST", {
           repoId: taskRepoId,
           prompt: prompt.trim(),
           title: taskTitle.trim() || undefined,
           settings: contributionSettings,
           ...setup.runRequest.current,
         }),
-      );
+        headers: participantHeaders(),
+      });
       setRuns((previous) => [summarizeRun(created), ...previous]);
       setRun(created);
       setFiles([]);
@@ -752,7 +767,7 @@ export function useRunActions({
   }
   async function reviewFile() {
     if (!file) return;
-    const reviewed = !run.reviewedFiles.includes(file.path);
+    const reviewed = !isFileReviewed(run, file, demo);
     if (demo) {
       // As on the server, only a run in review takes review marks: the
       // sample PR, once opened (or on its way), stays as it was approved.
@@ -809,8 +824,8 @@ export function useRunActions({
     }
   }
   async function ask(question: string) {
-    setShowExplanation(true);
     setFocusMode(false);
+    setShowExplanation(true);
     if (!file || !question.trim() || chatLoading) return;
     const key = `${run.id}:${file.path}`;
     if (pendingChats.current.has(key)) return;
@@ -988,31 +1003,78 @@ export function useRunActions({
     setBusy(true);
     setFormError("");
     const pushingRound = !!followUp;
+    const selection = selectionSequence.current;
     try {
       const result = await api<{ run: Run; url?: string }>(
         `/runs/${run.id}/publish`,
-        send("POST", {
-          fingerprint: run.approvedFingerprint,
-          acknowledged,
-          rulesDigest,
-          ...(overrides.length ? { overrides } : {}),
-        }),
+        {
+          ...send("POST", {
+            fingerprint: run.approvedFingerprint,
+            acknowledged,
+            rulesDigest,
+            ...(overrides.length ? { overrides } : {}),
+          }),
+          headers: participantHeaders(),
+        },
       );
       // The person may have opened another run while the PR was created.
-      if (runIdRef.current === result.run.id) setRun(result.run);
+      if (runIdRef.current === result.run.id && selectionSequence.current === selection)
+        setRun(result.run);
       closeModal();
       notify(pushingRound ? t.roundPushed : t.prCreated);
+      // A published round no longer uses its parent as the review base.
+      // Refresh the canonical files for that new comparison.
+      if (runIdRef.current === result.run.id && selectionSequence.current === selection) {
+        try {
+          const files = await readRunFiles(result.run.id);
+          if (runIdRef.current === result.run.id && selectionSequence.current === selection)
+            setFiles(files);
+        } catch (error) {
+          // The PR was already published; a failed read must not look like a failed push.
+          if (runIdRef.current === result.run.id && selectionSequence.current === selection)
+            notify((error as Error).message, "error");
+        }
+      }
     } catch (error) {
-      if (error instanceof ApiError && error.code === "understanding_check_required") checkFirst();
-      else setFormError((error as Error).message);
-      // A refused push may have saved the round's state; show it next to the error.
-      if (pushingRound)
-        void api<{ run: Run }>(`/runs/${run.id}`)
-          .then(({ run: latest }) => {
-            if (runIdRef.current === latest.id) setRun(latest);
-          })
-          .catch(() => undefined);
+      if (runIdRef.current === run.id) {
+        if (error instanceof ApiError && error.code === "understanding_check_required") checkFirst();
+        else setFormError((error as Error).message);
+      }
+      // Even a first publish can have committed locally before failing.
+      // Show that saved state so the person can recover the unfinished attempt.
+      await api<{ run: Run }>(runPath(run.id))
+        .then(({ run: latest }) => {
+          if (latest.id === run.id && runIdRef.current === latest.id) setRun(latest);
+        })
+        .catch(() => undefined);
     } finally {
+      setBusy(false);
+    }
+  }
+  async function recoverPublish() {
+    if (demo || draftDirty || recoveringPublish.current || run.publishing ||
+      run.session?.running || !recoverablePublish(run)) return;
+    const id = run.id;
+    const selection = selectionSequence.current;
+    const stillOpen = () => runIdRef.current === id && selectionSequence.current === selection;
+    recoveringPublish.current = true;
+    setBusy(true);
+    setFormError("");
+    try {
+      const { run: updated } = await api<{ run: Run }>(
+        `${runPath(id)}/publish/recover`,
+        send("POST", { commit: run.publishCommit }),
+      );
+      if (!stillOpen() || updated.id !== id) return;
+      setRun(updated);
+      setAcknowledged([]);
+      setOverrides([]);
+      closeModal();
+      notify(t.publishRecovered);
+    } catch (error) {
+      if (stillOpen()) notify((error as Error).message, "error");
+    } finally {
+      recoveringPublish.current = false;
       setBusy(false);
     }
   }
@@ -1099,6 +1161,89 @@ export function useRunActions({
       notify((error as Error).message, "error");
     }
   }
+  async function restoreHeldPaths(): Promise<HoldRestoreResult> {
+    const id = run.id;
+    try {
+      const result = await api<{ run: Run; restored: string[] }>(
+        `${runPath(id)}/holds/restore`,
+        { ...send("POST", {}), headers: participantHeaders() },
+      );
+      if (runIdRef.current !== id) return { restored: result.restored.length };
+      setRun(result.run);
+      try {
+        const files = await readRunFiles(id);
+        if (runIdRef.current === id) {
+          setFiles(files);
+          if (file && !files.some((item) => item.path === file.path))
+            setSelectedPath(files[0]?.path || "");
+        }
+        return { restored: result.restored.length, files };
+      } catch (error) {
+        return {
+          restored: result.restored.length,
+          refreshError: error instanceof Error ? error : new Error(String(error)),
+        };
+      }
+    } catch (error) {
+      const conflicts = heldConflicts(error);
+      if (conflicts && runIdRef.current === id) {
+        try {
+          const [current, files] = await Promise.all([
+            api<{ run: Run }>(runPath(id)),
+            readRunFiles(id),
+          ]);
+          if (runIdRef.current === id) {
+            setRun(current.run);
+            setFiles(files);
+            if (file && !files.some((item) => item.path === file.path))
+              setSelectedPath(files[0]?.path || "");
+          }
+        } catch {
+          if (runIdRef.current === id)
+            setRun((previous) =>
+              previous.id === id
+                ? {
+                    ...previous,
+                    heldPaths: [...new Set(conflicts.map((conflict) => conflict.path))],
+                  }
+                : previous,
+            );
+        }
+      }
+      throw error;
+    }
+  }
+  async function recheckHeldPaths(): Promise<HeldConflict[]> {
+    const id = run.id;
+    try {
+      const result = await api<{ run: Run }>(
+        `${runPath(id)}/holds/recheck`,
+        { ...send("POST", {}), headers: participantHeaders() },
+      );
+      if (runIdRef.current === id) setRun(result.run);
+      return [];
+    } catch (error) {
+      const conflicts = heldConflicts(error);
+      if (!conflicts) throw error;
+      if (runIdRef.current === id) {
+        try {
+          const current = await api<{ run: Run }>(runPath(id));
+          if (runIdRef.current === id) setRun(current.run);
+        } catch {
+          if (runIdRef.current === id)
+            setRun((previous) =>
+              previous.id === id
+                ? {
+                    ...previous,
+                    heldPaths: [...new Set(conflicts.map((conflict) => conflict.path))],
+                  }
+                : previous,
+            );
+        }
+      }
+      return conflicts;
+    }
+  }
   return {
     setRun,
     setFiles,
@@ -1127,9 +1272,40 @@ export function useRunActions({
     ask,
     approve,
     publish,
+    recoverPublish,
     fetchPrFeedback,
     cancel,
+    restoreHeldPaths,
+    recheckHeldPaths,
   };
+}
+
+export interface HeldConflict {
+  path: string;
+  holder: string;
+  title: string;
+  since: string;
+}
+
+export interface HoldRestoreResult {
+  restored: number;
+  files?: DiffFile[];
+  refreshError?: Error;
+}
+
+export function heldConflicts(error: unknown): HeldConflict[] | undefined {
+  if (!(error instanceof ApiError) || error.status !== 409 || error.details.reason !== "heldByOther")
+    return undefined;
+  if (!Array.isArray(error.details.held)) return undefined;
+  const conflicts = error.details.held.flatMap((value) => {
+    if (typeof value !== "object" || value === null) return [];
+    const conflict = value as Record<string, unknown>;
+    return typeof conflict.path === "string" && typeof conflict.holder === "string" &&
+      typeof conflict.title === "string" && typeof conflict.since === "string"
+      ? [{ path: conflict.path, holder: conflict.holder, title: conflict.title, since: conflict.since }]
+      : [];
+  });
+  return conflicts.length ? conflicts : undefined;
 }
 
 export type RunActions = ReturnType<typeof useRunActions>;

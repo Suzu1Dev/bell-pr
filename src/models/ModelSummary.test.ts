@@ -169,3 +169,10 @@ test("an effort shows its CLI id only where the label does not already read as i
     /<dd>高 · high<\/dd>/,
   );
 });
+
+test("full access is shown in both languages only when the run recorded it", () => {
+  const execution = { source: "cli-default", agentAccess: "full" } as const;
+  assert.match(render({ execution }), /完整權限（取消沙箱與指令拒絕規則）/);
+  assert.match(renderEnglish({ execution }), /Full access \(sandbox and command deny rules lifted\)/);
+  assert.doesNotMatch(render({ execution: { source: "cli-default" } }), /完整權限/);
+});

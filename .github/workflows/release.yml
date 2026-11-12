@@ -1,11 +1,18 @@
 name: Release
 
-# A version tag (v1.2.3) publishes the npm package (with provenance), pushes
-# the Docker image to ghcr.io and creates a GitHub release in this repository.
-# Started by hand with dry_run (the default), it builds, tests and packs, runs
-# `npm publish --dry-run` and builds the image without pushing, and creates
-# no release anywhere. `node scripts/release-dry-run.mjs` runs the same dry
-# run locally.
+# Pushing a version tag (v1.2.3) that names the version in package.json is
+# the only way to publish: it publishes the npm package (with provenance),
+# then pushes the Docker image to ghcr.io, then creates a GitHub release of
+# the tagged commit in this repository. The image waits for npm publish, so
+# a failed publish pushes no image and no `latest` tag.
+# Started by hand, it always runs as a dry run and fails when dry_run is
+# turned off: it builds, tests and packs, runs `npm publish --dry-run` and
+# builds the image without pushing, and creates no release anywhere.
+# `node scripts/release-dry-run.mjs` runs the same dry run locally.
+#
+# The verify job packs once with a plain `npm pack` (prepack runs). check-pack
+# inspects that tarball as it is, and the checksums, the artifact, npm publish
+# and the GitHub release all use that same file.
 #
 # Secrets: NPM_TOKEN (or npm trusted publishing). The release uses the
 # workflow's own GITHUB_TOKEN. npm provenance needs `repository` in
@@ -18,7 +25,7 @@ on:
   workflow_dispatch:
     inputs:
       dry_run:
-        description: Dry run (publish nothing)
+        description: Dry run (publish nothing). Only a pushed v* tag publishes.
         type: boolean
         default: true
 
@@ -57,19 +64,21 @@ jobs:
         id: meta
         env:
           EVENT_NAME: ${{ github.event_name }}
-          REF_NAME: ${{ github.ref_name }}
+          REF: ${{ github.ref }}
           DRY_RUN: ${{ inputs.dry_run }}
         run: |
           version="$(node -p "require('./package.json').version")"
           if [ "$EVENT_NAME" = push ]; then
             # A tag must name exactly the version in package.json.
-            if [ "$REF_NAME" != "v$version" ]; then
-              echo "::error::Tag $REF_NAME does not match package.json version $version."
+            if [ "$REF" != "refs/tags/v$version" ]; then
+              echo "::error::$REF does not match package.json version $version (expected refs/tags/v$version)."
               exit 1
             fi
             dry_run=false
           elif [ "$DRY_RUN" = false ]; then
-            dry_run=false
+            # Only the tag push above publishes, so every release passes its checks.
+            echo "::error::Started by hand, this workflow only runs a dry run. To publish $version, push the tag v$version."
+            exit 1
           else
             dry_run=true
           fi
@@ -85,7 +94,10 @@ jobs:
       - run: npm test
       - name: Pack (prepack builds)
         run: npm pack
-      - run: node scripts/check-pack.mjs
+      - name: Check the packed tarball as it is
+        env:
+          VERSION: ${{ steps.meta.outputs.version }}
+        run: node scripts/check-pack.mjs --tarball "bell-pr-$VERSION.tgz"
       - name: Checksums
         env:
           VERSION: ${{ steps.meta.outputs.version }}
@@ -145,7 +157,11 @@ jobs:
 
   docker:
     name: Docker image
-    needs: verify
+    # After npm, so a failed npm publish pushes no image. A dry run builds
+    # the image (and pushes nothing) whatever `npm publish --dry-run`
+    # returned: that fails once the version in package.json is on npm.
+    needs: [verify, npm]
+    if: ${{ !cancelled() && needs.verify.result == 'success' && (needs.verify.outputs.dry_run == 'true' || needs.npm.result == 'success') }}
     runs-on: ubuntu-latest
     timeout-minutes: 60
     permissions:
@@ -215,7 +231,10 @@ jobs:
           PRERELEASE: ${{ needs.verify.outputs.prerelease }}
         run: |
           if [ "$PRERELEASE" = true ]; then prerelease=--prerelease; else prerelease=; fi
+          # Should the tag be gone by now, gh creates it on the commit that was
+          # built (--target), not on the head of the default branch.
           gh release create "v$VERSION" \
+            --target "$GITHUB_SHA" \
             --title "BELL PR $VERSION" \
             --notes-file release-notes.md \
             $prerelease \

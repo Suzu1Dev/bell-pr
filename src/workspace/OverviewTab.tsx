@@ -1,6 +1,6 @@
 import { lazy, Suspense, type Dispatch, type SetStateAction } from "react";
 import { getDemo } from "../demo";
-import { useLocale, useT, withMessages, type Messages } from "../i18n";
+import { useLocale, withMessages } from "../i18n";
 import type { Repo, Run } from "../types";
 import type { useProjectInsights } from "../mission/useProjectInsights";
 import type {
@@ -20,22 +20,21 @@ const OverviewPanel = lazy(() =>
 
 /**
  * The run's contribution brief, built from the settings it started with;
- * `defaults` fills what the settings leave open.
+ * absent details stay absent rather than looking like an analysis.
  */
 export function contributionBrief(
   value: Run,
-  defaults: Messages["workspace"]["brief"],
 ): ContributionBrief | undefined {
   const settings = value.contributionSettings;
   if (!settings) return;
   return {
     problem: value.prompt,
-    motivation: settings.outcome || defaults.motivation,
+    motivation: "",
     beneficiaries: settings.targetUser ? [settings.targetUser] : [],
-    before: value.learnByHand ? defaults.beforeByHand : defaults.before,
-    after: settings.outcome || defaults.after,
+    before: "",
+    after: settings.outcome,
     validation: settings.acceptance.split("\n").filter(Boolean),
-    risks: settings.constraints ? [settings.constraints] : [defaults.risk],
+    risks: settings.constraints ? [settings.constraints] : [],
   };
 }
 
@@ -52,6 +51,10 @@ interface OverviewTabProps {
   /** Checks the run's premise against its code; absent while it cannot run. */
   onCheckPremise?: () => void;
   checkingPremise?: boolean;
+  /** Hands chosen setup to a Full access collaboration turn; absent while it cannot run. */
+  onSetupTurn?: (commands: string[]) => Promise<void>;
+  /** Why such a turn cannot start now. */
+  setupTurnBlock?: string;
 }
 
 /** The workspace's first tab: the project overview and why this change. */
@@ -66,8 +69,9 @@ export function OverviewTab({
   updatingRepo,
   onCheckPremise,
   checkingPremise,
+  onSetupTurn,
+  setupTurnBlock,
 }: OverviewTabProps) {
-  const t = useT("workspace");
   const [locale] = useLocale();
   return (
     <>
@@ -82,7 +86,7 @@ export function OverviewTab({
       brief={
         demo
           ? getDemo(locale).contributionBrief
-          : contributionBrief(run, t.brief)
+          : contributionBrief(run)
       }
       loading={intelligence.loading}
       error={intelligence.error}
@@ -103,6 +107,8 @@ export function OverviewTab({
       updatingRepo={updatingRepo}
       onCheckPremise={onCheckPremise}
       checkingPremise={checkingPremise}
+      onSetupTurn={onSetupTurn}
+      setupTurnBlock={setupTurnBlock}
     />
     </Suspense>
     </ErrorBoundary>

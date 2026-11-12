@@ -1,3 +1,4 @@
+import { sessionMovedFiles } from "../session/state";
 import {
   lazy,
   Suspense,
@@ -22,6 +23,7 @@ import "../team/team.css";
 import type { AppSettingsView } from "../../shared/app-settings";
 import { summarizeRun } from "../../shared/runs";
 import { dropSplitLinks } from "../../shared/split";
+import { ApiTokenEmptyState } from "./ApiTokenEmptyState";
 import { api, ApiError, send } from "../api";
 import { Logo } from "../brand/Logo";
 import { getDemo } from "../demo";
@@ -49,6 +51,7 @@ import { useDoctor, type DoctorState } from "../setup/useDoctor";
 import { WorkspacePage } from "../workspace/WorkspacePage";
 import { ErrorBoundary, listenForPreloadErrors } from "./ErrorBoundary";
 import { Sidebar } from "./Sidebar";
+import { SuiteSwitcher, SuiteTrigger } from "./SuiteSwitcher";
 import { Toasts, type Toast } from "./Toasts";
 import { Topbar } from "./Topbar";
 import { usePresentation } from "./presentation";
@@ -60,6 +63,7 @@ import { useRepoUpdate } from "./hooks/useRepoUpdate";
 import { useRunActions } from "./hooks/useRunActions";
 import { useRunPolling } from "./hooks/useRunPolling";
 import { useRunRounds } from "./hooks/useRunRounds";
+import { useSuiteLinks } from "./hooks/useSuiteLinks";
 import { useTaskSetup } from "./hooks/useTaskSetup";
 import { useWalkthroughs } from "./hooks/useWalkthroughs";
 
@@ -70,9 +74,10 @@ export type Page =
   | "explore"
   | "discovery"
   | "team"
+  | "group"
   | "learning"
   | "settings";
-export type Tab = "overview" | "changes" | "activity" | "draft" | "commits";
+export type Tab = "overview" | "changes" | "activity" | "session" | "draft" | "commits";
 export type ModalName =
   | "import"
   | "task"
@@ -115,6 +120,11 @@ const CommandPalette = lazy(() =>
 const LearningPage = lazy(() =>
   withMessages(import("../pages/LearningPage")).then((module) => ({
     default: module.LearningPage,
+  })),
+);
+const GroupPage = lazy(() =>
+  withMessages(import("../collab/GroupPage")).then((module) => ({
+    default: module.GroupPage,
   })),
 );
 // The task and model dialogs carry the direction and model pickers, which
@@ -180,7 +190,7 @@ function AppRoot() {
   const [doctorLive, setDoctorLive] = useState(false);
   const [doctorSettled, setDoctorSettled] = useState(false);
   const doctor = useDoctor({
-    enabled: !doctorSettled || doctorLive || view === "welcome",
+    enabled: !data.apiTokenRequired && (!doctorSettled || doctorLive || view === "welcome"),
   });
   useEffect(() => {
     if (doctor.report || doctor.error) setDoctorSettled(true);
@@ -223,6 +233,15 @@ function AppRoot() {
   };
 
   const starting = <div className="app-starting" aria-busy="true" />;
+  if (data.apiTokenRequired)
+    return (
+      <main className="welcome-screen" id="main-content">
+        <div className="welcome-screen-logo">
+          <Logo variant="wordmark" size={34} title="" />
+        </div>
+        <ApiTokenEmptyState />
+      </main>
+    );
   if (view === "pending") return starting;
   if (view === "welcome")
     return (
@@ -298,6 +317,8 @@ function pageFor(route: Route | null, knownRepo: boolean): Page {
       return "discovery";
     case "team":
       return "team";
+    case "group":
+      return "group";
     case "learning":
       return "learning";
     case "settings":
@@ -323,6 +344,7 @@ const pageRoutes = {
   repos: "repos",
   discovery: "discover",
   team: "team",
+  group: "group",
   learning: "learning",
   settings: "settings",
 } as const satisfies Record<
@@ -396,6 +418,7 @@ function AppShell({
     if (typeof value !== "function") openRunId.current = value.id;
     setRunState(value);
   }, []);
+  const [sessionComposer, setSessionComposer] = useState({ runId: "", text: "" });
   const [files, setFiles] = useState<DiffFile[]>(() => sample.files);
   // The workspace's tab and file while another page is shown, and the
   // repository the overview page shows next.
@@ -468,13 +491,44 @@ function AppShell({
   }, []);
   const [toast, setToast] = useState<Toast | null>(null);
   const [commandOpen, setCommandOpen] = useState(false);
+  // The product switcher: a button once another BELL product is linked.
+  const suiteLinks = useSuiteLinks();
+  const [suiteOpen, setSuiteOpen] = useState(false);
+  const suiteTrigger = suiteLinks && (
+    <SuiteTrigger open={suiteOpen} onOpen={() => setSuiteOpen(true)} />
+  );
   const mainContent = useRef<HTMLElement>(null);
   const [modal, setModal] = useState<ModalName>(initialModal);
   const exploreRepoId = route?.name === "repo" ? route.repoId : undefined;
   const settingsRequest = useRef(0);
-  const [showFiles, setShowFiles] = useState(true);
-  const [showExplanation, setShowExplanation] = useState(true);
-  const [focusMode, setFocusMode] = useState(false);
+  const [panes, setPanes] = useState<{
+    files: boolean;
+    explanation: boolean;
+    beforeFocus?: { files: boolean; explanation: boolean };
+  }>({ files: true, explanation: true });
+  const { files: showFiles, explanation: showExplanation } = panes;
+  const focusMode = !!panes.beforeFocus;
+  const setShowFiles = useCallback((value: SetStateAction<boolean>) => {
+    setPanes((previous) => ({ ...previous,
+      files: typeof value === "function" ? value(previous.files) : value,
+    }));
+  }, []);
+  const setShowExplanation = useCallback((value: SetStateAction<boolean>) => {
+    setPanes((previous) => ({ ...previous,
+      explanation: typeof value === "function" ? value(previous.explanation) : value,
+    }));
+  }, []);
+  const setFocusMode = useCallback((value: SetStateAction<boolean>) => {
+    setPanes((previous) => {
+      const focused = !!previous.beforeFocus;
+      const next = typeof value === "function" ? value(focused) : value;
+      if (next === focused) return previous;
+      // Focus starts with just the code, while its pane buttons remain usable.
+      return next ? { files: false, explanation: false,
+        beforeFocus: { files: previous.files, explanation: previous.explanation },
+      } : previous.beforeFocus ?? previous;
+    });
+  }, []);
   const [codeFont, setCodeFont] = useState(() => {
     try {
       return Number(localStorage.getItem("bellpr-code-font")) || 14;
@@ -527,7 +581,8 @@ function AppShell({
   const additions = files.reduce((sum, f) => sum + f.additions, 0);
   const deletions = files.reduce((sum, f) => sum + f.deletions, 0);
   const active = ["running", "queued", "awaiting_plan"].includes(run.status);
-  const editable = !demo && ["review", "approved"].includes(run.status);
+  const sessionRunning = Boolean(run.session?.running);
+  const editable = !demo && !sessionRunning && ["review", "approved"].includes(run.status);
   // A learner-requested re-review keeps the run in review/approved; only the
   // two reviewer agents report running, so poll and offer to stop on that signal.
   const reviewRerunning =
@@ -581,12 +636,13 @@ function AppShell({
       if (event.defaultPrevented || event.isComposing || event.repeat) return;
       if ((event.metaKey || event.ctrlKey) && !event.altKey && !event.shiftKey && event.key.toLowerCase() === "k") {
         event.preventDefault();
-        toggleCommandPalette();
+        // The product switcher is modal: the palette would open on top of it.
+        if (!suiteOpen) toggleCommandPalette();
       }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [toggleCommandPalette]);
+  }, [toggleCommandPalette, suiteOpen]);
 
   useEffect(() => {
     if (reading) window.scrollTo({ top: 0, behavior: "instant" });
@@ -603,7 +659,7 @@ function AppShell({
   }, [sidebarCollapsed]);
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
-      if (event.defaultPrevented || event.isComposing || modal || commandOpen) return;
+      if (event.defaultPrevented || event.isComposing || modal || commandOpen || suiteOpen) return;
       // #/about shows its dialog without setting `modal`; it is open all the same.
       if (currentRoute()?.name === "about") return;
       if (event.key === "Escape") setFocusMode(false);
@@ -619,7 +675,7 @@ function AppShell({
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [modal, commandOpen]);
+  }, [modal, commandOpen, suiteOpen, setFocusMode]);
   useEffect(() => {
     // Errors stay until the reader closes them; success notices fade out.
     if (!toast || toast.tone === "error") return;
@@ -728,6 +784,21 @@ function AppShell({
     setup,
   });
   const { chooseRun, importRepo, startTask, publish } = actions;
+  function adoptSessionRun(updated: Run) {
+    if (runIdRef.current !== updated.id) return;
+    const moved = sessionMovedFiles(run.session, updated.session);
+    setRun(updated);
+    setRuns((previous) => previous.map((item) =>
+      item.id === updated.id ? summarizeRun(updated) : item));
+    if (moved) void api<{ files: DiffFile[] }>(`/runs/${updated.id}/diff`)
+      .then(({ files: changed }) => {
+        if (runIdRef.current === updated.id) setFiles(changed);
+      })
+      .catch((error: Error) => {
+        if (runIdRef.current === updated.id) setApiError(error.message);
+      });
+  }
+
 
   // The workspace and the overview page come back as they were left.
   useEffect(() => {
@@ -1005,6 +1076,7 @@ function AppShell({
         openModal={openModal}
         beginContribution={beginContribution}
         chooseRun={chooseRun}
+        suiteTrigger={suiteTrigger}
       />
       <main className="main-shell" id="main-content" ref={mainContent} tabIndex={-1}>
         <Topbar
@@ -1021,6 +1093,7 @@ function AppShell({
           repoUrl={titleRepo && titleRepo !== sample.repo ? titleRepo.url : undefined}
           githubUser={status?.githubUser ?? ""}
           sampleBadge={presentation.present && showingSample}
+          suiteTrigger={suiteTrigger}
         />
         {apiError && (
           <div role="alert" className="connection-banner">
@@ -1067,6 +1140,9 @@ function AppShell({
           </div>
         ) : page === "workspace" ? (
           <WorkspacePage
+            sessionDraft={sessionComposer.runId === run.id ? sessionComposer.text : ""}
+            onSessionDraftChange={(text) => setSessionComposer({ runId: run.id, text })}
+            onSessionRun={adoptSessionRun}
             run={run}
             files={files}
             file={file}
@@ -1076,7 +1152,7 @@ function AppShell({
             demo={demo}
             reading={reading}
             active={active}
-            busy={busy}
+            busy={busy || sessionRunning}
             editable={editable}
             reviewRerunning={reviewRerunning}
             preparingDraft={preparingDraft}
@@ -1148,6 +1224,12 @@ function AppShell({
           />
         ) : page === "team" ? (
           <TeamPage beginContribution={beginContribution} />
+        ) : page === "group" ? (
+          <ErrorBoundary>
+          <Suspense fallback={null}>
+            <GroupPage status={status} />
+          </Suspense>
+          </ErrorBoundary>
         ) : page === "learning" ? (
           <ErrorBoundary>
           <Suspense fallback={null}>
@@ -1202,6 +1284,9 @@ function AppShell({
             />
           </Suspense>
         </ErrorBoundary>
+      )}
+      {suiteOpen && suiteLinks && (
+        <SuiteSwitcher links={suiteLinks} onClose={() => setSuiteOpen(false)} />
       )}
       <Toasts toast={toast} setToast={setToast} />
       {modal === "import" && (
@@ -1259,7 +1344,7 @@ function AppShell({
               currentRepo={currentRepo}
               additions={additions}
               deletions={deletions}
-              busy={busy}
+              busy={busy || sessionRunning}
               formError={formError}
               draft={draft}
               publish={publish}

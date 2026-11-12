@@ -1,7 +1,7 @@
+import { safeLink, WebLink } from "../review/MarkdownContent";
 import { lazy, Suspense, useEffect, useId, useState } from "react";
 import {
   Bug,
-  Cpu,
   FileText,
   Gauge,
   Globe,
@@ -18,6 +18,7 @@ import type {
   ContributionDirection,
   ContributionSettings,
 } from "../../shared/insights";
+import { activeProvider, codexEnabled } from "../../shared/codex-switch";
 import {
   agentProviders,
   providerLabels,
@@ -33,14 +34,58 @@ import {
 import { api } from "../api";
 import { usePresentation } from "../app/presentation";
 import { useT } from "../i18n";
+import { Modal } from "../modals/Modal";
 import { ReadinessMessage } from "../setup/ReadinessNotice";
 import { useDoctor, type DoctorState } from "../setup/useDoctor";
 import { providerReadiness, withProvider } from "./readiness";
 import type { StartCheck } from "./StartConfirm";
+import { SudoAccess } from "./SudoAccess";
 import "./mission.css";
 
 // The task dialog's facts: their own chunk, with the respect rules.
 const BeforeYouStart = lazy(() => import("./BeforeYouStart"));
+
+/**
+ * Full access applies only after confirmation. Choosing the working
+ * directory applies immediately and leaves the current mode unchanged
+ * until the person confirms.
+ */
+export function agentAccessChoice(
+  current: "workspace" | "full",
+  selected: string,
+): { access: "workspace" | "full"; confirm: boolean } {
+  const next = selected === "full" ? "full" : "workspace";
+  if (next === "full" && current !== "full") return { access: current, confirm: true };
+  return { access: next, confirm: false };
+}
+
+/** Confirmation before Full access. Cancel is the first action. */
+export function FullAccessConfirmDialog({
+  onCancel,
+  onConfirm,
+}: {
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  const permissions = useT("permissions");
+  return (
+    <Modal title={permissions.fullConfirmTitle} onClose={onCancel}>
+      <p className="settings-dialog-text">{permissions.fullAccessDisclosure}</p>
+      <div className="modal-actions">
+        <button type="button" className="button secondary" onClick={onCancel}>
+          {permissions.fullCancel}
+        </button>
+        <button
+          type="button"
+          className="button primary settings-danger-button"
+          onClick={onConfirm}
+        >
+          {permissions.fullConfirm}
+        </button>
+      </div>
+    </Modal>
+  );
+}
 
 /** The directions in display order; their labels are in the `mission` dictionary. */
 export const directionOptions = [
@@ -112,6 +157,7 @@ export function DirectionSettings({
   byHand = false,
 }: DirectionSettingsProps) {
   const { directions, settings: t } = useT("mission");
+  const permissions = useT("permissions");
   const byHandText = useT("discovery").byHand;
   const { reasoningEffort: efforts, reasoningEffortWithId } = useT("common");
   const id = useId();
@@ -126,7 +172,14 @@ export function DirectionSettings({
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loadingModels, setLoadingModels] = useState(!initialCatalog);
   const [catalogAttempt, setCatalogAttempt] = useState(0);
-  const provider = value.provider ?? "codex";
+  const [confirmingFull, setConfirmingFull] = useState(false);
+  const access = value.agentAccess === "full" ? "full" : "workspace";
+  const platform =
+    doctor?.report?.platform ??
+    report?.platform ??
+    (typeof process === "undefined" ? undefined : process.platform);
+  const linux = platform === "linux";
+  const provider = activeProvider(value.provider);
   const providerLabel = providerLabels[provider];
   useEffect(() => {
     const controller = new AbortController();
@@ -181,6 +234,56 @@ export function DirectionSettings({
     >
       {!modelsOnly && (
         <>
+          <div className="mission-settings-fields">
+            <div className="mission-form-field">
+              <label htmlFor={`${id}-acceptance`}>
+                {t.acceptance.label} <span>{t.optional}</span>
+              </label>
+              <textarea
+                id={`${id}-acceptance`}
+                maxLength={4000}
+                value={value.acceptance}
+                onChange={(event) => update("acceptance", event.target.value)}
+                rows={3}
+                placeholder={t.acceptance.placeholder}
+                aria-describedby={`${id}-acceptance-help`}
+              />
+              <p id={`${id}-acceptance-help`} className="mission-field-note">
+                {t.acceptance.help}
+              </p>
+            </div>
+            <div className="mission-form-field">
+              <label htmlFor={`${id}-issue`}>
+                {t.issue.label} <span>{t.optional}</span>
+              </label>
+              <input
+                id={`${id}-issue`}
+                type="text"
+                inputMode="url"
+                maxLength={400}
+                value={value.issueUrl ?? ""}
+                onChange={(event) => update("issueUrl", event.target.value)}
+                placeholder="https://github.com/owner/repo/issues/123"
+                aria-describedby={`${id}-issue-help`}
+              />
+              <p id={`${id}-issue-help`} className="mission-field-note">
+                {t.issue.help}
+              </p>
+              {repoId && (
+                <Suspense fallback={null}>
+                  <BeforeYouStart
+                    repoId={repoId}
+                    issueUrl={value.issueUrl}
+                    demo={demo}
+                    onFacts={onStartCheck}
+                    byHand={byHand}
+                  />
+                </Suspense>
+              )}
+            </div>
+          </div>
+          <details className="mission-form-details" open={!compact}>
+            <summary>{t.requirements}</summary>
           <fieldset className="mission-fieldset">
             <legend>
               <span className="mission-legend-icon">
@@ -236,7 +339,7 @@ export function DirectionSettings({
                 placeholder={t.outcome.placeholder}
               />
             </div>
-            <div className="mission-form-columns">
+            <div>
               <div className="mission-form-field">
                 <label htmlFor={`${id}-constraints`}>
                   {t.constraints.label} <span>{t.optional}</span>
@@ -254,67 +357,26 @@ export function DirectionSettings({
                   {t.constraints.help}
                 </p>
               </div>
-              <div className="mission-form-field">
-                <label htmlFor={`${id}-acceptance`}>
-                  {t.acceptance.label} <span>{t.optional}</span>
-                </label>
-                <textarea
-                  id={`${id}-acceptance`}
-                  maxLength={4000}
-                  value={value.acceptance}
-                  onChange={(event) => update("acceptance", event.target.value)}
-                  rows={3}
-                  placeholder={t.acceptance.placeholder}
-                  aria-describedby={`${id}-acceptance-help`}
-                />
-                <p id={`${id}-acceptance-help`} className="mission-field-note">
-                  {t.acceptance.help}
-                </p>
-              </div>
-            </div>
-            <div className="mission-form-field">
-              <label htmlFor={`${id}-issue`}>
-                {t.issue.label} <span>{t.optional}</span>
-              </label>
-              <input
-                id={`${id}-issue`}
-                type="text"
-                inputMode="url"
-                maxLength={400}
-                value={value.issueUrl ?? ""}
-                onChange={(event) => update("issueUrl", event.target.value)}
-                placeholder="https://github.com/owner/repo/issues/123"
-                aria-describedby={`${id}-issue-help`}
-              />
-              <p id={`${id}-issue-help`} className="mission-field-note">
-                {t.issue.help}
-              </p>
-              {repoId && (
-                <Suspense fallback={null}>
-                  <BeforeYouStart
-                    repoId={repoId}
-                    issueUrl={value.issueUrl}
-                    demo={demo}
-                    onFacts={onStartCheck}
-                    byHand={byHand}
-                  />
-                </Suspense>
-              )}
             </div>
           </div>
+          </details>
 
         </>
       )}
+      {provider === "antigravity" && !modelsOnly && (
+        <p className="mission-field-note" role="note">{t.model.antigravityWeb}</p>
+      )}
+      <details className="mission-form-details" open={!compact || modelsOnly || !selectedReadiness.ready || access === "full" || !!modelError}>
+        <summary id={`${id}-model-heading`}>
+          <strong>{modelsOnly ? t.model.heading : t.execution}</strong>
+          <span>{[providerLabel, value.model || defaultModel?.name || t.model.modelDefault({}), access === "full" ? permissions.full : permissions.workspace, !byHand && !modelsOnly ? t.team.summary({ count: value.maxTeammates }) : ""].filter(Boolean).join(" · ")}</span>
+        </summary>
       <div
         className="mission-model-settings"
         role="group"
         aria-labelledby={`${id}-model-heading`}
       >
         <div className="mission-model-header">
-          <h3 id={`${id}-model-heading`} className="mission-model-heading">
-            <Cpu size={16} aria-hidden="true" />
-            {t.model.heading}
-          </h3>
           <p className="mission-field-note">{t.model.note}</p>
         </div>
         <div className="mission-form-field">
@@ -323,19 +385,25 @@ export function DirectionSettings({
             id={`${id}-provider`}
             value={provider}
             aria-describedby={`${id}-provider-help`}
-            onChange={(event) =>
+            onChange={(event) => {
+              const next = event.target.value as AgentProvider;
+              if (next === "codex" && !codexEnabled) return;
               onChange({
                 ...value,
-                provider: event.target.value as AgentProvider,
+                provider: next,
                 model: "",
                 reasoningEffort: "",
-              })
-            }
+              });
+            }}
           >
             {agentProviders.map((option) => {
               const state = readiness(option)?.state;
               return (
-                <option key={option} value={option}>
+                <option
+                  key={option}
+                  value={option}
+                  disabled={option === "codex" && !codexEnabled}
+                >
                   {state
                     ? t.model.providerOption({
                         provider: providerLabels[option],
@@ -410,7 +478,7 @@ export function DirectionSettings({
                 loadingModels ||
                 (!availableEfforts.length && !value.reasoningEffort)
               }
-              aria-describedby={`${id}-reasoning-default ${id}-reasoning-help`}
+              aria-describedby={`${id}-reasoning-help`}
               onChange={(event) =>
                 update(
                   "reasoningEffort",
@@ -436,9 +504,6 @@ export function DirectionSettings({
                 </option>
               ))}
             </select>
-            <p id={`${id}-reasoning-default`} className="mission-field-note">
-              {t.model.defaultEffortNote}
-            </p>
             <p id={`${id}-reasoning-help`} className="mission-field-note">
               {unknownEffort && !loadingModels
                 ? t.model.unknownEffort
@@ -456,11 +521,44 @@ export function DirectionSettings({
           <span className="mission-plan-copy">
             <strong>
               <Globe size={16} />
-              {t.model.webAccess}
+              {provider === "antigravity" ? t.model.webPages : t.model.webAccess}
             </strong>
-            <small id={`${id}-web-help`}>{t.model.webAccessHelp}</small>
+            <small id={`${id}-web-help`}>{provider === "antigravity" ? t.model.antigravityWeb : t.model.webAccessHelp}</small>
           </span>
         </label>
+        <div className="mission-form-field">
+          <label htmlFor={`${id}-agent-access`}>{permissions.label}</label>
+          <select
+            id={`${id}-agent-access`}
+            value={access}
+            aria-describedby={`${id}-agent-access-help`}
+            onChange={(event) => {
+              const choice = agentAccessChoice(access, event.target.value);
+              if (choice.confirm) {
+                setConfirmingFull(true);
+                return;
+              }
+              setConfirmingFull(false);
+              update("agentAccess", choice.access);
+            }}
+          >
+            <option value="workspace">{permissions.workspace}</option>
+            <option value="full">{permissions.full}</option>
+          </select>
+          <p id={`${id}-agent-access-help`} className="mission-field-note">
+            {access === "full" ? permissions.fullAccessDisclosure : permissions.workspaceHelp}
+          </p>
+          {confirmingFull && (
+            <FullAccessConfirmDialog
+              onCancel={() => setConfirmingFull(false)}
+              onConfirm={() => {
+                setConfirmingFull(false);
+                update("agentAccess", "full");
+              }}
+            />
+          )}
+        </div>
+        {access === "full" && linux && <SudoAccess id={id} />}
         {modelError && (
           <div className="mission-model-error" role="status">
             <span>{t.model.error({ message: modelError })}</span>
@@ -495,9 +593,9 @@ export function DirectionSettings({
             </select>
             <p id={`${id}-ponytail-help`} className="mission-field-note">
               {t.ponytail.help}{" "}
-              <a href={ponytailSource} target="_blank" rel="noreferrer">
+              <WebLink href={safeLink(ponytailSource) || undefined} target="_blank" rel="noreferrer">
                 {t.ponytail.link}
-              </a>
+              </WebLink>
             </p>
           </div>
 
@@ -548,6 +646,7 @@ export function DirectionSettings({
           </div>
         </>
       )}
+      </details>
     </div>
   );
 }

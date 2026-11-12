@@ -125,7 +125,11 @@ export function SetupChecklist({
                 : t.status[check.status]}
             </span>
           </div>
-          {detail && <p className="setup-check-detail">{detail}</p>}
+          {detail?.split("\n").map((line) => (
+            <p key={line} className="setup-check-detail">
+              {line}
+            </p>
+          ))}
           {folder && !summary && (
             <p className="setup-check-detail">{t.dataDir({ path: folder })}</p>
           )}

@@ -72,6 +72,17 @@ test("the note hint appears only when a note is known to be missing and never di
   assert.doesNotMatch(render(demoFiles[0]), /還沒寫下你的理解/);
 });
 
+test("a published comparison hides review marks while keeping the code and questions readable", () => {
+  const html = renderEn(createElement(DiffView, {
+    file: getDemo("en").files[0], reviewed: false, showReview: false,
+    onReview() {}, onAsk() {}, view: "unified", hasNote: false,
+  }));
+  assert.doesNotMatch(html, /rv-reviewed|rv-note-hint|type="checkbox"/);
+  assert.match(html, /rv-line-added/);
+  assert.match(html, /Click any line and the agent will explain it/);
+  assertNoHan(html);
+});
+
 test("a blocked file shows the reason and disables review", () => {
   const html = render({ ...demoFiles[0], blocked: "原因" });
   assert.match(html, /這個檔案目前無法審閱/);

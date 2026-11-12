@@ -1,12 +1,13 @@
 /**
  * The client namespaces that only lazily loaded views use (English):
  * Settings, discovery, the learning page, the efficiency and model
- * summaries, onboarding, About, the legal texts and the team board (its
- * premise check shows at startup, so it is in workspace). The app loads them, in
- * the active locale, the first time such a view renders (`useT` in
- * src/i18n/index.tsx), so they stay out of the startup chunk.
+ * summaries, onboarding, About, the legal texts, group work and the team
+ * board (its premise check shows at startup, so it is in workspace). The app
+ * loads them, in the active locale, the first time such a view renders
+ * (`useT` in src/i18n/index.tsx), so they stay out of the startup chunk.
  */
 import about from "./about";
+import collab from "./collab";
 import discovery from "./discovery";
 import efficiency from "./efficiency";
 import learning from "./learning";
@@ -26,6 +27,7 @@ const messages = {
   about,
   legal,
   team,
+  collab,
 };
 
 export default messages;

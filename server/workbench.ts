@@ -45,11 +45,13 @@ import { RunQueue } from "./run-queue.js";
 import * as publishing from "./publish.js";
 import * as learning from "./learning.js";
 import * as drafting from "./draft-jobs.js";
+import * as sessions from "./session-runs.js";
 import * as syncing from "./sync-runs.js";
 import * as followUps from "./followup-runs.js";
 import * as walkthroughs from "./walkthrough-runs.js";
 import * as premises from "./premise-runs.js";
 import { commitDetail, listCommits } from "./commits.js";
+import { readDiffView } from "./diff-views.js";
 import { splitRun } from "./split-run.js";
 import { synchronizeWalkthroughs } from "./walkthroughs.js";
 import {
@@ -66,6 +68,10 @@ import { byHandFacade, type ByHandFacade } from "./by-hand.js";
 import type { GuardOverride } from "../shared/contribution.js";
 import type { SplitRequest } from "../shared/split.js";
 import type { WorkbenchContext } from "./workbench-context.js";
+import { planOverlaps } from "./group-local.js";
+import type { CollabHost } from "./collab-host.js";
+import { runHolds, type HoldsAsker } from "./hold-guard.js";
+import * as holdRecovery from "./hold-recovery.js";
 
 export type { WorkbenchContext };
 
@@ -80,6 +86,7 @@ export class Workbench {
   private explanationJobs = new Map<string, Promise<void>>();
   private walkthroughJobs = new Map<string, Promise<void>>();
   private draftJobs = new Map<string, Promise<void>>();
+  private sessionJobs = new Map<string, Promise<void>>();
   /** Learner-requested reviewer/tester reruns; one per run, aborted through controllers[run.id]. */
   private reviewJobs = new Map<string, Promise<void>>();
   private followUpJobs = new Map<string, Promise<void>>();
@@ -166,6 +173,7 @@ export class Workbench {
       explanationJobs: this.explanationJobs,
       walkthroughJobs: this.walkthroughJobs,
       draftJobs: this.draftJobs,
+      sessionJobs: this.sessionJobs,
       reviewJobs: this.reviewJobs,
       followUpJobs: this.followUpJobs,
       conflictJobs: this.conflictJobs,
@@ -395,6 +403,15 @@ export class Workbench {
     return createRun(this.context, sources, repoId, prompt, title, settings, mode);
   }
 
+  /**
+   * Gives agent turns, teammates and plans the group's holds
+   * (hold-guard.ts, S2). createApp calls it when BELL PR runs with --group;
+   * without it, none of them is checked.
+   */
+  guardHolds(host: CollabHost) {
+    this.context.holds = runHolds(host);
+  }
+
   /** Appends to the run's own log through the context (see appendRunLog). */
   private log(
     run: Run,
@@ -409,8 +426,13 @@ export class Workbench {
     return teamPlan.sendTeamMessage(this.context, id, input);
   }
 
-  async approvePlan(id: string) {
-    return teamPlan.approvePlan(this.context, id);
+  async approvePlan(id: string, options: { overlapDigest?: string } = {}) {
+    return teamPlan.approvePlan(this.context, id, options);
+  }
+
+  /** The person's other contributions whose files meet this run's plan (group-local.ts). */
+  async planOverlaps(id: string) {
+    return planOverlaps(this.context, this.run(id));
   }
 
   /** Sends a plan back to the lead with the person's feedback (team-plan.ts). */
@@ -422,8 +444,32 @@ export class Workbench {
     return retryTeam(this.context, id, message);
   }
 
+  /** Restores conflicting or recorded held paths in the run's checkout back to its base (hold-recovery.ts). */
+  async restoreHeldPaths(id: string, asker?: HoldsAsker) {
+    return holdRecovery.restoreHeldPaths(this.context, id, asker);
+  }
+
+  /** Re-evaluates the run's changed paths against current holds without modifying checkout files (hold-recovery.ts). */
+  async recheckHeldPaths(id: string, asker?: HoldsAsker) {
+    return holdRecovery.recheckHeldPaths(this.context, id, asker);
+  }
+
+  async startSession(id: string, content: string) {
+    return sessions.startSession(this.context, id, { content });
+  }
+
+  /** Hands the ticked setup commands of a Full access run to one collaboration turn (session-runs.ts). */
+  async startSetupSession(id: string, commands: string[]) {
+    return sessions.startSession(this.context, id, { setupCommands: commands });
+  }
+
+  async cancelSession(id: string) {
+    return sessions.cancelSession(this.context, id);
+  }
+
   async cancel(id: string) {
     const run = this.run(id);
+    if (this.sessionJobs.has(id)) return this.cancelSession(id);
     // Stopping a re-review only aborts the reviewers; the run keeps its status.
     // A conflict resolution or a follow-up round keeps the edits made so far
     // for review, and a published PR stays published.
@@ -480,6 +526,15 @@ export class Workbench {
     await syncing.refreshConflicts(run);
     await this.store.save();
     return files;
+  }
+
+  /** A recorded round or cumulative comparison, without updating review state. */
+  async diffView(id: string, round: string) {
+    return this.lock(id, async () => {
+      const run = this.run(id);
+      cleanup.assertWorkspacePresent(run);
+      return readDiffView(run, round);
+    });
   }
 
   async explanations(
@@ -581,9 +636,9 @@ export class Workbench {
   }
 
   /** Moves a run onto the latest commit of its target branch (see sync-runs.ts). */
-  async syncRun(id: string) {
+  async syncRun(id: string, asker?: HoldsAsker) {
     cleanup.assertWorkspacePresent(this.run(id), { update: true });
-    return syncing.syncRun(this.context, id);
+    return syncing.syncRun(this.context, id, asker);
   }
 
   async undoSync(id: string) {
@@ -612,7 +667,8 @@ export class Workbench {
    * Publishes the first commit and PR, or pushes an open round
    * (publish.ts). `overrides` lift a block with the person's reason
    * (only `issue-has-pr`), recorded on the run; `rulesDigest` binds the
-   * quoted confirm's tick to the words read.
+   * quoted confirm's tick to the words read; `holds` is the group's
+   * write guard, given only with --group (hold-guard.ts).
    */
   async publish(
     id: string,
@@ -620,6 +676,7 @@ export class Workbench {
     acknowledged: string[] = [],
     overrides: Pick<GuardOverride, "id" | "reason">[] = [],
     rulesDigest?: string,
+    holds?: publishing.HoldCheck | publishing.PublishHolds,
   ) {
     const round = activeFollowUp(this.run(id).followUps);
     return logged(
@@ -633,8 +690,14 @@ export class Workbench {
           acknowledged,
           overrides,
           rulesDigest,
+          holds,
         ),
     );
+  }
+
+  /** Preserves a failed pre-push commit and returns its contribution to review. */
+  async recoverPublish(id: string, commit: string) {
+    return publishing.recoverPublish(this.context, id, commit);
   }
 
   /** Frees a finished run's working files; the run and its notes stay. */

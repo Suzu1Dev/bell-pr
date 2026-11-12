@@ -12,7 +12,7 @@ const pages = {
   },
   team: {
     eyebrow: "BUILT TO COLLABORATE",
-    title: "One goal, one agent team.",
+    title: "How the AI team works",
     intro:
       "From breaking down the problem to cross-review, specialized roles fit into how you already work.",
     assign: "Assign a new task",
@@ -43,7 +43,7 @@ const pages = {
       },
     },
     noteTitle: "The agents build; you keep the final say.",
-    noteText: `Uses the ${providerLabels.codex} or ${providerLabels.claude} CLI signed in on this computer. Each task gets its own branch and goes to review when done; no PR is opened automatically.`,
+    noteText: `Uses the ${providerLabels.codex}, ${providerLabels.claude} or ${providerLabels.antigravity} CLI signed in on this computer. Each task gets its own branch and goes to review when done; no PR is opened automatically.`,
   },
 };
 

@@ -5,11 +5,12 @@ import { z } from "zod";
 import { ProjectInsightsService } from "./insights.js";
 import type { Workbench } from "./workbench.js";
 import { AppError } from "./types.js";
-import { redact } from "./process.js";
+import { redact } from "./secrets.js";
 import { DiscoveryService } from "./discovery.js";
 import type { AgentSlots } from "./agent-slots.js";
 import { localhostGuard, parseAllowedOrigins } from "./http-guard.js";
 import type { ApiErrorBody } from "../shared/errors.js";
+import type { SuiteLinks } from "../shared/suite.js";
 import { formatters, htmlLang, parseLocale } from "../shared/i18n/locale.js";
 import { defaultStaticDir } from "./config.js";
 import { currentLocale, sm, withLocale } from "./i18n/index.js";
@@ -33,6 +34,16 @@ import type { RouteDeps } from "./routes/types.js";
 import { registerUnderstandingRoutes } from "./routes/understanding.js";
 import { registerContributionRoutes } from "./routes/contribution.js";
 import { registerByHandRoutes } from "./routes/by-hand.js";
+import { registerSessionRoutes } from "./routes/session.js";
+import { registerSuiteRoutes } from "./routes/suite.js";
+import { registerSudoRoutes } from "./routes/sudo.js";
+import type { PasswordlessSudo } from "./sudo.js";
+import { readApiToken } from "./api-token.js";
+import { DeviceTokens } from "./device-tokens.js";
+import { Pairing } from "./pairing.js";
+import { registerPairingRoutes } from "./routes/pairing.js";
+import type { CollabHost } from "./collab-host.js";
+import { registerCollabRoutes } from "./routes/collab.js";
 
 /** Masks secrets in string values, which may quote command output. */
 function redactValues<T extends Record<string, unknown>>(values?: T) {
@@ -66,6 +77,7 @@ function appErrorBody(error: AppError): ApiErrorBody {
  * point and tests set what they need, and later work only fills in values.
  */
 export interface AppOptions {
+  sudo?: PasswordlessSudo;
   /**
    * The built UI: the dist/ folder next to the server code by default, not
    * the working directory.
@@ -90,6 +102,11 @@ export interface AppOptions {
   agentTimeoutScale?: number;
   /** The app version the API reports. */
   version?: string;
+  /**
+   * Operating system for Linux-only routes. This process by default.
+   * Tests pass another value; the server entry does not.
+   */
+  platform?: NodeJS.Platform;
   /** Development mode, with the UI dev server in front. Off by default. */
   dev?: boolean;
   /**
@@ -97,6 +114,22 @@ export interface AppOptions {
    * trusted like an allowed origin.
    */
   publicUrl?: string;
+  /**
+   * The install's API token. When set, /api except GET and HEAD
+   * /api/health requires it. `readApiToken` is read per request so
+   * rotation applies at once.
+   */
+  apiToken?: string;
+  readApiToken?: () => string | undefined;
+  /**
+   * Path to the install token file. When set, device pairing stores codes
+   * and device tokens next to it under the data directory.
+   */
+  apiTokenFile?: string;
+  /** Group work's host (collab-host.ts), when BELL PR was started with --group. */
+  collab?: CollabHost;
+  /** The other BELL products' origins (BELLPR_SUITE_LINKS); none by default. */
+  suiteLinks?: SuiteLinks;
 }
 
 export function createApp(workbench: Workbench, options: AppOptions = {}) {
@@ -142,6 +175,12 @@ export function createApp(workbench: Workbench, options: AppOptions = {}) {
     typeof allowedOrigins === "string"
       ? parseAllowedOrigins(allowedOrigins)
       : allowedOrigins;
+  const tokenFile = options.apiTokenFile;
+  const tokenReader = tokenFile
+    ? () => readApiToken(tokenFile)
+    : options.readApiToken;
+  // Device pairing keeps its files next to the token file.
+  const devices = tokenFile ? new DeviceTokens(path.dirname(tokenFile)) : undefined;
   app.use(
     localhostGuard({
       // The Vite dev server's port is trusted in development only.
@@ -154,6 +193,9 @@ export function createApp(workbench: Workbench, options: AppOptions = {}) {
             : configuredOrigins,
         ),
       ],
+      ...(options.apiToken !== undefined ? { apiToken: options.apiToken } : {}),
+      ...(tokenReader ? { readApiToken: tokenReader } : {}),
+      ...(devices ? { deviceToken: (presented, installToken) => devices.verify(presented, installToken) } : {}),
     }),
   );
   app.use(express.json({ limit: "160kb", strict: true }));
@@ -185,6 +227,21 @@ export function createApp(workbench: Workbench, options: AppOptions = {}) {
   registerUnderstandingRoutes(app, deps);
   registerContributionRoutes(app, deps);
   registerByHandRoutes(app, deps);
+  registerSessionRoutes(app, deps);
+  registerSuiteRoutes(app, deps);
+  if (tokenFile && devices)
+    registerPairingRoutes(app, tokenFile, {
+      devices,
+      pairing: new Pairing(path.dirname(tokenFile), devices),
+      publicUrl: options.publicUrl,
+    });
+  if (options.collab) {
+    app.locals.collab = options.collab;
+    registerCollabRoutes(app, options.collab, { store: workbench.store, devices, tokenFile });
+    // Agent turns, teammates and plans respect the group's holds too.
+    workbench.guardHolds(options.collab);
+  }
+  if ((options.platform ?? process.platform) === "linux") registerSudoRoutes(app, deps);
   app.use("/api", (_req, res) => {
     res.status(404).json({ error: sm().common.notFound });
   });
@@ -211,7 +268,7 @@ export function createApp(workbench: Workbench, options: AppOptions = {}) {
     );
     app.get("/{*splat}", (_req, res) => {
       res.setHeader("Cache-Control", "no-cache");
-      res.sendFile(indexFile, { cacheControl: false });
+      res.sendFile("index.html", { root: staticDirectory, cacheControl: false });
     });
   } else {
     // Started from source without `npm run build`: say so instead of a 404.

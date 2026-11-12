@@ -12,8 +12,9 @@ const version = (sha?: string) => (sha ? `分析版本 ${sha}` : "分析版本")
 
 const m: Translation<typeof en> = {
   overview: {
+    background: "專案背景與其他貢獻方向",
     kicker: "PROJECT CONTEXT",
-    title: "先看懂專案，再決定怎麼改。",
+    title: "專案背景",
     lead: "從使用者的角度，理解每一次貢獻的理由。",
     update: "更新到最新版本",
     updating: "正在更新…",
@@ -127,6 +128,7 @@ const m: Translation<typeof en> = {
     afterCaption: "希望帶來的改善",
     impactNote:
       "以上是這次貢獻的目標；是否達成，仍需根據實作與驗證結果確認。",
+    missingAcceptance: "尚未記錄完成條件，核准前請確認要如何驗證這次修改。",
     validation: "如何知道改動有用？",
     risks: "一起留意的取捨",
     request: "你提出的需求",
@@ -234,7 +236,7 @@ const m: Translation<typeof en> = {
     low: "初步構想",
   },
   nextStep: {
-    codeTitle: "帶著理解，回到程式碼。",
+    codeTitle: "審閱這次修改",
     codeLead: "把預期的使用者改善，和每一段實際變更對照。",
     codeAction: "檢閱程式碼變更",
     ideaTitle: "有自己的想法，也可以從這裡開始。",
@@ -251,6 +253,8 @@ const m: Translation<typeof en> = {
     maintenance: { label: "維護整理", hint: "降低後續修改的負擔" },
   },
   settings: {
+    requirements: "補充需求",
+    execution: "AI 與團隊設定",
     directionLegend: "這次想從哪個方向貢獻？",
     directionNote: "選一個主要方向，讓團隊圍繞同一個目標工作。",
     optional: "選填",
@@ -280,12 +284,14 @@ const m: Translation<typeof en> = {
     },
     model: {
       heading: "模型與思考方式",
-      note: "所有專案與 Agents 共用此設定。新任務會記錄自己的設定，後續修改不會影響已建立的任務。",
+      note: "預設設定套用至各專案的新任務，已建立的任務保留原設定。",
       agent: "Agent",
       providerHelp: {
         codex: "使用你已安裝並登入的 Codex CLI。",
         claude:
           "使用你已安裝並登入的 Claude Code CLI（Claude 方案或 Anthropic API 金鑰皆可）。用量計入你自己的帳號，可用模型依你的方案而定。",
+        antigravity:
+          "使用你已安裝並登入的 Antigravity CLI（agy；Google 帳號、Gemini API 金鑰或 Google Cloud 憑證皆可）。用量計入你自己的帳號，列出的模型也依帳號而定。它的 Agent 一律可以搜尋網路；專案若附帶 Antigravity 的 hooks、MCP 伺服器、外掛、Agent 或技能，就不會在其中啟動。",
       },
       providerOption: ({ provider, state }) => `${provider}（${state}）`,
       providerStates: {
@@ -293,6 +299,7 @@ const m: Translation<typeof en> = {
         missing: "未安裝",
         broken: "無法執行",
         "signed-out": "未登入",
+        disabled: "已關閉",
       },
       model: "執行模型",
       providerDefault: ({ provider, model }) =>
@@ -302,13 +309,14 @@ const m: Translation<typeof en> = {
       unknownModel: "目前無法驗證這個已儲存的模型，請重新選擇或載入清單。",
       defaultModelHelp: ({ provider }) => `沿用本機 ${provider} 的預設模型。`,
       effort: "思考強度",
-      defaultEffortNote: "「模型預設」會使用模型本身的預設強度。",
       modelDefault: ({ effort }) => `模型預設${effort ? ` · ${effort}` : ""}`,
       unknownEffort: "已儲存的強度未在此模型的清單中，請重新選擇。",
-      effortHelp: `只列出所選模型支援的強度；較高的強度每回合需要更久、用量也較多，${product.name} 會為 Claude Code 以及 xhigh、max 強度延長等待時間。`,
+      effortHelp: "思考強度越高，通常需要更多時間與帳號用量。",
       webAccess: "允許 Agent 上網搜尋與讀取網頁",
+      webPages: "允許 AI 讀取網頁",
+      antigravityWeb: "Antigravity 的網路搜尋無法關閉，包含專案分析與探索。這個選項只控制是否允許讀取網頁。",
       webAccessHelp:
-        "套用到 Lead、Teammates、Reviewer、Test analyst 與追問導師；專案分析與探索貢獻維持離線。網頁內容視為不可信資料；Claude Code 的 curl、wget 仍被拒絕。",
+        "允許任務與追問中的 AI 搜尋及讀取網頁；專案分析與探索不使用這些工具。網頁內容不視為可信指令，終端機網路存取仍受所選權限限制。",
       error: ({ message }) => `${message} 已儲存的選擇會保留。`,
       loadFailed: ({ provider }) => `暫時無法讀取 ${provider} 模型清單。`,
       reload: "重新載入",
@@ -325,6 +333,7 @@ const m: Translation<typeof en> = {
       link: "查看 Ponytail",
     },
     team: {
+      summary: ({ count }) => `${count} 位協作成員`,
       legend: "協作規模",
       teammates: "位隊友",
       note: "設定團隊上限，實際分工由任務計畫決定。",

@@ -74,8 +74,8 @@ export function ModelSettingsModal({
         >
           <DirectionSettings
             value={{ ...defaultContributionSettings, ...modelSettings }}
-            onChange={({ provider, model, reasoningEffort, webAccess }) => {
-              setModelSettings({ provider, model, reasoningEffort, webAccess });
+            onChange={({ provider, model, reasoningEffort, webAccess, agentAccess }) => {
+              setModelSettings({ provider, model, reasoningEffort, webAccess, agentAccess });
               setSettingsNotice("");
               setFormError("");
             }}

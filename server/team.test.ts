@@ -23,7 +23,7 @@ import { readDiff } from "./git.js";
 import { Workbench } from "./workbench.js";
 import { Store } from "./store.js";
 import type { AppError, DiffFile, Run } from "./types.js";
-import type { AgentTeam } from "../shared/team.js";
+import type { AgentTeam, TeamTask } from "../shared/team.js";
 import type { ContributionSettings } from "../shared/insights.js";
 import { ProjectInsightsService } from "./insights.js";
 import { AgentSlots } from "./agent-slots.js";
@@ -551,6 +551,122 @@ test("shared scheduler enforces dependencies, file ownership locks, and member c
   assert.equal(tasks[3].status, "blocked");
 });
 
+/** A scheduler task; its owner and file are its own unless given. */
+const schedulerTask = (
+  id: string,
+  dependsOn: string[],
+  status: TeamTask["status"] = "pending",
+  owner = `member-${id}`,
+  files = [`${id}.ts`],
+): TeamTask => ({ id, title: id, description: id, owner, files, dependsOn, status });
+
+/** Every order of `items`. */
+function orders<T>(items: T[]): T[][] {
+  if (items.length <= 1) return [items];
+  return items.flatMap((item, index) =>
+    orders([...items.slice(0, index), ...items.slice(index + 1)]).map(
+      (rest) => [item, ...rest],
+    ),
+  );
+}
+
+const statuses = (tasks: TeamTask[]) =>
+  Object.fromEntries(tasks.map((task) => [task.id, task.status]));
+
+test("a failed task blocks every task downstream of it, whatever order the plan lists them in", () => {
+  // b and c hang off a in a chain; d also waits on finished work and was
+  // marked ready earlier. y depends only on finished work and is unaffected.
+  const plan = () => [
+    schedulerTask("a", [], "failed"),
+    schedulerTask("b", ["a"]),
+    schedulerTask("c", ["b"]),
+    schedulerTask("d", ["c", "x"], "ready"),
+    schedulerTask("x", [], "complete"),
+    schedulerTask("y", ["x"]),
+  ];
+  for (const order of orders(["a", "b", "c", "d", "x", "y"])) {
+    const byId = new Map(plan().map((task) => [task.id, task]));
+    const tasks = order.map((id) => byId.get(id)!);
+    assert.deepEqual(claimReadyTasks(tasks, 0), [], order.join(" "));
+    assert.deepEqual(
+      statuses(tasks),
+      { a: "failed", b: "blocked", c: "blocked", d: "blocked", x: "complete", y: "ready" },
+      order.join(" "),
+    );
+  }
+});
+
+test("an already blocked task blocks the tasks that depend on it", () => {
+  const tasks = [
+    schedulerTask("c", ["b"]),
+    schedulerTask("b", ["a"], "ready"),
+    schedulerTask("a", [], "blocked"),
+    schedulerTask("other", []),
+  ];
+  assert.deepEqual(
+    claimReadyTasks(tasks, 2).map((task) => task.id),
+    ["other"],
+  );
+  assert.deepEqual(statuses(tasks), {
+    c: "blocked",
+    b: "blocked",
+    a: "blocked",
+    other: "running",
+  });
+});
+
+test("a propagation-only call claims nothing and leaves running and finished work alone", () => {
+  const tasks = [
+    schedulerTask("late", ["failed"]),
+    schedulerTask("failed", ["done"], "failed"),
+    schedulerTask("done", [], "complete"),
+    schedulerTask("busy", ["failed"], "running"),
+    schedulerTask("next", ["done"]),
+    schedulerTask("waiting", [], "ready"),
+    // A dependency on a task that is no longer listed is never complete.
+    schedulerTask("orphan", ["removed"]),
+  ];
+  assert.deepEqual(claimReadyTasks(tasks, 0), []);
+  assert.deepEqual(statuses(tasks), {
+    late: "blocked",
+    failed: "failed",
+    done: "complete",
+    busy: "running",
+    next: "ready",
+    waiting: "ready",
+    orphan: "pending",
+  });
+  assert.ok(tasks.every((task) => task.startedAt === undefined));
+});
+
+test("claims after propagation still respect owners, file scopes and capacity", () => {
+  const tasks = [
+    schedulerTask("c", ["b"]),
+    schedulerTask("b", ["a"]),
+    schedulerTask("a", [], "failed"),
+    schedulerTask("busy", [], "running", "member-1", ["src/"]),
+    schedulerTask("same-owner", [], "ready", "member-1", ["docs/a.md"]),
+    schedulerTask("same-files", [], "pending", "member-2", ["src/a.ts"]),
+    schedulerTask("free", [], "pending", "member-2", ["test/a.ts"]),
+    schedulerTask("over-capacity", [], "pending", "member-3", ["lib/a.ts"]),
+  ];
+  assert.deepEqual(
+    claimReadyTasks(tasks, 2).map((task) => task.id),
+    ["free"],
+  );
+  assert.deepEqual(statuses(tasks), {
+    c: "blocked",
+    b: "blocked",
+    a: "failed",
+    busy: "running",
+    "same-owner": "ready",
+    "same-files": "ready",
+    free: "running",
+    "over-capacity": "ready",
+  });
+  assert.ok(tasks.find((task) => task.id === "free")?.startedAt);
+});
+
 test("broadcast inbox delivery is persisted separately for each recipient", () => {
   const team: AgentTeam = {
     config: {
@@ -1075,6 +1191,69 @@ test("out-of-scope member edits are retained in isolation and never enter the re
   }
 });
 
+test("a plan meeting another contribution's changes does not start on its own, and approving it needs the overlap confirmed", async () => {
+  const f = await fixture(async (input) => {
+    if (input.role === "lead") return makePlan([{ id: "alpha", files: ["a.ts"] }, { id: "beta", files: ["b.ts"] }]);
+    return "Not a report";
+  });
+  try {
+    // An earlier contribution of the same project, in review, changed a.ts.
+    const baseSha = (await git(f.repo.path, ["rev-parse", "HEAD"])).stdout.trim();
+    const worktreePath = path.join(f.store.directory, "worktrees", "earlier-run");
+    await mkdir(path.dirname(worktreePath), { recursive: true });
+    await git(f.repo.path, ["worktree", "add", "-b", "fix/earlier", worktreePath, baseSha]);
+    await writeFile(path.join(worktreePath, "a.ts"), 'export const value = "earlier";\n');
+    f.store.data.runs.push({
+      id: "earlier-run",
+      repoId: f.repo.id,
+      title: "Earlier fix",
+      prompt: "Fix a",
+      status: "review",
+      branch: "fix/earlier",
+      baseBranch: "main",
+      baseSha,
+      worktreePath,
+      createdAt: new Date().toISOString(),
+      agents: [],
+      logs: [],
+      draft: { title: "Earlier fix", body: "" },
+      reviewedFiles: [],
+      reviewedFingerprints: {},
+    });
+
+    const run = await withLocale("en", () =>
+      f.workbench.createRun(f.repo.id, "Improve a and b", undefined, { ...settings, requirePlanApproval: false }),
+    );
+    await waitUntil(() => run.status === "awaiting_plan", "overlap gate");
+    assert.equal(run.team!.phase, "awaiting_approval");
+    assert.equal(run.team!.approvedAt, undefined);
+    assert.ok(run.logs.some((entry) => entry.kind === "notice" && /waits for your approval/.test(entry.message)));
+    assert.deepEqual((await f.workbench.planOverlaps(run.id)).overlaps, [
+      { runId: "earlier-run", title: "Earlier fix", status: "review", paths: ["a.ts"], taskIds: ["alpha"] },
+    ]);
+    await assert.rejects(withLocale("en", () => f.workbench.approvePlan(run.id)), {
+      statusCode: 409,
+      message: /Your other contributions to this project change files this plan covers: "Earlier fix"/,
+    });
+    assert.equal(run.status, "awaiting_plan");
+
+    // Stopping and retrying does not skip the check: the plan was never approved.
+    await f.workbench.cancel(run.id);
+    await waitUntil(() => !f.workbench.store.data.runs.some((entry) => entry.id === run.id && entry.status !== "cancelled"), "stop");
+    await withLocale("en", () => f.workbench.retryTeam(run.id));
+    assert.equal(run.status, "awaiting_plan");
+    assert.equal(run.team!.phase, "awaiting_approval");
+
+    const { digest } = await f.workbench.planOverlaps(run.id);
+    await withLocale("en", () => f.workbench.approvePlan(run.id, { overlapDigest: digest }));
+    assert.ok(run.team!.approvedAt);
+    assert.ok(run.logs.some((entry) => /Approved although "Earlier fix" changes some of the same files/.test(entry.message)));
+    await waitUntil(() => ["failed", "review"].includes(run.status), "approved run");
+  } finally {
+    await f.cleanup();
+  }
+});
+
 /**
  * Team roles for the retry scenarios: beta depends on alpha, and its first
  * attempt edits c.ts outside its scope. Flip `compliant` before retrying.
@@ -1300,6 +1479,33 @@ test("retrying with every task complete reruns only integration and review", asy
       ["alpha", "beta"],
     );
     assert.ok(run.reports!.reviewer);
+  } finally {
+    await f.cleanup();
+  }
+});
+
+test("a retried task whose dependency is no longer listed stops the run as stuck without starting it", async () => {
+  const scenario = retryScenario();
+  const f = await fixture(scenario.runner);
+  try {
+    const run = await startRetryRun(f);
+    await waitUntil(() => run.status === "failed", "ownership rejection");
+    const beta = run.team!.tasks[1];
+    // Only an edited state.json can do this; a lead's plan naming a missing task is rejected.
+    beta.dependsOn = ["removed"];
+    scenario.state.compliant = true;
+    await f.workbench.retryTeam(run.id);
+    await waitUntil(
+      () => run.status === "failed" || run.status === "review",
+      "retry completion",
+    );
+    assert.equal(run.status, "failed");
+    assert.equal(run.error, "任務依賴或檔案分工阻止團隊繼續，請檢視共享任務清單。");
+    assert.equal(beta.status, "pending");
+    assert.deepEqual(
+      scenario.memberInputs.map((input) => input.taskId),
+      ["alpha", "beta"],
+    );
   } finally {
     await f.cleanup();
   }
@@ -2274,7 +2480,7 @@ if (prompt.includes('You are the team lead with read-only access')) {
     }
     assert.ok(reviewer);
     assert.doesNotMatch(reviewer.prompt, /application-observed/);
-    // Every team role ran with live search and the one-sentence web rule; isolated roles stay offline.
+    // Every team role ran with live search and the web rule; isolated roles stay offline.
     const member = prompts.find((entry) =>
       entry.prompt.includes("independent teammate working on task"),
     );

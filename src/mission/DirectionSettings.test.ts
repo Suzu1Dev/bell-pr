@@ -10,9 +10,12 @@ import type { ModelCatalog } from "../../shared/models";
 import { ApiError } from "../api";
 import { setLocale } from "../i18n";
 import type { DoctorState } from "../setup/useDoctor";
+import { setCodexEnabledForTests } from "../../shared/codex-switch";
 import { assertNoHan, renderEn, renderZh } from "../test-utils/render";
 import {
+  agentAccessChoice,
   DirectionSettings,
+  FullAccessConfirmDialog,
   loadModelCatalog,
   type DirectionSettingsProps,
 } from "./DirectionSettings";
@@ -67,6 +70,18 @@ test("the English form has no Han in any layout or provider", () => {
   assert.match(html, /<strong>2<\/strong><span>teammates<\/span>/);
   // Compact layouts leave out the direction hints.
   assert.doesNotMatch(renderEn(props({}, { compact: true })), /Make it easier to understand and start/);
+});
+
+test("Codex cannot be selected while the release switch is off", () => {
+  setCodexEnabledForTests(false);
+  try {
+    const html = renderEn(props({ provider: "codex", model: "saved-model" }));
+    assert.match(html, /<option value="codex" disabled="">/);
+    assert.match(html, /<option value="claude" selected="">/);
+    assert.ok(html.includes(claudeSentence));
+  } finally {
+    setCodexEnabledForTests(true);
+  }
 });
 
 test("the English Claude help is the neutral sentence, not the replaced sign-in copy", () => {
@@ -201,8 +216,8 @@ test("every team size, every effort and web access are open, without a chip, in 
     assert.equal(option(html, "max"), '<option value="max">Max</option>');
     assert.doesNotMatch(webAccess(html), /disabled/);
     assert.doesNotMatch(html, /pro-badge|mission-clamp-notice|mission-option-locked|mission-team-choice[^"]* locked/);
-    assert.match(html, /aria-describedby="([^"]*)-reasoning-default \1-reasoning-help"/);
-    assert.match(html, /<p id="[^"]*-reasoning-default" class="mission-field-note">Default uses the model&#x27;s own default effort\.<\/p>/);
+    assert.match(html, /aria-describedby="[^"]*-reasoning-help"/);
+    assert.doesNotMatch(html, /reasoning-default/);
   }
 });
 
@@ -294,6 +309,19 @@ test("each provider says whether it is ready, and a selected provider that is no
   assert.match(claude, /<option value="claude" selected="">Claude Code — ready<\/option>/);
   assert.doesNotMatch(claude, /readiness-notice/);
 
+  // A Claude Code release outside the supported versions only warns.
+  const untested = renderEn(
+    props({ provider: "claude" }, {
+      doctor: doctor([
+        check("claude", "warn", { reason: "unsupported-version", version: "2.2.0" }),
+        check("claude-auth", "ok"),
+      ]),
+      demo: false,
+    }),
+  );
+  assert.match(untested, /<option value="claude" selected="">Claude Code — ready<\/option>/);
+  assert.doesNotMatch(untested, /readiness-notice/);
+
   const missing = renderEn(
     props({ provider: "claude" }, {
       doctor: doctor([check("codex", "warn", { reason: "broken" }), check("claude", "skip", { reason: "missing", detail: "Not installed." })]),
@@ -325,7 +353,7 @@ test("the efficiency setting is named Efficiency mode, with the Ponytail credit 
   );
   assert.doesNotMatch(html, /development mode/);
   assert.match(renderZh(props()), />效率模式<\/label>/);
-  assert.match(renderZh(props()), /「模型預設」會使用模型本身的預設強度。/);
+  assert.doesNotMatch(renderZh(props()), /reasoning-default/);
 });
 
 test("the task dialog's form shows the Before-you-start facts under the issue field; the settings defaults do not", async () => {
@@ -377,4 +405,61 @@ test("in Learn by hand the team size is hidden and plan approval is always on", 
   assert.match(team, /mission-team-size/);
   assert.ok(team.slice(team.lastIndexOf('<label class="mission-plan-option">')).startsWith('<label class="mission-plan-option"><input type="checkbox"/>'));
   assert.match(renderZh(props({}, { byHand: true })), /親手學一律開啟/);
+});
+
+const platformDoctor = (platform: string): DoctorState => ({
+  report: {
+    checks: [],
+    ready: true,
+    checkedAt: "2026-10-29T00:00:00.000Z",
+    platform,
+  },
+  checking: false,
+  error: "",
+  refresh: async () => undefined,
+});
+
+test("agent access defaults to workspace and exposes the sudo controls only for explicit full access on Linux", () => {
+  assert.equal(defaultContributionSettings.agentAccess, undefined);
+  const normal = renderEn(props({}, { modelsOnly: true, demo: true }));
+  assert.match(normal, /value="workspace" selected=""/);
+  assert.doesNotMatch(normal, /Reading sudo status/);
+  assert.doesNotMatch(normal, /role="dialog"/);
+  const full = renderEn(
+    props({ agentAccess: "full" }, { modelsOnly: true, demo: true, doctor: platformDoctor("linux") }),
+  );
+  assert.match(full, /value="full" selected=""/);
+  assert.match(full, /Passwordless sudo/);
+  assert.match(full, /&quot;Full access&quot; is off by default/);
+  assert.match(full, /&quot;Passwordless sudo&quot; \(Linux only\) is off by default/);
+  assert.doesNotMatch(full, /role="dialog"/);
+  assertNoHan(full);
+  const other = renderEn(
+    props({ agentAccess: "full" }, { modelsOnly: true, demo: true, doctor: platformDoctor("darwin") }),
+  );
+  assert.match(other, /value="full" selected=""/);
+  assert.doesNotMatch(other, /Passwordless sudo/);
+  assert.match(other, /&quot;Full access&quot; is off by default/);
+});
+
+test("switching to full access requires confirmation and switching back does not", () => {
+  assert.deepEqual(agentAccessChoice("workspace", "full"), { access: "workspace", confirm: true });
+  assert.deepEqual(agentAccessChoice("workspace", "workspace"), { access: "workspace", confirm: false });
+  assert.deepEqual(agentAccessChoice("full", "workspace"), { access: "workspace", confirm: false });
+  assert.deepEqual(agentAccessChoice("full", "full"), { access: "full", confirm: false });
+  const dialog = renderEn(
+    createElement(FullAccessConfirmDialog, { onCancel() {}, onConfirm() {} }),
+  );
+  assert.match(dialog, /role="dialog"/);
+  assert.match(dialog, /&quot;Full access&quot; is off by default/);
+  const actions = dialog.slice(dialog.indexOf("modal-actions"));
+  assert.match(
+    actions,
+    /<button type="button" class="button secondary">Keep the working directory<\/button><button type="button" class="button primary settings-danger-button">Use Full access<\/button>/,
+  );
+  assert.doesNotMatch(renderEn(props({}, { modelsOnly: true, demo: true })), /role="dialog"/);
+  const zh = renderZh(createElement(FullAccessConfirmDialog, { onCancel() {}, onConfirm() {} }));
+  assert.match(zh, /要改用完整權限嗎？/);
+  assert.match(zh, /「完整權限」預設關閉/);
+  assert.match(zh, /維持工作目錄（預設）/);
 });

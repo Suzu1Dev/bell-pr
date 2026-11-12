@@ -1,6 +1,6 @@
 {
   "name": "bell-pr",
-  "version": "1.0.0-rc.1",
+  "version": "1.1.0",
   "description": "From vibe coding to knowing why. A local workbench for AI-assisted open-source contributions: an agent team builds the change in isolated git worktrees, you learn every change, explain it back and send one Draft PR that follows the project's rules.",
   "keywords": [
     "open-source",
@@ -13,6 +13,7 @@
     "local-first",
     "learning"
   ],
+  "homepage": "https://bell-pr.suzu.tw",
   "bugs": {
     "url": "https://github.com/Suzu1Dev/bell-pr/issues"
   },
@@ -30,6 +31,7 @@
   "files": [
     "bin/",
     "build/",
+    "!build/**/*.map",
     "dist/",
     "!dist/.vite/",
     "vendor/ponytail/rules.md",
@@ -39,7 +41,9 @@
     "NOTICE",
     "THIRD_PARTY_NOTICES.md",
     "SECURITY.md",
-    "CHANGELOG.md"
+    "CHANGELOG.md",
+    "README.zh-TW.md",
+    "README.md"
   ],
   "scripts": {
     "dev": "concurrently -k -n api,web -c green,cyan \"npm:dev:server\" \"npm:dev:web\"",
@@ -51,7 +55,7 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "start": "node bin/bellpr.mjs start --no-open",
-    "test": "tsx --import ./test/css-stub.mjs --test \"server/**/*.test.ts\" \"shared/**/*.test.ts\" \"src/**/*.test.ts\"",
+    "test": "tsx --import ./test/css-stub.mjs --import ./test/codex-switch.mjs --test \"server/**/*.test.ts\" \"shared/**/*.test.ts\" \"src/**/*.test.ts\"",
     "test:e2e": "playwright test",
     "audit": "node scripts/audit.mjs",
     "check:i18n": "node scripts/check-i18n.mjs",
@@ -59,7 +63,9 @@
     "check:pack": "node scripts/check-pack.mjs",
     "check:meta": "node scripts/sync-package-meta.mjs --check",
     "check:generated": "tsx scripts/render-generated-regions.ts --check",
-    "release:dry-run": "node scripts/release-dry-run.mjs"
+    "release:dry-run": "node scripts/release-dry-run.mjs",
+    "check:pack-expected": "node scripts/pack-expected.mjs --check",
+    "pack-expected:write": "node scripts/pack-expected.mjs --write"
   },
   "engines": {
     "node": ">=22"
@@ -68,7 +74,7 @@
     "access": "public"
   },
   "bellpr": {
-    "releaseDate": "2026-10-20"
+    "releaseDate": "2026-11-04"
   },
   "dependencies": {
     "express": "^5.1.0",
@@ -102,5 +108,6 @@
     "typescript": "^5.8.0",
     "typescript-eslint": "~8.70.1",
     "vite": "^8.3.5"
-  }
+  },
+  "packageManager": "npm@11.21.1"
 }

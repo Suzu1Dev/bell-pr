@@ -288,6 +288,8 @@ test("the language switcher is labelled and lists each language by its own name"
 });
 
 const namespaces = [
+  "permissions",
+  "session",
   "common",
   "app",
   "workspace",
@@ -308,6 +310,7 @@ const namespaces = [
   "home",
   "about",
   "legal",
+  "collab",
 ];
 
 // The shape of a dictionary: nested keys, with each message's kind.

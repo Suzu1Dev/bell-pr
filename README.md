@@ -2,491 +2,236 @@
 
 **From vibe coding to knowing why.**
 
-Your AI agent team does the legwork. You understand every change, explain
-it back, and send only what a maintainer is glad to review.
-
 English · [繁體中文](README.zh-TW.md)
 
-BELL PR is a self-hosted, local-first workbench for open-source
-contributions. It runs on your computer with the AI coding CLI you already
-use (the OpenAI Codex CLI or Claude Code) and the GitHub CLI. It analyzes a
-project, suggests where to contribute and lets a small agent team build the
-change in isolated Git worktrees. Then it has you do the part that makes
-you better: understand every line you send, train your taste on real code,
-and respect the maintainers' time. It explains every changed file in plain
-language, asks you to explain the change back before you approve it, and
-drafts a pull request that follows the project's own rules. Before the
-pull request goes out, it checks that the project takes pull requests from
-you, that the issue is still open and yours, and that the change is
-reviewable and honest about its tests.
+BELL PR is a local workbench for learning through open-source contributions.
+It uses your Codex CLI, Claude Code or Antigravity CLI to analyze a project
+and build changes in isolated Git worktrees. You review the code with
+plain-language explanations, explain what you learned, and approve a
+Draft pull request that follows the project's rules.
 
-**Learn while you contribute, never automatic PRs.** Nothing is published
-until you have reviewed every file, explained the change back (on by
-default; you can turn it off, and the run says so) and approved the pull
-request yourself. Publishing checks that the project welcomes it. There is
-no BELL PR cloud, no telemetry and no account.
+Free and open source under [Apache-2.0](LICENSE). No BELL PR account or
+paid tier; AI usage counts against your own provider account. The interface
+and explanations support English and Traditional Chinese; PRs use English
+unless the target project asks otherwise.
 
-This is the open-source edition of BELL PR, licensed under
-[Apache-2.0](LICENSE) and free to use. It is community-maintained.
-
-![The Code changes tab: a diff with a plain-language explanation of the change beside it](docs/images/en/run-changes-1280.png)
+![Code changes with a plain-language explanation beside the diff](docs/images/en/run-changes-1280.png)
 
 [Quickstart](#quickstart) · [Requirements](#requirements) ·
-[Features](#features) · [Privacy](#privacy) ·
-[Security](#security-model) · [Configuration](#configuration) ·
-[Troubleshooting](#troubleshooting) · [Documentation](#documentation) ·
-[Contributing](#contributing) · [License](#license-and-trademarks)
+[Contribution workflow](#contribution-workflow) · [Development](#development) ·
+[Documentation](#documentation)
 
-## Quickstart
-
-With the [requirements](#requirements) in place, this takes about 60
-seconds.
-
-1. Start BELL PR:
-
-   ```sh
-   npx bell-pr
-   ```
-
-2. It prints its address and opens BELL PR in your browser:
-
-   ```text
-   BELL PR 1.0.0-rc.1 → http://127.0.0.1:4311
-   ```
-
-3. Walk through Welcome: choose your **language**, check your
-   **environment** (every missing tool comes with the command that fixes
-   it) and pick the AI **provider** your agents use.
-4. Take the sample tour, import a repository, or find a project to
-   contribute to.
-
-**Lost the address? Run `bell-pr open`** (or `npx bell-pr open` if you
-started with `npx`). It prints the address again and opens it.
-
-To keep BELL PR installed, run `npm install -g bell-pr`, then start it with
-`bell-pr`. The [getting started guide](docs/getting-started.md) walks
-through a whole contribution.
+<!-- generated:product-link key=homepageUrl path=#demo text="Watch the 90-second demo" -->
+[Watch the 90-second demo](https://bell-pr.suzu.tw/#demo)
+<!-- /generated:product-link -->
 
 ## Requirements
 
-- **Node.js 22 or later.**
-- **Git.** Syncing a run onto the latest target branch needs Git 2.40 or
-  later, and commits need your name and e-mail address in Git.
-- **The GitHub CLI** (`gh`), signed in with `gh auth login`, to import
-  from GitHub, publish pull requests and find projects.
-- **The Codex CLI or Claude Code**, installed and signed in as the same
-  user that runs BELL PR. One of them is enough.
-  - Codex CLI: `npm install -g @openai/codex`, then `codex login`. BELL PR
-    uses the Codex CLI you installed and signed in to. Usage counts
-    against your own account.
-  - Claude Code: `npm install -g @anthropic-ai/claude-code`, then
-    `claude auth login`. BELL PR uses the Claude Code CLI you installed and
-    signed in to (Claude plan or Anthropic API key). Usage counts against
-    your own account.
-- **On Linux, bubblewrap and socat** for the sandbox that Claude Code
-  agents edit files in (`sudo apt-get install bubblewrap socat`).
+Supported on **macOS and Linux**. Windows requires [WSL2](docs/installation.md#windows-with-wsl2)
+and all tools installed inside it; this setup has not been tested on a real
+Windows host. Browser tests and real agent runs have been verified on Linux.
 
-`bell-pr doctor` checks all of this and prints the command that fixes each
-problem.
+For real contributions, install:
 
-## Supported platforms
+- **Node.js 22+** ([download](https://nodejs.org/en)). The
+  [shell installer](docs/installation.md#shell-installer-macos-and-linux)
+  can prepare Node.js 24 if needed.
+- **Git**, with `user.name` and `user.email` configured. Syncing a contribution
+  onto the latest target branch requires Git 2.40+.
+- **GitHub CLI** ([install](https://cli.github.com/)), signed in with `gh auth login`.
+- **One AI coding CLI**, installed and signed in as the user running BELL PR:
 
-- **macOS**
-- **Linux**
-- **Windows through WSL2**: install and run BELL PR, Git, the GitHub CLI
-  and your AI CLI inside your WSL distribution.
+  | Provider | Install | Sign in |
+  | --- | --- | --- |
+  | Codex CLI | `npm install -g @openai/codex` | `codex login` |
+  | Claude Code | `npm install -g @anthropic-ai/claude-code` | `claude auth login` |
+  | Antigravity CLI | `curl -fsSL https://antigravity.google/cli/install.sh \| bash` | Run `agy` |
 
-The 1.0.0-rc.1 release candidate's unit tests, build and package check run
-on Linux and macOS with Node.js 22 and 24 (see the CI workflow). The browser
-tests and the real agent runs were done on Linux only, and WSL2 has not been
-tested (see the [changelog](CHANGELOG.md)). A Docker image is available in
-beta.
+  BELL PR uses the CLI you installed and signed in to. Claude Code supports
+  a Claude plan or an Anthropic API key; usage counts against your own account.
+- **For Claude Code on Linux:** `bubblewrap` and `socat`
+  (`sudo apt-get install bubblewrap socat` on Debian/Ubuntu).
 
-## Features
-
-### Understand the project before you change it
-
-An agent reads the project, read-only, and explains what it does, who uses
-it, how its parts fit together and where to start reading. It suggests up
-to five contribution directions per analysis, each quoting the code or
-documents it is based on, and BELL PR checks that every quote really
-exists; **Generate 5 more** adds five at a time, up to 30 per project. On
-the same page, the **Before you contribute** card quotes the project's own
-contribution rules (see [Respect the maintainer's
-time](#respect-the-maintainers-time)).
-
-![The project overview: the project context and the Before you contribute card with the project's quoted rules](docs/images/en/repo-overview-1280.png)
-
-### A small agent team, in isolated worktrees
-
-You describe the contribution: who benefits, what changes for them, what
-must not change and what counts as done. A **Lead** splits the work into
-tasks with clear file scopes, and you can approve or send back the plan.
-**Teammates**, two, three or four as you choose, work in parallel, each in
-its own Git worktree, and share findings through a team inbox. They are
-told to stay inside their file
-scopes, to make no formatting-only changes and never to weaken, skip or
-delete a test. A **Reviewer** and a **Test analyst** then check the
-integrated result, each adding only what the Lead's summary does not say.
-Failed subtasks can be retried.
-
-Before it plans, the Lead checks any assumption the request states against
-the code, and every role is told the verdict. The brief shows it, and once
-the run is finished you can check it again, also on a run made before
-these checks. Agents are told never to change your
-machine: no `sudo` and no global installs. When a check needs something
-the machine lacks, the overview lists it with a suggested command, for you
-to verify and run yourself.
-
-Several contributions can run at the same time, up to the limit in
-**Settings → Performance** or `BELLPR_MAX_ACTIVE_RUNS` (1 to 8; 2 by
-default). The others wait in the queue.
-
-In **Learn by hand** you write the change yourself: a guide plans with you,
-gives hints without code and reviews your change when you are ready. BELL PR
-runs your tests, and its agents cannot edit your files in these runs.
-
-![Agent activity: the team's plan, progress and reports](docs/images/en/run-activity-1280.png)
-
-### Review that teaches, and checks you learned
-
-Every changed file comes with a plain-language explanation: a concrete
-example of the behavior before and after, what changed and why, the
-concepts involved, what to check, another way to do it and a question to
-test yourself. **Try first**: you answer that question and say how sure
-you are before the answer shows, then grade yourself; and you can guess
-how else the change could be done before the other way shows, then choose
-which one you would take for this project, and why. Click a line to ask
-the agent about it, follow the suggested review order, write your own
-notes, mark each file reviewed, then explain the change back before you
-approve. You can also edit the code yourself and refresh the diff.
-
-The diff opens onto the unchanged code around each change, 20 lines at a
-time or the whole file. A **Code walkthrough** explains the functions
-around each change step by step, marks their lines in the diff and names
-what calls them and what they call; a function the change adds whole
-points back to its explanation instead.
-
-**Ship only what you can explain.** Before approval, a short closed-book
-check opens next to the diff: explain the change in a few sentences of
-your own, answer up to three questions about its riskiest files (none for
-a very small change) and, when source code changed, say what you did not
-test. Then put each answer beside its AI-written reference, grade it
-yourself and correct what you missed. No AI model grades you, and the
-check makes no AI call. It is on by default. You can turn it off
-under **Settings → Learning**: every file still has to be reviewed, you
-still approve the pull request, and runs approved without the check are
-marked "Check off" for good.
-
-![The understanding check next to the diff: your explanation, your answers and your grades](docs/images/en/run-check-1280.png)
-
-### Pull requests that follow the project's rules
-
-BELL PR reads the project's contribution guides, AI policies, pull request
-template, agent guides and PR-checking workflows, and suggests a title, a
-description and a commit message with the source of each rule. Your own
-explanation can open the description: **Use my explanation** puts it in
-with one click, and **Add my not-tested answer to Testing** adds what you
-did not test. While the description is still BELL PR's suggested wording,
-publishing asks you to confirm it, and waits if the project asks for
-descriptions in the contributor's own words. A snapshot shows how
-reviewable the change is, next to the sizes of the project's last merged
-pull requests, and a skipped, deleted or loosened test needs a one-line
-reason before you publish. When the plan has parts that do not depend on one
-another, the confirm before publishing lists them, and **Split into
-contributions** on the Draft tab can turn each part into its own contribution,
-by file. A part is a group of files, not always one fix, so check the grouping.
-
-It checks the text before anything is sent: credentials and unfinished
-placeholders block it, and a local path, a CI change or a public commit
-e-mail address needs your confirmation. AI assistance is mentioned only if
-the project requires it or you choose to, and publishing waits until a
-disclosure the project requires is there. Publishing pushes a branch (to
-your fork when needed) and opens a **Draft** PR through the GitHub CLI;
-nothing is ever force-pushed.
-
-![The PR draft tab: the pull request title and description editor, with what is left to do before you submit beside it](docs/images/en/run-draft-1280.png)
-
-### Respect the maintainer's time
-
-Practise anything locally; publish only what is welcome.
-
-- **Before you contribute.** The project overview quotes the project's own
-  rules from its files, each with its file and line: what it says about
-  AI-assisted contributions, disclosing AI help, descriptions in your own
-  words, explaining your change, issues kept for newcomers, notes to AI
-  agents and opening an issue first. It also says whether the project
-  takes pull requests from you. BELL PR never says that a project has no
-  rules, only which files it read.
-- **Still open, still yours.** When you link an issue, the task dialog
-  shows whether it is still open, whether someone is assigned to it or has
-  claimed it, whether someone else's pull request would already close it,
-  and what a maintainer last said there. Nothing stops you from starting
-  and practising; publishing checks again.
-- **Close the loop before the next one.** BELL PR counts your open pull
-  requests in the repository. The budget is 1 before your first pull
-  request there is merged and 2 after: at the budget, publishing asks you
-  to confirm, and so it does when a maintainer has waited more than 7 days
-  for you to answer a review there; at twice the budget, it waits until
-  you finish or close one. These numbers are BELL PR defaults.
-  Repositories you can write to are not paced, and local runs never are.
-- **Checked again at publish.** Publishing reads these facts from GitHub
-  again. A project that does not take pull requests from you, rules that
-  do not accept AI-assisted contributions, a closed issue, an issue the
-  project keeps for newcomers, and twice your budget each block it, with
-  no override; someone else's open pull request for the same issue blocks
-  it until you give your reason. A fact BELL PR could not read shows as
-  "Couldn't check", never as a pass.
-
-[Contributing responsibly](docs/contributing-responsibly.md) shows what
-maintainers ask for, in their own words, and how each check maps to it.
-
-### After you publish
-
-Sync a run or its pull request onto the latest target branch, with an
-agent that can resolve conflicts for your review. **Read feedback** reads
-the maintainers' reviews, comments and CI results once, when you ask:
-compare them with what you predicted, and tag what each comment raised and
-whether you saw it coming. Then let an agent address selected comments in a
-follow-up round, after you restate each one in your own words; you review
-the round and push it as one more commit.
-**Commit history** lists every commit of the pull request, from the first
-push to review rounds, syncs and commits made on GitHub, each opening to
-its files' diffs.
-
-### Find your next contribution
-
-Discovery searches GitHub for projects and issues that match your
-interests, language and the difficulty you want, reads their contribution
-rules, and explains the effort and the first step. It looks for
-help-wanted issues for the agent team: an issue labelled for newcomers is
-marked "Learn by hand", because writing that fix yourself is how a
-newcomer learns the project.
-
-![Explore contributions: search GitHub for your next contribution](docs/images/en/discover-1280.png)
-
-### Learning page and practice
-
-Every explanation and note from every contribution is collected on one
-page, with a search, so you can come back to a concept later.
-**Practice** brings your own questions back after 1, 3, 7 and 21 days:
-answers you missed while you were sure, maintainer comments that surprised
-you and questions you never tried. Plain counts from your records, such as
-how often you were right when you said "Sure", appear once there is enough
-to count, and none of them is a score or a goal. A **coach debrief** reads
-your records for one project, names what its maintainers raise most and
-builds practice drills from your own contributions, and you can export a
-contribution's complete learning record as Markdown.
-
-![The learning page: notes collected across contributions, with the Practice and Coach debrief tabs](docs/images/en/learning-1280.png)
-
-### Your tools, your accounts, your language
-
-Choose the Codex CLI or Claude Code, the model, the reasoning effort the
-model offers (from none to ultra) and an efficiency mode (Lean, Full or
-Off). Each run shows the usage the provider reported. When a CLI fails, the
-error it reported shows first and its raw output folds away. The interface
-and the agents' explanations are in
-English or Traditional Chinese (Taiwan); pull requests stay in English
-unless the project asks otherwise.
-
-**Web access for agents** is a setting that stays off until you turn it on.
-Claude Code may then open pages on GitHub's own sites only; the Codex CLI
-uses OpenAI's web search. Project analysis and discovery never get web
-access.
-
-### Try it with the sample project
-
-A finished sample contribution, with the project's rules, the plan, the
-changes, their explanations, the understanding check and the PR draft,
-needs no setup and makes no AI call.
-
-## Privacy
-
-- BELL PR runs on your computer and keeps everything in one data
-  directory. There is no BELL PR cloud, account, telemetry or analytics.
-- Your code and your questions go only to the services you set up: the
-  provider of the AI CLI you chose, and GitHub, under your own accounts.
-- Web access for agents is off unless you turn it on.
-- In the app you can free a run's files, delete a run or a project, or
-  delete all data.
-
-Details: [Privacy and your data](docs/privacy-and-data.md).
-
-## Security model
-
-- **Sandboxed agents.** Agents that write code run in their CLI's
-  operating-system sandbox: writes stay in the run's own worktree and the
-  network is closed. Claude Code agents are also denied your SSH keys, the
-  GitHub CLI's sign-in and BELL PR's own data; Codex's sandbox does not
-  limit reading.
-- **Imported projects are untrusted.** Their code, documents and agent
-  instructions (`AGENTS.md`, `CLAUDE.md`, `.claude/`) are treated as data:
-  the CLIs never load the project's own settings, hooks or instructions,
-  and a repository whose Git configuration could run programs is refused.
-  Agents still run the project's code, so import only projects you are
-  willing to run on this computer.
-- **No sign-in.** BELL PR does not authenticate anyone. It listens on
-  `127.0.0.1` by default, so only this computer can reach it. Anyone who can
-  reach its address can use everything it can do. Other sites may link to
-  its page, but cannot call its API or frame it.
-- **Unsandboxed agents are an explicit opt-in.** Without the sandbox (for
-  example in Docker with default settings), a Claude Code agent that edits
-  files is refused. You can allow it under **Settings → Agent safety** or
-  with `BELLPR_ALLOW_UNSANDBOXED_AGENTS=1`; such agents have your full user
-  rights, and every run that used one carries a **Ran without sandbox**
-  badge.
-- **You publish.** Nothing reaches GitHub before your file-by-file review
-  and approval, and the commit holds only the files you reviewed.
-
-Details and limits: [Security model](docs/security-model.md). To report a
-vulnerability, see [SECURITY.md](SECURITY.md).
-
-## Configuration
-
-BELL PR needs no configuration. Every setting below is an environment
-variable read at start; `bell-pr start` also takes `--port`, `--host`,
-`--data-dir`, `--no-open` and `--env-file <file>`. Values set in the app's
-Settings are used unless a variable sets them.
-
-| Variable | Default | What it sets |
-| --- | --- | --- |
-| `BELLPR_PORT` | `4311` | Port of the web interface and the API (1024 to 65535) |
-| `BELLPR_HOST` | `127.0.0.1` | Address to listen on; to reach BELL PR from other machines, keep it and add an HTTPS reverse proxy with `BELLPR_PUBLIC_URL` |
-| `BELLPR_PUBLIC_URL` | none | The address browsers use behind a reverse proxy or another published port |
-| `BELLPR_ALLOWED_ORIGINS` | none | Extra exact origins to accept, comma-separated |
-| `BELLPR_DATA_DIR` | `~/.bellpr` | The data directory |
-| `BELLPR_NO_OPEN` | not set | `1` never opens a browser |
-| `BELLPR_LOCALE` | `en` | Default language of server and CLI messages (`en` or `zh-TW`) |
-| `BELLPR_LOG_LEVEL` | `info` | `debug`, `info`, `warn` or `error` |
-| `BELLPR_MAX_AGENT_PROCESSES` | `3` | Agent CLI processes at the same time (1 to 32) |
-| `BELLPR_MAX_ACTIVE_RUNS` | `2` | Runs executing at the same time (1 to 8) |
-| `BELLPR_AGENT_TIMEOUT_SCALE` | `1` | Multiplier for agent time limits (0.5 to 10) |
-| `BELLPR_ALLOW_UNSANDBOXED_AGENTS` | not set | `1` lets Claude Code agents edit files without the sandbox |
-| `BELLPR_REQUIRE_UNDERSTANDING_CHECK` | not set | `1` keeps the understanding check on and locks the setting; no value turns it off |
-| `BELLPR_RETENTION_DAYS` | `14` | Days before the files of cancelled and failed runs are removed (1 to 365) |
-| `BELLPR_DEV` | not set | Development mode, for working on BELL PR itself |
-| `BELLPR_FRONTEND_PORT` | `4310` | Port of the dev server that development mode trusts |
-| `BELLPR_STATIC_DIR` | the package's `dist/` | The built web interface to serve |
-
-[Configuration](docs/configuration.md) explains each one, the commands and
-the app's settings; [.env.example](.env.example) is a commented template.
-Variables used only by BELL PR's own tests are in
-[Development](docs/development.md#test-and-tool-variables).
-
-## Docker (beta)
+## Quickstart
 
 ```sh
-docker build -t bell-pr .
-docker run -d --name bell-pr -p 127.0.0.1:4311:4311 \
-  -v bellpr-data:/data -v bellpr-home:/home/node bell-pr
-docker exec bell-pr bell-pr open --print
+npx bell-pr
 ```
 
-The image includes Git, the GitHub CLI and the Codex CLI; you can install
-Claude Code into the container yourself. Docker is **beta**: the agent
-sandbox needs three extra `--security-opt` options. Read
-[Docker](docs/docker.md) before you use it, and
-[Self-hosting](docs/self-hosting.md) for a systemd service or a reverse
-proxy.
+BELL PR checks your environment, then opens `http://127.0.0.1:4311` in your
+browser. In Welcome, choose your language and AI provider, then import a
+repository or explore contribution ideas. If a required check fails,
+startup stops and prints the commands to fix it.
 
-## Troubleshooting
+### Try the sample project
+
+With Node.js installed, you can try the review flow before setting up
+GitHub or an AI provider:
 
 ```sh
-bell-pr doctor
+npx bell-pr start --force
 ```
 
-checks Node.js, Git, the GitHub CLI and its permissions, the agent CLIs and
-their sign-ins, the Claude Code sandbox and the data directory, and prints
-the command that fixes each problem. `bell-pr doctor --json` gives the same
-report as JSON. It exits with 0 when every required check passes.
+Choose **Try the sample project** on Home or **Sample** in the sidebar.
+The sample includes a plan, diffs, explanations, an understanding check
+and a PR draft. It makes no AI calls and sends nothing to GitHub.
+Real agent runs still require a signed-in provider.
 
-[Troubleshooting](docs/troubleshooting.md) lists [every error
-code](docs/troubleshooting.md#error-codes) with its fix, explains
-[why BELL PR blocked
-publishing](docs/troubleshooting.md#publishing-was-blocked-by-a-project-rule-an-issue-or-pacing),
-and says what to do when BELL PR does not start and how to collect details
-for a support request.
+To keep BELL PR installed:
 
-## Data directory and backups
+```sh
+npm install -g bell-pr
+bell-pr
+```
 
-BELL PR keeps everything in `~/.bellpr` (or `--data-dir` /
-`BELLPR_DATA_DIR`): your projects and runs in `state.json`, its own clones
-of the projects, a Git worktree per run, analyses, settings and logs. It is
-readable by your user only.
+Other methods, including Homebrew, Bun, mise and the Windows installer,
+are in [Installation](docs/installation.md).
 
-- **Back up** by stopping BELL PR and copying the whole directory. Restore
-  it to the same path: its records contain absolute paths.
-- BELL PR keeps the last three versions of `state.json` and recovers from a
-  damaged file by itself.
-- One BELL PR runs per data directory at a time.
-- **Upgrading** never moves your data, and from 1.0.0 on an older version
-  can still read what a newer one wrote. See [Upgrading](docs/upgrading.md),
-  including data from versions before 1.0.
+## Contribution workflow
+
+1. **Understand the project.** Import a repository or discover one on GitHub.
+   BELL PR explains its structure, quotes its contribution rules and suggests
+   contribution ideas with references to the code.
+2. **Plan and build.** Describe the change and approve the Lead's plan.
+   Two to four teammates work in separate Git worktrees; a Reviewer and
+   Test analyst check the integrated result. In **Learn by hand**, you
+   write the code while agents provide guidance and review.
+3. **Review and learn.** Read each diff with its explanation, ask about
+   unfamiliar code and mark every file reviewed. **Collaborate** lets you
+   request fixes or tests on an agent contribution; changed files need
+   review again.
+4. **Explain and publish.** The understanding check asks you to describe
+   the change, answer review questions and state what you did not test.
+   Check your answers against references, then approve the PR draft.
+   Publishing pushes a branch to your fork when needed and opens a
+   **Draft PR** through the GitHub CLI.
+5. **Follow up.** Read maintainer feedback and CI results, review follow-up
+   fixes and sync with the target branch. Revisit your notes and questions
+   on the Learning page, or export your learning record as Markdown.
+
+The understanding check is on by default. Turning it off in **Settings →
+Learning** is recorded on the run; file review, approval and the project's
+own rules remain required. BELL PR's publishing flow never force-pushes.
+
+Before publishing, BELL PR checks the project's AI policy, issue status,
+competing PRs, your outstanding reviews and sensitive content in the change.
+Some findings block publication; others require your explanation or confirmation.
+See [Contributing responsibly](docs/contributing-responsibly.md) for the rules
+and limits, or follow [Getting started](docs/getting-started.md) for a full walkthrough.
+
+## Privacy and security
+
+- **Local storage, external AI.** BELL PR has no cloud service or telemetry.
+  Code and prompts read by agents go to your chosen AI provider; GitHub
+  operations use your GitHub account. The CLIs have their own data policies.
+- **Sandbox limits.** Agents use their CLI's sandbox by default. Import
+  only projects whose code you are willing to run. Your Claude Code settings
+  can widen its sandbox, and GitHub credentials in the system keyring are
+  not protected by its file restrictions; use a token with minimal permissions.
+- **Broader access is optional.** Full access or allowing unsandboxed agents
+  gives writable agents your user permissions. Linux's optional passwordless
+  sudo grants root access to every process under that user. Use these options
+  only in a disposable VM or container.
+- **Web access.** Agent web access is off by default, except Antigravity's
+  web search, which cannot be disabled. BELL PR also refuses Antigravity
+  runs in projects with its hooks, MCP servers, plugins, agents or skills.
+- **Private access.** BELL PR listens on `127.0.0.1` by default and requires
+  an API credential. For another device, use a private connection and
+  `bell-pr pair` as described in [Self-hosting](docs/self-hosting.md).
+  Do not expose BELL PR to the public internet. Treat token URLs as passwords;
+  `bell-pr token rotate` replaces the install token and revokes all paired devices.
+
+See [Privacy and your data](docs/privacy-and-data.md) and the
+[Security model](docs/security-model.md) for provider differences, API
+authentication and the limits of these protections.
+
+## Configuration and data
+
+Change language, models, learning options and concurrency in **Settings**.
+For ports, environment variables and CLI options, see
+[Configuration](docs/configuration.md) and [.env.example](.env.example).
+
+BELL PR stores its projects, worktrees, notes and settings in `~/.bellpr`;
+use `--data-dir` or `BELLPR_DATA_DIR` to choose another directory.
+To back up, stop BELL PR and copy that whole directory. Restore it to the
+same path because records contain absolute paths. See [Upgrading](docs/upgrading.md)
+for updates, recovery and version compatibility.
+
+## Development
+
+From a checkout of this repository, use **Node.js 22.13+** and Git:
+
+```sh
+npm ci
+BELLPR_DATA_DIR=~/.bellpr-dev npm run dev
+```
+
+This starts the React interface at `http://127.0.0.1:4310` and the API at
+port 4311, using a separate data directory. Real agent runs need the tools
+listed in [Requirements](#requirements). Follow the
+[development guide](docs/development.md#run-from-source) to authenticate the
+browser, run the sample without a provider, or start a built checkout.
+
+| Location | Purpose |
+| --- | --- |
+| `src/` | React interface and translations |
+| `server/` | Local API, CLI and agent orchestration |
+| `shared/` | Shared types, logic and product metadata |
+| `e2e/` | Browser tests; unit tests live beside the code |
+
+Before submitting changes:
+
+```sh
+npm run lint
+npm run build
+npm test
+node scripts/npm-readme.mjs --check-docs
+```
+
+Read [CONTRIBUTING.md](CONTRIBUTING.md) and [AGENTS.md](AGENTS.md) for
+contribution rules, including DCO sign-off and keeping both languages in step.
+[Development](docs/development.md) covers the remaining checks, architecture
+and packaging. Participants follow the [Code of Conduct](CODE_OF_CONDUCT.md).
 
 ## Documentation
 
-- [Getting started](docs/getting-started.md)
-- [Configuration](docs/configuration.md)
-- [Troubleshooting](docs/troubleshooting.md)
-- [Contributing responsibly](docs/contributing-responsibly.md)
-- [Privacy and your data](docs/privacy-and-data.md)
-- [Upgrading](docs/upgrading.md)
-- [FAQ](docs/faq.md)
-- [Self-hosting](docs/self-hosting.md) and [Docker](docs/docker.md)
-- [Security model](docs/security-model.md)
-- [Development](docs/development.md): building and checking BELL PR from
-  its source
-- [Changelog](CHANGELOG.md)
+| Need | Guide |
+| --- | --- |
+| Install or complete a first contribution | [Installation](docs/installation.md) · [Getting started](docs/getting-started.md) |
+| Adjust settings or connect BELL products | [Configuration](docs/configuration.md) · [BELL Suite](docs/bell-suite.md) |
+| Use another device or run a service | [Self-hosting and pairing](docs/self-hosting.md) · [Docker (beta)](docs/docker.md) |
+| Work with other people | [Group work](docs/group-work.md) |
+| Fix a problem | [Troubleshooting](docs/troubleshooting.md) · [FAQ](docs/faq.md) |
+| Update or restore data | [Upgrading](docs/upgrading.md) · [Changelog](CHANGELOG.md) |
+
+All guides are in the [documentation index](docs/README.md).
 
 <!-- generated:product-link key=docsUrl text="Online documentation" -->
 <!-- /generated:product-link -->
 
-## Contributing
-
-BELL PR welcomes contributions. Read [CONTRIBUTING.md](CONTRIBUTING.md)
-first and follow the [Code of Conduct](CODE_OF_CONDUCT.md). BELL PR asks
-you to contribute to other projects responsibly, and it asks the same of
-contributors here: small, understood, honest changes. [Contributing
-responsibly](docs/contributing-responsibly.md) shows what maintainers ask
-for, and [Development](docs/development.md) explains how to build and check
-BELL PR from its source.
-
 ## Support
 
-BELL PR is community-maintained. Start with `bell-pr doctor`, then
-[Troubleshooting](docs/troubleshooting.md) and the [FAQ](docs/faq.md); the
-rest of the [documentation](docs/README.md) covers each topic. The About
-dialog (**Settings → About → About BELL PR**) can copy a diagnostics report
-with secrets, paths and your GitHub login removed, ready for a support
-request.
-
-To report a security vulnerability, follow [SECURITY.md](SECURITY.md); do
-not open a public issue for it.
+Run `npx bell-pr doctor` to diagnose setup problems, or `npx bell-pr open`
+to reopen a running instance. Use the same `--data-dir` if you chose one.
+For a support request, **Settings → About → About BELL PR** can copy a
+diagnostics report with secrets, paths and your GitHub login removed.
+Report vulnerabilities privately as described in [SECURITY.md](SECURITY.md).
 
 <!-- generated:product-link key=homepageUrl text="Website" -->
-<!-- /generated:product-link -->
-<!-- generated:product-link key=supportEmail text="Contact support by e-mail" -->
+[Website](https://bell-pr.suzu.tw)
 <!-- /generated:product-link -->
 <!-- generated:product-link key=publicRepoUrl path=issues text="Report an issue" -->
 [Report an issue](https://github.com/Suzu1Dev/bell-pr/issues)
+<!-- /generated:product-link -->
+<!-- generated:product-link key=supportEmail text="Contact support by e-mail" -->
 <!-- /generated:product-link -->
 <!-- generated:product-link key=securityEmail text="Report a security issue privately" -->
 <!-- /generated:product-link -->
 
 ## License and trademarks
 
-BELL PR is open-source software, licensed under the
-[Apache License 2.0](LICENSE) (see also [NOTICE](NOTICE)). It is provided
-"as is", without warranty of any kind, as the license says. The third-party
-software it includes is listed in
-[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
-
-The BELL PR name and logo are not under the Apache license.
-[TRADEMARKS.md](TRADEMARKS.md) says what you may do with them.
-
-BELL PR is an independent project and is not affiliated with, endorsed by,
-or sponsored by GitHub, Inc., OpenAI, or Anthropic PBC. GitHub, OpenAI,
-Codex, Anthropic, Claude and Claude Code are trademarks of their
-respective owners; BELL PR names them only to say which tools it works
-with.
+[Apache License 2.0](LICENSE); see [NOTICE](NOTICE) and
+[third-party notices](THIRD_PARTY_NOTICES.md). The BELL PR name and logo
+are covered separately by [TRADEMARKS.md](TRADEMARKS.md).
+BELL PR is independent of GitHub, OpenAI, Anthropic and Google; their names
+and trademarks identify compatible tools and do not imply endorsement.

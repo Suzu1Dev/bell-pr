@@ -18,6 +18,7 @@ import { changeFilter, recordStoredHelp } from "./learning.js";
 import { currentLocale, shuttingDown, sm } from "./i18n/index.js";
 import { premiseCheckPrompt } from "./prompts/premise.js";
 import { contributionContext } from "./prompts/team.js";
+import { assertRunAgentAllowed } from "./codex-guard.js";
 import { runAgent } from "./run-executor.js";
 import { runBusy } from "./sync-runs.js";
 import {
@@ -65,6 +66,7 @@ export function dropUnansweredExplanations(
 export async function checkPremise(ctx: WorkbenchContext, id: string) {
   if (ctx.stopping()) throw new AppError(shuttingDown(), 503);
   const run = ctx.run(id);
+  assertRunAgentAllowed(run);
   const team = run.team;
   if (!team || !finishedStatuses.includes(run.status) || run.publishing)
     throw new AppError((m) => m.run.premise.tooEarly, 409);

@@ -2,6 +2,7 @@ import type { AgentSlots } from "./agent-slots.js";
 import type { TransientSleep } from "./agent-cli.js";
 import type { collectDraftContext } from "./draft-sources.js";
 import type * as drafting from "./draft-jobs.js";
+import type { RunHolds } from "./hold-guard.js";
 import type { command } from "./process.js";
 import type { Store } from "./store.js";
 import type { TeamAgentRunner } from "./team.js";
@@ -31,6 +32,8 @@ export interface WorkbenchContext {
   walkthroughJobs: Map<string, Promise<void>>;
   /** PR draft preparation in progress, by run id. */
   draftJobs: Map<string, Promise<void>>;
+  /** Collaborative editing turns on unpublished runs, by run id. */
+  sessionJobs: Map<string, Promise<void>>;
   /** Learner-requested reviewer/tester reruns; one per run, aborted through controllers[run.id]. */
   reviewJobs: Map<string, Promise<void>>;
   /** Review follow-up rounds and sync conflict resolutions, by run id; aborted through controllers[run.id]. */
@@ -52,6 +55,12 @@ export interface WorkbenchContext {
     /** Reads the target project's contribution rules for the PR draft. */
     collectDraftContext?: typeof collectDraftContext;
   };
+  /**
+   * The group's holds for work no request is behind (agent turns,
+   * teammates, plans), set only when BELL PR runs with --group
+   * (Workbench.guardHolds).
+   */
+  holds?: RunHolds;
   /** True once shutdown() has begun; no new background work starts. */
   stopping(): boolean;
   /** Throws 429 once queued, running and paused runs reach the cap. */

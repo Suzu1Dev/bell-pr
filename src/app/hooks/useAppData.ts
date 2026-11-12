@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { AppSettings, AppSettingsView } from "../../../shared/app-settings";
-import { api } from "../../api";
+import type { CollabStatus } from "../../../shared/collab";
+import { api, ApiError } from "../../api";
 import type { Repo, RunSummary } from "../../types";
 
 /** What /api/status reports about the local CLIs and the run limits. */
@@ -9,6 +10,8 @@ export type Status = {
   codexAuthenticated?: boolean;
   claude?: boolean;
   claudeAuthenticated?: boolean;
+  antigravity?: boolean;
+  antigravityAuthenticated?: boolean;
   github: boolean;
   githubUser?: string;
   /** No required environment check fails. */
@@ -20,6 +23,8 @@ export type Status = {
   };
   /** The server's version, for the About dialog. */
   version?: string;
+  /** Where group work stands; absent when BELL PR runs without --group. */
+  collab?: CollabStatus;
 };
 
 /** The first load's requests; each one answers on its own. */
@@ -84,6 +89,8 @@ export function useAppData() {
   const [appSettings, setAppSettings] = useState<AppSettings | null>(null);
   const [loaded, setLoaded] = useState(pending);
   const [apiError, setApiError] = useState("");
+  /** Missing, expired or revoked access, including in an already-open tab. */
+  const [apiTokenRequired, setApiTokenRequired] = useState(false);
   useEffect(() => {
     let cancelled = false;
     const settle = (source: AppDataSource, state: LoadState) =>
@@ -112,6 +119,10 @@ export function useAppData() {
       failed(source, error) {
         if (cancelled) return;
         settle(source, "failed");
+        if (error instanceof ApiError && error.status === 401) {
+          setApiTokenRequired(true);
+          return;
+        }
         // The settings only decide the welcome flow and the agreement
         // prompt; the other requests report a broken connection.
         if (source !== "appSettings")
@@ -123,6 +134,7 @@ export function useAppData() {
     };
   }, []);
   useEffect(() => {
+    if (apiTokenRequired) return;
     let stopped = false;
     let fetching = false;
     const timer = setInterval(async () => {
@@ -131,7 +143,9 @@ export function useAppData() {
       try {
         const { runs: latest } = await api<{ runs: RunSummary[] }>("/runs");
         if (!stopped) setRuns(latest);
-      } catch {
+      } catch (error) {
+        if (!stopped && error instanceof ApiError && error.status === 401)
+          setApiTokenRequired(true);
         /* The current-run poll reports actionable connection errors. */
       } finally {
         fetching = false;
@@ -141,7 +155,7 @@ export function useAppData() {
       stopped = true;
       clearInterval(timer);
     };
-  }, []);
+  }, [apiTokenRequired]);
   return {
     repos,
     setRepos,
@@ -155,6 +169,7 @@ export function useAppData() {
     loaded,
     apiError,
     setApiError,
+    apiTokenRequired,
   };
 }
 

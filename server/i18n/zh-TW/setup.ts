@@ -1,3 +1,4 @@
+import { fullAccessDisclosure, sudoDisclosure } from "../../../shared/i18n/disclosures.zh-TW.js";
 import {
   formatters,
   intlLocale,
@@ -31,7 +32,7 @@ const m: Translation<typeof en> = {
       maxActiveRuns: "同時執行的工作數",
       maxAgentProcesses: "同時執行的 Agent 程序數",
       agentTimeoutScale: "Agent 時間上限倍數",
-      allowUnsandboxedAgents: "允許 Claude Code Agent 不用沙箱",
+      allowUnsandboxedAgents: "允許 Claude Code 與 Antigravity Agent 不用沙箱",
       retentionDays: "已結束工作的檔案保留天數",
     },
     locked: ({ setting, variable }) =>
@@ -46,6 +47,7 @@ const m: Translation<typeof en> = {
     ghMissing: `尚未安裝 GitHub CLI（gh），或 ${product.name} 在它的 PATH 中找不到它。`,
     codexMissing: `尚未安裝 Codex CLI，或 ${product.name} 在它的 PATH 中找不到它。`,
     claudeMissing: `尚未安裝 Claude Code，或 ${product.name} 在它的 PATH 中找不到它。`,
+    antigravityMissing: `尚未安裝 Antigravity CLI（agy），或 ${product.name} 在它的 PATH 中找不到它。`,
     ghUnauthenticated: "GitHub CLI 尚未登入，或登入已失效。請重新登入後再試一次。",
     githubAuthRequired: "GitHub 要求登入。請用 GitHub CLI 登入後再試一次。",
     gitIdentityMissing:
@@ -55,6 +57,8 @@ const m: Translation<typeof en> = {
     codexUnauthenticated: "Codex 尚未登入，或登入已失效。請重新登入後再試一次。",
     claudeUnauthenticated:
       "Claude Code 尚未登入，或登入已失效。請重新登入後再試一次。",
+    antigravityUnauthenticated:
+      "Antigravity CLI 尚未登入，或登入已失效。請在終端機執行 agy 登入後再試一次。",
     cloneTimeout:
       "複製儲存庫超過 10 分鐘，已經停止。請自行複製儲存庫，再匯入你那份複本的路徑。",
   },
@@ -69,6 +73,8 @@ const m: Translation<typeof en> = {
     signInCodex: "登入 Codex",
     installClaude: "安裝 Claude Code",
     signInClaude: "登入 Claude Code",
+    installAntigravity: "安裝 Antigravity CLI",
+    signInAntigravity: "啟動一次 Antigravity CLI 來登入",
     setGitName: "設定你的名字",
     setGitEmail: "設定你的電子郵件地址",
     setNoreplyEmail: "使用你專屬的 GitHub no-reply 地址",
@@ -94,10 +100,15 @@ const m: Translation<typeof en> = {
       claude: "Claude Code",
       "claude-auth": "Claude Code 登入",
       "claude-sandbox": "Claude Code 沙箱",
+      antigravity: "Antigravity CLI",
+      "antigravity-auth": "Antigravity 登入",
+      "antigravity-sandbox": "Antigravity 沙箱",
       "provider-ready": "AI 服務",
       "data-dir": "資料目錄",
       app: product.name,
       platform: "平台",
+      "full-access": "完整權限",
+      "passwordless-sudo": "免密碼 sudo",
     },
     nodeTooOld: ({ version }) =>
       `Node.js ${version} 版本太舊：${product.name} 需要 22 以上版本。`,
@@ -108,6 +119,8 @@ const m: Translation<typeof en> = {
       `已安裝，但執行 \`${command}\` 失敗：${output}`,
     gitTooOld: ({ version }) =>
       `Git ${version} 可以使用，但要把工作移到目標分支的最新版本，需要 Git 2.40 以上。其他功能都能正常使用。`,
+    claudeVersionUnsupported: ({ version, min, below }) =>
+      `Claude Code ${version} 不在 ${product.name} 支援的版本範圍內（${min} 以上、${below} 之前）。Agent 仍會啟動，但 ${product.name} 尚未確認這個版本會套用它的沙箱與 hooks 設定。`,
     identityMissing:
       "尚未設定：Git 不知道你的名字與電子郵件地址，因此無法提交或發佈任何內容。",
     identityAutodetected: ({ email }) =>
@@ -130,10 +143,23 @@ const m: Translation<typeof en> = {
       "這個平台無法使用，因此 Claude Code Agent 無法修改檔案。",
     sandboxAllowed:
       "無法使用。你已允許 Claude Code Agent 不用沙箱修改檔案；這類工作會有標示。",
+    antigravitySandboxReady: "可以使用：會修改檔案的 Antigravity Agent 會在它的終端機沙箱中執行指令。",
+    antigravitySandboxRestricted:
+      "無法使用：這個 Linux 系統不允許 Antigravity CLI 建立 user namespace（kernel.apparmor_restrict_unprivileged_userns），因此 Antigravity Agent 無法修改檔案。docs/troubleshooting.md 說明可行的做法。",
+    antigravitySandboxUnsupported: "這個平台無法使用，因此 Antigravity Agent 無法修改檔案。",
+    antigravitySandboxAllowed:
+      "無法使用。你已允許 Antigravity Agent 不用沙箱修改檔案與執行指令；這類工作會有標示。",
+    fullAccessDisclosure,
+    sudoDisclosure,
+    passwordlessSudoInstalled: `已安裝 BELL PR 的免密碼 sudo 規則。${sudoDisclosure}`,
+    passwordlessSudoExternal: `免密碼 sudo 來自其他規則。${sudoDisclosure}`,
     providersReady: ({ providers }) => `已就緒：${fmt.list(providers)}。`,
-    noProvider: `請安裝並登入 Codex CLI 或 Claude Code：${product.name} 至少需要其中一個。`,
+    noProvider: `請安裝並登入 Codex CLI、Claude Code 或 Antigravity CLI：${product.name} 至少需要其中一個。`,
     savedProviderNotReady: ({ provider }) =>
       `模型設定選用的是 ${provider}，但它尚未就緒。`,
+    codexDisabled: "已停用。這個版本已關閉 Codex。",
+    claudeOnlyRelease: "1.0.0 只支援 Claude Code；Codex 暫時停用",
+    installClaudeCode: "請安裝 Claude Code。",
     dataDirReady: ({ free }) => `可以寫入，剩餘 ${size(free)}。`,
     dataDirWritable: "可以寫入。",
     dataDirNew: "會在第一次啟動時建立。",

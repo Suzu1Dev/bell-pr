@@ -56,16 +56,16 @@ const welcome = (step: WelcomeStep, props: Partial<WelcomeProps> = {}) =>
 
 test("every welcome step reads in English with no Chinese left, and in zh-TW", () => {
   assert.deepEqual([...welcomeSteps], ["language", "environment", "provider", "start"]);
-  for (const [position, step] of welcomeSteps.entries()) {
+  for (const step of welcomeSteps) {
     const html = renderEn(welcome(step));
     // The language switcher names each language in itself.
     assertNoHan(withoutOtherLanguages(html));
     assert.match(html, /<h1 id="welcome-title">Welcome to BELL PR<\/h1>/);
-    assert.match(html, new RegExp(`Step ${position + 1} of 4`));
+    assert.match(html, /aria-current="step"/);
     assert.equal(html.match(/aria-current="step"/g)?.length, 1);
     const zh = renderZh(welcome(step));
     assert.match(zh, /歡迎使用 BELL PR/);
-    assert.match(zh, new RegExp(`第 ${position + 1} 步，共 4 步`));
+    assert.equal(zh.match(/aria-current="step"/g)?.length, 1);
   }
   // The first step has no way back; the others do.
   assert.doesNotMatch(renderEn(welcome("language")), />Back</);
@@ -101,17 +101,38 @@ test("the provider step picks the only ready provider and lets the person choose
   assert.deepEqual(readyProviders(both), ["codex", "claude"]);
   assert.deepEqual(readyProviders(none), []);
   assert.deepEqual(readyProviders(null), []);
+  // A Claude Code release outside the supported versions only warns.
+  const untested: DoctorReport = {
+    ...claudeOnly,
+    checks: claudeOnly.checks.map((value) =>
+      value.id === "claude" ? { ...value, status: "warn", reason: "unsupported-version" } : value,
+    ),
+  };
+  assert.deepEqual(readyProviders(untested), ["claude"]);
   const only = renderEn(welcome("provider"));
-  assert.match(only, /Claude Code is installed and signed in, so your agents use it\./);
+  assert.match(only, /<strong>Claude Code<\/strong>/);
   // Neutral wording about the person's own Claude Code sign-in.
   assert.match(only, /Uses the Claude Code CLI you installed and signed in to \(Claude plan or Anthropic API key\)\. Usage counts against your own account\./);
   assert.doesNotMatch(only, /subscription|API billing/i);
   const choice = renderEn(welcome("provider", { doctor: doctor(both) }));
-  assert.match(choice, /<legend>Both providers are ready\. Which one should your agents use\?<\/legend>/);
+  assert.match(choice, /<legend>More than one provider is ready\. Which one should your agents use\?<\/legend>/);
   assert.equal(choice.match(/type="radio" name="welcome-provider"/g)?.length, 2);
   const empty = renderEn(welcome("provider", { doctor: doctor(none) }));
   assert.match(empty, /No provider is ready yet\./);
   assert.match(empty, />Re-check</);
+  const onlyCodex = report(base);
+  const providerReady = onlyCodex.checks.find((check) => check.id === "provider-ready")!;
+  providerReady.reason = "claude-only";
+  providerReady.detail =
+    "Claude Code only in 1.0.0; Codex support is disabled\nPlease install Claude Code.";
+  const blocked = renderEn(welcome("provider", { doctor: doctor(onlyCodex) }));
+  assert.match(blocked, /Claude Code only in 1\.0\.0; Codex support is disabled/);
+  assert.match(blocked, /Please install Claude Code\./);
+  assert.doesNotMatch(blocked, /No provider is ready yet/);
+  providerReady.detail = "1.0.0 只支援 Claude Code；Codex 暫時停用\n請安裝 Claude Code。";
+  const blockedZh = renderZh(welcome("provider", { doctor: doctor(onlyCodex) }));
+  assert.match(blockedZh, /1\.0\.0 只支援 Claude Code；Codex 暫時停用/);
+  assert.match(blockedZh, /請安裝 Claude Code。/);
   const loading = renderEn(welcome("provider", { doctor: doctor(null) }));
   assert.match(loading, /Checking which providers are ready…/);
 });

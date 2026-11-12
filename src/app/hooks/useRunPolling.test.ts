@@ -26,14 +26,14 @@ const respond = (body: unknown) =>
  * Polls `running` with a server whose diff answer is `diff`: the files and
  * tab it shows, and the runs it applies, are recorded.
  */
-async function mountPolling(diff: (epoch: { current: number }) => Promise<Response>) {
+async function mountPolling(diff: (epoch: { current: number }) => Promise<Response>, initial = running, response = finished) {
   const asked: string[] = [];
   const epoch = { current: 0 };
   const realFetch = globalThis.fetch;
   globalThis.fetch = (async (input: RequestInfo | URL) => {
     const url = String(input);
     asked.push(url);
-    return url.endsWith("/diff") ? diff(epoch) : respond({ run: finished });
+    return url.endsWith("/diff") ? diff(epoch) : respond({ run: response });
   }) as typeof fetch;
   const shown = { files: [] as DiffFile[], tab: "activity" as Tab, runs: [] as Run[] };
   // Stable, like the shell's state setters, so the poll keeps running.
@@ -47,9 +47,9 @@ async function mountPolling(diff: (epoch: { current: number }) => Promise<Respon
     shown.files = files;
     shown.tab = tab;
     useRunPolling({
-      run: running,
+      run: initial,
       demo: false,
-      active: true,
+      active: ["running", "queued", "awaiting_plan"].includes(initial.status),
       preparingDraft: false,
       reviewRerunning: false,
       draftMutationEpoch: epoch,
@@ -113,6 +113,24 @@ test("a finished team whose diff cannot be read is still shown as finished", asy
     await polling.poll();
     assert.deepEqual(polling.shown.files, []);
     assert.deepEqual(polling.shown.runs.map((run) => run.status), ["review"]);
+    assert.equal(polling.asked.filter((url) => url.endsWith("/diff")).length, 1);
+  } finally {
+    await polling.unmount();
+  }
+});
+
+test("a collaboration turn finishing in review refreshes files and draft without leaving its tab", async () => {
+  const session = { messages: [], revision: 0, updatedAt: "2026-10-28T00:00:00.000Z", running: true };
+  const initial = { ...finished, session } as Run;
+  const response = { ...finished, session: { ...session, running: false, revision: 1 }, draft: { title: "t", body: "Updated limitations" } } as Run;
+  const polling = await mountPolling(async () => respond({ files: [file] }), initial, response);
+  try {
+    await polling.poll();
+    assert.deepEqual(polling.shown.files, [file]);
+    assert.equal(polling.shown.tab, "activity");
+    assert.equal(polling.shown.runs.at(-1)?.draft.body, "Updated limitations");
+    assert.equal(polling.shown.runs.at(-1)?.session?.running, false);
+    await polling.poll();
     assert.equal(polling.asked.filter((url) => url.endsWith("/diff")).length, 1);
   } finally {
     await polling.unmount();

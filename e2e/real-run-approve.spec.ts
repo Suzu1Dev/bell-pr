@@ -8,6 +8,7 @@ import { execFileSync } from "node:child_process";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { expect, test, type Response } from "@playwright/test";
+import { e2eApiHeaders } from "./api-token.mjs";
 import type { DraftCheck } from "../shared/draft-checks";
 import draft from "../src/i18n/en/draft";
 import review from "../src/i18n/en/review";
@@ -105,6 +106,7 @@ async function seed(dataDir: string, options: { loosenTest?: boolean; rules?: un
 test("a seeded real run is approved through the UI and the publish dialog opens with no unexpected block", async ({ browser }) => {
   const server = await launchServer({ seed });
   const context = await browser.newContext({
+    extraHTTPHeaders: e2eApiHeaders,
     baseURL: server.baseURL,
     viewport: { width: 1440, height: 900 },
     locale: "en-US",
@@ -233,6 +235,7 @@ test("a passed check counts after the setting is turned off: publishing asks not
       }),
   });
   const context = await browser.newContext({
+    extraHTTPHeaders: e2eApiHeaders,
     baseURL: server.baseURL,
     viewport: { width: 1440, height: 900 },
     locale: "en-US",
@@ -287,7 +290,9 @@ test("a passed check counts after the setting is turned off: publishing asks not
     await page.keyboard.press("Escape");
     await expect(dialog).toHaveCount(0);
     await page.locator("#workspace-tab-draft").click();
-    await expect(page.locator('[data-row="understanding"]')).toContainText(draft.guidance.checklist.understandingPassed);
+    // The passed check is on the loaded guide's checklist. The fallback
+    // copy leaves once that guide is on the page.
+    await expect(page.locator(".draft-checklist")).toContainText(workspace.checklist.understandingPassed);
     await expect(page.locator('[data-row="rules"]')).not.toContainText("your understanding check is off");
   } finally {
     await context.close();

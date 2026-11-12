@@ -6,6 +6,7 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { expect, test, type Browser, type Page, type Route } from "@playwright/test";
+import { e2eApiHeaders } from "./api-token.mjs";
 import { locales } from "../shared/i18n/locale";
 import { product } from "../shared/product";
 import { getDemo } from "../src/demo/all";
@@ -34,6 +35,7 @@ const sidebarButton = (page: Page, name: string) =>
 /** A page on a spec-local server; closed with the server. */
 async function openOn(browser: Browser, server: LaunchedServer) {
   const context = await browser.newContext({
+    extraHTTPHeaders: e2eApiHeaders,
     baseURL: server.baseURL,
     locale: "en-US",
   });
@@ -172,7 +174,7 @@ test("the document title names each page, also after the language changes", asyn
     await page.goto(`/${hash}`);
     await expect(page).toHaveTitle(title);
   }
-  // "Repositories" reads the same in both languages; "Settings" does not.
+  // Page titles follow the selected language and keep it across reloads.
   for (const [hash, en, zh] of [
     ["#/repos", app.pages.repos, appZh.pages.repos],
     ["#/settings", app.pages.settings, appZh.pages.settings],
@@ -429,6 +431,7 @@ test("the import dialog suggests ~/projects/repository, which imports, and adds 
 
     // A browser on Windows, where BELL PR may run inside WSL2.
     const context = await browser.newContext({
+      extraHTTPHeaders: e2eApiHeaders,
       baseURL: server.baseURL,
       locale: "en-US",
     });
@@ -704,4 +707,3 @@ test("the global setup finished onboarding on the shared server", async ({ reque
   const { settings } = await response.json();
   expect(Date.parse(settings.onboardingCompletedAt)).not.toBeNaN();
 });
-

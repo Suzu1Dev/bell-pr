@@ -9,8 +9,10 @@ import { randomUUID } from "node:crypto";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { assertRunAgentAllowed } from "./codex-guard.js";
 import { git, redact } from "./process.js";
 import { readDiff } from "./git.js";
+import { heldPathsOf } from "./hold-guard.js";
 import { AppError, withRunLocale, type Run } from "./types.js";
 import type { TeamCheck } from "../shared/team.js";
 import {
@@ -100,6 +102,7 @@ export async function startFollowUp(
   if (ctx.stopping()) throw new AppError(shuttingDown(), 503);
   return ctx.lock(id, async () => {
     const run = ctx.run(id);
+    assertRunAgentAllowed(run);
     // No AI round in Learn by hand (until v1.2.1): the person pushes with their own Git.
     if (run.learnByHand) throw new AppError((m) => m.byHand.followUpRefused, 409);
     if (activeFollowUp(run.followUps))
@@ -224,7 +227,12 @@ async function runFollowUp(
   const started = Date.now();
   log.info("round.started", { runId: run.id, round: round.id });
   try {
-    const files = await readDiff(run);
+    // The agent needs the whole PR as background before it makes this round's edits.
+    const files = await readDiff({
+      worktreePath: run.worktreePath,
+      baseSha: run.baseSha,
+      locale: run.locale,
+    });
     temporary = await mkdtemp(path.join(os.tmpdir(), "bell-followup-"));
     const outputSchema = path.join(temporary, "followup-schema.json");
     await writeFile(outputSchema, JSON.stringify(followUpJsonSchema), {
@@ -266,6 +274,7 @@ async function runFollowUp(
         note: round.note,
         changedFiles: files.map((file) => file.path),
         provider: run.modelExecution?.provider,
+        agentAccess: run.modelExecution?.agentAccess,
       }),
       controller.signal,
       false,
@@ -327,7 +336,9 @@ async function runFollowUp(
         : controller.signal.aborted
           ? "cancelled"
           : "failed";
-      round.error = dirty ? sm().run.followUp.keptEdits({ reason }) : reason;
+      // A held stop already says the edits stay; they cannot be pushed until the hold goes.
+      const held = !controller.signal.aborted && heldPathsOf(error);
+      round.error = dirty && !held ? sm().run.followUp.keptEdits({ reason }) : reason;
       if (dirty) await ctx.diff(run.id).catch(() => undefined);
       else await restoreParentMessage(run, round).catch(() => undefined);
       run.status = dirty ? "review" : "published";
@@ -382,6 +393,7 @@ export async function discardFollowUp(ctx: WorkbenchContext, id: string) {
       run.status = "published";
       delete run.approvedFingerprint;
       delete run.error;
+      delete run.heldPaths;
       // Reading the pushed message back needs the checkout, so the round's goes.
       const { commitMessage: _round, ...draft } = run.draft;
       run.draft = draft;
@@ -417,6 +429,7 @@ export async function discardFollowUp(ctx: WorkbenchContext, id: string) {
     run.status = "published";
     delete run.approvedFingerprint;
     delete run.error;
+    delete run.heldPaths;
     const files = await ctx.diff(id);
     // The checkout is the pushed head again, whose files were all reviewed
     // before it was pushed, except files changed by commits taken over from

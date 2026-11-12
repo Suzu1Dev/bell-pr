@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { Bot, Check, CircleCheck, Loader2, TriangleAlert } from "lucide-react";
-import type { DoctorCheck, DoctorReport } from "../../shared/doctor";
+import { toolUsable, type DoctorCheck, type DoctorReport } from "../../shared/doctor";
 import type { Fix } from "../../shared/errors";
 import { defaultContributionSettings } from "../../shared/insights";
 import {
@@ -24,11 +24,18 @@ import {
 } from "./controls";
 
 /** How far an agent CLI is from working, as the environment check found it. */
-export type CliState = "checking" | "ready" | "signedOut" | "missing" | "notWorking";
+export type CliState =
+  | "checking"
+  | "ready"
+  | "signedOut"
+  | "missing"
+  | "notWorking"
+  | "disabled";
 
 const checkIds = {
   codex: { tool: "codex", auth: "codex-auth" },
   claude: { tool: "claude", auth: "claude-auth" },
+  antigravity: { tool: "antigravity", auth: "antigravity-auth" },
 } as const satisfies Record<AgentProvider, { tool: string; auth: string }>;
 
 /** The state of `provider`'s CLI and the checks it comes from. */
@@ -40,10 +47,11 @@ export function providerState(
   const find = (id: string) => report.checks.find((check) => check.id === id);
   const tool = find(checkIds[provider].tool);
   const auth = find(checkIds[provider].auth);
+  if (tool?.reason === "disabled") return { state: "disabled", tool, auth };
   const state: CliState =
     !tool || tool.status === "skip" || tool.reason === "missing"
       ? "missing"
-      : tool.status !== "ok"
+      : !toolUsable(tool)
         ? "notWorking"
         : auth?.status === "ok"
           ? "ready"
@@ -201,8 +209,8 @@ function ModelSettingsForm({
           <fieldset className="direction-settings-container" disabled={saving}>
             <DirectionSettings
               value={{ ...defaultContributionSettings, ...settings }}
-              onChange={({ provider, model, reasoningEffort, webAccess }) => {
-                setSettings({ provider, model, reasoningEffort, webAccess });
+              onChange={({ provider, model, reasoningEffort, webAccess, agentAccess }) => {
+                setSettings({ provider, model, reasoningEffort, webAccess, agentAccess });
                 setMessage("");
                 setError("");
               }}
@@ -232,8 +240,8 @@ function ModelSettingsForm({
 }
 
 /**
- * AI provider: whether the Codex CLI and Claude Code are installed and
- * signed in (at least one must be), and the models every project shares,
+ * AI provider: whether the Codex CLI, Claude Code and the Antigravity CLI
+ * are installed and signed in (at least one must be), and the models every project shares,
  * edited here instead of in a dialog.
  */
 export function ProviderSection({

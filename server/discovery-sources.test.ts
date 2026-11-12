@@ -460,7 +460,9 @@ test("remote content cannot redirect requests and sensitive or foreign evidence 
     ),
   );
   assert.ok(
-    result.candidates[0].warnings.some((warning) => warning.includes("遮蔽")),
+        result.candidates[0].warnings.some((warning) =>
+          warning.includes("發佈前會擋下常見格式的 token 與私鑰"),
+        ),
   );
 });
 
@@ -492,9 +494,11 @@ test("a credential in an issue title is masked in the warnings that name the sou
   const [candidate] = result.candidates;
   // Masked, truncated and unreadable sources each name the issue.
   assert.equal(
-    candidate.warnings.filter((warning) => warning.includes("[REDACTED]"))
-      .length,
-    3,
+    candidate.warnings.filter((warning) => warning.includes("[REDACTED]")).length,
+    2,
+  );
+  assert.ok(
+    candidate.warnings.includes("發佈前會擋下常見格式的 token 與私鑰。"),
   );
   assert.ok(candidate.warnings.every((warning) => !warning.includes("ghp_")));
   assert.ok(candidate.sources.every((source) => !source.title.includes("ghp_")));

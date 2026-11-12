@@ -1,6 +1,7 @@
 import test, { type TestContext } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { realpathSync } from "node:fs";
+import { mkdir, mkdtemp, realpath, rm, symlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
@@ -9,9 +10,13 @@ import {
   agentEventReader,
   agentLoginCheck,
   applyReportedModel,
+  claudeSettings,
+  codexAccessMode,
+  codexSandboxConfig,
   retryTransientAuth,
   type AgentEvent,
 } from "./agent-cli.js";
+import { sharedCredentialDenials } from "../shared/credential-denials.js";
 import type { ModelExecution } from "../shared/models.js";
 import { formatters } from "../shared/i18n/locale.js";
 import { agentEnvironment } from "./process.js";
@@ -42,22 +47,56 @@ async function withSandboxTools(t: TestContext) {
 /** The parsed --settings value of a Claude Code command. */
 const settingsOf = (args: string[]) =>
   JSON.parse(args[args.indexOf("--settings") + 1]) as {
+    disableAllHooks?: boolean;
+    autoMemoryEnabled?: boolean;
+    env?: Record<string, string>;
+    outputStyle?: string;
+    language?: string;
+    agent?: string;
+    claudeMdExcludes?: string[];
     permissions: { deny: string[]; blockReadsOutsideWorkingDirectories?: boolean };
     sandbox?: {
       enabled: boolean;
       failIfUnavailable: boolean;
       allowUnsandboxedCommands: boolean;
-      filesystem: { denyRead: string[]; allowRead: string[] };
-      network: { allowedDomains: string[]; strictAllowlist: boolean };
+      enableWeakerNestedSandbox?: boolean;
+      enableWeakerNetworkIsolation?: boolean;
+      allowAppleEvents?: boolean;
+      allowNestedUserNamespaces?: boolean;
+      filesystem: { denyRead: string[]; allowRead: string[]; disabled?: boolean };
+      network: {
+        allowedDomains: string[];
+        strictAllowlist: boolean;
+        allowAllUnixSockets?: boolean;
+        allowLocalBinding?: boolean;
+      };
     };
   };
 
+/**
+ * What every Claude turn switches off in the user's settings: hooks (they run
+ * outside the sandbox), auto memory (kept under ~/.claude/projects/ across
+ * runs), and the user's own instructions, output style and language, and a
+ * main-thread agent from the user's or a plugin's settings (it would replace
+ * the system prompt and drop StructuredOutput from schema turns).
+ */
+function assertUserCustomizationsOff(settings: ReturnType<typeof settingsOf>) {
+  assert.equal(settings.disableAllHooks, true);
+  assert.equal(settings.autoMemoryEnabled, false);
+  assert.deepEqual(settings.env, { CLAUDE_CODE_DISABLE_AUTO_MEMORY: "1" });
+  assert.equal(settings.outputStyle, "default");
+  assert.equal(settings.language, "");
+  assert.equal(settings.agent, "");
+  assert.equal(settings.claudeMdExcludes?.length, 2);
+}
+
 const credentialDenials = [
-  "Read(~/.ssh/**)",
   "Read(~/.config/gh/**)",
+  "Read(~/.git-credentials)",
+  "Read(~/.netrc)",
+  "Read(~/.ssh/**)",
   "Read(~/.aws/**)",
   "Read(~/.npmrc)",
-  "Read(~/.netrc)",
   "Read(~/.claude/.credentials.json)",
   "Read(~/.codex/auth.json)",
 ];
@@ -80,10 +119,13 @@ test("Codex arguments keep the existing sandbox, approval and schema flags", asy
       "--ephemeral",
       "--model",
       "codex-example",
-      "--sandbox",
-      "workspace-write",
+      ...codexSandboxConfig("write", "/work/tree"),
       "-c",
       'approval_policy="never"',
+      "-c",
+      'web_search="disabled"',
+      "-c",
+      "features.apps=false",
       "--json",
       "--color",
       "never",
@@ -102,10 +144,13 @@ test("Codex arguments keep the existing sandbox, approval and schema flags", asy
     },
   );
   assert.equal(readOnly.executable, "codex");
-  assert.equal(
-    readOnly.args[readOnly.args.indexOf("--sandbox") + 1],
-    "read-only",
-  );
+  assert.equal(codexAccessMode(readOnly.args), "read-only");
+  const writeTable = (
+    await agentCommand({ source: "cli-default" }, { cwd: "/work/tree", access: "write" })
+  ).args.find((arg) => arg.startsWith("permissions={bell-pr="));
+  assert.ok(writeTable?.includes('"/work/tree/.git"="read"'));
+  assert.ok(writeTable?.includes('"/work/tree/.git/**"="read"'));
+  assert.ok(!readOnly.args.includes("--sandbox"));
   assert.ok(readOnly.args.includes("--skip-git-repo-check"));
   assert.equal(
     readOnly.args[readOnly.args.indexOf("--output-schema") + 1],
@@ -115,6 +160,210 @@ test("Codex arguments keep the existing sandbox, approval and schema flags", asy
     executable: "codex",
     args: ["login", "status"],
   });
+});
+
+/** The deny entries of a Codex profile, in order. */
+function codexDenyEntries(args: string[]) {
+  const table = args.find((arg) => arg.startsWith("permissions={bell-pr="));
+  assert.ok(table);
+  return [...table.matchAll(/"([^"]+)"="deny"/g)].map((match) => match[1]);
+}
+
+/**
+ * An entry with `~` expanded and trailing slashes dropped, as given and
+ * physical. A missing path is resolved through its nearest existing parent.
+ */
+function denyForms(entry: string, home: string) {
+  const expanded = entry === "~" ? home : entry.startsWith("~/") ? path.join(home, entry.slice(2)) : entry;
+  const given = expanded.replace(/\/+$/, "");
+  const physicalOf = (value: string): string => {
+    try {
+      return realpathSync(value);
+    } catch {
+      const parent = path.dirname(value);
+      return parent === value ? value : path.join(physicalOf(parent), path.basename(value));
+    }
+  };
+  return { given, physical: physicalOf(given), directory: entry.endsWith("/") };
+}
+
+const under = (child: string, parent: string) => child.startsWith(`${parent}/`);
+
+test("Codex deny entries never repeat, lie inside a denied directory or pass through a link", { skip: process.platform === "win32" }, async (t) => {
+  // bubblewrap fails to start when one does, for example with ~/.ssh/ and
+  // ~/.ssh/** both listed and any file in ~/.ssh, or with CODEX_HOME named
+  // through a symbolic link.
+  const root = await realpath(await mkdtemp(path.join(os.tmpdir(), "bell-codex-deny-")));
+  const keys = ["HOME", "GIT_CONFIG_GLOBAL", "GIT_CONFIG_NOSYSTEM", "XDG_CONFIG_HOME", "CODEX_HOME", "CLAUDE_CONFIG_DIR", "GH_CONFIG_DIR"];
+  const previous = Object.fromEntries(keys.map((key) => [key, process.env[key]]));
+  t.after(async () => {
+    for (const [key, value] of Object.entries(previous)) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+    await rm(root, { recursive: true, force: true });
+  });
+  const gitconfig = path.join(root, "gitconfig");
+  // A store file inside ~/.ssh, and two siblings that only share its prefix.
+  await writeFile(
+    gitconfig,
+    "[credential]\n\thelper = store --file ~/.ssh/git-creds\n\thelper = store --file ~/.ssh-backup/creds\n\thelper = store --file ~/.sshx\n",
+  );
+  const makeHome = async (home: string) => {
+    for (const directory of [".ssh", ".ssh-backup", ".codex", ".claude", ".config/gh"])
+      await mkdir(path.join(home, directory), { recursive: true });
+    for (const file of [".ssh/known_hosts", ".ssh/authorized_keys", ".ssh/git-creds", ".ssh-backup/creds", ".sshx"])
+      await writeFile(path.join(home, file), "decoy\n");
+  };
+  const plain = path.join(root, "home");
+  await makeHome(plain);
+  const physical = path.join(root, "physical-home");
+  await makeHome(physical);
+  const linked = path.join(root, "linked-home");
+  await symlink(physical, linked, "dir");
+  // Config directories named through a link, one of them not created yet.
+  const realConfig = path.join(root, "real-config");
+  for (const directory of ["codex", "claude", "gh", "xdg/gh"])
+    await mkdir(path.join(realConfig, directory), { recursive: true });
+  const linkConfig = path.join(root, "link-config");
+  await symlink(realConfig, linkConfig, "dir");
+  // ~/.codex links to a folder whose physical path the profile cannot hold.
+  const braceHome = path.join(root, "brace-home");
+  await makeHome(braceHome);
+  const braceCodex = path.join(root, "Sync {work}", "codex");
+  await mkdir(braceCodex, { recursive: true });
+  await rm(path.join(braceHome, ".codex"), { recursive: true });
+  await symlink(braceCodex, path.join(braceHome, ".codex"), "dir");
+  // Credential files that are symbolic links into a vault, as a dotfile
+  // manager leaves them, in ~/.aws, ~/.config/gh and the moved gh config.
+  // Codex skips links when it expands `**`, so only `X/` denies them.
+  const linkFilesHome = path.join(root, "link-files-home");
+  await makeHome(linkFilesHome);
+  const vault = path.join(root, "vault");
+  await mkdir(vault);
+  const movedGh = path.join(root, "moved-gh");
+  const movedXdg = path.join(root, "moved-xdg");
+  await mkdir(path.join(linkFilesHome, ".aws", "sso", "cache"), { recursive: true });
+  await writeFile(path.join(linkFilesHome, ".aws", "sso", "cache", "x.json"), "decoy\n");
+  for (const [name, at] of [
+    ["aws-credentials", path.join(linkFilesHome, ".aws", "credentials")],
+    ["gh-hosts.yml", path.join(linkFilesHome, ".config", "gh", "hosts.yml")],
+    ["moved-gh-hosts.yml", path.join(movedGh, "hosts.yml")],
+    ["moved-xdg-hosts.yml", path.join(movedXdg, "gh", "hosts.yml")],
+  ]) {
+    await writeFile(path.join(vault, name), "decoy\n");
+    await mkdir(path.dirname(at), { recursive: true });
+    await symlink(path.join(vault, name), at, "file");
+  }
+  const defaults = (home: string) => ({
+    XDG_CONFIG_HOME: path.join(home, ".config"),
+    CODEX_HOME: path.join(home, ".codex"),
+    CLAUDE_CONFIG_DIR: path.join(home, ".claude"),
+    GH_CONFIG_DIR: path.join(home, ".config", "gh"),
+  });
+  const cases: { name: string; home: string; env: Record<string, string> }[] = [
+    { name: "plain HOME", home: plain, env: {} },
+    { name: "config variables at their default places", home: plain, env: defaults(plain) },
+    { name: "symlinked HOME", home: linked, env: defaults(linked) },
+    {
+      name: "config directories through a link",
+      home: plain,
+      env: {
+        CODEX_HOME: path.join(linkConfig, "codex"),
+        CLAUDE_CONFIG_DIR: path.join(linkConfig, "claude"),
+        GH_CONFIG_DIR: path.join(linkConfig, "new", "gh"),
+        XDG_CONFIG_HOME: path.join(linkConfig, "xdg"),
+      },
+    },
+    {
+      name: "CODEX_HOME through a link to a path the profile cannot hold",
+      home: braceHome,
+      env: { CODEX_HOME: path.join(braceHome, ".codex") },
+    },
+    {
+      name: "credential files that are symbolic links",
+      home: linkFilesHome,
+      env: { GH_CONFIG_DIR: movedGh, XDG_CONFIG_HOME: movedXdg },
+    },
+  ];
+  for (const { name, home, env } of cases) {
+    for (const key of keys) delete process.env[key];
+    Object.assign(process.env, { HOME: home, GIT_CONFIG_GLOBAL: gitconfig, GIT_CONFIG_NOSYSTEM: "1" }, env);
+    const shared = sharedCredentialDenials();
+    // The shared list (and so Claude's Read rules) keeps every entry.
+    assert.ok(shared.includes("~/.ssh/**"), name);
+    assert.ok(shared.some((entry) => entry.endsWith("/.ssh/git-creds")), name);
+    for (const access of ["read", "write"] as const) {
+      const entries = codexDenyEntries(codexSandboxConfig(access, path.join(root, "work")));
+      const forms = entries.map((entry) => ({ entry, ...denyForms(entry, home) }));
+      for (const item of forms)
+        for (const other of forms) {
+          if (item === other) continue;
+          assert.notEqual(item.given, other.given, `${name}: ${item.entry} repeats ${other.entry}`);
+          if (other.directory)
+            assert.ok(
+              !under(item.given, other.given) && !under(item.physical, other.physical),
+              `${name}: ${item.entry} lies inside ${other.entry}`,
+            );
+        }
+      assert.ok(entries.includes("~/.ssh/"), name);
+      assert.ok(!entries.includes("~/.ssh/**"), name);
+      // Codex skips symbolic links when it expands `**`: every `X/**`
+      // credential entry reaches it as the directory `X/`.
+      assert.ok(entries.includes("~/.aws/"), name);
+      assert.ok(!entries.some((entry) => entry.endsWith("/**")), `${name}: ${entries.join(" ")}`);
+      // A path that only shares the ~/.ssh prefix is not inside it.
+      assert.ok(entries.some((entry) => entry.endsWith("/.ssh-backup/creds")), name);
+      assert.ok(entries.some((entry) => entry.endsWith("/.sshx")), name);
+      // A deny path through a symbolic link also stops bubblewrap: when the
+      // physical form is listed, the linked one is not.
+      for (const item of forms)
+        if (item.physical !== item.given)
+          assert.ok(
+            !forms.some((other) => other.given === item.physical),
+            `${name}: ${item.entry} passes through a link to ${item.physical}`,
+          );
+      // Nothing is lost: each left-out entry repeats a kept one, names the
+      // same physical path, or lies inside a kept directory.
+      for (const entry of shared.filter((value) => !entries.includes(value))) {
+        const left = denyForms(entry, home);
+        assert.ok(
+          forms.some(
+            (kept) =>
+              kept.given === left.given ||
+              kept.physical === left.physical ||
+              (kept.directory &&
+                (under(left.given, kept.given) || under(left.physical, kept.physical))),
+          ),
+          `${name}: ${entry} is no longer denied`,
+        );
+      }
+      if (name === "config directories through a link") {
+        // Claude Code's Read rules keep both forms; Codex gets the physical one only.
+        for (const file of ["codex/auth.json", "claude/.credentials.json", "new/gh/**", "xdg/gh/**"]) {
+          assert.ok(shared.includes(path.join(linkConfig, file)), `${name}: shared ${file}`);
+          assert.ok(shared.includes(path.join(realConfig, file)), `${name}: shared physical ${file}`);
+          const codex = path.join(realConfig, file.replace(/\*\*$/, ""));
+          assert.ok(entries.includes(codex), `${name}: Codex physical ${codex}`);
+        }
+        assert.ok(!entries.some((entry) => entry.startsWith(`${linkConfig}/`)), `${name}: ${entries.join(" ")}`);
+      }
+      if (name === "CODEX_HOME through a link to a path the profile cannot hold") {
+        // The physical form cannot be written, so the linked one stays and
+        // the sandbox fails closed instead of leaving auth.json readable.
+        assert.ok(shared.includes(path.join(braceCodex, "auth.json")), `${name}: shared physical`);
+        assert.ok(entries.includes("~/.codex/auth.json"), `${name}: ${entries.join(" ")}`);
+      }
+      if (name === "credential files that are symbolic links") {
+        // Claude Code's Read rules keep `X/**`; Codex gets the directories,
+        // which also hide the nested ~/.aws/sso/cache/x.json.
+        for (const directory of ["~/.aws/", "~/.config/gh/", `${movedGh}/`, `${movedXdg}/gh/`]) {
+          assert.ok(shared.includes(`${directory}**`), `${name}: shared ${directory}**`);
+          assert.ok(entries.includes(directory), `${name}: Codex ${directory} in ${entries.join(" ")}`);
+        }
+      }
+    }
+  }
 });
 
 test("Claude Code arguments map access levels, inline the schema and keep MCP connectors out", async (t) => {
@@ -190,6 +439,7 @@ test("Claude Code arguments map access levels, inline the schema and keep MCP co
     const settings = settingsOf(command.args);
     for (const rule of credentialDenials)
       assert.ok(settings.permissions.deny.includes(rule), rule);
+    assertUserCustomizationsOff(settings);
   }
   assert.equal(settingsOf(none.args).sandbox, undefined);
   assert.equal(settingsOf(read.args).sandbox, undefined);
@@ -203,8 +453,20 @@ test("Claude Code arguments map access levels, inline the schema and keep MCP co
     failIfUnavailable: true,
     autoAllowBashIfSandboxed: true,
     allowUnsandboxedCommands: false,
-    network: { allowedDomains: [], strictAllowlist: true },
+    // A single value wins over the user's settings, so those that would
+    // weaken the sandbox are set back to their defaults.
+    enableWeakerNestedSandbox: false,
+    enableWeakerNetworkIsolation: false,
+    allowAppleEvents: false,
+    allowNestedUserNamespaces: false,
+    network: {
+      allowedDomains: [],
+      strictAllowlist: true,
+      allowAllUnixSockets: false,
+      allowLocalBinding: false,
+    },
   });
+  assert.equal(filesystem.disabled, false);
   // Outside BELL's data directory, sandboxed commands may read none of it.
   assert.ok(filesystem.denyRead.length > 0);
   assert.deepEqual(filesystem.allowRead, []);
@@ -225,6 +487,66 @@ test("Claude Code arguments map access levels, inline the schema and keep MCP co
   });
 });
 
+test("Claude turns leave out the user's CLAUDE.md and rules where CLAUDE_CONFIG_DIR puts them", async (t) => {
+  const previous = process.env.CLAUDE_CONFIG_DIR;
+  t.after(() => {
+    if (previous === undefined) delete process.env.CLAUDE_CONFIG_DIR;
+    else process.env.CLAUDE_CONFIG_DIR = previous;
+  });
+  const claude = { provider: "claude" as const, source: "cli-default" as const };
+  process.env.CLAUDE_CONFIG_DIR = "/config/claude";
+  const moved = await agentCommand(claude, { cwd: "/work/tree", access: "none" });
+  assert.deepEqual(settingsOf(moved.args).claudeMdExcludes, [
+    path.join(path.resolve("/config/claude"), "CLAUDE.md"),
+    path.join(path.resolve("/config/claude"), "rules", "**"),
+  ]);
+  delete process.env.CLAUDE_CONFIG_DIR;
+  const home = path.join(os.homedir(), ".claude");
+  const standard = await agentCommand(claude, { cwd: "/work/tree", access: "none" });
+  assert.deepEqual(settingsOf(standard.args).claudeMdExcludes, [
+    path.join(home, "CLAUDE.md"),
+    path.join(home, "rules", "**"),
+  ]);
+  // Claude Code reads them as picomatch globs: `(` would start a group, and
+  // rules/** would no longer match the files under it.
+  process.env.CLAUDE_CONFIG_DIR = "/Users/me/Dropbox (Personal)/claude";
+  const parenthesised = await agentCommand(claude, { cwd: "/work/tree", access: "none" });
+  const escaped = path.resolve("/Users/me/Dropbox [(]Personal[)]/claude");
+  assert.deepEqual(settingsOf(parenthesised.args).claudeMdExcludes, [
+    path.join(escaped, "CLAUDE.md"),
+    path.join(escaped, "rules", "**"),
+  ]);
+  process.env.CLAUDE_CONFIG_DIR = "/c/a{b,c}[d]*?!(e)+@|";
+  const glob = await agentCommand(claude, { cwd: "/work/tree", access: "none" });
+  assert.equal(
+    settingsOf(glob.args).claudeMdExcludes?.[0],
+    path.join(path.resolve("/c/a[{]b,c[}][[]d[]][*][?][!][(]e[)][+][@][|]"), "CLAUDE.md"),
+  );
+});
+
+test("Claude settings hold no empty value and leave sandbox.ripgrep to Claude Code", () => {
+  // Claude Code 2.1.292 ignores all of --settings, without a message, when
+  // one value fails its schema; `sandbox.ripgrep: null` was tried.
+  const empty = (value: unknown, where: string): string[] =>
+    value === null || value === undefined
+      ? [where]
+      : typeof value === "object"
+        ? Object.entries(value).flatMap(([key, item]) => empty(item, `${where}.${key}`))
+        : [];
+  for (const access of ["none", "read", "write"] as const)
+    for (const [sandbox, full] of [
+      [true, false],
+      [false, false],
+      [false, true],
+    ] as const) {
+      const settings = claudeSettings({ cwd: "/work/tree", access, sandbox, full });
+      assert.deepEqual(empty(settings, "settings"), [], `${access} ${sandbox} ${full}`);
+      // Any value BELL could write would replace Claude Code's own ripgrep,
+      // which the sandbox uses to keep files such as .bashrc read-only.
+      assert.ok(!("ripgrep" in (settings.sandbox ?? {})));
+    }
+});
+
 test("teammates combine write access with an output schema on both providers", async (t) => {
   await withSandboxTools(t);
   const directory = await mkdtemp(path.join(os.tmpdir(), "bell-agent-cli-"));
@@ -238,7 +560,7 @@ test("teammates combine write access with an output schema on both providers", a
     { source: "cli-default" },
     { cwd: directory, access: "write", outputSchema: schemaPath },
   );
-  assert.equal(value(codex.args, "--sandbox"), "workspace-write");
+  assert.equal(codexAccessMode(codex.args), "workspace-write");
   assert.equal(value(codex.args, "--output-schema"), schemaPath);
   assert.ok(!codex.args.includes("--skip-git-repo-check"));
 
@@ -275,17 +597,23 @@ test("web access adds Claude Code's WebSearch/WebFetch and Codex live search for
     assert.equal(value(off.args, "--tools"), tools);
     assert.equal(value(off.args, "--allowedTools"), allowed);
     assert.deepEqual(await agentCommand(claude, { cwd: "/work/tree", access }), off);
-    // Codex 0.159 `exec` rejects --search; the live search config override is the only addition.
+    // Codex 0.159 `exec` rejects --search, so search is a config override. Codex searches a
+    // cached index by default, so off is passed as "disabled"; the value is the only difference.
     const codexOn = await agentCommand(codex, { cwd: "/work/tree", access, web: true });
     const codexOff = await agentCommand(codex, { cwd: "/work/tree", access });
     const index = codexOn.args.indexOf('web_search="live"');
     assert.ok(index > 0 && codexOn.args[index - 1] === "-c");
+    assert.equal(codexOff.args[index], 'web_search="disabled"');
     assert.deepEqual(
-      codexOn.args.filter((_arg, position) => position !== index - 1 && position !== index),
-      codexOff.args,
+      codexOn.args.filter((_arg, position) => position !== index),
+      codexOff.args.filter((_arg, position) => position !== index),
     );
     assert.ok(!codexOn.args.includes("--search"));
-    assert.doesNotMatch(JSON.stringify(codexOff.args), /web_search/);
+    assert.equal(codexOff.args.filter((arg) => arg.startsWith("web_search=")).length, 1);
+    // ChatGPT apps carry a search tool of their own, so they are off either way.
+    assert.ok(codexOn.args.includes("features.apps=false"));
+    assert.ok(codexOff.args.includes("features.apps=false"));
+    assert.deepEqual(await agentCommand(codex, { cwd: "/work/tree", access, web: false }), codexOff);
   }
   // curl and wget stay denied with web on: WebFetch is the sanctioned way to read a page.
   const write = await agentCommand(claude, { cwd: "/work/tree", access: "write", web: true });
@@ -297,11 +625,12 @@ test("web access adds Claude Code's WebSearch/WebFetch and Codex live search for
     "Bash(wget:*)",
   ]);
   assert.equal(value(write.args, "--permission-mode"), "acceptEdits");
-  // Analysis and discovery use "none": the flag never reaches the CLI there.
+  // Analysis and discovery use "none": the flag never reaches the CLI there, and Codex search is off.
   for (const execution of [claude, codex]) {
     const none = await agentCommand(execution, { cwd: "/work/tree", access: "none", web: true });
     assert.deepEqual(none, await agentCommand(execution, { cwd: "/work/tree", access: "none" }));
-    assert.doesNotMatch(JSON.stringify(none.args), /WebSearch|WebFetch|web_search/);
+    assert.doesNotMatch(none.args.join(" "), /WebSearch|WebFetch|web_search="live"/);
+    assert.equal(execution === codex, none.args.includes('web_search="disabled"'));
   }
 });
 
@@ -1138,4 +1467,33 @@ test("agent CLI notices, outcomes and failures follow the locale in effect", asy
   assert.deepEqual(notices, [
     "Claude Code is refreshing its sign-in while another process holds the refresh lock; next try in 15 seconds (attempt 2 of 3).",
   ]);
+});
+
+test("explicit full access affects write turns only and retains isolation from repository settings", async () => {
+  const execution: ModelExecution = { provider: "claude", source: "cli-default", agentAccess: "full" };
+  const write = await agentCommand(execution, { cwd: "/work/tree", access: "write" });
+  assert.equal(write.args[write.args.indexOf("--permission-mode") + 1], "bypassPermissions");
+  assert.equal(write.unsandboxed, true);
+  assert.equal(settingsOf(write.args).sandbox?.enabled, false);
+  assert.ok(settingsOf(write.args).permissions.deny.includes("Read(~/.ssh/**)"));
+  assert.ok(write.args.includes("--strict-mcp-config"));
+  assert.equal(write.args[write.args.indexOf("--setting-sources") + 1], "user");
+  assert.ok(!write.args.includes("--disallowedTools"));
+  // Without the sandbox, the user's hooks and auto memory stay off all the same.
+  assertUserCustomizationsOff(settingsOf(write.args));
+  for (const access of ["read", "none"] as const) {
+    const read = await agentCommand(execution, { cwd: "/work/tree", access, full: true });
+    assert.equal(read.args[read.args.indexOf("--permission-mode") + 1], "dontAsk");
+    assertUserCustomizationsOff(settingsOf(read.args));
+    assert.equal(settingsOf(read.args).permissions.blockReadsOutsideWorkingDirectories, true);
+    assert.equal(read.unsandboxed, undefined);
+    const codex = await agentCommand({ ...execution, provider: "codex" }, { cwd: "/work/tree", access });
+    assert.equal(codexAccessMode(codex.args), "read-only");
+    assert.ok(!codex.args.includes("--sandbox"));
+  }
+  const codex = await agentCommand({ ...execution, provider: "codex" }, { cwd: "/work/tree", access: "write" });
+  assert.equal(codex.args[codex.args.indexOf("--sandbox") + 1], "danger-full-access");
+  // Codex defaults to live search in a full access sandbox; web access off still turns it off.
+  assert.ok(codex.args.includes('web_search="disabled"'));
+  assert.ok(codex.args.includes("--ignore-rules"));
 });

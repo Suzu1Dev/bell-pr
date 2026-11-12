@@ -1,3 +1,6 @@
+import { safeLink, WebLink } from "../review/MarkdownContent";
+import { limitationsSection } from "../../shared/limitations";
+import { sessionTurnBlock } from "../session/state";
 import {
   Suspense,
   useEffect,
@@ -14,7 +17,6 @@ import {
   Loader2,
   Play,
   RefreshCw,
-  ShieldCheck,
 } from "lucide-react";
 import { getDemo } from "../demo";
 import { useFormat, useLocale, useT } from "../i18n";
@@ -27,7 +29,7 @@ import {
 import type { Tab } from "../app/AppShell";
 import { ErrorBoundary } from "../app/ErrorBoundary";
 import type { DraftEditor } from "../app/hooks/useDraftEditor";
-import type { RunActions } from "../app/hooks/useRunActions";
+import { recoverablePublish, type RunActions } from "../app/hooks/useRunActions";
 import type { RunRecords } from "../app/hooks/useRunRecords";
 import type { RunRounds } from "../app/hooks/useRunRounds";
 import type { Understanding } from "../app/hooks/useUnderstanding";
@@ -47,6 +49,7 @@ import {
 } from "./draftMounts";
 
 interface DraftTabProps {
+  onAddressLimitations?: (section: string) => void;
   run: Run;
   files: DiffFile[];
   demo: boolean;
@@ -90,7 +93,7 @@ interface DraftTabProps {
     | "serverChecksRead"
     | "loadPublishChecks"
   >;
-  actions: Pick<RunActions, "feedbackLoading" | "fetchPrFeedback" | "openSplit">;
+  actions: Pick<RunActions, "feedbackLoading" | "fetchPrFeedback" | "openSplit" | "recoverPublish">;
   rounds: RunRounds;
   currentRepo?: Repo;
   /** The Explain-it-back check and the person's other records (useUnderstanding, useRunRecords). */
@@ -144,6 +147,7 @@ export function SamplePublishedCard({ run }: { run: Run }) {
  * contribution guide, draft editor, checklist and feedback.
  */
 export function DraftTab({
+  onAddressLimitations,
   run,
   files,
   demo,
@@ -162,6 +166,8 @@ export function DraftTab({
   records,
 }: DraftTabProps) {
   const t = useT("workspace");
+  const sessionMessages = useT("session");
+  const sessionRunning = !!run.session?.running;
   const optional = useT("common").optional;
   const fmt = useFormat();
   // The run's own branch is shown as code inside the help sentence.
@@ -199,6 +205,8 @@ export function DraftTab({
     loadPublishChecks,
   } = draft;
   const { feedbackLoading, fetchPrFeedback } = actions;
+  const draftLimitations = limitationsSection(draftBody ?? "");
+  const sessionBlock = sessionTurnBlock(run, sessionMessages.blocks);
   // The guide lists the checks publishing runs on the saved draft, with
   // the ones only the server can make (this computer's folders, changed CI
   // files, the commit e-mail), read again whenever the saved draft changes.
@@ -238,11 +246,115 @@ export function DraftTab({
   const sync = !demo && !!run.baseSha && (
     <SyncPanel
       run={run}
-      busy={busy}
+      busy={busy || sessionRunning}
       onSync={() => void syncToLatest()}
       onResolve={() => void resolveSyncConflicts()}
       onUndo={() => void undoSync()}
     />
+  );
+  const basicChecks = [
+    {
+      id: "reviewed",
+      done: allReviewed,
+      off: false,
+      content: (
+        <>
+          <span>
+            {t.checklist.allReviewed}
+            <small>{t.checklist.files({ reviewed: reviewedCount, total: files.length })}</small>
+          </span>
+          {!allReviewed && (
+            <button type="button" className="button secondary" onClick={() => setTab("changes")}>
+              {t.checklist.reviewAction}
+            </button>
+          )}
+        </>
+      ),
+    },
+    {
+      id: "saved",
+      done: !draftDirty,
+      off: false,
+      content: (
+        <>
+          <span>{t.checklist.saved}{draftDirty && <small>{t.checklist.unsaved}</small>}</span>
+          {draftDirty && (
+            <button
+              type="button"
+              className="button secondary"
+              disabled={busy || sessionRunning || run.status === "published"}
+              onClick={saveDraft}
+            >
+              {t.draft.save}
+            </button>
+          )}
+        </>
+      ),
+    },
+    {
+      id: "description",
+      done: followUp ? !commitMessageUnfinished : !!draftBody.trim() && !draftUnfinished,
+      off: false,
+      content: (
+        <>
+          <span>
+            {followUp ? t.checklist.commitReady : t.checklist.noPlaceholders}
+            <small>
+              {followUp
+                ? (commitMessageUnfinished ? t.checklist.commitMissing : "")
+                : !draftBody.trim() ? t.checklist.noDescription : draftUnfinished?.details.join("\n")}
+            </small>
+          </span>
+          {(followUp ? commitMessageUnfinished : !draftBody.trim() || draftUnfinished) && (
+            <button
+              type="button"
+              className="button secondary"
+              onClick={() => document.getElementById(followUp ? "pr-commit-message" : "pr-body")?.focus()}
+            >
+              {t.checklist.editAction}
+            </button>
+          )}
+        </>
+      ),
+    },
+    ...(understanding ? [{
+      id: "understanding",
+      done: understanding.passed || understanding.off || !understanding.required,
+      off: !understanding.passed && (understanding.off || !understanding.required),
+      content: <UnderstandingRow run={run} check={understanding} />,
+    }] : []),
+  ];
+  const checkRows = (done: boolean) => basicChecks.filter((item) => item.done === done).map((item) => (
+    <li key={item.id} className={`checklist-item${item.done && !item.off ? " checked" : ""}`}>
+      {item.id !== "understanding" && (item.done ? <CircleCheck size={18} /> : <Circle size={18} />)}
+      {item.content}
+    </li>
+  ));
+  const taskChecks = {
+    pending: (
+      <>
+        {checkRows(false)}
+        {run.learnByHand && (
+          <li><Deferred resetKey={run.id}><ByHandRecord run={run} place="draft" /></Deferred></li>
+        )}
+      </>
+    ),
+    complete: checkRows(true),
+    passed: basicChecks.filter((item) => item.done && !item.off).length,
+    off: basicChecks.filter((item) => item.off).length,
+    hasUnderstanding: !!understanding,
+  };
+  const basicChecklist = (
+    <section className="publish-checklist draft-round-checklist" tabIndex={-1}>
+      <h3>{t.checklist.title}</h3>
+      <ul>{taskChecks.pending}</ul>
+      <details>
+        <summary>{t.checklist.completed}</summary>
+        <ul>{taskChecks.complete}</ul>
+      </details>
+      <p>{followUp ? t.checklist.samePr : t.checklist.draftPr}</p>
+      <p>{followUp ? t.checklist.samePrHelp : t.checklist.draftPrHelp}</p>
+    </section>
   );
   return (
     <div className="draft-workspace">
@@ -261,15 +373,36 @@ export function DraftTab({
           }
         />
       )}
-      <div className="draft-layout">
+      <div className="draft-layout is-focused">
         <div className="draft-editor">
           <div className="section-heading">
             <div>
               <h2>{t.draft.heading}</h2>
-              <p>{t.draft.subheading}</p>
             </div>
-            <span className="draft-label">{t.draft.label}</span>
+            <button type="button" className="button secondary" onClick={() => {
+              const checklist = document.querySelector<HTMLElement>(".draft-checklist, .draft-round-checklist");
+              checklist?.focus();
+              checklist?.scrollIntoView({ block: "start" });
+            }}>{t.checklist.open}</button>
           </div>
+          {!demo && !followUp && recoverablePublish(run) && (
+            <div className="draft-origin-notice">
+              <AlertCircle size={16} aria-hidden="true" />
+              <div>
+                <p id="publish-recovery-help">{t.draft.recoveryHelp}</p>
+                {draftDirty && <p id="publish-recovery-unsaved">{t.draft.recoveryNeedsSave}</p>}
+                <button
+                  type="button"
+                  className="button secondary"
+                  aria-describedby={`publish-recovery-help${draftDirty ? " publish-recovery-unsaved" : ""}`}
+                  disabled={busy || active || sessionRunning || !!run.publishing || draftDirty}
+                  onClick={() => void actions.recoverPublish()}
+                >
+                  {t.draft.recoverPublish}
+                </button>
+              </div>
+            </div>
+          )}
           {followUp && (
             <div className="draft-origin-notice" role="status">
               <AlertCircle size={16} />
@@ -298,7 +431,7 @@ export function DraftTab({
             )}
           {!followUp && (
             <Deferred resetKey={run.id}>
-              <YourWords run={run} record={record} body={draftBody} onInsert={setDraftBody} disabled={run.status === "published"} />
+              <YourWords run={run} record={record} body={draftBody} onInsert={setDraftBody} disabled={sessionRunning || run.status === "published"} />
             </Deferred>
           )}
           <label className="field-label" htmlFor="pr-title">
@@ -309,7 +442,7 @@ export function DraftTab({
             className="text-input draft-title"
             value={draftTitle}
             onChange={(e) => setDraftTitle(e.target.value)}
-            disabled={run.status === "published" || !!followUp}
+            disabled={sessionRunning || run.status === "published" || !!followUp}
           />
           <div className="editor-toolbar">
             <div role="group" aria-label={t.draft.modeLabel}>
@@ -344,206 +477,22 @@ export function DraftTab({
               aria-label={t.draft.bodyLabel}
               value={draftBody}
               onChange={(e) => setDraftBody(e.target.value)}
-              disabled={run.status === "published" || !!followUp}
+              disabled={sessionRunning || run.status === "published" || !!followUp}
             />
           )}
-          <label
-            className="field-label"
-            htmlFor="pr-commit-message"
-          >
-            {followUp ? t.draft.commitLabelRound : t.draft.commitLabel}{" "}
-            <span>git commit</span>
-          </label>
-          <textarea
-            id="pr-commit-message"
-            className="draft-textarea draft-commit-message"
-            aria-describedby="pr-commit-message-help"
-            maxLength={4000}
-            value={
-              followUp
-                ? draftCommitMessage
-                : draftCommitMessage || draftTitle
-            }
-            onChange={(e) =>
-              setDraftCommitMessage(e.target.value)
-            }
-            disabled={run.status === "published"}
-          />
-          <p id="pr-commit-message-help" className="field-help">
-            {followUp ? t.draft.commitHelpRound : t.draft.commitHelp}
-          </p>
-          <label
-            className="field-label"
-            htmlFor="pr-publish-branch"
-          >
-            {t.draft.branchLabel} <span>git push</span>
-          </label>
-          <input
-            id="pr-publish-branch"
-            className="text-input"
-            value={draftPublishBranch}
-            placeholder={run.branch}
-            spellCheck={false}
-            aria-describedby="pr-publish-branch-help"
-            aria-invalid={publishBranchInvalid}
-            onChange={(e) => setDraftPublishBranch(e.target.value)}
-            disabled={
-              run.status === "published" ||
-              !!run.publishedBranch ||
-              !!followUp
-            }
-          />
-          <p id="pr-publish-branch-help" className="field-help">
-            {branchHelpBefore}
-            <code>{run.branch}</code>
-            {branchHelpAfter}
-            {run.publishedBranch && t.draft.branchLocked}
-          </p>
-          {publishBranchInvalid && (
-            <p role="alert" className="inline-error">
-              {publishBranchError}
-            </p>
-          )}
-          {commitMessageSuggestion && !followUp && !run.learnByHand && (
-            <div className="commit-suggestion">
-              <div>
-                <strong>{t.draft.suggestionTitle}</strong>
-                <p>{commitMessageSuggestion.rationale}</p>
-              </div>
-              <pre>{commitMessageSuggestion.message}</pre>
-              <div className="commit-suggestion-actions">
-                <span>{t.draft.suggestionNote}</span>
-                <button
-                  type="button"
-                  className="button secondary"
-                  disabled={run.status === "published"}
-                  onClick={applyCommitMessageSuggestion}
-                >
-                  {t.draft.useSuggestion}
-                </button>
-              </div>
+          {!demo && !run.learnByHand && draftLimitations && onAddressLimitations && (
+            <div className="session-limitations">
+              <p className="field-help">{sessionMessages.limitationsNotice}</p>
+              <button type="button" className="button secondary" disabled={busy || !!sessionBlock}
+                title={sessionBlock} onClick={() => onAddressLimitations(draftLimitations)}>
+                {sessionMessages.limitationsAction}
+              </button>
             </div>
           )}
-          <div className="draft-save-row">
-            <span>
-              {demo ? t.draft.savedInBrowser : t.draft.savedLocally}
-            </span>
-            <button
-              className="button primary"
-              disabled={
-                busy || !draftDirty || run.status === "published"
-              }
-              onClick={saveDraft}
-            >
-              {busy ? (
-                <Loader2 className="spin" size={15} />
-              ) : (
-                <Check size={15} />
-              )}
-              {t.draft.save}
-            </button>
-          </div>
-        </div>
-        <aside className="publish-checklist">
-          <div className="checklist-icon">
-            <GitPullRequest size={24} />
-          </div>
-          <h3>{t.checklist.title}</h3>
-          <p>{t.checklist.text}</p>
-          <div
-            className={
-              allReviewed
-                ? "checklist-item checked"
-                : "checklist-item"
-            }
-          >
-            {allReviewed ? (
-              <CircleCheck size={18} />
-            ) : (
-              <Circle size={18} />
-            )}
-            <span>
-              {t.checklist.allReviewed}
-              <small>
-                {t.checklist.files({
-                  reviewed: reviewedCount,
-                  total: files.length,
-                })}
-              </small>
-            </span>
-          </div>
-          {understanding && <UnderstandingRow run={run} check={understanding} />}
-          {run.learnByHand && <Deferred resetKey={run.id}><ByHandRecord run={run} place="draft" /></Deferred>}
-          <div
-            className={
-              !draftDirty
-                ? "checklist-item checked"
-                : "checklist-item"
-            }
-          >
-            {!draftDirty ? (
-              <CircleCheck size={18} />
-            ) : (
-              <Circle size={18} />
-            )}
-            <span>
-              {t.checklist.saved}
-              <small>
-                {draftDirty ? t.checklist.unsaved : t.checklist.canAdjust}
-              </small>
-            </span>
-          </div>
-          {followUp ? (
-            <div
-              className={
-                commitMessageUnfinished
-                  ? "checklist-item"
-                  : "checklist-item checked"
-              }
-            >
-              {commitMessageUnfinished ? (
-                <Circle size={18} />
-              ) : (
-                <CircleCheck size={18} />
-              )}
-              <span>
-                {t.checklist.commitReady}
-                <small>
-                  {commitMessageUnfinished
-                    ? t.checklist.commitMissing
-                    : t.checklist.commitBecomes}
-                </small>
-              </span>
-            </div>
-          ) : (
-          <>
-          <div
-            className={
-              draftBody.trim() && !draftUnfinished
-                ? "checklist-item checked"
-                : "checklist-item"
-            }
-          >
-            {draftBody.trim() && !draftUnfinished ? (
-              <CircleCheck size={18} />
-            ) : (
-              <Circle size={18} />
-            )}
-            <span>
-              {t.checklist.noPlaceholders}
-              <small>
-                {!draftBody.trim()
-                  ? t.checklist.noDescription
-                  : draftUnfinished
-                    ? draftUnfinished.details.join("\n")
-                    : t.checklist.placeholdersStay}
-              </small>
-            </span>
-          </div>
           {draftTaskGroups.length > 0 && (
             <fieldset
               className="draft-task-items"
-              disabled={run.status === "published" || busy}
+              disabled={sessionRunning || run.status === "published" || busy}
             >
               <legend>{t.checklist.taskItems}</legend>
               <p>{t.checklist.taskItemsHelp}</p>
@@ -575,30 +524,117 @@ export function DraftTab({
               ))}
             </fieldset>
           )}
-          </>
+
+          <details className="draft-publish-options" open={publishBranchInvalid || !!followUp}>
+            <summary>{t.draft.publishOptions}</summary>
+          <label
+            className="field-label"
+            htmlFor="pr-commit-message"
+          >
+            {followUp ? t.draft.commitLabelRound : t.draft.commitLabel}{" "}
+            <span>git commit</span>
+          </label>
+          <textarea
+            id="pr-commit-message"
+            className="draft-textarea draft-commit-message"
+            aria-describedby="pr-commit-message-help"
+            maxLength={4000}
+            value={
+              followUp
+                ? draftCommitMessage
+                : draftCommitMessage || draftTitle
+            }
+            onChange={(e) =>
+              setDraftCommitMessage(e.target.value)
+            }
+            disabled={sessionRunning || run.status === "published"}
+          />
+          <p id="pr-commit-message-help" className="field-help">
+            {followUp ? t.draft.commitHelpRound : t.draft.commitHelp}
+          </p>
+          <label
+            className="field-label"
+            htmlFor="pr-publish-branch"
+          >
+            {t.draft.branchLabel} <span>git push</span>
+          </label>
+          <input
+            id="pr-publish-branch"
+            className="text-input"
+            value={draftPublishBranch}
+            placeholder={run.branch}
+            spellCheck={false}
+            aria-describedby="pr-publish-branch-help"
+            aria-invalid={publishBranchInvalid}
+            onChange={(e) => setDraftPublishBranch(e.target.value)}
+            disabled={
+              sessionRunning || run.status === "published" ||
+              !!run.publishedBranch ||
+              !!followUp
+            }
+          />
+          <p id="pr-publish-branch-help" className="field-help">
+            {branchHelpBefore}
+            <code>{run.branch}</code>
+            {branchHelpAfter}
+            {run.publishedBranch && t.draft.branchLocked}
+          </p>
+          {publishBranchInvalid && (
+            <p role="alert" className="inline-error">
+              {publishBranchError}
+            </p>
           )}
-          <div className="checklist-item">
-            <ShieldCheck size={18} />
-            {followUp ? (
-              <span>
-                {t.checklist.samePr}
-                <small>{t.checklist.samePrHelp}</small>
-              </span>
-            ) : (
-              <span>
-                {t.checklist.draftPr}
-                <small>{t.checklist.draftPrHelp}</small>
-              </span>
-            )}
+          {commitMessageSuggestion && !followUp && !run.learnByHand && (
+            <div className="commit-suggestion">
+              <div>
+                <strong>{t.draft.suggestionTitle}</strong>
+                <p>{commitMessageSuggestion.rationale}</p>
+              </div>
+              <pre>{commitMessageSuggestion.message}</pre>
+              <div className="commit-suggestion-actions">
+                <span>{t.draft.suggestionNote}</span>
+                <button
+                  type="button"
+                  className="button secondary"
+                  disabled={sessionRunning || run.status === "published"}
+                  onClick={applyCommitMessageSuggestion}
+                >
+                  {t.draft.useSuggestion}
+                </button>
+              </div>
+            </div>
+          )}
+          </details>
+          <div className="draft-save-row">
+            <span>
+              {demo ? t.draft.savedInBrowser : t.draft.savedLocally}
+            </span>
+            <button
+              className="button primary"
+              disabled={
+                busy || sessionRunning || !draftDirty || run.status === "published"
+              }
+              onClick={saveDraft}
+            >
+              {busy ? (
+                <Loader2 className="spin" size={15} />
+              ) : (
+                <Check size={15} />
+              )}
+              {t.draft.save}
+            </button>
           </div>
-        </aside>
+        </div>
+
       </div>
+      {followUp && basicChecklist}
       {!followUp && (
       <ErrorBoundary resetKey={run.id}>
         <Suspense
-          fallback={<p className="muted">{t.draft.loadingGuide}</p>}
+          fallback={basicChecklist}
         >
           <DraftGuide
+            taskChecks={taskChecks}
             run={run}
             files={files}
             repo={currentRepo}
@@ -653,16 +689,16 @@ export function DraftTab({
             <div className="pr-feedback-actions">
               {/* The sample PR exists nowhere to link to. */}
               {!demo && (
-                <a
+                <WebLink
                   className="button secondary"
-                  href={run.prUrl}
+                  href={safeLink(run.prUrl) || undefined}
                   target="_blank"
                   rel="noreferrer"
                 >
                   <GitPullRequest size={15} />
                   {t.feedback.viewPullRequest}
                   <ExternalLink size={13} />
-                </a>
+                </WebLink>
               )}
               <button className="button primary" disabled={feedbackLoading} onClick={fetchPrFeedback}>
                 {feedbackLoading ? <Loader2 className="spin" size={15} /> : <RefreshCw size={15} />}
@@ -720,13 +756,13 @@ export function DraftTab({
                         <span>{check.name}</span>
                         <b>{check.state}</b>
                         {check.url && (
-                          <a
-                            href={check.url}
+                          <WebLink
+                            href={safeLink(check.url) || undefined}
                             target="_blank"
                             rel="noreferrer"
                           >
                             {t.feedback.details}
-                          </a>
+                          </WebLink>
                         )}
                       </li>
                     ))}
@@ -814,13 +850,13 @@ export function DraftTab({
                             )}
                             {/* Sample feedback links to nothing on GitHub. */}
                             {!demo && (
-                              <a
-                                href={item.url}
+                              <WebLink
+                                href={safeLink(item.url) || undefined}
                                 target="_blank"
                                 rel="noreferrer"
                               >
                                 {t.feedback.openOnGitHub}
-                              </a>
+                              </WebLink>
                             )}
                           </div>
                           <p
@@ -896,9 +932,9 @@ export function DraftTab({
           {/* The sample's PR exists nowhere to close. */}
           {!demo && (
             <p className="pr-feedback-cant">
-              <a href={run.prUrl} target="_blank" rel="noreferrer">
+              <WebLink href={safeLink(run.prUrl) || undefined} target="_blank" rel="noreferrer">
                 {t.feedback.cantContinue}
-              </a>
+              </WebLink>
             </p>
           )}
         </section>

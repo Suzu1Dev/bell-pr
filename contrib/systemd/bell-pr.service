@@ -39,6 +39,9 @@ StartLimitBurst=5
 
 [Service]
 Type=simple
+# `bell-pr start` exits before it listens when a required doctor check
+# failed. Sign in to an AI CLI first. `--force` starts anyway and is for
+# the sample tour, not for this service.
 ExecStart=/usr/bin/env bell-pr start --no-open
 Environment=PATH=%h/.local/bin:%h/.npm-global/bin:/usr/local/bin:/usr/bin:/bin
 Environment=NODE_ENV=production

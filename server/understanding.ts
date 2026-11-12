@@ -1,3 +1,4 @@
+import { assertSessionIdle } from "./session.js";
 /**
  * The Explain-it-back check on the server, which is its authority:
  * approve() and publish() refuse with `understanding_check_required` until
@@ -253,6 +254,7 @@ function openedAt(value: string | undefined, at: string) {
 
 /** The check is taken while the run waits for review or approval, never while it publishes. */
 function assertOpen(run: Run) {
+  assertSessionIdle(run);
   if (!["review", "approved"].includes(run.status) || run.publishing)
     throw new AppError((m) => m.understanding.notOpen, 409);
 }

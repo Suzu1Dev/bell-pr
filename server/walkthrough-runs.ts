@@ -13,6 +13,7 @@ import { log } from "./log.js";
 import { redact } from "./process.js";
 import { contributionContext } from "./prompts/team.js";
 import { walkthroughPrompt } from "./prompts/walkthroughs.js";
+import { assertRunAgentAllowed } from "./codex-guard.js";
 import { runAgent } from "./run-executor.js";
 import { parseAgentOutput } from "./run-events.js";
 import { AppError, withRunLocale, type DiffFile, type Run } from "./types.js";
@@ -62,6 +63,7 @@ export async function walkthrough(
 ) {
   if (ctx.stopping()) throw new AppError(shuttingDown(), 503);
   const run = ctx.run(id);
+  assertRunAgentAllowed(run);
   if (!readableStatuses.includes(run.status) || run.publishing)
     throw new AppError((m) => m.run.walkthrough.tooEarly, 409);
   // Learn by hand: after Ready, and after the file's own Explain-it-back answer (F10).

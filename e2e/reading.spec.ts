@@ -11,6 +11,7 @@
 // share it and run in order. Axe checks each new view.
 import AxeBuilder from "@axe-core/playwright";
 import { expect, request, test, type Browser, type Page } from "@playwright/test";
+import { e2eApiHeaders } from "./api-token.mjs";
 import { readyNow } from "../shared/by-hand";
 import { changeFingerprint } from "../shared/change-fingerprint";
 import panelStrings from "../src/review/i18n/en";
@@ -138,6 +139,7 @@ async function axe(page: Page, include: string) {
 function opener(project: () => RealProject) {
   return async (browser: Browser) => {
     const context = await browser.newContext({
+      extraHTTPHeaders: e2eApiHeaders,
       baseURL: project().baseURL,
       viewport: { width: 1440, height: 900 },
       locale: "en-US",
@@ -255,6 +257,8 @@ test.describe("reading a real run in review", () => {
         t.team.setupNeeds.reportedBy({ names: t.team.setupNeeds.agent({ name: "Member 1", id: "member-1" }) }),
       );
       await expect(setup.locator("code")).toHaveText("curl -fsSL https://deno.land/install.sh | sh");
+      // This run has no Full access, so the list stays the person's to run.
+      await expect(setup.getByRole("button", { name: t.team.setupNeeds.handOffAction })).toHaveCount(0);
       // A run made before premise checks offers one; the verdict then leads the brief.
       const brief = page.locator("#overview-contribution");
       await brief.getByRole("button", { name: t.mission.brief.premiseCheck }).click();
@@ -321,7 +325,7 @@ test.describe("a Learn-by-hand run in review, marked ready", () => {
     // it from a first one, and mark that version ready on the second.
     const first = await startRealProject();
     try {
-      const api = await request.newContext({ baseURL: first.baseURL });
+      const api = await request.newContext({ extraHTTPHeaders: e2eApiHeaders, baseURL: first.baseURL });
       const { files: diff } = (await (await api.get(`/api/runs/${runId}/diff`)).json()) as {
         files: { path: string; fingerprint: string }[];
       };

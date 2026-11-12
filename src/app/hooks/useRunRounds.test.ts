@@ -47,3 +47,63 @@ test("discarding a round on a run whose files were freed says it was discarded, 
     globalThis.fetch = realFetch;
   }
 });
+
+test("syncing reports when commits on the target branch changed files under your hold", async () => {
+  const baseRun = {
+    id: "run-sync-held",
+    status: "review",
+    baseBranch: "main",
+    agents: [],
+  } as unknown as Run;
+  const realFetch = globalThis.fetch;
+  let heldCount = 1;
+  globalThis.fetch = (async (input: RequestInfo | URL) => {
+    const url = String(input);
+    if (url.endsWith("/sync")) {
+      return json(200, {
+        run: baseRun,
+        updated: true,
+        conflicts: [],
+        heldChanges: Array.from({ length: heldCount }, (_, idx) => ({
+          path: `src/f${idx}.ts`,
+          commits: ["abc1234"],
+        })),
+      });
+    }
+    if (url.endsWith("/diff")) return json(200, { files: [] });
+    throw new Error(`unexpected request ${url}`);
+  }) as typeof fetch;
+  const notes: { message: string; tone?: string }[] = [];
+  let rounds!: ReturnType<typeof useRunRounds>;
+  function Probe() {
+    rounds = useRunRounds({
+      run: baseRun,
+      setRun() {},
+      runIdRef: { current: baseRun.id },
+      setFiles() {},
+      setBusy() {},
+      notify: (message, tone) => void notes.push({ message, tone }),
+      setTab() {},
+    });
+    return null;
+  }
+  const mounted = await mount(createElement(Probe));
+  try {
+    await act(async () => rounds.syncToLatest());
+    heldCount = 2;
+    await act(async () => rounds.syncToLatest());
+    assert.deepEqual(notes, [
+      {
+        message: "1 file under your hold changed on the target branch. Check the Target branch panel.",
+        tone: "success",
+      },
+      {
+        message: "2 files under your hold changed on the target branch. Check the Target branch panel.",
+        tone: "success",
+      },
+    ]);
+  } finally {
+    await mounted.unmount();
+    globalThis.fetch = realFetch;
+  }
+});

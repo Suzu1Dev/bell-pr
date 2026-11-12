@@ -5,6 +5,7 @@ import {
   useRef,
   useState,
   type Dispatch,
+  type ReactNode,
   type SetStateAction,
 } from "react";
 import {
@@ -34,6 +35,8 @@ import { useT } from "../i18n";
 import type { DiffFile, Repo, Run } from "../types";
 import { applyReviewOrder, parseReviewOrder } from "../../shared/review-order";
 import { DiffView } from "../review/DiffView";
+import { isFileReviewed } from "../review/reviewed";
+import { reviewBaseSha } from "../../shared/followups";
 import { languageBadge } from "../review/diff";
 import type { useProjectInsights } from "../mission/useProjectInsights";
 import type { Tab } from "../app/AppShell";
@@ -67,6 +70,7 @@ const YourTurn = lazy(() => import("../byhand/lazy").then((module) => ({ default
 const GuidePanel = lazy(() => import("../byhand/lazy").then((module) => ({ default: module.GuidePanel })));
 
 interface ChangesTabProps {
+  diffRoundPicker?: ReactNode;
   run: Run;
   files: DiffFile[];
   /** The changed file open in the code view. */
@@ -136,7 +140,7 @@ async function loadBaseLines(run: Run, target: DiffFile) {
   const query = new URLSearchParams({
     path: target.path,
     fingerprint: target.fingerprint ?? "",
-    base: run.baseSha ?? "",
+    base: reviewBaseSha(run) ?? "",
   });
   const { lines } = await api<{ lines: string[] }>(
     `/runs/${encodeURIComponent(run.id)}/context?${query}`,
@@ -146,6 +150,7 @@ async function loadBaseLines(run: Run, target: DiffFile) {
 
 /** The code review tab: changed files, the diff and the explanation panel. */
 export function ChangesTab({
+  diffRoundPicker,
   run,
   files,
   file,
@@ -208,6 +213,7 @@ export function ChangesTab({
   const checking = !!understanding && !!checkMode;
   // The check is taken while the run waits for review or approval.
   const checkOpen = ["review", "approved"].includes(run.status) && !run.publishing;
+  const showReview = demo || run.status !== "published";
   const [askWaiting, setAskWaiting] = useState(false);
   // Learn by hand: while the person writes, the guide takes the explanation's place.
   const writing = !!byHand?.writing;
@@ -227,8 +233,8 @@ export function ChangesTab({
       setAskWaiting(false);
       return;
     }
-    setShowExplanation(true);
     setFocusMode(false);
+    setShowExplanation(true);
   }, [checking, setShowExplanation, setFocusMode]);
   /**
    * The current-file lines a walkthrough part marks in the diff, with the
@@ -307,14 +313,14 @@ export function ChangesTab({
   ).filter(
     (f) =>
       f.path.toLowerCase().includes(fileSearch.toLowerCase()) &&
-      (!onlyUnreviewed || !run.reviewedFiles.includes(f.path)),
+      (!showReview || !onlyUnreviewed || !isFileReviewed(run, f, demo)),
   );
   return (
     <>
     {run.byHand?.ready && writing && <p className="by-hand-note" role="status">{workspace.byHand.changed}</p>}
     <div
       ref={reviewGridRef}
-      className={`review-grid ${!showFiles ? "files-hidden" : ""} ${!showExplanation ? "explanation-hidden" : ""}`}
+      className={`review-grid ${!showFiles ? "files-hidden" : ""} ${!showExplanation && !checking ? "explanation-hidden" : ""}`}
     >
       {showFiles && (
         <aside
@@ -360,8 +366,8 @@ export function ChangesTab({
             />
             <kbd aria-hidden="true">⌕</kbd>
           </label>
-          <div className="file-filters">
-            <button
+          {(showReview || reviewOrder.length > 0) && <div className="file-filters">
+            {showReview && <button
               className={`filter-toggle ${onlyUnreviewed ? "is-on" : ""}`}
               aria-pressed={onlyUnreviewed}
               onClick={() => setOnlyUnreviewed(!onlyUnreviewed)}
@@ -370,7 +376,7 @@ export function ChangesTab({
                 <span />
               </span>
               {t.onlyUnreviewed}
-            </button>
+            </button>}
             {reviewOrder.length > 0 && (
               <button
                 className={`filter-toggle ${suggestedOrder ? "is-on" : ""}`}
@@ -384,7 +390,7 @@ export function ChangesTab({
                 {t.suggestedOrder}
               </button>
             )}
-          </div>
+          </div>}
           <div className="file-tree">
             <div className="tree-root">
               <ChevronDown size={13} />
@@ -419,7 +425,7 @@ export function ChangesTab({
                       : "/"}
                   </small>
                 </span>
-                {run.reviewedFiles.includes(f.path) ? (
+                {showReview && isFileReviewed(run, f, demo) ? (
                   <CircleCheck
                     className="file-reviewed"
                     size={14}
@@ -440,7 +446,7 @@ export function ChangesTab({
               </p>
             )}
           </div>
-          <div className="review-progress">
+          {showReview && <div className="review-progress">
             <div>
               <span>{t.progress}</span>
               <strong>
@@ -462,16 +468,16 @@ export function ChangesTab({
                   ? t.allReviewed
                   : t.allReviewedDone}
             </small>
-          </div>
+          </div>}
         </aside>
       )}
       <section className="diff-panel">
         <div className="diff-topbar">
-          <span>
+          {diffRoundPicker ?? <span>
             <GitBranch size={14} /> {run.baseBranch}{" "}
             <span className="diff-topbar-arrow">←</span>{" "}
             {run.branch}
-          </span>
+          </span>}
           <PremiseNotice premise={run.team?.premise} compact guide={run.learnByHand} />
           <div
             className="diff-toolbar-actions"
@@ -571,15 +577,17 @@ export function ChangesTab({
         </div>
         {file ? (
           <DiffView
-            key={`${run.id}:${file.path}:${run.baseSha ?? ""}`}
+            key={`${run.id}:${file.path}:${reviewBaseSha(run) ?? ""}`}
             file={file}
-            reviewed={run.reviewedFiles.includes(file.path)}
+            reviewed={isFileReviewed(run, file, demo)}
+            showReview={showReview}
             onReview={reviewFile}
+            reviewDisabled={!!run.session?.running}
             onAsk={checking ? () => setAskWaiting(true) : writing ? (question) => byHand?.ask(file, question) : ask}
             view={diffView}
             hasNote={Boolean(run.notes?.[file.path]?.text)}
             onLoadBase={
-              !demo && file.fingerprint && run.baseSha
+              !demo && file.fingerprint && reviewBaseSha(run)
                 ? () => loadBaseLines(run, file)
                 : undefined
             }

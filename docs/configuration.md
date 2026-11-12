@@ -28,9 +28,11 @@ the settings in the app.
 
 | Command | What it does |
 | --- | --- |
-| `bell-pr` or `bell-pr start` | Starts BELL PR and prints its address |
-| `bell-pr open` | Prints the address of the running BELL PR and opens it; `--print` only prints it |
-| `bell-pr doctor` | Checks Node.js, Git, the GitHub CLI, the agent CLIs, the sandbox and the data directory; `--json` for scripts |
+| `bell-pr` or `bell-pr start` | Starts BELL PR and prints its address. Exits 1 before listening when a required doctor check fails; `--force` starts anyway |
+| `bell-pr open` | Prints the address of the running BELL PR without the API token, and opens the browser with the token. `--print` only prints that address. `--print-token` includes the token in the printed address |
+| `bell-pr token rotate` | Replaces `<data dir>/api-token`. A running BELL PR uses the new token on the next request. The new token is not printed |
+| `bell-pr doctor` | Checks Node.js, Git, the GitHub CLI, the agent CLIs, the sandbox and the data directory; `--json` for scripts. The report does not include the API token |
+| `bell-pr group status`, `bell-pr group setup`, `bell-pr group invite <name> [--admin]` | [Group work](group-work.md) on a BELL PR started with `--group`: shows whether it is set up, sets it up, and prints a one-time invite code for a person (`--admin` for a group admin) |
 | `bell-pr version` | Shows the version, its release date, Node.js, the platform and the data directory |
 | `bell-pr help` | Lists the commands and options |
 
@@ -42,27 +44,39 @@ Options of `bell-pr start`:
 | `--host <host>` | `BELLPR_HOST` | `127.0.0.1` |
 | `--data-dir <dir>` | `BELLPR_DATA_DIR` | `~/.bellpr` |
 | `--no-open` | `BELLPR_NO_OPEN=1` | opens the browser when it can |
+| `--force` | | off. Start even when `bell-pr doctor` reports Not ready |
+| `--group` | `BELLPR_GROUP=1` | off. Turns [group work](group-work.md) on |
 | `--env-file <file>` | | none |
 
-`--data-dir` and `--env-file` work with every command, so `open`, `doctor`
-and `version` find the data directory of the BELL PR you mean.
+`bell-pr start` runs the same required checks as `bell-pr doctor` and exits
+with status 1 before it listens when one fails. The message is the doctor's
+checklist (each failed check and the command that fixes it) plus how to
+start anyway. `--force` skips that gate and prints a warning. The sample
+tour needs no AI provider, so `bell-pr start --force` is how you open it
+when none is signed in. A real agent run is still refused until a provider
+is ready.
+
+`--data-dir` and `--env-file` work with every command, so `open`, `doctor`,
+`group` and `version` find the data directory of the BELL PR you mean.
 
 ## Environment variables
 
 | Variable | Default | What it sets |
 | --- | --- | --- |
 | `BELLPR_PORT` | `4311` | Port of the web interface and the API, 1024 to 65535. Also `--port`. |
-| `BELLPR_HOST` | `127.0.0.1` | Address to listen on. Also `--host`. The default accepts connections from this computer only. `0.0.0.0` or `::` listen on every address (the Docker image uses this inside the container) but still answer only requests addressed to this computer or to `BELLPR_PUBLIC_URL`. Any other address needs `BELLPR_PUBLIC_URL`. |
-| `BELLPR_PUBLIC_URL` | none | The address browsers use when BELL PR sits behind a reverse proxy or a different published port, without a path, such as `https://bell.example.com`. BELL PR accepts requests for it and prints it as its address. It must be `https` unless it points to this computer. |
+| `BELLPR_HOST` | `127.0.0.1` | Address to listen on. Also `--host`. Prefer loopback. For another machine or phone, keep loopback and use Tailscale serve (not Funnel) with `BELLPR_PUBLIC_URL`. `0.0.0.0` or `::` listen on every address (Docker uses this inside the container) but still answer only this computer or `BELLPR_PUBLIC_URL`. Without `BELLPR_PUBLIC_URL`, a warning is printed to stderr and remote requests get 403. |
+| `BELLPR_PUBLIC_URL` | none | HTTPS origin browsers use (no path), e.g. `https://<your-url>`. Required for Tailscale serve / remote Host acceptance; without it those requests get 403. Must be `https` unless it points to this computer. |
 | `BELLPR_ALLOWED_ORIGINS` | none | Extra exact origins to accept, separated by commas. Rarely needed: `BELLPR_PUBLIC_URL` already adds its own. Plain `http` only for loopback addresses. |
-| `BELLPR_DATA_DIR` | `~/.bellpr` | Where repositories, worktrees, run records and settings live. Also `--data-dir`. An absolute path is safest. |
+| `BELLPR_SUITE_LINKS` | none | Where the other BELL products are: `explain=<origin>` and `personal=<origin>`, separated by commas. An origin is on this computer, or an `https` `*.ts.net` name in the same tailnet as `BELLPR_PUBLIC_URL` or `BELLPR_ALLOWED_ORIGINS`. Shows the product switcher; BELL PR refuses to start with an invalid value. See [BELL Suite link](bell-suite.md). |
+| `BELLPR_DATA_DIR` | `~/.bellpr` | Where repositories, worktrees, run records and settings live. Also `--data-dir`. An absolute path is safest. Not under `/tmp` or `$TMPDIR` when Codex agents write code: their sandbox lets commands write there ([security model](security-model.md#codex)). |
 | `BELLPR_NO_OPEN` | not set | Any value other than `0` or `false` stops BELL PR from opening a browser at start and for `bell-pr open`. It also stays closed in CI, in containers and when the output is not a terminal. Also `--no-open`. |
+| `BELLPR_GROUP` | not set | Any value other than `0` or `false` turns [group work](group-work.md) on for the people who share this BELL PR. The data directory's lock is then strict: it is never replaced because of its age, and a start after a crash can be refused until you remove the lock file. Also `--group`. |
 | `BELLPR_LOCALE` | `en` | Language of server and command-line messages when nothing else decides: `en` or `zh-TW`. The language chosen in the app wins. |
 | `BELLPR_LOG_LEVEL` | `info` | How much the server logs: `debug`, `info`, `warn` or `error`. |
 | `BELLPR_MAX_AGENT_PROCESSES` | `3` | Agent CLI processes at the same time across all runs, analyses and discovery, 1 to 32. Lower it when your AI provider's usage limits are tight. Locks **Settings → Performance**. |
 | `BELLPR_MAX_ACTIVE_RUNS` | `2` | Contribution runs executing at the same time, 1 to 8. Running, queued and plan-approval runs together are capped at 8 or twice this value, whichever is larger. Locks **Settings → Performance**. |
 | `BELLPR_AGENT_TIMEOUT_SCALE` | `1` | Multiplier for the time limit of one agent turn, 0.5 to 10 (see below). Locks **Settings → Performance**. |
-| `BELLPR_ALLOW_UNSANDBOXED_AGENTS` | not set | `1` lets Claude Code agents that edit files run without the operating-system sandbox when it is unavailable. They then have your full user rights, and their runs are marked "Ran without sandbox". Locks **Settings → Agent safety**. |
+| `BELLPR_ALLOW_UNSANDBOXED_AGENTS` | not set | `1` lets Claude Code and Antigravity agents that edit files run without the operating-system sandbox when it is unavailable. They then have your full user rights, and their runs are marked "Ran without sandbox". Locks **Settings → Agent safety**. |
 | `BELLPR_REQUIRE_UNDERSTANDING_CHECK` | not set | `1` keeps the understanding check on, so you explain each change back before you approve it, and locks the switch in **Settings → Learning**; for example on a classroom or shared computer. Any other value locks nothing, and BELL PR warns about it at start. No value turns the check off. |
 | `BELLPR_RETENTION_DAYS` | `14` | Days after which the working files of a cancelled or failed run are removed, 1 to 365. Records, reports and notes stay; published runs are never removed automatically. Locks **Settings → Data & privacy**. |
 | `BELLPR_DEV` | not set | Development mode, for working on BELL PR itself: the API trusts the Vite dev server. `npm run dev` sets it; it only works on `127.0.0.1`. |
@@ -98,7 +112,7 @@ of them. When a turn times out, its message says how long it waited.
 | **Data & privacy** | The data directory, disk use per run and freeing it, automatic cleanup, deleting all data, and what leaves this computer |
 | **About** | The version, and the About dialog with the data directory, the Apache-2.0 license, the notices and the security policy, help links and **Copy diagnostics** |
 
-The model settings (agent, model, reasoning effort, web access) are shared
+The model settings (agent, model, reasoning effort, web access and agent access) are shared
 by every project and saved in `<data dir>/model-settings.json`. Each new
 run records the settings it started with, so later changes do not affect
 runs that already exist. A project's contribution direction, team size,
@@ -119,9 +133,10 @@ command-line messages before a language is chosen.
 
 BELL PR serves the web interface and the API on one port, 4311 by default, on
 `127.0.0.1`. Two BELL PR servers on one computer, for example one from `npx`
-and one in Docker, need different ports. BELL PR does not authenticate anyone,
-so keep the default `127.0.0.1` unless a proxy that authenticates sits in front
-(see [Self-hosting](self-hosting.md)).
+and one in Docker, need different ports. Keep the default `127.0.0.1` unless
+you mean to listen elsewhere: `--host` and `BELLPR_HOST` are explicit, and
+BELL PR prints a warning for an address that is not loopback. The API token
+is still required (see [Self-hosting](self-hosting.md)).
 
 ## Logs
 
@@ -130,3 +145,8 @@ The server writes one log file per day to `<data dir>/logs/`
 and 50 MB, and redacts secrets. Prompts and page contents are never
 logged. In a terminal it also prints every entry in a readable form; under
 a service manager or in a container it prints warnings and errors only.
+
+Prefer `bell-pr pair` when the other device can open `/pair`. Interactive
+SSH and headless starts may hint `bell-pr open --print --print-token` as a
+fallback when you cannot pair; run it explicitly if you need that private
+authorized URL. Desktop launches use a temporary private `file://` redirect.

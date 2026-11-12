@@ -8,7 +8,7 @@ const list = (items: readonly string[]) => fmt.list(items, { type: "unit" });
 
 /** Sandbox messages, and the outgoing-text checks on a PR. */
 export default {
-  /** A Claude Code write agent that cannot get the OS sandbox (503). */
+  /** A Claude Code or Antigravity write agent that cannot get the OS sandbox (503). */
   sandbox: {
     unavailable: `Claude Code agents that edit files and run commands need the operating system sandbox, which is not available on this computer. On Linux it needs bubblewrap (bwrap) and socat; on macOS, sandbox-exec. Install them, switch this project to Codex, or allow unsandboxed agents under Settings → Agent safety.`,
     /** bubblewrap is installed but cannot create a sandbox, as in Docker with default options. */
@@ -18,11 +18,22 @@ export default {
       "In Docker, add these options to docker run (see docs/docker.md)",
     codexFix:
       "Or sign in to Codex and choose it as the provider under Settings → Models",
-    allowFix: `Or allow unsandboxed Claude agents under Settings → Agent safety, or start ${product.name} with this variable (agents then run with your full user rights)`,
+    allowFix: `Or allow unsandboxed agents under Settings → Agent safety, or start ${product.name} with this variable (agents then run with your full user rights)`,
+    /** An Antigravity write agent whose terminal sandbox cannot start (503). */
+    antigravityUnavailable: `Antigravity agents that edit files and run commands need the Antigravity CLI's terminal sandbox, which is not available on this computer (on Linux it needs user namespaces; on macOS, sandbox-exec). Choose Claude Code or Codex under Settings → Models, or allow unsandboxed agents under Settings → Agent safety.`,
+    /** Linux withholds user namespaces from the Antigravity CLI (Ubuntu 24.04 and later by default). */
+    antigravityRestricted: `Antigravity agents that edit files and run commands need the Antigravity CLI's terminal sandbox, and this Linux system does not let programs create user namespaces (kernel.apparmor_restrict_unprivileged_userns, the Ubuntu default since 24.04). docs/troubleshooting.md explains how to allow it. Otherwise choose Claude Code or Codex under Settings → Models, or allow unsandboxed agents under Settings → Agent safety.`,
+    claudeFix:
+      "Or sign in to Claude Code and choose it as the provider under Settings → Models",
+    /** The working directory holds customizations the Antigravity CLI would load (422). */
+    antigravityWorkspaceConfig: ({ paths }: { paths: string[] }) =>
+      `This project contains Antigravity customizations (${list(paths)}). The Antigravity CLI would load them for every agent, and their hooks and MCP servers run outside any sandbox, so ${product.name} does not start Antigravity in it. Choose Claude Code or Codex under Settings → Models to work on this project.`,
   },
   /** BELLPR_ALLOWED_ORIGINS (or an origin given to the request guard) is not valid. */
   invalidOrigins:
     "BELLPR_ALLOWED_ORIGINS must contain comma-separated origins without credentials, paths, queries, fragments, or wildcards; plain HTTP is accepted only for loopback addresses.",
+  /** BELLPR_SUITE_LINKS is not valid. Never quotes the value: it may hold a private host name. */
+  suiteLinksInvalid: `BELLPR_SUITE_LINKS must list explain=<origin> or personal=<origin>, separated by commas, each product once. An origin has no credentials, path (not even a trailing /), query, fragment, wildcard or port 0. It is on this computer (localhost, 127.x.x.x or [::1]) or an https *.ts.net name in the same tailnet as BELLPR_PUBLIC_URL or BELLPR_ALLOWED_ORIGINS, and never this ${product.name}'s own address.`,
   /** A repository whose own Git configuration could run commands (409). */
   gitConfigUnsafe: ({ keys }: { keys: string[] }) =>
     `This repository's Git configuration sets ${list(keys)}, which can make Git run other programs or send credentials elsewhere. ${product.name} does not run Git in it. Remove these settings from its .git/config, or import the project again.`,

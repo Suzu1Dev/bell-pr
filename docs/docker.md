@@ -37,11 +37,25 @@ docker run -d --name bell-pr \
   bell-pr
 ```
 
-- `-p 127.0.0.1:4311:4311` publishes BELL PR on this computer only. Do not
-  publish it on all interfaces: BELL PR has no sign-in, so anything that
-  reaches the port can use it. For access from other machines, put an HTTPS
-  reverse proxy that authenticates in front, as
-  [docs/self-hosting.md](self-hosting.md) describes.
+- The image's command is `bell-pr start`. If a required doctor check fails
+  (no Codex or Claude Code sign-in yet), the process exits before it
+  listens and prints each failed check with its fix command. Sign in as
+  below, or open the sample tour with `docker run ... bell-pr start --force`
+  (that replaces the image command). A real agent run is still refused
+  until a provider is signed in.
+- `-p 127.0.0.1:4311:4311` publishes BELL PR on this computer only. The
+  image listens on `0.0.0.0` inside the container (an explicit setting; BELL
+  PR prints a warning) and still requires the API token in `/data/api-token`.
+  Do not publish the port on all interfaces unless you mean to. For access
+  from other machines, use Tailscale serve plus pairing with
+  `BELLPR_PUBLIC_URL`, as
+  [Self-hosting: Reach BELL PR from another machine](self-hosting.md#reach-bell-pr-from-another-machine)
+  describes (never Tailscale Funnel; keep it off the public internet). An
+  HTTPS reverse proxy on the same host is an advanced option: it must not
+  rewrite `Host`, and you must set `BELLPR_PUBLIC_URL`. Prefer pairing;
+  manage devices from the device list in Settings, or on the host with
+  `bell-pr devices list` / `bell-pr devices revoke <id>`. Keep any
+  install-token URL private.
 - `bellpr-data` holds repositories, worktrees and run records (`/data`,
   `BELLPR_DATA_DIR`). `bellpr-home` keeps the container user's home:
   CLI sign-ins, the git configuration and anything you install with
@@ -49,7 +63,8 @@ docker run -d --name bell-pr \
 - `BELLPR_PUBLIC_URL` must be the address your browser uses. BELL PR refuses
   requests for any other address. If you publish another port, for example
   `-p 127.0.0.1:8080:4311`, set `BELLPR_PUBLIC_URL=http://localhost:8080`.
-- `GH_TOKEN` lets `gh` and git push to GitHub. Instead, you can sign in once
+- `GH_TOKEN` lets `gh` and a git push or fetch talk to GitHub. Other git
+  commands BELL PR runs do not receive it. Instead, you can sign in once
   with `docker exec -it bell-pr gh auth login`; the login stays in
   `bellpr-home`.
 - Codex: pass `OPENAI_API_KEY`, or sign in once with
@@ -82,10 +97,17 @@ in place of `bell-pr`:
 docker exec <container> bell-pr open --print
 ```
 
-The browser never opens by itself from a container, so `--print` is the way to
-go: open the printed address in your browser. The health check
-(`GET /api/health`) is built into the image, so `docker ps` shows when BELL PR
-is ready.
+The browser never opens by itself from a container. Prefer pairing when
+another device can open `/pair` on your private network (see
+[Self-hosting](self-hosting.md#reach-bell-pr-from-another-machine)). For
+SSH or headless use when you cannot pair,
+`docker exec <container> bell-pr open --print --print-token` is a fallback:
+the printed address ends with `#bell_token=` and signs the page in. Without
+`--print-token` the printed address has no token. The startup line in
+`docker logs` does not include the token. Treat the `--print-token` address
+like a password. The health check (`GET /api/health`) does not need the
+token and is built into the image, so `docker ps` shows when BELL PR is
+ready.
 
 To check the tools inside the container, run
 `docker exec bell-pr bell-pr doctor`.
@@ -115,8 +137,8 @@ its own bubblewrap-based sandbox for every agent (read-only or writing),
 and Claude Code uses bubblewrap with socat for agents that write code. Both need to create Linux namespaces, which Docker's default
 seccomp and AppArmor profiles and its masked `/proc` paths forbid.
 
-Probe, run without any model call (Docker Engine 29.7 on Linux, Codex CLI
-0.159.0, in a fresh container of this image):
+Probe, run without any model call (Docker Engine 29.7 on an Ubuntu 26.04
+host, Codex CLI 0.159.0, in a fresh container of an image built from 1.0.1):
 
 ```sh
 codex sandbox -c 'sandbox_mode="workspace-write"' -- sh -c 'echo ok > probe && cat probe'
@@ -129,7 +151,7 @@ bwrap --ro-bind / / --dev /dev --proc /proc --unshare-all --die-with-parent true
 | `--security-opt seccomp=unconfined` | Fails: `bwrap: Failed to make / slave: Permission denied` |
 | `--security-opt apparmor=unconfined` | Fails: `bwrap: No permissions to create a new namespace` |
 | both of the above | Fails: `bwrap: Can't mount proc on /proc: Operation not permitted` |
-| both of the above and `--security-opt systempaths=unconfined` | Works: the agent writes inside its workspace, a write to `/home/node` fails with "Read-only file system", and network access fails |
+| both of the above and `--security-opt systempaths=unconfined` | Works: the agent writes inside its workspace (under `/data`, where BELL PR keeps checkouts), a write to `/home/node` fails with "Read-only file system", and network access fails |
 
 The direct `bwrap` probe (what Claude Code's sandbox needs) gives the same
 results.
@@ -155,11 +177,13 @@ code cannot start their sandbox.
 
 ## Beta status
 
-Docker stays **beta** in 1.0.0-rc.1 because the agent sandbox needs the
-three `--security-opt` options above. What the release candidate verified
-on Linux (Docker Engine 29.7):
+Docker stays **beta** because the agent sandbox needs the three
+`--security-opt` options above. What was verified on Linux (Docker Engine
+29.7) with an image built from 1.0.1:
 
-- the image builds, reports healthy within seconds and prints its address;
+- the image builds; with `bell-pr start --force` it reports healthy within
+  seconds and prints its address (without a provider signed in, plain
+  `bell-pr start` exits, as [Run it](#run-it) says);
 - git, the GitHub CLI, the Codex CLI, bubblewrap and socat are in the
   image, and `bell-pr doctor` runs in it;
 - the sandbox probe in the table above: it fails with the default options
@@ -187,6 +211,8 @@ volumes:
 docker rm -f bell-pr
 docker run -d --name bell-pr ... bell-pr
 docker exec bell-pr bell-pr open --print
+# fallback when you cannot pair:
+# docker exec bell-pr bell-pr open --print --print-token
 ```
 
 Agents that were still running when the old container stopped are gone;

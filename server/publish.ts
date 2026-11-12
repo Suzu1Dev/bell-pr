@@ -1,3 +1,4 @@
+import { assertSessionIdle } from "./session.js";
 /**
  * The human review gate and publishing: the PR draft, per-file review,
  * approval, and publishing exactly the reviewed files as one commit in a
@@ -29,7 +30,7 @@ import {
   type DraftCheck,
 } from "../shared/draft-checks.js";
 import type { Locale } from "../shared/i18n/locale.js";
-import { activeFollowUp, type FollowUpRound } from "../shared/followups.js";
+import { activeFollowUp, reviewBaseSha, type FollowUpRound } from "../shared/followups.js";
 import {
   AppError,
   type DiffFile,
@@ -37,13 +38,13 @@ import {
   type Run,
 } from "./types.js";
 import { assertRemoteHead, prHasCommit, remoteBranchHead } from "./pr-branch.js";
-import { assertConflictsResolved } from "./sync-runs.js";
+import { assertConflictsResolved, runBusy } from "./sync-runs.js";
 import { applyAiDisclosure } from "./drafts.js";
 import { assertReady } from "./by-hand.js";
 import { assertGitIdentity, githubTokenScopes } from "./doctor.js";
 import { setupError } from "./cli-errors.js";
 import type { WorkbenchContext } from "./workbench.js";
-import { currentLocale, sm } from "./i18n/index.js";
+import { currentLocale, shuttingDown, sm } from "./i18n/index.js";
 import { secretInPatch } from "./secrets.js";
 import { assertUnderstood, understandingRequired } from "./understanding.js";
 import { reviewabilitySnapshot } from "../shared/reviewability.js";
@@ -53,6 +54,8 @@ import type {
   GuardOverride,
 } from "../shared/contribution.js";
 import { explainPrCreateFailure, refreshRunFacts } from "./contribution-facts.js";
+import { outgoingPublishText } from "../shared/publish-payload.js";
+import { localPublishChecks } from "./group-local.js";
 
 const now = () => new Date().toISOString();
 
@@ -133,7 +136,8 @@ function changesOf(run: Run, files: DiffFile[], repo?: Repository) {
  * (the project's rules, the stored GitHub facts, reviewability, pacing).
  * The publish dialog shows the same list (GET /api/runs/:id/preflight),
  * which never calls GitHub: it uses the facts stored on the run unless
- * `extra.facts` passes fresher ones.
+ * `extra.facts` passes fresher ones. With `extra.runs`, the person's other
+ * contributions of the project are checked too (server/group-local.ts).
  */
 export async function publishChecks(
   run: Run,
@@ -144,6 +148,7 @@ export async function publishChecks(
     repo?: Repository;
     facts?: ContributionFacts;
     overrides?: GuardOverride[];
+    runs?: readonly Run[];
   } = {},
 ): Promise<DraftCheck[]> {
   const confirmed = await confirmedEmails(dataDirectory);
@@ -182,6 +187,10 @@ export async function publishChecks(
     },
     locale,
   );
+  if (extra.repo && extra.runs)
+    checks.push(
+      ...(await localPublishChecks({ runs: extra.runs, repo: extra.repo, directory: dataDirectory }, run, files)),
+    );
   // The quoted confirm carries a digest of its words, which publish() wants back with its tick.
   return checks.map((check) => (check.id === "by-hand-rules" ? { ...check, digest: checkDigest(check) } : check));
 }
@@ -209,6 +218,7 @@ async function assertWorkflowScope(files: DiffFile[]) {
 
 /** The draft, file reviews and approval change only in review or approved, never while publishing. */
 export function editable(run: Run) {
+  assertSessionIdle(run);
   if (!["review", "approved"].includes(run.status) || run.publishing)
     throw new AppError((m) => m.run.publish.notEditable, 409);
 }
@@ -389,11 +399,244 @@ export async function approve(
 }
 
 /**
+ * Releases an unpublished commit left by a failed publish, preserving the
+ * checkout and the old commit. A recorded push target is never guessed or
+ * discarded; only successful empty remote reads permit this local recovery.
+ */
+export async function recoverPublish(
+  ctx: WorkbenchContext,
+  id: string,
+  expectedCommit: string,
+) {
+  if (ctx.stopping()) throw new AppError(shuttingDown(), 503);
+  return ctx.lock(id, async () => {
+    const run = ctx.run(id);
+    const assertRecoverable = () => {
+      if (ctx.stopping()) throw new AppError(shuttingDown(), 503);
+      if (
+        !/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(expectedCommit) ||
+        run.publishCommit !== expectedCommit
+      )
+        throw new AppError((m) => m.run.publish.recoveryStale, 409);
+      if (
+        !["review", "approved"].includes(run.status) ||
+        run.publishing ||
+        run.prUrl ||
+        run.headRepository ||
+        run.publishedBranch ||
+        activeFollowUp(run.followUps)
+      )
+        throw new AppError((m) => m.run.publish.recoveryNotAllowed, 409);
+      if (
+        run.session?.running ||
+        ctx.sessionJobs.has(id) ||
+        ctx.draftJobs.has(id) ||
+        runBusy(ctx, id, { walkthroughs: false })
+      )
+        throw new AppError((m) => m.run.publish.recoveryBusy, 409);
+    };
+    assertRecoverable();
+    await assertGitConfigSafe(run.worktreePath);
+    const repo = ctx.repo(run.repoId);
+    const source = parseGitHubSource(repo.url);
+    if (
+      !source ||
+      source.fullName.toLowerCase() !== repo.fullName.toLowerCase()
+    )
+      throw new AppError((m) => m.run.publish.noGithubOrigin, 422);
+    assertGitHubRepository(source.fullName);
+    const branches = [
+      ...new Set(
+        [run.branch, run.draft.publishBranch].filter(
+          (branch): branch is string => !!branch,
+        ),
+      ),
+    ];
+    for (const branch of branches) assertRefName(branch);
+    const archiveRef = `refs/bellpr/publish-recovery/${run.id}/${expectedCommit}`;
+    await git(run.worktreePath, ["check-ref-format", archiveRef]);
+    // None of these reads changes HEAD, the index or files, even if the old commit is now detached from the branch.
+    const branchRef = `refs/heads/${run.branch}`;
+    await git(run.worktreePath, ["show-ref", "--verify", branchRef]);
+    const checkedOut = (
+      await git(run.worktreePath, ["symbolic-ref", "--quiet", "HEAD"])
+    ).stdout.trim();
+    const objectType = (
+      await git(run.worktreePath, ["cat-file", "-t", expectedCommit])
+    ).stdout.trim();
+    if (checkedOut !== branchRef || objectType !== "commit")
+      throw new AppError((m) => m.run.publish.recoveryCheckout, 409);
+
+    let login: unknown;
+    try {
+      const user: unknown = JSON.parse(
+        (await command("gh", ["api", "user"], { timeoutMs: 30_000 })).stdout,
+      );
+      login =
+        user && typeof user === "object" && "login" in user
+          ? user.login
+          : undefined;
+      if (
+        typeof login !== "string" ||
+        !/^[A-Za-z0-9][A-Za-z0-9-]{0,38}$/.test(login)
+      )
+        throw new Error("Invalid GitHub login");
+    } catch (cause) {
+      throw new AppError((m) => m.run.publish.recoveryUnknown, 502, { cause });
+    }
+    const repositories = [
+      ...new Set([source.fullName, `${login}/${source.name}`]),
+    ];
+    for (const repository of repositories) {
+      assertGitHubRepository(repository);
+      for (const branch of branches) {
+        let output: string;
+        try {
+          output = (
+            await gitNetwork(
+              run.worktreePath,
+              [
+                "ls-remote",
+                "--",
+                `https://github.com/${repository}.git`,
+                `refs/heads/${branch}`,
+              ],
+              { timeoutMs: 60_000 },
+            )
+          ).stdout.trim();
+        } catch (cause) {
+          throw new AppError((m) => m.run.publish.recoveryUnknown, 502, {
+            cause,
+          });
+        }
+        // A nonempty malformed reply is unknown, never evidence that the branch is absent.
+        if (output) {
+          const parts = output.split(/\s+/);
+          if (
+            parts.length !== 2 ||
+            !/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(parts[0]) ||
+            parts[1] !== `refs/heads/${branch}`
+          )
+            throw new AppError((m) => m.run.publish.recoveryUnknown, 502);
+          throw new AppError(
+            (m) => m.run.publish.recoveryRemoteBranch({ repository, branch }),
+            409,
+          );
+        }
+      }
+    }
+    for (const branch of branches) {
+      let prs: unknown;
+      try {
+        prs = JSON.parse(
+          (
+            await command(
+              "gh",
+              [
+                "pr",
+                "list",
+                "--repo",
+                source.fullName,
+                "--head",
+                branch,
+                "--state",
+                "all",
+                "--limit",
+                "1",
+                "--json",
+                "number",
+              ],
+              { timeoutMs: 30_000 },
+            )
+          ).stdout,
+        );
+      } catch (cause) {
+        throw new AppError((m) => m.run.publish.recoveryUnknown, 502, {
+          cause,
+        });
+      }
+      if (!Array.isArray(prs))
+        throw new AppError((m) => m.run.publish.recoveryUnknown, 502);
+      // A closed/merged PR, a changed SHA, or a PR from another owner still means this branch was used.
+      if (prs.length)
+        throw new AppError(
+          (m) => m.run.publish.recoveryPrExists({ branch }),
+          409,
+        );
+    }
+    // Review and premise jobs reserve controllers before taking this lock; check again after network I/O.
+    assertRecoverable();
+    const archived = await git(
+      run.worktreePath,
+      ["rev-parse", "--verify", "--quiet", archiveRef],
+      { allowedCodes: [0, 1] },
+    );
+    if (archived.code === 0 && archived.stdout.trim() !== expectedCommit)
+      throw new AppError((m) => m.run.publish.recoveryCheckout, 409);
+    await git(run.worktreePath, [
+      "update-ref",
+      archiveRef,
+      expectedCommit,
+      archived.code === 0 ? expectedCommit : "0".repeat(expectedCommit.length),
+    ]);
+    assertRecoverable();
+    const previous = {
+      status: run.status,
+      error: run.error,
+      approval: run.approvedFingerprint,
+      logs: [...run.logs],
+    };
+    delete run.publishCommit;
+    delete run.error;
+    delete run.approvedFingerprint;
+    run.status = "review";
+    ctx.log(
+      run,
+      "system",
+      sm().run.publish.recovered({ commit: expectedCommit }),
+    );
+    try {
+      await ctx.store.save();
+    } catch (error) {
+      run.publishCommit = expectedCommit;
+      run.status = previous.status;
+      if (previous.error === undefined) delete run.error;
+      else run.error = previous.error;
+      if (previous.approval === undefined) delete run.approvedFingerprint;
+      else run.approvedFingerprint = previous.approval;
+      run.logs = previous.logs;
+      throw error;
+    }
+    return run;
+  });
+}
+
+/**
+ * Refuses a change that meets a file someone else in the group holds
+ * (hold-guard.ts). Given only when BELL PR runs with --group.
+ */
+export type HoldCheck = (
+  run: Run,
+  files: readonly DiffFile[],
+  acknowledged: readonly string[],
+) => void;
+
+export interface PublishHolds {
+  publishing: HoldCheck;
+  confirms?: (
+    run: Run,
+    repo: Repository | undefined,
+    runs: readonly Run[],
+  ) => Promise<DraftCheck[]>;
+}
+
+/**
  * `acknowledged` lists the preflight items the person confirmed in the
  * publish dialog. They are recomputed here from the saved draft, so a stale
  * or partial list is rejected before anything is pushed. The quoted
  * confirm's tick counts only with `rulesDigest`, the digest of the words
  * the dialog showed, when it matches the words the server shows now.
+ * `holds` is the group's write guard, when BELL PR runs with --group.
  */
 export async function publish(
   ctx: WorkbenchContext,
@@ -402,7 +645,10 @@ export async function publish(
   acknowledged: string[] = [],
   overrides: Pick<GuardOverride, "id" | "reason">[] = [],
   rulesDigest?: string,
+  holds?: HoldCheck | PublishHolds,
 ) {
+  const holdCheck = typeof holds === "function" ? holds : holds?.publishing;
+  const holdConfirms = typeof holds === "function" ? undefined : holds?.confirms;
   return ctx.lock(id, async () => {
     const run = ctx.run(id);
     if (
@@ -411,6 +657,7 @@ export async function publish(
     )
       throw new AppError((m) => m.run.publish.approvalStale, 409);
     if (run.status === "published") return run;
+    assertSessionIdle(run);
     const repo = ctx.repo(run.repoId);
     if (run.status !== "approved" || !run.approvedFingerprint)
       throw new AppError((m) => m.run.publish.approveFirst, 409);
@@ -437,6 +684,8 @@ export async function publish(
     // The current setting applies, also to runs approved while it was off
     // and to runs approved by builds before the check existed.
     assertUnderstood(run, files, repo);
+    // Before the follow-up branch, so a follow-up round is held to it too.
+    holdCheck?.(run, files, acknowledged);
     const round = activeFollowUp(run.followUps);
     if (round) return publishFollowUp(ctx, run, round, files);
     if (run.prUrl)
@@ -514,8 +763,10 @@ export async function publish(
       files,
       ctx.store.directory,
       currentLocale(),
-      { repo, overrides: guardOverrides },
+      { repo, overrides: guardOverrides, runs: ctx.store.data.runs },
     );
+    if (holdConfirms)
+      checks.push(...(await holdConfirms(run, repo, ctx.store.data.runs)));
     const blocking = checks.find((check) => check.kind === "block");
     if (blocking)
       throw new AppError(
@@ -603,6 +854,7 @@ export async function publish(
       let commit = run.publishCommit;
       if (commit) await assertPriorCommit(run, commit, tree);
       else {
+        const outgoing = outgoingPublishText(run.draft, false);
         commit = (
           await git(
             run.worktreePath,
@@ -610,8 +862,7 @@ export async function publish(
             {
               // The person's full message (subject, body, their own trailers)
               // or, when none was written, the title alone as before.
-              input:
-                (run.draft.commitMessage?.trim() || run.draft.title) + "\n",
+              input: outgoing.commitMessage,
             },
           )
         ).stdout.trim();
@@ -637,7 +888,9 @@ export async function publish(
           { timeoutMs: 120_000 },
         );
         headRepository = `${githubUser}/${repo.name}`;
-        const fork = json<{ parent?: { nameWithOwner: string } }>(
+        const fork = json<{
+          parent?: { name?: unknown; owner?: { login?: unknown } | null } | null;
+        } | null>(
           (
             await command("gh", [
               "repo",
@@ -648,9 +901,13 @@ export async function publish(
             ])
           ).stdout,
         );
+        // `gh repo view --json parent` returns the owner's login and repository name separately.
+        const parentOwner = fork?.parent?.owner?.login;
+        const parentName = fork?.parent?.name;
         if (
-          fork.parent?.nameWithOwner.toLowerCase() !==
-          repo.fullName.toLowerCase()
+          typeof parentOwner !== "string" ||
+          typeof parentName !== "string" ||
+          `${parentOwner}/${parentName}`.toLowerCase() !== repo.fullName.toLowerCase()
         )
           throw new AppError((m) => m.run.publish.notAFork, 409);
         headOwner = githubUser;
@@ -673,6 +930,7 @@ export async function publish(
       const headRef = `${headOwner}:${headBranch}`;
       let prUrl = await openPrUrl(repo.fullName, headBranch, headOwner, commit);
       if (!prUrl) {
+        const outgoing = outgoingPublishText(run.draft, false);
         const result = await command(
           "gh",
           [
@@ -686,11 +944,11 @@ export async function publish(
             headRef,
             "--draft",
             "--title",
-            run.draft.title,
+            outgoing.title,
             "--body-file",
             "-",
           ],
-          { input: run.draft.body, timeoutMs: 120_000 },
+          { input: outgoing.body, timeoutMs: 120_000 },
         );
         prUrl = result.stdout.match(
           /https:\/\/github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+\/pull\/\d+/,
@@ -722,9 +980,8 @@ export async function publish(
 }
 
 /**
- * Paths whose pushed content a round changed but the review list cannot
- * show: a file put back to its base version or deleted drops out of the
- * diff against the base, yet it would change the pushed commit.
+ * Paths a round would change outside its reviewed diff. Review rounds use
+ * the previous PR head; sync rounds use the target branch being merged.
  */
 async function unreviewableRoundPaths(
   run: Run,
@@ -872,7 +1129,7 @@ async function publishFollowUp(
             round.parentCommit,
             ...(round.mergeParent ? ["-p", round.mergeParent] : []),
           ],
-          { input: `${message}\n` },
+          { input: outgoingPublishText(run.draft, true).commitMessage },
         )
       ).stdout.trim();
     }
@@ -1025,7 +1282,8 @@ async function stageReviewedTree(
   files: DiffFile[],
   indexEnv: NodeJS.ProcessEnv,
 ) {
-  await git(run.worktreePath, ["read-tree", run.baseSha], {
+  const base = reviewBaseSha(run)!;
+  await git(run.worktreePath, ["read-tree", base], {
     env: indexEnv,
   });
   await git(
@@ -1049,7 +1307,7 @@ async function stageReviewedTree(
         "--no-renames",
         "--name-only",
         "-z",
-        run.baseSha,
+        base,
         "--",
       ],
       { env: indexEnv },
@@ -1074,7 +1332,7 @@ async function stageReviewedTree(
           "--no-ext-diff",
           "--no-textconv",
           "--no-renames",
-          run.baseSha,
+          base,
           "--",
           file.path,
         ],

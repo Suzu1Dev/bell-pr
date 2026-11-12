@@ -2,8 +2,7 @@ import { formatters, type Translation } from "../../../shared/i18n/locale.js";
 import type en from "../en/security-draft-checks.js";
 
 const m: Translation<typeof en> = {
-  secret:
-    "PR 標題、說明或提交訊息含有疑似憑證的內容，例如存取權杖或私密金鑰。請移除：發佈到 GitHub 的內容任何人都看得到。",
+  secret: "發佈前會擋下常見格式的 token 與私鑰。",
   secretIn: ({ field }) =>
     ({
       title: "位於標題",
