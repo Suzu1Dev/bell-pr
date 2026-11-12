@@ -238,6 +238,8 @@ export function createApp(workbench: Workbench, options: AppOptions = {}) {
   if (options.collab) {
     app.locals.collab = options.collab;
     registerCollabRoutes(app, options.collab, { store: workbench.store, devices, tokenFile });
+    // Agent turns, teammates and plans respect the group's holds too.
+    workbench.guardHolds(options.collab);
   }
   if ((options.platform ?? process.platform) === "linux") registerSudoRoutes(app, deps);
   app.use("/api", (_req, res) => {

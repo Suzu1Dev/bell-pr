@@ -91,8 +91,12 @@ what BELL PR trusts, what it does not, and the limits of each protection.
     to the group and revoke someone else's hold. A removed person whose
     device is still paired keeps all of that.
   - A hold is a record, not a lock. BELL PR refuses a second hold that
-    meets one already held; it does not stop an agent, an editor or a push
-    from writing to a held path.
+    meets one already held, publishes no change over someone else's hold
+    and holds its own agents to them: held paths are read-only in the
+    sandbox, and each turn that may change files is checked when it ends
+    ([What a hold does not do](group-work.md#what-a-hold-does-not-do)). It
+    does not stop an editor, a tool or a push outside BELL PR from writing
+    to a held path, and nothing is locked in a checkout or on GitHub.
 - **Browser hardening.** Every response carries
   `Content-Security-Policy: default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'`,
   `Cross-Origin-Resource-Policy: same-origin`, `X-Frame-Options: DENY`,
