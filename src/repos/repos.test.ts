@@ -29,8 +29,8 @@ test("the repository list reads in English with no Chinese left", () => {
   const html = renderEn(element);
   assert.match(html, /<h1 tabindex="-1">Projects<\/h1>/);
   assert.match(html, /<span class="demo-pill">Sample project<\/span>/);
-  assert.match(html, /Explore the demo workbench/);
-  assert.match(html, /Explore the project and directions/);
+  assert.match(html, /Open the sample workbench/);
+  assert.match(html, /Open project/);
   assert.match(html, /<strong>Add your repository<\/strong>/);
   assertNoHan(html);
   assert.match(renderZh(element), /<span class="demo-pill">示範專案<\/span>/);

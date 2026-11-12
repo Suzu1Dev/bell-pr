@@ -170,7 +170,7 @@ test("rules stored with the repository need no request; a missing set is read on
   stubFetch(() => ({ status: 200, body: {} }));
   const empty = await mount(card());
   try {
-    assert.ok(empty.text().includes("Couldn't check: BELL PR hasn't read this project's rules yet."), empty.text());
+    assert.ok(empty.text().includes("Couldn't check: the rules have not been read yet. Choose Check again to read them."), empty.text());
   } finally {
     await empty.unmount();
   }

@@ -31,7 +31,7 @@ const understanding = {
   notOpen:
     "The understanding check can be taken while the run waits for your review or approval, not while it runs or publishes.",
   changed:
-    "The changes moved since you opened the check. Reload it to see the questions for the latest version.",
+    "The changes were updated after you opened the check. Reload it to see the questions for the latest version.",
   unknownQuestion:
     "One of the answers is not for a question of the current check. Reload the check and answer again.",
   alreadyLocked:

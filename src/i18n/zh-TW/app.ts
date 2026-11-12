@@ -36,7 +36,7 @@ const m: Translation<typeof en> = {
     practiceReadyLabel: ({ count }) => `有 ${count} 則練習可以做了`,
     help: "使用指南",
     about: `關於 ${product.name}`,
-    profileFallback: "My workspace",
+    profileFallback: "我的工作空間",
     localWorkspace: "本機工作空間",
     workspaceSettings: "工作空間設定",
   },

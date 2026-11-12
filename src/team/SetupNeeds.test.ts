@@ -133,7 +133,7 @@ test("a setup turn's results read in both languages, with the outcome in words",
   const html = renderEn(createElement(SetupResults, { results }));
   assertNoHan(html);
   assert.match(html, /Setup results \(the agent&#x27;s report\)/);
-  assert.match(html, /<li data-outcome="installed"><span class="setup-result-outcome">installed<\/span> <strong>GLib headers<\/strong> <code>sudo apt-get install -y libglib2\.0-dev<\/code><p>The agent&#x27;s account: Installed with apt-get\.<\/p><\/li>/);
+  assert.match(html, /<li data-outcome="installed"><span class="setup-result-outcome">installed<\/span> <strong>GLib headers<\/strong> <code>sudo apt-get install -y libglib2\.0-dev<\/code><p>The agent&#x27;s note: Installed with apt-get\.<\/p><\/li>/);
   assert.match(html, /<span class="setup-result-outcome">needs you<\/span>/);
   assert.match(renderZh(createElement(SetupResults, { results })), /環境準備結果（Agent 回報）.*已安裝.*需要你處理/);
 });

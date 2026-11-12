@@ -102,7 +102,7 @@ test("the new-task dialog asks for the repository, the goal and the team setting
   assert.match(html, /任務名稱 <span>選填<\/span>/);
   assert.match(html, /這次想完成什麼？/);
   assert.match(html, /3 位協作成員/);
-  assert.match(html, /會使用本機 Codex 帳號執行任務/);
+  assert.match(html, /任務會使用本機已登入的 Codex CLI 執行/);
   assert.doesNotMatch(html, /示範設定可以自由調整/);
 });
 
@@ -123,7 +123,7 @@ test("the start button names what happens next and waits for a long enough goal"
     },
   });
   assert.match(direct, />開始任務<\/button>/);
-  assert.match(direct, /會使用本機 Claude Code 帳號執行任務/);
+  assert.match(direct, /任務會使用本機已登入的 Claude Code CLI 執行/);
 });
 
 test("the demo repository plays the sample team again instead of starting agents", () => {

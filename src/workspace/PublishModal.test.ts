@@ -111,7 +111,7 @@ test("the publish dialog summarises the reviewed branch before sending a Draft P
   assert.match(html, /bell\/retry-backoff<span>→<\/span>main/);
   assert.ok(html.includes(`${demoFiles.length} 個檔案已審閱`));
   assert.match(html, /<b>\+12 −3<\/b>/);
-  assert.match(html, /<strong>會送到 GitHub 的 PR 標題<\/strong><pre>Add retry backoff<\/pre>/);
+  assert.match(html, /<strong>PR 標題<\/strong><pre>Add retry backoff<\/pre>/);
   assert.match(html, /<pre>Add retry backoff\n<\/pre>/);
   assert.match(html, /<pre>## Summary\n\nRetries GET requests\.<\/pre>/);
   assert.match(html, /<button class="button primary">.*送出 Draft PR<\/button>/);
@@ -306,9 +306,9 @@ test("a follow-up round previews its commit and pushes to the PR branch instead 
   assert.doesNotMatch(html, /ignored-branch/);
   assert.match(
     html,
-    /<strong>會送到 GitHub 的提交訊息<\/strong><pre>Rename the option\n\nAddress the review on retry\.ts\.\n<\/pre>/,
+    /<strong>提交訊息<\/strong><pre>Rename the option\n\nAddress the review on retry\.ts\.\n<\/pre>/,
   );
-  assert.match(html, /<strong>會送到 GitHub 的 PR 標題<\/strong><pre>Add retry backoff<\/pre>/);
+  assert.match(html, /<strong>PR 標題<\/strong><pre>Add retry backoff<\/pre>/);
   assert.match(html, /<pre>## Summary\n\nRetries GET requests\.<\/pre>/);
   assert.match(html, /<button class="button primary">.*推送這輪修正<\/button>/);
 
@@ -339,9 +339,9 @@ test("the publish dialog reads in English with no Chinese left", () => {
   const html = renderEn(element());
   assert.match(html, /<h2 id="modal-title">Send this contribution to GitHub\.<\/h2>/);
   assert.ok(html.includes(`${demoFiles.length} files reviewed`));
-  assert.match(html, /<strong>PR title sent to GitHub<\/strong><pre>Add retry backoff<\/pre>/);
-  assert.match(html, /<strong>Commit message sent to GitHub<\/strong>/);
-  assert.match(html, /<strong>PR description sent to GitHub<\/strong><pre>## Summary\n\nRetries GET requests\.<\/pre>/);
+  assert.match(html, /<strong>PR title<\/strong><pre>Add retry backoff<\/pre>/);
+  assert.match(html, /<strong>Commit message<\/strong>/);
+  assert.match(html, /<strong>PR description<\/strong><pre>## Summary\n\nRetries GET requests\.<\/pre>/);
   assert.match(html, /<button class="button primary">.*Submit Draft PR<\/button>/);
   assert.match(html, />Back to the draft<\/button>/);
   assert.match(html, /aria-label="Close dialog"/);
@@ -375,8 +375,8 @@ test("the publish dialog reads in English with no Chinese left", () => {
 test("an open round's publish dialog reads in English with no Chinese left", () => {
   const html = renderEn(element({ run: roundRun }, { followUp: round }));
   assert.match(html, /<h2 id="modal-title">Push this round to the PR\.<\/h2>/);
-  assert.match(html, /<strong>Commit message sent to GitHub<\/strong><pre>Rename the option\n<\/pre>/);
-  assert.match(html, /<strong>PR title sent to GitHub<\/strong><pre>Add retry backoff<\/pre>/);
+  assert.match(html, /<strong>Commit message<\/strong><pre>Rename the option\n<\/pre>/);
+  assert.match(html, /<strong>PR title<\/strong><pre>Add retry backoff<\/pre>/);
   assert.match(html, /<pre>## Summary\n\nRetries GET requests\.<\/pre>/);
   assert.match(html, /<button class="button primary">.*Push this round<\/button>/);
   assertNoHan(html);
@@ -500,7 +500,7 @@ test("the facts line: reading, couldn't check, the pace here, and the check off"
   assert.match(renderEn(checksElement()), /Every check passes/);
   assert.match(
     renderEn(checksElement({ pacing: { open: 0, budget: 1, first: true } })),
-    /Your open PRs here: 0 of 1 \(first contribution here\)/,
+    /Your open PRs here: 0 of 1 \(BELL PR default; first contribution here\)/,
   );
   assert.match(renderEn(checksElement({ pacing: "exempt" })), /not paced, since you can write to this repository/);
   assert.match(renderEn(checksElement({ checkOff: true })), /Understanding check: off/);
@@ -546,7 +546,7 @@ test("the sample's checks all pass, with its pace shown, in English", () => {
   const checks = samplePublishChecks(demo, { ...demo.run, status: "approved" }, demo.files, "en");
   const html = renderEn(checksElement({ checks, pacing: pacingOf(demo.contributionFacts) }));
   assert.match(html, /Every check passes\./);
-  assert.match(html, /Your open PRs here: 0 of 1 \(first contribution here\)/);
+  assert.match(html, /Your open PRs here: 0 of 1 \(BELL PR default; first contribution here\)/);
   assert.doesNotMatch(html, /<fieldset/);
   assertNoHan(html);
 });

@@ -81,7 +81,7 @@ const mission = {
       `try ${n(attempt)} of ${n(attempts)}`,
     /** `elapsed` arrives as a clock time such as "3:05". */
     elapsed: ({ elapsed }: { elapsed: string }) => `Running for ${elapsed}`,
-    note: "The bar fills with the time used against the most this step may take, not with how much of the work is done. While it only moves, there is no such time to show.",
+    note: "The bar shows the time used against this step's time limit, not how much of the work is done. When a step has no time limit to show, the bar only moves.",
   },
   project: {
     sourceDemo: "Sample analysis",
@@ -390,7 +390,7 @@ const mission = {
       help: "Only GitHub issue page URLs are accepted. With one, the PR draft can write Fixes or Refs #number and link back to the issue. Before you submit, comment on the issue to say you will work on it.",
     },
     model: {
-      heading: "Model and reasoning",
+      heading: "Model and reasoning effort",
       note: "Defaults apply to new tasks across projects. Existing tasks keep their settings.",
       agent: "Agent",
       providerHelp: {
@@ -430,7 +430,7 @@ const mission = {
         "The saved effort is not in this model's list. Choose again.",
       effortHelp: "Higher reasoning effort takes longer and uses more of your account’s allowance.",
       webAccess: "Let Agents search the web and read pages",
-      webPages: "Allow agents to read web pages",
+      webPages: "Let Agents read web pages",
       antigravityWeb: "Antigravity can always search the web, including during project analysis and discovery. This switch only controls reading web pages.",
       webAccessHelp:
         "Allows task and follow-up agents to search and read web pages. Project analysis and discovery do not use these tools. Web content is untrusted; command-line network access still follows the chosen permissions.",
@@ -538,7 +538,7 @@ const mission = {
     noFiles:
       "No contributing guide, policy or pull request template was there to read. Some projects publish their rules on a website or wiki; check before you publish.",
     couldntCheck: ({ reason }: { reason: string }) => `Couldn't check: ${reason}`,
-    notRead: `${product.name} hasn't read this project's rules yet. It reads them when the project is imported or updated, and when you check again.`,
+    notRead: "the rules have not been read yet. Choose Check again to read them.",
     filesRead: ({ count }: { count: number }) =>
       `Files ${product.name} read · ${n(count)}`,
     orgDefaults: ({ repository }: { repository: string }) =>

@@ -50,7 +50,7 @@ const m: Translation<typeof en> = {
     attempt: ({ attempt, attempts }) =>
       `第 ${n(attempt)} / ${n(attempts)} 次嘗試`,
     elapsed: ({ elapsed }) => `已執行 ${elapsed}`,
-    note: "進度條依已用時間占這一步上限的比例填滿，不代表完成了多少工作；只在移動時，表示目前沒有可顯示的時間。",
+    note: "進度條顯示已用時間占這一步時間上限的比例，不代表工作完成了多少。沒有時間上限可顯示時，進度條只會持續移動。",
   },
   project: {
     sourceDemo: "示範分析",
@@ -202,7 +202,7 @@ const m: Translation<typeof en> = {
     },
     navigationHint: "左右滑動，或聚焦清單後按方向鍵",
     showing: ({ first, last, total }) =>
-      `顯示 ${n(first)}${last > first ? `–${n(last)}` : ""} / ${n(total)} 個顯示中的建議`,
+      `第 ${n(first)}${last > first ? `–${n(last)}` : ""} 個，共 ${n(total)} 個顯示中的建議`,
     previous: "上一個建議",
     next: "下一個建議",
     railLabel: "貢獻建議橫向清單",
@@ -283,7 +283,7 @@ const m: Translation<typeof en> = {
       help: "只接受 GitHub issue 頁面網址。填了之後，PR 草稿才可以寫 Fixes／Refs #編號並連回這個 issue；送出前請先在 issue 留言表明要處理。",
     },
     model: {
-      heading: "模型與思考方式",
+      heading: "模型與思考強度",
       note: "預設設定套用至各專案的新任務，已建立的任務保留原設定。",
       agent: "Agent",
       providerHelp: {
@@ -301,7 +301,7 @@ const m: Translation<typeof en> = {
         "signed-out": "未登入",
         disabled: "已關閉",
       },
-      model: "執行模型",
+      model: "模型",
       providerDefault: ({ provider, model }) =>
         `${provider} 預設${model ? ` · ${model}` : ""}`,
       unconfirmed: ({ value }) => `${value} · 已儲存，待確認`,
@@ -313,7 +313,7 @@ const m: Translation<typeof en> = {
       unknownEffort: "已儲存的強度未在此模型的清單中，請重新選擇。",
       effortHelp: "思考強度越高，通常需要更多時間與帳號用量。",
       webAccess: "允許 Agent 上網搜尋與讀取網頁",
-      webPages: "允許 AI 讀取網頁",
+      webPages: "允許 Agent 讀取網頁",
       antigravityWeb: "Antigravity 的網路搜尋無法關閉，包含專案分析與探索。這個選項只控制是否允許讀取網頁。",
       webAccessHelp:
         "允許任務與追問中的 AI 搜尋及讀取網頁；專案分析與探索不使用這些工具。網頁內容不視為可信指令，終端機網路存取仍受所選權限限制。",
@@ -401,7 +401,7 @@ const m: Translation<typeof en> = {
     noFiles:
       "沒有可讀的貢獻指南、政策或 Pull Request 範本。有些專案把規範放在網站或 wiki 上，發布前請自行確認。",
     couldntCheck: ({ reason }) => `無法確認：${reason}`,
-    notRead: `${product.name} 還沒讀取專案規範。匯入或更新專案時會讀取，你也可以按「再確認一次」。`,
+    notRead: "尚未讀取專案規範。按「再確認一次」即可讀取。",
     filesRead: ({ count }) => `${product.name} 讀過的檔案 · ${n(count)}`,
     orgDefaults: ({ repository }) => `包含 ${repository} 的預設檔案。`,
     unread: ({ part, reason }) => {
@@ -428,7 +428,7 @@ const m: Translation<typeof en> = {
     checking: "正在到 GitHub 確認這個 issue…",
     issue: ({ number }) => `Issue #${number}`,
     sampleIssue: ({ number }) => `#${number}（示範）`,
-    open: "開著",
+    open: "開放中",
     closed: ({ reason }) => (reason ? `已關閉（${reason}）` : "已關閉"),
     closedReasons: {
       COMPLETED: "已完成",
@@ -441,12 +441,12 @@ const m: Translation<typeof en> = {
       bot
         ? `@${author}（機器人）在 ${date} 認領`
         : `@${author} 在 ${date} 認領`,
-    noOtherPr: "沒有其他開著的 PR",
+    noOtherPr: "沒有其他開放中的 PR",
     otherPr: ({ author, number }) => `@${author} 的 PR #${number} 會關閉這個 issue`,
     closedPr: ({ author, number }) => `@${author} 的 PR #${number} 未合併就被關閉`,
     maintainer: ({ quote, date }) => `維護者說：「${quote}」（${date}）`,
     learning: ({ labels }) => `新手標籤：${fmt.list(labels)}`,
-    pacing: ({ open, budget }) => `你在這裡開著的 PR：${n(open)} / ${n(budget)}`,
+    pacing: ({ open, budget }) => `你在這裡開放中的 PR：${n(open)} / ${n(budget)}`,
     pacingHelp: `這個上限是 ${product.name} 的預設值：在一個 repository 第一次被合併前為 1 個，之後為 2 個。`,
     pacingExempt: "你可以寫入這個 repository，所以在這裡發布不受節奏限制",
     doorClosed: "這個 repository 不接受你開的 Pull Request",
@@ -455,7 +455,7 @@ const m: Translation<typeof en> = {
       const what = {
         door: "Pull Request 是否對你開放",
         issue: "這個 issue",
-        pacing: "你在這裡開著的 Pull Request",
+        pacing: "你在這裡開放中的 Pull Request",
         other: "一項 GitHub 資訊",
       }[part];
       return reason ? `無法確認${what}：${reason}` : `無法確認${what}`;

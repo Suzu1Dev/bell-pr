@@ -115,7 +115,7 @@ test("an English render of a finished discovery has no Han", () => {
   assert.doesNotMatch(html, /FIND YOUR NEXT CONTRIBUTION/);
   // Like every page's heading, it can take the focus when the app opens the page.
   assert.match(html, /<h1 tabindex="-1">Find a project /);
-  assert.match(html, /<h2>Where do you want to start\?<\/h2>/);
+  assert.match(html, /<h2>What are you interested in\?<\/h2>/);
   assert.match(html, /placeholder="For example: accessibility, developer tools"/);
   assert.match(html, /<option value="beginner" selected="">Beginner-friendly<\/option>/);
   assert.match(html, /<option value="stars" selected="">Stars<\/option>/);
@@ -141,7 +141,7 @@ test("an English render of a finished discovery has no Han", () => {
   assert.match(html, /<h4>Who does this contribution help\?<\/h4>/);
   assert.match(html, /Evidence and quoted sources · 1/);
   assert.match(html, /The README was shortened\./);
-  assert.match(html, /Choose this opportunity<\/button>/);
+  assert.match(html, /Import project and set up task<\/button>/);
   // The model and usage of the discovery
   assert.match(html, /<summary>Model and usage for this discovery<\/summary>/);
   assert.match(html, /<dd>High<\/dd>/);
@@ -152,7 +152,7 @@ test("English renders of the other discovery states have no Han", () => {
   assert.match(renderEnglish(undefined), /Loading your discovery history…/);
 
   const first = renderEnglish(null);
-  assert.match(first, /No search results yet/);
+  assert.match(first, /Nothing searched yet/);
   assert.doesNotMatch(first, /<span>04<\/span>/);
 
   const nothing = renderEnglish({
@@ -202,7 +202,7 @@ test("a learn-by-hand opportunity is tagged, has no agent-team choice, and keeps
     html,
     /<span class="discovery-learn-tag"><svg[^>]*lucide-hand[\s\S]*?<\/svg>Learn by hand: write this one yourself<\/span><h3>Return focus when the dialog closes<\/h3>/,
   );
-  assert.doesNotMatch(html, /Choose this opportunity/);
+  assert.doesNotMatch(html, /Import project and set up task/);
   assert.match(html, /The issue is labelled for newcomers\. Writing the fix yourself is how you learn the project/);
   // The person can start writing it, with the guide (DESIGN v1.2 F1).
   assert.match(html, /<button type="button" class="button primary"><svg[^>]*lucide-hand[\s\S]*?<\/svg>Start learning by hand<\/button>/);
@@ -222,11 +222,11 @@ test("a learn-by-hand opportunity is tagged, has no agent-team choice, and keeps
   };
   assert.doesNotMatch(renderEnglish(noLink), /Open the issue/);
   // Opportunities without the flag keep their choice.
-  assert.match(renderEnglish(job), /Choose this opportunity<\/button>/);
+  assert.match(renderEnglish(job), /Import project and set up task<\/button>/);
   assert.doesNotMatch(renderEnglish(job), /discovery-learn-tag/);
   const zh = renderZh(createElement(DiscoveryPanel, props(byHand, live)));
   assert.match(zh, /親手學：這一個請自己寫/);
-  assert.doesNotMatch(zh, /選擇此項目/);
+  assert.doesNotMatch(zh, /匯入專案並設定任務/);
 });
 
 test("the sample's learn-by-hand opportunity shows its tag in place of the choice", () => {
@@ -237,7 +237,7 @@ test("the sample's learn-by-hand opportunity shows its tag in place of the choic
   assert.equal(cards.length, sampleJob.opportunities.length);
   sampleJob.opportunities.forEach((item, index) => {
     assert.equal(cards[index].includes("Learn by hand: write this one yourself"), !!item.learnByHand, item.id);
-    assert.equal(cards[index].includes("Choose this opportunity"), !item.learnByHand, item.id);
+    assert.equal(cards[index].includes("Import project and set up task"), !item.learnByHand, item.id);
   });
 });
 
@@ -285,7 +285,7 @@ test("the live form is open from the first render, with no sample and no chip", 
   assert.deepEqual(fieldsets(html), [false, false]);
   assert.doesNotMatch(submit(html), /disabled/);
   assert.doesNotMatch(html, /pro-badge/);
-  assert.match(html, /No search results yet/);
+  assert.match(html, /Nothing searched yet/);
 });
 
 test("while the saved results load, the panel waits and sends nothing", () => {
@@ -301,7 +301,7 @@ test("saved results show with their repository links and can be chosen", () => {
   assert.doesNotMatch(html, /Sample results — not live/);
   assert.match(html, /<a class="discovery-repo-link" href="https:\/\/github\.com\/example\/widgets"/);
   assert.deepEqual(fieldsets(html), [false, false]);
-  assert.match(html, /<button class="button primary">.*?Choose this opportunity<\/button>/);
+  assert.match(html, /<button class="button primary">.*?Import project and set up task<\/button>/);
   // A discovery still running can be stopped, and the form waits for it.
   const running = panel({ ...job, status: "running", phase: "searching", opportunities: [] }, live);
   assert.match(running, /Stop discovery/);
@@ -331,10 +331,10 @@ test("the sample project shows its sample results as ordinary sample data", () =
   const byHand = sample.opportunities.filter((item) => item.learnByHand).length;
   assert.ok(byHand > 0, "the sample has a learn-by-hand opportunity");
   assert.equal(
-    html.match(/<button class="button primary" disabled="">.*?Choose this opportunity<\/button>/g)?.length,
+    html.match(/<button class="button primary" disabled="">.*?Import project and set up task<\/button>/g)?.length,
     sample.opportunities.length - byHand,
   );
-  assert.match(html, /A sample cannot be chosen\. Live discovery finds real projects you can import\./);
+  assert.match(html, /A sample cannot be imported\. Live discovery finds real projects you can import\./);
   // The heading's note describes a live search, not one the reader ran.
   assert.match(html, /A live search takes 12 candidates in the order you choose/);
   assert.doesNotMatch(html, /order you chose/);

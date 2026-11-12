@@ -239,7 +239,7 @@ test("task ids are normalised before validation and format problems name the fie
         makePlan([{ id: "a", files: ["a.ts"], dependsOn: ["Missing Task"] }]),
         2,
       ),
-    /依賴/,
+    /相依/,
   );
   for (const reserved of ["LEAD", "Member 1", "User"])
     assert.throws(
@@ -314,15 +314,15 @@ test("lead plan problems and member reports are worded in the locale in effect",
   for (const [value, expected] of [
     [
       JSON.parse(makePlan([{ id: "a", files: ["a.ts"], dependsOn: ["a"] }])),
-      "The lead's plan has an invalid task dependency.",
+      "The lead's plan has an invalid task dependency; adjust the request and try again.",
     ],
     [
       JSON.parse(makePlan([{ id: "lead", files: ["a.ts"] }])),
-      "The lead's plan has duplicate or reserved task IDs.",
+      "The lead's plan has duplicate or reserved task IDs; adjust the request and try again.",
     ],
     [
       JSON.parse(makePlan([{ id: "a", files: ["src/*"] }])),
-      "The lead's plan has an invalid file scope: src/*",
+      "The lead's plan has an invalid file scope (src/*); adjust the request and try again.",
     ],
     [
       JSON.parse(
@@ -331,7 +331,7 @@ test("lead plan problems and member reports are worded in the locale in effect",
           { id: "b", files: ["b.ts"], dependsOn: ["a"] },
         ]),
       ),
-      "The lead's plan has a dependency cycle.",
+      "The lead's plan has tasks that depend on each other in a circle; adjust the request and try again.",
     ],
   ] as const)
     assert.equal(englishProblem(value), expected);
@@ -394,7 +394,7 @@ test("team plans validate DAGs, concrete scopes, and preserve literal bracket fi
         makePlan([{ id: "a", files: ["a.ts"], dependsOn: ["missing"] }]),
         2,
       ),
-    /依賴/,
+    /相依/,
   );
   for (const invalid of [
     "../outside",
@@ -1311,7 +1311,7 @@ test("retrying a failed run reruns only the failed task with the previous error 
     assert.deepEqual((await readDiff(run)).map((file) => file.path), ["a.ts"]);
     await assert.rejects(
       f.workbench.sendTeamMessage(run.id, { to: "beta", content: "hi" }),
-      /已停止工作/,
+      /已停止處理/,
     );
 
     // Commands observed in the discarded attempt are not evidence for the retry.

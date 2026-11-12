@@ -15,7 +15,7 @@ const m: Translation<typeof en> = {
     codexFix: "或登入 Codex，並在「設定 → 模型」選用它",
     allowFix: `或在「設定 → Agent 安全」允許不使用沙箱的 Agent，或用這個變數啟動 ${product.name}（Agent 會以你的完整使用者權限執行）`,
     antigravityUnavailable: `會修改檔案與執行指令的 Antigravity Agent 需要 Antigravity CLI 的終端機沙箱，但這台電腦無法使用（Linux 需要 user namespace；macOS 需要 sandbox-exec）。請在「設定 → 模型」改選 Claude Code 或 Codex，或在「設定 → Agent 安全」允許不使用沙箱的 Agent。`,
-    antigravityRestricted: `會修改檔案與執行指令的 Antigravity Agent 需要 Antigravity CLI 的終端機沙箱，但這個 Linux 系統不允許程式建立 user namespace（kernel.apparmor_restrict_unprivileged_userns，Ubuntu 24.04 起的預設）。docs/troubleshooting.md 說明如何允許它。否則請在「設定 → 模型」改選 Claude Code 或 Codex，或在「設定 → Agent 安全」允許不使用沙箱的 Agent。`,
+    antigravityRestricted: `會修改檔案與執行指令的 Antigravity Agent 需要 Antigravity CLI 的終端機沙箱，但它在這裡無法啟動：這個 Linux 系統不允許程式建立 user namespace（kernel.apparmor_restrict_unprivileged_userns，Ubuntu 24.04 起的預設）。請依 docs/troubleshooting.md 的說明允許 user namespace，或在「設定 → Agent 安全」允許不使用沙箱的 Agent。在「設定 → 模型」改選 Claude Code 或 Codex 不一定有用：它們的沙箱可能也需要同一項 Ubuntu 設定。`,
     claudeFix: "或登入 Claude Code，並在「設定 → 模型」選用它",
     antigravityWorkspaceConfig: ({ paths }) =>
       `這個專案含有 Antigravity 自訂設定（${list(paths)}）。Antigravity CLI 會為每個 Agent 載入它們，其中的 hooks 與 MCP 伺服器在任何沙箱之外執行，因此 ${product.name} 不會在其中啟動 Antigravity。要處理這個專案，請在「設定 → 模型」改選 Claude Code 或 Codex。`,

@@ -22,7 +22,7 @@ export default {
     /** An Antigravity write agent whose terminal sandbox cannot start (503). */
     antigravityUnavailable: `Antigravity agents that edit files and run commands need the Antigravity CLI's terminal sandbox, which is not available on this computer (on Linux it needs user namespaces; on macOS, sandbox-exec). Choose Claude Code or Codex under Settings → Models, or allow unsandboxed agents under Settings → Agent safety.`,
     /** Linux withholds user namespaces from the Antigravity CLI (Ubuntu 24.04 and later by default). */
-    antigravityRestricted: `Antigravity agents that edit files and run commands need the Antigravity CLI's terminal sandbox, and this Linux system does not let programs create user namespaces (kernel.apparmor_restrict_unprivileged_userns, the Ubuntu default since 24.04). docs/troubleshooting.md explains how to allow it. Otherwise choose Claude Code or Codex under Settings → Models, or allow unsandboxed agents under Settings → Agent safety.`,
+    antigravityRestricted: `Antigravity agents that edit files and run commands need the Antigravity CLI's terminal sandbox. It cannot start here, because this Linux system does not let programs create user namespaces (kernel.apparmor_restrict_unprivileged_userns, the Ubuntu default since 24.04). To fix it, allow user namespaces as docs/troubleshooting.md explains, or allow unsandboxed agents under Settings → Agent safety. Choosing Claude Code or Codex under Settings → Models may not help: their sandboxes can need the same Ubuntu setting.`,
     claudeFix:
       "Or sign in to Claude Code and choose it as the provider under Settings → Models",
     /** The working directory holds customizations the Antigravity CLI would load (422). */

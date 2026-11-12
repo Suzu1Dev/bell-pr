@@ -19,7 +19,7 @@ const flow = {
   /** Draft preparation in a Learn-by-hand run (DESIGN v1.2 F11). */
   draftRefused: `In Learn by hand, the pull request text is yours; ${product.name} doesn't draft it.`,
   /** Ready for review with a change that moved since the dialog opened. */
-  changed: "The change moved since you opened this. Look at it again, then mark it ready.",
+  changed: "The change was updated after you opened this. Look at it again, then mark it ready for review.",
   /** The log line after the orientation turn. */
   guideRead: "The guide read the project. Write the steps of your own plan first.",
   /** Saving the plan once the change is marked ready, approved or published. */

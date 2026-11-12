@@ -307,7 +307,8 @@ test("the English board renders every phase without Han", () => {
   );
   assert.match(integrating, /The lead is integrating/);
   assert.match(integrating, /Plan runs automatically/);
-  assert.match(integrating, /Codex · BELL PR team engine/);
+  assert.match(integrating, /<h2>Agent team<\/h2>/);
+  assert.match(integrating, /<span>Codex<small>/);
 });
 
 test("English plan revisions and retries use whole sentences with English plurals", () => {
@@ -819,7 +820,7 @@ test("a learn-by-hand run plans with the guide instead of approving a team plan,
   // The premise check shows once, first in the plan panel (loading here), not on the board too.
   assert.doesNotMatch(planning, /Retries never stop\./);
   // No agent team here: no team header, flow, task lanes or team conversation, only the plan and the run's details.
-  assert.doesNotMatch(planning, /Shared tasks and team messages|Build together|Teammates work in parallel|team-kanban|Team conversation|Team message/);
+  assert.doesNotMatch(planning, /Shared tasks and team messages|<h2>Agent team<\/h2>|Teammates work in parallel|team-kanban|Team conversation|Team message/);
   assert.match(planning, /Run details/);
   // The plan panel loads with the byhand chunk; no team approval or "send back".
   assert.match(planning, /<svg[^>]*lucide-loader-circle[^>]*spin/);

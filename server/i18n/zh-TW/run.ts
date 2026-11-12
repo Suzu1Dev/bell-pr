@@ -51,7 +51,7 @@ const m: Translation<typeof en> = {
       "尚未安裝 Antigravity CLI（agy）。請先安裝，再在終端機執行一次 agy 完成登入。",
     antigravitySignedOut: "Antigravity CLI 尚未登入。請先在終端機執行 agy 並登入。",
     full: ({ max }) => `最多可同時排入 ${max} 個工作；請等待現有工作完成。`,
-    teamStopped: "團隊已停止工作，請使用程式碼追問功能。",
+    teamStopped: "團隊已停止處理這個任務；程式碼的問題請改到「追問 Agent」分頁詢問。",
     noPlanToApprove: "目前沒有等待核准的團隊計畫。",
     planApproved: "已核准任務分工與檔案範圍，團隊進入開發佇列。",
     feedbackLength: "退回意見必須介於 1 至 4000 字。",
@@ -89,7 +89,9 @@ const m: Translation<typeof en> = {
     turnLimit:
       "已達每個任務 3 回合上限；尚未送達的訊息保留在團隊收件匣，交由 Lead 在整合時檢視。",
     taskIntegrated: ({ title, files }) =>
-      `${title} 完成，${files.length} 個檔案通過範圍檢查並整合${files.length ? `：${list(files)}` : ""}。`,
+      files.length
+        ? `${title} 完成，${files.length} 個檔案通過範圍檢查並整合：${list(files)}。`
+        : `${title} 完成，沒有需要整合的檔案變更。`,
     checkoutRemoved: ({ owner }) =>
       `整合後的差異已在本次工作的 worktree，${owner} 的獨立 checkout 已不需保留，已移除。`,
     checkoutNotRemoved: ({ task, reason }) =>
@@ -254,10 +256,11 @@ const m: Translation<typeof en> = {
     notJson: "Lead 未回傳有效的任務計畫 JSON，請調整需求後重試。",
     invalid: ({ problem }) =>
       `Lead 回傳的計畫不符合格式（${problem}）；請調整需求後重試。`,
-    duplicateIds: "Lead 計畫包含重複或保留的任務 ID。",
-    invalidDependency: "Lead 計畫包含無效的任務依賴。",
-    invalidScope: ({ scope }) => `Lead 計畫的檔案範圍無效：${scope}`,
-    cycle: "Lead 計畫的任務依賴形成循環。",
+    duplicateIds: "Lead 計畫包含重複或保留的子任務 ID；請調整需求後重試。",
+    invalidDependency: "Lead 計畫包含無效的子任務相依關係；請調整需求後重試。",
+    invalidScope: ({ scope }) =>
+      `Lead 計畫的檔案範圍無效（${scope}）；請調整需求後重試。`,
+    cycle: "Lead 計畫的子任務彼此相依、形成循環；請調整需求後重試。",
   },
   report: {
     member: ({ summary, checks, limitations, tradeoffs }) =>
@@ -363,7 +366,7 @@ const m: Translation<typeof en> = {
   followUp: {
     inProgress: "這個工作已有一輪修正在進行。",
     busy: "這個工作已有一輪修正或審查在進行。",
-    notPublished: "只有已送出 PR 的工作可以依 review 繼續修正。",
+    notPublished: "只有已發布 PR 的任務可以開始一輪修正。",
     feedbackNotInLatest:
       "選取的回饋不在最近一次讀取的結果中；請重新讀取回饋後再選。",
     inputRequired: "請至少選一則回饋，或寫下這輪要修正的內容。",
@@ -510,14 +513,14 @@ const m: Translation<typeof en> = {
       `先前發佈已推送到 GitHub 分支 ${branch}，推送後不能改分支，以免重複建立 PR。請還原分支名稱，或建立新工作。`,
     fileChanged: "檔案差異已更新；請重新載入並審閱最新內容，再標記為已審閱。",
     draftChanged: "PR 草稿已更新；請重新載入並確認最新標題與內容，再重新核准。",
-    reviewAllFirst: "請先審閱所有最新差異，並移除被擋下的檔案。",
+    reviewAllFirst: "請先審閱每個變更檔案的最新版本、標記為已審閱，並移除被擋下的檔案。",
     prTextRequired: "請先填寫 PR 標題與內容。",
     roundMessageRequired: "請填好這輪修正的提交訊息，不要留下待填寫的內容。",
     approvalStale: "核准版本已更新或失效；請重新載入、審閱並核准，再送出 PR。",
     approveFirst: "請先完成審閱並核准 PR。",
     noGithubOrigin: "此 Repository 尚未連結 GitHub origin，無法發佈。",
-    diffChanged: "差異已變更，請重新審閱與核准。",
-    notAllReviewed: "最新差異尚未全部審閱。",
+    diffChanged: "變更內容和你核准時不同，請重新審閱與核准。",
+    notAllReviewed: "請先審閱每個變更檔案的最新版本、標記為已審閱，並移除被擋下的檔案。",
     understandingRequired:
       "核准或發布前，請先用自己的話講一遍：完成最新版本變更的理解檢查。你可以在「設定 → 學習」關閉這項檢查；未經檢查就核准的工作會被標記。",
     prAlreadySent:

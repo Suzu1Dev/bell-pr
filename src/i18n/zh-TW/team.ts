@@ -10,11 +10,11 @@ const m: Translation<typeof en> = {
   },
   boardLabel: "共享任務與團隊訊息",
   eyebrow: "SHARED TASKS · INDEPENDENT CONTEXTS",
-  title: "一起開發，有分工也有對話。",
+  title: "AI 團隊分工",
   intro: "Lead 拆解與整合，每位 teammate 有自己的工作目錄與上下文。",
   runtime: {
     demo: "團隊協作示範",
-    engine: ({ provider }) => `${provider} · ${product.name} 協作引擎`,
+    engine: ({ provider }) => provider,
     capacity: ({ count }) => `最多 ${count} 位成員同時工作`,
   },
   flow: {
@@ -126,7 +126,7 @@ const m: Translation<typeof en> = {
     closedRecipient: ({ name }) => `${name}（已停止收件）`,
     messageLabel: "團隊訊息",
     messagesLabel: "團隊訊息列表",
-    finishedPlaceholder: "此團隊已結束，可在程式碼閱讀區追問。",
+    finishedPlaceholder: "此團隊已結束，請到「程式碼變更」分頁追問。",
     placeholder: "例如：請保留目前的 API 相容性…",
     demoHint: "示範訊息僅保留在畫面",
     hint: "傳送會留存在任務記錄",
@@ -148,7 +148,7 @@ const m: Translation<typeof en> = {
     reportedBy: ({ names }) => `回報者：${names}`,
     round: ({ number }) => `修正第 ${number} 輪`,
     agent: ({ name, id }) => `${name}（${id}）`,
-    handOffAction: "讓 Agent 自動處理這些環境",
+    handOffAction: "讓 Agent 準備這些環境",
     handOffNote:
       "這個工作使用完整權限：Agent 可以在沒有沙箱的情況下用你的帳號安裝你選擇的項目，再重跑因此受阻的檢查。開始前你會先確認要交出的指令。",
     handOffUnsafe: `這個指令會下載後執行或串接其他指令，或以 pipe 交給 shell 或其他直譯器，${product.name} 不會把它交給 Agent；請自行確認後執行。`,

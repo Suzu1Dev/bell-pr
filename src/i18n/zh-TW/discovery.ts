@@ -16,11 +16,11 @@ const m: Translation<typeof en> = {
   },
   heroCaption: "GitHub → 你的下一步",
   form: {
-    heading: "你想從哪裡開始？",
-    hint: "留白也可以，我們先幫你找方向",
+    heading: "你對什麼有興趣？",
+    hint: "興趣與程式語言可以留白。",
     interests: "感興趣的領域",
     interestsPlaceholder: "例如：accessibility、developer tools",
-    interestsHint: "以 GitHub 關鍵字搜尋；多個詞會一起篩選。",
+    interestsHint: "以 GitHub 關鍵字搜尋；填多個詞時，專案必須全部符合。",
     language: "程式語言",
     languagePlaceholder: "不限，例如 TypeScript",
     difficulty: "可接受的難度",
@@ -51,8 +51,8 @@ const m: Translation<typeof en> = {
     },
     accountHint: ({ provider }) =>
       `分析會沿用你的 ${provider} 登入，使用模型用量。模型目錄不代表帳號具有所有模型的使用權限。`,
-    publicDataOnly: "查閱公開資料，選定項目後再開始規劃。",
-    submit: "推薦貢獻項目",
+    publicDataOnly: "只讀取公開資料；選定項目後才開始規劃。",
+    submit: "尋找貢獻項目",
   },
   sorts: {
     updated: "最近更新",
@@ -92,11 +92,11 @@ const m: Translation<typeof en> = {
       },
     },
   },
-  searchedAt: ({ date }) => `查詢時間 ${date ?? "未提供"}`,
+  searchedAt: ({ date }) => (date ? `查詢時間 ${date}` : "未記錄查詢時間"),
   limitations: ({ count }) => `這次搜尋的範圍與限制 · ${fmt.number(count)}`,
   empty: {
     title: "尚未搜尋",
-    body: "在上方設定興趣與條件，再按「推薦貢獻項目」。",
+    body: "在上方設定興趣與條件，再按「尋找貢獻項目」。",
     retryTitle: "換個條件，找找下一個機會。",
     retryBody:
       "目前沒有足夠證據支持適合的項目。試著減少關鍵字、放寬難度，或降低最低星數。",
@@ -129,7 +129,7 @@ const m: Translation<typeof en> = {
   },
   card: {
     languageUnknown: "未標示語言",
-    lastPush: ({ date }) => `最近推送 ${date ?? "未提供"}`,
+    lastPush: ({ date }) => (date ? `最近推送 ${date}` : "最近推送時間不明"),
     whoItHelps: "這次貢獻，可以幫助誰？",
     whyItFits: "為什麼適合投入",
     effort: "預估投入",
@@ -142,9 +142,9 @@ const m: Translation<typeof en> = {
     acceptanceChecks: "如何確認完成（尚未執行）",
     risks: "投入之前，再確認",
     evidence: ({ count }) => `推薦依據與原文 · ${fmt.number(count)} 則`,
-    chooseHint: "選擇後匯入專案，帶入可編輯的任務設定。",
-    sampleHint: "示範專案無法選擇；即時探索會找到可匯入的真實專案。",
-    choose: "選擇此項目",
+    chooseHint: "會帶入任務設定，可再修改。",
+    sampleHint: "示範專案無法匯入；即時探索會找到可匯入的真實專案。",
+    choose: "匯入專案並設定任務",
     importing: "正在匯入專案…",
     learnByHand: "親手學：這一個請自己寫",
     learnByHandHint:

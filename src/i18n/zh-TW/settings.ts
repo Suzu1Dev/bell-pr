@@ -7,8 +7,7 @@ const fmt = formatters("zh-TW");
 const number = (value: number) => fmt.number(value);
 
 const m: Translation<typeof en> = {
-  eyebrow: "設定",
-  title: "讓工作環境準備就緒。",
+  title: "設定",
   intro: "語言、AI 服務、Agent 安全、學習、上限與資料。這裡的設定都只保留在這台電腦上。",
   nav: { label: "設定分類" },
   sections: {
@@ -137,10 +136,10 @@ const m: Translation<typeof en> = {
       confirmTitle: "不用自己的話講一遍就核准？",
       confirmLost: "你將可以核准一個自己沒有講解過的 pull request。",
       confirmKept:
-        "每個檔案仍須審閱，pull request 仍由你親自核准，專案規則、issue 與發佈節奏的檢查也都照常進行。",
+        "每個檔案仍須審閱，pull request 仍由你親自核准，專案規則、issue 與發布節奏的檢查也都照常進行。",
       confirmRecorded:
         "沒有經過檢查就核准的任務會永久標記為「檢查已關閉」：在工作區、你的學習紀錄與匯出檔中都看得到。",
-      confirmBack: "你隨時可以重新開啟；屆時已核准的任務在發佈前也必須先通過檢查。",
+      confirmBack: "你隨時可以重新開啟；屆時已核准的任務在發布前也必須先通過檢查。",
       keep: "保留檢查",
       turnOff: "關閉檢查",
     },
@@ -222,8 +221,8 @@ const m: Translation<typeof en> = {
       logs: "紀錄",
       runs: "工作的檔案",
       runsHelp: "每個工作的工作副本與 teammates 的 checkout。釋放空間後，工作的紀錄、報告與筆記都會保留。",
-      published: "已發佈的工作",
-      publishedHelp: "已發佈的工作會保留 checkout，因為後續修改回合與同步需要它。不再需要時再釋放。",
+      published: "已發布的工作",
+      publishedHelp: "已發布的工作會保留 checkout，因為後續修改回合與同步需要它。不再需要時再釋放。",
       others: "其他工作",
       noRuns: "沒有任何工作在磁碟上留有檔案。",
       runMeta: ({ status, date }) => `${status} · ${date}`,
@@ -231,15 +230,15 @@ const m: Translation<typeof en> = {
       freeLabel: ({ title }) => `釋放「${title}」的空間`,
       freeing: "釋放中…",
       freed: ({ size }) => `已釋放 ${size}。`,
-      confirmFree: "要釋放這個工作的檔案嗎？之後就無法在這裡審閱或發佈它的變更。",
-      confirmPublished: "要釋放這個已發佈工作的 checkout 嗎？之後它就無法進行後續修改回合與同步。",
+      confirmFree: "要釋放這個工作的檔案嗎？之後就無法在這裡審閱或發布它的變更。",
+      confirmPublished: "要釋放這個已發布工作的 checkout 嗎？之後它就無法進行後續修改回合與同步。",
       outside: "位於資料目錄之外",
       busy: "進行中",
     },
     retention: {
       title: "自動清理",
       label: "保留已停止與失敗工作檔案的天數",
-      help: "1 到 365。已停止或失敗的工作在這麼多天沒有動靜後，工作檔案會被移除；紀錄、報告與筆記會保留。已發佈的工作會一直保留，直到你釋放它。",
+      help: "1 到 365。已停止或失敗的工作在這麼多天沒有動靜後，工作檔案會被移除；紀錄、報告與筆記會保留。已發布的工作會一直保留，直到你釋放它。",
       save: "儲存",
     },
     erase: {

@@ -8,7 +8,7 @@ const m: Translation<typeof en> = {
   title: "學習筆記",
   intro: "每個任務審查時產生的解說都會留在這裡，可以跨任務回顧同一個觀念。",
   aiNote:
-    "這些解說由審查各項變更的 AI agent 產生，可能有誤；採用前請對照程式碼確認。",
+    "這些解說由審查各項變更的 AI Agent 產生，可能有誤；採用前請對照程式碼確認。",
   keyword: "關鍵字",
   keywordPlaceholder: "搜尋觀念、提示、檔案或任務",
   run: "任務",
@@ -26,7 +26,7 @@ const m: Translation<typeof en> = {
   noRealNotes: "尚無真實任務的筆記",
   emptyTitle: "還沒有屬於你的學習筆記",
   emptyBody:
-    "先在「Repositories」頁匯入 repository 並建立任務；進入審查後，每個檔案的解說會自動彙整到這裡。",
+    "先在「專案」頁匯入專案並新增貢獻；進入審查後，每個檔案的解說會自動彙整到這裡。",
   noMatches: "沒有符合篩選條件的筆記。",
   demoTitle: "示範筆記",
   demoTag: "示範",

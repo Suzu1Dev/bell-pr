@@ -530,7 +530,7 @@ test("every explanation state renders English text without Han", () => {
         file: { ...withoutExample, explanationStatus: "failed" },
         onRetryExplanation() {},
       },
-      /example isn&#x27;t ready yet[\s\S]*Prepare the example again/,
+      /example couldn&#x27;t be prepared[\s\S]*Prepare the example again/,
     ],
     [
       {
@@ -549,7 +549,7 @@ test("every explanation state renders English text without Han", () => {
         file: { ...file, explanation: undefined, explanationStatus: "failed" },
         onRetryExplanation() {},
       },
-      /explanation isn&#x27;t ready yet[\s\S]*Prepare the explanation again/,
+      /explanation couldn&#x27;t be prepared[\s\S]*Prepare the explanation again/,
     ],
     [
       { file: { ...file, explanation: undefined, explanationStatus: "generating" } },

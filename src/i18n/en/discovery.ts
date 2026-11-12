@@ -28,8 +28,8 @@ const discovery = {
   },
   heroCaption: "GitHub → your next step",
   form: {
-    heading: "Where do you want to start?",
-    hint: "You can leave everything blank; we'll suggest a direction first.",
+    heading: "What are you interested in?",
+    hint: "Interests and language can be left blank.",
     interests: "Areas of interest",
     interestsPlaceholder: "For example: accessibility, developer tools",
     interestsHint:
@@ -71,7 +71,7 @@ const discovery = {
       `The analysis uses your ${provider} sign-in and counts against your model usage. The catalog lists models that exist; your account may not have access to all of them.`,
     publicDataOnly:
       "Reads public data only. Planning starts after you choose an item.",
-    submit: "Recommend contributions",
+    submit: "Find contributions",
   },
   sorts: {
     updated: "Recently updated",
@@ -120,8 +120,8 @@ const discovery = {
   limitations: ({ count }: { count: number }) =>
     `Scope and limits of this search · ${fmt.number(count)}`,
   empty: {
-    title: "No search results yet",
-    body: "Set your interests above, then choose Recommend contributions.",
+    title: "Nothing searched yet",
+    body: "Set your interests above, then choose Find contributions.",
     /** After a discovery that found nothing suitable. */
     retryTitle: "Change the criteria and look for the next opportunity.",
     retryBody:
@@ -185,11 +185,10 @@ const discovery = {
     risks: "Check before you commit",
     evidence: ({ count }: { count: number }) =>
       `Evidence and quoted sources · ${fmt.number(count)}`,
-    chooseHint:
-      "Choosing it imports the project and fills in contribution settings you can edit.",
+    chooseHint: "The settings are filled in for you and can be edited.",
     sampleHint:
-      "A sample cannot be chosen. Live discovery finds real projects you can import.",
-    choose: "Choose this opportunity",
+      "A sample cannot be imported. Live discovery finds real projects you can import.",
+    choose: "Import project and set up task",
     importing: "Importing the project…",
     /** An opportunity whose issue is labelled for newcomers: practice for the person, not work for the agent team. */
     learnByHand: "Learn by hand: write this one yourself",

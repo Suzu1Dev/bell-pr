@@ -401,7 +401,7 @@ test("the feedback summary formats the time, the checks and the labels for the l
     english,
     /Read at [^<]*2026[^<]* · CI 2 checks: 1 passed, 0 in progress, 1 failed \(overall FAILURE\) · Labels: needs: tests, docs</,
   );
-  assert.match(english, /The PR has a label that starts with “needs:”/);
+  assert.match(english, /A “needs:” label usually means/);
   assert.match(english, /No reviews or comments yet\./);
   assertNoHan(english);
   const chinese = render({ run: withChecks });

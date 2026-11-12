@@ -278,7 +278,7 @@ test("approval requires current per-file reviews and is invalidated by later edi
     );
     await assert.rejects(
       f.workbench.approve(f.run.id, { ...f.run.draft }),
-      /審閱所有/,
+      /審閱每個變更檔案/,
     );
     await f.workbench.review(
       f.run.id,
@@ -919,7 +919,11 @@ test("HTTP errors follow X-Bell-Locale: validation, the guard, the error handler
     );
     assert.deepEqual(
       await errorOf("en", "/api/repos", { headers: { host: "invalid.example:4311" } }),
-      { status: 403, error: "This service address is not allowed." },
+      {
+        status: 403,
+        error:
+          "BELL PR does not accept this address. Use the address it printed at start (`bell-pr open` prints it again), or set BELLPR_PUBLIC_URL to reach it at another address.",
+      },
     );
     assert.deepEqual(
       await errorOf("en", "/api/repos", { headers: { origin: "https://invalid.example" } }),
@@ -946,7 +950,7 @@ test("HTTP errors follow X-Bell-Locale: validation, the guard, the error handler
       body: JSON.stringify({ draft: f.run.draft }),
     }), {
       status: 409,
-      error: "Review every latest change and remove the blocked files first.",
+      error: "Review the latest version of every changed file and mark it as reviewed, and remove the blocked files first.",
     });
     assert.deepEqual(await errorOf("en", `/api/runs/${f.run.id}/publish`, {
       body: JSON.stringify({ fingerprint: "a".repeat(64) }),

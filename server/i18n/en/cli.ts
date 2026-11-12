@@ -16,7 +16,7 @@ export default {
       "Commands:",
       `  start      Start ${name}, or open its running workspace (the default command)`,
       "  open       Print the address of the running server and open it in the browser",
-      "  doctor     Check git, gh and the agent CLIs (--json for machine output)",
+      `  doctor     Check that this computer has what ${name} needs (--json for machine output)`,
       "  token      Replace the API token and sign out paired devices (`token rotate`)",
       "  pair       Make a one-time code to pair a phone or another computer",
       "  devices    List paired devices (`devices list`) or revoke one (`devices revoke <id>`)",
@@ -205,7 +205,7 @@ export default {
     ready: "Group work is set up and ready.",
     /** `reason` is the stable word the server gives, such as sideMissing. */
     stopped: ({ reason }: { reason: string }) =>
-      `Group work has stopped (reason: ${reason}). docs/troubleshooting.md explains each reason. Fix the cause, then restart ${name}.`,
+      `Group work has stopped (reason: ${reason}). Look the reason up under "Group work has stopped" in docs/troubleshooting.md, fix the cause, then restart ${name}.`,
     setUp: `Group work is set up. Invite the first admin with \`${bin} group invite <name> --admin\`.`,
     alreadySetUp: "Group work is already set up.",
     invited: ({

@@ -11,8 +11,7 @@ const fmt = formatters("en");
 const number = (value: number) => fmt.number(value);
 
 const settings = {
-  eyebrow: "SETTINGS",
-  title: "Get your workspace ready.",
+  title: "Settings",
   intro:
     "Language, AI provider, agent safety, learning, limits and data. Everything you set here stays on this computer.",
   nav: { label: "Settings sections" },

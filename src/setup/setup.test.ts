@@ -235,9 +235,9 @@ test("the summary says what a failing optional check blocks, and it is not calle
   };
   const html = renderEn(createElement(SetupChecklist, { report: blocked }));
   assertNoHan(html);
-  assert.match(html, /Ready to start, but 1 item must be fixed before every step works\./);
+  assert.match(html, /You can start\. 1 item needs fixing before every step works\./);
   assert.doesNotMatch(html, /items? worth a look/);
-  assert.match(renderZh(createElement(SetupChecklist, { report: blocked })), /可以開始使用，但還有 1 個項目需要修正，否則有些步驟無法進行。/);
+  assert.match(renderZh(createElement(SetupChecklist, { report: blocked })), /可以開始使用；還有 1 個項目修正後，所有步驟才能進行。/);
 });
 
 test("token permissions that cannot be read are not checked, rather than not used", () => {

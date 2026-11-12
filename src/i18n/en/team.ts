@@ -20,13 +20,12 @@ const team = {
   },
   boardLabel: "Shared tasks and team messages",
   eyebrow: "SHARED TASKS · INDEPENDENT CONTEXTS",
-  title: "Build together, with clear roles and an open conversation.",
+  title: "Agent team",
   intro:
     "The lead splits up and integrates the work; each teammate has its own working directory and context.",
   runtime: {
     demo: "Sample team collaboration",
-    engine: ({ provider }: { provider: string }) =>
-      `${provider} · ${product.name} team engine`,
+    engine: ({ provider }: { provider: string }) => provider,
     capacity: ({ count }: { count: number }) =>
       count === 1
         ? "Up to 1 member works at a time"
@@ -206,7 +205,7 @@ const team = {
     outcomeLine: ({ outcome, time }: { outcome: string; time: string }) => `Agent reports: ${outcome} (${time})`,
     unreportedLine: ({ time }: { time: string }) => `The setup turn at ${time} ended without a result for this item.`,
     resultsTitle: "Setup results (the agent's report)",
-    agentAccount: "The agent's account:",
+    agentAccount: "The agent's note:",
     outcomes: {
       installed: "installed",
       present: "already present",
@@ -232,7 +231,8 @@ const team = {
       review:
         "The agent is told not to change code. A file it does change, such as a lockfile an install step rewrites, loses its review mark, and a change to the files or to the PR draft's Validation and Limitations returns an approved contribution to review.",
       stop: "Follow and stop it on the Collaborate tab. Stopping does not undo what was installed, and an install already started through sudo may finish anyway.",
-      confirm: ({ count }: { count: number }) => `Start the agent (${count})`,
+      confirm: ({ count }: { count: number }) =>
+        `Start the agent (${count === 1 ? "1 command" : `${count} commands`})`,
       starting: "Starting the agent…",
     },
   },

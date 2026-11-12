@@ -346,7 +346,7 @@ test("before a learn-by-hand run's first change, Code changes says the guide rea
   assert.match(reading, /<h3>The guide is reading the code<\/h3>/);
   assert.doesNotMatch(reading, /agent team|once it finishes/);
   const planning = empty("awaiting_plan", false, true);
-  assert.match(planning, /Write your own plan in Agent activity first; then you write the change\./);
+  assert.match(planning, /Write your own plan in “Activity” first; then you write the change\./);
   assert.doesNotMatch(planning, /once it finishes/);
   assert.match(empty("running", true, true, renderZh), /嚮導正在閱讀程式碼/);
   // An agent run's team prepares the changes, as before.

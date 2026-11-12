@@ -16,7 +16,7 @@ const m: Translation<typeof en> = {
     build: { title: "協作開發", description: "Agent team 分工完成" },
     buildByHand: { title: "親手寫", description: "嚮導和你一起規劃、給提示" },
     review: { title: "理解與審查", description: "讀懂它，再用自己的話講一遍" },
-    submit: { title: "送出貢獻", description: "你的下一個 Pull Request" },
+    submit: { title: "送出貢獻", description: "核准後建立 Draft PR" },
   },
   stepTooltip: ({ n, title, description }) => `${n} ${title}：${description}`,
   tabsLabel: "任務內容",
@@ -54,7 +54,7 @@ const m: Translation<typeof en> = {
   holdStop: {
     heading: () => "改到別人佔用的檔案，已停止",
     body:
-      "上一回合改到別人佔用的檔案，改動仍留在工作目錄。你可以還原這些檔案，或等釋出、收回佔用後重新檢查。",
+      "改動仍留在工作目錄。你可以還原這些檔案，或等對方釋出、小組管理員收回佔用後重新檢查。",
     legacyBody:
       "這項工作先前因改到別人佔用的檔案而停止。你可以還原這些檔案，或重新檢查目前的佔用狀態。",
     legacyTaskStopped:
@@ -71,8 +71,10 @@ const m: Translation<typeof en> = {
     recheckingAction: "檢查中…",
     restoreConfirmTitle: "還原被佔用的檔案？",
     restoreConfirmBody: ({ count }) =>
-      `要把這 ${count} 個被佔用的檔案還原回這次工作的基準版本嗎？${count === 1 ? "這個" : "這些"}檔案的改動會移除，其他檔案若有修改會維持原樣。`,
-    restoreConfirmAction: "還原這些檔案",
+      `會把這 ${count} 個被佔用的檔案還原到這次工作的基準版本。${count === 1 ? "這個" : "這些"}檔案的改動會移除，其他檔案的修改維持原樣。`,
+    restoreConfirmLegacyBody:
+      "會把被佔用的檔案還原到這次工作的基準版本。這些檔案的改動會移除，其他檔案的修改維持原樣。",
+    restoreConfirmAction: "還原",
     restoreCancelAction: "取消",
     restoreFailed:
       "無法完成還原，部分檔案可能已還原。請重新整理確認後再試，或在工作目錄手動還原。",
@@ -166,15 +168,12 @@ const m: Translation<typeof en> = {
     closedBookAsk: "不看解說作答中：向 agent 提問要等你關閉檢查後。",
     hideFiles: "收合檔案清單",
     showFiles: "顯示檔案清單",
-    toggleFiles: "切換檔案清單",
     smallerCode: "縮小程式碼字體",
     largerCode: "放大程式碼字體",
     hideExplanation: "收合解說面板",
     showExplanation: "顯示解說面板",
-    toggleExplanation: "切換解說面板",
     exitFocus: "離開專注模式",
     enterFocus: "進入專注模式",
-    focus: "專注閱讀",
     refresh: "重新整理差異",
     toolbar: "Diff 工具",
     viewMode: "Diff 顯示模式",
@@ -331,7 +330,7 @@ const m: Translation<typeof en> = {
       "這輪修正只會在 PR 分支加上一個新的 commit，PR 標題與說明維持原樣。請先在「程式碼變更」審閱這輪改到的檔案，再確認下方的提交訊息。",
     proposalNotice: `下方說明是 ${product.name} 依專案規範產生的建議原文，你還沒有修改。這段文字會原樣送到 GitHub：送出前請用自己的話確認內容，待辦事項留在下方規範區的核對清單，不要寫進說明。`,
     emptyNotice:
-      "還沒有 PR 說明。可以在下方產生並套用建議草稿，或用自己的話寫下改了什麼、為什麼，以及實際執行過哪些檢查。Agent 的完整報告在「審查者怎麼看」。",
+      "還沒有 PR 說明。可以在下方產生並套用建議草稿，或用自己的話寫下改了什麼、為什麼，以及實際執行過哪些檢查。Agent 的完整報告在「程式碼變更」的「審查者怎麼看」。",
     emptyNoticeByHand: `請用自己的話寫下 PR 標題與說明：在親手學中，${product.name} 不會替你起草，而核准需要兩者都填好。`,
     titleLabel: "Pull Request 標題",
     modeLabel: "說明檢視方式",
@@ -349,8 +348,8 @@ const m: Translation<typeof en> = {
     suggestionTitle: "依專案規範建議的提交訊息",
     suggestionNote: "只會填入欄位，簽署仍由你補上。",
     useSuggestion: "採用建議",
-    savedInBrowser: "示範草稿儲存在此瀏覽器",
-    savedLocally: "草稿儲存在本機工作空間",
+    savedInBrowser: "儲存後，示範草稿留在此瀏覽器",
+    savedLocally: "儲存後，草稿留在本機",
     save: "儲存草稿",
   },
   checklist: {
@@ -379,7 +378,7 @@ const m: Translation<typeof en> = {
     samePrHelp: "只加上新的 commit，不會 force push，也不會改 PR 標題與說明。",
     draftPr: "以 Draft PR 送出",
     draftPrHelp:
-      "送出後仍可在 GitHub 繼續編輯；專案的自動檢查對 Draft PR 一樣會執行。",
+      "送出後仍可在 GitHub 繼續編輯；專案的自動檢查通常對 Draft PR 也會執行。",
     understanding: "理解檢查",
     understandingPassed: "已通過：你用自己的話講過一遍",
     understandingRequired: "必做：核准前先用自己的話講一遍",
@@ -401,13 +400,13 @@ const m: Translation<typeof en> = {
       return state ? `${summary}（整體 ${state}）` : summary;
     },
     noChecks: ({ state }) =>
-      state ? `CI 尚無檢查（整體 ${state}）` : "CI 尚無檢查",
+      state ? `CI：尚無檢查（整體 ${state}）` : "CI：尚無檢查",
     labels: ({ labels }) => `標籤：${labels}`,
     needsLabel:
-      "PR 被加上「needs:」開頭的標籤，通常代表專案的自動檢查認為還有項目沒完成；即使 CI 顯示成功也一樣。請看下方機器人的留言，並在 GitHub 上修改說明。",
+      "「needs:」開頭的標籤通常代表專案的自動檢查認為還缺東西，即使 CI 成功也一樣。請看下方機器人的留言，再到 GitHub 修改說明。",
     details: "詳情",
     noItems:
-      "目前還沒有 review 或留言。維護者回應通常需要幾天到幾週；可以先準備回覆思路。",
+      "目前還沒有 review 或留言。維護者回應通常需要幾天到幾週。",
     general: "整體 review 與對話",
     openInChanges: "在程式碼變更開啟",
     include: ({ author, path, line }) =>
@@ -451,11 +450,11 @@ const m: Translation<typeof en> = {
       author: ({ author }) => `Commit 作者：${author}`,
       login: ({ login }) => `以 @${login} 推送`,
     },
-    titlePreview: "會送到 GitHub 的 PR 標題",
+    titlePreview: "PR 標題",
     titlePreviewDemo: "PR 標題",
-    commitPreview: "會送到 GitHub 的提交訊息",
+    commitPreview: "提交訊息",
     commitPreviewDemo: "提交訊息",
-    bodyPreview: "會送到 GitHub 的 PR 說明",
+    bodyPreview: "PR 說明",
     bodyPreviewWords: ({ count }) => `會送到 GitHub 的 PR 說明（約 ${count} 字）`,
     bodyPreviewDemo: "PR 說明預覽",
     bodyPreviewDemoWords: ({ count }) => `PR 說明預覽（約 ${count} 字）`,
@@ -466,7 +465,7 @@ const m: Translation<typeof en> = {
       unknown: "無法確認",
       rules: "專案規範",
       issue: "Issue",
-      pacing: "你在這裡的步調",
+      pacing: "你在這裡的節奏",
       others: "你在這裡的其他貢獻",
       holds: "檔案佔用",
       words: "你的文字與可審閱性",
@@ -475,8 +474,8 @@ const m: Translation<typeof en> = {
     blocked: ({ message }) => `會擋下送出：${message}`,
     checkOff: "理解檢查：已關閉",
     pacing: ({ open, budget, first }) =>
-      `你在這裡開著的 PR：${open} / ${budget}${first ? "（第一次在這裡貢獻）" : ""}`,
-    pacingExempt: "你在這裡開著的 PR：不受步調限制，因為你可以寫入這個 repository",
+      `你在這裡開著的 PR：${open} / ${budget}（${product.name} 預設值${first ? "；第一次在這裡貢獻" : ""}）`,
+    pacingExempt: "你在這裡開著的 PR：不受節奏限制，因為你可以寫入這個 repository",
     factsLoading: "正在讀取 GitHub 資訊…",
     couldntCheck: ({ reason }) => `無法確認：${reason}`,
     factsMissing: "這個版本還無法讀取 GitHub 資訊",

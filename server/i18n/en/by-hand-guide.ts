@@ -31,7 +31,7 @@ const guide = {
     `The guide has no more hints for this step in this run: the project's text it is fitted to doesn't name ${kind}. Try an exit instead: ask a human, make this step smaller, or talk it through.`,
   /** No rung left on the step: the last one was given. */
   lastRungGiven:
-    "There is no hint after an example in this project. Try an exit instead: ask a human, make this step smaller, or talk it through.",
+    '"An example in this project" is the last hint. Try an exit instead: ask a human, make this step smaller, or talk it through.',
   /** An answer BELL removed every part of, with no place left to point to. */
   nothingLeft: `${product.name} removed code from this answer and nothing else was left. Ask again in other words, or ask for the next hint.`,
   /** The run log's line for a command an agent ran in a Learn-by-hand run, unless it is a plain read. */

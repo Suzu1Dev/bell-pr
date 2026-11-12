@@ -21,7 +21,7 @@ const m: Translation<typeof en> = {
   runStatus: {
     queued: "等待執行",
     awaiting_plan: "等待確認計畫",
-    running: "開發中",
+    running: "進行中",
     review: "等待你的審查",
     approved: "已確認",
     published: "已送出 PR",

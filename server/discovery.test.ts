@@ -142,7 +142,7 @@ test("discovery results require repository-specific issue and contribution-rule 
       [{ ...candidate, pushedAt: "" }],
       defaultDiscoveryPreferences,
     ).opportunities[0].popularity,
-    /最近推送於 未提供/,
+    /未提供最近推送日期/,
   );
   assert.throws(() =>
     parseDiscoveryResult(

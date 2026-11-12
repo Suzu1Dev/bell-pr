@@ -455,11 +455,11 @@ test("switching to full access requires confirmation and switching back does not
   const actions = dialog.slice(dialog.indexOf("modal-actions"));
   assert.match(
     actions,
-    /<button type="button" class="button secondary">Keep the working directory<\/button><button type="button" class="button primary settings-danger-button">Use Full access<\/button>/,
+    /<button type="button" class="button secondary">Keep working directory only<\/button><button type="button" class="button primary settings-danger-button">Use Full access<\/button>/,
   );
   assert.doesNotMatch(renderEn(props({}, { modelsOnly: true, demo: true })), /role="dialog"/);
   const zh = renderZh(createElement(FullAccessConfirmDialog, { onCancel() {}, onConfirm() {} }));
   assert.match(zh, /要改用完整權限嗎？/);
   assert.match(zh, /「完整權限」預設關閉/);
-  assert.match(zh, /維持工作目錄（預設）/);
+  assert.match(zh, /維持僅限工作目錄/);
 });

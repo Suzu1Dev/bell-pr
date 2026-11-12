@@ -60,7 +60,7 @@ test("the runs list reads in English with no Chinese left", () => {
   assert.match(html, /<small>Interactive demo · /);
   assert.match(html, />New contribution<\/button>/);
   assertNoHan(html);
-  assert.match(renderZh(element), /<small>octo\/widgets · fix\/retry<\/small><\/span><em>開發中<\/em>/);
+  assert.match(renderZh(element), /<small>octo\/widgets · fix\/retry<\/small><\/span><em>進行中<\/em>/);
 });
 
 test("a run of the person's own can free its disk space or be deleted; the sample cannot", () => {

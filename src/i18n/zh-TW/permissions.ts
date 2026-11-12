@@ -4,12 +4,12 @@ import type en from "../en/permissions";
 import { product } from "../../../shared/product";
 const messages: Translation<typeof en> = {
   label: "Agent 權限",
-  workspace: "工作目錄（預設）",
+  workspace: "僅限工作目錄（預設）",
   full: "完整權限",
   fullAccessDisclosure,
   fullConfirmTitle: "要改用完整權限嗎？",
   fullConfirm: "使用完整權限",
-  fullCancel: "維持工作目錄（預設）",
+  fullCancel: "維持僅限工作目錄",
   summary: "完整權限（取消沙箱與指令拒絕規則）",
   workspaceHelp: "Codex 使用工作目錄沙箱。Claude Code 與 Antigravity 保留作業系統沙箱與指令拒絕規則，除非你另外允許在無沙箱時執行。唯讀角色仍維持限制。",
   fullHelp: "可寫入的 Agent 會以你的帳號執行，取消沙箱與指令拒絕規則，可以安裝套件、修改系統設定並使用免密碼 sudo。專案內容可能誘導 Agent，影響整台電腦；只在信任的專案使用。唯讀角色仍維持限制。",

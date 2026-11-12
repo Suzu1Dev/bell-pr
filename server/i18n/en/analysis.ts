@@ -37,7 +37,7 @@ export default {
     duplicateIds: "The AI returned duplicate recommendation ids. Analyze again.",
     repositoryNotFound: "Repository not found.",
     cacheUnreadable:
-      "The project analysis data cannot be read. Check the local insights data file.",
+      "The project analysis data cannot be read. Check the files in the insights folder of the data directory.",
     modelSettingsUnreadable:
       "The model settings cannot be read. Check the local model-settings.json file.",
     analyzeFirst:

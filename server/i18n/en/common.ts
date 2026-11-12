@@ -17,7 +17,7 @@ export default {
   /** An unexpected server error; the details go to the local log only (500). */
   internalError: "The operation did not complete. Check the local service log.",
   /** A Host header that is not one of the trusted addresses (403). */
-  hostNotAllowed: "This service address is not allowed.",
+  hostNotAllowed: `${product.name} does not accept this address. Use the address it printed at start (\`${bin} open\` prints it again), or set BELLPR_PUBLIC_URL to reach it at another address.`,
   /** A request from another origin (403). */
   crossOriginNotAllowed: "Cross-origin requests are not allowed.",
   /** A mutation sent without a JSON body (415). */

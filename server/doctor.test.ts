@@ -924,17 +924,17 @@ test("only Codex installed, with the switch off, asks for Claude Code and does n
   assert.equal(row.reason, "claude-only");
   assert.equal(
     row.detail,
-    "Claude Code only in 1.0.0; Codex support is disabled\nPlease install Claude Code.",
+    "1.0.0 supports Claude Code only; Codex support is disabled.\nInstall Claude Code.",
   );
   assert.equal(row.fixes, undefined);
   assert.equal(check(again, "codex").status, "skip");
   assert.equal(check(again, "codex").reason, "disabled");
   assert.equal(check(again, "codex").required, false);
-  assert.match(formatDoctorReport(again), /Claude Code only in 1\.0\.0; Codex support is disabled\n {4}Please install Claude Code\./);
+  assert.match(formatDoctorReport(again), /1\.0\.0 supports Claude Code only; Codex support is disabled\.\n {4}Install Claude Code\./);
   const zh = await withLocale("zh-TW", () => runDoctor({ force: true, platform: "linux" }));
   assert.equal(
     check(zh, "provider-ready").detail,
-    "1.0.0 只支援 Claude Code；Codex 暫時停用\n請安裝 Claude Code。",
+    "1.0.0 只支援 Claude Code；Codex 已停用。\n請安裝 Claude Code。",
   );
   assert.equal(check(zh, "codex").status, "skip");
 });

@@ -27,7 +27,7 @@ const m: Translation<typeof en> = {
   invalidScope: ({ max }) =>
     `請至少指定一個儲存庫裡的檔案或資料夾，每個路徑最多 ${max} 個字元。有些路徑無法佔用，例如儲存庫以外的路徑或含有特殊字元的路徑。`,
   tooManyScopes: ({ max }) => `一次佔用最多 ${max} 個路徑。`,
-  conflict: "已經有人佔用了會互相衝突的路徑，所以這次沒有佔用任何路徑。",
+  conflict: "已經有人佔用了和你重疊的路徑，所以這次沒有佔用任何路徑。",
   dependencyUnknown: "這項工作相依的任務不在這個儲存庫裡，所以這次沒有佔用任何路徑。",
   dependencyPending: "這項工作相依的任務還沒完成，所以這次沒有佔用任何路徑。",
   tooManyDependencies: ({ max }) => `一項工作最多相依 ${max} 個任務。`,

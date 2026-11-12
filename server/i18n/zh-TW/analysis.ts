@@ -19,7 +19,7 @@ const m: Translation<typeof en> = {
     readingPathTooShort: "AI 分析的建議閱讀順序過短，請重新分析；原有結果已保留。",
     duplicateIds: "AI 建議的識別碼重複，請重新分析。",
     repositoryNotFound: "找不到 Repository。",
-    cacheUnreadable: "專案分析資料無法讀取，請檢查本機 insights 資料檔。",
+    cacheUnreadable: "專案分析資料無法讀取，請檢查資料目錄裡 insights 資料夾的檔案。",
     modelSettingsUnreadable: "模型設定無法讀取，請檢查本機 model-settings.json。",
     analyzeFirst: "請先分析專案，再調整貢獻建議。",
     recommendationsChanged: "部分貢獻建議已更新，請重新整理後再調整。",
@@ -52,7 +52,7 @@ const m: Translation<typeof en> = {
     popularity: ({ stars, forks, pushedAt }) =>
       `GitHub 查詢快照：${stars} stars、${forks} forks，最近推送於 ${pushedAt}。人氣不能保證提案會被接受。`,
     popularityWithoutPush: ({ stars, forks }) =>
-      `GitHub 查詢快照：${stars} stars、${forks} forks，最近推送於 未提供。人氣不能保證提案會被接受。`,
+      `GitHub 查詢快照：${stars} stars、${forks} forks，未提供最近推送日期。人氣不能保證提案會被接受。`,
     skippedDifficulty: ({ count }) => `已略過 ${count} 項超出指定難度的建議。`,
     fileTooLarge: "探索結果檔案過大，無法安全載入。",
     interruptedError:
@@ -200,7 +200,7 @@ const m: Translation<typeof en> = {
     linuxOverridesRules:
       "已有適用的專案規範，不能以 Linux 預設取代，請重新產生。",
     certifiesForPerson:
-      "PR 草稿不能代替使用者簽署、背書或勾選已完成的確認項目。",
+      "PR 草稿不能代替你簽署、背書或勾選確認項目。",
     placeholdersInBody: ({ lines }) =>
       `PR 草稿把待辦事項或未填的範本欄位寫進了會送到 GitHub 的說明（第 ${lines} 行），請重新產生。`,
     provisionalLinuxPolicy:
@@ -242,7 +242,7 @@ const m: Translation<typeof en> = {
       "暫時無法讀取 Codex 模型目錄。請確認 CLI 已安裝並登入，稍後再試。",
     antigravityCatalogUnavailable:
       "暫時無法讀取 Antigravity 模型目錄。請確認 agy CLI 已安裝並登入，稍後再試。",
-    antigravityModel: "由 Antigravity CLI 依你的帳號列出；它提供的思考強度列在思考強度選項中。",
+    antigravityModel: "由 Antigravity CLI 依你的帳號列出；它提供的思考層級會列為思考強度選項。",
     claudeOpus: "適合複雜的程式修改、審查與多步驟推理。",
     claudeSonnet: "速度與能力較平衡，適合日常開發與分析。",
     claudeFable: "能力最強，單次工作可能較久；需方案支援。",

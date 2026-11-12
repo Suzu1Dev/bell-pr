@@ -13,14 +13,14 @@ const repos = {
     discoveryTitle: "Not sure which project to contribute to yet?",
     discoveryText:
       "Let AI find projects on GitHub with real needs that suit your first steps.",
-    discoveryAction: "Recommend contributions",
+    discoveryAction: "Find contributions",
     demoBadge: "Sample project",
     imported: "Imported",
     demoDescription:
       "Try a complete contribution and review with the SDK smart-retry sample.",
     languageFallback: "Git repository",
-    openDemo: "Explore the demo workbench",
-    explore: "Explore the project and directions",
+    openDemo: "Open the sample workbench",
+    explore: "Open project",
     addTitle: "Add your repository",
     addText: "A GitHub link or a local Git project",
     delete: "Delete repository",

@@ -489,7 +489,7 @@ export function ChangesTab({
               {...toolbar.itemProps(0)}
               className="icon-button"
               aria-label={showFiles ? t.hideFiles : t.showFiles}
-              title={t.toggleFiles}
+              title={showFiles ? t.hideFiles : t.showFiles}
               onClick={() => setShowFiles(!showFiles)}
             >
               <PanelLeftClose size={16} />
@@ -519,7 +519,7 @@ export function ChangesTab({
               aria-label={
                 showExplanation ? t.hideExplanation : t.showExplanation
               }
-              title={t.toggleExplanation}
+              title={showExplanation ? t.hideExplanation : t.showExplanation}
               onClick={() => setShowExplanation(!showExplanation)}
             >
               {showExplanation ? (
@@ -532,7 +532,7 @@ export function ChangesTab({
               {...toolbar.itemProps(4)}
               className="icon-button"
               aria-label={focusMode ? t.exitFocus : t.enterFocus}
-              title={t.focus}
+              title={focusMode ? t.exitFocus : t.enterFocus}
               onClick={() => setFocusMode(!focusMode)}
             >
               {focusMode ? (

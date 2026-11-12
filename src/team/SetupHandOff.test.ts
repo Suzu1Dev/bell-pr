@@ -44,7 +44,7 @@ test("a blocked hand-off is a disabled button that says why, in words", () => {
   const html = renderEn(createElement(SetupHandOff, { needs: [need(1)], block: "A turn is already running.", async onStart() {} }));
   assertNoHan(html);
   assert.match(html, /<button type="button" class="button secondary" disabled="" aria-describedby="([^"]+)">.*Let the agent set this up<\/button><p id="\1" class="field-help">A turn is already running\.<\/p>/);
-  assert.match(renderZh(createElement(SetupHandOff, { needs: [need(1)], async onStart() {} })), /讓 Agent 自動處理這些環境/);
+  assert.match(renderZh(createElement(SetupHandOff, { needs: [need(1)], async onStart() {} })), /讓 Agent 準備這些環境/);
 });
 
 test("the dialog lists every command to tick, at most 10, says whether sudo needs a password, and starts only the ticked ones", async () => {
@@ -68,12 +68,12 @@ test("the dialog lists every command to tick, at most 10, says whether sudo need
     const actions = find((element) => element.getAttribute("class") === "modal-actions")[0];
     assert.deepEqual(actions.querySelectorAll((element) => element.nodeName === "BUTTON").map((button) => button.textContent), [
       "Cancel",
-      "Start the agent (10)",
+      "Start the agent (10 commands)",
     ]);
     // Unticking one frees a place; ticking the last command takes it.
     await tick(boxes[0], false);
     await tick(boxes[11], true);
-    const confirm = find((element) => element.nodeName === "BUTTON" && element.textContent === "Start the agent (10)")[0];
+    const confirm = find((element) => element.nodeName === "BUTTON" && element.textContent === "Start the agent (10 commands)")[0];
     await click(confirm);
     await settle();
     assert.deepEqual(started, [[...needs.slice(1, 10).map((entry) => entry.command), "corepack enable"]]);
@@ -146,7 +146,7 @@ test("the sudo line says when sudo needs no password or is missing, and commands
       const boxes = find((element) => element.nodeName === "INPUT");
       await tick(boxes[0], false);
       await tick(boxes[0], true);
-      await click(find((element) => element.nodeName === "BUTTON" && element.textContent === "Start the agent (3)")[0]);
+      await click(find((element) => element.nodeName === "BUTTON" && element.textContent === "Start the agent (3 commands)")[0]);
       await settle();
       assert.deepEqual(started, [needs.map((entry) => entry.command)]);
     } finally {
@@ -168,7 +168,7 @@ test("a command no longer listed is not sent, and the count says so", async () =
     await settle();
     // A poll closed the first item while the dialog was open.
     await view.rerender(createElement(SetupHandOff, { needs: [need(2)], onStart }));
-    await click(find((element) => element.nodeName === "BUTTON" && element.textContent === "Start the agent (1)")[0]);
+    await click(find((element) => element.nodeName === "BUTTON" && element.textContent === "Start the agent (1 command)")[0]);
     await settle();
     assert.deepEqual(started, [[need(2).command]]);
   } finally {

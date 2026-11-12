@@ -11,7 +11,7 @@ interface Held {
 
 const collab = {
   eyebrow: "GROUP WORK",
-  title: "Who holds what?",
+  title: "Who holds which paths?",
   live: "Live",
   polling: "Updating every 10 s",
   reconnecting: "Reconnecting",
@@ -32,8 +32,8 @@ const collab = {
   paths: "Paths",
   onePerLine: "one per line",
   takeHold: "Take hold",
-  pathsHelp: "A folder holds everything inside it. Letter case is ignored.",
-  free: "Nothing in the way, in what BELL checked",
+  pathsHelp: "Holding a folder holds everything inside it. Letter case is ignored.",
+  free: `No one holds these paths, as far as ${product.name} checked`,
   holds: ({ name, paths, title, time }: Held) =>
     `${name} holds ${paths} — ${title}${time ? `, since ${time}` : ""}`,
   youHold: ({ name, paths, title, time }: Held) =>
@@ -68,7 +68,7 @@ const collab = {
   keep: "Keep it",
   nothingHeld: ({ time }: { time: string }) => `Nothing is held, as of ${time}.`,
   honesty:
-    `${product.name} refuses a hold that meets another, publishes no change over someone else's hold, and stops a run whose agent changed a held path; that change stays in the working directory. It cannot stop an editor, a terminal tool or a direct git push.`,
+    `${product.name} refuses a hold that overlaps another, publishes no change to paths someone else holds, and stops a run whose agent changed a held path; that change stays in the working directory. It cannot stop an editor, a terminal tool or a direct git push.`,
   join: {
     title: "Join this group",
     body: "Ask an admin of this group for an invite code. A code works once, for 10 minutes.",

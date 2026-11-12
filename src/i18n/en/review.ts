@@ -201,7 +201,7 @@ const review = {
     exampleBefore: "Before the change",
     exampleAfter: "After the change",
     exampleFailed:
-      "The plain-language example isn't ready yet. You can keep reading the rest of the explanation.",
+      "The plain-language example couldn't be prepared. You can keep reading the rest of the explanation.",
     retryBusy: "Preparing other explanations…",
     retryExample: "Prepare the example again",
     examplePending: "Adding a plain-language example",
@@ -214,11 +214,11 @@ const review = {
       "Sample content isn't live AI output and doesn't represent test results.",
     evidenceLive:
       "The explanation is based on the current diff. Check the source code and tests to confirm the actual behavior.",
-    failedTitle: "This explanation isn't ready yet",
+    failedTitle: "The explanation couldn't be prepared",
     failedBody:
       "Something went wrong while preparing the explanation. You can still review the change as usual.",
     retry: "Prepare the explanation again",
-    failedNote: "It will appear right here when it's done",
+    failedNote: "After you retry, it appears right here",
     generatingTitle: "Turning the change into plain language",
     generatingBody:
       "Comparing against the actual diff to prepare a concrete scenario, the reasons behind the design and what to check while reviewing.",
@@ -410,7 +410,7 @@ const review = {
     /** `paths` lists the sample's files that have one, each shown as code. */
     demoOnly: ({ paths }: { paths: string }) =>
       `The sample has a code walkthrough for ${paths} only; open it from the file list to see one.`,
-    failedTitle: "The code walkthrough isn't finished",
+    failedTitle: "The code walkthrough couldn't be prepared",
     failedBody:
       "Something went wrong while preparing the code walkthrough; the changes can still be reviewed.",
     retry: "Prepare the code walkthrough again",

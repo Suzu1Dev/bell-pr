@@ -57,17 +57,14 @@ const mouseDownSelf = (target: FakeElement) =>
 const button = (view: Awaited<ReturnType<typeof mount>>, label: string) =>
   view.container.querySelectorAll((node) => node.nodeName === "BUTTON" && node.textContent === label)[0]!;
 
-const buttons = (view: Awaited<ReturnType<typeof mount>>, label: string) =>
-  view.container.querySelectorAll((node) => node.nodeName === "BUTTON" && node.textContent === label);
-
 const byClass = (view: Awaited<ReturnType<typeof mount>>, classToken: string) =>
   view.container.querySelectorAll((node) => (node.getAttribute("class") ?? "").split(/\s+/).includes(classToken))[0];
 
 test("the stopped-run card renders Muse's English and Chinese copy with path-only fallbacks", () => {
   const html = renderEn(element());
   assertNoHan(html);
-  assert.match(html, /Stopped because files are held/);
-  assert.match(html, /The last turn changed files someone else holds; edits stay in the working directory\./);
+  assert.match(html, /Stopped: this run changed files someone else holds/);
+  assert.match(html, /The edits are still in the working directory\./);
   assert.match(html, /src\/very\/long\/path\/that\/wraps\.ts \(held by another member\)/);
   assert.match(html, />Put these files back<\/button>/);
   assert.match(html, />Check again<\/button>/);
@@ -157,8 +154,8 @@ test("legacy runs without heldPaths render legacy copy without an empty list, av
   try {
     await click(button(view, "Put these files back"));
     assert.doesNotMatch(view.text(), /0 held files/);
-    assert.match(view.text(), /This run stopped earlier because it changed files someone else held\./);
-    await click(buttons(view, "Put these files back").at(-1)!);
+    assert.match(view.text(), /This puts the held files back to this run's base version\. Their edits are removed; other changed files stay as they are\./);
+    await click(button(view, "Put back"));
     assert.deepEqual(notes, [{ message: "No holds remain on these files. You can continue.", tone: "success" }]);
   } finally {
     await view.unmount();
@@ -197,13 +194,13 @@ test("restore asks for confirmation with TriangleAlert mark, blocks close while 
   try {
     await click(button(view, "Put this file back"));
     assert.match(view.text(), /Put held files back\?/);
-    assert.match(view.text(), /Put 1 held file back to this run's base version\? Edits to that file will be removed, while any other changed files stay as they are\./);
+    assert.match(view.text(), /This puts 1 held file back to this run's base version\. Its edits are removed; other changed files stay as they are\./);
     const modalMarkSvg = byClass(view, "modal-mark")?.querySelectorAll((node) => node.nodeName.toUpperCase() === "SVG")[0];
     assert.ok(modalMarkSvg);
     assert.equal(modalMarkSvg.getAttribute("aria-hidden"), "true");
     assert.match(modalMarkSvg.getAttribute("class") ?? "", /triangle-alert/);
 
-    await click(buttons(view, "Put these files back").at(-1)!);
+    await click(button(view, "Put back"));
     assert.ok(button(view, "Putting back…").hasAttribute("disabled"));
     assert.ok(button(view, "Check again").hasAttribute("disabled"));
     assert.ok(button(view, "Cancel").hasAttribute("disabled"));
@@ -217,7 +214,7 @@ test("restore asks for confirmation with TriangleAlert mark, blocks close while 
     const other = { path: "src/other.ts" } as DiffFile;
     await act(async () => { finish({ restored: 1, files: [other] }); await pending; });
     assert.doesNotMatch(view.text(), /Put held files back\?/);
-    assert.doesNotMatch(view.text(), /Stopped because/);
+    assert.doesNotMatch(view.text(), /Stopped: this run/);
     const heading = view.container.querySelectorAll((node) => node.nodeName === "H1")[0]!;
     assert.equal((globalThis.document as unknown as { activeElement: FakeElement | null }).activeElement, heading);
     assert.deepEqual(notes, [{ message: "1 file restored. Other changes were kept.", tone: "success" }]);
@@ -249,7 +246,7 @@ test("Check again moves focus to .workspace-heading h1 when the stop is cleared"
   const view = await mount(createElement(Page));
   try {
     await click(button(view, "Check again"));
-    assert.doesNotMatch(view.text(), /Stopped because/);
+    assert.doesNotMatch(view.text(), /Stopped: this run/);
     const heading = view.container.querySelectorAll((node) => node.nodeName === "H1")[0]!;
     assert.equal((globalThis.document as unknown as { activeElement: FakeElement | null }).activeElement, heading);
   } finally {
@@ -302,7 +299,7 @@ test("switching runs while restore or recheck is in flight never mutates dialog,
     // 2. Switch back to run-1, start a restore inside the modal, then switch to run-2 and open run-2's modal.
     await view.rerender(renderFor(run));
     await click(button(view, "Put these files back"));
-    await click(buttons(view, "Put these files back").at(-1)!);
+    await click(button(view, "Put back"));
     assert.ok(button(view, "Putting back…").hasAttribute("disabled"));
 
     await view.rerender(renderFor(run2));
@@ -378,7 +375,7 @@ test("409 heldByOther on restore updates conflicts and closes the modal, 409 bus
   try {
     await click(button(view, "Check again"));
     await click(button(view, "Put these files back"));
-    await click(buttons(view, "Put these files back").at(-1)!);
+    await click(button(view, "Put back"));
     // Modal remains open on transient 409 busy so the user can retry or cancel.
     assert.match(view.text(), /Put held files back\?/);
 
@@ -389,7 +386,7 @@ test("409 heldByOther on restore updates conflicts and closes the modal, 409 bus
         held: [{ path: "docs/guide.md", holder: "Dee", title: "Guide work", since: "2026-11-10T09:00:00Z" }],
       },
     });
-    await click(buttons(view, "Put these files back").at(-1)!);
+    await click(button(view, "Put back"));
     // 409 heldByOther closes the modal and shows live holder metadata on the card.
     assert.doesNotMatch(view.text(), /Put held files back\?/);
     assert.match(view.text(), /Held by Dee for “Guide work” · since/);
@@ -397,10 +394,10 @@ test("409 heldByOther on restore updates conflicts and closes the modal, 409 bus
     failWith = new ApiError("Join the group on the Group page first.", { status: 403, details: { reason: "notJoined" } });
     await click(button(view, "Check again"));
     await click(button(view, "Put these files back"));
-    await click(buttons(view, "Put these files back").at(-1)!);
+    await click(button(view, "Put back"));
 
     failWith = new ApiError("Group stopped", { status: 503, details: { reason: "holdsUnknown" } });
-    await click(buttons(view, "Put these files back").at(-1)!);
+    await click(button(view, "Put back"));
     await click(button(view, "Cancel"));
     await click(button(view, "Check again"));
 

@@ -306,7 +306,7 @@ const draft = {
     } satisfies Record<ReviewabilityBand, string>,
     /** The band chip; `band` is one of `bands`. */
     band: ({ band }: { band: string }) => `${band} · ${product.name} default`,
-    bandHelp: `${product.name}'s size bands are defaults after Google's guidance on small changes, not this project's rule: small up to 100 changed lines, medium up to 400, large up to 1,000, very large above 1,000 lines or 20 files. The project's own merged pull requests are the real reference.`,
+    bandHelp: `${product.name}'s size bands are its own defaults, not this project's rule: small up to 100 changed lines, medium up to 400, large up to 1,000, very large above 1,000 lines or 20 files. The 100 and 1,000 marks come from Google's guidance on small changes. This project's own merged pull requests are the real reference.`,
     lines: "Changed lines",
     files: "Files",
     tests: "Test files changed",
@@ -349,7 +349,7 @@ const draft = {
     reasonHint: "3 words or more.",
     save: "Save reasons",
     saving: "Saving…",
-    saved: "Offered for your Testing section",
+    saved: "Saved. Paste this into your PR's Testing section:",
     copy: "Copy for the Testing section",
     saveFailed: ({ reason }: { reason: string }) =>
       `The reasons were not saved: ${reason}`,

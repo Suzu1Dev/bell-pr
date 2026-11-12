@@ -64,7 +64,7 @@ export default {
     full: ({ max }: { max: number }) =>
       `Up to ${max} runs can be queued or in progress at once; wait for one to finish.`,
     teamStopped:
-      "The team has stopped working on this run; ask about the code in the follow-up chat instead.",
+      "The team has stopped working on this run; ask about the code in the Ask tab instead.",
     noPlanToApprove: "No team plan is waiting for approval.",
     planApproved:
       "Approved the task split and file scopes; the team is queued for development.",
@@ -431,11 +431,14 @@ export default {
       "The lead did not return a valid task plan in JSON; adjust the request and try again.",
     invalid: ({ problem }: { problem: string }) =>
       `The lead's plan does not match the required format (${problem}); adjust the request and try again.`,
-    duplicateIds: "The lead's plan has duplicate or reserved task IDs.",
-    invalidDependency: "The lead's plan has an invalid task dependency.",
+    duplicateIds:
+      "The lead's plan has duplicate or reserved task IDs; adjust the request and try again.",
+    invalidDependency:
+      "The lead's plan has an invalid task dependency; adjust the request and try again.",
     invalidScope: ({ scope }: { scope: string }) =>
-      `The lead's plan has an invalid file scope: ${scope}`,
-    cycle: "The lead's plan has a dependency cycle.",
+      `The lead's plan has an invalid file scope (${scope}); adjust the request and try again.`,
+    cycle:
+      "The lead's plan has tasks that depend on each other in a circle; adjust the request and try again.",
   },
   /** A teammate's structured report as the one text the board and the lead read. */
   report: {
@@ -610,7 +613,7 @@ export default {
     inProgress: "A follow-up round is already in progress on this run.",
     busy: "A follow-up round or a review is already in progress on this run.",
     notPublished:
-      "Only a run whose PR has been sent can start a follow-up round from its review.",
+      "Only a run whose PR has been published can start a follow-up round.",
     feedbackNotInLatest:
       "The selected feedback is not in the latest feedback read; read the feedback again, then choose.",
     inputRequired:
@@ -782,7 +785,7 @@ export default {
     holdRecoveryNotAllowed:
       "Held files can only be restored or checked again on a finished run whose pull request has not merged.",
     holdRecoveryBusy:
-      "Work is still running on this contribution. Wait for it to finish before restoring or checking held files.",
+      "Work is still running on this run. Wait for it to finish before restoring or checking held files.",
     holdRecoveryCheckoutMissing:
       "This run's working directory or base commit is unavailable.",
     heldPathsRestored: ({ files }: { files: readonly string[] }) =>
@@ -800,8 +803,8 @@ export default {
       `Can't check file holds because group work has stopped, so nothing was published. Fix group work on the host and restart ${name}, or start ${name} without --group.`,
     recoveryStale: "The unfinished publish changed. Reload before recovering it.",
     recoveryNotAllowed: "Only an unfinished publish with no recorded push target or pull request can be recovered here.",
-    recoveryBusy: "Work is still running for this contribution. Wait for it to finish before recovering the publish.",
-    recoveryCheckout: "The local branch or saved commit does not match this contribution. Recovery stopped without changing the checkout.",
+    recoveryBusy: "Work is still running on this run. Wait for it to finish before recovering the publish.",
+    recoveryCheckout: "The local branch or saved commit does not match this run. Recovery stopped without changing the working directory.",
     recoveryUnknown: "Could not confirm that both GitHub repositories have no matching branch or pull request. Recovery stopped; try again when the repositories can be read.",
     recoveryRemoteBranch: ({ repository, branch }: { repository: string; branch: string }) => `GitHub branch ${repository}:${branch} already exists. The unfinished publish was kept for inspection.`,
     recoveryPrExists: ({ branch }: { branch: string }) => `A pull request already uses branch ${branch}, including closed or merged pull requests. The unfinished publish was kept for inspection.`,
@@ -822,7 +825,7 @@ export default {
     draftChanged:
       "The PR draft changed; reload, check the latest title and description, and approve again.",
     reviewAllFirst:
-      "Review every latest change and remove the blocked files first.",
+      "Review the latest version of every changed file and mark it as reviewed, and remove the blocked files first.",
     prTextRequired: "Fill in the PR title and description first.",
     roundMessageRequired:
       "Write this follow-up round's commit message and leave no placeholders in it.",
@@ -833,7 +836,8 @@ export default {
       "This repository has no GitHub origin, so it cannot be published.",
     diffChanged:
       "The changes differ from what you approved; review and approve them again.",
-    notAllReviewed: "Not every latest change has been reviewed.",
+    notAllReviewed:
+      "Review the latest version of every changed file and mark it as reviewed, and remove the blocked files first.",
     understandingRequired:
       "Explain the change back before you approve or publish: finish the understanding check for the latest version of the changes. You can turn the check off in Settings → Learning; runs approved without it are marked.",
     prAlreadySent:

@@ -229,7 +229,7 @@ test("an attempt is an edit, a BELL test run after the hint, or a new 'what I tr
   await f.ask({ kind: "hint", stepId: "s1", rung: 4 });
   assert.deepEqual(f.run.byHand?.thread?.map((entry) => entry.rung), [1, 2, 3, 4]);
   // No hint past R4: the exits.
-  await assert.rejects(f.ask({ kind: "ask", entry: "change", stepId: "s1", question: "Now what?" }), refused(409, /^There is no hint after an example in this project\./));
+  await assert.rejects(f.ask({ kind: "ask", entry: "change", stepId: "s1", question: "Now what?" }), refused(409, /^"An example in this project" is the last hint\./));
 });
 
 test("one guide turn per run: a second request while one runs is refused, and Stop ends it without changing the run", async (t) => {

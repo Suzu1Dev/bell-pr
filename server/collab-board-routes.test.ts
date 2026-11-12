@@ -324,7 +324,7 @@ test("work: a title and paths become a hold; a held path in the way is refused w
     });
     assert.deepEqual([refused.status, refused.json], [409, {
       reason: "conflict",
-      error: "Someone already holds a path that is in the way. Nothing was held.",
+      error: "Someone already holds a path that overlaps yours. Nothing was held.",
       conflicts: [{ scope: "src/parser", holder: "Ben", title: "Fix the parser", since: held.since }],
     }], scope);
   }
@@ -332,7 +332,7 @@ test("work: a title and paths become a hold; a held path in the way is refused w
     title: "Another",
     scopes: ["docs"],
   });
-  assert.equal(inChinese.json.error, "已經有人佔用了會互相衝突的路徑，所以這次沒有佔用任何路徑。");
+  assert.equal(inChinese.json.error, "已經有人佔用了和你重疊的路徑，所以這次沒有佔用任何路徑。");
   assert.equal(inChinese.json.conflicts[0].scope, "docs/guide.md");
   assert.deepEqual(await f.files(), kept);
 

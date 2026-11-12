@@ -131,8 +131,6 @@ test("settings", async ({ page }) => {
   await sidebar(page)
     .getByRole("button", { name: "連線與設定", exact: true })
     .click();
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText(
-    "讓工作環境準備就緒。",
-  );
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("設定");
   await expectScreen(page, "settings");
 });

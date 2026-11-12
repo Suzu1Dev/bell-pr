@@ -16,7 +16,7 @@ const m: Translation<typeof en> = {
       "指令：",
       `  start      啟動 ${name}，或開啟執行中的工作區（預設指令）`,
       "  open       印出執行中伺服器的位址，並在瀏覽器開啟",
-      "  doctor     檢查 git、gh 與 Agent CLI（加 --json 輸出機器可讀格式）",
+      `  doctor     檢查這台電腦是否具備 ${name} 需要的環境（加 --json 輸出機器可讀格式）`,
       "  token      更換 API 權杖，並登出已配對的裝置（`token rotate`）",
       "  pair       產生一次性配對碼，讓手機或另一台電腦配對",
       "  devices    列出已配對裝置（`devices list`）或撤銷其中一台（`devices revoke <id>`）",
@@ -29,7 +29,7 @@ const m: Translation<typeof en> = {
       "  --host <主機>       監聽的位址（BELLPR_HOST，預設 127.0.0.1）",
       "  --data-dir <目錄>   資料目錄（BELLPR_DATA_DIR，預設 ~/.bellpr）",
       "  --no-open           不開啟瀏覽器（BELLPR_NO_OPEN=1）",
-      "  --force             即使 doctor 尚未就緒也啟動",
+      "  --force             即使 doctor 回報「尚未就緒」也啟動",
       `  --group             開啟小組協作，讓共用這個 ${name} 的人一起使用（BELLPR_GROUP=1）`,
       "  --env-file <檔案>   先從檔案載入 BELLPR_PORT 等設定",
       "",
@@ -156,7 +156,7 @@ const m: Translation<typeof en> = {
     notSetUp: `尚未設定小組協作。請執行 \`${bin} group setup\`。`,
     ready: "小組協作已設定完成，可以使用。",
     stopped: ({ reason }) =>
-      `小組協作已停止（原因：${reason}）。docs/troubleshooting.md 說明每一種原因。請先排除原因，再重新啟動 ${name}。`,
+      `小組協作已停止（原因：${reason}）。請到 docs/troubleshooting.md 的「Group work has stopped」一節查這個原因，排除後再重新啟動 ${name}。`,
     setUp: `小組協作已設定完成。請用 \`${bin} group invite <名稱> --admin\` 邀請第一位管理員。`,
     alreadySetUp: "小組協作先前已設定完成。",
     invited: ({ person, admin, code, expiresAt, minutes }) =>

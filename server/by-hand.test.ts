@@ -445,7 +445,7 @@ test("Ready for review binds the current fingerprint; a stale one and an empty c
   const first = await f.fingerprint(run);
   await assert.rejects(
     en(() => f.workbench.byHand.ready(run.id, { changeFingerprint: "0".repeat(16), review: false })),
-    refused(409, /^The change moved since you opened this/),
+    refused(409, /^The change was updated after you opened this/),
   );
   await en(() => f.workbench.byHand.ready(run.id, { changeFingerprint: first, leastSure: " The retry count. ", review: false }));
   assert.deepEqual({ ...run.byHand!.ready, at: undefined }, { at: undefined, changeFingerprint: first, leastSure: "The retry count.", review: false });

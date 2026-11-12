@@ -111,7 +111,7 @@ test("discovery is an ordinary item, without a badge", () => {
 
 test("the profile shows the GitHub user's initials, and only an icon while presenting", () => {
   assert.match(render(), /<span class="profile-avatar" aria-hidden="true"><svg/);
-  assert.match(render(), /<strong>My workspace<\/strong>/);
+  assert.match(render(), /<strong>我的工作空間<\/strong>/);
   const status = { codex: true, github: true, githubUser: "octo-cat" };
   const html = render({ status });
   assert.match(html, /<span class="profile-avatar" aria-hidden="true">OC<\/span>/);

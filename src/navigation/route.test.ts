@@ -142,9 +142,9 @@ test("serializing writes file before the flags and never a flag named file", () 
 });
 
 const tabTitles = [
-  ["overview", "Overview & motivation"],
+  ["overview", "Overview"],
   ["changes", "Code changes"],
-  ["activity", "Agent activity"],
+  ["activity", "Activity"],
   ["draft", "PR draft"],
 ] as const;
 
@@ -157,11 +157,11 @@ test("titles name the page, then what it shows, then the product", () => {
     );
   assert.equal(
     titleFor({ name: "run", runId: "x" }, en),
-    "Overview & motivation — BELL PR",
+    "Overview — BELL PR",
   );
   assert.equal(
     titleFor({ name: "demo" }, en, { repoName }),
-    `Overview & motivation · ${repoName} — BELL PR`,
+    `Overview · ${repoName} — BELL PR`,
   );
   assert.equal(
     titleFor({ name: "repo", repoId: "demo-repo" }, en, { repoName }),

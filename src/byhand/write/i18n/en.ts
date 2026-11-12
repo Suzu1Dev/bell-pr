@@ -127,7 +127,7 @@ const en = {
     newFiles: ({ n, list }: { n: number; list: string }) => `${name} sees ${count(n, "new file")} your tests wrote: ${list}`,
     output: "Output",
     explain: "Explain this failure",
-    error: `${name} stopped them for too much output, or the command could not start; the run log in Agent activity says which.`,
+    error: `${name} stopped them for too much output, or the command could not start; the run log in “Activity” says which.`,
   },
   live: {
     tail: "Output so far",

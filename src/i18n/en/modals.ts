@@ -21,18 +21,17 @@ const modals = {
     add: "Add a contribution",
     remove: ({ number }: { number: number }) => `Remove contribution ${number}`,
     goesTo: ({ path }: { path: string }) => `Contribution for ${path}`,
-    leaveOut: "Leave out",
+    leaveOut: "Original only",
     titlePlaceholder: "Title of this contribution",
     empty: "No files yet. Move files here from the menu next to each file.",
-    leftOutTitle: "Left out",
-    leftOutHint: "These stay only in the original.",
+    leftOutTitle: "Only in the original",
     blocked: ({ reason }: { reason: string }) => `Held back from review, so it can't move: ${reason}`,
     summary: ({ contributions, leftOut }: { contributions: number; leftOut: number }) =>
-      `${contributions} ${plural(contributions) === "one" ? "contribution" : "contributions"}; ${leftOut} ${plural(leftOut) === "one" ? "file" : "files"} left out.`,
+      `${contributions} ${plural(contributions) === "one" ? "contribution" : "contributions"}; ${leftOut} ${plural(leftOut) === "one" ? "file" : "files"} only in the original.`,
     pathLimit: ({ count }: { count: number }) =>
       `Give each contribution at most ${count} ${plural(count) === "one" ? "file" : "files"}.`,
     suggestionLimit: ({ count }: { count: number }) =>
-      `Only the first ${count} ${plural(count) === "one" ? "part is" : "parts are"} assigned. Place the remaining files or leave them out.`,
+      `Only the first ${count} ${plural(count) === "one" ? "part is" : "parts are"} assigned. Place the remaining files or leave them only in the original.`,
     mixed: ({ paths, issues }: { paths: string[]; issues: string[] }) =>
       `${list(paths)} ${plural(paths.length) === "one" ? "holds" : "hold"} changes for ${list(issues)}. ${product.name} cannot separate changes inside a file: split them by hand, or keep them together.`,
     linked: ({ issues }: { issues: string[] }) =>
@@ -72,9 +71,9 @@ const modals = {
     newContribution: "New contribution",
     freeSpace: "Free disk space",
     freeSpaceLabel: ({ title }: { title: string }) => `Free disk space: ${title}`,
-    freeConfirm: `Remove this contribution's working files: its Git worktree, its teammates' checkouts and its branch in ${product.name}'s own copy of the project? The contribution, its notes and its explanations stay, but its changes can no longer be shown.`,
+    freeConfirm: `Remove this contribution's working files? They are its Git worktree, its teammates' checkouts and its branch in ${product.name}'s own copy of the project. The contribution, its notes and its explanations stay. Its changes can no longer be shown.`,
     /** The same for a published run, whose checkout follow-ups and syncing need. */
-    freeConfirmPublished: `Remove this published contribution's working files: its Git worktree, its teammates' checkouts and its branch in ${product.name}'s own copy of the project? Follow-up rounds and syncing stop working for it. The contribution, its notes and its explanations stay.`,
+    freeConfirmPublished: `Remove this published contribution's working files? They are its Git worktree, its teammates' checkouts and its branch in ${product.name}'s own copy of the project. Follow-up rounds and syncing stop working for it. The contribution, its notes and its explanations stay.`,
     freeYes: "Free disk space",
     /** Marks a run whose working files were removed. */
     filesRemoved: "Files removed",

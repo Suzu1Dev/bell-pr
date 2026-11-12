@@ -124,14 +124,14 @@ test("the provider step picks the only ready provider and lets the person choose
   const providerReady = onlyCodex.checks.find((check) => check.id === "provider-ready")!;
   providerReady.reason = "claude-only";
   providerReady.detail =
-    "Claude Code only in 1.0.0; Codex support is disabled\nPlease install Claude Code.";
+    "1.0.0 supports Claude Code only; Codex support is disabled.\nInstall Claude Code.";
   const blocked = renderEn(welcome("provider", { doctor: doctor(onlyCodex) }));
-  assert.match(blocked, /Claude Code only in 1\.0\.0; Codex support is disabled/);
-  assert.match(blocked, /Please install Claude Code\./);
+  assert.match(blocked, /1\.0\.0 supports Claude Code only; Codex support is disabled\./);
+  assert.match(blocked, /Install Claude Code\./);
   assert.doesNotMatch(blocked, /No provider is ready yet/);
-  providerReady.detail = "1.0.0 只支援 Claude Code；Codex 暫時停用\n請安裝 Claude Code。";
+  providerReady.detail = "1.0.0 只支援 Claude Code；Codex 已停用。\n請安裝 Claude Code。";
   const blockedZh = renderZh(welcome("provider", { doctor: doctor(onlyCodex) }));
-  assert.match(blockedZh, /1\.0\.0 只支援 Claude Code；Codex 暫時停用/);
+  assert.match(blockedZh, /1\.0\.0 只支援 Claude Code；Codex 已停用。/);
   assert.match(blockedZh, /請安裝 Claude Code。/);
   const loading = renderEn(welcome("provider", { doctor: doctor(null) }));
   assert.match(loading, /Checking which providers are ready…/);

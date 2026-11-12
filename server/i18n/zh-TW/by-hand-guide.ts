@@ -15,7 +15,7 @@ const guide: Translation<typeof en> = {
   testsRunning: "你的測試正在跑。等它跑完再問嚮導。",
   noRungLeft: ({ kind }) =>
     `這個工作裡，嚮導對這個步驟已經沒有更多提示了：它所配合的專案文字沒有提到${kind}。請改走其他出口：問人、把這個步驟切小，或說說看。`,
-  lastRungGiven: "「專案裡的例子」之後就沒有提示了。請改走其他出口：問人、把這個步驟切小，或說說看。",
+  lastRungGiven: "「專案裡的例子」是最後一個提示。請改走其他出口：問問專案的人、把這一步拆小，或說說看。",
   nothingLeft: `${product.name} 從這個回答裡移除了程式碼，之後什麼都不剩。請換個說法再問一次，或要下一階提示。`,
   ranCommand: "嚮導執行了一個唯讀指令。",
   removedFromAnswer: `${product.name} 在你看到這個回答之前，從裡面移除了程式碼。`,

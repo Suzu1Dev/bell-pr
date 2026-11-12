@@ -147,7 +147,7 @@ const text = (html: string) => html.replace(/<[^>]+>/g, " ");
 test("the settings page lists its sections, each at its own address, and opens on General", () => {
   const html = renderEn(page(status));
   assertNoHan(withoutOtherLanguages(html));
-  assert.match(html, /<span class="eyebrow">SETTINGS<\/span><h1 tabindex="-1">Get your workspace ready\.<\/h1>/);
+  assert.match(html, /<h1 tabindex="-1">Settings<\/h1>/);
   assert.match(html, /<nav class="settings-nav" aria-label="Settings sections">/);
   const links = [...html.matchAll(/<a href="([^"]+)"[^>]*data-section="(\w+)"/g)].map(
     ([, href, section]) => [href, section],

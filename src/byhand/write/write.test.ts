@@ -323,7 +323,7 @@ test("a test run that did not finish says why it may have stopped, never that th
   const confirmed = { testCommand: { suggestion: "npm test", confirmed: { command: "npm test", confirmedAt: at } } };
   const text = html(guide({ tests: [{ at, command: "npm test", changeFingerprint: fingerprint, outcome: "error", ms: 9 }] }, confirmed));
   assert.ok(text.includes("It did not finish."));
-  assert.ok(text.includes("BELL PR stopped them for too much output, or the command could not start; the run log in Agent activity says which."));
+  assert.ok(text.includes("BELL PR stopped them for too much output, or the command could not start; the run log in “Activity” says which."));
   assert.doesNotMatch(text, /could not run/);
   assert.match(renderZh(guide({ tests: [{ at, command: "npm test", changeFingerprint: fingerprint, outcome: "error", ms: 9 }] }, confirmed)), /結果沒有跑完。/);
 });
