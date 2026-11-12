@@ -631,6 +631,7 @@ test("web access adds Claude Code's WebSearch/WebFetch and Codex live search for
     assert.deepEqual(none, await agentCommand(execution, { cwd: "/work/tree", access: "none" }));
     assert.doesNotMatch(none.args.join(" "), /WebSearch|WebFetch|web_search="live"/);
     assert.equal(execution === codex, none.args.includes('web_search="disabled"'));
+    assert.equal(execution === codex, none.args.includes("features.apps=false"));
   }
 });
 
@@ -1495,5 +1496,7 @@ test("explicit full access affects write turns only and retains isolation from r
   assert.equal(codex.args[codex.args.indexOf("--sandbox") + 1], "danger-full-access");
   // Codex defaults to live search in a full access sandbox; web access off still turns it off.
   assert.ok(codex.args.includes('web_search="disabled"'));
+  // Full access does not bring ChatGPT apps back.
+  assert.ok(codex.args.includes("features.apps=false"));
   assert.ok(codex.args.includes("--ignore-rules"));
 });
