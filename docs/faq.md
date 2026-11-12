@@ -26,7 +26,7 @@ the part that makes you better:
 - **Train your taste.** You choose between the approach the agents took
   and another one, predict what the maintainer will question, and later
   compare that with what the maintainers actually said. What you missed
-  comes back in your practice deck.
+  comes back in **Practice**.
 - **Respect the maintainer's time.** BELL PR quotes the project's own
   rules and checks before you publish that the project takes pull requests
   from you, that the issue is still yours, that the change is reviewable
@@ -135,7 +135,8 @@ it has no model of its own and no BELL PR cloud.
 
 BELL PR uses the sign-in your CLI already has. With the Codex CLI: BELL PR
 uses the Codex CLI you installed and signed in to, and usage counts
-against your own account. With Claude Code: BELL PR uses the Claude Code
+against your own account. With
+[Claude Code](https://code.claude.com/docs/en/setup#authenticate): BELL PR uses the Claude Code
 CLI you installed and signed in to (Claude plan or Anthropic API key), and
 usage counts against your own account. Your provider's prices and usage
 limits apply. Agent teams run several agents at once, which uses your
@@ -148,8 +149,8 @@ shown as unknown.
 
 ### Which models can I use?
 
-The models your CLI offers. Choose the agent, the model and the reasoning
-effort in the model settings; they are shared by every project, and each
+The models your CLI offers. Choose the AI provider, the model and the reasoning
+effort under **Settings → AI provider**; they are shared by every project, and each
 run records the ones it started with. Each model lists the efforts it
 supports, up to xhigh, max and ultra where it has them; leaving the effort
 on "Default" uses the model's own default.
@@ -184,10 +185,17 @@ or paths, excluded commands, plugin language servers; see
 Claude Code is denied the GitHub CLI config files,
 `~/.git-credentials` and credential-store files, `~/.netrc`, and `~/.ssh/`.
 `GH_TOKEN`/`GITHUB_TOKEN` are removed from the agent's environment. Tokens
-in your system keyring are not covered: the agent can still read your GitHub
+in your system keyring
+([where `gh` stores them](https://cli.github.com/manual/gh_auth_login)) are
+not covered: the agent can still read your GitHub
 token via `gh auth token`. Your main protection is a fine-grained token with
-the minimum permissions you need. Claude Code is also denied BELL PR's own
-data outside its checkout. The project's own agent instructions and settings
+the minimum permissions you need.
+[GitHub documents](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens#personal-access-tokens-classic)
+that only classic personal access tokens have write access to public
+repositories that you or your organizations do not own. If publishing fails
+with a fine-grained token, use a classic token.
+Claude Code is also denied BELL PR's own
+data outside its working directory. The project's own agent instructions and settings
 are never loaded. If you allow unsandboxed Claude Code agents, they have your
 full user rights, and those runs are marked. The
 [security model](security-model.md) explains every protection and its limits.
@@ -256,8 +264,8 @@ explanations and need another review.
 ### How do I know what a subtask is waiting for?
 
 Each subtask on the task board names the subtasks it depends on, with their
-current status. **Waiting on dependencies** means at least one of them is not
-integrated yet. **Ready to claim** means all of them are; while the run is
+current status. **Waiting for earlier subtasks** means at least one of them is not
+integrated yet. **Ready to start** means all of them are; while the run is
 going, a teammate takes it once no subtask in progress has the same owner or
 overlapping files and the team has a free place. **Ready after retry** means
 the same, but the run has failed or was cancelled, so nothing starts it until
@@ -276,7 +284,7 @@ edited data file can hold one.
 
 A restart stops the agents. When BELL PR starts again, the run and each
 subtask that was in progress are marked failed, with a note that the service
-restarted; their isolated working directories are kept. Subtasks that have
+restarted; their own working directories are kept. Subtasks that have
 not started and depend on them, directly or through others, are marked
 **Blocked**, as when a subtask fails during the run, and integrated subtasks
 stay integrated. A subtask whose dependencies are all integrated shows
@@ -289,8 +297,8 @@ promise that all of them run.
 ### Can I split a contribution that holds several fixes?
 
 Yes, by file. When the plan has parts that do not depend on one another,
-**Split into contributions** on the Draft tab (beside **Ask how to split it**)
-turns each part into its own contribution, with its own branch, working copy
+**Split into contributions** on the PR draft tab (beside **Ask how to split it**)
+turns each part into its own contribution, with its own branch, working directory
 and pull request draft, all from the same base commit. A part is a group of
 files the plan keeps apart, not always one fix: the plan splits work by file,
 often for speed, so check the grouping. BELL PR joins tasks that cite the same
@@ -308,7 +316,7 @@ check that a part works on its own, so run each part's tests. When a task
 in one part depends on a task in another, publishing that part before the
 other is merged asks you to confirm, so you can publish them in order. The
 split is not offered for the sample run, a Learn by hand run, a published
-run, or a run whose working copy is gone.
+run, or a run whose working directory is gone.
 
 ### What happens when two of my contributions change the same files?
 
@@ -322,8 +330,8 @@ for the overlap it was given on; a run started without plan approval waits
 for it. The publish dialog asks you to confirm the overlap for the files you
 changed (`group-own-overlap`), because whichever is merged second may need
 its conflicts resolved. BELL PR only reads its own records and working
-copies for this, and nothing is saved or sent (a temporary copy of a working
-copy's Git index is deleted right after it is read). The parts of one split
+directories for this, and nothing is saved or sent (a temporary copy of a working
+directory's Git index is deleted right after it is read). The parts of one split
 never count against each other or the original, and an original that was
 split counts only for the files none of its parts holds.
 

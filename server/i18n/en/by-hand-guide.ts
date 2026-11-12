@@ -9,9 +9,7 @@ const guide = {
   /** An answer of another entry that the model said is about the change. */
   aboutYourChange: "This is about your change; use Hint for the next step.",
   /** A hint rung more than one above the highest one given on the step. */
-  rungTooHigh: "Ask for the hints of this step in order, one rung at a time.",
-  /** Shown with every guide answer (DESIGN v1.2 F6). */
-  canBeWrong: "The guide can be wrong. Check its pointers against the code and your tests.",
+  rungTooHigh: "Ask for the hints of this step in order, one at a time.",
   /** A hint, a question or a failure explained outside the review status. */
   notNow: "The guide gives hints and answers questions while you write your change, not while the run plans or publishes.",
   /** Questions on the plan after it was confirmed, or before the guide read the project. */
@@ -31,7 +29,7 @@ const guide = {
     `The guide has no more hints for this step in this run: the project's text it is fitted to doesn't name ${kind}. Try an exit instead: ask a human, make this step smaller, or talk it through.`,
   /** No rung left on the step: the last one was given. */
   lastRungGiven:
-    "There is no hint after an example in this project. Try an exit instead: ask a human, make this step smaller, or talk it through.",
+    '"An example in this project" is the last hint. Try an exit instead: ask a human, make this step smaller, or talk it through.',
   /** An answer BELL removed every part of, with no place left to point to. */
   nothingLeft: `${product.name} removed code from this answer and nothing else was left. Ask again in other words, or ask for the next hint.`,
   /** The run log's line for a command an agent ran in a Learn-by-hand run, unless it is a plain read. */

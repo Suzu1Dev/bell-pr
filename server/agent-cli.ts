@@ -644,8 +644,15 @@ export async function agentCommand(
         : codexSandboxConfig(options.access, options.cwd, held)),
       "-c",
       'approval_policy="never"',
-      // Codex 0.159 `exec` has no --search flag; live search is a config override.
-      ...(web ? ["-c", 'web_search="live"'] : []),
+      // Codex 0.159 `exec` has no --search flag; search is a config override.
+      // Codex searches a cached index by default, so off is stated as well.
+      "-c",
+      web ? 'web_search="live"' : 'web_search="disabled"',
+      // ChatGPT apps (connectors) stay away from agents, as the user's MCP
+      // servers do. With a ChatGPT sign-in they include a web search tool
+      // (`codex_apps`, codex-cli 0.167) that web_search="disabled" leaves on.
+      "-c",
+      "features.apps=false",
       ...(options.skipGitRepoCheck ? ["--skip-git-repo-check"] : []),
       "--json",
       "--color",

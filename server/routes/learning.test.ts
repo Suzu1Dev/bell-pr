@@ -174,7 +174,7 @@ test("feedback tags: published runs only, comments of the latest read only, merg
   assert.equal(unpublished.status, 409);
   assert.equal(
     unpublished.body.error,
-    "Maintainer feedback can be tagged once the pull request is sent and its feedback is read.",
+    "Maintainer feedback can be tagged once the pull request is published and its feedback is read.",
   );
   const unknown = await call("PATCH", `/runs/${run.id}/feedback-tags`, { url: `${prUrl}#discussion_r999`, dimension: "risk" });
   assert.equal(unknown.status, 400);

@@ -229,12 +229,12 @@ test("in a Learn-by-hand run the person's own words and the guide's review are l
   };
   const html = renderEn(element({ run: locked, view: byHand, demo: false }));
   assertNoHan(html);
-  assert.match(html, /Closed book: the guide, the explanations and your notes stay hidden while you answer/);
+  assert.match(html, /Closed book\. Hidden while you answer: the guide, the explanations and your notes\./);
   assert.match(html, /You grade yourself against your own earlier words and the guide&#x27;s review\./);
   assert.match(html, /<strong>Your own words<\/strong><p>Cap the retries at three, in the client\.<\/p><strong>The guide&#x27;s review<\/strong><p>The guide&#x27;s review: retry\.ts:12/);
   // The not-tested question: the last test run speaks for itself, then the guide's review.
   assert.match(html, /<div class="check-reference"><p>Your last test run of this version: npm test \(passed\)\.<\/p><strong>The guide&#x27;s review<\/strong>/);
-  assert.doesNotMatch(html, /AI-written|Test analyst|the agent/);
+  assert.doesNotMatch(html, /AI-written|Test analyst|the Agent/);
   const zh = renderZh(element({ run: locked, view: byHand, demo: false }));
   assert.match(zh, /<strong>你自己的話<\/strong>/);
   assert.match(zh, /<strong>嚮導的審查<\/strong>/);

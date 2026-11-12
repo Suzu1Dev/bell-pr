@@ -526,7 +526,9 @@ export function PublishModal({
           {demo
             ? t.finishDemo
             : busy
-              ? t.sending
+              ? followUp
+                ? t.pushing
+                : t.sending
               : followUp
                 ? t.pushRound
                 : t.submit}
@@ -682,7 +684,7 @@ export function PublishChecks({
 const pullNumber = (url: string) => /\/pull\/(\d+)/.exec(url)?.[1] ?? "?";
 
 /**
- * "Close the loop first", shown when the pacing check says a maintainer is
+ * The "First read …" links, shown when the pacing check says a maintainer is
  * waiting: each pull request GitHub names as waiting on the person (up to
  * 3), as its BELL run whose feedback BELL reads or else as a link to
  * the review on GitHub; without that list, the person's other published

@@ -73,7 +73,7 @@ SSH or headless hosts where you cannot pair in a browser,
 `bell-pr open --print --print-token` is a fallback that prints
 `#bell_token=` as well. The page stores the token and removes it from the
 address bar. The line printed at start does not include the token. Treat
-the `--print-token` address like a password: it is not in the server log
+the `--print-token` address like a password: it is not in the log on the host
 or in `bell-pr doctor --json`.
 
 ## One instance per data directory

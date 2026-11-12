@@ -29,9 +29,9 @@ test("the repository list reads in English with no Chinese left", () => {
   const html = renderEn(element);
   assert.match(html, /<h1 tabindex="-1">Projects<\/h1>/);
   assert.match(html, /<span class="demo-pill">Sample project<\/span>/);
-  assert.match(html, /Explore the demo workbench/);
-  assert.match(html, /Explore the project and directions/);
-  assert.match(html, /<strong>Add your repository<\/strong>/);
+  assert.match(html, /Open the sample workbench/);
+  assert.match(html, /Open project/);
+  assert.match(html, /<strong>Import a project<\/strong>/);
   assertNoHan(html);
   assert.match(renderZh(element), /<span class="demo-pill">示範專案<\/span>/);
 });
@@ -51,7 +51,7 @@ test("an imported repository can be deleted, the sample cannot, and paths mask w
   const html = renderEn(element);
   assert.match(
     html,
-    /<button type="button" class="run-list-action run-list-action-danger" data-repo-delete="repo-1" aria-label="Delete repository: octo\/widgets"><svg[^]*?Delete repository<\/button>/,
+    /<button type="button" class="run-list-action run-list-action-danger" data-repo-delete="repo-1" aria-label="Delete project: octo\/widgets"><svg[^]*?Delete project<\/button>/,
   );
   assert.equal(html.match(/repository-delete/g)?.length, 1);
   // One line that keeps the end of the path; the full (masked) path is its title.
@@ -81,9 +81,9 @@ test("the import dialog reads in English with no Chinese left", () => {
   };
   const html = renderEn(createElement(ImportRepoModal, props));
   assert.match(html, /<h2 id="modal-title">Import a project<\/h2>/);
-  assert.match(html, /<label class="field-label" for="repo-source">Repository source<\/label>/);
+  assert.match(html, /<label class="field-label" for="repo-source">Project source<\/label>/);
   assert.match(html, /placeholder="owner\/repository or https:\/\/github\.com\/owner\/repository"/);
-  assert.match(html, /Local Git projects work too: paste the path, such as ~\/projects\/repository<\/p>/);
+  assert.match(html, /Paste a GitHub link, owner\/repository, or the full path of a local Git project, such as ~\/projects\/repository<\/p>/);
   assert.match(html, />Not now<\/button>/);
   assert.doesNotMatch(html, /lucide-github|Cloning/);
   assertNoHan(html);
@@ -124,7 +124,7 @@ test("one path example for every computer, and the WSL2 hint for Windows browser
   );
   assertNoHan(windows);
   const zh = renderZh(createElement(ImportRepoModal, { ...props, platform: "Win32" }));
-  assert.match(zh, /也支援本機 Git 專案：貼上路徑，例如 ~\/projects\/repository/);
+  assert.match(zh, /貼上 GitHub 連結、owner\/repository，或本機 Git 專案的完整路徑，例如 ~\/projects\/repository/);
   assert.match(zh, /若 BELL PR 在這台電腦的 WSL2 中執行，請使用 Linux 發行版中的路徑/);
 });
 

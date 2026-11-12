@@ -508,6 +508,6 @@ test("the refusal and the dialog's block speak the request's language", async (t
   assert.equal(outcome(reply), "409 heldByOther");
   assert.match(
     reply.json.error,
-    /^這次變更動到別人佔用的檔案，所以沒有發佈。src\/api\/users\.ts：由 Ada 為「Users API」佔用（.+ 起）。請對方釋出，或請小組管理員收回這項佔用。$/,
+    /^這次變更動到別人佔用的檔案，所以沒有發布。src\/api\/users\.ts：由 Ada 為「Users API」佔用（.+ 起）。請對方釋出，或請小組管理員撤銷這項佔用。$/,
   );
 });

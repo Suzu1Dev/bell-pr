@@ -130,6 +130,18 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   product can read the feed yet, because BELL PR has no read-only
   credential to give one. [BELL Suite link](docs/bell-suite.md) has the
   details.
+- **Diagrams in the project analysis and the change explanations.** The
+  analysis also returns its main flow as up to six short steps, and the
+  reading section draws them as a diagram through the modules, under "How
+  the modules fit together", with the flow's prose as its caption; a step
+  whose path is not in the repository is drawn as outside it. Each file's
+  plain-language example also returns its before and after as up to five
+  steps each, drawn in the Before and After boxes with the steps that
+  differ marked by border, icon and text for screen readers. The learning
+  record export lists the same steps. BELL PR draws both from the
+  Agent's short fields with its own HTML and CSS; the Agent writes no
+  drawing. Analyses and explanations saved earlier load as before and show
+  no diagram, and an explanation is not made again for it.
 
 ### Changed
 
@@ -158,9 +170,31 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   it is held back from review, and a draft that holds it cannot be
   published. This applies with or without group work. A longer or shorter
   name that starts with `bpc_` is left as it is.
+- **Shorter, consistent interface text.** Sentences that differed from
+  what BELL PR does are corrected, a fact repeated on the same screen is
+  said once, long notices are split into one fact per sentence, and
+  strings that were never shown are removed. One word now names one thing
+  in both languages: for example "publish" (發布) for sending the PR,
+  "working directory" (工作目錄) for where a run works, "repository" in
+  Chinese text too (no longer 儲存庫), and "Agent" with a capital letter.
+  The roles keep their English names, capitalised in both languages
+  ("the Lead", "Reviewer", "Test analyst"), and Chinese text calls the
+  command deny rules 指令 deny 規則, as the full access notice does. Several buttons and tabs were renamed: "Activity",
+  "Overview", "Explain it back now", "Approve and preview the PR",
+  "Publish Draft PR", "Check again" and "Code changes" among them. Saved
+  runs and stored messages keep the wording they were saved with.
+- **The docs link to the official documentation for outside facts.**
+  Statements about Claude Code, Codex, Antigravity, the GitHub CLI,
+  GitHub tokens, Ubuntu and Docker now link to the vendor's own page that
+  states them, and the docs quote the current interface labels.
 
 ### Fixed
 
+- **Sandbox messages name the real Settings section.** They pointed to
+  "Settings → Models", which does not exist; they now say "Settings → AI
+  provider". When Ubuntu's restriction on user namespaces stops the
+  Antigravity sandbox, the error no longer offers signing in to Claude
+  Code as a fix, because Claude Code's sandbox can need the same setting.
 - **The publish dialog keeps the draft body inside a phone-width column.**
   The body is shown preformatted in the browser's own monospace, which is
   wider than the column with some fonts. The line scrolls inside the
@@ -192,6 +226,19 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   retry" instead of "Ready to claim", since nothing starts it until you
   retry. Long titles and descriptions, even with no space to break at, now
   wrap inside their card.
+- **Codex's web search tool is now off while web access is off.** BELL PR
+  passed Codex a search setting only with web access on. Codex searches a
+  cached index by default, and live in a full access sandbox, so its agents
+  could search the web with the switch off, in project analysis and
+  discovery too (seen with Codex CLI 0.167). Every Codex turn now states
+  the setting: `web_search="live"` with web access on, and
+  `web_search="disabled"` otherwise.
+- **Codex agents no longer get ChatGPT apps (connectors).** With a ChatGPT
+  sign-in, Codex offers its apps to every turn. They include a web search
+  tool that stays available with web search disabled (seen with Codex CLI
+  0.167), and the run log did not record its queries. Every Codex turn now
+  starts with `features.apps=false`, with web access on or off, as BELL PR
+  already keeps your own MCP servers away from agents.
 
 ## [1.1.0] - 2026-11-04
 

@@ -664,7 +664,7 @@ test("a project that asks for an AI trailer gets it on the suggested commit mess
   assert.deepEqual(suggested.sources, ["contributing"]);
   assert.match(
     suggested.rationale,
-    /^CONTRIBUTING\.md asks for Fixes lines\. CONTRIBUTING\.md asks for an AI trailer \(“4\. Disclose AI assistance[^”]+”\), so the message ends with Assisted-by: Claude Code, which names the agent that wrote this change\.$/,
+    /^CONTRIBUTING\.md asks for Fixes lines\. CONTRIBUTING\.md asks for an AI trailer \(“4\. Disclose AI assistance[^”]+”\), so the message ends with Assisted-by: Claude Code, which names the Agent that wrote this change\.$/,
   );
   // Without a message from the model the PR title is the subject, and the rule is the source.
   const made = parse(null, { assistant: "Codex" })!;
@@ -900,7 +900,7 @@ test("shutdown cancels draft generation and waits for temporary workspace cleanu
     await pending;
     assert.equal(f.run.status, "review");
     assert.equal(f.run.draftPreparation?.status, "failed");
-    assert.match(f.run.draftPreparation?.error ?? "", /中斷/);
+    assert.match(f.run.draftPreparation?.error ?? "", /已停止/);
     await assert.rejects(readdir(cwd), /ENOENT/);
     await assert.rejects(f.workbench.prepareDraft(f.run.id), /關閉/);
   } finally {
@@ -1618,7 +1618,7 @@ test("preflight blocks a credential in the PR text and asks to confirm local pat
     "zh-TW",
   );
   assert.deepEqual(zh.map((check) => check.id), ["secret", "local-paths", "workflows", "author-email"]);
-  assert.equal(zh[0].message, "發佈前會擋下常見格式的 token 與私鑰。");
+  assert.equal(zh[0].message, "發布前會擋下常見格式的 token 與私鑰。");
   assert.deepEqual(zh[0].details, ["位於說明"]);
 });
 

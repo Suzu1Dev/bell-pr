@@ -264,7 +264,6 @@ export function SplitModal({ run, files, busy, formError, splitRun, closeModal }
             <section className="split-card is-left-out" aria-label={t.leaveOut}>
               <header className="split-card-head">
                 <h3>{t.leftOutTitle}</h3>
-                <span className="split-hint">{t.leftOutHint}</span>
               </header>
               <ul className="split-members">{leftOut.map(row)}</ul>
             </section>

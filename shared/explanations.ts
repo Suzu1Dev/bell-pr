@@ -1,3 +1,10 @@
+/** A step of the example, drawn as a diagram. */
+export interface ExampleStep {
+  label: string;
+  /** True when this step differs between before and after. */
+  changed: boolean;
+}
+
 /** Structured teaching content, shared by generated and demo explanations. */
 export interface ChangeExplanation {
   summary: string;
@@ -5,7 +12,14 @@ export interface ChangeExplanation {
   concept: string;
   tip: string;
   /** Optional only for explanations saved before examples were introduced. */
-  example?: { scenario: string; before: string; after: string };
+  example?: {
+    scenario: string;
+    before: string;
+    after: string;
+    /** Optional: explanations saved before the diagram have none. */
+    beforeSteps?: ExampleStep[];
+    afterSteps?: ExampleStep[];
+  };
   /**
    * Another viable approach, why it was not taken and when to prefer it.
    * Optional only for explanations saved before this card was introduced;

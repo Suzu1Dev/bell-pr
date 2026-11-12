@@ -127,7 +127,7 @@ test.describe("the sample project", () => {
     const rows = checklist.locator(".draft-checklist-row");
     await expect(rows).toHaveCount(7);
     expect((await rows.locator("strong").allTextContents()).sort()).toEqual(Object.entries(draft.guidance.checklist.rows).filter(([id]) => id !== "understanding").map(([, label]) => label).sort());
-    await expect(checklist.getByRole("button", { name: "Explain the change" })).toBeVisible();
+    await expect(checklist.getByRole("button", { name: "Explain it back" })).toBeVisible();
     await expect(checklist.locator(".draft-checklist-why")).toHaveCount(7);
     // Every row says where it stands; the next test checks which.
     await expect(rows.locator(".draft-checklist-status")).toHaveCount(7);

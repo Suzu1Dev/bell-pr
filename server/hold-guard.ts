@@ -348,9 +348,7 @@ export function holdGuard(host: CollabHost, asker: HoldsAsker) {
         id: "held-changed-upstream",
         kind: "confirm",
         message: m.heldChangedUpstream({ branch: run.baseBranch }),
-        details: changes.map((change) =>
-          m.heldChangedUpstreamItem({ ...change, branch: run.baseBranch }),
-        ),
+        details: changes.map((change) => m.heldChangedUpstreamItem(change)),
       },
     ];
   };

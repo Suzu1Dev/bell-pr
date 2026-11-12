@@ -41,8 +41,43 @@ async function answer(page: Page, question: string, text: string, confidence: st
 /** No serious or critical axe issue (color contrast included) on the page as it is. */
 async function expectAccessible(page: Page, where: string) {
   await page.evaluate(() => document.fonts.ready);
-  // Let transitions (focus rings, chips) settle before colors are read.
-  await page.waitForTimeout(300);
+  // Finite animations (focus rings, chips) only, and only for 5s.
+  const still = await page.evaluate(async () => {
+    const deadline = performance.now() + 5_000;
+    const moving = () =>
+      document
+        .getAnimations()
+        .filter(
+          (animation) =>
+            animation.playState === "running" &&
+            animation.effect?.getComputedTiming().endTime !== Infinity,
+        );
+    const label = (animation: Animation) => {
+      const target = animation.effect instanceof KeyframeEffect ? animation.effect.target : null;
+      const selector =
+        target instanceof Element
+          ? target.tagName.toLowerCase() +
+            (target.id ? `#${target.id}` : "") +
+            [...target.classList].map((name) => `.${name}`).join("")
+          : "";
+      const name =
+        animation instanceof CSSAnimation
+          ? animation.animationName
+          : animation instanceof CSSTransition
+            ? animation.transitionProperty
+            : animation.id;
+      return [selector, name].filter(Boolean).join(" ") || "animation";
+    };
+    for (let running = moving(); running.length > 0; running = moving()) {
+      if (performance.now() >= deadline) return running.map(label);
+      await Promise.race([
+        Promise.allSettled(running.map((animation) => animation.finished)),
+        new Promise((resolve) => setTimeout(resolve, deadline - performance.now())),
+      ]);
+    }
+    return [];
+  });
+  expect(still, `Animations still running after 5s: ${still.join(", ")}`).toEqual([]);
   const { violations } = await new AxeBuilder({ page })
     .options({ rules: { "color-contrast": { enabled: true } } })
     .analyze();
@@ -111,9 +146,8 @@ test("the sample passes with its own answers: a correction, a prediction and the
   await page.goto("/#/runs/demo-run/changes?locale=en");
   await reviewAll(page);
   const footer = page.locator(".review-footer");
-  await expect(footer).toContainText(workspace.footer.allReviewed);
   await expect(page.locator(".review-progress")).toContainText(workspace.changes.allReviewed);
-  const explain = page.getByRole("button", { name: workspace.footer.explainBack });
+  const explain = footer.getByRole("button", { name: workspace.footer.explainBack });
   await expect(explain).toHaveAttribute("title", workspace.footer.needsCheck);
   await explain.click();
 
@@ -205,7 +239,7 @@ test("with the check turned off, the run says so and approval needs the ticks on
     await expect(page.locator("#check-off-help")).toHaveText(workspace.checkOff.tooltipSetting);
     await reviewAll(page);
     await expect(page.locator(".review-footer")).toContainText(workspace.footer.checkOff);
-    await expect(page.locator(".review-progress")).toContainText(workspace.changes.allReviewedDone);
+    await expect(page.locator(".review-progress")).not.toContainText(workspace.changes.allReviewed);
     await page.getByRole("button", { name: workspace.footer.approvePr }).click();
     const dialog = page.getByRole("dialog", { name: workspace.publish.titleDemo });
     await expect(dialog).toContainText(workspace.publish.checkOff);

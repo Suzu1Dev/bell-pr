@@ -22,7 +22,7 @@ import { samplePublishChecks } from "../workspace/respect";
 
 const qemu =
   "Current QEMU project policy is to DECLINE any contributions which are believed to include or derive from AI generated content.";
-const agentCopy = "The project's rules do not accept AI-assisted contributions, and AI agents wrote this change.";
+const agentCopy = "The project's rules do not accept AI-assisted contributions, and AI Agents wrote this change.";
 const byHandCopy = "The project's rules decline AI-generated content. BELL PR's agents had no write access and gave you no code for this change.";
 
 function byHandRun(clean: boolean): Run {

@@ -121,7 +121,7 @@ test("the checklist shows each check with its state, version, detail and the fix
   // A problem keeps its explanation.
   assert.match(html, /data-check="gh-auth".*?<p class="setup-check-detail">Not signed in\.<\/p>/);
   assert.match(html, /data-check="claude-auth".*?<p class="setup-check-detail">Not signed in\.<\/p>/);
-  assert.match(html, />Re-check</);
+  assert.match(html, />Check again</);
   assert.match(html, /Checked at /);
   // Every fix, also on rows that are fine or not used, on request.
   const all = renderEn(createElement(SetupChecklist, { report: notReady, fixes: "all" }));
@@ -235,9 +235,9 @@ test("the summary says what a failing optional check blocks, and it is not calle
   };
   const html = renderEn(createElement(SetupChecklist, { report: blocked }));
   assertNoHan(html);
-  assert.match(html, /Ready to start, but 1 item must be fixed before every step works\./);
+  assert.match(html, /You can start\. 1 item needs fixing before every step works\./);
   assert.doesNotMatch(html, /items? worth a look/);
-  assert.match(renderZh(createElement(SetupChecklist, { report: blocked })), /可以開始使用，但還有 1 個項目需要修正，否則有些步驟無法進行。/);
+  assert.match(renderZh(createElement(SetupChecklist, { report: blocked })), /可以開始使用；還有 1 個項目修正後，所有步驟才能進行。/);
 });
 
 test("token permissions that cannot be read are not checked, rather than not used", () => {
@@ -356,7 +356,6 @@ test("the readiness notice explains the requirement with fixes, and renders noth
   assertNoHan(html);
   assert.match(html, /This needs an AI provider: install and sign in to the Codex CLI, Claude Code or the Antigravity CLI\./);
   assert.match(html, /This needs the GitHub CLI, installed and signed in\./);
-  assert.match(html, /Unavailable until this is fixed\./);
   assert.match(html, /AI provider: Install and sign in to the Codex CLI or Claude Code\./);
   assert.match(html, /<code>npm install -g @openai\/codex<\/code>/);
   assert.match(html, /<code>gh auth login<\/code>/);

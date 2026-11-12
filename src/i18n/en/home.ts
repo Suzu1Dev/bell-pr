@@ -6,10 +6,10 @@ const home = {
     heading: "Start here",
     sample: {
       title: "Try the sample project",
-      text: "Walk through a finished contribution: the project's rules, the agent team's plan, explaining the change back and the pull request draft. No setup needed.",
+      text: "Walk through a finished contribution: the project's rules, the Agent team's plan, explaining the change back and the pull request draft. No setup needed.",
     },
     import: {
-      title: "Import a repository",
+      title: "Import a project",
       text: "Bring a project from GitHub (owner/repo or a link) or a Git folder on this computer.",
     },
     discover: {
