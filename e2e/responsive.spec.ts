@@ -115,9 +115,13 @@ function findSideOverflow(page: Page): Promise<string[]> {
         "a[href], button, input:not([type='hidden']), select, textarea, summary",
       );
     };
-    /** The box itself scrolls sideways and the keyboard can reach it. */
+    /**
+     * The box itself scrolls sideways and the keyboard can move it: the box
+     * is in the tab order, or a roving tab stop inside it is.
+     */
     const scrollsOnPurpose = (element: Element) =>
-      scrollsSideways(getComputedStyle(element)) && keyboardReachable(element);
+      scrollsSideways(getComputedStyle(element)) &&
+      (keyboardReachable(element) || element.querySelector("[tabindex='0']") !== null);
     const counts = (element: Element) =>
       element.matches("button, a[href], input, select, textarea, summary, [role='tab']") ||
       !!element.textContent?.trim();
@@ -132,7 +136,7 @@ function findSideOverflow(page: Page): Promise<string[]> {
     /**
      * The left and right edges that clip `element`: the window's,
      * narrowed by each ancestor that hides its overflow, or that scrolls
-     * sideways without being keyboard-reachable, and holds the element's
+     * sideways without a keyboard stop on it or inside it, and holds the element's
      * box (an absolutely positioned box escapes the static ancestors
      * between it and its containing block, a fixed one all of them).
      * Undefined when an ancestor is meant to scroll sideways on its own.

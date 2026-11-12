@@ -154,7 +154,7 @@ export function DiffView({
     start: number;
     end: number;
   } | null>(null);
-  // The list of lines is one tab stop; the arrow keys move inside it.
+  // The list of lines is one tab stop; up and down move inside it.
   const roving = useRovingList(codeLines.length, { pageSize: linesPerPage });
   const askButton = useRef<HTMLButtonElement>(null);
   const focusAskButton = useRef(false);
@@ -204,7 +204,6 @@ export function DiffView({
   const highlightEnd = highlight?.endLine;
   const scrollPending = useRef(false);
   const codeScroll = useRef<HTMLDivElement>(null);
-  const tabBack = useRef(false);
   const highlighted = (line: DiffLine) =>
     highlightStart !== undefined &&
     highlightEnd !== undefined &&
@@ -330,6 +329,12 @@ export function DiffView({
       if (!selection) return;
       event.preventDefault();
       setSelection(null);
+    } else if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+      // Up and down stay on the lines. Left and right move the code sideways.
+      const box = codeScroll.current;
+      if (!box || box.scrollWidth <= box.clientWidth + 1) return;
+      event.preventDefault();
+      box.scrollLeft += (event.key === "ArrowRight" ? 1 : -1) * (box.clientWidth / 4);
     } else {
       const next = roving.handleKeyDown(event);
       if (next !== undefined && event.shiftKey) {
@@ -595,33 +600,7 @@ export function DiffView({
           <p>{file.blocked || t.diff.noTextBody}</p>
         </div>
       ) : (
-        <div
-          className="rv-code-scroll"
-          ref={codeScroll}
-          role="region"
-          aria-label={t.diff.regionLabel({ path: file.path })}
-          tabIndex={0}
-          onKeyDown={(event) => {
-            tabBack.current = event.key === "Tab" && event.shiftKey;
-          }}
-          onFocus={(event) => {
-            // The lines stay the one tab stop. The scroller is in the tab
-            // order so the sideways overflow can be reached, then focus
-            // moves on: forward to the line the reader left, back to the
-            // control before the code.
-            const back = tabBack.current;
-            tabBack.current = false;
-            if (event.target !== event.currentTarget) return;
-            const box = event.currentTarget;
-            if (back) {
-              const stops = [...document.querySelectorAll<HTMLElement>("a[href], button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), summary, [tabindex='0']")];
-              const index = stops.indexOf(box);
-              stops.slice(0, index).reverse().find((stop) => !box.contains(stop))?.focus();
-              return;
-            }
-            box.querySelector<HTMLElement>('[role="option"][tabindex="0"]')?.focus();
-          }}
-        >
+        <div className="rv-code-scroll" ref={codeScroll}>
           {view === "split" ? (
             <div className="rv-split-content">
               <div className="rv-split-labels">

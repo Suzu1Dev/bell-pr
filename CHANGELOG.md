@@ -164,9 +164,9 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **Sideways overflow on the overview and in the publish dialog.** The
   contribution directions stay a sideways row you can scroll (arrow keys,
   previous and next), and that row no longer pushes its section wider than
-  the page. The run's tabs, the section links, the file list and the diff
-  scroll from the keyboard too: each scroller is named and shows a focus
-  ring. The diff is still one tab stop; focus moves to the line you left.
+  the page. The run's tabs, the section links and the file list scroll
+  from the keyboard: each is named and shows a focus ring. The diff stays
+  one tab stop; the left and right arrow keys scroll its lines sideways.
   The publish description keeps its long lines, scrolls them with the
   arrow keys, and shows a fade on the side that still has more to scroll.
 - **Other requests no longer wait while the server starts Git.** Before each
