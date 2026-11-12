@@ -343,7 +343,8 @@ Full access changes writable roles as described [below](#explicit-full-access).
   `state.json`, the settings and other runs' checkouts there. Read-only
   roles extend `:read-only`, which allows no writes. BELL PR does not pass
   `--sandbox` for that profile. On Codex CLI 0.165, `--sandbox` selects the
-  older sandbox and ignores `default_permissions`, which would drop the read
+  older sandbox and ignores
+  [`default_permissions`](https://learn.chatgpt.com/docs/config-file/config-reference), which would drop the read
   denials below. Explicit full access, described below, is the case that
   passes `--sandbox danger-full-access`.
 - The profile names the same path list as Claude Code
@@ -465,8 +466,8 @@ does not cover Antigravity yet.
   the agent to work alone. A subagent inherits the turn's permission
   rules.
 - **Write roles** run their commands in agy's terminal sandbox
-  (`--sandbox`, `toolPermission: "proceed-in-sandbox"`). Google documents
-  it as user namespaces on Linux and `sandbox-exec` on macOS, with the
+  (`--sandbox`, `toolPermission: "proceed-in-sandbox"`). [Google documents
+  it](https://antigravity.google/docs/sandbox) as user namespaces on Linux and `sandbox-exec` on macOS, with the
   project folder writable, temporary folders and common build caches
   writable, system folders readable, every other path invisible unless a
   rule allows it, and no network. BELL PR allows `read_file` on the

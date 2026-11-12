@@ -308,7 +308,7 @@ then fails in `bell-pr doctor` too.
 An Antigravity agent that edits files and runs commands needs the
 Antigravity CLI's terminal sandbox, and it cannot start here, so the run
 stops before the agent starts (HTTP 503). On Linux that sandbox needs user
-namespaces. Ubuntu 24.04 and later withhold them from programs without an
+namespaces. [Ubuntu 24.04 and later withhold them](https://documentation.ubuntu.com/release-notes/24.04/#unprivileged-user-namespace-restrictions) from programs without an
 AppArmor profile (`kernel.apparmor_restrict_unprivileged_userns = 1`), and
 the Antigravity CLI then reports "Terminal sandbox unavailable" in its own
 log. BELL PR reads the same settings. Pick one:
@@ -327,7 +327,7 @@ log. BELL PR reads the same settings. Pick one:
 Choosing Claude Code or Codex in the model settings may not help: their
 sandboxes can need the same Ubuntu setting. Claude Code documents that
 [Ubuntu's AppArmor restriction can keep its sandbox from starting](https://code.claude.com/docs/en/sandboxing#apparmor-restriction-stops-bubblewrap).
-Codex's sandboxing documentation says that on Ubuntu 24.04 Codex may still
+[Codex's sandboxing documentation](https://learn.chatgpt.com/docs/sandboxing#prerequisites) says that on Ubuntu 24.04 Codex may still
 warn that it cannot create the needed user namespace after bubblewrap is
 installed. The same documentation says that on Ubuntu 25.04 bubblewrap from
 Ubuntu's package repository should work without extra AppArmor setup, and

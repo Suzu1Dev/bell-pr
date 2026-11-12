@@ -133,9 +133,9 @@ against your own account. You can also pass `-e ANTHROPIC_API_KEY` to
 ## Agent sandbox in Docker
 
 Agents run their commands inside an operating-system sandbox: Codex uses
-its own bubblewrap-based sandbox for every agent (read-only or writing),
-and Claude Code uses bubblewrap with socat for agents that write code. Both need to create Linux namespaces, which Docker's default
-seccomp and AppArmor profiles and its masked `/proc` paths forbid.
+[its own bubblewrap-based sandbox](https://learn.chatgpt.com/docs/agent-approvals-security#os-level-sandbox) for every agent (read-only or writing),
+and Claude Code uses bubblewrap with socat for agents that write code. Both need to create Linux namespaces, which Docker's [default
+seccomp](https://docs.docker.com/engine/security/seccomp/#significant-syscalls-blocked-by-the-default-profile) and AppArmor profiles and its masked `/proc` paths forbid.
 
 Probe, run without any model call (Docker Engine 29.7 on an Ubuntu 26.04
 host, Codex CLI 0.159.0, in a fresh container of an image built from 1.0.1):

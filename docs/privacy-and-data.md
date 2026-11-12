@@ -107,7 +107,8 @@ BELL PR runs in:
   [also accepts the older name](https://code.claude.com/docs/en/env-vars),
   and the older name is the one BELL PR passes on.
 
-BELL PR starts each Codex agent with `codex exec --ignore-user-config`, which
+BELL PR starts each Codex agent with
+[`codex exec --ignore-user-config`](https://learn.chatgpt.com/docs/non-interactive-mode), which
 does not load `$CODEX_HOME/config.toml` (sign-in still uses `CODEX_HOME`). This
 keeps your personal Codex settings out of the agents' work, but it also
 means that a setting you made only in that file, such as
