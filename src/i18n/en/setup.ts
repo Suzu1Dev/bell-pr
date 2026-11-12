@@ -10,9 +10,7 @@ const fmt = formatters("en");
 
 export default {
   checklist: {
-    title: "Environment",
-    intro: `What ${product.name} needs on this computer, and how to fix what is missing.`,
-    recheck: "Re-check",
+    recheck: "Check again",
     rechecking: "Checking…",
     checking: "Checking your environment…",
     checkedAt: ({ time }: { time: string }) => `Checked at ${time}`,
@@ -59,8 +57,8 @@ export default {
     /** No required check fails, but others do (for example the Git identity publishing needs). */
     summaryBlocked: ({ count }: { count: number }) =>
       fmt.plural(count) === "one"
-        ? `Ready to start, but ${count} item must be fixed before every step works.`
-        : `Ready to start, but ${count} items must be fixed before every step works.`,
+        ? `You can start. ${count} item needs fixing before every step works.`
+        : `You can start. ${count} items need fixing before every step works.`,
     summaryWarnings: ({ count }: { count: number }) =>
       fmt.plural(count) === "one"
         ? `Ready, with ${count} item worth a look.`
@@ -82,7 +80,6 @@ export default {
     gh: "This needs the GitHub CLI, installed and signed in.",
     "git-identity":
       "This needs your Git name and e-mail address, which every commit carries.",
-    unavailable: "Unavailable until this is fixed.",
     detail: ({ check, detail }: { check: string; detail: string }) =>
       `${check}: ${detail}`,
   },

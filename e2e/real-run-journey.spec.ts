@@ -139,7 +139,7 @@ test.describe("the contribution journey on a seeded real run with a fake gh", ()
         await reviewed.click();
         await expect(reviewed).toBeChecked();
       }
-      await page.getByRole("button", { name: en.workspace.footer.explainBack }).click();
+      await page.locator(".review-footer").getByRole("button", { name: en.workspace.footer.explainBack }).click();
       const panel = page.locator(".understanding-check");
       await expect(page.locator(".explain-panel")).toHaveCount(0);
       const answers = panel.getByRole("region", { name: c.answerTitle }).getByRole("listitem");

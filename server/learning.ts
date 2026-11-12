@@ -38,7 +38,7 @@ import { runAgent, runIndependentReview } from "./run-executor.js";
 import { parseAgentOutput } from "./run-events.js";
 import type { WorkbenchContext } from "./workbench.js";
 import { filterAgentText, filterCodeField } from "../shared/by-hand-filter.js";
-import type { ChangeExplanation } from "../shared/explanations.js";
+import type { ChangeExplanation, ExampleStep } from "../shared/explanations.js";
 import { understandingStatus } from "../shared/understanding.js";
 import * as guide from "./by-hand-guide.js";
 import { filteredError, turnFiles } from "./by-hand-filter.js";
@@ -564,10 +564,13 @@ export async function changeFilter(run: Run, files: readonly DiffFile[], cited: 
 /** An explanation card of the person's change, filtered (F7) field by field. */
 export async function filterExplanation(run: Run, files: readonly DiffFile[], filePath: string, content: ChangeExplanation) {
   const filter = await changeFilter(run, files, [filePath]);
+  const steps = (list: ExampleStep[]) => list.map(({ label, changed }) => ({ label: filter.text(label), changed }));
   const example = content.example && {
     scenario: filter.text(content.example.scenario),
     before: filter.code(content.example.before),
     after: filter.code(content.example.after),
+    ...(content.example.beforeSteps ? { beforeSteps: steps(content.example.beforeSteps) } : {}),
+    ...(content.example.afterSteps ? { afterSteps: steps(content.example.afterSteps) } : {}),
   };
   const value: ChangeExplanation = {
     summary: filter.text(content.summary),

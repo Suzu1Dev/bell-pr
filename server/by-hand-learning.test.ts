@@ -117,7 +117,7 @@ test("the complete export gains a Learn by hand section, with the claim only for
   );
   assertNoHan(clean);
   const unclean = buildLearningExport(run("lbh", { learnByHand: true, byHand: { ...byHand, agentWrites: 1 } }), repo, "en");
-  assert.ok(unclean.includes("BELL PR saw agent edits in this run, so it makes no Learn-by-hand claim for it."));
+  assert.ok(unclean.includes("BELL PR saw Agent edits in this run, so it makes no Learn-by-hand claim for it."));
   assert.ok(!unclean.includes("had no write access"));
   const fitted = buildLearningExport(
     run("lbh", {

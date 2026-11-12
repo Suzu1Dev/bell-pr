@@ -1,7 +1,7 @@
 import type { Translation } from "../../../shared/i18n/locale.js";
 import type en from "../en/sudo.js";
 const messages: Translation<typeof en> = {
-  fullAccessNotice: "這個 Claude Agent 未在作業系統沙箱中執行，因為這次工作已選擇完整權限。",
+  fullAccessNotice: "這個 Claude Agent 未在作業系統沙箱中執行，因為這個任務已選擇完整權限。",
   busy: "正在設定免密碼 sudo，請稍候。",
   invalidUser: "這個帳號名稱無法安全寫入 sudoers 規則。",
   invalidRule: "產生的 sudoers 規則沒有通過 visudo 檢查，未寫入。",

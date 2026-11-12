@@ -39,7 +39,7 @@ const summary = (id: string, title: string, status: RunSummary["status"] = "revi
 
 test("the sidebar lists every page and marks the open one", () => {
   const html = render();
-  for (const label of ["首頁", "貢獻工作台", "專案", "探索貢獻", "學習筆記", "連線與設定", "使用指南"])
+  for (const label of ["首頁", "貢獻工作台", "專案", "探索貢獻", "學習筆記", "設定", "使用指南"])
     assert.ok(html.includes(`<span>${label}</span>`), label);
   assert.match(html, /<nav aria-label="主要導覽">/);
   assert.match(html, /class="nav-item active" title="貢獻工作台" aria-current="page"/);
@@ -85,7 +85,7 @@ test("recent contributions show the four newest runs, then the sample under its 
   assert.ok(!html.includes("第五個任務"));
   assert.match(
     html,
-    /更新使用文件<\/span><\/button><div class="recent-sample-heading">範例<\/div><button class="recent-item "><span class="small-status "><\/span><span>SDK 智慧重試機制<\/span><\/button>/,
+    /更新使用文件<\/span><\/button><div class="recent-sample-heading">示範<\/div><button class="recent-item "><span class="small-status "><\/span><span>SDK 智慧重試機制<\/span><\/button>/,
   );
   assert.match(html, /class="recent-item selected"><span class="small-status "><\/span><span>補上重試測試/);
   assert.match(html, /<span class="small-status running"><\/span><span>修正登入逾時/);
@@ -111,7 +111,7 @@ test("discovery is an ordinary item, without a badge", () => {
 
 test("the profile shows the GitHub user's initials, and only an icon while presenting", () => {
   assert.match(render(), /<span class="profile-avatar" aria-hidden="true"><svg/);
-  assert.match(render(), /<strong>My workspace<\/strong>/);
+  assert.match(render(), /<strong>我的工作空間<\/strong>/);
   const status = { codex: true, github: true, githubUser: "octo-cat" };
   const html = render({ status });
   assert.match(html, /<span class="profile-avatar" aria-hidden="true">OC<\/span>/);

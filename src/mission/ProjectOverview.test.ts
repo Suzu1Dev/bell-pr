@@ -69,6 +69,32 @@ test("the reading path lists each step with the matching module purpose and evid
   assert.match(legacy, /主要模組怎麼分工？/);
 });
 
+test("a flow of two steps or more is a figure captioned by the prose; a shorter or missing one keeps the prose block", () => {
+  const html = render();
+  const prose = demoInsights.howItFitsTogether!;
+  const figure = /<figure class="mission-reading-flow mission-flow mission-flow-few">([\s\S]*?)<\/figure>/.exec(html)?.[1];
+  assert.ok(figure, "the sample draws its flow");
+  assert.ok(figure.includes(`<figcaption>${prose}</figcaption>`));
+  // The prose is the caption, not a second copy.
+  assert.equal(html.split(prose).length, 2);
+  assert.equal(figure.match(/<li>/g)?.length, 4);
+  assert.equal(figure.match(/<code>src\/client\.ts<\/code>/g)?.length, 2);
+  // Steps outside the repository are dashed and say so to screen readers.
+  assert.equal(figure.match(/mission-flow-step mission-flow-outside/g)?.length, 2);
+  assert.equal(figure.match(/<span class="visually-hidden"> 在這個 repository 之外<\/span>/g)?.length, 2);
+  // Three arrows between four steps, each naming what passes on; the last step passes nothing.
+  assert.equal(figure.match(/class="mission-flow-link"/g)?.length, 3);
+  for (const passes of ["要 GET 的路徑", "HTTP 請求", "回應"])
+    assert.ok(figure.includes(`<span class="visually-hidden">傳給下一步： </span>${passes}`), passes);
+
+  const block = `<div class="mission-reading-flow"><span>模組怎麼串起來</span><p>${prose}</p></div>`;
+  for (const flow of [undefined, [], demoInsights.flow!.slice(0, 1)]) {
+    const plain = render({ insights: { ...demoInsights, flow } });
+    assert.doesNotMatch(plain, /<figure/);
+    assert.ok(plain.includes(block));
+  }
+});
+
 test("the stale notice reports changed and cited files, and never suggests skipping re-analysis", () => {
   const unknown = render({ insights: analyzed, stale: true });
   assert.match(unknown, /無法列出變更明細；重新分析後再確認貢獻方向/);
@@ -336,7 +362,7 @@ test("the English overview words counts, dates and the update help in English", 
   assert.match(html, />Update to the latest version<\/button>/);
   assert.ok(
     html.includes(
-      `Fetches the latest main from GitHub, and the overview and analysis follow it. New contributions always start from the latest version. Last updated: ${en.dateTime("2026-10-13T00:00:00.000Z")}`,
+      `Fetches the latest main from GitHub for the overview and analysis. New contributions start from the latest version either way. Last updated: ${en.dateTime("2026-10-13T00:00:00.000Z")}`,
     ),
   );
   const analyzed = en.dateTime("2026-10-07T08:00:00.000Z", {
@@ -416,12 +442,12 @@ test("Generate 5 more is always open on a real analysis, with no chip and no upg
   assertNoHan(html);
   assert.match(moreButton(html), /Generate 5 more<\/button>$/);
   assert.doesNotMatch(moreButton(html), /disabled|pro-badge/);
-  assert.match(moreReason(html) ?? "", /^The Agent uses the model settings saved for this project/);
+  assert.match(moreReason(html) ?? "", /^Uses the saved model settings\./);
   assert.doesNotMatch(html, /pro-badge|mission-upgrade-button|See what Pro adds/);
   const zh = render({ insights: analyzed });
   assert.match(moreButton(zh), /產出 5 個新建議<\/button>$/);
   assert.doesNotMatch(moreButton(zh), /disabled|pro-badge/);
-  assert.match(moreReason(zh) ?? "", /^Agent 會沿用這個專案已儲存的模型設定/);
+  assert.match(moreReason(zh) ?? "", /^沿用已儲存的模型設定。/);
 });
 
 test("Generate 5 more waits for a newer analysis, and stops at 30 recommendations per project", () => {
@@ -841,7 +867,7 @@ test("an open contribution leads with its brief, which does not repeat the title
     reviewedFiles: [],
   } as unknown as NonNullable<ProjectOverviewProps["run"]>;
   const html = render({ run });
-  const brief = html.indexOf("這次改動，會帶來什麼不同？");
+  const brief = html.indexOf("這次變更，會帶來什麼不同？");
   assert.ok(brief >= 0 && brief < html.indexOf('<details class="mission-context"'));
   assert.ok(brief < html.indexOf('id="mission-purpose-title"'));
   // The header shows the title; the brief does not repeat it.
@@ -851,10 +877,10 @@ test("an open contribution leads with its brief, which does not repeat the title
   // While the analysis loads, or before there is one, the brief still leads.
   for (const props of [{ loading: true, insights: null }, { insights: null }]) {
     const pending = render({ run, ...props });
-    assert.ok(pending.indexOf("這次改動，會帶來什麼不同？") < pending.indexOf("mission-overview-empty"));
+    assert.ok(pending.indexOf("這次變更，會帶來什麼不同？") < pending.indexOf("mission-overview-empty"));
   }
   // The project page has no brief.
-  assert.doesNotMatch(render(), /這次改動，會帶來什麼不同？/);
+  assert.doesNotMatch(render(), /這次變更，會帶來什麼不同？/);
 });
 
 test("a request written in labelled sections renders as Markdown with its labels in bold", () => {

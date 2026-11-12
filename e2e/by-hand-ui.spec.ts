@@ -12,7 +12,7 @@ import { execFileSync } from "node:child_process";
 import { appendFile, mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import AxeBuilder from "@axe-core/playwright";
-import { expect, test, type Browser, type Page, type Route } from "@playwright/test";
+import { expect, test, type Browser, type Page, type Request, type Route } from "@playwright/test";
 import { e2eApiHeaders } from "./api-token.mjs";
 import { changeFingerprint } from "../shared/change-fingerprint";
 import type { DiscoveryJob } from "../shared/discovery";
@@ -24,6 +24,7 @@ import byHandZh from "../src/byhand/write/i18n/zh-TW";
 import { getSampleDiscoveryJob } from "../src/demo/discovery";
 import discovery from "../src/i18n/en/discovery";
 import modals from "../src/i18n/en/modals";
+import review from "../src/i18n/en/review";
 import workspace from "../src/i18n/en/workspace";
 import { findOverflow } from "./helpers/overflow";
 import { startReadyServer } from "./helpers/ready-server";
@@ -238,7 +239,7 @@ test.afterAll(async () => {
   await server?.stop();
 });
 
-async function open(browser: Browser, hash: string, { locale = "en", width = 1440 }: { locale?: Locale; width?: number } = {}) {
+async function open(browser: Browser, hash: string, { locale = "en", width = 1440, clock = false }: { locale?: Locale; width?: number; clock?: boolean } = {}) {
   const context = await browser.newContext({
     extraHTTPHeaders: e2eApiHeaders,
     baseURL: server.baseURL,
@@ -247,8 +248,64 @@ async function open(browser: Browser, hash: string, { locale = "en", width = 144
     timezoneId: "UTC",
   });
   const page = await context.newPage();
+  // Timers run while the page loads. Tests that pass `clock` pause them once it is up.
+  if (clock) await page.clock.install({ time: new Date(at) });
   await page.goto(`/${hash}${hash.includes("?") ? "&" : "?"}locale=${locale}`);
   return { page, close: () => context.close() };
+}
+
+/**
+ * Pauses the page clock, then runs long enough for a read scheduled on load
+ * (2s after focus) and one poll (2.5s) to finish. A diff still in flight is
+ * waited out, so the next read is the one the test starts.
+ */
+async function settleTimers(page: Page) {
+  const inflight = new Set<Request>();
+  const isDiff = (request: Request) => new URL(request.url()).pathname.endsWith("/diff");
+  const track = (request: Request) => {
+    if (isDiff(request)) inflight.add(request);
+  };
+  const done = (request: Request) => inflight.delete(request);
+  page.on("request", track);
+  page.on("requestfinished", done);
+  page.on("requestfailed", done);
+  try {
+    const now = await page.evaluate(() => Date.now());
+    await page.clock.pauseAt(now + 1000);
+    await page.clock.runFor(2500);
+    await expect.poll(() => inflight.size).toBe(0);
+  } finally {
+    page.off("request", track);
+    page.off("requestfinished", done);
+    page.off("requestfailed", done);
+  }
+}
+
+/**
+ * Counts a diff body once the read that consumed it has applied it. The
+ * marker is queued after the response text, so it runs after the `Promise.all`
+ * continuation that calls `setFiles` / `setRun`.
+ */
+async function noteDiffApplied(page: Page) {
+  await page.evaluate(() => {
+    const marked = window as Window & { __diffApplied?: number };
+    const orig = Response.prototype.text;
+    Response.prototype.text = function (this: Response) {
+      const tracked = this.url.includes("/diff");
+      const result = orig.call(this);
+      if (!tracked) return result;
+      return Promise.resolve(result).then((text) => {
+        queueMicrotask(() =>
+          queueMicrotask(() =>
+            queueMicrotask(() => {
+              marked.__diffApplied = (marked.__diffApplied ?? 0) + 1;
+            }),
+          ),
+        );
+        return text;
+      });
+    };
+  });
 }
 
 /** A refusal in the server's words for every request but reads, with or without W2A-W2C's routes in the build. */
@@ -256,8 +313,11 @@ const refuse = (route: Route) => (route.request().method() === "GET" ? route.con
 
 /** No serious or critical axe issue, color contrast included, within `selector`. */
 async function expectAccessible(page: Page, selector: string) {
-  await page.evaluate(() => document.fonts.ready);
-  await page.waitForTimeout(300);
+  await expect(page.locator(selector).first()).toBeVisible();
+  await page.evaluate(async () => {
+    await document.fonts.ready;
+    await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+  });
   const results = await new AxeBuilder({ page })
     .options({ rules: { "color-contrast": { enabled: true } } })
     .include(selector)
@@ -304,7 +364,6 @@ test("the plan saves what changed, once, and This is my plan takes one click rig
     await page.route(`**/api/runs/${runs.planning}/by-hand/plan`, async (route) => {
       const body = route.request().postDataJSON();
       saves.push(body);
-      await new Promise((resolve) => setTimeout(resolve, 400));
       const steps = body.steps.map((step: object, index: number) => ({ id: `p${index + 1}`, ...step }));
       await route.fulfill({ json: { run: { ...run, byHand: { ...run.byHand, plan: { ...body, steps, savedAt: at } } } } });
     });
@@ -314,14 +373,25 @@ test("the plan saves what changed, once, and This is my plan takes one click rig
       route.fulfill({ json: { run: { ...run, status: "review", team: { ...run.team, phase: "developing" }, byHand: { ...run.byHand, plan: { steps: [{ id: "p1", title: "Find where retries are counted" }], savedAt: at, confirmedAt: at } } } } }),
     );
     const plan = page.getByRole("region", { name: t.plan.title });
+    await plan.locator(".by-hand-steps").evaluate((list) => {
+      const marked = window as Window & { __planSteps?: number };
+      marked.__planSteps = 0;
+      new MutationObserver(() => {
+        marked.__planSteps = (marked.__planSteps ?? 0) + 1;
+      }).observe(list, { childList: true });
+    });
+    const savedResponse = page.waitForResponse(
+      (response) => response.url().endsWith(`/api/runs/${runs.planning}/by-hand/plan`) && response.request().method() === "PUT" && response.ok(),
+    );
     await plan.getByRole("textbox", { name: t.plan.step({ number: 1 }) }).fill("Find where retries are counted");
     await plan.getByRole("textbox", { name: t.plan.unsure }).click();
     await expect.poll(() => saves.length).toBe(1);
-    await page.waitForTimeout(600);
-    // Moving between fields without a change sends nothing more, the ids the server gave included.
+    await savedResponse;
+    // The ids the server gave remount the steps. Moving between fields without a change sends nothing more.
+    await expect.poll(() => page.evaluate(() => (window as Window & { __planSteps?: number }).__planSteps ?? 0)).toBeGreaterThan(0);
     await plan.getByRole("textbox", { name: t.plan.tests }).click();
     await plan.getByRole("textbox", { name: t.plan.unsure }).click();
-    await page.waitForTimeout(600);
+    await page.evaluate(() => true);
     expect(saves).toHaveLength(1);
     // Typing, then one click on This is my plan: it saves, then confirms.
     await plan.getByRole("textbox", { name: t.plan.unsure }).fill("Whether three is enough");
@@ -508,30 +578,48 @@ test("after Mark it ready, the focus goes to Explain it back, not to the page", 
 });
 
 test("a read begun before Mark it ready never undoes it", async ({ browser }) => {
-  const { page, close } = await open(browser, `#/runs/${runs.writing}/changes`);
+  const { page, close } = await open(browser, `#/runs/${runs.writing}/changes`, { clock: true });
   try {
     const { run } = await (await page.request.get(`/api/runs/${runs.writing}`)).json();
     const { files } = await (await page.request.get(`/api/runs/${runs.writing}/diff`)).json();
     const ready = { ...run, team: { ...run.team, phase: "complete" }, byHand: { ...run.byHand, ready: { at, changeFingerprint: changeFingerprint(files), review: false } } };
     await page.route(`**/api/runs/${runs.writing}/by-hand/ready`, (route) => route.fulfill({ json: { run: ready } }));
     await expect(page.locator(".guide-panel")).toBeVisible();
-    await page.waitForTimeout(2500);
-    // Back from the editor: the read of the run and its diff starts 2 s later, and its diff takes a while.
-    let slow = 1;
+    await expect(page.getByRole("region", { name: review.diff.regionLabel({ path: source }) })).toBeVisible();
+    await settleTimers(page);
+    await noteDiffApplied(page);
+    // Back from the editor: the read of the run and its diff starts 2 s later, and its diff stays in flight.
+    let releaseDiff: () => void = () => undefined;
+    const diffHeld = new Promise<void>((resolve) => {
+      releaseDiff = resolve;
+    });
+    let holdNextDiff = true;
     await page.route(`**/api/runs/${runs.writing}/diff`, async (route) => {
-      if (slow-- > 0) await new Promise((resolve) => setTimeout(resolve, 2500));
+      if (holdNextDiff) {
+        holdNextDiff = false;
+        await diffHeld;
+      }
       await route.continue();
     });
-    const reading = page.waitForRequest((request) => request.url().endsWith(`/api/runs/${runs.writing}/diff`));
+    const diffPath = `/api/runs/${runs.writing}/diff`;
+    const runPathname = `/api/runs/${runs.writing}`;
+    const reading = page.waitForRequest((request) => new URL(request.url()).pathname === diffPath);
+    const runRead = page.waitForResponse((response) => new URL(response.url()).pathname === runPathname && response.request().method() === "GET");
+    const diffRead = page.waitForResponse((response) => new URL(response.url()).pathname === diffPath && response.ok());
     await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+    await page.clock.runFor(2000);
     await reading;
-    // Meanwhile the person marks the change ready.
+    await runRead;
+    // The diff stays held. Time moves again so the dialog can open; the read does not finish until it is released.
+    await page.clock.resume();
     await page.locator(".review-footer").getByRole("button", { name: workspace.byHand.ready }).click();
     await page.getByRole("dialog", { name: t.ready.title }).getByRole("button", { name: t.ready.confirm }).click();
     const status = page.locator(".title-row .status-badge").first();
     await expect(status).toHaveText("Ready for your review");
     // The read that began before ends: the run stays marked ready.
-    await page.waitForTimeout(3000);
+    releaseDiff();
+    await diffRead;
+    await expect.poll(() => page.evaluate(() => (window as Window & { __diffApplied?: number }).__diffApplied ?? 0)).toBeGreaterThan(0);
     await expect(status).toHaveText("Ready for your review");
   } finally {
     await close();
@@ -539,9 +627,10 @@ test("a read begun before Mark it ready never undoes it", async ({ browser }) =>
 });
 
 test("back from the editor, the diff is read again once", async ({ browser }) => {
-  const { page, close } = await open(browser, `#/runs/${runs.writing}/changes`);
+  const { page, close } = await open(browser, `#/runs/${runs.writing}/changes`, { clock: true });
   try {
     await expect(page.locator(".guide-panel")).toBeVisible();
+    await settleTimers(page);
     const reads: string[] = [];
     page.on("request", (request) => {
       if (new URL(request.url()).pathname === `/api/runs/${runs.writing}/diff`) reads.push(request.url());
@@ -551,8 +640,11 @@ test("back from the editor, the diff is read again once", async ({ browser }) =>
       document.dispatchEvent(new Event("visibilitychange"));
       window.dispatchEvent(new Event("focus"));
     });
+    // The read starts 2 s after the last of those events.
+    await page.clock.runFor(2000);
     await expect(page.getByText("export const backoffMs = 100;")).toBeVisible({ timeout: 10_000 });
-    await page.waitForTimeout(2500);
+    // Past another debounce and the 2.5 s poll, nothing reads the diff again.
+    await page.clock.runFor(2500);
     expect(reads).toHaveLength(1);
   } finally {
     await close();
@@ -588,7 +680,7 @@ test("the task dialog says why BELL won't publish a learn-by-hand run on a banni
   const { page, close } = await open(browser, `#/runs/${runs.writing}/overview`);
   try {
     const mode = discovery.byHand;
-    await page.getByRole("button", { name: workspace.newContribution }).click();
+    await page.locator(".workspace-heading").getByRole("button", { name: workspace.newContribution }).click();
     const dialog = page.getByRole("dialog");
     await dialog.locator("#task-repo").selectOption(banRepoId);
     // A banning project is never a reason to preselect Learn by hand.

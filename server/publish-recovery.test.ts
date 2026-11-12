@@ -6,6 +6,7 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { createApp } from "./app.js";
+import { sm, withLocale } from "./i18n/index.js";
 import { command, git } from "./process.js";
 import { Store } from "./store.js";
 import { Workbench, type WorkbenchContext } from "./workbench.js";
@@ -17,6 +18,7 @@ interface RemoteScenario {
   branchRepository?: string;
   branchName?: string;
   prText?: string;
+  prByHead?: Record<string, string>;
   prCode?: number;
   userText?: string;
   userCode?: number;
@@ -127,7 +129,13 @@ const args = process.argv.slice(2);
 fs.appendFileSync(${JSON.stringify(callsFile)}, JSON.stringify(['gh', ...args]) + '\\n');
 const scenario = JSON.parse(fs.readFileSync(${JSON.stringify(scenarioFile)}, 'utf8'));
 if (args[0] === 'api' && args[1] === 'user') { process.stdout.write(scenario.userText ?? '{"login":"test-owner"}'); process.exit(scenario.userCode ?? 0); }
-if (args[0] === 'pr' && args[1] === 'list') { process.stdout.write(scenario.prText ?? '[]'); process.exit(scenario.prCode ?? 0); }
+if (args[0] === 'pr' && args[1] === 'list') {
+  const head = args[args.indexOf('--head') + 1];
+  const byHead = scenario.prByHead;
+  const text = byHead && Object.prototype.hasOwnProperty.call(byHead, head) ? byHead[head] : (scenario.prText ?? '[]');
+  process.stdout.write(text);
+  process.exit(scenario.prCode ?? 0);
+}
 process.exit(97);
 `,
     { mode: 0o700 },
@@ -169,6 +177,23 @@ async function checkout(repository: string) {
 }
 const refused = (status: number) => (error: unknown) =>
   error instanceof AppError && error.statusCode === status;
+
+const messageIs = (message: string) => (error: unknown) => {
+  assert.ok(error instanceof AppError);
+  assert.equal(error.statusCode, 409);
+  assert.equal(error.message, message);
+  return true;
+};
+
+async function recoveryRefNames(repository: string) {
+  return (
+    await git(repository, [
+      "for-each-ref",
+      "--format=%(refname)",
+      "refs/bellpr/publish-recovery/",
+    ])
+  ).stdout;
+}
 
 test("recovery preserves the old commit, current checkout, draft, review marks and conversation", async () => {
   const f = await fixture();
@@ -426,6 +451,97 @@ test("the recovery API requires the exact commit field and returns the recovered
   } finally {
     server.closeAllConnections();
     await new Promise<void>((resolve) => server.close(() => resolve()));
+    await f.cleanup();
+  }
+});
+
+test("recoveryCheckout refuses another branch or a saved object that is not a commit", async () => {
+  const f = await fixture();
+  try {
+    const remoteReads = async () =>
+      (await f.calls()).filter(
+        (args) => args[0] === "gh" || args.includes("ls-remote"),
+      ).length;
+    const blob = (
+      await git(f.repository, ["rev-parse", "HEAD:hello.txt"])
+    ).stdout.trim();
+    f.run.publishCommit = blob;
+    const savedBlob = structuredClone(f.run);
+    const tree = await checkout(f.repository);
+    await withLocale("en", () =>
+      assert.rejects(
+        f.workbench.recoverPublish(f.run.id, blob),
+        messageIs(sm().run.publish.recoveryCheckout),
+      ),
+    );
+    assert.deepEqual(f.run, savedBlob);
+    assert.deepEqual(await checkout(f.repository), tree);
+
+    f.run.publishCommit = f.oldCommit;
+    await git(f.repository, ["symbolic-ref", "HEAD", "refs/heads/main"]);
+    const savedBranch = structuredClone(f.run);
+    const otherBranch = await checkout(f.repository);
+    await withLocale("en", () =>
+      assert.rejects(
+        f.workbench.recoverPublish(f.run.id, f.oldCommit),
+        messageIs(sm().run.publish.recoveryCheckout),
+      ),
+    );
+    assert.deepEqual(f.run, savedBranch);
+    assert.deepEqual(await checkout(f.repository), otherBranch);
+    assert.equal(await recoveryRefNames(f.repository), "");
+    assert.equal(await remoteReads(), 0);
+  } finally {
+    await f.cleanup();
+  }
+});
+
+test("recoveryCheckout refuses a recovery ref that already points at a different commit", async () => {
+  const f = await fixture();
+  try {
+    const base = (await git(f.repository, ["rev-parse", "main"])).stdout.trim();
+    const ref = `refs/bellpr/publish-recovery/${f.run.id}/${f.oldCommit}`;
+    await git(f.repository, ["update-ref", ref, base]);
+    const before = structuredClone(f.run);
+    const tree = await checkout(f.repository);
+    await withLocale("en", () =>
+      assert.rejects(
+        f.workbench.recoverPublish(f.run.id, f.oldCommit),
+        messageIs(sm().run.publish.recoveryCheckout),
+      ),
+    );
+    assert.deepEqual(f.run, before);
+    assert.deepEqual(await checkout(f.repository), tree);
+    assert.equal((await git(f.repository, ["rev-parse", ref])).stdout.trim(), base);
+  } finally {
+    await f.cleanup();
+  }
+});
+
+test("recoveryPrExists stops recovery when the publish branch already has a pull request", async () => {
+  const f = await fixture();
+  try {
+    await f.scenario({
+      prByHead: {
+        "fix/new-name": JSON.stringify([{ number: 4, state: "CLOSED" }]),
+      },
+    });
+    const before = structuredClone(f.run);
+    const tree = await checkout(f.repository);
+    await withLocale("en", () =>
+      assert.rejects(
+        f.workbench.recoverPublish(f.run.id, f.oldCommit),
+        messageIs(sm().run.publish.recoveryPrExists({ branch: "fix/new-name" })),
+      ),
+    );
+    assert.deepEqual(f.run, before);
+    assert.deepEqual(await checkout(f.repository), tree);
+    assert.equal(await recoveryRefNames(f.repository), "");
+    const heads = (await f.calls())
+      .filter((args) => args[0] === "gh" && args[1] === "pr")
+      .map((args) => args[args.indexOf("--head") + 1]);
+    assert.deepEqual(heads, ["fix/recovery", "fix/new-name"]);
+  } finally {
     await f.cleanup();
   }
 });

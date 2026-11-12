@@ -233,7 +233,7 @@ test("everything ready: versions, the GitHub account, scopes and the Claude plan
   assert.equal(check(report, "app").version, "9.9.9");
   assert.equal(
     check(report, "app").detail,
-    "Port 4541, 2 runs at a time, 3 agent processes.",
+    "Port 4541, 2 runs at a time, 3 Agent processes.",
   );
   assert.deepEqual(check(report, "app").params, {
     port: 4541,
@@ -668,7 +668,7 @@ test("bell-pr doctor follows the saved language and sandbox opt-in, then leaves 
   assert.equal(code, 0);
   assert.match(text, /^BELL PR environment check\n/);
   // Only the stand-ins are on PATH, so the sandbox is missing, but allowed.
-  assert.match(text, /! Claude Code sandbox +Not available\. Claude Code agents may edit files without it because you allowed that/);
+  assert.match(text, /! Claude Code sandbox +Not available\. Claude Code Agents may edit files without it because you allowed that/);
   // Afterwards the defaults are the environment's again.
   assert.equal(currentLocale(), "zh-TW");
   assert.equal(allowUnsandboxedAgents(), false);
@@ -924,17 +924,17 @@ test("only Codex installed, with the switch off, asks for Claude Code and does n
   assert.equal(row.reason, "claude-only");
   assert.equal(
     row.detail,
-    "Claude Code only in 1.0.0; Codex support is disabled\nPlease install Claude Code.",
+    "1.0.0 supports Claude Code only; Codex support is disabled.\nInstall Claude Code.",
   );
   assert.equal(row.fixes, undefined);
   assert.equal(check(again, "codex").status, "skip");
   assert.equal(check(again, "codex").reason, "disabled");
   assert.equal(check(again, "codex").required, false);
-  assert.match(formatDoctorReport(again), /Claude Code only in 1\.0\.0; Codex support is disabled\n {4}Please install Claude Code\./);
+  assert.match(formatDoctorReport(again), /1\.0\.0 supports Claude Code only; Codex support is disabled\.\n {4}Install Claude Code\./);
   const zh = await withLocale("zh-TW", () => runDoctor({ force: true, platform: "linux" }));
   assert.equal(
     check(zh, "provider-ready").detail,
-    "1.0.0 只支援 Claude Code；Codex 暫時停用\n請安裝 Claude Code。",
+    "1.0.0 只支援 Claude Code；Codex 已停用。\n請安裝 Claude Code。",
   );
   assert.equal(check(zh, "codex").status, "skip");
 });

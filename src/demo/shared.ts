@@ -449,6 +449,8 @@ export const insights = {
     "src/client.ts",
     "src/utils/retry.ts",
   ],
+  // The main flow before the change, in order: a module path, or "" outside the repository.
+  flow: ["", "src/client.ts", "", "src/client.ts"],
   evidence: ["README.md", "src/client.ts", "src/utils/retry.ts"],
   recommendations: [
     {
@@ -479,6 +481,7 @@ export const insights = {
 } as const;
 export type DemoModulePath = (typeof insights.modules)[number];
 export type DemoReadingPath = (typeof insights.readingPath)[number];
+export type DemoFlowPaths = typeof insights.flow;
 export type DemoEvidencePath = (typeof insights.evidence)[number];
 export type DemoRecommendationId =
   (typeof insights.recommendations)[number]["id"];
@@ -1093,6 +1096,10 @@ export function buildDemoContent(copy: DemoCopy): DemoContent {
         ...copy.insights.readingPath[path],
       })),
       howItFitsTogether: copy.insights.howItFitsTogether,
+      flow: insights.flow.map((path, index) => ({
+        path,
+        ...copy.insights.flow[index],
+      })),
       evidence: insights.evidence.map((path) => ({
         path,
         note: copy.insights.evidence[path],

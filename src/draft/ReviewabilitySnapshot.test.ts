@@ -58,7 +58,7 @@ test("the snapshot of the sample shows its numbers, a green band labelled as BEL
   assert.equal(demoSnapshot.band, "small");
   const html = english({ onAskSplit() {} });
   assert.match(html, /<h3 id="reviewability-[^"]+"><svg[\s\S]*?<\/svg> How reviewable is this change\?<\/h3>/);
-  assert.match(html, /<span class="reviewability-band is-ok" title="BELL PR&#x27;s size bands are defaults/);
+  assert.match(html, /<span class="reviewability-band is-ok" title="BELL PR&#x27;s size bands are its own defaults/);
   assert.match(html, />Small · BELL PR default<\/span>/);
   assert.deepEqual(numbers(html), {
     "Changed lines": String(demoSnapshot.changedLines),
@@ -118,7 +118,7 @@ test("each weakened test asks for a one-line reason; Save sends the valid ones",
   assert.equal(html.match(/maxLength="300"/g)?.length, 3);
   // Nothing changed yet: Save waits.
   assert.match(html, /<button type="button" class="button primary" disabled="">Save reasons<\/button>/);
-  assert.doesNotMatch(html, /Offered for your Testing section/);
+  assert.doesNotMatch(html, /Paste this into your PR&#x27;s Testing section/);
   // Without a save handler the fields are read-only.
   assert.equal(english({ weakened }).match(/<input[^>]*disabled=""/g)?.length, 3);
   assert.doesNotMatch(english({ weakened }), /Save reasons/);
@@ -130,7 +130,7 @@ test("saved reasons are offered for the Testing section, with a copy button", ()
     "tests/old.test.ts#0": "short",
   };
   const html = english({ weakened, reasons, onSaveReasons() {} });
-  assert.match(html, /<p>Offered for your Testing section<\/p><pre>- `tests\/retry\.test\.ts:2`: The flaky test waits on a real network\.<\/pre>/);
+  assert.match(html, /<p>Saved\. Paste this into your PR&#x27;s Testing section:<\/p><pre>- `tests\/retry\.test\.ts:2`: The flaky test waits on a real network\.<\/pre>/);
   assert.match(html, /Copy for the Testing section<\/button>/);
   assert.equal(reasonLines(weakened, reasons), "- `tests/retry.test.ts:2`: The flaky test waits on a real network.");
   assert.equal(

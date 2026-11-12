@@ -333,7 +333,7 @@ test("a title is sent as one plain line of at most 120 characters", () => {
     title("Clone https://alice:hunter2pass@git.invalid/repo and fix"),
     "Clone https://[REDACTED]@git.invalid/repo and fix",
   );
-  assert.equal(title("", "zh-TW"), "未命名的工作");
+  assert.equal(title("", "zh-TW"), "未命名的任務");
 });
 
 test("the feed sends a run's id, title, state and time, and writes nothing", async (t) => {
@@ -365,7 +365,7 @@ test("the feed sends a run's id, title, state and time, and writes nothing", asy
         href: "#/runs/one",
         state: "needs-you",
         updatedAt: day(2),
-        detail: "等你審查",
+        detail: "等你審閱",
       },
     ],
     truncated: false,

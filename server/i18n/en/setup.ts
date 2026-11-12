@@ -54,7 +54,7 @@ export default {
       maxActiveRuns: "Runs at a time",
       maxAgentProcesses: "Agent processes at a time",
       agentTimeoutScale: "Agent time limit scale",
-      allowUnsandboxedAgents: "Allow unsandboxed Claude Code and Antigravity agents",
+      allowUnsandboxedAgents: "Allow unsandboxed Claude Code and Antigravity Agents",
       retentionDays: "Days to keep a finished run's files",
     },
     locked: ({ setting, variable }: { setting: string; variable: string }) =>
@@ -156,23 +156,23 @@ export default {
       "Pull requests that change GitHub Actions workflows cannot be pushed without the workflow permission.",
     scopesUnknown:
       "This kind of token does not report its permissions, so they are not checked.",
-    sandboxReady: "Available: Claude Code agents that edit files run in the sandbox.",
+    sandboxReady: "Available: Claude Code Agents that edit files run in the sandbox.",
     sandboxMissing:
-      "Not available: install bubblewrap and socat so Claude Code agents can edit files in a sandbox.",
+      "Not available: bubblewrap or socat is missing, so Claude Code Agents cannot edit files.",
     sandboxBlocked:
       "Not available: bubblewrap is installed but cannot start a sandbox here, as in a container with default security settings.",
     sandboxUnsupported:
-      "Not available on this platform, so Claude Code agents cannot edit files.",
+      "Not available on this platform, so Claude Code Agents cannot edit files.",
     sandboxAllowed:
-      "Not available. Claude Code agents may edit files without it because you allowed that; such runs are marked.",
+      "Not available. Claude Code Agents may edit files without it because you allowed that; such runs are marked.",
     antigravitySandboxReady:
-      "Available: Antigravity agents that edit files run their commands in its terminal sandbox.",
+      "Available: Antigravity Agents that edit files run their commands in its terminal sandbox.",
     antigravitySandboxRestricted:
-      "Not available: this Linux system does not let the Antigravity CLI create user namespaces (kernel.apparmor_restrict_unprivileged_userns), so Antigravity agents cannot edit files. docs/troubleshooting.md explains the options.",
+      "Not available: this Linux system does not let the Antigravity CLI create user namespaces (kernel.apparmor_restrict_unprivileged_userns), so Antigravity Agents cannot edit files. docs/troubleshooting.md explains the options.",
     antigravitySandboxUnsupported:
-      "Not available on this platform, so Antigravity agents cannot edit files.",
+      "Not available on this platform, so Antigravity Agents cannot edit files.",
     antigravitySandboxAllowed:
-      "Not available. Antigravity agents may edit files and run commands without it because you allowed that; such runs are marked.",
+      "Not available. Antigravity Agents may edit files and run commands without it because you allowed that; such runs are marked.",
     fullAccessDisclosure,
     sudoDisclosure,
     passwordlessSudoInstalled: `BELL PR's passwordless sudo rule is installed. ${sudoDisclosure}`,
@@ -186,8 +186,8 @@ export default {
     /** Codex when the release switch `codexEnabled` is false. Not a failure. */
     codexDisabled: "Disabled. Codex is turned off in this build.",
     /** Only Codex is installed, and the release switch leaves it off. */
-    claudeOnlyRelease: "Claude Code only in 1.0.0; Codex support is disabled",
-    installClaudeCode: "Please install Claude Code.",
+    claudeOnlyRelease: "1.0.0 supports Claude Code only; Codex support is disabled.",
+    installClaudeCode: "Install Claude Code.",
     dataDirReady: ({ free }: { free: number }) => `Writable, ${size(free)} free.`,
     dataDirWritable: "Writable.",
     dataDirNew: "Will be created at the first start.",
@@ -214,8 +214,8 @@ export default {
         processes === undefined
           ? undefined
           : fmt.plural(processes) === "one"
-            ? `${processes} agent process`
-            : `${processes} agent processes`,
+            ? `${processes} Agent process`
+            : `${processes} Agent processes`,
       ].filter(Boolean);
       return parts.length ? `${parts.join(", ")}.` : "";
     },

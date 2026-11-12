@@ -59,8 +59,8 @@ const common = {
     return label.toLowerCase() === effort ? label : `${label} · ${effort}`;
   },
   teamTaskStatus: {
-    pending: "Waiting on dependencies",
-    ready: "Ready to claim",
+    pending: "Waiting for earlier subtasks",
+    ready: "Ready to start",
     running: "In progress",
     complete: "Integrated",
     failed: "Failed",
@@ -72,7 +72,6 @@ const common = {
     close: "Close",
     copy: "Copy",
     retry: "Retry",
-    learnMore: "Learn more",
   },
   /** Marks an optional form field, next to its label. */
   optional: "Optional",

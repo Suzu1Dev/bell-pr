@@ -40,13 +40,6 @@ const draft = {
       repository: "Follows the project's rules",
       linux: "Linux principles · adapted for PRs",
     },
-    empty: {
-      rules: "Checks the rules and the template",
-      sources: "Cites a source for each suggestion",
-      choice: "You choose what to apply",
-      demo: "Try the whole flow with sample documents; nothing is read from or changed in a remote project.",
-      real: "For runs whose changes are done; older runs can add a draft suggestion here too.",
-    },
     warnings: "What was read and what to confirm",
     rules: {
       title: "What this draft is based on",
@@ -66,8 +59,8 @@ const draft = {
         "No further writing rules were found; check the draft's sections against the source documents.",
     },
     checks: {
-      title: "Confirm before you publish",
-      intro: "These are reminders to check, not checks that were done.",
+      title: "Reminders from this suggestion",
+      intro: "Nothing here was checked for you.",
     },
     preview: "Preview the suggested draft",
     apply: {
@@ -81,22 +74,19 @@ const draft = {
       title: "Suggested commit message",
       /** Label in front of the source links. */
       sources: "Based on:",
-      /** Code examples shown inside `why`. */
+      /** Code examples shown inside `whyTitle` and `why`. */
       code: {
         typeScope: "type(scope)",
         subject: "type(scope): summary",
         signOff: "Signed-off-by: Your Name <email>",
       },
-      why: ({
-        typeScope,
-        subject,
-        signOff,
-      }: {
-        typeScope: string;
-        subject: string;
-        signOff: string;
-      }) =>
-        `Why do projects ask for ${typeScope} or a sign-off? Projects that use Conventional Commits generate their changelog and choose the version number from subjects such as ${subject}, and commitlint rejects commits in any other format in CI. Projects that use the DCO require every commit to carry ${signOff}, which states that you have the right to contribute the code under the project's license; the DCO bot checks the commit trailer, not the PR description. This suggestion only lays out the format the rules ask for. The sign-off is your own statement, so type it into the commit message field yourself; the model never fills it in.`,
+      /** Always shown under the suggestion. */
+      note: "This suggestion only lays out the format the rules ask for. The sign-off is your own statement: type it into the commit message field yourself; the model never fills it in.",
+      /** Label of the disclosure that holds `why`. */
+      whyTitle: ({ typeScope }: { typeScope: string }) =>
+        `Why do projects ask for ${typeScope} or a sign-off?`,
+      why: ({ subject, signOff }: { subject: string; signOff: string }) =>
+        `Projects that use Conventional Commits generate their changelog and choose the version number from subjects such as ${subject}. In CI, commitlint rejects commits in any other format. Projects that use the DCO require ${signOff} on every commit. It states that you have the right to contribute the code under the project's license. The DCO bot checks the commit trailer, not the PR description.`,
     },
     meta: {
       base: ({ commit }: { commit: string }) => `Base ${commit}`,
@@ -133,14 +123,14 @@ const draft = {
       factsRead: ({ date }: { date: string }) => `GitHub read ${date}`,
       status: {
         ok: "OK",
-        confirm: "Asks to confirm",
+        confirm: "Needs your confirmation",
         block: "Blocks publishing",
         unknown: "Couldn't check",
         off: "Off",
       },
       rows: {
         rules: "The project's rules",
-        door: "Pull requests open to you",
+        door: "Who may open pull requests",
         issue: "The linked issue",
         pacing: "Your pace here",
         words: "Your own words",
@@ -192,7 +182,7 @@ const draft = {
       wordsOk: `The description isn't ${product.name}'s suggested wording. Only you can tell whether it says what you understood, in your own words.`,
       wordsUnknown: `${product.name} has no suggested description to compare with. Check that it says what you understood, in your own words.`,
       reviewable: ({ band, lines, files }: { band: string; lines: number; files: number }) =>
-        `${band} by ${product.name}'s default bands: ${fmt.number(lines)} changed lines in ${fmt.plural(files) === "one" ? "1 file" : `${fmt.number(files)} files`}.`,
+        `${band} (${product.name} default): ${fmt.number(lines)} changed lines in ${fmt.plural(files) === "one" ? "1 file" : `${fmt.number(files)} files`}.`,
       disclosureRequired:
         "The project asks for a disclosure, and the description has one.",
       disclosureWaits:
@@ -261,15 +251,8 @@ const draft = {
     },
     /** The publish preflight for the saved draft. */
     preflight: {
-      title: "Checks before publishing",
-      intro:
-        "Publishing runs the same checks on the saved draft. A blocking check stops publishing until you fix it; the others ask you to confirm.",
       block: "Blocks publishing",
-      confirm: "Confirm before publishing",
-      clear: "No check needs your attention in the saved draft.",
-      /** The text checks are clear, and the maintainer checklist holds the rest. */
-      textClear:
-        "The checks on the text are clear. The maintainer checklist below shows the rest.",
+      confirm: "Needs your confirmation",
     },
   },
   /**
@@ -306,7 +289,7 @@ const draft = {
     } satisfies Record<ReviewabilityBand, string>,
     /** The band chip; `band` is one of `bands`. */
     band: ({ band }: { band: string }) => `${band} · ${product.name} default`,
-    bandHelp: `${product.name}'s size bands are defaults after Google's guidance on small changes, not this project's rule: small up to 100 changed lines, medium up to 400, large up to 1,000, very large above 1,000 lines or 20 files. The project's own merged pull requests are the real reference.`,
+    bandHelp: `${product.name}'s size bands are its own defaults, not this project's rule: small up to 100 changed lines, medium up to 400, large up to 1,000, very large above 1,000 lines or 20 files. The 100 and 1,000 marks come from Google's guidance on small changes. This project's own merged pull requests are the real reference.`,
     lines: "Changed lines",
     files: "Files",
     tests: "Test files changed",
@@ -349,7 +332,7 @@ const draft = {
     reasonHint: "3 words or more.",
     save: "Save reasons",
     saving: "Saving…",
-    saved: "Offered for your Testing section",
+    saved: "Saved. Paste this into your PR's Testing section:",
     copy: "Copy for the Testing section",
     saveFailed: ({ reason }: { reason: string }) =>
       `The reasons were not saved: ${reason}`,
@@ -405,9 +388,9 @@ const draft = {
     title: "Target branch",
     intro: {
       published: ({ branch, commit }: { branch: string; commit: string }) =>
-        `This contribution is based on ${branch} at ${commit}. Syncing merges the latest version into the PR: after your review a merge commit is pushed, nothing is force-pushed and the PR description stays the same.`,
+        `Based on ${branch} at ${commit}. Syncing merges the latest ${branch} into the PR. After your review, one merge commit is pushed. Nothing is force-pushed and the PR description stays the same.`,
       unpublished: ({ branch, commit }: { branch: string; commit: string }) =>
-        `This contribution is based on ${branch} at ${commit}. Syncing moves these changes onto the latest version; files that the target branch changed need another review, and you can undo the sync.`,
+        `Based on ${branch} at ${commit}. Syncing moves your changes onto the latest ${branch}. Files that ${branch} changed need another review. You can undo the sync.`,
     },
     lastSync: ({ from, to, date }: { from: string; to: string; date: string }) =>
       `Last sync: ${from} to ${to}, ${date}`,
@@ -431,14 +414,14 @@ const draft = {
         : `Conflict markers remain in ${open} of ${total} files.`,
     conflictHelp: {
       published: ({ latest, ours }: { latest: string; ours: string }) =>
-        `In each file, the side marked ${latest} is the target branch's current content and the side marked ${ours} is this pull request. You cannot approve until every conflict marker is removed: edit the files in the working directory yourself and then refresh the diff on the Code changes tab, or ask the agent to resolve them. Changed files still need a file-by-file review.`,
+        `In each file, the side marked ${latest} is the target branch's current content and the side marked ${ours} is this pull request. You cannot approve until every conflict marker is removed: edit the files in the working directory yourself and then refresh the diff on the Code changes tab, or ask the Agent to resolve them. Changed files still need a file-by-file review.`,
       unpublished: ({ latest, ours }: { latest: string; ours: string }) =>
-        `In each file, the side marked ${latest} is the target branch's current content and the side marked ${ours} is this contribution. You cannot approve until every conflict marker is removed: edit the files in the working directory yourself and then refresh the diff on the Code changes tab, or ask the agent to resolve them. Changed files still need a file-by-file review.`,
+        `In each file, the side marked ${latest} is the target branch's current content and the side marked ${ours} is this contribution. You cannot approve until every conflict marker is removed: edit the files in the working directory yourself and then refresh the diff on the Code changes tab, or ask the Agent to resolve them. Changed files still need a file-by-file review.`,
     },
     allResolved:
       "All conflict markers are removed; changed files still need a file-by-file review.",
-    resolving: "The agent is resolving the conflicts…",
-    resolve: "Ask the agent to resolve the conflicts",
+    resolving: "The Agent is resolving the conflicts…",
+    resolve: "Ask the Agent to resolve the conflicts",
     /** A Learn-by-hand run has no conflict agent (DESIGN v1.2 F2): the person resolves the markers. */
     byHand: {
       published: ({ latest, ours }: { latest: string; ours: string }) =>
@@ -467,9 +450,9 @@ const draft = {
     } satisfies Record<FollowUpRound["status"], string>,
     round: ({ number }: { number: number }) => `Round ${number}`,
     /** Follows the round number for commits made on GitHub that the app took over. */
-    adopted: "Picked up from GitHub",
+    adopted: "Taken over from GitHub",
     /** Follows the round number for a round that merged the target branch. */
-    syncRound: "Target branch sync",
+    syncRound: "Merged the target branch",
     /** Names an item that came from the person's own note rather than a review. */
     yourNote: "Your note",
     /** Names a review item that is no longer in the latest feedback. */

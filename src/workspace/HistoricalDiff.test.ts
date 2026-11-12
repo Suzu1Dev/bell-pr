@@ -33,7 +33,7 @@ test("historical diff ignores late replies for another round or run and exposes 
     assert.match(view.text(), /Patch withheld/);
     assert.doesNotMatch(view.text(), /blocked\.ts contents/);
     assert.equal(view.container.querySelectorAll((node) => ["INPUT", "TEXTAREA", "FORM"].includes(node.nodeName)).length, 0);
-    assert.doesNotMatch(view.text(), /Reviewed|Ask the agent|Explain it back/);
+    assert.doesNotMatch(view.text(), /Reviewed|Ask the Agent|Explain it back/);
     assert.deepEqual(requests, [
       "/api/runs/run%2Fa/diff-view?round=initial", "/api/runs/run%2Fa/diff-view?round=all", "/api/runs/other/diff-view?round=initial",
     ]);
