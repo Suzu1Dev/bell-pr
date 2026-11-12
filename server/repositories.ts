@@ -36,6 +36,24 @@ function localClonePrefix(sourcePath: string) {
 }
 
 /**
+ * True when `url` is a GitHub repository address with userinfo. Stripping
+ * the userinfo is only a check: that address is not used as a GitHub source.
+ */
+function githubUserinfoOrigin(url: string): boolean {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return false;
+  }
+  if (parsed.protocol !== "https:" || parsed.hostname !== "github.com") return false;
+  if (parsed.username === "" && parsed.password === "") return false;
+  parsed.username = "";
+  parsed.password = "";
+  return parseGitHubSource(parsed.href) !== null;
+}
+
+/**
  * Clones a local checkout into BELL's data directory, so runs never add
  * worktrees or branches to the person's own repository. Only commits are
  * copied (no hard links, no submodules, none of the checkout's hooks or
@@ -283,6 +301,7 @@ export async function importRepository(
         }
       | undefined;
     let remote = github;
+    let ignoredUserinfo = false;
     let defaultBranch: string | undefined;
     /** A local-only project is named after the person's checkout, not BELL's clone. */
     let localName: string | undefined;
@@ -334,9 +353,14 @@ export async function importRepository(
       if (isBare === "true") throw new AppError((m) => m.run.repos.bare);
       await git(checkout, ["rev-parse", "--verify", "HEAD"]);
       try {
-        remote = parseGitHubSource(
-          (await git(checkout, ["remote", "get-url", "origin"])).stdout.trim(),
-        );
+        // The first URL saved for origin. `--get` returns the last, and
+        // `remote get-url` applies `url.<base>.insteadOf`.
+        const saved = (
+          await git(checkout, ["config", "--local", "--get-all", "remote.origin.url"])
+        ).stdout.split("\n")[0].trim();
+        // Userinfo is not a GitHub source. The address itself is not kept.
+        if (githubUserinfoOrigin(saved)) ignoredUserinfo = true;
+        else remote = parseGitHubSource(saved);
       } catch {
         /* A local-only repository may have no origin. */
       }
@@ -389,6 +413,7 @@ export async function importRepository(
       url: remote?.url ?? "",
       language: metadata?.primaryLanguage?.name,
     };
+    if (ignoredUserinfo) log.warn("repo.origin_userinfo", { repoId: repo.id });
     // The project's own rules from its files; GitHub's facts (the door)
     // only for a GitHub import: a local folder runs no gh at import.
     const rules = await projectRules(ctx, repo, { network: !!github });
