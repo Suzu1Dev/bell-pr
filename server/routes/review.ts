@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { z } from "zod";
 import {
   overridableCheckIds,
@@ -8,6 +8,8 @@ import { runDraftSchema } from "../drafts.js";
 import { learningExport } from "../learning-export.js";
 import { publishChecks, resumesPublish } from "../publish.js";
 import { currentLocale } from "../i18n/index.js";
+import { participantHeader } from "../coordination-routes.js";
+import { holdGuard } from "../hold-guard.js";
 import type { RouteDeps } from "./types.js";
 
 // The commit message is passed to git verbatim, so newline is the only control character allowed.
@@ -18,7 +20,19 @@ const commitMessageField = runDraftSchema.shape.commitMessage;
  * diff, chat and explanations, the PR draft, notes, per-file review and the
  * review rerun, approval, maintainer feedback and publishing.
  */
-export function registerReviewRoutes(app: Express, { workbench }: RouteDeps) {
+export function registerReviewRoutes(
+  app: Express,
+  { workbench, options }: RouteDeps,
+) {
+  // The group's write guard, only with --group: who is asking is the
+  // participant token if the request sends one, else the device it comes from.
+  const holds = (req: Request, res: Response) =>
+    options.collab
+      ? holdGuard(options.collab, {
+          participant: req.get(participantHeader),
+          deviceId: res.locals.deviceId,
+        })
+      : undefined;
   app.get("/api/runs/:id/export.md", (req, res) => {
     const run = workbench.run(req.params.id);
     const repo = workbench.store.data.repos.find(
@@ -96,6 +110,13 @@ export function registerReviewRoutes(app: Express, { workbench }: RouteDeps) {
       currentLocale(),
       { repo, runs: workbench.store.data.runs },
     );
+    const guard = holds(req, res);
+    if (guard) {
+      const holdChecks = guard.preflight(run, files);
+      checks.push(...holdChecks);
+      if (!holdChecks.some((check) => check.id === "holds-unknown"))
+        checks.push(...(await guard.confirms(run, repo, workbench.store.data.runs)));
+    }
     // After an attempt that pushed but recorded no PR, GitHub's open count
     // may include the PR that attempt opened. publish() records that PR
     // before its checks and still refuses with this block when there is no
@@ -198,6 +219,7 @@ export function registerReviewRoutes(app: Express, { workbench }: RouteDeps) {
         acknowledged,
         overrides,
         rulesDigest,
+        holds(req, res),
       ),
     });
   });

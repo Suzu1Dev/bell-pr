@@ -90,6 +90,7 @@ const m: Translation<typeof en> = {
   laneEmptyPlanning: "Lead 的計畫完成後，子任務會出現在這裡。",
   laneEmptyAwaiting: "你確認計畫後，子任務才會開始。",
   task: {
+    details: "分工與檔案",
     worktree: "獨立 worktree",
     worktreeRemoved: "獨立 worktree 已清理",
     filesPending: "規劃中",

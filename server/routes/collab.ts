@@ -1,14 +1,19 @@
 /**
  * Group work: GET /api/collab, POST /api/collab/setup, POST
  * /api/collab/invites, POST /api/collab/join and POST
- * /api/collab/people/:id/remove. Registered only when BELL PR was started
- * with --group.
+ * /api/collab/people/:id/remove, and the group's repositories and boards
+ * (routes/collab-board.ts). Registered only when BELL PR was started with
+ * --group.
  *
  * The guard runs first, so every request already carries the app token
  * (install or device). Who is asking within the group is the participant
  * token in `x-bell-participant`, and the coordinator alone decides whose
  * it is. A participant problem is answered 403 `notJoined`, never 401: the
  * interface takes a 401 to mean this device is no longer paired.
+ *
+ * Every refusal leaves through collabErrors (collab-refusal.ts): a reason
+ * and a sentence of group work's own, and nothing the coordinator or git
+ * wrote.
  */
 import type { Express, RequestHandler, Response } from "express";
 import { z } from "zod";
@@ -20,14 +25,18 @@ import type {
   CollabSetupResponse,
 } from "../../shared/collab.js";
 import { readApiToken } from "../api-token.js";
-import { collabId, type CollabHost, type CollabSide } from "../collab-host.js";
+import { dropHoldEntries, taskKey } from "../collab-board.js";
+import { collabId, sideEntry, type CollabHost, type CollabSide } from "../collab-host.js";
 import { CollabInvites, inviteTtl, maxInvites, type Invite } from "../collab-invites.js";
+import { adminOnly, collabErrors, notJoined, reasonOf, refuse } from "../collab-refusal.js";
 import { participantHeader } from "../coordination-routes.js";
 import type { Actor } from "../coordination.js";
 import type { DeviceTokens } from "../device-tokens.js";
 import { sm } from "../i18n/index.js";
 import { log } from "../log.js";
+import type { Store } from "../store.js";
 import { AppError } from "../types.js";
+import { registerCollabBoardRoutes } from "./collab-board.js";
 import { deviceName } from "./pairing.js";
 
 type Person = NonNullable<CollabSide["people"]>[string];
@@ -40,17 +49,10 @@ const inviteSchema = z.union([
 const joinSchema = z.strictObject({ code: z.string().max(32) });
 const removeSchema = z.strictObject({ unpair: z.literal(true).optional() });
 
-const refuse = (status: number, reason: string, message: ConstructorParameters<typeof AppError>[0]) =>
-  new AppError(message, status, { details: { reason } });
-const notJoined = () => refuse(403, "notJoined", (m) => m.collab.notJoined);
-const adminOnly = () => refuse(403, "adminOnly", (m) => m.collab.adminOnly);
 const invalidCode = () => refuse(400, "invalidCode", (m) => m.collab.invalidCode);
 
-/** The side file's entry for an id; own keys only, so no id reaches Object.prototype. */
-function personOf(host: CollabHost, id: string): Person | undefined {
-  const people = host.side().people;
-  return people && Object.hasOwn(people, id) ? people[id] : undefined;
-}
+const personOf = (host: CollabHost, id: string): Person | undefined =>
+  sideEntry(host.side().people, id);
 
 /** Who a participant token belongs to; undefined when missing, unknown or removed. */
 export function participantOf(
@@ -98,9 +100,10 @@ export function collabParticipant(host: CollabHost): RequestHandler {
 export function registerCollabRoutes(
   app: Express,
   host: CollabHost,
-  { devices, tokenFile }: { devices?: DeviceTokens; tokenFile?: string } = {},
+  { store, devices, tokenFile }: { store: Store; devices?: DeviceTokens; tokenFile?: string },
 ) {
   const invites = new CollabInvites();
+  const hub = registerCollabBoardRoutes(app, host, { store, participant: collabParticipant(host) });
   /** The person at the host: the install token, not a paired device. */
   const atHost = (res: Response) => res.locals.deviceId === undefined;
   const identity = ({ actor, person }: { actor: Actor; person: Person }) => ({
@@ -168,10 +171,11 @@ export function registerCollabRoutes(
     const deviceId: string | undefined = res.locals.deviceId;
     const result = invites.redeem(code, deviceId ?? "install");
     if (result.status === "locked")
-      throw new AppError(
-        (m) => m.collab.joinLocked({ minutes: Math.ceil(result.retryAfter / 60) }),
+      throw refuse(
         429,
-        { details: { reason: "joinLocked", retryAfter: result.retryAfter } },
+        "joinLocked",
+        (m) => m.collab.joinLocked({ minutes: Math.ceil(result.retryAfter / 60) }),
+        { retryAfter: result.retryAfter },
       );
     if (result.status === "invalid") throw invalidCode();
     const { invite } = result;
@@ -217,15 +221,36 @@ export function registerCollabRoutes(
       if (actor.role !== "admin") throw adminOnly();
       const { id } = req.params;
       if (id === actor.id) throw refuse(409, "self", (m) => m.collab.removeSelf);
+      let revoked = 0;
       const deviceId = await host.run(async () => {
         const person = personOf(host, id);
         if (!person) throw refuse(404, "unknownPerson", (m) => m.collab.unknownPerson);
-        if (!person.removedAt)
+        if (!person.removedAt) {
           await host.saveSide((draft) => {
             // One removal at a time: an admin removed a moment ago removes nobody.
             if (draft.people![actor.id]?.removedAt) throw notJoined();
             draft.people![id].removedAt = new Date().toISOString();
           });
+          log.info(`group: ${id} removed by ${actor.id}`);
+        }
+        hub.forget(id);
+        // What they hold goes with them, in every repository of the group.
+        const coordinator = host.coordinator();
+        const revokedKeys: string[] = [];
+        for (const projectId of Object.keys(host.side().projects ?? {}))
+          for (const claim of coordinator.project(actor, projectId).claims) {
+            if (claim.status !== "held" || claim.holder !== id) continue;
+            try {
+              await coordinator.revoke(actor, projectId, claim.id, {});
+              revoked += 1;
+              revokedKeys.push(taskKey(projectId, claim.taskId));
+            } catch (error) {
+              // A hold that ended in the meantime is not counted.
+              if (reasonOf(error) !== "ended") throw error;
+            }
+          }
+        if (revokedKeys.some((key) => sideEntry(host.side().holds, key) !== undefined))
+          await host.saveSide((draft) => dropHoldEntries(draft, revokedKeys));
         return person.deviceId;
       });
       // What they left waiting goes with them: the codes they gave out and their own.
@@ -242,9 +267,10 @@ export function registerCollabRoutes(
         const installToken = readApiToken(tokenFile);
         if (installToken) unpaired = await devices.revoke(deviceId, installToken);
       }
-      log.info(`group: ${id} removed by ${actor.id}`);
-      const body: CollabRemoveResponse = { revoked: 0, unpaired };
+      const body: CollabRemoveResponse = { revoked, unpaired };
       res.json(body);
     },
   );
+
+  app.use("/api/collab", collabErrors);
 }

@@ -158,6 +158,7 @@ export function SafetySection({
           <Globe size={15} aria-hidden="true" />
           {s.web.text}
         </p>
+        <p className="settings-text" role="note">{s.web.exception}</p>
         <p className="settings-text">{s.web.privacy}</p>
         <a className="settings-link" href={providerHref}>
           {s.web.open}

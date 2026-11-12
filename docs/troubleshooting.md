@@ -32,6 +32,8 @@ Contents:
 - [Publishing was blocked by a project rule, an issue or pacing](#publishing-was-blocked-by-a-project-rule-an-issue-or-pacing)
 - [BELL PR does not start](#bell-pr-does-not-start)
 - [Group work has stopped](#group-work-has-stopped)
+- [Group storage is full](#group-storage-is-full)
+- [Group work asks you to wait](#group-work-asks-you-to-wait)
 - [Runs that wait, stop or cannot be reviewed](#runs-that-wait-stop-or-cannot-be-reviewed)
 - [Collecting details for a support request](#collecting-details-for-a-support-request)
 
@@ -649,14 +651,20 @@ there, then publish again.
 
 Only for a BELL PR started with `--group` ([Group work](group-work.md)).
 `bell-pr group status` prints "Group work has stopped (reason: …)".
-Inviting, joining and removing answer 503 with `reason: "stopped"`, and
+Group requests answer 503 with `reason: "stopped"` (set-up answers 409), and
 `GET /api/collab` and `GET /api/status` carry the reason. The one request
 whose write stopped group work can answer 503 with the reason itself,
 `notSingleWriter` or `unavailable`. The server log has a "Group work
 stopped" line with the cause. When the lock file itself is gone,
 `bell-pr group status` finds no running BELL PR and cannot print the
 reason: read it in the log or in `GET /api/collab`. The rest of BELL PR
-keeps working.
+keeps working, except that nothing in a repository of the group is
+published: the publish dialog shows a block, and publishing answers 503
+with `reason: "holdsUnknown"`
+([Publishing over someone else's hold](group-work.md#publishing-over-someone-elses-hold)).
+Agent turns that may change files there, and plan approvals, are answered
+503 `holdsUnknown` too
+([BELL PR's agents and someone else's hold](group-work.md#bell-prs-agents-and-someone-elses-hold)).
 
 A stopped group stays stopped until BELL PR is restarted, and BELL PR
 never creates or repairs the group's files by itself. Fix the cause below,
@@ -673,9 +681,77 @@ then restart BELL PR.
 | `closed` | BELL PR is shutting down | Start it again |
 
 With no backup, the group has to start again: stop BELL PR, move
-`coordination.json` and `collab.json` out of the data directory, start
-BELL PR with `--group`, run `bell-pr group setup` and invite everyone
-again. Their earlier participant tokens no longer work.
+`coordination.json`, `collab.json` and the `collab/` folder out of the data
+directory, start BELL PR with `--group`, run `bell-pr group setup` and
+invite everyone again. Their earlier participant tokens no longer work,
+and the group's repositories, holds and their history are gone with the
+files.
+
+## Group storage is full
+
+Only with [group work](group-work.md). A request that would add to the
+group's record is answered 409 with `reason: "full"` and "The group's
+record is full. Ask the host to reset group storage.": taking a hold,
+joining, and adding a repository. It is the same for everyone, and a
+restart does not change it. Holds can still be released and revoked, and
+the boards can still be read.
+
+First find out which limit it is ([Limits](group-work.md#limits) lists
+them). A group admin reads `storage` in the answer of
+`GET /api/collab/projects`:
+
+- **`used` is far below `max`.** A limit on what is held at a time was
+  reached: 100 holds or 2000 paths for one person over all repositories,
+  or 1000 holds or 20 000 paths in one repository. Release or revoke holds
+  that are no longer needed, and the next one is taken. Nothing has to be
+  reset.
+- **`used` is near `max`** (8 MiB). The record itself is full. It keeps
+  every hold that has ended and every task, and no clean-up is built, so
+  releasing holds makes room for a few more at most. `full` comes before
+  `used` reaches `max`: BELL PR keeps about 3 KB free for each hold held
+  now and 0.1 KB for each task, so that what is held can still end. The
+  same reset is the way out when a group has had 1000 people, 100
+  repositories, or 10 000 tasks in one repository.
+
+To reset group storage, on the computer that runs BELL PR:
+
+1. Tell the group. Every hold and its history will be gone.
+2. Stop BELL PR.
+3. Move `coordination.json`, `collab.json` and the `collab/` folder out of
+   the data directory (`~/.bellpr` by default). Keep them somewhere else
+   until the new group works, then delete them.
+4. Start BELL PR with `--group`.
+5. Run `bell-pr group setup`, then `bell-pr group invite` for each person.
+   Everyone joins again with a new code and gets a new id and a new
+   participant token. The earlier tokens are answered 403 `notJoined`.
+6. An admin adds the group's repositories again.
+
+The holds, the tasks and their history are gone: nothing copies them into
+the new group. Everything else is untouched: projects, contributions and
+their runs, notes, settings and paired devices.
+
+## Group work asks you to wait
+
+Only with [group work](group-work.md). Both answers are 429, and nothing
+was changed by the refused request.
+
+- **"Too many requests in a short time. Try again in N seconds."**
+  (`reason: "slowDown"`): one person sent more than 30 requests to take a
+  hold within 10 minutes, taken or refused, or more than 120 checks within
+  a minute. `retryAfter` in the answer is the same number of seconds. Wait
+  that long and send the request again; the refused one was not counted.
+  The count is per person, over all their devices, and starts again when
+  BELL PR restarts.
+- **"Too many pages are open on the group's boards. Close one, then try
+  again."** (`reason: "tooManyWaiters"`): a request that follows a
+  [live feed](group-work.md#the-live-feed) would have waited, and that
+  person already has 2 requests waiting, or the group has 64. Close a
+  page, or stop a script that follows the feed. Until then, the same
+  request with `wait=0` is still answered, so a board can be read by asking
+  again every few seconds. The same answer, with `wait=0` too, goes to a
+  person whose connections have left 8 feed answers unread: a script that
+  sends requests and does not read the answers. It ends when the answers
+  are read or those connections close.
 
 ## Runs that wait, stop or cannot be reviewed
 

@@ -112,9 +112,9 @@ const renderEnglish = (initialJob: DiscoveryJob | null | undefined) => {
 test("an English render of a finished discovery has no Han", () => {
   const html = renderEnglish(job);
   // The form
-  assert.match(html, /<span class="eyebrow">FIND YOUR NEXT CONTRIBUTION<\/span>/);
+  assert.doesNotMatch(html, /FIND YOUR NEXT CONTRIBUTION/);
   // Like every page's heading, it can take the focus when the app opens the page.
-  assert.match(html, /<h1 tabindex="-1">Find the next contribution<br\/>/);
+  assert.match(html, /<h1 tabindex="-1">Find a project /);
   assert.match(html, /<h2>Where do you want to start\?<\/h2>/);
   assert.match(html, /placeholder="For example: accessibility, developer tools"/);
   assert.match(html, /<option value="beginner" selected="">Beginner-friendly<\/option>/);
@@ -152,8 +152,8 @@ test("English renders of the other discovery states have no Han", () => {
   assert.match(renderEnglish(undefined), /Loading your discovery history…/);
 
   const first = renderEnglish(null);
-  assert.match(first, /Good contributions start with understanding the need\./);
-  assert.match(first, /<span>04<\/span><strong>Barrier to entry<\/strong>/);
+  assert.match(first, /No search results yet/);
+  assert.doesNotMatch(first, /<span>04<\/span>/);
 
   const nothing = renderEnglish({
     ...job,
@@ -258,7 +258,7 @@ test("saved settings missing from the catalog are labelled in English", () => {
 
 test("the zh-TW render keeps the original copy and formats numbers", () => {
   const html = renderZh(createElement(DiscoveryPanel, props(job, live)));
-  assert.match(html, /找到值得投入的<br\/><em>下一個貢獻。<\/em>/);
+  assert.match(html, /尋找可貢獻的 <em>專案<\/em>/);
   assert.match(html, /依你選的「星數」排序取 12 個候選/);
   assert.match(html, /<span class="discovery-count">1 個項目<\/span>/);
   assert.match(html, /<span class="discovery-difficulty">初學者<\/span>/);
@@ -285,7 +285,7 @@ test("the live form is open from the first render, with no sample and no chip", 
   assert.deepEqual(fieldsets(html), [false, false]);
   assert.doesNotMatch(submit(html), /disabled/);
   assert.doesNotMatch(html, /pro-badge/);
-  assert.match(html, /Good contributions start with understanding the need\./);
+  assert.match(html, /No search results yet/);
 });
 
 test("while the saved results load, the panel waits and sends nothing", () => {

@@ -3,8 +3,8 @@
  * presentation flags live in the address after `#`, so a link, a reload or
  * Back shows what the reader saw.
  *
- *   #/home  #/demo  #/repos  #/repos/:id  #/discover  #/team  #/learning
- *   #/settings/:section?  #/about
+ *   #/home  #/demo  #/repos  #/repos/:id  #/discover  #/team  #/group
+ *   #/learning  #/settings/:section?  #/about
  *   #/runs/:runId/:tab?file=<path>   (tab: overview, changes, activity, draft,
  *                                     commits)
  *
@@ -48,6 +48,7 @@ export type Route = (
   | { name: "repo"; repoId: string }
   | { name: "discover" }
   | { name: "team" }
+  | { name: "group" }
   | { name: "learning" }
   | { name: "settings"; section?: string }
   | { name: "about" }
@@ -65,6 +66,7 @@ const plainRoutes = {
   repos: "repos",
   discover: "discover",
   team: "team",
+  group: "group",
   learning: "learning",
   settings: "settings",
   about: "about",
@@ -207,6 +209,9 @@ export function titleFor(
       break;
     case "team":
       page = pages.team;
+      break;
+    case "group":
+      page = pages.group;
       break;
     case "learning":
       page = pages.learning;

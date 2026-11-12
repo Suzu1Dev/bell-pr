@@ -4,199 +4,16 @@
  * log or a file. Synthetic tokens only; the clock is real, so time-based
  * rules live in collab-invites.test.ts.
  */
-import test, { type TestContext } from "node:test";
+import test from "node:test";
 import assert from "node:assert/strict";
-import { once } from "node:events";
 import { existsSync } from "node:fs";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
-import { request } from "node:http";
-import type { AddressInfo } from "node:net";
-import { tmpdir } from "node:os";
-import path from "node:path";
-import { inspect } from "node:util";
-import type { CollabJoinResponse } from "../shared/collab.js";
-import { loadOrCreateApiToken } from "./api-token.js";
-import { createApp } from "./app.js";
-import { openCollabHost } from "./collab-host.js";
+import { rm } from "node:fs/promises";
+import { collabFixture as fixture, outcome, type Headers } from "../test/collab-fixture.js";
 import { CollabInvites, inviteTtl, maxInvites } from "./collab-invites.js";
-import { dataPaths } from "./config.js";
 import { participantHeader } from "./coordination-routes.js";
-import { acquireWriterLock } from "./index.js";
-import { log } from "./log.js";
-import { failureLimit, normalizePairCode } from "./pairing.js";
-import { Store } from "./store.js";
-import { Workbench } from "./workbench.js";
+import { failureLimit } from "./pairing.js";
 
-type Headers = Record<string, string>;
-/** A response; `json` is loose so each test reads the fields it checks. */
-interface Reply {
-  status: number;
-  body: string;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  json: any;
-}
-/** "403 notJoined", or "201" when the answer names no reason. */
-const outcome = (reply: Reply) => [reply.status, reply.json?.reason].filter(Boolean).join(" ");
 const wrong = { code: "0000-0000" };
-
-async function fixture(t: TestContext) {
-  const directory = await mkdtemp(path.join(tmpdir(), "bell-collab-routes-"));
-  const file = path.join(directory, "api-token");
-  const install: Headers = { authorization: `Bearer ${await loadOrCreateApiToken(file)}` };
-  const paths = dataPaths(directory);
-  /** Every line the server logged, and every code and token it handed out. */
-  const logged: string[] = [];
-  const secrets: string[] = [];
-  for (const level of ["debug", "info", "warn", "error"] as const)
-    t.mock.method(log, level, (...line: unknown[]) => {
-      logged.push(inspect(line, { depth: 8 }));
-    });
-
-  let port = 0;
-  let stop = async () => {};
-  /** BELL PR with group work on this directory; called again, a restart (after `change`). */
-  const start = async (change?: () => Promise<unknown>) => {
-    await stop();
-    await change?.();
-    const lock = await acquireWriterLock(directory);
-    const collab = await openCollabHost({ dataDir: directory, lock });
-    const store = new Store(directory);
-    await store.initialize();
-    const workbench = new Workbench(store);
-    const app = createApp(workbench, {
-      staticDirectory: path.join(directory, "missing"),
-      port: 4311,
-      publicUrl: "https://bell.example.internal",
-      apiTokenFile: file,
-      collab,
-    });
-    const server = app.listen(0, "127.0.0.1");
-    await once(server, "listening");
-    port = (server.address() as AddressInfo).port;
-    stop = async () => {
-      stop = async () => {};
-      await collab.close();
-      await new Promise<void>((resolve, reject) =>
-        server.close((error) => (error ? reject(error) : resolve())),
-      );
-      await app.locals.insights.shutdown();
-      await app.locals.discovery.shutdown();
-      await workbench.shutdown();
-      lock.release();
-    };
-  };
-  await start();
-  t.after(async () => {
-    await stop();
-    await rm(directory, { recursive: true, force: true });
-  });
-
-  const send = (method: string, urlPath: string, headers: Headers = {}, body?: unknown) =>
-    new Promise<Reply>((resolve, reject) => {
-      const text = body === undefined ? "" : JSON.stringify(body);
-      const req = request(
-        {
-          host: "127.0.0.1",
-          port,
-          path: urlPath,
-          method,
-          headers: {
-            host: "127.0.0.1:4311",
-            "content-type": "application/json",
-            "content-length": String(Buffer.byteLength(text)),
-            ...headers,
-          },
-        },
-        (res) => {
-          let data = "";
-          res.setEncoding("utf8");
-          res.on("data", (chunk) => (data += chunk));
-          res.on("end", () => {
-            let json: Reply["json"];
-            try {
-              json = JSON.parse(data);
-            } catch {
-              json = undefined;
-            }
-            if (urlPath.startsWith("/api/collab"))
-              for (const secret of [json?.code, json?.token])
-                if (typeof secret === "string") secrets.push(secret);
-            resolve({ status: res.statusCode!, body: data, json });
-          });
-        },
-      );
-      req.on("error", reject);
-      req.end(text);
-    });
-  const post = (urlPath: string, who: Headers, body: unknown = {}) =>
-    send("POST", `/api/collab${urlPath}`, who, body);
-  const info = (who: Headers) => send("GET", "/api/collab", who);
-  /** The headers of a newly paired device. */
-  const device = async (name: string): Promise<Headers> => {
-    const code = await send("POST", "/api/pair/codes", install, {});
-    const paired = await send("POST", "/api/pair", {}, { code: code.json.code, name });
-    assert.equal(paired.status, 201, paired.body);
-    return { authorization: `Bearer ${paired.json.token}` };
-  };
-  const invite = async (who: Headers, body: unknown) => {
-    const made = await post("/invites", who, body);
-    assert.equal(made.status, 201, made.body);
-    return made.json.code as string;
-  };
-  const join = async (who: Headers, code: string) => {
-    const joined = await post("/join", who, { code });
-    assert.equal(joined.status, 201, joined.body);
-    return joined.json as CollabJoinResponse;
-  };
-  const withToken = (who: Headers, token: string): Headers => ({ ...who, [participantHeader]: token });
-  const files = () =>
-    Promise.all([paths.collab, paths.coordination].map((each) => readFile(each, "utf8")));
-
-  /** The group set up, with an admin, a member and a removed person, each on a paired device. */
-  const cast = async () => {
-    const setup = await post("/setup", install);
-    assert.equal(setup.status, 201, setup.body);
-    const devices = {
-      ada: await device("Phone A"),
-      ben: await device("Laptop B"),
-      cy: await device("Tablet C"),
-      none: await device("Not joined"),
-    };
-    const ada = await join(devices.ada, await invite(install, { name: "Ada", admin: true }));
-    const admin = withToken(devices.ada, ada.token);
-    const ben = await join(devices.ben, await invite(admin, { name: "Ben" }));
-    const cy = await join(devices.cy, await invite(admin, { name: "Cy" }));
-    const removed = await post(`/people/${cy.id}/remove`, admin);
-    assert.deepEqual([removed.status, removed.json], [200, { revoked: 0, unpaired: false }]);
-    return {
-      groupId: setup.json.groupId as string,
-      ada,
-      ben,
-      cy,
-      devices,
-      who: {
-        install,
-        device: devices.none,
-        member: withToken(devices.ben, ben.token),
-        admin,
-        removed: withToken(devices.cy, cy.token),
-        stranger: withToken(devices.none, `bpc_${"s".repeat(43)}`),
-      },
-    };
-  };
-
-  /** No log line and neither file holds a code (as shown or as typed) or a participant token. */
-  const nothingLeaked = async () => {
-    assert.ok(secrets.length > 0);
-    const kept = [...logged, ...(await files())].join("\n");
-    assert.equal(/bpc_/.test(kept), false);
-    for (const secret of secrets)
-      for (const form of [secret, normalizePairCode(secret) ?? secret])
-        assert.equal(kept.includes(form), false);
-  };
-
-  return { paths, install, logged, start, send, post, info, device, invite, join, files, cast, nothingLeaked };
-}
 
 test("before setup the group routes say so, only the person at the host sets it up, and a stopped group stays stopped", async (t) => {
   const f = await fixture(t);
@@ -208,12 +25,16 @@ test("before setup the group routes say so, only the person at the host sets it 
     ["/people/m-0000000001/remove", {}],
   ];
   const expectNotReady = async (state: string) => {
-    for (const who of [f.install, phone])
+    for (const who of [f.install, phone]) {
       for (const [urlPath, body] of asks) {
         const reply = await f.post(urlPath, who, body);
         assert.equal(outcome(reply), `503 ${state}`, urlPath);
         assert.deepEqual(Object.keys(reply.json).sort(), ["error", "reason"]);
       }
+      const tasksReply = await f.send("GET", "/api/collab/projects/p-0000000000/tasks", who);
+      assert.equal(outcome(tasksReply), `503 ${state}`, "GET /projects/:project/tasks");
+      assert.deepEqual(Object.keys(tasksReply.json).sort(), ["error", "reason"]);
+    }
   };
   assert.deepEqual((await f.info(f.install)).json, { state: "notSetUp", host: true });
   assert.deepEqual((await f.info(phone)).json, { state: "notSetUp", host: false });
@@ -422,6 +243,8 @@ test("remove: the person leaves the group; their device is unpaired only when as
   // Asked again with the tick box: the device they joined from goes, the date stays.
   assert.deepEqual((await remove(c.ben.id, { unpair: true })).json, { revoked: 0, unpaired: true });
   assert.equal(await removedAt(), first);
+  // The log has the removal once: the second request removed nobody.
+  assert.equal(f.logged.filter((line) => line.includes(`group: ${c.ben.id} removed by`)).length, 1);
   assert.equal((await f.info(c.who.member)).status, 401);
   assert.equal((await f.info(c.who.admin)).status, 200);
   // Nothing to unpair for someone who joined at the host.

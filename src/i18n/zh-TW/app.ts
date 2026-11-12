@@ -13,10 +13,11 @@ const m: Translation<typeof en> = {
   pages: {
     home: "首頁",
     workspace: "貢獻工作台",
-    repos: "Repositories",
+    repos: "專案",
     explore: "專案全貌",
     discovery: "探索貢獻",
-    team: "Agent team",
+    team: "AI 團隊分工",
+    group: "小組",
     learning: "學習筆記",
     settings: "連線與設定",
   },

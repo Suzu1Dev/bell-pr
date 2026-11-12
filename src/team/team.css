@@ -983,3 +983,7 @@
     font-size: var(--text-md);
   }
 }
+
+.team-task-details > summary, .activity-details > summary { cursor: pointer; font-weight: 600; }
+.activity-details { margin: 24px 28px; }
+.team-task-details { margin-block: 12px; }

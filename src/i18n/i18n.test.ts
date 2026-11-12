@@ -310,6 +310,7 @@ const namespaces = [
   "home",
   "about",
   "legal",
+  "collab",
 ];
 
 // The shape of a dictionary: nested keys, with each message's kind.

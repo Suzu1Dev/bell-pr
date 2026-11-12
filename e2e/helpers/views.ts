@@ -133,7 +133,7 @@ export const stateViews: StateView[] = [
     route: "#/runs/demo-run/draft",
     include: ".draft-checklist",
     async drive(page) {
-      await expect(page.locator(".draft-checklist-row")).toHaveCount(8);
+      await expect(page.locator(".draft-checklist-row")).toHaveCount(7);
     },
   },
   {
@@ -179,8 +179,10 @@ export const stateViews: StateView[] = [
     },
   },
   {
-    // A real run whose premise check refuted the request's assumption: the
-    // brief's motivation and after card carry the tag, at every width.
+    // A real run whose premise check refuted the request's assumption.
+    // The notice states the refutation. The hoped-for outcome is written,
+    // so the after card is drawn and carries the refuted-premise tag, at
+    // every width.
     name: "premise-refuted",
     route: `#/runs/${runId}/overview`,
     include: ".mission-contribution",
@@ -188,6 +190,9 @@ export const stateViews: StateView[] = [
       run: {
         // Short enough for the sidebar's run list at 768 and 1024 px.
         title: "Greet by language",
+        contributionSettings: {
+          outcome: "Each person is greeted in their own language.",
+        },
         team: {
           config: { maxTeammates: 2, requirePlanApproval: true, provider: "codex", protocol: "bell-shared-tasks", messageDelivery: "between-turns" },
           phase: "complete",
@@ -207,8 +212,12 @@ export const stateViews: StateView[] = [
       { width: 1024, height: 768 },
     ],
     async drive(page, locale) {
-      const t = messages[locale].mission.brief;
-      await expect(page.locator(".mission-after .mission-premise-tag")).toHaveText(t.premiseRefuted);
+      const premise = messages[locale].workspace.premise;
+      const brief = messages[locale].mission.brief;
+      const notice = page.locator(".mission-contribution .premise-notice");
+      await expect(notice.getByRole("heading", { name: premise.heading({ verdict: premise.verdicts.refuted }) })).toBeVisible();
+      await expect(notice.locator(".premise-statement")).toHaveText("Greetings are always in English today.");
+      await expect(page.locator(".mission-after .mission-premise-tag")).toHaveText(brief.premiseRefuted);
     },
   },
   {

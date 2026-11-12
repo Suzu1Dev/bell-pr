@@ -212,7 +212,10 @@ same.
 
 ## 3. Choose a direction
 
-**Choose a contribution direction**, or start from a recommendation. Pick
+Choose **New contribution**, or start from a recommendation. Enter the task
+goal and completion criteria first. **Additional requirements** holds the
+beneficiaries, outcome and boundaries; **AI and team settings** shows the
+current configuration and expands for changes. Pick
 one main direction (fix a bug, add a feature, improve performance, user
 experience, add tests, improve docs or maintenance) and describe:
 
@@ -429,7 +432,8 @@ against the code.
 **Overview & motivation** leads with this contribution's brief: the premise
 check, the problem and the motivation, before and after, and how to
 validate it, in Markdown as written. The project's analysis follows as its
-background, and the directions come last. On a finished run you can check
+background in an expandable section, together with other contribution
+directions. The review action stays next to the current brief. On a finished run you can check
 the premise again (or for the first time, on a run made before premise
 checks); a changed verdict has the walkthroughs written again, and the
 explanations you have not answered from yet.
@@ -576,8 +580,12 @@ those new parts makes the parts that built on them build on that part again.
 **The maintainer checklist** shows, row by row, the project's rules,
 whether pull requests are open to you, the linked issue, your pace in this
 repository, your own words, reviewability, disclosing AI help and the
-understanding check, each with its source and one sentence on why
-maintainers care.
+understanding check, together with file review and draft-saving status.
+Unfinished, blocked and unknown items stay visible. Completed checks are
+collapsed, with separate counts for passed and turned-off checks. Sources and
+explanations can be expanded. **View publishing checklist** jumps there from
+the editor. Commit messages and branch names are under **Commit message and
+branch**.
 
 Before you can approve, BELL PR checks what will be sent. Blocks common token formats and private keys before publishing.
 Placeholders such as `TODO:` or an empty `Fixes #` block it;
@@ -671,6 +679,9 @@ If it may be the only copy, it stays.
   short note in your own words.
 
 ## Keep learning
+
+Learning notes are grouped by contribution. Sample notes can be expanded
+separately. The AI team role reference is available from **User guide**.
 
 - **Learning notes** in the sidebar collects the explanations and your
   notes from every contribution, with a search, so you can come back to a

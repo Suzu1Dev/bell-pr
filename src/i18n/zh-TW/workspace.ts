@@ -22,9 +22,9 @@ const m: Translation<typeof en> = {
   tabsLabel: "任務內容",
   tabs: {
     session: "協作",
-    overview: "全貌與動機",
+    overview: "任務概覽",
     changes: "程式碼變更",
-    activity: "Agent 動態",
+    activity: "執行進度",
     draft: "PR 草稿",
     commits: "Commit 歷程",
   },
@@ -50,6 +50,36 @@ const m: Translation<typeof en> = {
       `維護者在 ${date} 要求修改。請在 GitHub 上用自己的話回覆，或開始一輪修正。`,
     queued: "排隊中：同時執行的工作數已達上限，其他任務完成後才會開始",
     workspaceRemoved: "為了釋出磁碟空間，這次任務的檔案已清除；報告與筆記仍會保留。",
+  },
+  holdStop: {
+    heading: () => "改到別人佔用的檔案，已停止",
+    body:
+      "上一回合改到別人佔用的檔案，改動仍留在工作目錄。你可以還原這些檔案，或等釋出、收回佔用後重新檢查。",
+    legacyBody:
+      "這項工作先前因改到別人佔用的檔案而停止。你可以還原這些檔案，或重新檢查目前的佔用狀態。",
+    legacyTaskStopped:
+      "這個子任務改到別人佔用的檔案，改動未加入這份貢獻。等佔用釋出或收回後即可重試。",
+    item: ({ path, holder, title, since }) =>
+      `${path}：由 ${holder} 為「${title}」佔用（${since} 起）`,
+    itemMeta: ({ holder, title, since }) =>
+      `由 ${holder} 為「${title}」佔用 · ${since} 起`,
+    itemPathOnly: ({ path }) => `${path}（被他人佔用）`,
+    restoreAction: ({ count = 2 } = {}) =>
+      count === 1 ? "還原這個檔案" : "還原這些檔案",
+    restoringAction: "還原中…",
+    recheckAction: "重新檢查",
+    recheckingAction: "檢查中…",
+    restoreConfirmTitle: "還原被佔用的檔案？",
+    restoreConfirmBody: ({ count }) =>
+      `要把這 ${count} 個被佔用的檔案還原回這次工作的基準版本嗎？${count === 1 ? "這個" : "這些"}檔案的改動會移除，其他檔案若有修改會維持原樣。`,
+    restoreConfirmAction: "還原這些檔案",
+    restoreCancelAction: "取消",
+    restoreFailed:
+      "無法完成還原，部分檔案可能已還原。請重新整理確認後再試，或在工作目錄手動還原。",
+    restoreStale:
+      "工作目錄已有新的變更，未執行還原。請重新整理檔案清單後再試。",
+    recheckFailed: ({ name }) =>
+      `目前無法確認檔案佔用狀態。請稍後再試；若小組協作已停止，請先在主機修復並重新啟動 ${name}。`,
   },
   sampleReview: "範例審查",
   humanReview: "人工審查",
@@ -85,7 +115,7 @@ const m: Translation<typeof en> = {
     ready: "可以審查了",
     writeFirst: "請先寫一點修改",
     reading: "嚮導正在閱讀程式碼",
-    planFirst: "先到 Agent 動態寫下你自己的計畫，接著再自己寫修改。",
+    planFirst: "先到「執行進度」寫下你自己的計畫，接著再自己寫修改。",
     writePr: "先寫好 PR 標題與說明",
     reviewing: "嚮導正在審查",
     changed: "你在標記可以審查之後又改了程式碼。審查和理解檢查會等你再次標記可以審查。",
@@ -153,8 +183,8 @@ const m: Translation<typeof en> = {
     preparing: "Agent team 正在準備你的變更",
     noChanges: "尚無程式碼變更",
     filesRemoved: "變更的檔案已清除",
-    noChangesHint: "在 Agent 動態查看執行過程，完成後即可在這裡審查。",
-    viewActivity: "查看 Agent 動態",
+    noChangesHint: "在「執行進度」查看執行過程，完成後即可在這裡審查。",
+    viewActivity: "查看執行進度",
     resize: "調整解說面板寬度",
     loadingPanel: "正在準備閱讀面板…",
     emptyTitle: "理解，從改動開始。",
@@ -191,8 +221,9 @@ const m: Translation<typeof en> = {
     notOpen: "等 agent 完成、任務進入審閱後，就能開始檢查。",
     loadFailed: ({ message }) => `無法載入檢查：${message}`,
     retry: "重試",
-    plan: ({ questions, lines }) =>
-      `${lines} 行變更，問 ${questions} 個檔案問題。${product.name} 預設：15 行以內不問，100 行以內 1 題，400 行以內 2 題，更多 3 題。`,
+    plan: ({ questions, lines }) => `${lines} 行變更・${questions} 個檔案問題`,
+    planHelp: "題數如何決定",
+    planRules: "預設依變更行數安排檔案問題：15 行以內不問、100 行以內 1 題、400 行以內 2 題，更多為 3 題。仍須說明整體變更與尚未測試的行為。",
     fill: "填入範例答案",
     explainTitle: "1. 講一遍",
     explainPrompt: "用 2 到 4 句話說明：這解決什麼問題、改了什麼、可能弄壞什麼？",
@@ -285,16 +316,10 @@ const m: Translation<typeof en> = {
     emptyLog: "任務開始後會在此顯示紀錄。",
     emptyFilter: "這個角色目前沒有紀錄。",
   },
-  brief: {
-    motivation: "這次貢獻的價值仍需由任務需求與驗收結果確認。",
-    before: "目前存在任務描述中的問題，實際影響範圍由團隊在規劃時確認。",
-    beforeByHand: "目前存在任務描述中的問題，實際影響範圍由你和嚮導在規劃時確認。",
-    after: "依任務需求改善現有行為，尚未驗證是否達成。",
-    risk: "在送出前確認相容性、回歸測試與使用者行為。",
-  },
   draft: {
+    publishOptions: "提交訊息與分支",
     loadingGuide: "正在載入草稿規範…",
-    heading: "讓好的改動，也有好的說明。",
+    heading: "PR 標題與說明",
     subheading: "調整草稿，讓維護者輕鬆理解你的貢獻。",
     label: "DRAFT PR",
     recoverPublish: "恢復未完成的發佈",
@@ -329,7 +354,12 @@ const m: Translation<typeof en> = {
     save: "儲存草稿",
   },
   checklist: {
-    title: "送出前，最後看一眼。",
+    open: "查看送出前待辦",
+    understandingAction: "開始理解檢查",
+    completed: "已完成的檢查",
+    reviewAction: "審閱修改",
+    editAction: "編輯草稿",
+    title: "送出前待完成",
     text: "一份清楚的 PR，是一次好合作的開始。",
     allReviewed: "已審閱所有檔案",
     files: ({ reviewed, total }) => `${reviewed} / ${total} 個檔案`,
@@ -343,7 +373,7 @@ const m: Translation<typeof en> = {
     noDescription: "還沒有說明",
     placeholdersStay: "TODO 與待填空格不會送到 GitHub",
     taskItems: "說明中的勾選項目",
-    taskItemsHelp: `只勾你真正完成或確認的項目。${product.name} 和模型不會替你勾；勾選會直接改寫左側說明，記得儲存。`,
+    taskItemsHelp: `只勾你真正完成或確認的項目。${product.name} 和模型不會替你勾；勾選會直接改寫上方說明，記得儲存。`,
     noSection: "未分段",
     samePr: "推送到同一個 PR",
     samePrHelp: "只加上新的 commit，不會 force push，也不會改 PR 標題與說明。",
@@ -438,6 +468,7 @@ const m: Translation<typeof en> = {
       issue: "Issue",
       pacing: "你在這裡的步調",
       others: "你在這裡的其他貢獻",
+      holds: "檔案佔用",
       words: "你的文字與可審閱性",
       safety: "安全",
     },
@@ -508,6 +539,17 @@ const m: Translation<typeof en> = {
       `已同步，但 ${count} 個檔案有衝突；解決後才能核准。`,
     syncedPr: "已把最新目標分支合併進 PR，審閱後推送一個合併 commit。",
     synced: "已同步到最新目標分支；改到的檔案請重新審閱。",
+    syncHeldChanges: ({ count }) =>
+      `目標分支改到 ${count} 個你佔用的檔案，請查看「目標分支」區塊。`,
+    heldFilesRestored: ({ count, keptOtherChanges = true }) =>
+      keptOtherChanges
+        ? `已還原 ${count} 個檔案，其他修改維持原樣。`
+        : `已還原 ${count} 個檔案。`,
+    holdCleared: "這些檔案已無他人佔用，可以繼續進行。",
+    holdStillActiveBy: ({ who, paths, pathCount }) =>
+      `${who} 仍佔用 ${paths}。請等對方釋出、請小組管理員收回佔用，或還原${pathCount === 1 ? "這個" : "這些"}檔案。`,
+    holdStillActiveMulti: ({ count, holders, paths }) =>
+      `仍有 ${count} 個檔案由 ${holders} 佔用（${paths}）。請等對方釋出、請小組管理員收回佔用，或還原這些檔案。`,
     resolvingConflicts: "Agent 正在解決衝突，完成後請逐檔審閱。",
     undoSyncConfirm:
       "復原同步？工作會回到同步前的內容與基準，同步後在工作目錄做的修改會被移除。",
