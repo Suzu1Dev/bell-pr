@@ -136,8 +136,8 @@ The first time you open BELL PR, a short Welcome takes you through:
 2. **Environment**: the same check as `bell-pr doctor`, with a copy button
    for every fix command. You can continue and fix the rest later in
    **Settings → Environment**.
-3. **AI provider**: if one agent CLI is ready, your agents use it; if both
-   are, you choose. You can change it later in **Settings → AI provider**.
+3. **AI provider**: if one agent CLI is ready, your agents use it; if more
+   than one is, you choose. You can change it later in **Settings → AI provider**.
 4. **Get started**: take the sample tour, import a project, or find a
    project to contribute to.
 
@@ -259,7 +259,7 @@ started with.
 ## 4. Let the agent team work
 
 Start the run with **Generate the team plan** (with plan approval) or
-**Start the agent team**. Everything happens in **Activity**:
+**Start the Agent team**. Everything happens in **Activity**:
 
 - The **Lead** splits the work into tasks, each with the files it may
   change and what it depends on. Before it plans, it checks any
@@ -319,7 +319,7 @@ Start the run with **Generate the team plan** (with plan approval) or
   **Settings → AI provider** lets writable agents install required tools and use available sudo
   privileges outside the working directory. Read the [access settings](security-model.md#explicit-full-access)
   before enabling it; read-only roles keep their restrictions. On a Full
-  access run in review or approved, **Let the agent set this up** opens the commands for
+  access run in review or approved, **Let the Agent set this up** opens the commands for
   you to tick and confirm, at most 10 per turn, then hands them to one
   Collaborate turn, which runs without the sandbox and with your account.
   The agent is told to run only the ticked commands that match the
@@ -347,7 +347,7 @@ layout from before you entered it.
 Before publishing an agent contribution, the **Collaborate** tab lets you ask
 an agent to finish missing checks, add tests or fix failures in the run's working
 directory. The draft's Limitations shortcut fills the message box for you to review
-and send. The setup checklist's **Let the agent set this up** (Full access runs
+and send. The setup checklist's **Let the Agent set this up** (Full access runs
 only) starts its turn once you confirm the commands; the agent is told not to
 change code in that turn, and when the turn finishes, its per-item results
 appear in the conversation and on the checklist. Each message starts a fresh agent call with recent conversation and
@@ -394,11 +394,11 @@ When the team is done, the run waits for your review in **Code changes**:
   way to see it and a question to check yourself. A function the change adds whole has no
   earlier version to walk through, so it points to the explanation
   instead. Walkthroughs are written one file at a time, the selected file
-  first, and are kept for that version of the diff. The walkthrough's
-  question is a hint: click it to see its answer. Unlike the
-  explanation's "Quiz yourself", it does not ask for your answer first,
-  nothing is recorded, and it does not count toward the understanding
-  check.
+  first, and are kept for that version of the diff. Each
+  part's "Check yourself" question works like the explanation's "Quiz
+  yourself" (see **Try first** below): it asks for your answer before it
+  shows one, and in an Agent run a graded answer can count toward the
+  understanding check. In a Learn by hand run it counts toward nothing.
 - **Unchanged code**: the bar between two changes says how many unchanged
   lines it hides; show 20 more above or below, or all of them, and
   **Whole file** shows the whole file between the changes. The lines are
@@ -644,7 +644,7 @@ finish, it leaves the contribution unchanged.
 - **Sync to the latest target branch** when the project moved on: BELL PR
   merges the latest target branch into your work (for a published PR, as
   one merge commit). Files the target branch changed need another review.
-  Conflicts can be resolved by hand or with **Ask the agent to resolve the
+  Conflicts can be resolved by hand or with **Ask the Agent to resolve the
   conflicts**; an unpublished run's sync can be undone.
 - **Maintainer feedback**: **Read feedback** reads the reviews, comments
   and CI results of your PR once, when you press it, and shows them file

@@ -158,7 +158,7 @@ const m: Translation<typeof en> = {
     title: "效能",
     intro: "同時進行多少工作，以及單次 Agent 回合最多能花多久。",
     maxActiveRuns: {
-      label: "同時執行的工作數",
+      label: "同時執行的任務數",
       help: "1 到 8。超過上限的工作會排隊等待。",
     },
     maxAgentProcesses: {
@@ -191,7 +191,7 @@ const m: Translation<typeof en> = {
       documentation: "詳見說明文件。",
       variables: {
         BELLPR_DATA_DIR: "資料目錄的位置（也可用 --data-dir）。預設是家目錄中的 .bellpr 資料夾。",
-        BELLPR_MAX_ACTIVE_RUNS: "同時執行的工作數：1 到 8，預設 2。",
+        BELLPR_MAX_ACTIVE_RUNS: "同時執行的任務數：1 到 8，預設 2。",
         BELLPR_MAX_AGENT_PROCESSES: "同時執行的 Agent CLI 行程數：1 到 32，預設 3。",
         BELLPR_AGENT_TIMEOUT_SCALE: "Agent 逾時倍數：0.5 到 10，預設 1。",
         BELLPR_ALLOW_UNSANDBOXED_AGENTS: "設為 1 允許 Claude Code 與 Antigravity Agent 在沙箱外執行。",

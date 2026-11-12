@@ -44,7 +44,7 @@ retry **Publish Draft PR** after resolving the error. BELL PR reuses the saved
 commit; recovery is needed when that commit no longer matches your changes.
 
 A failed publish can leave a local commit. If you later change the files or
-commit message, retrying cannot reuse that commit. On the **Draft** tab, save
+commit message, retrying cannot reuse that commit. On the **PR draft** tab, save
 your edits and choose **Recover unfinished publish**. This option appears
 only for attempts that stopped before pushing began.
 
@@ -259,7 +259,7 @@ the agent starts (HTTP 503). Pick one:
   `--security-opt` options in [Running BELL PR in Docker](docker.md#agent-sandbox-in-docker).
 - **Use Codex** for this work: sign in to the Codex CLI and choose it as
   the AI provider under **Settings → AI provider**. Its sandbox is separate.
-- **Allow unsandboxed Claude Code agents** under **Settings → Agent
+- **Allow unsandboxed Claude Code and Antigravity Agents** under **Settings → Agent
   safety**, or start BELL PR with `BELLPR_ALLOW_UNSANDBOXED_AGENTS=1`. The
   agents then run with your full user rights: they can read and change
   anything your account can, such as other projects, SSH keys and the
@@ -318,7 +318,7 @@ log. BELL PR reads the same settings. Pick one:
   `sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0` (until
   the next restart; a file in `/etc/sysctl.d/` keeps it). Then press
   **Check again** in **Settings → Environment**.
-- **Allow unsandboxed agents** under **Settings → Agent safety**, or start
+- **Allow unsandboxed Agents** under **Settings → Agent safety**, or start
   BELL PR with `BELLPR_ALLOW_UNSANDBOXED_AGENTS=1`. Antigravity's commands
   then run with your full user rights, as described for
   `claude_sandbox_unavailable` above, and every such run carries a "Ran
@@ -765,7 +765,7 @@ physical path or a symbolic link keeps the recorded Git directory; a different
 working directory with a copied `.git` pointer is still refused.
 
 - **A run is queued**: only as many contributions execute at once as
-  **Settings → Performance → Runs at a time** allows
+  **Settings → Performance → Runs at the same time** allows
   (`BELLPR_MAX_ACTIVE_RUNS`, 1 to 8, 2 by default). The others wait in the
   queue and start by themselves.
 - **"Up to 8 runs can be queued or in progress at once"**: the queue is
