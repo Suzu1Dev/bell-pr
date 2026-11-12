@@ -1,4 +1,14 @@
 /**
+ * A path under the person's hold that commits on the target branch changed
+ * since the hold was taken (docs/design/collab-write-guard.md, S4).
+ */
+export interface HeldUpstreamChange {
+  path: string;
+  /** Short commit SHAs on the target branch since the hold's base, newest first. */
+  commits: string[];
+}
+
+/**
  * The last move of an unpublished run onto a newer commit of its target
  * branch. The contribution stays uncommitted on top of the new base, as
  * every unpublished run does, so the person reviews it before publishing.
@@ -22,4 +32,6 @@ export interface BaseSync {
   resolutions?: { path: string; resolution: string }[];
   /** True while an agent resolves the conflicts; a restart clears it. */
   resolving?: boolean;
+  /** Files under the person's hold that commits on the target branch changed since the hold was taken. */
+  heldChanges?: HeldUpstreamChange[];
 }

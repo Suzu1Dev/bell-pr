@@ -446,6 +446,11 @@ const draft = {
       unpublished: ({ latest, ours }: { latest: string; ours: string }) =>
         `In each file, the side marked ${latest} is the target branch's current content and the side marked ${ours} is this contribution. You cannot approve until every conflict marker is removed. Resolve the markers by hand; ${product.name} re-checks them when you refresh the diff on the Code changes tab. Changed files still need a file-by-file review.`,
     },
+    heldChanges: "Changes under your hold",
+    heldChangesNote:
+      "Commits on {branch} changed these files since you took your hold. Check them before you publish.",
+    heldChangesCommits: ({ commits }: { commits: readonly string[] }) =>
+      `(${commits.join(", ")})`,
   },
   /** FollowUpRounds: the rounds of changes after maintainer review. */
   followUps: {

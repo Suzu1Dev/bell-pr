@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { createElement } from "react";
 import { assertNoHan, renderEn, renderZh } from "../test-utils/render";
-import { type Answer, cannotTake, GroupPage, HoldAnswer } from "./GroupPage";
+import { type Answer, cannotTake, GroupPage, HoldAnswer, taskChoices } from "./GroupPage";
 
 const asOf = "2026-11-10T09:00:05.000Z";
 const free: Answer = { asOf, invalid: [], holds: [] };
@@ -81,6 +81,13 @@ test("Take hold is off without a title, without an answer, and while something i
   assert.equal(cannotTake("Fix pagination", held({ mine: true })), true);
   assert.equal(cannotTake("Fix pagination", { ...free, invalid: ["../x"] }), true);
   assert.equal(cannotTake("Fix pagination", { ...held(), notTaken: true }), true);
+});
+
+test("a selected prerequisite stays visible after its unfinished hold leaves the task list", () => {
+  const api = { taskId: "t-api", title: "API" };
+  const ui = { taskId: "t-ui", title: "UI" };
+  assert.deepEqual(taskChoices([api], [ui]), [api, ui]);
+  assert.deepEqual(taskChoices([], [api, ui]), [api, ui]);
 });
 
 test("where group work is off the page says how to start it", () => {

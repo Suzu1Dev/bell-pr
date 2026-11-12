@@ -203,6 +203,8 @@ function contributionRun(
     ...(source.modelExecution ? { modelExecution: structuredClone(source.modelExecution) } : {}),
     ...(facts ? { contributionFacts: facts } : {}),
     ...(source.unsandboxed ? { unsandboxed: true as const } : {}),
+    // A part is still the work of the people who started the contribution.
+    ...(source.owners ? { owners: [...source.owners] } : {}),
     ...(explanations ? { explanations } : {}),
     ...(walkthroughs ? { walkthroughs } : {}),
     ...(notes ? { notes } : {}),

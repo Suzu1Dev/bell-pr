@@ -22,7 +22,7 @@ export default {
   stopped: "這輪對話已停止",
   failed: "這輪對話未完成",
   editsKept: ({ reason }: { reason: string }) =>
-    `${reason}；已改到的檔案保留在工作目錄，請到「檔案變更」檢查。`,
+    `${reason.replace(/[.。]+$/u, "")}；已改到的檔案保留在工作目錄，請到「檔案變更」檢查。`,
   waiting: "等待你的下一則訊息",
   interrupted: "這輪對話中斷",
   draftStale: "協作中有新的檢查或修改；請重新產生符合目前狀態的 PR 草稿建議。",
