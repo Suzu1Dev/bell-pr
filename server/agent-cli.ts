@@ -644,8 +644,10 @@ export async function agentCommand(
         : codexSandboxConfig(options.access, options.cwd, held)),
       "-c",
       'approval_policy="never"',
-      // Codex 0.159 `exec` has no --search flag; live search is a config override.
-      ...(web ? ["-c", 'web_search="live"'] : []),
+      // Codex 0.159 `exec` has no --search flag; search is a config override.
+      // Codex searches a cached index by default, so off is stated as well.
+      "-c",
+      web ? 'web_search="live"' : 'web_search="disabled"',
       ...(options.skipGitRepoCheck ? ["--skip-git-repo-check"] : []),
       "--json",
       "--color",

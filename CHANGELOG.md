@@ -188,6 +188,13 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   retry" instead of "Ready to claim", since nothing starts it until you
   retry. Long titles and descriptions, even with no space to break at, now
   wrap inside their card.
+- **Codex's web search tool is now off while web access is off.** BELL PR
+  passed Codex a search setting only with web access on. Codex searches a
+  cached index by default, and live in a full access sandbox, so its agents
+  could search the web with the switch off, in project analysis and
+  discovery too (seen with Codex CLI 0.167). Every Codex turn now states
+  the setting: `web_search="live"` with web access on, and
+  `web_search="disabled"` otherwise.
 
 ## [1.1.0] - 2026-11-04
 
