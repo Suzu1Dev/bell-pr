@@ -348,13 +348,17 @@ const m: Translation<typeof en> = {
       `Agent 處理後仍有衝突標記：${list(files)}；可以自行修改，或再請 Agent 處理。`,
     stopped: "已停止解衝突；已改的檔案保留，可以自行完成，或再請 Agent 處理。",
     failed: ({ reason }) =>
-      `${reason}；已改的檔案保留，可以自行完成，或再請 Agent 處理。`,
+      `${reason.replace(/[.。]+$/u, "")}；已改的檔案保留，可以自行完成，或再請 Agent 處理。`,
     incompleteReason: "解衝突未完成",
     incomplete: "解衝突未完成。",
     conflictsOpen: ({ files }) =>
       `這些檔案還有合併衝突標記：${list(files)}。請先解決衝突（也可以請 Agent 解決）。`,
     mergeFailed: "無法計算合併結果。",
     answerIncomplete: "Agent 回傳的解衝突結果格式不完整",
+    heldChangedUpstream: ({ branch, items }) =>
+      `在你佔用期間，${branch} 上有提交改到你佔用的檔案：${items.join("；")}。`,
+    heldChangedUpstreamItem: ({ path, commits }) =>
+      `${path}（${commits.join("、")}）`,
   },
   followUp: {
     inProgress: "這個工作已有一輪修正在進行。",
@@ -375,7 +379,7 @@ const m: Translation<typeof en> = {
     stoppedReason: "這輪修正已停止",
     incompleteReason: "這輪修正未完成",
     keptEdits: ({ reason }) =>
-      `${reason}；工作目錄保留了部分修改，可以審閱、寫好提交訊息後推送，或放棄這輪修正。`,
+      `${reason.replace(/[.。]+$/u, "")}；工作目錄保留了部分修改，可以審閱、寫好提交訊息後推送，或放棄這輪修正。`,
     nothingToDiscard: "目前沒有可以放棄的修正。",
     alreadyPushed: `這輪修正已推送到 PR；請再按一次推送，讓 ${product.name} 記錄完成。`,
     discarded: "已放棄這輪修正，工作目錄回到已推送的 PR 內容。",
@@ -451,8 +455,40 @@ const m: Translation<typeof en> = {
       "這個拆分出來的部分建立在同一次拆分中尚未合併的其他部分上。請先發佈那些部分，否則這個 PR 在它們合併前可能無法通過檢查。",
     buildsOn: ({ title, prUrl }) =>
       prUrl ? `「${title}」：已發佈於 ${prUrl}，尚未看到合併` : `「${title}」：尚未發佈`,
+    heldByOther:
+      "小組裡有人佔用了這次變更動到的檔案。請對方釋出、請小組管理員收回佔用，或先把這些檔案移出這次變更再發佈。",
+    heldByOtherItem: ({ path, holder, title, since }) => `${path}：由 ${holder} 為「${title}」佔用（${since} 起）`,
+    holdsUnknown: ({ name }) =>
+      `小組協作已停止，無法確認檔案佔用狀態。發佈前請先在主機修復小組協作並重新啟動 ${name}。`,
+    turnHeldByOther: ({ items }) =>
+      `Agent 改到別人佔用的檔案，所以這項工作已停止。改動仍留在工作目錄裡。${items.join("；")}。請對方釋出、請小組管理員收回佔用，或把這些檔案的改動還原，再試一次。`,
+    taskHeldByOther: ({ items }) =>
+      `隊友改到別人佔用的檔案，所以這些改動沒有加入這份貢獻。${items.join("；")}。請對方釋出，或請小組管理員收回佔用，再試一次。`,
+    planHeldByOther: ({ items }) =>
+      `這個計畫涵蓋別人佔用的檔案，所以無法核准。${items.join("；")}。請附上意見退回計畫，或等對方釋出。`,
+    autoHeld: "這個計畫涵蓋小組裡別人佔用的檔案，所以改為等待你核准，不會自動開始。",
+    agentsHoldsUnknown: ({ name }) =>
+      `小組協作已停止，無法確認檔案佔用狀態，所以 Agent 不能修改檔案。請先在主機修復小組協作並重新啟動 ${name}，或改以不帶 --group 的方式啟動 ${name}。`,
+    heldChangedUpstream: ({ branch }) =>
+      `在你佔用期間，${branch} 上有提交改到你佔用的檔案。發佈前請先確認這些變更。`,
+    heldChangedUpstreamItem: ({ path, branch, commits }) =>
+      `${path}：在你佔用期間，${branch} 上有變更（${commits.join("、")}）`,
+    holdRecoveryNotAllowed:
+      "只有已完成且尚未合併 PR 的工作，才能還原佔用檔案或重新檢查佔用狀態。",
+    holdRecoveryBusy:
+      "這個工作還有作業在進行；請等完成後再還原佔用檔案或重新檢查。",
+    holdRecoveryCheckoutMissing: "找不到這個工作的工作目錄或基準提交。",
+    heldPathsRestored: ({ files }) =>
+      files.length
+        ? `已將 ${files.length} 個佔用檔案還原到工作基準：${list([...files])}。`
+        : "沒有佔用檔案與工作基準不同。",
+    heldPathsRechecked: "已重新檢查檔案佔用：目前改到的檔案都沒有被其他人佔用。",
   },
   publish: {
+    heldByOther: ({ items }) =>
+      `這次變更動到別人佔用的檔案，所以沒有發佈。${items.join("；")}。請對方釋出，或請小組管理員收回這項佔用。`,
+    holdsUnknown: ({ name }) =>
+      `小組協作已停止，無法確認檔案佔用狀態，所以沒有發佈。請先在主機修復小組協作並重新啟動 ${name}，或改以不帶 --group 的方式啟動 ${name}。`,
     recoveryStale: "未完成的發佈記錄已變更；請重新載入後再恢復。",
     recoveryNotAllowed: "只能恢復尚未記錄推送目標或 PR 的未完成發佈。",
     recoveryBusy: "這個工作仍有作業進行中；請等完成後再恢復發佈。",

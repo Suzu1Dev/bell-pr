@@ -18,9 +18,8 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   with the code through `POST /api/collab/join` and gets a participant
   token, sent in `x-bell-participant` next to the app token; an admin can
   remove a person and, when asked, unpair the device they joined from.
-  Group work keeps nobody from writing anything: admin and member only
-  decide who may invite and remove people, add repositories and revoke a
-  hold (next entry). Without the switch nothing changes, except that a
+  Admin and member only decide who may invite and remove people, add
+  repositories and revoke a hold (next entry). Without the switch nothing changes, except that a
   participant token is masked (under Changed). `docs/group-work.md`
   describes it.
 - **The group's repositories, holds on files and folders, and a live feed,
@@ -36,7 +35,9 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `GET /api/collab/projects/<id>/feed` answers with the repository's
   board, the people of the group and what is held now, and waits up to 25
   seconds for the next change. A hold does not stop a tool, an editor or a
-  push from writing outside it, and BELL PR's agents do not read holds.
+  push outside BELL PR from writing to a held path; what BELL PR checks of
+  its own writes is in the entry "BELL PR checks its own writes against
+  other people's holds" below.
   The group's record keeps every ended hold and nothing cleans it up: once
   it is full (8 MiB) new holds are refused until the host resets group
   storage, which `docs/troubleshooting.md` describes. The paths that
@@ -59,11 +60,34 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   question. The person at the host starts group work and adds a repository
   there, an admin invites with a one-time code, and a paired device joins
   by typing it. A chip says whether the board is live, updated every 10
-  seconds or reconnecting. Using the same identity on another device and
-  removing a person stay API-only. The page shows holds and stops nothing:
-  a hold still does not keep a tool, an editor or a push from writing
-  outside it. Without the switch the page says how to turn group work on,
-  and the sidebar has no Group item. `docs/group-work.md` describes it.
+  seconds or reconnecting. Under **Must finish first** you tick the tasks
+  that must be finished before yours starts, and your own hold has
+  **Finish & release** (the task is done, so work that waits for it can
+  start) and **Release only**. Using the same identity on another device
+  and removing a person stay API-only. Without the switch the page says
+  how to turn group work on, and the sidebar has no Group item.
+  `docs/group-work.md` describes it.
+- **BELL PR checks its own writes against other people's holds.** In a
+  repository of the group, BELL PR publishes no change (first pull request
+  or follow-up round) that touches a path someone else holds: the publish
+  dialog lists the files and who holds them. A plan that covers such a
+  path cannot be approved, Codex and Claude Code turns get other people's
+  held paths read-only in the sandbox, and a teammate's change over one is
+  not integrated. A turn that still changed such a file stops the run,
+  with the change left in the checkout: the run page lists the files with
+  **Put these files back** (**Put this file back** for one file; to the
+  run's base, after one question; other changed files stay) and **Check
+  again**, also
+  `POST /api/runs/<id>/holds/restore` and `/holds/recheck`. A run keeps
+  who started it (`owners`) and the files that stopped it (`heldPaths`).
+  Sync and the first publish report commits on the target branch that
+  changed files under your own hold. Work can wait for other work
+  (`dependsOn`, releasing with `"done": true`, and
+  `GET /api/collab/projects/<id>/tasks`). An editor, a terminal tool or a
+  push outside BELL PR is not checked, and nothing is locked in a checkout
+  or on GitHub. While group work has stopped, nothing is published and no
+  turn that may change files starts in a repository of the group. Without
+  the switch nothing is checked. `docs/group-work.md` has the details.
 - **A coordination core for several people on one project, its integration
   not reachable yet.** `server/coordination.ts` grants claims on files all
   or nothing, waits for task dependencies, and moves a dedicated branch one
@@ -71,9 +95,8 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   Only group work opens it: to add the people and the repositories of a
   group, and to claim, release and revoke for its holds. Nothing in the
   app, the CLI or any listener reaches its dependencies or its
-  integration, and it protects nothing at write time: a shell, an editor
-  or an agent can still write outside a claim. Working together on one
-  project is not safer yet.
+  integration, and the core itself checks no write against a claim: the
+  checks against holds are group work's (the entry above).
 - **An admin can reopen a failed coordination task, in the core only.** The
   task keeps its claims, their reasons and fences, and records who reopened
   it and when. Members cannot reopen a task, and an integrated task never
