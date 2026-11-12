@@ -83,12 +83,46 @@
   font-size: var(--text-2xl);
   text-align: center;
 }
+.group-dependencies {
+  min-width: 0;
+  margin: var(--space-4) 0;
+  padding: 0;
+  border: 0;
+}
+.group-dependencies > .field-help:first-of-type {
+  margin-top: 0;
+}
+.group-selected,
+.group-release {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+.group-selected {
+  justify-content: space-between;
+  margin-top: var(--space-2);
+}
+.group-release {
+  justify-content: flex-end;
+  max-width: 20rem;
+}
+.group-release .button {
+  min-height: 44px;
+}
 @media (max-width: 760px) {
   .group-hold {
     grid-template-columns: 32px minmax(0, 1fr) auto;
   }
   .group-what {
     grid-area: 2 / 1 / auto / -1;
+  }
+  .group-release {
+    grid-column: 1 / -1;
+    max-width: none;
+  }
+  .group-release .button {
+    flex: 1 1 9rem;
   }
   /* Touch targets. */
   .group-page :is(.button, .icon-button, .text-input, select, .group-people > *, .draft-task-items label) {

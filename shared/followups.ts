@@ -1,4 +1,5 @@
 import type { SetupNeed } from "./setup-needs.js";
+import type { HeldUpstreamChange } from "./sync.js";
 
 /**
  * A round of changes made after maintainers reviewed the published PR. Each
@@ -52,6 +53,8 @@ export interface FollowUpRound {
   resolutions?: { path: string; resolution: string }[];
   /** True while an agent resolves this round's conflicts; a restart clears it. */
   resolving?: boolean;
+  /** Files under the person's hold that commits on the target branch changed since the hold was taken. */
+  heldChanges?: HeldUpstreamChange[];
   /** Commits pushed on GitHub outside BELL that BELL took over; nothing was pushed. */
   adopted?: boolean;
   /** What the machine lacked for checks this round could not run; absent when none was reported. */

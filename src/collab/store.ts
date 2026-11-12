@@ -16,6 +16,7 @@ import type {
   CollabProjectsResponse,
 } from "../../shared/collab";
 import { api, ApiError, send } from "../api";
+import { keepParticipantToken, participantToken } from "./participant";
 
 export interface GroupState {
   /** GET /api/collab; undefined until it answered. */
@@ -39,27 +40,6 @@ export interface GroupState {
   link: "live" | "polling" | "reconnecting";
   /** When the board was last confirmed: the host's clock, or this one's when nothing had changed. */
   asOf?: string | number;
-}
-
-/** The participant token, given once by `join`: kept as the device token is. */
-const tokenKey = "bellpr-participant-token";
-let memoryToken = "";
-
-function participantToken() {
-  try {
-    return localStorage.getItem(tokenKey) ?? memoryToken;
-  } catch {
-    return memoryToken;
-  }
-}
-
-function keepToken(token: string) {
-  memoryToken = token;
-  try {
-    localStorage.setItem(tokenKey, token);
-  } catch {
-    // Storage is unavailable: the token lasts as long as the page.
-  }
 }
 
 /** The `reason` of a refusal of group work. */
@@ -264,7 +244,7 @@ export function createGroupStore() {
 
   async function join(code: string) {
     const { token } = await api<CollabJoinResponse>("/collab/join", send("POST", { code }));
-    keepToken(token);
+    keepParticipantToken(token);
     // The card goes at once, so a second press cannot send the used code again. Maybe as
     // another person: the repositories, and which ones can be added, are asked for again.
     set({ info: undefined, refused: undefined, projects: undefined, addable: undefined, link: "live" });
