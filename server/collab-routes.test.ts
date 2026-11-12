@@ -25,12 +25,16 @@ test("before setup the group routes say so, only the person at the host sets it 
     ["/people/m-0000000001/remove", {}],
   ];
   const expectNotReady = async (state: string) => {
-    for (const who of [f.install, phone])
+    for (const who of [f.install, phone]) {
       for (const [urlPath, body] of asks) {
         const reply = await f.post(urlPath, who, body);
         assert.equal(outcome(reply), `503 ${state}`, urlPath);
         assert.deepEqual(Object.keys(reply.json).sort(), ["error", "reason"]);
       }
+      const tasksReply = await f.send("GET", "/api/collab/projects/p-0000000000/tasks", who);
+      assert.equal(outcome(tasksReply), `503 ${state}`, "GET /projects/:project/tasks");
+      assert.deepEqual(Object.keys(tasksReply.json).sort(), ["error", "reason"]);
+    }
   };
   assert.deepEqual((await f.info(f.install)).json, { state: "notSetUp", host: true });
   assert.deepEqual((await f.info(phone)).json, { state: "notSetUp", host: false });

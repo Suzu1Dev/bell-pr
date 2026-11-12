@@ -36,6 +36,8 @@ const newId = () => randomUUID();
 export interface NewRunMode {
   learnByHand?: boolean;
   byHandFit?: { learningIssue: boolean };
+  /** With group work set up: who counts as "you" for the request (hold-guard.ts runOwners), saved as the run's owners. */
+  owners?: string[];
 }
 
 export interface NewRunSources {
@@ -194,6 +196,7 @@ export async function createRun(
     modelExecution,
     ...(byHand ? { learnByHand: true as const } : {}),
     ...(helpLock ? { byHand: { helpLock } } : {}),
+    ...(mode.owners?.length ? { owners: [...mode.owners] } : {}),
     team: {
       config: {
         maxTeammates,

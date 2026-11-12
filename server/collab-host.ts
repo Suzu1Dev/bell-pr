@@ -53,10 +53,27 @@ const sideSchema = z.strictObject({
       }),
     )
     .optional(),
-  /** What the coordinator does not keep of a task, by "<project id>/<task id>". */
+  /**
+   * What the coordinator does not keep of a task, by "<project id>/<task id>":
+   * its title, the tasks it waited for, and when its holder said it is done.
+   */
   tasks: z
-    .record(z.string().max(140), z.strictObject({ title: z.string().max(120).optional() }))
+    .record(
+      z.string().max(140),
+      z.strictObject({
+        title: z.string().max(120).optional(),
+        dependsOn: z.array(z.string().max(64)).max(50).optional(),
+        doneAt: stamp,
+      }),
+    )
     .optional(),
+  /**
+   * The repository's default-branch commit when each active hold was taken,
+   * by "<project id>/<task id>", removed when the hold ends, so the holder's
+   * sync and publish can report commits on the target branch since then that
+   * touch held paths (S4).
+   */
+  holds: z.record(z.string().max(140), z.string().max(64)).optional(),
 });
 const sideReadSchema = lenientRead(sideSchema);
 export type CollabSide = z.infer<typeof sideSchema>;

@@ -7,13 +7,14 @@
 import test, { type TestContext } from "node:test";
 import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
-import { mkdir, mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, rm, symlink, writeFile } from "node:fs/promises";
 import { connect } from "node:net";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import type { CollabBoard, CollabHold } from "../shared/collab.js";
 import { collabFixture, outcome, type Headers, type Reply } from "../test/collab-fixture.js";
+import type { CollabHost } from "./collab-host.js";
 import { CollabHub } from "./collab-hub.js";
 import { participantHeader } from "./coordination-routes.js";
 import { Coordinator, coordinationLimits } from "./coordination.js";
@@ -138,7 +139,7 @@ async function group(t: TestContext, options?: Parameters<typeof collabFixture>[
   };
 }
 
-/** The fields a refusal of group work may have. */
+/** The fields a refusal in the access table may have: no row there names a dependency. */
 const refusalFields = ["reason", "error", "conflicts", "retryAfter", "invalid"];
 const fieldsOf = (reply: Reply) => Object.keys(reply.json).sort();
 
@@ -287,7 +288,8 @@ test("work: a title and paths become a hold; a held path in the way is refused w
     scopes: ["./src/parser/", "docs/guide.md"],
   });
   assert.equal(made.status, 201, made.body);
-  assert.deepEqual(Object.keys(made.json), ["hold"]);
+  assert.deepEqual(Object.keys(made.json), ["hold", "changing"]);
+  assert.deepEqual(made.json.changing, []);
   const held: CollabHold = made.json.hold;
   assert.deepEqual(Object.keys(held), [
     "claimId",
@@ -355,6 +357,7 @@ test("work: a title and paths become a hold; a held path in the way is refused w
         holder: "Ben",
       },
     ],
+    changing: [],
   });
   assert.deepEqual(await f.files(), kept);
 
@@ -411,6 +414,386 @@ test("work: a path that someone took in between is refused as a held path is", a
     { scope: "src", holder: "Dee", title: "Sources", since: hers.since },
   ]);
   assert.deepEqual((await g.board(project)).held, [hers]);
+});
+
+test("dependsOn: work is held only once each task it names is done; a task not done, or not the repository's, is refused and nothing is made", async (t) => {
+  const g = await group(t);
+  const { f, who } = g;
+  const project = await g.add("widgets");
+  const other = await g.add("gadgets");
+  const en = (asWho: Headers): Headers => ({ ...asWho, "x-bell-locale": "en" });
+  const ui = (dependsOn: unknown, asWho = who.dee) =>
+    g.work(asWho, project, { title: "UI", scopes: ["web"], dependsOn });
+  const finish = (held: CollabHold, asWho: Headers, body: unknown) =>
+    f.post(`/projects/${project}/holds/${held.claimId}/release`, asWho, body);
+  const savedTask = async (taskId: string) =>
+    JSON.parse((await f.files())[0]).tasks[`${project}/${taskId}`];
+
+  const api = await g.hold(who.member, project, { title: "API", scopes: ["src/api"] });
+  const elsewhere = await g.hold(who.dee, other, { title: "Elsewhere", scopes: ["lib"] });
+  const kept = await f.files();
+
+  // Not a task of this repository: an id nobody made, another repository's
+  // task, and an id that is no task at all. Only those are named back.
+  for (const dependsOn of [["t-0000000000"], [elsewhere.taskId], [api.taskId, "__proto__"]]) {
+    const refused = await ui(dependsOn, en(who.dee));
+    assert.deepEqual([refused.status, refused.json], [400, {
+      reason: "dependencyUnknown",
+      error: "This work depends on a task this repository does not have. Nothing was held.",
+      unknown: dependsOn.filter((id) => id !== api.taskId),
+    }], dependsOn.join());
+  }
+  // Not a list of ids: the body's shape.
+  for (const dependsOn of [api.taskId, [7]])
+    assert.equal((await ui(dependsOn)).status, 400, JSON.stringify(dependsOn));
+  // More than 50 ids, in the person's language; an id longer than a task's is no task.
+  const fiftyOne = Array.from({ length: 51 }, (_, index) => `t-${index}`);
+  const tooMany = await ui(fiftyOne, en(who.dee));
+  assert.deepEqual([tooMany.status, tooMany.json], [400, {
+    reason: "tooManyDependencies",
+    error: "One work request depends on at most 50 tasks.",
+  }]);
+  const inChineseTooMany = await ui(fiftyOne, { ...who.dee, "x-bell-locale": "zh-TW" });
+  assert.equal(inChineseTooMany.json.error, "一項工作最多相依 50 個任務。");
+  const long = "t".repeat(65);
+  assert.deepEqual((await ui([long, api.taskId], en(who.dee))).json, {
+    reason: "dependencyUnknown",
+    error: "This work depends on a task this repository does not have. Nothing was held.",
+    unknown: [long],
+  });
+
+  // Blocked: API is held and not done. Nothing is made, nothing is held.
+  const blocked = await ui([api.taskId], en(who.dee));
+  assert.deepEqual([blocked.status, blocked.json], [409, {
+    reason: "dependencyPending",
+    error: "This work depends on a task that is not done yet. Nothing was held.",
+    pending: [{ taskId: api.taskId, title: "API", held: true }],
+  }]);
+  const inChinese = await ui([api.taskId], { ...who.dee, "x-bell-locale": "zh-TW" });
+  assert.equal(inChinese.json.error, "這項工作相依的任務還沒完成，所以這次沒有佔用任何路徑。");
+  // Blocked comes first: the paths are free, and would be in the way of nobody.
+  assert.deepEqual(await f.files(), kept);
+  assert.deepEqual((await g.board(project)).held, [api]);
+
+  // Released without `done`, or revoked: not done, and never now, since
+  // that task is not held again.
+  assert.equal((await g.release(who.member, project, api)).status, 200);
+  assert.deepEqual((await ui([api.taskId])).json.pending, [
+    { taskId: api.taskId, title: "API", held: false },
+  ]);
+  const second = await g.hold(who.member, project, { title: "API 2", scopes: ["src/api"] });
+  assert.equal((await g.revoke(who.admin, project, second.claimId)).status, 200);
+  assert.equal(outcome(await ui([second.taskId])), "409 dependencyPending");
+  assert.deepEqual(await savedTask(second.taskId), { title: "API 2" });
+
+  // Only its holder says it is done, and only in a release that is taken.
+  const third = await g.hold(who.member, project, { title: "API 3", scopes: ["src/api"] });
+  assert.equal(outcome(await finish(third, who.dee, { fence: third.fence, done: true })), "403 notHolder");
+  const stale = await finish(third, who.member, { fence: third.fence + 1, done: true });
+  assert.equal(outcome(stale), "409 staleFence");
+  assert.equal((await finish(third, who.member, { fence: third.fence, done: "yes" })).status, 400);
+  assert.equal(outcome(await ui([third.taskId])), "409 dependencyPending");
+  assert.deepEqual(await savedTask(third.taskId), { title: "API 3" });
+
+  // Done: the hold ends, the side file says when, and the work that waited is held.
+  const done = await finish(third, who.member, { fence: third.fence, done: true });
+  assert.deepEqual([done.status, done.json], [200, { ok: true }]);
+  const finished = await savedTask(third.taskId);
+  assert.deepEqual(Object.keys(finished), ["title", "doneAt"]);
+  assert.ok(Date.parse(finished.doneAt) > 0);
+  assert.equal(outcome(await finish(third, who.member, { fence: third.fence, done: true })), "409 ended");
+  const waited = await ui([third.taskId, third.taskId]);
+  assert.equal(waited.status, 201, waited.body);
+  const held: CollabHold = waited.json.hold;
+  // Named twice is named once.
+  assert.deepEqual(held.dependsOn, [{ taskId: third.taskId, title: "API 3" }]);
+  assert.deepEqual(await savedTask(held.taskId), { title: "UI", dependsOn: [third.taskId] });
+  // The coordinator's task names none: its own rule would wait for an integration.
+  const coordinator = f.collab.coordinator();
+  const view = coordinator.project(coordinator.authenticate(g.dee.token), project);
+  assert.deepEqual(view.tasks.find((task) => task.id === held.taskId)?.dependsOn, []);
+
+  // One done and one not: waiting for that one alone.
+  const docs = await g.work(who.member, project, {
+    title: "Docs",
+    scopes: ["docs"],
+    dependsOn: [third.taskId, held.taskId],
+  });
+  assert.equal(outcome(docs), "409 dependencyPending");
+  assert.deepEqual(docs.json.pending, [{ taskId: held.taskId, title: "UI", held: true }]);
+  // No cycle can form: work makes a new task each time, it names only tasks
+  // made before it, and what a task names never changes.
+  assert.deepEqual(await savedTask(third.taskId), finished);
+  await f.nothingLeaked();
+});
+
+test("dependsOn on the board: a hold names the tasks it waited for, the feed wakes for a task done, and done stays done after a restart", async (t) => {
+  const g = await group(t);
+  const { f, who } = g;
+  const project = await g.add("widgets");
+  const api = await g.hold(who.member, project, { title: "API", scopes: ["src/api"] });
+
+  const first = await g.park(who.dee, project);
+  const released = await f.post(`/projects/${project}/holds/${api.claimId}/release`, who.member, {
+    fence: api.fence,
+    done: true,
+  });
+  assert.equal(released.status, 200, released.body);
+  assert.deepEqual((await first.reply).json.board.held, []);
+
+  const second = await g.park(who.dee, project);
+  const ui = await g.hold(who.admin, project, { title: "UI", scopes: ["web"], dependsOn: [api.taskId] });
+  assert.deepEqual(Object.keys(ui), [
+    "claimId",
+    "taskId",
+    "title",
+    "holder",
+    "scopes",
+    "fence",
+    "since",
+    "dependsOn",
+  ]);
+  const told = await second.reply;
+  assert.equal(told.status, 200, told.body);
+  assert.deepEqual(told.json.board.held, [ui]);
+  assert.deepEqual(told.json.board.held[0].dependsOn, [{ taskId: api.taskId, title: "API" }]);
+
+  await f.start();
+  assert.deepEqual((await g.board(project)).held, [ui]);
+  const docs = await g.hold(who.dee, project, {
+    title: "Docs",
+    scopes: ["docs"],
+    dependsOn: [api.taskId],
+  });
+  assert.deepEqual(docs.dependsOn, [{ taskId: api.taskId, title: "API" }]);
+});
+
+test("the task list offers active and done prerequisites, not unfinished ended holds", async (t) => {
+  const g = await group(t);
+  const { f, who } = g;
+  const project = await g.add("widgets");
+  const other = await g.add("gadgets");
+  const elsewhere = await g.hold(who.dee, other, { title: "Elsewhere", scopes: ["lib/other.ts"] });
+  const otherFinished = await g.hold(who.member, other, { title: "Gadgets done", scopes: ["docs/other.md"] });
+  assert.equal(
+    (
+      await f.post(`/projects/${other}/holds/${otherFinished.claimId}/release`, who.member, {
+        fence: otherFinished.fence,
+        done: true,
+      })
+    ).status,
+    200,
+  );
+  const list = (asWho: Headers = who.dee, id = project) =>
+    f.send("GET", `/api/collab/projects/${id}/tasks`, asWho);
+
+  const first = await g.hold(who.member, project, { title: "API", scopes: ["src/secret/api.ts"] });
+  assert.deepEqual((await list()).json, {
+    tasks: [{ taskId: first.taskId, title: "API", status: "held" }],
+  });
+
+  // Omitted `done`, explicit `done: false`, admin revoke, and removal auto-revoke all drop from `/tasks`.
+  await g.release(who.member, project, first);
+  assert.deepEqual((await list()).json, { tasks: [] });
+  const pending = await g.work(who.dee, project, {
+    title: "UI",
+    scopes: ["web"],
+    dependsOn: [first.taskId],
+  });
+  assert.deepEqual(pending.json.pending, [{ taskId: first.taskId, title: "API", held: false }]);
+
+  const explicitFalse = await g.hold(who.member, project, { title: "Draft API", scopes: ["src/secret/draft.ts"] });
+  const releasedFalse = await f.post(`/projects/${project}/holds/${explicitFalse.claimId}/release`, who.member, {
+    fence: explicitFalse.fence,
+    done: false,
+  });
+  assert.equal(releasedFalse.status, 200, releasedFalse.body);
+  assert.deepEqual((await list()).json, { tasks: [] });
+
+  const revokedHold = await g.hold(who.member, project, { title: "Abandoned", scopes: ["src/secret/abandoned.ts"] });
+  assert.equal((await g.revoke(who.admin, project, revokedHold.claimId)).status, 200);
+  assert.deepEqual((await list()).json, { tasks: [] });
+
+  const deskE = await f.device("Desk E");
+  const eve = await f.join(deskE, await f.invite(who.admin, { name: "Eve" }));
+  const whoEve: Headers = { ...deskE, [participantHeader]: eve.token };
+  await g.hold(whoEve, project, { title: "Eve hold", scopes: ["src/secret/eve.ts"] });
+  assert.equal((await f.post(`/people/${eve.id}/remove`, who.admin)).status, 200);
+  assert.deepEqual((await list()).json, { tasks: [] });
+
+  const second = await g.hold(who.member, project, { title: "API 2", scopes: ["src/secret/api2.ts"] });
+  const done = await f.post(`/projects/${project}/holds/${second.claimId}/release`, who.member, {
+    fence: second.fence,
+    done: true,
+  });
+  assert.equal(done.status, 200, done.body);
+  const dependent = await g.hold(who.dee, project, {
+    title: "UI",
+    scopes: ["web/secret/ui.tsx"],
+    dependsOn: [second.taskId],
+  });
+
+  const checkPayload = async () => {
+    const reply = await list(who.member);
+    assert.equal(reply.status, 200, reply.body);
+    assert.deepEqual(Object.keys(reply.json), ["tasks"]);
+    assert.deepEqual(reply.json, {
+      tasks: [
+        { taskId: second.taskId, title: "API 2", status: "done" },
+        { taskId: dependent.taskId, title: "UI", status: "held" },
+      ],
+    });
+    for (const entry of reply.json.tasks)
+      assert.deepEqual(Object.keys(entry).sort(), ["status", "taskId", "title"]);
+    for (const forbidden of [
+      "scopes",
+      "holder",
+      "claimId",
+      "fence",
+      "since",
+      "dependsOn",
+      "src/secret",
+      "web/secret",
+      "lib/other.ts",
+      "docs/other.md",
+      "Elsewhere",
+      "Gadgets done",
+      "Ben",
+      "Dee",
+      "Eve",
+      g.ben.id,
+      g.dee.id,
+      eve.id,
+      second.claimId,
+      dependent.claimId,
+      "bpc_",
+    ])
+      assert.equal(reply.body.includes(forbidden), false, `leaked ${forbidden}`);
+  };
+  await checkPayload();
+
+  // Strict cross-project isolation in both directions, and preserved across restart.
+  const otherReply = await list(who.dee, other);
+  assert.deepEqual(otherReply.json, {
+    tasks: [
+      { taskId: elsewhere.taskId, title: "Elsewhere", status: "held" },
+      { taskId: otherFinished.taskId, title: "Gadgets done", status: "done" },
+    ],
+  });
+  for (const cross of [second.taskId, dependent.taskId, "API 2", "UI"])
+    assert.equal(otherReply.body.includes(cross), false, `cross-project leak ${cross}`);
+
+  const unknown = await list(who.dee, "no-such");
+  assert.equal(outcome(unknown), "404 unknownProject");
+  assert.deepEqual(fieldsOf(unknown), ["error", "reason"]);
+
+  await f.start();
+  await checkPayload();
+  await f.nothingLeaked();
+});
+
+/**
+ * Holds up the host's next side-file write, which fails when `fails`.
+ * `meanwhile` runs `steps` once the write is on its way, then lets it on,
+ * also when a step fails: a write held up for good would hold up the end
+ * of the test.
+ */
+function writeHeldUp(t: TestContext, host: CollabHost, { fails = false } = {}) {
+  const saveSide = host.saveSide;
+  let reached = false;
+  let go = () => {};
+  const gate = new Promise<void>((resolve) => (go = resolve));
+  t.mock.method(host, "saveSide", async (change: Parameters<CollabHost["saveSide"]>[0]) => {
+    if (!reached) {
+      reached = true;
+      await gate;
+      if (fails) throw new Error("EIO: i/o error, write");
+    }
+    return saveSide(change);
+  });
+  return {
+    async meanwhile<T>(steps: () => Promise<T>): Promise<T> {
+      try {
+        await until(() => reached);
+        return await steps();
+      } finally {
+        go();
+      }
+    },
+  };
+}
+
+test("dependsOn during a done release: the work waits for the done write and is held, instead of reading the task as ended and never done", async (t) => {
+  const g = await group(t);
+  const { f, who } = g;
+  const project = await g.add("widgets");
+  const other = await g.add("gadgets");
+  const api = await g.hold(who.member, project, { title: "API", scopes: ["src/api"] });
+  const runs = t.mock.method(f.collab, "run");
+
+  const write = writeHeldUp(t, f.collab);
+  const released = f.post(`/projects/${project}/holds/${api.claimId}/release`, who.member, {
+    fence: api.fence,
+    done: true,
+  });
+  const { waited, docs, early } = await write.meanwhile(async () => {
+    // The hold has ended, and the side file does not say done yet.
+    assert.deepEqual((await g.board(project)).held, []);
+    // The work that waits for API is with the host, after the release.
+    const before = runs.mock.callCount();
+    let answered = false;
+    const waited = g.work(who.dee, project, { title: "UI", scopes: ["web"], dependsOn: [api.taskId] });
+    void waited.then(() => (answered = true));
+    await until(() => runs.mock.callCount() > before);
+    // Work that names no task, and work in another repository, do not wait.
+    const docs = await g.hold(who.admin, project, { title: "Docs", scopes: ["docs"] });
+    await g.hold(who.admin, other, { title: "Elsewhere", scopes: ["lib"], dependsOn: [] });
+    return { waited, docs, early: answered };
+  });
+  assert.equal(early, false, "answered while the done write was on its way");
+  assert.deepEqual((await released).json, { ok: true });
+  const ui = await waited;
+  assert.equal(ui.status, 201, ui.body);
+  assert.deepEqual(ui.json.hold.dependsOn, [{ taskId: api.taskId, title: "API" }]);
+  assert.deepEqual((await g.board(project)).held, [docs, ui.json.hold]);
+});
+
+test("a done write that fails: the release says the hold ended and cannot be done now, and the work that waited for it is told so", async (t) => {
+  const g = await group(t);
+  const { f, who } = g;
+  const project = await g.add("widgets");
+  const api = await g.hold(who.member, project, { title: "API", scopes: ["src/api"] });
+  const runs = t.mock.method(f.collab, "run");
+  const finish = (asWho: Headers) =>
+    f.post(`/projects/${project}/holds/${api.claimId}/release`, asWho, {
+      fence: api.fence,
+      done: true,
+    });
+
+  const write = writeHeldUp(t, f.collab, { fails: true });
+  const released = finish({ ...who.member, "x-bell-locale": "en" });
+  const waited = write.meanwhile(async () => {
+    const before = runs.mock.callCount();
+    const waited = g.work(who.dee, project, { title: "UI", scopes: ["web"], dependsOn: [api.taskId] });
+    await until(() => runs.mock.callCount() > before);
+    return { waited };
+  });
+
+  const failed = await released;
+  assert.deepEqual([failed.status, failed.json], [500, {
+    reason: "doneNotSaved",
+    error:
+      "The hold has ended, but its task could not be marked done, and now it never can be. Work that waits for it has to name another task. The log on the host has the details.",
+  }]);
+  assert.ok(f.logged.some((line) => line.includes("could not save that a task is done")));
+  // The work after it in the queue is answered, with what is true now.
+  const ui = await (await waited).waited;
+  assert.equal(outcome(ui), "409 dependencyPending");
+  assert.deepEqual(ui.json.pending, [{ taskId: api.taskId, title: "API", held: false }]);
+  assert.equal(outcome(await finish(who.member)), "409 ended");
+  // Group work goes on.
+  const next = await g.work(who.dee, project, { title: "UI", scopes: ["web"] });
+  assert.equal(next.status, 201, next.body);
 });
 
 test("the board: what is held, oldest first, and the people; a hold that ended or was refused is not on it", async (t) => {
@@ -673,7 +1056,8 @@ test("who may use the repositories and the boards: people of the group, and no 4
     ["GET", `${at}/feed`, undefined, { member: "200", admin: "200" }],
     ["POST", `${at}/check`, { scopes: ["src"] }, { member: "200", admin: "200" }],
     // The member is asked first and takes the path, so the admin finds it held.
-    ["POST", `${at}/work`, { title: "Parser", scopes: ["src"] }, { member: "201", admin: "409 conflict" }],
+    ["POST", `${at}/work`, { title: "Parser", scopes: ["src/secret/parser.ts"] }, { member: "201", admin: "409 conflict" }],
+    ["GET", `${at}/tasks`, undefined, { member: "200", admin: "200" }],
     [
       "POST",
       `${at}/holds/no-such-hold/release`,
@@ -687,6 +1071,10 @@ test("who may use the repositories and the boards: people of the group, and no 4
       { member: "403 adminOnly", admin: "404 unknownClaim" },
     ],
   ];
+  const assertNoTaskOrPathLeak = (reply: Reply, label: string) => {
+    for (const leaked of ["src/secret/parser.ts", "\"tasks\"", "bpc_"])
+      assert.equal(reply.body.includes(leaked), false, `${label}: leaked ${leaked}`);
+  };
   for (const [method, urlPath, body, expected] of rows) {
     const name = `${method} /api/collab${urlPath}`;
     for (const asWho of Object.keys(who) as Who[]) {
@@ -697,25 +1085,65 @@ test("who may use the repositories and the boards: people of the group, and no 4
       assert.equal(typeof reply.json.error, "string");
       for (const field of Object.keys(reply.json))
         assert.ok(refusalFields.includes(field), `${name} as ${asWho}: ${field}`);
+      if (urlPath === `${at}/tasks`) {
+        assert.equal(reply.body.includes("Parser"), false, `${name} as ${asWho}: leaked title`);
+        assertNoTaskOrPathLeak(reply, `${name} as ${asWho}`);
+      }
     }
     // 401 is the guard's alone: no app token, whatever the participant token.
     const noAppToken = await f.send(method, `/api/collab${urlPath}`, {
       [participantHeader]: g.ada.token,
     }, body);
     assert.equal(noAppToken.status, 401, name);
+    assert.equal(noAppToken.body.includes("Parser"), false, `${name} 401 leaked title`);
+    assertNoTaskOrPathLeak(noAppToken, `${name} noAppToken`);
+  }
+
+  // `/tasks` auth & revocation edges: untrusted Bearer or unpaired device -> 401;
+  // paired member device without X-Bell-Participant, malformed token, or removed member -> 403 notJoined.
+  const deskE = await f.device("Desk E");
+  const eve = await f.join(deskE, await f.invite(who.admin, { name: "Eve" }));
+  const unpaired = await f.post(`/people/${eve.id}/remove`, who.admin, { unpair: true });
+  assert.deepEqual([unpaired.status, unpaired.json.unpaired], [200, true]);
+  for (const [label, badAuth] of [
+    ["missing Authorization", {}],
+    ["untrusted Bearer with valid participant", { authorization: "Bearer untrusted-token", [participantHeader]: g.ada.token }],
+    ["unpaired device with removed participant", { ...deskE, [participantHeader]: eve.token }],
+    ["unpaired device with active participant", { ...deskE, [participantHeader]: g.ben.token }],
+  ] as [string, Headers][]) {
+    const reply = await f.send("GET", `/api/collab${at}/tasks`, badAuth);
+    assert.equal(reply.status, 401, label);
+    assert.equal(reply.body.includes("Parser"), false, `${label}: leaked title`);
+    assertNoTaskOrPathLeak(reply, label);
+  }
+  for (const [label, unjoinedHeaders] of [
+    ["paired member device without X-Bell-Participant", g.devices.ben],
+    ["empty X-Bell-Participant", { ...g.devices.ben, [participantHeader]: "" }],
+    ["malformed X-Bell-Participant", { ...g.devices.ben, [participantHeader]: "not-a-bpc-token" }],
+    ["removed Eve token on paired device", { ...who.device, [participantHeader]: eve.token }],
+  ] as [string, Headers][]) {
+    const reply = await f.send("GET", `/api/collab${at}/tasks`, unjoinedHeaders);
+    assert.equal(outcome(reply), "403 notJoined", label);
+    assert.deepEqual(fieldsOf(reply), ["error", "reason"]);
+    assert.equal(reply.body.includes("Parser"), false, `${label}: leaked title`);
+    assertNoTaskOrPathLeak(reply, label);
   }
 
   // No repository of the group, or the name of something every object has.
-  for (const id of ["p-0000000000", "__proto__", "constructor"]) {
+  for (const id of ["p-0000000000", "__proto__", "constructor", "toString"]) {
     const base = `/projects/${id}`;
     const replies = [
+      await f.send("GET", `/api/collab${base}/tasks`, who.member),
       await f.send("GET", `/api/collab${base}/feed`, who.member),
       await f.post(`${base}/check`, who.member, { scopes: ["src"] }),
       await f.post(`${base}/work`, who.member, { title: "Parser", scopes: ["lib"] }),
       await f.post(`${base}/holds/no-such-hold/release`, who.member, { fence: 1 }),
       await f.post(`${base}/holds/no-such-hold/revoke`, who.admin, {}),
     ];
-    for (const reply of replies) assert.equal(outcome(reply), "404 unknownProject", id);
+    for (const reply of replies) {
+      assert.equal(outcome(reply), "404 unknownProject", id);
+      assertNoTaskOrPathLeak(reply, `404 ${id}`);
+    }
   }
   assert.deepEqual(Object.getOwnPropertyNames(Object.prototype), prototype);
   // A refusal is no failure worth a log line.
@@ -741,6 +1169,7 @@ test("a host that stops answers 503 on every route, frees nothing, and does not 
   const calls = [
     () => f.send("GET", "/api/collab/projects", who.admin),
     () => f.post("/projects", who.admin, { repoId: "repo-widgets" }),
+    () => f.send("GET", `/api/collab/projects/${project}/tasks`, who.member),
     () => g.feed(who.member, project),
     () => g.check(who.member, project, ["src"]),
     () => g.work(who.member, project, { title: "More", scopes: ["lib"] }),
@@ -867,4 +1296,59 @@ test("what a person may send: 50 paths of 300 characters, a title of 120, and so
   assert.equal(outcome(hurried), "429 slowDown");
   assert.ok(hurried.json.retryAfter >= 1 && hurried.json.retryAfter <= checkLimit.windowMs / 1000);
   assert.equal((await g.check(who.dee, project, ["lib"])).status, 200);
+});
+
+test("a path through a committed symbolic link or into a submodule cannot be held", async (t) => {
+  const g = await group(t);
+  const { f, who } = g;
+  const repo = await g.repository("links");
+  await mkdir(path.join(repo.path, "src", "api"), { recursive: true });
+  await writeFile(path.join(repo.path, "src", "api", "users.ts"), "export {};\n");
+  await symlink("src/api", path.join(repo.path, "alias"));
+  await symlink("README.md", path.join(repo.path, "readme"));
+  await git(repo.path, ["add", "-A"]);
+  // A submodule as Git records it: one entry, whatever is inside it.
+  await git(repo.path, ["update-index", "--add", "--cacheinfo", `160000,${"1".repeat(40)},vendor/lib`]);
+  await git(repo.path, ["commit", "-q", "-m", "links"]);
+  // Only the default branch counts: on another one, `docs` is a link too.
+  await git(repo.path, ["checkout", "-q", "-b", "linked"]);
+  await symlink("src", path.join(repo.path, "docs"));
+  await git(repo.path, ["add", "docs"]);
+  await git(repo.path, ["commit", "-q", "-m", "docs link"]);
+  await git(repo.path, ["checkout", "-q", "main"]);
+  const added = await f.post("/projects", who.admin, { repoId: repo.id });
+  assert.equal(added.status, 201, added.body);
+  const project = added.json.project.id as string;
+
+  // In another case too: on a disk that does not tell case apart, ALIAS opens the link.
+  const asked = [
+    "./alias/users.ts",
+    "alias/",
+    "readme",
+    "vendor/lib/x.ts",
+    "ALIAS/users.ts",
+    "Readme",
+    "VENDOR/Lib/x.ts",
+    "src/api/users.ts",
+    "SRC/Api/users.ts",
+  ];
+  const linked = asked.slice(0, -2);
+  const checked = await g.check(who.member, project, asked);
+  assert.equal(checked.status, 200, checked.body);
+  assert.deepEqual([checked.json.invalid, checked.json.meets], [linked, []]);
+  const refused = await g.work(who.member, project, { title: "Users", scopes: asked });
+  assert.equal(outcome(refused), "400 invalidScope");
+  assert.deepEqual(refused.json.invalid, linked);
+  // The real path, the submodule as a whole and a path that is a link on another branch.
+  const held = await g.hold(who.member, project, {
+    title: "Users",
+    scopes: ["src/api/users.ts", "vendor/lib", "docs/guide.md"],
+  });
+  assert.deepEqual(held.scopes, ["src/api/users.ts", "vendor/lib", "docs/guide.md"]);
+
+  // Unread when BELL PR's clone has no default branch: held as before.
+  await git(repo.path, ["checkout", "-q", "linked"]);
+  await git(repo.path, ["branch", "-q", "-D", "main"]);
+  const unread = await g.hold(who.dee, project, { title: "Alias", scopes: ["alias/users.ts"] });
+  assert.deepEqual(unread.scopes, ["alias/users.ts"]);
 });
