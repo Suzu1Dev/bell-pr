@@ -424,7 +424,8 @@ test("the coach's CLI runs read-only in BELL's empty folder, offline, even when 
   assert.ok(!call.args.includes("--sandbox"));
   assert.equal(flag("--model"), "gpt-saved");
   assert.ok(call.args.includes("--skip-git-repo-check"));
-  assert.ok(!call.args.some((arg) => arg.includes("web_search")));
+  assert.ok(call.args.includes('web_search="disabled"'));
+  assert.ok(!call.args.includes('web_search="live"'));
   assert.equal(flag("-C"), call.cwd);
   assert.ok(call.cwd!.startsWith(path.join(os.tmpdir(), "bell-coach-")));
   assert.ok(flag("--output-schema").startsWith(call.cwd!));

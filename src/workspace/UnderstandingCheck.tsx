@@ -460,9 +460,10 @@ export default function UnderstandingCheck({
       {header}
       {!open && !view.passed && <p className="check-step">{t.notOpen}</p>}
       {open && !view.passed && (
-        <p className="check-plan">
-          {t.plan({ questions: view.plan.filter((item) => item.path).length, lines })}
-        </p>
+        <div className="check-plan">
+          <p>{t.plan({ questions: view.plan.filter((item) => item.path).length, lines })}</p>
+          <details><summary>{t.planHelp}</summary><p>{t.planRules}</p></details>
+        </div>
       )}
       {(open || record?.summary) && (
         <Step id={ids.explain} title={t.explainTitle}>

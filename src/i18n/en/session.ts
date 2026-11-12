@@ -3,7 +3,7 @@ const messages = {
   "attention": "Needs attention",
   "busy": "The agent is working in this checkout. Wait until it finishes before making changes.",
   "label": "Collaborate with the agent",
-  "empty": "Tell the agent what to do, such as fixing a failed check or adding tests. It edits this unpublished checkout and runs checks. Each turn lists the changed files, observed commands and any questions.",
+  "empty": "Describe the next change. The agent can edit this unpublished checkout and run checks; review its results after each turn.",
   "progress": "Current agent progress",
   "working": "The agent is working",
   "stop": "Stop",

@@ -2480,7 +2480,7 @@ if (prompt.includes('You are the team lead with read-only access')) {
     }
     assert.ok(reviewer);
     assert.doesNotMatch(reviewer.prompt, /application-observed/);
-    // Every team role ran with live search and the one-sentence web rule; isolated roles stay offline.
+    // Every team role ran with live search and the web rule; isolated roles stay offline.
     const member = prompts.find((entry) =>
       entry.prompt.includes("independent teammate working on task"),
     );

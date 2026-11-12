@@ -204,6 +204,9 @@ const sectionAnchor = (section: OverviewSection) => `overview-${section}`;
 
 /** Scrolls `target` to the top, below the sticky section nav, and focuses it. */
 function showSection(target: HTMLElement) {
+  for (let parent = target.parentElement; parent; parent = parent.parentElement) {
+    if (parent instanceof HTMLDetailsElement) parent.open = true;
+  }
   target.scrollIntoView({
     block: "start",
     behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
@@ -463,7 +466,6 @@ function Brief({
     >
       <div className="mission-section-heading">
         <div>
-          <span className="mission-kicker">{t.kicker}</span>
           <h2 id="mission-contribution-title">{t.title}</h2>
         </div>
         <span className="mission-section-icon">
@@ -495,11 +497,11 @@ function Brief({
               <span>{t.problem}</span>
               <BriefText text={brief.problem} />
             </div>
-            <div>
+            {brief.motivation && brief.motivation !== brief.after && <div>
               <span>{t.motivation}</span>
               {tag && <em className="mission-premise-tag">{tag}</em>}
               <BriefText text={brief.motivation} />
-            </div>
+            </div>}
           </div>
           {brief.beneficiaries.length > 0 && (
             <div className="mission-beneficiaries">
@@ -510,28 +512,29 @@ function Brief({
               ))}
             </div>
           )}
-          <div className="mission-before-after">
-            <article className="mission-before">
+          {(brief.before || brief.after) && <div className="mission-before-after">
+            {brief.before && <article className="mission-before">
               <span className="mission-change-label">
                 {t.before} <span>{t.beforeCaption}</span>
               </span>
               <BriefText text={brief.before} />
-            </article>
-            <div className="mission-change-arrow" aria-hidden="true">
+            </article>}
+            {brief.before && brief.after && <div className="mission-change-arrow" aria-hidden="true">
               <ArrowRight size={20} />
-            </div>
-            <article className="mission-after">
+            </div>}
+            {brief.after && <article className="mission-after">
               <span className="mission-change-label">
                 {t.after} <span>{t.afterCaption}</span>
               </span>
               {/* Under the label, never squeezed by its mono caps. */}
               {tag && <em className="mission-premise-tag">{tag}</em>}
               <BriefText text={brief.after} />
-            </article>
-          </div>
+            </article>}
+          </div>}
           <p className="mission-impact-note">
             {verdict === "refuted" ? t.impactRefuted : t.impactNote}
           </p>
+          {!brief.validation.length && <p className="mission-field-note">{t.missingAcceptance}</p>}
           <div className="mission-validation-grid">
             {brief.validation.length > 0 && (
               <div>
@@ -1043,14 +1046,37 @@ export function ProjectOverview({
           checkingPremise={checkingPremise}
         />
       )}
+      {run && (
+        <div className="mission-next-step">
+          <div>
+            <span className="mission-next-icon">
+              <Code2 size={20} />
+            </span>
+            <div>
+              <strong>
+                {t.nextStep.codeTitle}
+              </strong>
+              <p>{t.nextStep.codeLead}</p>
+            </div>
+          </div>
+          <button
+            type="button"
+            className="mission-button mission-button-primary"
+            onClick={onReadCode}
+          >
+            {t.nextStep.codeAction}
+            <ArrowRight size={15} />
+          </button>
+        </div>
+      )}
+      <Suspense fallback={null}>
+        <ContributionRulesCard repoId={repo.id} rules={repo.contributionRules} demo={sampleRepo} byHandRun={run?.learnByHand ? run : undefined} />
+      </Suspense>
+      <details className="mission-context" open={!run || !!error || loading || stale || !!analysisLocale}>
+        <summary>{t.overview.background}</summary>
       <div className="mission-overview-heading">
         <div>
-          <span className="mission-kicker">
-            <BookOpen size={14} />
-            {t.overview.kicker}
-          </span>
           <h2>{t.overview.title}</h2>
-          <p>{t.overview.lead}</p>
         </div>
         <div className="mission-overview-actions">
           {onUpdateRepo && (
@@ -1145,9 +1171,6 @@ export function ProjectOverview({
         <AnalysisProgress progress={progress} />
       )}
 
-      <Suspense fallback={null}>
-        <ContributionRulesCard repoId={repo.id} rules={repo.contributionRules} demo={sampleRepo} byHandRun={run?.learnByHand ? run : undefined} />
-      </Suspense>
 
       {!insights ? (
         // Not busy once the steps show, or their notice could be held back until they are gone.
@@ -1719,25 +1742,26 @@ export function ProjectOverview({
 
       {!run && projectContext}
 
-      {(run || onStartContribution) && (
+      </details>
+      {!run && onStartContribution && (
         <div className="mission-next-step">
           <div>
             <span className="mission-next-icon">
-              {run ? <Code2 size={20} /> : <Target size={20} />}
+              <Target size={20} />
             </span>
             <div>
               <strong>
-                {run ? t.nextStep.codeTitle : t.nextStep.ideaTitle}
+                {t.nextStep.ideaTitle}
               </strong>
-              <p>{run ? t.nextStep.codeLead : t.nextStep.ideaLead}</p>
+              <p>{t.nextStep.ideaLead}</p>
             </div>
           </div>
           <button
             type="button"
             className="mission-button mission-button-primary"
-            onClick={run ? onReadCode : onStartContribution}
+            onClick={onStartContribution}
           >
-            {run ? t.nextStep.codeAction : t.nextStep.ideaAction}
+            {t.nextStep.ideaAction}
             <ArrowRight size={15} />
           </button>
         </div>

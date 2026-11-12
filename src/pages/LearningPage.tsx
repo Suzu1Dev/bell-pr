@@ -1,7 +1,6 @@
 import type { Dispatch, SetStateAction } from "react";
-import { MessageSquare } from "lucide-react";
 import { getDemo } from "../demo";
-import { useLocale, useT } from "../i18n";
+import { useLocale } from "../i18n";
 import type { Repo } from "../types";
 import { LearningNotes } from "../learning/LearningNotes";
 import type { Tab } from "../app/AppShell";
@@ -21,7 +20,6 @@ export function LearningPage({
   setSelectedPath,
   setTab,
 }: LearningPageProps) {
-  const t = useT("pages").learning;
   const [locale] = useLocale();
   return (
     <section className="page-content">
@@ -38,13 +36,6 @@ export function LearningPage({
           }}
         />
       </ErrorBoundary>
-      <div className="team-note">
-        <MessageSquare size={25} />
-        <div>
-          <strong>{t.noteTitle}</strong>
-          <p>{t.noteText}</p>
-        </div>
-      </div>
     </section>
   );
 }

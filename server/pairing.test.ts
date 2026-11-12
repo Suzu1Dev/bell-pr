@@ -212,9 +212,18 @@ test("device tokens verify, record use at most once a minute, and die with a rot
   assert.equal(f.devices.verify(f.install, f.install), undefined);
 
   const writes = async () => JSON.parse(await readFile(f.paths.devices, "utf8")).devices[0].lastUsedAt;
-  // The first use is written; let the queued write finish.
-  await new Promise((resolve) => setTimeout(resolve, 50));
-  const first = await writes();
+  // The use is written on a queue. Wait until that write lands, not a fixed 50 ms.
+  const settled = async (expected: string) => {
+    const deadline = Date.now() + 2_000;
+    let value = "";
+    do {
+      value = await writes();
+      if (value === expected) return value;
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    } while (Date.now() < deadline);
+    return value;
+  };
+  const first = await settled(new Date(f.clock.now).toISOString());
   assert.equal(first, new Date(f.clock.now).toISOString());
   f.clock.now += lastUsedWriteInterval - 1;
   f.devices.verify(paired.token, f.install);
@@ -222,8 +231,7 @@ test("device tokens verify, record use at most once a minute, and die with a rot
   assert.equal(await writes(), first);
   f.clock.now += 1;
   f.devices.verify(paired.token, f.install);
-  await new Promise((resolve) => setTimeout(resolve, 50));
-  assert.equal(await writes(), new Date(f.clock.now).toISOString());
+  assert.equal(await settled(new Date(f.clock.now).toISOString()), new Date(f.clock.now).toISOString());
 
   // Another install token (a rotate) invalidates every device, even before the files are cleared.
   const rotated = generateApiToken();

@@ -25,6 +25,7 @@ import type {
   CollabSetupResponse,
 } from "../../shared/collab.js";
 import { readApiToken } from "../api-token.js";
+import { dropHoldEntries, taskKey } from "../collab-board.js";
 import { collabId, sideEntry, type CollabHost, type CollabSide } from "../collab-host.js";
 import { CollabInvites, inviteTtl, maxInvites, type Invite } from "../collab-invites.js";
 import { adminOnly, collabErrors, notJoined, reasonOf, refuse } from "../collab-refusal.js";
@@ -235,17 +236,21 @@ export function registerCollabRoutes(
         hub.forget(id);
         // What they hold goes with them, in every repository of the group.
         const coordinator = host.coordinator();
+        const revokedKeys: string[] = [];
         for (const projectId of Object.keys(host.side().projects ?? {}))
           for (const claim of coordinator.project(actor, projectId).claims) {
             if (claim.status !== "held" || claim.holder !== id) continue;
             try {
               await coordinator.revoke(actor, projectId, claim.id, {});
               revoked += 1;
+              revokedKeys.push(taskKey(projectId, claim.taskId));
             } catch (error) {
               // A hold that ended in the meantime is not counted.
               if (reasonOf(error) !== "ended") throw error;
             }
           }
+        if (revokedKeys.some((key) => sideEntry(host.side().holds, key) !== undefined))
+          await host.saveSide((draft) => dropHoldEntries(draft, revokedKeys));
         return person.deviceId;
       });
       // What they left waiting goes with them: the codes they gave out and their own.

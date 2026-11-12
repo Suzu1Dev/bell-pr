@@ -1,5 +1,5 @@
 import { safeLink, WebLink } from "../review/MarkdownContent";
-import { useEffect, useId, useState, type ReactNode } from "react";
+import { useId, useState, type ReactNode } from "react";
 import {
   ArrowDownToLine,
   ArrowUpRight,
@@ -20,7 +20,6 @@ import {
   OctagonX,
   Quote,
   RefreshCw,
-  ShieldCheck,
   Sparkles,
 } from "lucide-react";
 import { issueRule, type DraftCheck } from "../../shared/draft-checks";
@@ -43,7 +42,6 @@ import { useFormat, useLocale, useT } from "../i18n";
 import { MarkdownContent } from "../review/MarkdownContent";
 import {
   checklistCheck,
-  checklistRowIds,
   checklistRows,
   withFactChecks,
   type ChecklistStatus,
@@ -53,6 +51,7 @@ import { rich } from "./rich";
 import "./drafts.css";
 
 interface Props {
+  taskChecks?: { pending: ReactNode; complete: ReactNode; passed: number; off: number; hasUnderstanding: boolean };
   preparation?: DraftPreparation;
   busy: boolean;
   disabled?: boolean;
@@ -122,43 +121,12 @@ const statusIcons: Record<ChecklistStatus, typeof CircleCheck> = {
   off: CircleMinus,
 };
 
-/**
- * How many times this browser showed each checklist row's "why
- * maintainers care" sentence. After `whyShownTimes` it folds away. Storage
- * can be blocked or full: the sentence then simply stays open.
- */
-const whySeenKey = "bellpr-checklist-why-seen";
-export const whyShownTimes = 3;
-
-function readWhySeen(): Record<string, number> {
-  try {
-    const value: unknown = JSON.parse(
-      globalThis.localStorage?.getItem(whySeenKey) || "{}",
-    );
-    return value && typeof value === "object" && !Array.isArray(value)
-      ? (value as Record<string, number>)
-      : {};
-  } catch {
-    return {};
-  }
-}
-
-function countWhySeen() {
-  try {
-    const seen = readWhySeen();
-    for (const id of checklistRowIds)
-      seen[id] = Math.min(99, (Number(seen[id]) || 0) + 1);
-    globalThis.localStorage?.setItem(whySeenKey, JSON.stringify(seen));
-  } catch {
-    // Not remembered; the sentences stay open next time.
-  }
-}
-
 function webLink(value?: string) {
   return safeLink(value) || undefined;
 }
 
 export function DraftGuidancePanel({
+  taskChecks,
   preparation,
   busy,
   disabled = false,
@@ -188,9 +156,6 @@ export function DraftGuidancePanel({
   const byHand = !!byHandRun?.learnByHand;
   // A clean Learn-by-hand run's input: then the server's list decides some rows.
   const learnByHand = byHandRun && byHandPreflight(byHandRun, new Date().toISOString());
-  // Read once per visit, then counted, so the sentences fold on a later one.
-  const [whySeen] = useState(readWhySeen);
-  useEffect(countWhySeen, []);
   // The choice made here while nothing saves it (no onAiDisclosureChange).
   const [localDisclosure, setLocalDisclosure] = useState<boolean>();
   const issueLink = webLink(issueUrl);
@@ -293,6 +258,65 @@ export function DraftGuidancePanel({
     draftMessages.reviewability.bands,
     locale,
   );
+  const displayedRows = taskChecks?.hasUnderstanding ? rows.filter((row) => row.id !== "understanding") : rows;
+  const priority = { block: 0, confirm: 1, unknown: 2, ok: 3, off: 4 };
+  const pendingRows = displayedRows.filter((row) => row.status !== "ok" && row.status !== "off").sort((a, b) => priority[a.status] - priority[b.status]);
+  const completedRows = displayedRows.filter((row) => row.status === "ok" || row.status === "off");
+  const passedCount = completedRows.filter((row) => row.status === "ok").length + (taskChecks?.passed ?? 0);
+  const offCount = completedRows.filter((row) => row.status === "off").length + (taskChecks?.off ?? 0);
+  const renderRow = (row: (typeof rows)[number]) => {
+    const Icon = statusIcons[row.status];
+    const why = t.checklist.why[row.id];
+    return (
+      <li
+        key={row.id}
+        className={`draft-checklist-row is-${row.status}`}
+        data-row={row.id}
+      >
+        <span className="draft-checklist-status">
+          <Icon size={14} aria-hidden="true" />
+          {t.checklist.status[row.status]}
+        </span>
+        <div className="draft-checklist-body">
+          <strong>{t.checklist.rows[row.id]}</strong>
+          {row.lines.map((line, index) => (
+            <p key={index}>{line}</p>
+          ))}
+          {row.sources.length > 0 && (
+            <details className="draft-checklist-sources">
+              <summary>{t.checklist.sources}</summary>
+              <ul>
+                {row.sources.map((source, index) => (
+                  <li key={index}>{source}</li>
+                ))}
+              </ul>
+            </details>
+          )}
+          {/* The issue-link check, when it fires, quotes the same rule. */}
+          {row.id === "issue" &&
+            issueRequirement &&
+            !respect?.some((check) => check.id === "issue") && (
+            <p className="draft-guidance-issue-rule" role="note">
+              <strong>{t.checklist.rule}</strong>
+              {t.checklist.ruleQuote({ quote: issueRequirement.quote })}
+              <small>
+                {t.checklist.ruleSource({ source: issueRequirement.label })}
+              </small>
+            </p>
+          )}
+          {row.id === "issue" && issueLink && (
+            <WebLink href={safeLink(issueLink) || undefined} target="_blank" rel="noopener noreferrer">
+              {t.checklist.openIssue} <ArrowUpRight size={12} aria-hidden="true" />
+            </WebLink>
+          )}
+          <details className="draft-checklist-why">
+            <summary>{t.checklist.whySummary}</summary>
+            <p>{why}</p>
+          </details>
+        </div>
+      </li>
+    );
+  };
   const readAt = (value?: string) => {
     const date = value ? new Date(value) : undefined;
     return date && !Number.isNaN(date.getTime()) ? fmt.dateTime(date) : undefined;
@@ -375,14 +399,64 @@ export function DraftGuidancePanel({
       className="draft-guidance-panel"
       aria-labelledby={`draft-guidance-${prefix}`}
     >
+      <section
+        className="draft-checklist"
+        tabIndex={-1}
+        aria-labelledby={`draft-checklist-${prefix}`}
+      >
+        <h3 id={`draft-checklist-${prefix}`}>
+          <ListChecks size={16} aria-hidden="true" /> {t.checklist.title}
+        </h3>
+        {(rulesRead || factsRead) && (
+          <p className="draft-checklist-meta">
+            {rulesRead && <span>{t.checklist.rulesRead({ date: rulesRead })}</span>}
+            {factsRead && <span>{t.checklist.factsRead({ date: factsRead })}</span>}
+          </p>
+        )}
+        <ul className="draft-pending-checks">
+          {taskChecks?.pending}
+          {pendingRows.map(renderRow)}
+        </ul>
+        {textChecks.length > 0 && (
+          <div className="draft-guidance-preflight">
+            <ul>
+              {[...blocking, ...confirming].map((check) => (
+                <li key={check.id} className={`is-${check.kind}`}>
+                  <span className="draft-guidance-preflight-kind">
+                    {check.kind === "block" ? (
+                      <OctagonX size={14} aria-hidden="true" />
+                    ) : (
+                      <CircleAlert size={14} aria-hidden="true" />
+                    )}
+                    {check.kind === "block"
+                      ? t.preflight.block
+                      : t.preflight.confirm}
+                  </span>
+                  <strong>{check.message}</strong>
+                  {check.details.length > 0 && (
+                    <ul>
+                      {check.details.map((detail, index) => (
+                        <li key={index}>{detail}</li>
+                      ))}
+                    </ul>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+        {(passedCount > 0 || offCount > 0) && <details className="draft-completed-checks">
+          <summary>{t.checklist.completed({ passed: passedCount, off: offCount })}</summary>
+          <ul>{taskChecks?.complete}{completedRows.map(renderRow)}</ul>
+        </details>}
+      </section>
+
       <header className="draft-guidance-header">
         <span className="draft-guidance-icon" aria-hidden="true">
           <BookOpen size={21} />
         </span>
         <div className="draft-guidance-heading">
-          <div className="draft-guidance-eyebrow">{t.eyebrow}</div>
           <h2 id={`draft-guidance-${prefix}`}>{t.title}</h2>
-          <p>{t.intro}</p>
         </div>
         <div className="draft-guidance-actions">
           {demo && (
@@ -439,20 +513,7 @@ export function DraftGuidancePanel({
         </div>
       )}
 
-      {byHand ? helpers : !preparation && !readOnly && (
-        <div className="draft-guidance-empty">
-          <span>
-            <FileText size={16} /> {t.empty.rules}
-          </span>
-          <span>
-            <Quote size={16} /> {t.empty.sources}
-          </span>
-          <span>
-            <ArrowDownToLine size={16} /> {t.empty.choice}
-          </span>
-          <p>{demo ? t.empty.demo : t.empty.real}</p>
-        </div>
-      )}
+      {byHand && helpers}
 
       {!!preparation?.context?.warnings.length && (
         <div className="draft-guidance-warnings">
@@ -652,48 +713,6 @@ export function DraftGuidancePanel({
 
       {!proposal && onAiDisclosureChange && !byHand && disclosure}
 
-      {checks && (
-        <section
-          className="draft-guidance-preflight"
-          aria-labelledby={`draft-preflight-${prefix}`}
-        >
-          <h3 id={`draft-preflight-${prefix}`}>
-            <ShieldCheck size={16} aria-hidden="true" /> {t.preflight.title}
-          </h3>
-          <p>{t.preflight.intro}</p>
-          {textChecks.length ? (
-            <ul>
-              {[...blocking, ...confirming].map((check) => (
-                <li key={check.id} className={`is-${check.kind}`}>
-                  <span className="draft-guidance-preflight-kind">
-                    {check.kind === "block" ? (
-                      <OctagonX size={14} aria-hidden="true" />
-                    ) : (
-                      <CircleAlert size={14} aria-hidden="true" />
-                    )}
-                    {check.kind === "block"
-                      ? t.preflight.block
-                      : t.preflight.confirm}
-                  </span>
-                  <strong>{check.message}</strong>
-                  {check.details.length > 0 && (
-                    <ul>
-                      {check.details.map((detail, index) => (
-                        <li key={index}>{detail}</li>
-                      ))}
-                    </ul>
-                  )}
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="draft-guidance-preflight-clear">
-              <CircleCheck size={15} aria-hidden="true" />{" "}
-              {checks.length ? t.preflight.textClear : t.preflight.clear}
-            </p>
-          )}
-        </section>
-      )}
 
       {!demo && preparation?.context && (
         <div className="draft-guidance-source-meta">
@@ -761,77 +780,6 @@ export function DraftGuidancePanel({
         </details>
       )}
 
-      <section
-        className="draft-checklist"
-        aria-labelledby={`draft-checklist-${prefix}`}
-      >
-        <h3 id={`draft-checklist-${prefix}`}>
-          <ListChecks size={16} aria-hidden="true" /> {t.checklist.title}
-        </h3>
-        <p>{t.checklist.intro}</p>
-        {(rulesRead || factsRead) && (
-          <p className="draft-checklist-meta">
-            {rulesRead && <span>{t.checklist.rulesRead({ date: rulesRead })}</span>}
-            {factsRead && <span>{t.checklist.factsRead({ date: factsRead })}</span>}
-          </p>
-        )}
-        <ul>
-          {rows.map((row) => {
-            const Icon = statusIcons[row.status];
-            const why = t.checklist.why[row.id];
-            return (
-              <li
-                key={row.id}
-                className={`draft-checklist-row is-${row.status}`}
-                data-row={row.id}
-              >
-                <span className="draft-checklist-status">
-                  <Icon size={14} aria-hidden="true" />
-                  {t.checklist.status[row.status]}
-                </span>
-                <div className="draft-checklist-body">
-                  <strong>{t.checklist.rows[row.id]}</strong>
-                  {row.lines.map((line, index) => (
-                    <p key={index}>{line}</p>
-                  ))}
-                  {row.sources.length > 0 && (
-                    <ul className="draft-checklist-sources">
-                      {row.sources.map((source, index) => (
-                        <li key={index}>{source}</li>
-                      ))}
-                    </ul>
-                  )}
-                  {/* The issue-link check, when it fires, quotes the same rule. */}
-                  {row.id === "issue" &&
-                    issueRequirement &&
-                    !respect?.some((check) => check.id === "issue") && (
-                    <p className="draft-guidance-issue-rule" role="note">
-                      <strong>{t.checklist.rule}</strong>
-                      {t.checklist.ruleQuote({ quote: issueRequirement.quote })}
-                      <small>
-                        {t.checklist.ruleSource({ source: issueRequirement.label })}
-                      </small>
-                    </p>
-                  )}
-                  {row.id === "issue" && issueLink && (
-                    <WebLink href={safeLink(issueLink) || undefined} target="_blank" rel="noopener noreferrer">
-                      {t.checklist.openIssue} <ArrowUpRight size={12} aria-hidden="true" />
-                    </WebLink>
-                  )}
-                  {(whySeen[row.id] ?? 0) >= whyShownTimes ? (
-                    <details className="draft-checklist-why">
-                      <summary>{t.checklist.whySummary}</summary>
-                      <p>{why}</p>
-                    </details>
-                  ) : (
-                    <p className="draft-checklist-why">{why}</p>
-                  )}
-                </div>
-              </li>
-            );
-          })}
-        </ul>
-      </section>
 
       {proposal?.policy === "linux" && (
         <p className="draft-guidance-linux">
