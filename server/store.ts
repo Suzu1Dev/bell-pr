@@ -468,6 +468,8 @@ export const repositoryReadSchema = loose({
     defaultBranch: text,
     url: text,
     language: text.optional(),
+    /** Set when a local import ignored an origin that had userinfo. The address is not stored. */
+    originUserinfoIgnored: later(z.boolean()),
     updatedAt: text.optional(),
     contributionRules: later(contributionRulesSchema),
     debriefs: later(z.array(debriefSchema).max(5)),

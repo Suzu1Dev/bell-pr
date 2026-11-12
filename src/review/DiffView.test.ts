@@ -187,6 +187,7 @@ test("a 500-line diff is one tab stop: a listbox of lines with a roving tabindex
     );
     const region = codeRegion(html);
     assert.equal(count(region, /tabindex="0"/g), 1, view);
+    assert.doesNotMatch(html, /class="rv-code-scroll"[^>]*tabindex/, view);
     assert.equal(count(html, /tabindex="0"/g), 1, view);
     assert.equal(count(region, /tabindex="-1"/g), 499, view);
     // Every code line is one option, named by its own label.

@@ -19,8 +19,12 @@
 // their panes another layout from 761 px up.
 //
 //   BELLPR_E2E_PORT=<port> npx playwright test e2e/responsive.spec.ts
+import { writeFile } from "node:fs/promises";
+import path from "node:path";
+import { inflateSync } from "node:zlib";
 import { expect, test, type Browser, type Page } from "@playwright/test";
 import { e2eApiHeaders } from "./api-token.mjs";
+import { messages } from "./helpers/messages";
 import { htmlLang, locales, type Locale } from "../shared/i18n/locale";
 import { findOverflow } from "./helpers/overflow";
 import { startReadyServer } from "./helpers/ready-server";
@@ -70,9 +74,11 @@ async function settled(page: Page, locale: Locale) {
  *   box lets its overflow show. A box with a negative side margin bleeds
  *   on purpose, and a box positioned on its own (a tooltip, a badge on a
  *   corner) is placed on purpose.
- * Content inside a box that scrolls sideways (code, tables, a row of
- * tabs) can be scrolled to and does not count, and neither does a
- * decoration without text.
+ * Content counts as reachable only inside a box that is meant to scroll
+ * sideways on its own: that box has overflow-x auto or scroll, and a
+ * keyboard user can reach it (code, a wide table, a row of tabs). Any
+ * other overflow:auto ancestor hides the overflow, so it counts. A
+ * decoration without text does not.
  */
 function findSideOverflow(page: Page): Promise<string[]> {
   return page.evaluate(() => {
@@ -97,6 +103,25 @@ function findSideOverflow(page: Page): Promise<string[]> {
       style.overflowX === "auto" || style.overflowX === "scroll";
     const hidesOverflow = (style: CSSStyleDeclaration) =>
       style.overflowX === "hidden" || style.overflowX === "clip";
+    /** In the tab order, so the keyboard can move this box. */
+    const keyboardReachable = (element: Element) => {
+      if (!(element instanceof HTMLElement) || element.matches(":disabled")) return false;
+      const attr = element.getAttribute("tabindex");
+      if (attr !== null) {
+        const index = Number(attr);
+        return Number.isInteger(index) && index >= 0;
+      }
+      return element.matches(
+        "a[href], button, input:not([type='hidden']), select, textarea, summary",
+      );
+    };
+    /**
+     * The box itself scrolls sideways and the keyboard can move it: the box
+     * is in the tab order, or a roving tab stop inside it is.
+     */
+    const scrollsOnPurpose = (element: Element) =>
+      scrollsSideways(getComputedStyle(element)) &&
+      (keyboardReachable(element) || element.querySelector("[tabindex='0']") !== null);
     const counts = (element: Element) =>
       element.matches("button, a[href], input, select, textarea, summary, [role='tab']") ||
       !!element.textContent?.trim();
@@ -110,10 +135,11 @@ function findSideOverflow(page: Page): Promise<string[]> {
     };
     /**
      * The left and right edges that clip `element`: the window's,
-     * narrowed by each ancestor that hides its overflow and holds the
-     * element's box (an absolutely positioned box escapes the static
-     * ancestors between it and its containing block, a fixed one all of
-     * them). Undefined when an ancestor scrolls sideways.
+     * narrowed by each ancestor that hides its overflow, or that scrolls
+     * sideways without a keyboard stop on it or inside it, and holds the element's
+     * box (an absolutely positioned box escapes the static ancestors
+     * between it and its containing block, a fixed one all of them).
+     * Undefined when an ancestor is meant to scroll sideways on its own.
      */
     const clipEdges = (element: Element) => {
       let left = 0;
@@ -126,8 +152,8 @@ function findSideOverflow(page: Page): Promise<string[]> {
       ) {
         const style = getComputedStyle(parent);
         if (position === "absolute" && style.position === "static") continue;
-        if (scrollsSideways(style)) return undefined;
-        if (hidesOverflow(style)) {
+        if (scrollsOnPurpose(parent)) return undefined;
+        if (hidesOverflow(style) || scrollsSideways(style)) {
           const box = parent.getBoundingClientRect();
           left = Math.max(left, box.left + parent.clientLeft);
           right = Math.min(right, box.left + parent.clientLeft + parent.clientWidth);
@@ -162,14 +188,31 @@ function findSideOverflow(page: Page): Promise<string[]> {
         if (cut.some((other) => other === child || other.contains(child))) continue;
         const childStyle = getComputedStyle(child);
         if (childStyle.position === "absolute" || childStyle.position === "fixed") continue;
-        if (parseFloat(childStyle.marginLeft) < 0 || parseFloat(childStyle.marginRight) < 0)
-          continue;
+        // A negative side margin may bleed by that margin and no further.
+        const bleedLeft = Math.min(0, parseFloat(childStyle.marginLeft) || 0);
+        const bleedRight = Math.min(0, parseFloat(childStyle.marginRight) || 0);
         const rect = child.getBoundingClientRect();
-        if (rect.left >= outer.left - 1 && rect.right <= outer.right + 1) continue;
+        if (
+          rect.left >= outer.left + bleedLeft - 1 &&
+          rect.right <= outer.right - bleedRight + 1
+        )
+          continue;
         result.push(
-          `sticks out: ${describe(child)} spans ${span(rect)} in ${nameOf(box)} at ${span(outer)}`,
+          `sticks out: ${describe(child)} spans ${span(rect)} (${child.scrollWidth} px wide) in ${nameOf(box)} at ${span(outer)}`,
         );
       }
+    }
+
+    // A box that does not scroll still has overflow when its content is
+    // wider than the box. A purposeful sideways scroller is exempt.
+    for (const element of document.body.querySelectorAll("*")) {
+      if (!(element instanceof HTMLElement) || !shown(element) || !counts(element)) continue;
+      if (getComputedStyle(element).overflowX !== "visible") continue;
+      if (element.scrollWidth <= element.clientWidth + 1) continue;
+      if (!clipEdges(element)) continue;
+      result.push(
+        `wider than its box: ${nameOf(element)} is ${element.scrollWidth} px wide in ${element.clientWidth} px`,
+      );
     }
     return result;
   });
@@ -510,3 +553,153 @@ for (const view of stateViews.filter((entry) => entry.real))
           });
         });
   });
+
+/** RGBA pixels of an 8-bit PNG screenshot (Playwright's). */
+function pngPixels(png: Buffer) {
+  let offset = 8;
+  let width = 0;
+  let height = 0;
+  let color = 6;
+  const parts: Buffer[] = [];
+  while (offset + 8 <= png.length) {
+    const length = png.readUInt32BE(offset);
+    const type = png.toString("ascii", offset + 4, offset + 8);
+    const data = png.subarray(offset + 8, offset + 8 + length);
+    if (type === "IHDR") {
+      width = data.readUInt32BE(0);
+      height = data.readUInt32BE(4);
+      color = data[9];
+    } else if (type === "IDAT") parts.push(Buffer.from(data));
+    else if (type === "IEND") break;
+    offset += 12 + length;
+  }
+  const channels = color === 2 ? 3 : 4;
+  const raw = inflateSync(Buffer.concat(parts));
+  const out = Buffer.alloc(width * height * channels);
+  let src = 0;
+  for (let y = 0; y < height; y++) {
+    const filter = raw[src++];
+    const row = y * width * channels;
+    const prev = row - width * channels;
+    for (let i = 0; i < width * channels; i++) {
+      const left = i >= channels ? out[row + i - channels] : 0;
+      const up = y > 0 ? out[prev + i] : 0;
+      const upLeft = y > 0 && i >= channels ? out[prev + i - channels] : 0;
+      const value = raw[src++];
+      let decoded = value;
+      if (filter === 1) decoded = (value + left) & 255;
+      else if (filter === 2) decoded = (value + up) & 255;
+      else if (filter === 3) decoded = (value + Math.floor((left + up) / 2)) & 255;
+      else if (filter === 4) {
+        const estimate = left + up - upLeft;
+        const towardLeft = Math.abs(estimate - left);
+        const towardUp = Math.abs(estimate - up);
+        const towardUpLeft = Math.abs(estimate - upLeft);
+        const pred = towardLeft <= towardUp && towardLeft <= towardUpLeft ? left
+          : towardUp <= towardUpLeft ? up
+          : upLeft;
+        decoded = (value + pred) & 255;
+      }
+      out[row + i] = decoded;
+    }
+  }
+  return { width, height, data: out, channels };
+}
+
+/** Mean luminance of a rectangle in a screenshot. */
+function luminance(png: Buffer, x0: number, x1: number, y0: number, y1: number) {
+  const { width, data, channels } = pngPixels(png);
+  let sum = 0;
+  let count = 0;
+  for (let y = y0; y < y1; y++)
+    for (let x = x0; x < x1; x++) {
+      const i = (y * width + x) * channels;
+      sum += 0.2126 * data[i] + 0.7152 * data[i + 1] + 0.0722 * data[i + 2];
+      count += 1;
+    }
+  return sum / count;
+}
+
+// The description keeps long lines and scrolls them. At 320 a fade sits on
+// the side that still has more, and it is gone once that side is scrolled
+// to the end. The fade is a background, so it does not take the keyboard.
+test.describe("the publish body preview at 320 px", () => {
+  let server: LaunchedServer | undefined;
+  test.beforeAll(async () => {
+    server = await startServer({
+      seed: (dataDir) =>
+        writeFile(
+          path.join(dataDir, "app-settings.json"),
+          JSON.stringify({ skipUnderstandingCheck: true }),
+        ),
+    });
+  });
+  test.afterAll(async () => {
+    await server?.stop();
+  });
+
+  for (const locale of locales)
+    test(`the description shows that it scrolls in ${locale}`, async ({ browser }) => {
+      const context = await browser.newContext({
+        extraHTTPHeaders: e2eApiHeaders,
+        baseURL: server!.baseURL,
+        locale: "en-US",
+        timezoneId: "UTC",
+        viewport: { width: 320, height: 700 },
+        deviceScaleFactor: 1,
+      });
+      try {
+        const page = await context.newPage();
+        const copy = messages[locale];
+        await page.goto(`/#/runs/demo-run/changes?present=1&capture=1&locale=${locale}`);
+        await settled(page, locale);
+        const files = page.locator(".file-item");
+        for (let index = 0; index < (await files.count()); index++) {
+          await files.nth(index).click();
+          await page.getByRole("checkbox", { name: copy.review.diff.reviewed }).check();
+        }
+        await page.getByRole("button", { name: copy.workspace.footer.approvePr }).click();
+        const dialog = page.getByRole("dialog", { name: copy.workspace.publish.titleDemo });
+        const pre = dialog.locator(".publish-body-preview pre");
+        await expect(pre).toBeVisible();
+        const box = await pre.evaluate((element) => ({
+          scroll: element.scrollWidth,
+          client: element.clientWidth,
+          overflowX: getComputedStyle(element).overflowX,
+          attachment: getComputedStyle(element).backgroundAttachment,
+        }));
+        expect(box.scroll).toBeGreaterThan(box.client + 1);
+        expect(box.overflowX).toBe("auto");
+        expect(box.attachment).toContain("local");
+        await dialog.locator("button").first().focus();
+        for (let step = 0; step < 30 && !(await pre.evaluate((element) => element === document.activeElement)); step++)
+          await page.keyboard.press("Tab");
+        await expect(pre).toBeFocused();
+        const ring = await pre.evaluate((element) => getComputedStyle(element).boxShadow);
+        expect(ring).toContain("inset");
+        const start = await pre.evaluate((element) => element.scrollLeft);
+        await page.keyboard.press("ArrowRight");
+        expect(await pre.evaluate((element) => element.scrollLeft)).toBeGreaterThan(start);
+        await pre.evaluate((element) => {
+          element.scrollLeft = 0;
+        });
+        const atStart = await pre.screenshot();
+        await pre.evaluate((element) => {
+          element.scrollLeft = element.scrollWidth;
+        });
+        const atEnd = await pre.screenshot();
+        const edge = (shot: Buffer) => {
+          const { width } = pngPixels(shot);
+          return luminance(shot, width - 10, width - 2, 2, 10) - luminance(shot, Math.floor(width / 2) - 4, Math.floor(width / 2) + 4, 2, 10);
+        };
+        const startEdge = edge(atStart);
+        const endEdge = edge(atEnd);
+        // The trailing fade is darker than the padding beside it, and it
+        // leaves once the line is scrolled to its end.
+        expect(startEdge, `fade at the start (${startEdge})`).toBeLessThan(-8);
+        expect(endEdge, `fade at the end (${endEdge}), start was ${startEdge}`).toBeGreaterThan(-3);
+      } finally {
+        await context.close();
+      }
+    });
+});

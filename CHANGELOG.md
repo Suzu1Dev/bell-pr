@@ -9,6 +9,11 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **A local import whose origin had credentials shows what to do next.**
+  The project list and the project page say to replace OWNER and REPO,
+  update the remote in the checkout, use a credential helper, remove that
+  local project, and import the folder again. The command can be copied.
+  A narrow card stacks it under the hint.
 - **Group work for the people who share one BELL PR, from the command
   line and the API.** `bell-pr start --group` (or `BELLPR_GROUP=1`) turns
   it on. The person at the host sets the group up with
@@ -146,6 +151,18 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- **The sudo helper is now host-local only and enabled for a limited time.**
+  Each enable asks for the sudo password and a duration from 1 minute to
+  8 hours (1 hour by default). BELL PR removes the rule when the time is up
+  and, at startup, removes a rule past its time or without an end time (such
+  as one installed by 1.0.0 or 1.1.0; if removal needs a password,
+  `bell-pr doctor` prints the `sudo rm` command). While it is on, it cannot
+  be enabled again to move its end time; remove it first. Only the install
+  token, from this computer at `localhost`, `127.0.0.1` or `[::1]` and
+  without proxy headers, may use it; paired devices may not. Changes are
+  recorded in `audit/sudo.jsonl` in the data directory, never with the
+  password. `bell-pr doctor` reports a rule past its time or without one, and
+  `--sudoers-path <file>` picks the file it inspects.
 - **A sync snapshot does not count as another copy of a recovered commit.**
   `refs/bellpr/sync/<run>` is removed with the run's files, so a
   publish-recovery ref is kept when that snapshot is the only other ref
@@ -230,6 +247,14 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   provider". When Ubuntu's restriction on user namespaces stops the
   Antigravity sandbox, the error no longer offers signing in to Claude
   Code as a fix, because Claude Code's sandbox can need the same setting.
+- **Sideways overflow on the overview and in the publish dialog.** The
+  contribution directions stay a sideways row you can scroll (arrow keys,
+  previous and next), and that row no longer pushes its section wider than
+  the page. The run's tabs, the section links and the file list scroll
+  from the keyboard: each is named and shows a focus ring. The diff stays
+  one tab stop; the left and right arrow keys scroll its lines sideways.
+  The publish description keeps its long lines, scrolls them with the
+  arrow keys, and shows a fade on the side that still has more to scroll.
 - **The publish dialog keeps the draft body inside a phone-width column.**
   The body is shown preformatted in the browser's own monospace, which is
   wider than the column with some fonts. The line scrolls inside the
