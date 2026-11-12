@@ -937,8 +937,9 @@
   scroll-padding-inline: 4px;
   scrollbar-color: var(--color-accent-500) var(--color-accent-50);
   scrollbar-width: auto;
+  /* Padding keeps the inset focus ring off the cards. No negative
+     margin: that made the section wider than its box. */
   padding: 4px 4px 16px;
-  margin: -4px;
   min-width: 0;
 }
 .mission-idea-list::-webkit-scrollbar {
@@ -969,8 +970,8 @@
 }
 .mission-idea:focus-visible {
   outline: 2px solid transparent;
-  outline-offset: 2px;
-  box-shadow: var(--focus-ring);
+  outline-offset: 0;
+  box-shadow: var(--focus-ring-inset);
 }
 .mission-idea-new {
   border-color: var(--color-brand-300);
@@ -1585,18 +1586,6 @@
 }
 .mission-settings-models-only {
   margin-top: 20px;
-}
-.mission-model-heading {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 0;
-  font-size: var(--text-md);
-  font-weight: 600;
-  line-height: 1.6;
-}
-.mission-model-heading svg {
-  color: var(--color-accent-600);
 }
 .mission-model-header > .mission-field-note {
   margin-top: 8px;
@@ -2225,9 +2214,6 @@
   font-style: normal;
   font-weight: 500;
 }
-.mission-premise-recheck {
-  margin: -8px 0 18px;
-}
 .mission-premise-missing {
   padding: var(--space-3) 14px;
   border: 1px dashed var(--color-border);
@@ -2245,6 +2231,7 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 6px var(--space-3);
+  margin: -8px 0 18px;
 }
 .mission-premise-recheck small {
   color: var(--color-text-muted);

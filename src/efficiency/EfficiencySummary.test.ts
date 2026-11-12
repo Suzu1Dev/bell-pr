@@ -110,14 +110,14 @@ test("English renders format tokens, seconds and the usage note", () => {
   const html = renderEnglish({ metrics });
   assert.match(html, /aria-label="Team AI usage"/);
   assert.match(html, /<strong>Team AI usage<\/strong>/);
-  assert.match(html, /<summary title="The efficiency modes build on Ponytail \d+\.\d+\.\d+ by DietrichGebert \(MIT license\)\.[^"]*">Efficiency mode: Lean<svg/);
+  assert.match(html, /<summary title="Efficiency modes build on Ponytail \d+\.\d+\.\d+ by DietrichGebert \(MIT license\)\.[^"]*">Efficiency mode: Lean<svg/);
   assert.match(html, /<dt>Input tokens<\/dt><dd>123,456<\/dd>/);
   assert.match(html, /<dt>Of which cached<\/dt><dd>7,890<\/dd>/);
   assert.match(html, /<dt>Output tokens<\/dt><dd>1,234<\/dd>/);
   assert.match(html, /<dt>Total Agent time<\/dt><dd>12\.3 s<\/dd>/);
   assert.match(
     html,
-    /2 calls · usage reported for 2 of 2\. Cached input is included in the input tokens\./,
+    /2 calls · usage reported for 2 of 2\. Input tokens include cached input\./,
   );
 
   const partial = renderEnglish({
@@ -189,7 +189,7 @@ test("the mode chip reads Efficiency mode and opens the Ponytail credit and link
   assert.match(
     html,
     new RegExp(
-      `<details class="efficiency-mode"><summary title="[^"]+">Efficiency mode: Lean<svg[\\s\\S]*?</svg></summary><div class="efficiency-credit" role="note" tabindex="-1"><p>The efficiency modes build on Ponytail ${ponytailVersion} by DietrichGebert \\(MIT license\\)\\. Lean gives the Agents a short adaptation of its principles, Full gives them its complete rules, and Off adds neither\\.</p><a href="${ponytailSource}" target="_blank" rel="noreferrer">Ponytail upstream project<svg`,
+      `<details class="efficiency-mode"><summary title="[^"]+">Efficiency mode: Lean<svg[\\s\\S]*?</svg></summary><div class="efficiency-credit" role="note" tabindex="-1"><p>Efficiency modes build on Ponytail ${ponytailVersion} by DietrichGebert \\(MIT license\\)\\. Lean gives Agents a short adaptation of its principles; Full, its complete rules; Off, neither\\.</p><a href="${ponytailSource}" target="_blank" rel="noreferrer">Ponytail upstream project<svg`,
     ),
   );
   assert.match(renderEnglish({ mode: "full" }), /Efficiency mode: Full/);

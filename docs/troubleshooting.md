@@ -24,6 +24,10 @@ versions BELL PR supports (2.1.292 or later, before 2.2); agents still
 start, and the [security model](security-model.md#claude-code) says why
 the version matters.
 
+On Linux, the Passwordless sudo line fails when BELL PR's sudo rule is past
+its expiry time or has none; run the `sudo rm` command it prints. Add
+`--sudoers-path <file>` to inspect another file; the check only reads it.
+
 Contents:
 
 - [I lost the address](#i-lost-the-address)
@@ -52,7 +56,10 @@ Recovery checks the project and your signed-in account's fork for matching
 branches, and checks the project for matching PRs in any state. If no branch
 or PR exists, it backs up the old commit locally, keeps your files and draft,
 and returns the contribution to review. Review and approve it again, then
-submit the Draft PR as usual.
+submit the Draft PR as usual. After a later publish succeeds, or when the
+run is removed, that backup is deleted only if the commit is already
+reachable from the remote branch, the pull request, or another ref. If it
+may be the only copy, it stays.
 
 If GitHub cannot be checked, fix the connection or sign-in and try recovery
 again. If a branch or PR already exists, recovery leaves everything unchanged;
@@ -395,8 +402,9 @@ Published runs are never cleaned up automatically; only you can free them.
 
 ### `git_config_unsafe`
 
-"This repository's Git configuration sets …, which can make Git run other
-programs or send credentials elsewhere." (HTTP 409). The project's own
+"This repository's Git config sets …, which can make Git run other programs
+or send credentials elsewhere, so BELL PR won't run Git in it."
+(HTTP 409). The project's own
 `.git/config` (or a worktree's `config.worktree`) defines a filter, a diff
 or merge driver, a signing program, a credential helper, protocol rules,
 URL rewrites or an include. BELL PR's own clones never have them, so
@@ -561,12 +569,14 @@ there, then publish again.
 ## BELL PR does not start
 
 - **"Not ready: fix the required check…"**: `bell-pr doctor` failed a
-  required check, so `bell-pr start` exited before it listened. The message
-  is the doctor's checklist: each failed check and the command that fixes
-  it, under a line that points to the sample tour. `bell-pr start --force`
-  starts and prints a warning. The sample tour needs no AI provider; a
-  real agent run still waits until Codex CLI, Claude Code or the
-  Antigravity CLI is installed and signed in.
+  required check other than the AI provider alone, so `bell-pr start`
+  exited before it listened. If only the provider check fails, start still
+  listens. The first time, Welcome shows how to install Codex CLI, Claude
+  Code or the Antigravity CLI. The message is the doctor's checklist: each
+  failed check and the command that fixes it, under a line that points to
+  the sample tour. `bell-pr start --force` starts and prints a warning. The
+  sample tour needs no AI provider; a real agent run still waits until
+  Codex CLI, Claude Code or the Antigravity CLI is installed and signed in.
 - **"BELL PR needs Node.js 22 or later"**: install the current Node.js LTS
   from [nodejs.org](https://nodejs.org/en) (or `nvm install 22`).
 - **"Port 4311 is already in use by another program"**: start on a free
@@ -595,8 +605,8 @@ there, then publish again.
   Removing the lock while its BELL PR still runs lets two processes write
   the same data directory; the one that lost the lock then stops group
   work (`notSingleWriter` below).
-- **"Another BELL PR start is replacing a lock left behind in this data
-  directory …"**: before a start replaces a lock left by a crash, it
+- **"Another BELL PR start is replacing this data directory's stale lock
+  …"**: before a start replaces a lock left by a crash, it
   writes a claim file beside it, `bellpr.lock.takeover-…`, and removes it
   a moment later. This one is still there: another start is at work, or
   one stopped part-way. Wait about half a minute and start again: a start
@@ -609,8 +619,8 @@ there, then publish again.
   where there is no lock, only a leftover claim, and it can leave an empty
   `bellpr.lock` behind: once the claim is gone, the next start clears
   that by itself.
-- **"BELL PR cannot tell whether the start that was replacing a lock left
-  behind in this data directory has stopped …"**: the same claim file, on
+- **"BELL PR cannot tell whether the start replacing this data directory's
+  stale lock has stopped …"**: the same claim file, on
   a data directory used with [group work](group-work.md). There a claim
   stays, however old it is, until the process that wrote it is shown to
   have stopped. Make

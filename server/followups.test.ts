@@ -335,7 +335,7 @@ test("a follow-up round works in the run's locale, whatever the locale of the re
     assert.equal(f.run.followUps![0].status, "review");
     assert.equal(
       f.run.logs.at(-1)?.message,
-      "Follow-up round 1 is done; review the files this round changed one by one and check the commit message before you push.",
+      "Follow-up round 1 is done. Review each changed file and the commit message before you push.",
     );
     assert.equal(
       f.run.agents.find((agent) => agent.id === "followup")?.detail,
@@ -765,7 +765,7 @@ test("a round can review and publish reverted or deleted PR files, and an agent'
     await settled(f.run);
     const round = f.run.followUps!.at(-1)!;
     assert.equal(round.status, "review");
-    assert.match(round.error!, /自行建立了 commit/);
+    assert.match(round.error!, /自行建立 commit 或切換分支/);
     assert.equal((await git(f.repository, ["rev-parse", "HEAD"])).stdout.trim(), revertedCommit);
     assert.match(
       (await git(f.repository, ["status", "--porcelain"])).stdout,
@@ -875,7 +875,7 @@ test("an agent that switches branches or detaches HEAD is put back on the PR bra
       await settled(f.run);
       const round = f.run.followUps!.at(-1)!;
       assert.equal(round.status, "review", label);
-      assert.match(round.error!, /切換了分支/, label);
+      assert.match(round.error!, /切換分支/, label);
       assert.equal(
         (await git(f.repository, ["symbolic-ref", "HEAD"])).stdout.trim(),
         `refs/heads/${f.run.branch}`,
@@ -951,7 +951,7 @@ test("a round over HTTP needs the person's restatement of each selected comment,
     f.run.prFeedback!.items.push(second);
     const start = (body: unknown) => api(port, "POST", `/runs/${f.run.id}/follow-ups`, body);
     const required =
-      "In your own words, restate what the maintainer asks for in each selected comment: one line of at least 3 words and at most 300 characters per comment.";
+      "Restate each selected comment's request in your own words: one line, at least 3 words and at most 300 characters.";
     for (const body of [
       // None, or not for every selected comment.
       { feedbackUrls: [feedbackItem.url] },

@@ -43,7 +43,7 @@ const discovery = {
     sort: "Sort search by",
     sortHelp: "About sorting",
     sortHint:
-      "Recently updated: active projects; results change often. Relevance: GitHub's best match; may include projects not maintained for a while (archived ones are left out, and the last push date is shown). Stars: well-known projects, more competition, a higher review bar.",
+      "Recently updated: active projects; results change often. Relevance: GitHub's best match, possibly unmaintained (archived ones excluded; last push date shown). Stars: well-known projects, more competition, higher review bar.",
     minStars: "Minimum stars",
     advanced: "Model and efficiency settings",
     agent: "AI provider",
@@ -129,7 +129,7 @@ const discovery = {
     title: "Suggested contributions",
     previousTitle: "Your previous recommendations are still here.",
     note: ({ sort }: { sort: string }) =>
-      `12 candidates in "${sort}" order, at most 6 kept after checking. The order comes from the analysis, not a GitHub ranking. Before you start, check the issue's latest status and whether the maintainers want the change.`,
+      `12 candidates by "${sort}", at most 6 kept after checks; the analysis orders them, not GitHub. Before starting, check the issue's status and that maintainers want it.`,
     /** Above the sample results, which no search produced. */
     sampleNote:
       "A live search takes 12 candidates in the order you choose and keeps at most 6 after checking them.",
@@ -169,11 +169,11 @@ const discovery = {
     /** An opportunity whose issue is labelled for newcomers: practice for the person, not work for the agent team. */
     learnByHand: "Learn by hand: write this one yourself",
     learnByHandHint:
-      "The issue is labelled for newcomers. Writing the fix yourself is how you learn the project, so the Agent team does not take it. Read the plan and the sources, then open the issue.",
+      "Newcomer issue: writing the fix yourself teaches you the project, so the Agent team won't take it. Read the plan and sources first.",
     openIssue: "Open the issue",
     /** Learn by hand (DESIGN v1.2 F1, F12): the task dialog then shows the project's case. */
     startByHand: "Start learning by hand",
-    reservedOutput: `This project closes AI-generated pull requests for issues like this one. ${product.name} can publish a learn-by-hand run for it only if the project's own text names each kind of help the guide gives, and only after you confirm the quoted rule; the task dialog shows which.`,
+    reservedOutput: `This project closes AI-generated pull requests for issues like this. To publish a learn-by-hand run, the project's own text must name each kind of help the guide gives, and you must confirm the quoted rule (see the task dialog).`,
   },
   /**
    * Learn by hand outside the byhand chunk (DESIGN v1.2 F1, F12): the task
@@ -186,7 +186,7 @@ const discovery = {
     legend: "Who writes the code?",
     agents: "The Agent team writes it",
     hand: "You write it (Learn by hand)",
-    handText: `The guide plans with you, gives hints and reviews your change when you ask. ${product.name}'s Agents can't edit your files in this run. You'll explain the change back without help before you publish it.`,
+    handText: `The guide plans with you, gives hints and reviews your change on request. ${product.name}'s Agents can't edit your files. Before publishing, you explain the change back unaided.`,
     sample: "The sample shows the Agent team. Learn by hand works on your own projects.",
     start: "Plan with the guide",
     fit: "Fit the guide to the project's rules",
@@ -203,7 +203,7 @@ const discovery = {
         ? `${product.name} won't publish a learn-by-hand run for this issue: the project closes AI-generated pull requests for issues like it, and ${condition}.`
         : `${product.name} won't publish a learn-by-hand run for this issue: the project keeps it for people learning without AI tools.`,
     fitted: ({ kinds, quote }: { kinds: string; quote: string }) =>
-      `${product.name} can publish a learn-by-hand run here only if the guide stays within what the project's own text says is fine (${kinds}: "${quote}"), and only after you confirm the project's quoted rule. The maintainers decide whether your change fits.`,
+      `To publish here, the guide must stay within what the project's own text allows (${kinds}: "${quote}"), and you must confirm its quoted rule. The maintainers decide whether your change fits.`,
     /** A rule from BELL's owner-signed list of rules projects publish outside their repositories (F14). */
     registry: ({ date }: { date: string }) => `From ${product.name}'s checked list · checked on ${date}`,
     /** The Activity tab's plan heading in a Learn-by-hand run, by team phase (no agent team works in it). */
@@ -218,9 +218,9 @@ const discovery = {
     boardReading: "The guide reads the project first; then you write your own steps.",
     /** The task dialog's usage line for a Learn-by-hand run. */
     usage: ({ provider }: { provider: string }) =>
-      `The guide runs with the ${provider} CLI signed in on this computer and counts against that account's usage. You write the change yourself, in your own editor.`,
+      `The guide uses the ${provider} CLI signed in on this computer; usage counts against that account. You write the change in your editor.`,
     /** The rules card in a Learn-by-hand run fitted to this rule when it started (F12). */
-    rulesFitted: "This run was fitted to it, so publishing can ask you to confirm the quoted rule instead of blocking. The maintainers decide whether your change fits.",
+    rulesFitted: "This run was fitted to it, so publishing can ask you to confirm it, not block. The maintainers decide whether your change fits.",
     retry: "A retry takes this run back to planning with the guide.",
   },
   runtime: {

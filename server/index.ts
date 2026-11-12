@@ -56,6 +56,9 @@ import { sm } from "./i18n/index.js";
 import { log } from "./log.js";
 import { redact } from "./process.js";
 import { Store } from "./store.js";
+import { PasswordlessSudo } from "./sudo.js";
+import { SudoAudit } from "./sudo-audit.js";
+import { sudoTestOverrides } from "./sudo-test-overrides.js";
 import { Workbench } from "./workbench.js";
 import { issueWriterLock, type WriterLock } from "./writer-lock.js";
 
@@ -792,9 +795,19 @@ export async function startServer(
       maxActiveRuns: config.limits.maxActiveRuns,
       agentTimeoutScale: config.limits.agentTimeoutScale,
     });
+    // Linux only, like the sudo routes: a rule past its expiry is removed
+    // now and a valid one when it expires.
+    let sudo: PasswordlessSudo | undefined;
+    if (process.platform === "linux" && !sudoTestOverrides.skipStartupCleanup) {
+      sudo = new PasswordlessSudo({ audit: new SudoAudit(paths.sudoAudit) });
+      const helper = sudo;
+      cleanups.push(() => helper.stop());
+      await sudo.cleanUpAtStartup().catch((error: unknown) => log.warn("sudo.startup_cleanup_failed", { error }));
+    }
     if (writerLock)
       collab = await openCollabHost({ dataDir: config.dataDir, lock: writerLock });
     app = createApp(workbench, {
+      ...(sudo ? { sudo } : {}),
       port: config.port,
       ...(config.frontendPort ? { frontendPort: config.frontendPort } : {}),
       dev: config.dev,

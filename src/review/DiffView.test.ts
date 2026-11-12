@@ -187,6 +187,7 @@ test("a 500-line diff is one tab stop: a listbox of lines with a roving tabindex
     );
     const region = codeRegion(html);
     assert.equal(count(region, /tabindex="0"/g), 1, view);
+    assert.doesNotMatch(html, /class="rv-code-scroll"[^>]*tabindex/, view);
     assert.equal(count(html, /tabindex="0"/g), 1, view);
     assert.equal(count(region, /tabindex="-1"/g), 499, view);
     // Every code line is one option, named by its own label.
@@ -232,7 +233,7 @@ test("the list of lines explains its keys and has a status for the selection", (
   const describedBy = /role="listbox"[^>]*aria-describedby="([^"]+)"/.exec(html)![1];
   assert.match(
     html,
-    new RegExp(`<p class="rv-visually-hidden" id="${describedBy}">Use the arrow keys to move between lines and Shift with an arrow key to select several\\. Press Enter to go to “Explain this code” for the selection, and Escape to clear it\\.</p>`),
+    new RegExp(`<p class="rv-visually-hidden" id="${describedBy}">Arrow keys move between lines; Shift plus an arrow selects several\\. Enter goes to “Explain this code” for the selection; Escape clears it\\.</p>`),
   );
   // Empty until lines are selected, so a screen reader hears the count change.
   assert.match(html, /<span class="rv-visually-hidden" role="status"><\/span>/);
@@ -246,7 +247,7 @@ test("the list of lines explains its keys and has a status for the selection", (
     }),
   );
   assert.match(zh, /aria-label="差異的各行"/);
-  assert.match(zh, /用方向鍵在各行之間移動.*按 Enter 前往選取範圍的「解說這段程式碼」/);
+  assert.match(zh, /方向鍵在各行間移動.*Enter 前往選取範圍的「解說這段程式碼」/);
   assert.match(zh, /aria-label="export function first\(\) \{ 中，從舊版第 1 行、新版第 1 行起的變更"/);
 });
 
@@ -407,7 +408,7 @@ test("in a Learn-by-hand run the selection's button and hint name the guide, nev
   const html = diff({ guide: true } as Partial<DiffViewProps>);
   assertNoHan(html);
   assert.match(html, /rv-diff-footer[^>]*>.*Click any line to ask the guide about it/);
-  assert.match(html, /Press Enter to go to “Ask the guide about these lines” for the selection/);
+  assert.match(html, /Enter goes to “Ask the guide about these lines” for the selection/);
   assert.doesNotMatch(html, /agent|Explain this code/);
   const zh = diff({ guide: true } as Partial<DiffViewProps>, renderZh);
   assert.match(zh, /點選任何一行，向嚮導提問/);

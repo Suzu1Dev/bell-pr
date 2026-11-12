@@ -378,7 +378,7 @@ export function WorkspacePage({
         })}
       </section>
       <section className="review-area">
-        <div className="review-toolbar">
+        <div className="review-toolbar" tabIndex={0} role="region" aria-label={t.tabsLabel}>
           <div
             className="review-tabs"
             role="tablist"

@@ -142,7 +142,8 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   whose path is not in the repository is drawn as outside it. Each file's
   plain-language example also returns its before and after as up to five
   steps each, drawn in the Before and After boxes with the steps that
-  differ marked by border, icon and text for screen readers. The learning
+  differ marked by border, icon and text for screen readers; an example
+  with these steps opens by itself, one in prose only stays closed. The learning
   record export lists the same steps. BELL PR draws both from the
   Agent's short fields with its own HTML and CSS; the Agent writes no
   drawing. Analyses and explanations saved earlier load as before and show
@@ -150,6 +151,36 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- **The sudo helper is now host-local only and enabled for a limited time.**
+  Each enable asks for the sudo password and a duration from 1 minute to
+  8 hours (1 hour by default). BELL PR removes the rule when the time is up
+  and, at startup, removes a rule past its time or without an end time (such
+  as one installed by 1.0.0 or 1.1.0; if removal needs a password,
+  `bell-pr doctor` prints the `sudo rm` command). While it is on, it cannot
+  be enabled again to move its end time; remove it first. Only the install
+  token, from this computer at `localhost`, `127.0.0.1` or `[::1]` and
+  without proxy headers, may use it; paired devices may not. Changes are
+  recorded in `audit/sudo.jsonl` in the data directory, never with the
+  password. `bell-pr doctor` reports a rule past its time or without one, and
+  `--sudoers-path <file>` picks the file it inspects.
+- **A sync snapshot does not count as another copy of a recovered commit.**
+  `refs/bellpr/sync/<run>` is removed with the run's files, so a
+  publish-recovery ref is kept when that snapshot is the only other ref
+  that can reach the commit.
+- **A publish-recovery ref is deleted only when its commit is already
+  reachable.** After a later publish succeeds, or when a run is removed,
+  `refs/bellpr/publish-recovery/<run>/<commit>` is deleted if that commit
+  can be reached from the remote branch, the pull request, or another ref.
+  If it may be the only copy, it stays, and the log says why. Deleting a
+  ref that is already gone is not an error.
+- **Start now listens when the provider is the only required check that
+  fails,** on the first start and on every later one. The first time,
+  Welcome shows how to install Codex CLI, Claude Code or the
+  Antigravity CLI, with the same commands and documentation links as the
+  guides. Any other required check, alone or together with the provider,
+  still prints the checklist and exits 1. `bell-pr doctor` still exits 1
+  when the provider is not ready. `bell-pr start --force` still starts
+  when another required check fails.
 - **The data-directory lock is written whole.** Where the file system
   supports hard links, a start writes its lock aside and links it into
   place, so no other start reads it half written. A stale lock is removed
@@ -186,7 +217,11 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   ("the Lead", "Reviewer", "Test analyst"), and Chinese text calls the
   command deny rules 指令 deny 規則, as the full access notice does. Several buttons and tabs were renamed: "Activity",
   "Overview", "Explain it back now", "Approve and preview the PR",
-  "Publish Draft PR", "Check again" and "Code changes" among them. Saved
+  "Publish Draft PR", "Check again" and "Code changes" among them. The 191
+  longest messages that may change (over 25 English words each) are
+  about a fifth shorter, counted on the rendered text: English from 7,260
+  to 5,666 words (−22%) and Chinese from 9,684 to 7,493 Han characters
+  (−23%). They keep the facts, warnings and next steps they gave. Saved
   runs and stored messages keep the wording they were saved with.
 - **The docs link to the official documentation for outside facts.**
   Statements about Claude Code, Codex, Antigravity, the GitHub CLI,
@@ -194,6 +229,13 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   states them, and the docs quote the current interface labels.
 
 ### Fixed
+
+- **npmjs.com shows the English README.** `npm publish` takes any root
+  file named `README` or `README.*` as the package's README, in no fixed
+  order, so npmjs.com showed the Traditional Chinese README for 1.0.0 and
+  1.1.0. It is now `README-zh-TW.md`, in the repository and in the package,
+  and `node scripts/check-pack.mjs` fails when npm could send another README
+  than `README.md`.
 
 - **A local import uses the origin URL saved in the checkout.** A global
   `url.*.insteadOf` rewrite no longer hides a GitHub project, and an origin
@@ -205,6 +247,14 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   provider". When Ubuntu's restriction on user namespaces stops the
   Antigravity sandbox, the error no longer offers signing in to Claude
   Code as a fix, because Claude Code's sandbox can need the same setting.
+- **Sideways overflow on the overview and in the publish dialog.** The
+  contribution directions stay a sideways row you can scroll (arrow keys,
+  previous and next), and that row no longer pushes its section wider than
+  the page. The run's tabs, the section links and the file list scroll
+  from the keyboard: each is named and shows a focus ring. The diff stays
+  one tab stop; the left and right arrow keys scroll its lines sideways.
+  The publish description keeps its long lines, scrolls them with the
+  arrow keys, and shows a fade on the side that still has more to scroll.
 - **Other requests no longer wait while the server starts Git.** Before each
   Git command, the server read the repository's driver settings with a
   synchronous `git config`, so no other request was served until it

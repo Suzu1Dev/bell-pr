@@ -90,7 +90,7 @@ test("bell-pr open without a running instance exits 1 and says how to start", as
     assert.equal(result.stdout, "");
     assert.equal(
       result.stderr,
-      `No BELL PR is running with the data directory ${dataDir}. Start it with \`bell-pr\`, or, for a BELL PR started with another data directory, run \`bell-pr open --data-dir <dir>\`.\n`,
+      `No BELL PR is running with the data directory ${dataDir}. Start it with \`bell-pr\`; for another data directory, run \`bell-pr open --data-dir <dir>\`.\n`,
     );
 
     // A lock left by a process that is gone, or one whose pid now runs
@@ -578,8 +578,8 @@ const readyCodex = `case "$1" in
   *) exit 1 ;;
 esac`;
 
-test("bell-pr start exits 1 before it listens when doctor is not ready", async () => {
-  await withStandInClis({ git: standInGit }, async (directory) => {
+test("bell-pr start exits 1 before it listens when a required check other than the provider fails", async () => {
+  await withStandInClis({}, async (directory) => {
     const dataDir = path.join(directory, "data");
     const port = await freePort();
     const result = await cli(
@@ -588,6 +588,7 @@ test("bell-pr start exits 1 before it listens when doctor is not ready", async (
     );
     assert.equal(result.code, 1, result.stderr);
     assert.equal(result.stdout, "");
+    assert.match(result.stderr, /✗ Git/);
     assert.match(result.stderr, /✗ AI provider/);
     const sample = "No AI provider yet? See the sample tour: bell-pr start --force";
     const headlineAt = result.stderr.indexOf("Not ready:");

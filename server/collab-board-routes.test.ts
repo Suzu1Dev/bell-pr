@@ -783,7 +783,7 @@ test("a done write that fails: the release says the hold ended and cannot be don
   assert.deepEqual([failed.status, failed.json], [500, {
     reason: "doneNotSaved",
     error:
-      "The hold has ended, but its task could not be marked done, and now it never can be. Work that waits for it has to name another task. The log on the host has the details.",
+      "The hold ended, but its task can never be marked done now. Work waiting on it must name another task. See the log on the host.",
   }]);
   assert.ok(f.logged.some((line) => line.includes("could not save that a task is done")));
   // The work after it in the queue is answered, with what is true now.

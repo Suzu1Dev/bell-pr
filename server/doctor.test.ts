@@ -10,7 +10,7 @@ import {
   sudoDisclosure,
 } from "../shared/i18n/disclosures.en.js";
 import { fullAccessDisclosure as fullAccessDisclosureZh } from "../shared/i18n/disclosures.zh-TW.js";
-import { bellSudoersFile } from "../shared/sudo.js";
+import { bellSudoersFile, sudoersExpiryPrefix } from "../shared/sudo.js";
 import type { DoctorCheck, DoctorReport } from "../shared/doctor.js";
 import {
   claudeAuthDetail,
@@ -33,6 +33,9 @@ import { AppError } from "./types.js";
  * claude can run. Each script logs its arguments to calls.log and answers
  * by its first arguments, like the tool it stands in for.
  */
+/** The expiry line of a rule that is still in time. */
+const inThirtyMinutes = () => `${sudoersExpiryPrefix}${new Date(Date.now() + 30 * 60_000).toISOString()}\n`;
+
 async function fakes(t: TestContext, scripts: Record<string, string>) {
   const directory = await mkdtemp(path.join(os.tmpdir(), "bell-doctor-test-"));
   const bin = path.join(directory, "bin");
@@ -387,7 +390,7 @@ test("Claude Code outside the supported versions works with a warning", async (t
   assert.equal(tool.version, "2.2.0");
   assert.equal(
     tool.detail,
-    "Claude Code 2.2.0 is outside the versions BELL PR supports (2.1.292 or later, before 2.2). Agents still start, but BELL PR has not checked that this release applies its sandbox and hook settings.",
+    "Claude Code 2.2.0 is unsupported (BELL PR supports 2.1.292 or later, before 2.2). Agents still start, but BELL PR's sandbox and hook settings are untested on it.",
   );
   // Only a warning: Claude Code still counts as ready and runs are not refused.
   assert.equal(check(report, "provider-ready").status, "ok");
@@ -789,7 +792,7 @@ esac`,
   );
 
   const installed = path.join(f.directory, "bell-pr-agent");
-  await writeFile(installed, "# fixture only\nDO-NOT-READ-THIS-FILE\n");
+  await writeFile(installed, `# fixture only\n${inThirtyMinutes()}DO-NOT-READ-THIS-FILE\n`);
   const sudo = await withLocale("en", () =>
     runDoctor({ force: true, platform: "linux", sudoersFile: installed, agentAccess: "workspace" }),
   );
@@ -832,7 +835,7 @@ esac`,
 test("passwordless sudo warns for BELL's rule and for another rule, and skips when sudo is absent or this is not Linux", async (t) => {
   const f = await fakes(t, { git: git() });
   const installed = path.join(f.directory, "bell-pr-agent");
-  await writeFile(installed, "# fixture\nDO-NOT-READ-THIS-FILE\n");
+  await writeFile(installed, `# fixture\n${inThirtyMinutes()}DO-NOT-READ-THIS-FILE\n`);
   const missing = path.join(f.directory, "no-sudoers");
   const base = { force: true, platform: "linux" as const, agentAccess: "workspace" as const };
 
@@ -882,6 +885,70 @@ test("passwordless sudo warns for BELL's rule and for another rule, and skips wh
   assert.equal(JSON.stringify(bell).includes("DO-NOT-READ-THIS-FILE"), false);
 });
 
+test("BELL's rule past its expiry, or without one, fails the sudo check with the command that removes it", async (t) => {
+  const f = await fakes(t, { git: git() });
+  const file = path.join(f.directory, "bell-pr-agent");
+  const base = { force: true, platform: "linux" as const, agentAccess: "workspace" as const, sudoersFile: file };
+  const expired = new Date(Date.now() - 60_000).toISOString();
+  for (const [text, reason, detail, sudoCode] of [
+    [`${sudoersExpiryPrefix}${expired}\nbellsvc ALL=(ALL) NOPASSWD: ALL\n`, "expired", /past its expiry time/, 0],
+    [`${sudoersExpiryPrefix}${expired}\nbellsvc ALL=(ALL) NOPASSWD: ALL\n`, "expired", /past its expiry time/, 1],
+    ["bellsvc ALL=(ALL) NOPASSWD: ALL\n", "no-expiry", /no valid expiry time/, 0],
+    [`${sudoersExpiryPrefix}someday\n`, "no-expiry", /no valid expiry time/, 1],
+  ] as const) {
+    await writeFile(file, text);
+    const report = await withLocale("en", () => runDoctor({ ...base, sudoRun: async () => sudoCode }));
+    const sudo = check(report, "passwordless-sudo");
+    assert.equal(sudo.status, "fail", text);
+    assert.equal(sudo.required, false);
+    assert.equal(sudo.reason, reason);
+    assert.match(sudo.detail ?? "", detail);
+    assert.deepEqual(sudo.fixes, [{ label: "Remove BELL PR's sudo rule", command: `sudo rm ${file}` }]);
+    if (reason === "expired") assert.deepEqual(sudo.params, { expiresAt: expired });
+  }
+  const zh = await withLocale("zh-TW", () => runDoctor({ ...base, sudoRun: async () => 1 }));
+  assert.match(check(zh, "passwordless-sudo").detail ?? "", /沒有有效的到期時間/);
+  // The doctor only reads: the file is still there.
+  assert.equal(await readFile(file, "utf8"), `${sudoersExpiryPrefix}someday\n`);
+
+  await writeFile(file, inThirtyMinutes());
+  const valid = await withLocale("en", () => runDoctor({ ...base, sudoRun: async () => 0 }));
+  assert.equal(check(valid, "passwordless-sudo").status, "warn");
+  assert.match(String(check(valid, "passwordless-sudo").params?.expiresAt), /^\d{4}-\d{2}-\d{2}T.*Z$/);
+});
+
+test("tests never inspect the real rule file, and bell-pr doctor --sudoers-path picks the file to inspect", { skip: process.platform !== "linux" }, async (t) => {
+  const f = await fakes(t, { git: git(), sudo: "exit 1" });
+  const leftover = await withLocale("en", () =>
+    runDoctor({ force: true, platform: "linux", agentAccess: "workspace", sudoRun: async () => 0 }),
+  );
+  // The test preload points the default at a file that does not exist.
+  assert.equal(check(leftover, "passwordless-sudo").reason, "external");
+
+  const file = path.join(f.directory, "bell-pr-agent");
+  await writeFile(file, `${sudoersExpiryPrefix}2020-01-01T00:00:00.000Z\n`);
+  let json = "";
+  await withLocale("en", () =>
+    runDoctorCli(["--json", "--sudoers-path", file], { stdout: { write: (chunk: string) => (json += chunk) } }),
+  );
+  const report = JSON.parse(json) as DoctorReport;
+  assert.equal(check(report, "passwordless-sudo").status, "fail");
+  assert.equal(check(report, "passwordless-sudo").reason, "expired");
+  let text = "";
+  await withLocale("en", () =>
+    runDoctorCli(["--sudoers-path", file], { stdout: { write: (chunk: string) => (text += chunk) } }),
+  );
+  assert.match(text, /✗ Passwordless sudo +BELL PR's passwordless sudo rule is past its expiry time/);
+  assert.ok(text.includes(`sudo rm ${file}`));
+  assert.equal(await readFile(file, "utf8"), `${sudoersExpiryPrefix}2020-01-01T00:00:00.000Z\n`);
+  let usage = "";
+  assert.equal(
+    await withLocale("en", () => runDoctorCli(["--sudoers-path"], { stdout: { write: (chunk: string) => (usage += chunk) } })),
+    2,
+  );
+  assert.match(usage, /--sudoers-path <file>/);
+});
+
 test("Codex turned off is disabled, not a required failure, and a saved Codex choice falls back", async (t) => {
   setCodexEnabledForTests(false);
   t.after(() => setCodexEnabledForTests(true));
@@ -926,7 +993,10 @@ test("only Codex installed, with the switch off, asks for Claude Code and does n
     row.detail,
     "1.0.0 supports Claude Code only; Codex support is disabled.\nInstall Claude Code.",
   );
-  assert.equal(row.fixes, undefined);
+  assert.deepEqual(
+    row.fixes?.map((fix) => fix.command),
+    ["npm install -g @anthropic-ai/claude-code", "claude auth login"],
+  );
   assert.equal(check(again, "codex").status, "skip");
   assert.equal(check(again, "codex").reason, "disabled");
   assert.equal(check(again, "codex").required, false);

@@ -65,6 +65,7 @@ const m: Translation<typeof en> = {
   fixes: {
     installGit: "安裝 Git",
     useWsl: `安裝 WSL2，並在其中執行 ${product.name}`,
+    removeSudoRule: `移除 ${product.name} 的 sudo 規則`,
     installGh: "安裝 GitHub CLI",
     signInGh: "登入 GitHub",
     addWorkflowScope: "允許推送工作流程的修改",
@@ -120,7 +121,7 @@ const m: Translation<typeof en> = {
     gitTooOld: ({ version }) =>
       `Git ${version} 可以使用，但要把任務移到目標分支的最新版本，需要 Git 2.40 以上。其他功能都能正常使用。`,
     claudeVersionUnsupported: ({ version, min, below }) =>
-      `Claude Code ${version} 不在 ${product.name} 支援的版本範圍內（${min} 以上、${below} 之前）。Agent 仍會啟動，但 ${product.name} 尚未確認這個版本會套用它的沙箱與 hooks 設定。`,
+      `Claude Code ${version} 不受支援（${product.name} 支援 ${min} 以上、${below} 之前）。Agent 仍會啟動，但 ${product.name} 的沙箱與 hooks 設定在這個版本未經驗證。`,
     identityMissing:
       "尚未設定：Git 不知道你的名字與電子郵件地址，因此無法提交或發布任何內容。",
     identityAutodetected: ({ email }) =>
@@ -145,13 +146,15 @@ const m: Translation<typeof en> = {
       "無法使用。你已允許 Claude Code Agent 不用沙箱修改檔案；這類任務會有標示。",
     antigravitySandboxReady: "可以使用：會修改檔案的 Antigravity Agent 會在它的終端機沙箱中執行指令。",
     antigravitySandboxRestricted:
-      "無法使用：這個 Linux 系統不允許 Antigravity CLI 建立 user namespace（kernel.apparmor_restrict_unprivileged_userns），因此 Antigravity Agent 無法修改檔案。docs/troubleshooting.md 說明可行的做法。",
+      "無法使用：這個 Linux 系統不允許 Antigravity CLI 建立 user namespace（kernel.apparmor_restrict_unprivileged_userns），所以 Antigravity Agent 無法修改檔案。做法見 docs/troubleshooting.md。",
     antigravitySandboxUnsupported: "這個平台無法使用，因此 Antigravity Agent 無法修改檔案。",
     antigravitySandboxAllowed:
       "無法使用。你已允許 Antigravity Agent 不用沙箱修改檔案與執行指令；這類任務會有標示。",
     fullAccessDisclosure,
     sudoDisclosure,
     passwordlessSudoInstalled: `已安裝 BELL PR 的免密碼 sudo 規則。${sudoDisclosure}`,
+    passwordlessSudoExpired: "BELL PR 的免密碼 sudo 規則已過期，但檔案仍在。請移除它。",
+    passwordlessSudoNoExpiry: "BELL PR 的免密碼 sudo 規則沒有有效的到期時間。請移除它。",
     passwordlessSudoExternal: `免密碼 sudo 來自其他規則。${sudoDisclosure}`,
     providersReady: ({ providers }) => `已就緒：${fmt.list(providers)}。`,
     noProvider: `請安裝並登入 Codex CLI、Claude Code 或 Antigravity CLI：${product.name} 至少需要其中一個。`,
@@ -185,7 +188,7 @@ const m: Translation<typeof en> = {
       `尚未就緒：請修正標示 ✗ 的必要檢查（${fmt.list(checks)}），再重新檢查一次。`,
     dataDir: ({ path }) => `資料目錄：${path}`,
     fix: ({ label }) => `${label}：`,
-    usage: `用法：${product.binNames[0]} doctor [--json] [--data-dir <目錄>]`,
+    usage: `用法：${product.binNames[0]} doctor [--json] [--data-dir <目錄>] [--sudoers-path <檔案>]`,
     unknownArgument: ({ argument }) => `沒有「${argument}」這個參數。`,
   },
 };

@@ -251,7 +251,7 @@ test("with the check turned off, approval needs the ticks only, and the run says
       /<span>Understanding check off: approval needs only your reviewed ticks\.<\/span>/,
     );
     assert.match(html, /class="unsandboxed-badge check-off-badge"/);
-    assert.match(html, /The understanding check is off, so you can approve without explaining the change back\./);
+    assert.match(html, /You can approve without explaining the change back\. Runs approved this way stay marked\./);
     assertNoHan(html);
   } finally {
     setCheckSettingsForTests(undefined);

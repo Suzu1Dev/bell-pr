@@ -1140,7 +1140,7 @@ test("discovery passes the Codex baseline timeout and a longer, announced wait f
     assert.equal(failed.status, "failed");
     assert.equal(
       failed.error,
-      "claude 執行逾時（已等待 15 分鐘）。較高的思考強度或大型專案需要更久；可降低思考強度、改用較快的模型，或提高 BELLPR_AGENT_TIMEOUT_SCALE。",
+      "claude 執行逾時（15 分鐘）。請調低思考強度、換較快的模型或提高 BELLPR_AGENT_TIMEOUT_SCALE；大型專案需要更久。",
     );
   } finally {
     await claude.cleanup();

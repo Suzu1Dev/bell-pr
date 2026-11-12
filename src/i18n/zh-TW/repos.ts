@@ -27,7 +27,7 @@ const m: Translation<typeof en> = {
     delete: "刪除專案",
     deleteLabel: ({ name }) => `刪除專案：${name}`,
     deleteConfirm: ({ name }) =>
-      `要從 ${product.name} 刪除 ${name} 嗎？它的貢獻、筆記與專案分析也會一併刪除。${product.name} 下載的副本會被移除；從這台電腦匯入的資料夾則保留在原處。`,
+      `要從 ${product.name} 刪除 ${name} 嗎？貢獻、筆記與分析也會刪除。下載的副本會移除；本機匯入的資料夾會保留。`,
     deleteYes: "刪除",
     deleteNo: "保留",
     deleting: "正在刪除…",
@@ -44,7 +44,7 @@ const m: Translation<typeof en> = {
     placeholder: "owner/repository 或 https://github.com/owner/repository",
     localPathHint: ({ example }) =>
       `貼上 GitHub 連結、owner/repository，或本機 Git 專案的完整路徑，例如 ${example}`,
-    wslPathHint: `若 ${product.name} 在這台電腦的 WSL2 中執行，請使用 Linux 發行版中的路徑：Windows 的資料夾位於 /mnt/c/ 底下，例如 /mnt/c/projects/repository。`,
+    wslPathHint: `若 ${product.name} 在這台電腦的 WSL2 中執行，請使用 Linux 路徑，例如 Windows 資料夾是 /mnt/c/projects/repository。`,
     callout:
       "GitHub 專案會下載到這台電腦。之後的開發在獨立的工作目錄（Git worktree）進行，原專案維持原狀。",
     later: "稍後再說",

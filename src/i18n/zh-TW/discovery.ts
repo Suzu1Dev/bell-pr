@@ -30,7 +30,7 @@ const m: Translation<typeof en> = {
     sort: "搜尋排序",
     sortHelp: "排序方式說明",
     sortHint:
-      "最近更新：近期有活動的專案，結果常變動。相關度：GitHub 的最佳符合，可能含久未維護的專案（已排除封存專案，並顯示最近推送時間）。星數：知名專案，競爭多、審查門檻高。",
+      "最近更新：活躍專案，結果常變。相關度：GitHub 最佳符合，可能久未維護（不含封存，顯示最近推送時間）。星數：知名專案，競爭多、審查門檻高。",
     minStars: "最低星數",
     advanced: "模型與效率設定",
     agent: "AI 服務",
@@ -103,7 +103,7 @@ const m: Translation<typeof en> = {
     title: "推薦貢獻項目",
     previousTitle: "上一份推薦，仍在這裡。",
     note: ({ sort }) =>
-      `依「${sort}」排序取 12 個候選，檢查後最多保留 6 個。順序來自分析，不是 GitHub 排名。動工前請確認 issue 最新狀態與維護者意願。`,
+      `依「${sort}」取 12 個候選，檢查後最多留 6 個；排序來自分析而非 GitHub。動工前請確認 issue 最新狀態與維護者意願。`,
     sampleNote: "即時搜尋會依你選的排序取 12 個候選，檢查後最多保留 6 個。",
     previousNote: ({ date }) =>
       date
@@ -137,16 +137,16 @@ const m: Translation<typeof en> = {
     importing: "正在匯入專案…",
     learnByHand: "親手學：這一個請自己寫",
     learnByHandHint:
-      "這個 issue 有新手標籤。親手寫修正才是認識專案的方式，所以 Agent 團隊不會接手。先讀計畫與來源，再開啟 issue。",
+      "這是新手 issue：親手寫修正才能認識專案，所以 Agent 團隊不接。請先讀計畫與來源。",
     openIssue: "開啟 issue",
     startByHand: "開始親手學",
-    reservedOutput: `這個專案會關閉這類 issue 上由 AI 產生的 Pull Request。只有專案自己的文字點名了嚮導提供的每一種協助，而且你確認過被引用的規範之後，${product.name} 才能為它發布親手學的任務；任務對話框會說明是哪一種情況。`,
+    reservedOutput: `這個專案會關閉這類 issue 的 AI 生成 Pull Request。要發布親手學的任務，專案原文須點名嚮導提供的每種協助，且你須確認被引用的規範（見任務對話框）。`,
   },
   byHand: {
     legend: "誰來寫程式碼？",
     agents: "Agent 團隊來寫",
     hand: "你自己寫（親手學）",
-    handText: `嚮導和你一起規劃、給提示，並在你要求時審查你的修改。這個任務裡，${product.name} 的 Agent 無法修改你的檔案。發布之前，你要在沒有協助的情況下把修改解釋一遍。`,
+    handText: `嚮導陪你規劃、給提示，並應你要求審查修改。${product.name} 的 Agent 不能修改你的檔案。發布前，你要獨力把修改講一遍。`,
     sample: "示範專案只示範 Agent 團隊。親手學請用你自己的專案。",
     start: "和嚮導一起規劃",
     fit: "讓嚮導配合專案規範",
@@ -163,7 +163,7 @@ const m: Translation<typeof en> = {
         ? `${product.name} 不會為這個 issue 發布親手學的任務：專案會關閉這類 issue 由 AI 產生的 Pull Request，而且${condition}。`
         : `${product.name} 不會為這個 issue 發布親手學的任務：專案把它留給不靠 AI 工具學習的人。`,
     fitted: ({ kinds, quote }) =>
-      `只有嚮導始終待在專案原文說可以的範圍內（${kinds}：「${quote}」），而且你確認過專案被引用的規範之後，${product.name} 才能在這裡發布親手學的任務。你的修改是否合適，由維護者決定。`,
+      `要在這裡發布，嚮導須在專案原文允許的範圍內（${kinds}：「${quote}」），且你須確認被引用的規範。你的修改是否合適，由維護者決定。`,
     registry: ({ date }) => `出自 ${product.name} 的檢查清單 · 查核於 ${date}`,
     board: {
       planning: "嚮導正在閱讀程式碼",
@@ -173,8 +173,8 @@ const m: Translation<typeof en> = {
       cancelled: "這個任務已停止",
     },
     boardReading: "嚮導先閱讀專案；接著由你寫下自己的步驟。",
-    usage: ({ provider }) => `嚮導會使用本機已登入的 ${provider} CLI 執行，消耗該帳號的用量。修改由你自己在編輯器裡寫。`,
-    rulesFitted: "這個任務開始時就配合了這條規則，所以發布時可以改為請你確認被引用的規則，而不是直接擋下。你的修改是否合適，由維護者決定。",
+    usage: ({ provider }) => `嚮導使用本機已登入的 ${provider} CLI，用量計入該帳號。修改由你在編輯器裡寫。`,
+    rulesFitted: "這個任務開始時已配合此規則，發布時可改為請你確認，不直接擋下。你的修改是否合適，由維護者決定。",
     retry: "重試會讓這個任務回到和嚮導一起規劃的階段。",
   },
   runtime: {

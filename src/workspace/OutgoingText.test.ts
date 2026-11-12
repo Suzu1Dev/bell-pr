@@ -20,7 +20,7 @@ test("the confirm dialog shows the exact title, commit message and PR body", () 
       demo: false,
     }),
   );
-  const pres = [...html.matchAll(/<pre>([\s\S]*?)<\/pre>/g)].map((match) =>
+  const pres = [...html.matchAll(/<pre[^>]*>([\s\S]*?)<\/pre>/g)].map((match) =>
     match[1].replaceAll("&lt;", "<").replaceAll("&gt;", ">").replaceAll("&amp;", "&"),
   );
   assert.deepEqual(pres, [text.title, text.commitMessage, text.body]);

@@ -664,14 +664,14 @@ test("a project that asks for an AI trailer gets it on the suggested commit mess
   assert.deepEqual(suggested.sources, ["contributing"]);
   assert.match(
     suggested.rationale,
-    /^CONTRIBUTING\.md asks for Fixes lines\. CONTRIBUTING\.md asks for an AI trailer \(“4\. Disclose AI assistance[^”]+”\), so the message ends with Assisted-by: Claude Code, which names the Agent that wrote this change\.$/,
+    /^CONTRIBUTING\.md asks for Fixes lines\. CONTRIBUTING\.md asks for an AI trailer \(“4\. Disclose AI assistance[^”]+”\), so the message ends with Assisted-by: Claude Code, naming the Agent\.$/,
   );
   // Without a message from the model the PR title is the subject, and the rule is the source.
   const made = parse(null, { assistant: "Codex" })!;
   assert.equal(made.message, `${proposal.title}\n\nAssisted-by: Codex`);
   assert.deepEqual(made.sources, ["contributing"]);
   assert.match(made.rationale, /^The subject is the PR title\. CONTRIBUTING\.md asks for an AI trailer/);
-  assert.match(parse(null, { assistant: "Codex" }, trailerRule, "zh-TW")!.rationale, /^主旨沿用 PR 標題。CONTRIBUTING\.md 要求加上 AI trailer/);
+  assert.match(parse(null, { assistant: "Codex" }, trailerRule, "zh-TW")!.rationale, /^主旨沿用 PR 標題。CONTRIBUTING\.md 要求 AI trailer/);
   // The trailer the rule names; none for a rule that refuses one or a project that does not ask.
   assert.equal(
     parse(null, undefined, "Add a `Generated-by:` trailer naming the tool.")?.message,
@@ -1358,7 +1358,7 @@ test("in English, draft rejections and the provisional-policy note carry no Han"
   );
   assert.match(
     provisional.summary,
-    /^Looking up the project's sources was limited or incomplete, so the Linux contribution writing principles are used for now\./,
+    /^Source lookup was limited or incomplete, so Linux contribution writing principles stand in\./,
   );
   assertNoHan(provisional.summary.split("\n")[0]);
 });
@@ -1597,7 +1597,7 @@ test("preflight blocks a credential in the PR text and asks to confirm local pat
   // Two addresses are listed the way the locale lists them.
   assert.match(
     draftPreflight({ body: "A fix.", commitEmails: ["a@company.dev", "b@company.dev"] })[0].message,
-    /addresses a@company\.dev and b@company\.dev,/,
+    /addresses a@company\.dev and b@company\.dev\./,
   );
   for (const address of [
     "12345+me@users.noreply.github.com",

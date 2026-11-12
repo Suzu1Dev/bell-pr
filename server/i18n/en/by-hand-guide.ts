@@ -26,7 +26,7 @@ const guide = {
   testsRunning: "Your tests are running. Ask the guide when they finish.",
   /** No rung left on the step in a fitted run: the next one gives a kind of help the lock lacks. */
   noRungLeft: ({ kind }: { kind: string }) =>
-    `The guide has no more hints for this step in this run: the project's text it is fitted to doesn't name ${kind}. Try an exit instead: ask a human, make this step smaller, or talk it through.`,
+    `No more hints for this step in this run: the project's text the guide is fitted to doesn't name ${kind}. Try an exit: ask a human, make this step smaller, or talk it through.`,
   /** No rung left on the step: the last one was given. */
   lastRungGiven:
     '"An example in this project" is the last hint. Try an exit instead: ask a human, make this step smaller, or talk it through.',
