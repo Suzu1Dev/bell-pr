@@ -47,7 +47,7 @@ const m: Translation<typeof en> = {
     attempt: ({ attempt, attempts }) =>
       `第 ${n(attempt)} / ${n(attempts)} 次嘗試`,
     elapsed: ({ elapsed }) => `已執行 ${elapsed}`,
-    note: "進度條顯示已用時間占這一步時間上限的比例，不代表工作完成了多少。沒有時間上限可顯示時，進度條只會持續移動。",
+    note: "進度條顯示這一步已用時間占上限的比例，而非工作進度。沒有上限時，它只會移動。",
   },
   project: {
     sourceDemo: "示範分析",
@@ -65,11 +65,11 @@ const m: Translation<typeof en> = {
     unknown:
       "專案內容已更新。這份分析來自先前版本，無法列出變更明細；重新分析後再確認貢獻方向。",
     sameContent:
-      "版本已變更，但分析引用的檔案內容相同；全貌仍可能受其他變更影響，重新分析後再確認貢獻方向。",
+      "版本已變更，但引用的檔案沒變；其他變更仍可能影響全貌，重新分析後再選方向。",
     uncited: ({ changed, sha }) =>
-      `自${version(sha)}後有至少 ${n(changed)} 個檔案變動。分析引用的檔案未變動，但全貌仍可能受其他變更影響，重新分析後再確認貢獻方向。`,
+      `自${version(sha)}後至少 ${n(changed)} 個檔案有變動，都未被引用，但仍可能影響全貌；重新分析後再選方向。`,
     cited: ({ changed, sha, cited, capped, files }) =>
-      `自${version(sha)}後有至少 ${n(changed)} 個檔案變動，其中 ${n(cited)} 個${capped ? "以上" : ""}是本份分析引用的檔案：${files}。重新分析後再確認貢獻方向。`,
+      `自${version(sha)}後至少 ${n(changed)} 個檔案有變動，其中 ${n(cited)} 個${capped ? "以上" : ""}被引用：${files}。重新分析後再選方向。`,
   },
   sections: {
     label: "本頁內容",
@@ -131,15 +131,15 @@ const m: Translation<typeof en> = {
     premiseRefuted: "依你的假設，查證後不成立",
     premiseUnclear: "依你的假設，尚未能確認",
     impactRefuted:
-      "前提查核顯示這個假設不成立：上面依假設描述的問題與影響實際上不會發生，請以查核結果與 Lead 的整合摘要為準。",
+      "前提查核推翻了此假設：上述問題與影響不會發生。以查核結果與 Lead 的整合摘要為準。",
     premiseMissing:
-      "這個貢獻建立時還沒有前提查核，需求裡的假設是否成立沒有記錄下來。可以請 Lead 依目前的程式碼與審查報告補做一次。完成後，程式碼解說與你還沒作答的變更解說會依結論重新產生。",
+      "這個貢獻早於前提查核，假設是否成立沒有記錄。Lead 可依目前程式碼與審查報告查核一次。之後，程式碼解說與未作答的解說會依結論更新。",
     premiseCheck: "依審查結果查核前提",
     premiseRecheck: "重新查核前提",
     premiseChecking: "正在查核前提…",
     premiseRecheckNote: "結論改變時，程式碼解說與你還沒作答的變更解說會依新的結論重新產生。",
     pending:
-      "尚未產生這次貢獻的使用者影響分析。先保留原始需求，完成分析後再連結到具體動機與驗收方式。",
+      "尚未分析使用者影響。需求先保留在此，分析後會連結動機與驗收方式。",
   },
   evidence: {
     none: "尚無檔案依據，開始前需確認。",
@@ -186,11 +186,11 @@ const m: Translation<typeof en> = {
     droppedIdeas: ({ count }) =>
       `引文核對未通過，已略過 ${n(count)} 個建議`,
     droppedIdeasNote:
-      "這些建議引用的原文不在送進模型的節錄中，因此只保留標題與原因；其餘分析結果照常儲存，可再「產出新建議」補足。",
+      "引文不在模型看到的節錄中，只留標題與原因。其餘已儲存；可按「產出新建議」補上。",
     droppedPaths: ({ count }) =>
       `因引用未抽樣／不存在的檔案而略過 ${n(count)} 項說明`,
     droppedPathsNote:
-      "模型只讀過抽樣的檔案，引用其他檔案的說明無法核對，因此略過。其餘分析結果照常儲存。",
+      "模型只讀過抽樣檔案，引用其他檔案的說明無法核對。其餘已儲存。",
     rounds: {
       analysis: "專案分析",
       expansion: "最近一次追加",
@@ -275,7 +275,7 @@ const m: Translation<typeof en> = {
     },
     issue: {
       label: "相關 issue 連結",
-      help: "只接受 GitHub issue 網址。填了之後，PR 草稿才能寫 Fixes／Refs #編號。發布前請先在 issue 留言表明要處理。",
+      help: "只接受 GitHub issue 網址；PR 草稿會據此寫 Fixes／Refs #編號。發布前先到 issue 留言認領。",
     },
     model: {
       heading: "模型與思考強度",
@@ -286,7 +286,7 @@ const m: Translation<typeof en> = {
         claude:
           "使用你已安裝並登入的 Claude Code CLI（Claude 方案或 Anthropic API 金鑰皆可）。用量計入你自己的帳號，可用模型依你的方案而定。",
         antigravity:
-          "使用你已安裝並登入的 Antigravity CLI（agy；Google 帳號、Gemini API 金鑰或 Google Cloud 憑證皆可）。用量計入你自己的帳號，列出的模型也依帳號而定。專案若附帶 Antigravity 的 hooks、MCP 伺服器、外掛、Agent 或技能，Antigravity 就不會在其中啟動。",
+          "使用你已安裝並登入的 Antigravity CLI（agy；Google 帳號、Gemini API 金鑰或 Google Cloud 憑證皆可）。用量計入你自己的帳號，列出的模型也依帳號而定。專案若附帶 Antigravity 的 hooks、MCP 伺服器、外掛、Agent 或技能，它就不會啟動。",
       },
       providerOption: ({ provider, state }) => `${provider}（${state}）`,
       providerStates: {
@@ -311,7 +311,7 @@ const m: Translation<typeof en> = {
       webPages: "允許 Agent 讀取網頁",
       antigravityWeb: "Antigravity 的網路搜尋無法關閉，包含專案分析與探索。這個選項只控制是否允許讀取網頁。",
       webAccessHelp:
-        "適用於任務與追問。專案分析與探索不使用這些工具。網頁內容一律視為不可信。終端機的網路存取仍受所選權限限制。",
+        "只用於任務與追問，不含分析與探索。網頁內容視為不可信。終端機連網仍依你的權限。",
       error: ({ message }) => `${message} 已儲存的選擇會保留。`,
       loadFailed: ({ provider }) => `暫時無法讀取 ${provider} 模型清單。`,
       reload: "重新載入",
@@ -324,7 +324,7 @@ const m: Translation<typeof en> = {
         full: "完整",
         off: "關閉",
       },
-      help: "輕量：以精簡規則減少過度開發。完整：套用更多規則，優先重用現有程式與原生功能。關閉：方便比較不同方式的成果與用量。",
+      help: "輕量：精簡規則，防止過度開發。完整：更多規則，優先用現有程式與原生功能。關閉：比較成果與用量。",
       link: "查看 Ponytail",
     },
     team: {
@@ -393,7 +393,7 @@ const m: Translation<typeof en> = {
     notFound: ({ files }) =>
       `在 ${product.name} 讀過的 ${n(files)} 個檔案中沒有找到。有些專案把規範放在網站或 wiki 上，發布前請自行確認。`,
     noFiles:
-      "沒有可讀的貢獻指南、政策或 Pull Request 範本。有些專案把規範放在網站或 wiki 上，發布前請自行確認。",
+      "找不到貢獻指南、政策或 Pull Request 範本。有些專案把規範放在網站或 wiki 上，發布前請自行確認。",
     couldntCheck: ({ reason }) => `無法確認：${reason}`,
     notRead: "尚未讀取專案規範。按「重新檢查」即可讀取。",
     filesRead: ({ count }) => `${product.name} 讀過的檔案 · ${n(count)}`,
@@ -471,7 +471,7 @@ const m: Translation<typeof en> = {
     pacing: ({ open, budget }) =>
       `你在這裡有 ${n(open)} 個開放中的 Pull Request，至少是上限 ${n(budget)} 的兩倍；降下來之前，${product.name} 不會發布這個任務。`,
     lesson:
-      "有新手標籤的 issue，是新手親手寫修正、認識專案的入口。交給 Agent 團隊做，下一位新手就少了這個機會。可以考慮改做標有 help wanted 的 issue。",
+      "新手 issue 讓人親手修正、認識專案；交給 Agent 團隊，下一位新手就少了這個機會。可改做 help wanted 的 issue。",
     practiseLocally: "開始，在本機練習",
     startAnyway: "仍要開始",
     back: "返回",

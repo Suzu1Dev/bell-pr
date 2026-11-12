@@ -8,7 +8,7 @@ test("the agent team page reads in English with no Chinese left", () => {
   const html = renderEn(createElement(TeamPage, { beginContribution() {} }));
   assert.match(html, /<h1 tabindex="-1">How the AI team works<\/h1>/);
   assert.match(html, /2 to 4 teammates · Shared task board/);
-  assert.match(html, /Uses the Codex, Claude Code or Antigravity CLI signed in on this computer\./);
+  assert.match(html, /Uses your signed-in Codex, Claude Code or Antigravity CLI\./);
   assertNoHan(html);
   assert.match(
     renderZh(createElement(TeamPage, { beginContribution() {} })),

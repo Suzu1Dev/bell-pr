@@ -36,7 +36,7 @@ const efficiency = {
   /** The credit behind the mode chip: its tooltip and the panel it opens. */
   credit: {
     text: ({ version }: { version: string }) =>
-      `The efficiency modes build on Ponytail ${version} by DietrichGebert (MIT license). Lean gives the Agents a short adaptation of its principles, Full gives them its complete rules, and Off adds neither.`,
+      `Efficiency modes build on Ponytail ${version} by DietrichGebert (MIT license). Lean gives Agents a short adaptation of its principles; Full, its complete rules; Off, neither.`,
     link: "Ponytail upstream project",
   },
   inputTokens: "Input tokens",
@@ -51,7 +51,7 @@ const efficiency = {
   usageNote: ({ calls, measured }: { calls: number; measured: number }) =>
     `${fmt.number(calls)} ${fmt.plural(calls) === "one" ? "call" : "calls"} · usage reported for ${fmt.number(measured)} of ${fmt.number(calls)}${
       measured < calls ? ", so the totals include only the reported calls." : "."
-    } Cached input is included in the input tokens. The time is the sum of all calls, not the time you waited.`,
+    } Input tokens include cached input. Time adds up all calls, not your wait.`,
   byRole: ({ count }: { count: number }) =>
     `By role (${fmt.number(count)} ${fmt.plural(count) === "one" ? "group" : "groups"})`,
   columns: {

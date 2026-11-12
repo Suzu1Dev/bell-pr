@@ -17,13 +17,13 @@ export default {
   /** An unexpected server error; the details go to the local log only (500). */
   internalError: "The operation did not complete. Check the local service log.",
   /** A Host header that is not one of the trusted addresses (403). */
-  hostNotAllowed: `${product.name} does not accept this address. Use the address it printed at start (\`${bin} open\` prints it again), or set BELLPR_PUBLIC_URL to reach it at another address.`,
+  hostNotAllowed: `${product.name} rejects this address. Use the startup address (\`${bin} open\` prints it again) or set BELLPR_PUBLIC_URL to use another.`,
   /** A request from another origin (403). */
   crossOriginNotAllowed: "Cross-origin requests are not allowed.",
   /** A mutation sent without a JSON body (415). */
   jsonRequired: "Requests that change data must use application/json.",
   /** An API request without this install's token (401). */
-  apiTokenRequired: `This request needs the API token for this ${product.name}. On this computer, run \`${bin} open\` to open the app with it. Send it as Authorization: Bearer <token>, or as the X-Bell-Token header.`,
+  apiTokenRequired: `Missing this ${product.name}'s API token. On this computer, \`${bin} open\` opens the app with it; API clients send Authorization: Bearer <token> or an X-Bell-Token header.`,
   /** An agent provider the server does not know (400). */
   unsupportedProvider: "This AI provider is not supported.",
   /**

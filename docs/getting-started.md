@@ -392,7 +392,8 @@ When the team is done, the run waits for your review in **Code changes**:
   example of the behavior before and after, what changed and why, the
   concepts involved, what to check, another way it could have been done and
   a question to test yourself. When the example is a sequence, its before
-  and after are also drawn as steps, with the steps that differ marked.
+  and after are also drawn as steps, with the steps that differ marked, and
+  the example opens by itself.
 - **Ask**: click a line (Shift for several) and ask the agent about it.
   Answers are saved with the run.
 - **Reviews**: the Lead's summary and the Reviewer's and Test analyst's

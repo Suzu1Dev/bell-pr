@@ -82,7 +82,7 @@ test("a limitations heading with no text under it is skipped", () => {
 
 test("the composer request states the task and keeps the section within one message", () => {
   const request = limitationsRequest("## Limitations\n- not run");
-  assert.match(request, /^The PR draft’s Limitations section lists unfinished/);
+  assert.match(request, /^Work through the PR draft’s Limitations below:/);
   assert.ok(request.endsWith("## Limitations\n- not run"));
   const long = limitationsRequest("x".repeat(sessionInputLimit * 2));
   assert.equal(long.length, sessionInputLimit);

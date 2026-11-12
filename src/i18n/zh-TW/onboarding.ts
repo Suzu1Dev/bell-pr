@@ -55,7 +55,7 @@ const m: Translation<typeof en> = {
     tourText: "在示範專案上看一次完整的貢獻流程，不需任何設定。",
     import: "匯入專案",
     importText:
-      "從 GitHub 或這台電腦帶入專案，開始貢獻。每一份貢獻最後都由你用自己的話講一遍；可在「設定 → 學習」調整。",
+      "從 GitHub 或這台電腦匯入。每份貢獻最後都由你用自己的話講一遍；可在「設定 → 學習」關閉。",
     importTextLocked: "從 GitHub 或這台電腦帶入專案，開始貢獻。每一份貢獻最後都由你用自己的話講一遍。",
     discover: "尋找可貢獻的專案",
     discoverText: "在 GitHub 上搜尋歡迎你這類協助的專案。",

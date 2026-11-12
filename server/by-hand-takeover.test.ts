@@ -49,7 +49,7 @@ const prUrl = "https://github.com/test-owner/example/pull/1";
 const pushFirst = /^Push your commits first; BELL PR takes them over once they are on the pull request's branch\./;
 const commitFirst = /^Commit or discard your changes in the run's folder first\./;
 const pullFirst = /^The pull request's branch has commits the run's folder doesn't have yet\./;
-const rewritten = /rewrote history that BELL PR pushed/;
+const rewritten = /rewrote history BELL PR pushed/;
 const switchBack = /^The run's folder isn't on its branch fix\/lbh0001\. Switch back to it first; BELL PR takes over commits only from that branch\./;
 const remoteMoved = /^The PR branch fix\/lbh0001 on GitHub has commits from outside BELL PR/;
 
@@ -236,9 +236,9 @@ test("commits pushed from the run's folder are taken over at the feedback read, 
   assert.equal(round.report, "Took over 1 commit you pushed from the run's folder to the pull request's branch.");
   assert.equal(f.run.publishCommit, mine);
   assert.equal(await f.head(), mine);
-  // The log says it in Learn-by-hand words, never "reviewed with the next round".
+  // The log says it in Learn-by-hand words, never that the next round reviews them.
   assert.ok(f.run.logs.some((entry) => entry.message === round.report));
-  assert.ok(!f.run.logs.some((entry) => /reviewed with the next round/.test(entry.message)));
+  assert.ok(!f.run.logs.some((entry) => /reviewed with the next round|next round reviews them/.test(entry.message)));
   // The takeover changes neither the claim's history nor the help record.
   assert.deepEqual(byHandClean(f.run), { clean: true });
   assert.deepEqual(f.run.byHand?.events, events);

@@ -47,7 +47,7 @@ const review = {
      * selected yet and moves to that button, which then asks.
      */
     keyboardHint: ({ button }: { button: string }) =>
-      `Use the arrow keys to move between lines and Shift with an arrow key to select several. Press Enter to go to “${button}” for the selection, and Escape to clear it.`,
+      `Arrow keys move between lines; Shift plus an arrow selects several. Enter goes to “${button}” for the selection; Escape clears it.`,
     /** The accessible name of one hunk: where its lines start in each version. */
     hunkLabel: ({ oldLine, newLine }: { oldLine: number; newLine: number }) =>
       `Changes from old line ${oldLine}, new line ${newLine}`,
@@ -255,7 +255,7 @@ const review = {
     rerun: "Run the review again",
     rerunBusy: "Running the review again…",
     rerunNote:
-      "Runs the Reviewer and Test analyst again on the current diff in the working directory (read-only; it counts toward your CLI usage). Reports are only suggestions and don't change what you have reviewed or approved.",
+      "Runs the Reviewer and Test analyst again on the current diff (read-only; counts toward your CLI usage). Reports are only suggestions and don't change your reviews or approval.",
     emptyTitle: "No review reports for this contribution yet",
     emptyBody:
       "Once the Lead's integration, the Reviewer and the Test analyst have finished, their full reports appear here.",
@@ -263,7 +263,7 @@ const review = {
       "Independent static reviews: the code was read, not run. Each report is shown in full.",
     orderTitle: "Reading order suggested by the Lead",
     orderIntro:
-      "A common approach is to read definitions and interfaces first, then their callers, with tests first or last. The Lead's integration summary explains why this order was chosen. The file list on the left can switch to this suggested order.",
+      "A common order: definitions and interfaces, then their callers, with tests first or last. The Lead's integration summary explains this order. The left file list can switch to it.",
     staticBadge: "Static review",
     mentions: ({ count }: { count: number }) =>
       plural(count) === "one"
@@ -459,9 +459,9 @@ const review = {
       plural(count) === "one"
         ? "1 more file is past the display limit; see the full diff on GitHub."
         : `${count} more files are past the display limit; see the full diff on GitHub.`,
-    unpublished: `No PR yet, so the changes are still uncommitted. ${product.name} makes the first commit when you publish. Each review round and each sync with the target branch then adds one more commit here.`,
+    unpublished: `No PR yet, so nothing is committed. ${product.name} commits when you publish; each review round and sync adds one more.`,
     unpublishedDemo:
-      "The sample has not published a PR, so it has no commits yet. Below is the sample's history as it looks after the first push, one review round and a merge of the target branch.",
+      "The sample has no PR, so no commits yet. Below: its history after the first push, one review round and a target-branch merge.",
     publishedDemo:
       "The sample PR's commits: the first push, one review round and a merge of the target branch. Nothing was sent to GitHub.",
     loading: "Reading the commit history…",

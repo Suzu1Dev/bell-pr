@@ -16,7 +16,7 @@ export default {
   /** An interrupted integration that opening could not settle from the branch. */
   recovery: {
     undecided: ({ project }: { project: string }) =>
-      `An integration into ${project} was interrupted and its branch no longer shows whether it happened, so ${project} takes no changes until an admin settles it. Other projects are not affected.`,
+      `An integration into ${project} was interrupted, and its branch no longer shows whether it finished. ${project} takes no changes until an admin settles it; other projects are unaffected.`,
     nothingToSettle: "This project has no interrupted integration waiting to be settled.",
     stalePending:
       "The project is waiting on a different interrupted integration than the one named. Read the project again.",

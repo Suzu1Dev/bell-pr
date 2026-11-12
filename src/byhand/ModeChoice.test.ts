@@ -55,7 +55,7 @@ test("the task dialog offers the agent team and Learn by hand, the team first", 
   assert.match(html, /<legend class="field-label">Who writes the code\?<\/legend>/);
   assert.match(radio(html, "The Agent team writes it"), /checked=""/);
   assert.doesNotMatch(radio(html, "You write it \\(Learn by hand\\)"), /checked|disabled/);
-  assert.ok(html.includes("BELL PR&#x27;s Agents can&#x27;t edit your files in this run."));
+  assert.ok(html.includes("BELL PR&#x27;s Agents can&#x27;t edit your files."));
   // Nothing about the project's rules while the team writes.
   assert.doesNotMatch(html, /mode-case|mode-fit/);
   assert.match(renderZh(choice()), /你自己寫（親手學）/);
@@ -84,7 +84,7 @@ test("where the project's text allows the quoted confirm, fitting the guide is p
   assertNoHan(html);
   const options = html.slice(html.indexOf('class="mode-fit"'));
   assert.match(options, /<input type="radio"[^>]*checked=""[^>]*\/><span class="mission-plan-copy"><strong>Fit the guide to the project&#x27;s rules<\/strong>/);
-  assert.ok(options.includes("only if the guide stays within what the project&#x27;s own text says is fine (explanations, answers, and test help:"));
+  assert.ok(options.includes("the guide must stay within what the project&#x27;s own text allows (explanations, answers, and test help:"));
   assert.ok(options.includes("The maintainers decide whether your change fits."));
   // The carve-out shows once, in the line; a second one of the same rules below it.
   assert.equal(options.split(carveOut).length, 2);

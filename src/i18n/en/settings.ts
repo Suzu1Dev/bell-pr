@@ -113,14 +113,14 @@ const settings = {
     intro:
       "Agents run the project's code on this computer. These settings decide what they may reach.",
     sandbox: {
-      text: "Claude Code Agents that edit files run every command in the operating-system sandbox. Writes stay in the run's working directory and Claude Code's temporary folders. The network is closed. Your own Claude Code user settings can widen the sandbox (proxy ports, allowed domains or paths, excluded commands, plugin language servers). The Codex CLI uses its own sandbox. Antigravity Agents that edit files run their commands in the Antigravity CLI's terminal sandbox. Writes stay in the working directory. The network is closed.",
+      text: "File-editing Agents run every command sandboxed: Claude Code in the OS sandbox, Antigravity in its CLI's terminal sandbox. Writes stay in the working directory (plus Claude Code's temp folders). The network is closed. Your own Claude Code settings can widen its sandbox (proxy ports, allowed domains or paths, excluded commands, plugin language servers). Codex uses its own sandbox.",
     },
     unsandboxed: {
       label: "Allow unsandboxed Claude Code and Antigravity Agents",
       help: "Used only when the sandbox is unavailable. While this is off, a run that would need it is refused instead.",
       confirmTitle: "Allow Agents without the sandbox?",
       confirmText:
-        "When the sandbox is unavailable, Claude Code and Antigravity Agents that edit files will run without it. They can then read and change anything your user account can, such as other projects, your SSH keys and the sign-ins of your tools. Allow it only for projects you trust.",
+        "Without a working sandbox, file-editing Claude Code and Antigravity Agents run unsandboxed and can read and change anything your account can: other projects, SSH keys, tool sign-ins. Allow only for trusted projects.",
       confirmBadge:
         "Every run where an Agent worked without the sandbox carries a badge in the Workbench, and its log says so.",
       confirm: "Allow unsandboxed Agents",
@@ -145,7 +145,7 @@ const settings = {
     intro: `How ${product.name} asks you to understand a change before you approve it, and how it prompts you while you review.`,
     check: {
       title: "Understanding check",
-      text: "Before you approve a pull request, you explain the change back in your own words, answer a few questions about it and grade your answers against the reference yourself. No AI model grades you.",
+      text: "You explain the change back in your own words, answer a few questions and grade yourself against the reference. No AI model grades you.",
       label: "Ask me to explain each change back before approval",
       help: "When enabled, complete the check for the latest changes before approving and publishing.",
       /** BELLPR_REQUIRE_UNDERSTANDING_CHECK=1 locks it on; no variable turns it off. */
@@ -178,7 +178,7 @@ const settings = {
     tryFirst: {
       title: "Try first",
       label: "Ask me to answer before the answers show",
-      help: "On by default. You answer first: each file's question, a guess at another way to make the change, and each Check yourself question in the code walkthrough. Then the answers and the alternatives show. When this is off, they sit behind a plain reveal, with nothing to fill in.",
+      help: "On by default. Covers each file's question, a guess at another approach and each Check yourself question in the code walkthrough. When off, a click reveals the answers.",
     },
   },
   performance: {
@@ -217,7 +217,7 @@ const settings = {
     },
     advanced: {
       summary: "Advanced: environment variables",
-      text: `A variable set before ${product.name} starts wins over the setting here. The setting then shows as set by the environment. Restart ${product.name} after changing one.`,
+      text: `Variables set before ${product.name} starts override these settings (shown as set by the environment). Restart ${product.name} after changing one.`,
       /** The documentation link; hidden while the product has no docs URL. */
       documentation: "See the documentation.",
       variables: {
@@ -281,7 +281,7 @@ const settings = {
     retention: {
       title: "Automatic cleanup",
       label: "Days to keep the files of stopped and failed runs",
-      help: "1 to 365. After this many days without activity, a stopped or failed run's working files are removed; its record, reports and notes stay. Published runs are kept until you free them.",
+      help: "1 to 365, from the last activity. The run's record, reports and notes stay. Published runs are kept until you free them.",
       save: "Save",
     },
     erase: {
@@ -298,7 +298,7 @@ const settings = {
       none: `${product.name} sends no telemetry, analytics or crash reports, and has no account or cloud service of its own.`,
       ai: "Your code and questions go to the provider of the AI coding CLI you use, under your own account.",
       github:
-        "GitHub receives what the GitHub CLI and Git send under your account: clones and searches, and only after you approve, a branch and a draft pull request.",
+        "GitHub gets clones and searches from the GitHub CLI and Git under your account; a branch and draft pull request only after you approve.",
       web: "Web access for Agents is off unless you turn it on.",
       rest: "Everything else stays in the data directory.",
     },

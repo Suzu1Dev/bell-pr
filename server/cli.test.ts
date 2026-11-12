@@ -90,7 +90,7 @@ test("bell-pr open without a running instance exits 1 and says how to start", as
     assert.equal(result.stdout, "");
     assert.equal(
       result.stderr,
-      `No BELL PR is running with the data directory ${dataDir}. Start it with \`bell-pr\`, or, for a BELL PR started with another data directory, run \`bell-pr open --data-dir <dir>\`.\n`,
+      `No BELL PR is running with the data directory ${dataDir}. Start it with \`bell-pr\`; for another data directory, run \`bell-pr open --data-dir <dir>\`.\n`,
     );
 
     // A lock left by a process that is gone, or one whose pid now runs
