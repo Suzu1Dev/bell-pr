@@ -137,7 +137,7 @@ const workspace = {
       refuted: "the assumption does not hold",
       unclear: "the assumption could not be confirmed",
     } satisfies Record<PremiseVerdict, string>,
-    source: "Found by the lead reading the code; check it against the cited lines.",
+    source: "Found by the Lead reading the code; check it against the cited lines.",
     detailLabel: "Evidence and source",
     /** A Learn-by-hand run's premise check, from the guide's first read (DESIGN v1.2 F3). */
     sourceGuide: "Found by the guide reading the code; check it against the cited lines.",

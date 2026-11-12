@@ -54,7 +54,7 @@ const team = {
       "The run is in the queue. The lead starts planning as soon as it can run.",
     replanning: "The lead is re-planning with your feedback.",
     /** A team that stopped before the lead's plan was ready. */
-    none: "The team stopped before the lead finished a plan.",
+    none: "The team stopped before the Lead finished a plan.",
     reading:
       "Reading the project and building a plan with clear scopes and dependencies.",
     /** The toggle of a long plan, folded to its first lines. */
@@ -87,13 +87,13 @@ const team = {
     limitReached:
       "The revision limit is reached. Approve the current plan or cancel the run.",
     counter: ({ count, max }: { count: number; max: number }) =>
-      `Revised ${count}/${max}. Each revision makes the lead plan once more, without writing code.`,
+      `Revised ${count}/${max}. Each revision makes the Lead plan once more, without writing code.`,
   },
   retry: {
     partial: ({ kept, retried }: { kept: number; retried: number }) =>
       `${subtaskCount(kept)} already integrated will not run again. ${subtaskCount(retried)} that failed or ${retried === 1 ? "was blocked will discard its old working directory" : "were blocked will discard their old working directories"} and start again from a fresh snapshot.`,
     integrationOnly:
-      "All subtasks are integrated; a retry only runs the lead's integration and the independent review again.",
+      "All subtasks are integrated; a retry only runs the Lead's integration and the independent review again.",
     notStarted:
       "Some subtasks have not started yet; if the plan is not approved, a retry first goes back to waiting for approval.",
     label: "Note for the retried subtasks",
@@ -113,7 +113,7 @@ const team = {
     done: "No subtask has finished yet",
   } satisfies Record<TeamLaneId, string>,
   /** The to-do lane while the lead plans. */
-  laneEmptyPlanning: "Subtasks appear here once the lead's plan is ready.",
+  laneEmptyPlanning: "Subtasks appear here once the Lead's plan is ready.",
   /** The running lane while the plan waits for approval. */
   laneEmptyAwaiting: "Subtasks start once you approve the plan.",
   task: {
@@ -139,7 +139,7 @@ const team = {
       planning:
         "The lead is planning. Once the plan is ready, you can send the members more instructions.",
       leadDuringApproval: ({ action }: { action: string }) =>
-        `To change the plan, use “${action}” above so the lead re-plans. Messages here are only read in the integration turn.`,
+        `To change the plan, use “${action}” above so the Lead re-plans. Messages here are only read in the integration turn.`,
       lead: "The lead reads messages in the next integration turn and does not re-plan. Send development instructions to everyone or to a specific teammate.",
       members:
         "Messages arrive at the next work turn. A turn in progress is not interrupted.",
@@ -166,7 +166,7 @@ const team = {
     hint: "Sent messages are kept in the run record",
     send: "Send team message",
     unavailable:
-      "This task no longer receives messages. Choose the lead or another member.",
+      "This task no longer receives messages. Choose the Lead or another teammate.",
   },
   /** The model and AI usage cards, folded together. */
   runDetails: {

@@ -634,7 +634,7 @@ test("a run left without a plan retries from planning", async (t) => {
   const run = store.data.runs[0];
   await withLocale("en", () => workbench.retryTeam(run.id, "Keep the change small."));
   assert.equal(run.error, undefined);
-  assert.equal(run.logs.at(-1)?.message, "Retrying the run: the lead plans the task again.");
+  assert.equal(run.logs.at(-1)?.message, "Retrying the run: the Lead plans the task again.");
   await waitUntil(() => run.status === "awaiting_plan", "the new plan");
   assert.equal(run.team?.phase, "awaiting_approval");
   assert.match(prompts[0], /Keep the change small\./);

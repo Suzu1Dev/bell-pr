@@ -341,7 +341,7 @@ test("English plan revisions and retries use whole sentences with English plural
   assert.match(approval, /The previous plan had 2 tasks: Do it all, Ship it/);
   assert.match(approval, /<b>Your feedback: <\/b>Split the tests out\./);
   assert.match(approval, /The lead did not describe the changes/);
-  assert.match(approval, /Revised 1\/3\. Each revision makes the lead plan once more, without writing code\./);
+  assert.match(approval, /Revised 1\/3\. Each revision makes the Lead plan once more, without writing code\./);
   assert.match(approval, /aria-label="Feedback on the plan"/);
   const retry = renderEn(
     board(
@@ -383,7 +383,7 @@ test("the empty running lane message is chosen by lane id, not by its label", ()
     ),
   );
   const [todo, running, done] = lanes(html);
-  assert.match(todo, /^<h3>To do<span>0<\/span><\/h3>[\s\S]*Subtasks appear here once the lead&#x27;s plan is ready\./);
+  assert.match(todo, /^<h3>To do<span>0<\/span><\/h3>[\s\S]*Subtasks appear here once the Lead&#x27;s plan is ready\./);
   assert.match(running, /^<h3>Done<span>0<\/span><\/h3>[\s\S]*No subtask is running right now/);
   assert.match(done, /^<h3>In progress<span>0<\/span><\/h3>[\s\S]*No subtask has finished yet/);
   assert.doesNotMatch(done, /No subtask is running/);
@@ -515,7 +515,7 @@ test("a team that stopped before its plan says so instead of planning", () => {
       status: phase,
       team: { ...englishTeam, phase, planSummary: "", tasks: [], messages: [] },
     });
-    assert.match(html, /The team stopped before the lead finished a plan\./, phase);
+    assert.match(html, /The team stopped before the Lead finished a plan\./, phase);
     assert.doesNotMatch(html, /Reading the project/, phase);
   }
 });
@@ -534,7 +534,7 @@ test("the English planning phase shows the lead at work and lane messages chosen
   assert.deepEqual(
     lanes(html).map((lane) => /team-lane-empty">([^<]*)</.exec(lane)?.[1]),
     [
-      "Subtasks appear here once the lead&#x27;s plan is ready.",
+      "Subtasks appear here once the Lead&#x27;s plan is ready.",
       "No subtask is running right now",
       "No subtask has finished yet",
     ],
@@ -715,7 +715,7 @@ test(
     );
     assert.match(seen.get("queued")!, /Waiting to start/);
     assert.match(seen.get("planning")!, /The lead is planning/);
-    assert.match(seen.get("planning")!, /Subtasks appear here once the lead&#x27;s plan is ready\./);
+    assert.match(seen.get("planning")!, /Subtasks appear here once the Lead&#x27;s plan is ready\./);
     // The sample's approve button calls onApprove, which 5B points at the playback.
     assert.match(seen.get("awaiting_approval")!, /Approve the plan and start development/);
     assert.match(seen.get("awaiting_approval")!, /Subtasks start once you approve the plan\./);
