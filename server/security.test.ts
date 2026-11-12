@@ -277,6 +277,7 @@ test("a local import is cloned, so runs never add worktrees or branches to the p
   assert.ok(repo.path.startsWith(path.join(store.directory, "repositories") + path.sep));
   assert.equal(repo.url, "");
   assert.equal(repo.fullName, "local/own");
+  assert.equal(repo.originUserinfoIgnored, undefined);
   assert.equal(repo.defaultBranch, "main");
   assert.equal(workbench.managedClone(repo), false);
   // Every branch came along; the clone keeps no remote pointing at the checkout.
@@ -307,6 +308,7 @@ test("a local import is cloned, so runs never add worktrees or branches to the p
   const cloned = await workbench.importRepository(github);
   assert.equal(cloned.url, "https://github.com/test-owner/example");
   assert.equal(cloned.fullName, "test-owner/example");
+  assert.equal(cloned.originUserinfoIgnored, undefined);
   assert.equal(workbench.managedClone(cloned), true);
   // The URL stored on the clone. `remote get-url` applies insteadOf.
   assert.equal(
@@ -410,6 +412,7 @@ test("an origin with userinfo is imported as local, and that address is not stor
   const repo = await workbench.importRepository(checkout);
   assert.equal(repo.url, "");
   assert.equal(repo.owner, "local");
+  assert.equal(repo.originUserinfoIgnored, true);
   assert.equal(workbench.managedClone(repo), false);
   const logs = (await recentLogLines(store.directory)).join("\n");
   assert.match(logs, /repo\.origin_userinfo/);
@@ -442,6 +445,7 @@ test("an http origin with userinfo is imported as local, and that address is not
   const repo = await workbench.importRepository(checkout);
   assert.equal(repo.url, "");
   assert.equal(repo.owner, "local");
+  assert.equal(repo.originUserinfoIgnored, true);
   assert.equal(workbench.managedClone(repo), false);
   const lines = await recentLogLines(store.directory);
   const warn = lines

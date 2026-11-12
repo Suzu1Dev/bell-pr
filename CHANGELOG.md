@@ -9,6 +9,11 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **A local import whose origin had credentials shows what to do next.**
+  The project list and the project page say to replace OWNER and REPO,
+  update the remote in the checkout, use a credential helper, remove that
+  local project, and import the folder again. The command can be copied.
+  A narrow card stacks it under the hint.
 - **Group work for the people who share one BELL PR, from the command
   line and the API.** `bell-pr start --group` (or `BELLPR_GROUP=1`) turns
   it on. The person at the host sets the group up with

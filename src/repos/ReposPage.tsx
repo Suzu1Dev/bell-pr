@@ -12,6 +12,7 @@ import { getDemo } from "../demo";
 import { useLocale, useT } from "../i18n";
 import type { Repo } from "../types";
 import type { ModalName, Page } from "../app/AppShell";
+import { OriginIgnoredNotice } from "./OriginIgnoredNotice";
 
 interface ReposPageProps {
   repos: Repo[];
@@ -125,6 +126,7 @@ export function ReposPage({
                   <span>{maskPath(repo.path)}</span>
                 </p>
               )}
+              <OriginIgnoredNotice ignored={repo.originUserinfoIgnored} />
               <div className="repository-meta">
                 <span>
                   <span className="language-dot" />

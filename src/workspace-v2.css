@@ -1,26 +1,4 @@
 /* A dedicated reading surface: give the code the space it deserves. */
-.workspace-heading {
-  padding-top: 22px;
-  padding-bottom: 14px;
-}
-.review-tabs {
-  gap: 23px;
-}
-.review-tabs > button {
-  font-size: var(--text-sm);
-  white-space: nowrap;
-}
-/* The tabs fill the top edge of the review card, which clips its overflow,
-   and up to 1100 px the tab row scrolls sideways: an outer focus ring
-   would be cut off. */
-:root .review-tabs > [role="tab"]:focus-visible {
-  box-shadow: var(--focus-ring-inset);
-}
-.review-toolbar {
-  height: 58px;
-  /* The totals never touch the last tab, even when the row scrolls. */
-  gap: 24px;
-}
 .explore-page {
   padding-top: 30px;
 }
@@ -223,8 +201,14 @@
 .is-reading .review-footer {
   padding: 11px 15px;
 }
-.is-reading .footer-hint {
+.is-reading .footer-hint,
+.is-focused .topbar,
+.is-focused .workspace-heading {
   display: none;
+}
+.is-focused .review-area {
+  margin: 0;
+  border-radius: 0;
 }
 @media (min-width: 761px) {
   .is-sidebar-collapsed .sidebar {
@@ -257,12 +241,9 @@
   }
   .is-sidebar-collapsed .sidebar .nav-item > span {
     position: absolute;
-    clip: rect(0, 0, 0, 0);
     clip-path: inset(50%);
     width: 1px;
     height: 1px;
-    /* A padded count chip would keep a box larger than 1 px, and the
-       overflow check would read its hidden text as cut off. */
     padding: 0;
     border: 0;
     overflow: hidden;
@@ -434,22 +415,11 @@
     flex-shrink: 0;
   }
   .is-focused .sidebar,
-  .is-focused .topbar,
-  .is-focused .workspace-heading {
+  .is-focused .review-toolbar {
     display: none;
   }
   .is-focused .main-shell {
     margin-left: 0;
-  }
-  /* Focus mode hides the tab row (it comes back with Esc or the 離開專注模式
-     button); the review footer stays so the reviewed count and 核准並預覽 PR
-     remain visible. */
-  .is-focused .review-toolbar {
-    display: none;
-  }
-  .is-focused .review-area {
-    margin: 0;
-    border-radius: 0;
   }
   .is-focused .diff-topbar > span {
     font-size: var(--text-xs);
@@ -548,14 +518,10 @@
     overflow-x: auto;
   }
   .review-tabs {
-    gap: 18px;
     flex-shrink: 0;
   }
   .review-tabs > button {
     font-size: var(--text-xs);
-  }
-  .review-tabs > button svg {
-    width: 14px;
   }
   .modal-wide {
     width: 100%;
@@ -564,11 +530,6 @@
   .task-repo-actions {
     flex-wrap: wrap;
     font-size: var(--text-xs);
-  }
-  .task-team-preview {
-    flex-wrap: wrap;
-    font-size: var(--text-2xs);
-    gap: 7px;
   }
   .is-reading .review-area {
     margin: 0 8px 12px;
@@ -617,14 +578,6 @@
   .pane-resizer {
     display: none;
   }
-  .is-focused .workspace-heading,
-  .is-focused .topbar {
-    display: none;
-  }
-  .is-focused .review-area {
-    margin: 0;
-    border-radius: 0;
-  }
   .is-focused .diff-panel {
     height: calc(100dvh - 133px);
     min-height: 400px;
@@ -641,9 +594,6 @@
   .explore-page .page-title h1 {
     font-size: 21px;
     overflow-wrap: anywhere;
-  }
-  .task-demo-note {
-    font-size: var(--text-xs);
   }
 }
 

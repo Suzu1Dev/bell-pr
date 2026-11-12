@@ -5,6 +5,13 @@
 import { product } from "../../../shared/product";
 
 const repos = {
+  /** Shown when a saved origin had credentials. The words never include that address. */
+  originIgnored:
+    "The origin URL includes credentials, so this was imported as a local project. Replace OWNER and REPO, update the remote in your checkout, and use a credential helper. Remove this local project and import the folder again.",
+  originIgnoredCommand: "git remote set-url origin https://github.com/OWNER/REPO",
+  originIgnoredReplace: "Replace OWNER and REPO.",
+  originIgnoredReplaceLabel: ({ command }: { command: string }) =>
+    `Copy the command. Replace OWNER and REPO: ${command}`,
   list: {
     title: "Projects",
     intro: "Open an imported project or add one.",
