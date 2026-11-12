@@ -98,6 +98,8 @@ const withAuxiliaryRoles =
             scenario: "使用者查看模組提供的文字。",
             before: "文字是各檔案原本的內容。",
             after: "文字更新為這次任務指定的內容。",
+            beforeSteps: [],
+            afterSteps: [],
           },
           alternatives: "也可以集中成一個常數；這次沒有，因為各模組獨立。",
           lookup: ["single source of truth"],

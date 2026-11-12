@@ -68,7 +68,19 @@ function explanationAnswer(input: TeamAgentInput) {
         reason: "A flaky server stops breaking the page.\n```ts\nwhile (failed) await retryWithJitter();\n```",
         concept: "Retry\nTrying a safe request again.",
         tip: "Test a 503 followed by a 200.",
-        example: { scenario: "A shop page loads.", before: "export const attempts = 1;", after: "export const attempts = retryBudget();" },
+        example: {
+          scenario: "A shop page loads.",
+          before: "export const attempts = 1;",
+          after: "export const attempts = retryBudget();",
+          beforeSteps: [
+            { label: "The page loads", changed: false },
+            { label: "One 503 shows an error", changed: true },
+          ],
+          afterSteps: [
+            { label: "The page loads", changed: false },
+            { label: "It asks again with `retryBudget()`", changed: true },
+          ],
+        },
         alternatives: "A circuit breaker.",
         lookup: ["retry"],
         selfCheck: { question: "Why only GET?", answer: "A GET can be sent twice safely." },
@@ -240,6 +252,14 @@ test("after Ready an explanation comes one file at a time, after that file's own
   assert.doesNotMatch(card.reason, /```|retryWithJitter/);
   assert.equal(card.example?.before, "export const attempts = 1;");
   assert.doesNotMatch(card.example?.after ?? "", /retryBudget/);
+  // Each step's label is filtered as prose; the steps keep their order and their marks.
+  assert.deepEqual(card.example?.beforeSteps, [
+    { label: "The page loads", changed: false },
+    { label: "One 503 shows an error", changed: true },
+  ]);
+  assert.deepEqual(card.example?.afterSteps?.map((step) => step.changed), [false, true]);
+  assert.equal(card.example?.afterSteps?.[0].label, "The page loads");
+  assert.doesNotMatch(card.example?.afterSteps?.[1].label ?? "", /retryBudget/);
   assert.equal(stored?.status, "ready");
   assert.match(card.summary, /`attempts`/);
   assert.ok(result.files.some((file) => file.path === slotted.path));

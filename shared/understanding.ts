@@ -825,6 +825,8 @@ export function cardTexts(card: ChangeExplanation) {
     card.example?.scenario,
     card.example?.before,
     card.example?.after,
+    ...(card.example?.beforeSteps ?? []).map((step) => step.label),
+    ...(card.example?.afterSteps ?? []).map((step) => step.label),
     card.selfCheck?.question,
     card.selfCheck?.answer,
   ].filter((text): text is string => !!text?.trim());

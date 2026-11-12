@@ -69,6 +69,32 @@ test("the reading path lists each step with the matching module purpose and evid
   assert.match(legacy, /主要模組怎麼分工？/);
 });
 
+test("a flow of two steps or more is a figure captioned by the prose; a shorter or missing one keeps the prose block", () => {
+  const html = render();
+  const prose = demoInsights.howItFitsTogether!;
+  const figure = /<figure class="mission-reading-flow mission-flow mission-flow-few">([\s\S]*?)<\/figure>/.exec(html)?.[1];
+  assert.ok(figure, "the sample draws its flow");
+  assert.ok(figure.includes(`<figcaption>${prose}</figcaption>`));
+  // The prose is the caption, not a second copy.
+  assert.equal(html.split(prose).length, 2);
+  assert.equal(figure.match(/<li>/g)?.length, 4);
+  assert.equal(figure.match(/<code>src\/client\.ts<\/code>/g)?.length, 2);
+  // Steps outside the repository are dashed and say so to screen readers.
+  assert.equal(figure.match(/mission-flow-step mission-flow-outside/g)?.length, 2);
+  assert.equal(figure.match(/<span class="visually-hidden"> 在這個 repository 之外<\/span>/g)?.length, 2);
+  // Three arrows between four steps, each naming what passes on; the last step passes nothing.
+  assert.equal(figure.match(/class="mission-flow-link"/g)?.length, 3);
+  for (const passes of ["要 GET 的路徑", "HTTP 請求", "回應"])
+    assert.ok(figure.includes(`<span class="visually-hidden">傳給下一步： </span>${passes}`), passes);
+
+  const block = `<div class="mission-reading-flow"><span>模組怎麼串起來</span><p>${prose}</p></div>`;
+  for (const flow of [undefined, [], demoInsights.flow!.slice(0, 1)]) {
+    const plain = render({ insights: { ...demoInsights, flow } });
+    assert.doesNotMatch(plain, /<figure/);
+    assert.ok(plain.includes(block));
+  }
+});
+
 test("the stale notice reports changed and cited files, and never suggests skipping re-analysis", () => {
   const unknown = render({ insights: analyzed, stale: true });
   assert.match(unknown, /無法列出變更明細；重新分析後再確認貢獻方向/);

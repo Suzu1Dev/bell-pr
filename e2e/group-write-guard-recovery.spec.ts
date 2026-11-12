@@ -223,7 +223,7 @@ if (base === "plan-schema.json") {
       reason: "Supports requested behavior.",
       concept: "Module export\\nExports updated constant.",
       tip: "Verify callers expecting previous value.",
-      example: { scenario: "Importing module.", before: "Previous value.", after: "Updated value." },
+      example: { scenario: "Importing module.", before: "Previous value.", after: "Updated value.", beforeSteps: [], afterSteps: [] },
       alternatives: "Could pass as parameter instead.",
       lookup: ["typescript exports"],
       selfCheck: { question: "What changed in " + d.path + "?", answer: "Its exported value was updated." },
