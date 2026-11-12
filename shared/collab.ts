@@ -231,7 +231,8 @@ export interface CollabRefusal {
   unknown?: string[];
   /**
    * With 409 `dependencyPending`: the tasks not done yet. `held` is false
-   * for one whose hold ended without being done, which is never done now.
+   * for one that was never held or whose hold ended without being done; it
+   * is never done now.
    */
   pending?: (CollabDependency & { held: boolean })[];
 }

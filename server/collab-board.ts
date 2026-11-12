@@ -1,7 +1,8 @@
 /**
  * One repository's board, put together from the coordinator's view of the
  * project (its claims) and the side file (names and titles): who holds
- * what. Reading only.
+ * what. Reading only, apart from `dropHoldEntries`, which edits a
+ * `saveSide` draft.
  */
 import type { CollabBoard, CollabHold } from "../shared/collab.js";
 import { sideEntry, type CollabSide } from "./collab-host.js";

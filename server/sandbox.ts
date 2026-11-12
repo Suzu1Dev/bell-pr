@@ -696,7 +696,8 @@ export const maxHeldWriteTargets = 200;
  * the turn, since the held path changed.
  *
  * Each sandbox may leave out more (codexSandboxConfig: glob characters;
- * heldSandboxWriteDenials: paths that do not exist).
+ * heldSandboxWriteDenials: paths that do not exist; heldEditDenials:
+ * parentheses, backslashes and line breaks).
  *
  * Verified with codex-cli 0.167.0 (`codex sandbox`) on Linux with
  * bubblewrap 0.11.1: a read-only file cannot be written, deleted or
@@ -742,7 +743,8 @@ export function heldWriteTargets(cwd: string, scopes: readonly string[]): string
  * The Claude Code Edit rules for heldWriteTargets: each path and everything
  * under it. Edit rules cover every tool that edits files (Edit, Write,
  * NotebookEdit); the sandbox's denyWrite covers Bash. They apply with or
- * without the sandbox.
+ * without the sandbox. A path absoluteRule cannot write as a rule gets
+ * none and is left to the check after the turn.
  */
 export function heldEditDenials(targets: readonly string[]): string[] {
   return targets.flatMap((target) =>

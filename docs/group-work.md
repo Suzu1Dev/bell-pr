@@ -515,7 +515,7 @@ start it without `--group`: then nothing is checked.
 A run belongs to the people who started it, worked out as for publishing:
 the person of the `x-bell-participant` token, or else everyone in the
 group who joined from the device that started it. BELL PR keeps them with
-the run, so they stay its owners after a restart. A run nobody in the
+the run (at most 100), so they stay its owners after a restart. A run nobody in the
 group started (a device where nobody joined) has no owners, and then
 every hold counts as someone else's. In a repository of the group, an
 unknown token, or one of someone removed, is answered 403 `notJoined` and
@@ -540,7 +540,9 @@ everyone else:
   check after the turn: a held path that goes through a symbolic link or
   whose folder does not exist yet, a spelling the checkout does not have
   yet, a renamed folder above a held path (the held file can be changed
-  at its new place), Codex with full access, and Antigravity.
+  at its new place), Claude Code's edit tools on a path with a
+  parenthesis, a backslash or a line break in it, Codex with full access,
+  and Antigravity.
 - **A plan over someone else's hold waits.** A plan that would start on
   its own waits for approval instead, with a notice that it covers files
   someone else holds. Approving a plan that covers such a file is
@@ -556,7 +558,9 @@ everyone else:
   turn from the **Collaborate** tab, a follow-up round or a turn that
   resolves sync conflicts, every file the run changed since its base (new
   files too, and a moved file at both of its paths) is compared with the
-  holds of that moment.
+  holds of that moment. A turn that fails for another reason is not
+  checked then: what it changed is checked after the next turn that
+  completes, and at publish.
   A change over someone else's hold stops the turn with the files.
   Nothing is undone: the changes stay in the checkout for review, a
   follow-up round keeps them without a commit message, and BELL PR saves
@@ -582,7 +586,10 @@ everyone else:
     back, and the run page lists the new files to be confirmed. A run saved before `heldPaths` existed gets every changed
     file put back that meets someone else's active hold. When reviewable
     changes remain on a completed solo or team run that a hold stopped as
-    `failed`, its status returns to `review`.
+    `failed`, its status returns to `review`. A checkout BELL PR cannot
+    show as a diff (more than 150 changed files, for one) is answered 422
+    after the files were put back, and the stop stays until the diff can
+    be read and **Check again** is pressed.
   - `POST /api/runs/<id>/holds/recheck` with `{}` re-checks the
     checkout's changed files against the current holds without modifying
     any file: it answers 409 `heldByOther` (updating `heldPaths`) while a
@@ -621,7 +628,12 @@ sees them on the run's target branch (`<hold base>..<target>`):
 
 Only your own active holds are checked (resolved by `x-bell-participant` or
 by device, as for publishing), and only file paths and short commit hashes
-are shown — never commit subjects or other people's holds.
+are shown — never commit subjects or other people's holds. BELL PR reads
+the newest 500 first-parent commits on the target branch since each hold;
+an older change is not reported. While group work
+[has stopped](#when-group-work-stops) a sync still runs and reports no
+changes under your holds; the check before the first publish runs again
+once group work is back.
 
 ### What a hold does not do
 
@@ -631,7 +643,8 @@ it is refused, the reason BELL PR does not
 [limit for BELL PR's agents](#bell-prs-agents-and-someone-elses-hold). It
 **does not stop every write as it happens**: an agent's sandbox refuses
 most writes to held paths, any other change an agent makes is found when
-its turn ends, an editor or a tool outside BELL PR is not checked, and
+its turn ends (after a turn that failed: when the next one completes, or
+at publish), an editor or a tool outside BELL PR is not checked, and
 nothing is locked in a checkout or on GitHub. A push made outside BELL PR
 is not checked at all. A hold says nothing about a path nobody named, and
 nothing about two changes in different files that do not work together.

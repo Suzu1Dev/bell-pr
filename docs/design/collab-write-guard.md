@@ -1,12 +1,12 @@
 # Design: holds that stop writes (group work gap G1)
 
-Status: draft for review. Written against
-`feat/collab-work-depends-on` at 9272696. S1 is implemented on
-`feat/collab-write-guard` (`server/hold-guard.ts`, tests in
-`server/hold-guard.test.ts`), S2 on `feat/collab-write-guard-turns`
-(tests in `server/hold-guard-turns.test.ts`), and S3 on
-`feat/collab-write-guard-sandbox` (`heldWriteTargets` in
-`server/sandbox.ts`, tests in `server/hold-guard-sandbox.test.ts`).
+Status: implemented behind the group switch. S1 is `server/hold-guard.ts`
+(tests in `server/hold-guard.test.ts`), S2 has its tests in
+`server/hold-guard-turns.test.ts` and `server/hold-guard-recovery.test.ts`,
+S3 is `heldWriteTargets` in `server/sandbox.ts` (tests in
+`server/hold-guard-sandbox.test.ts`), and S4 has its tests in
+`server/hold-guard-detection.test.ts`. "Slices" says what is still to
+verify. The design was written against commit 9272696.
 
 ## The gap
 
@@ -34,7 +34,7 @@ and where.
 
 ## Who "you" are
 
-Runs do not record who started them today, and the web app sends no
+At 9272696 runs did not record who started them, and the web app sent no
 participant token. The guard decides who "you" are like this:
 
 1. If the request carries `x-bell-participant`, "you" is that person. An
@@ -76,10 +76,12 @@ Line numbers are at 9272696.
 | Sync, sync resolve and undo | `server/routes/sync.ts:10-16` | Sync merges the target branch into the checkout. Resolve is an agent turn. Undo puts the checkout back | Resolve: after the turn. Sync also reports commits on the target branch since the holder's hold was taken (`heldChanges`), and undo clears them | S2 for resolve, S4 for sync |
 | Learn-by-hand edits | The person's own editor, in the run's checkout | Files in the checkout, by hand | Plan approval (step files) and publish. Nothing sees keystrokes | S1 publish, S2 plan |
 | Recover a failed publish | `recoverPublish` `server/publish.ts:406` | Local only. It releases an unpublished commit and never pushes | None needed | — |
+| Put held files back | `restoreHeldPaths` in `server/hold-recovery.ts`, from `POST /api/runs/:id/holds/restore` (added after 9272696) | Files in the run's checkout: the listed paths go back to the run's review base. Files the base has are checked out from it; files it does not have are deleted | None needed for what it puts back. The changes that remain are compared with the holds again before it answers | S2 |
 
 No route takes file contents from a client and writes them into a
 checkout. The server itself writes into checkouts only through Git (sync,
-undo) and conflict-marker labels (`server/sync.ts:213`).
+undo, and `holds/restore`, which also deletes files its base does not
+have) and conflict-marker labels (`server/sync.ts:213`).
 
 ## The rule
 
@@ -226,6 +228,9 @@ release).
      for held paths is unverified and gets only paths that exist.
    - At most 200 paths (`maxHeldWriteTargets`); a path below another one
      in the list, `.git`, and `..` are left out.
+   - A path with a parenthesis, a backslash or a line break gets no Claude
+     Code edit rule (`absoluteRule` cannot write it as one), so its edit
+     tools can change it; the check after the turn stops that turn.
    - Renaming a folder above a held path is not refused: the rename needs
      write access only to the folder that contains it, and making that
      read-only would refuse other people's files there too. Each command
@@ -276,8 +281,9 @@ What can be detected, and where:
 ## Races and limits
 
 - **Check, then push.** A hold taken after the publish check and before
-  the push lands is not seen. The window is the push itself, a few
-  seconds. Closing it would mean holding the group's lock across a network
+  the push lands is not seen. The window runs from the publish check to
+  the push: the GitHub lookups, the commit and, on first use, creating
+  the fork. Closing it would mean holding the group's lock across a network
   push, which blocks every hold in the group. Not worth it in S1. The S4
   holder-side detection reports such a push afterwards.
 - **Holds never expire (G3).** With a refusing guard, a forgotten hold now
@@ -364,7 +370,9 @@ the titles; a team teammate's diff that meets a hold is refused next to
   `reviewBaseSha`) and `POST /api/runs/:id/holds/recheck` ("Check again",
   re-evaluating checkout changes against current holds without touching
   files), tested in `server/hold-guard-turns.test.ts` and
-  `server/hold-guard-recovery.test.ts`.
+  `server/hold-guard-recovery.test.ts`. A turn that fails for another
+  reason is not checked when it ends; the next turn that completes and
+  the publish check see what it changed.
 - **S3: sandbox denies** for held paths. Done for Codex and Claude Code
   as described under "Telling agents their scope". Still to verify:
   macOS (Seatbelt) for both, and Claude Code's Bash `denyWrite` on a host
