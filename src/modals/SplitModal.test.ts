@@ -158,7 +158,7 @@ const sharedFileFiles = () => [file("src/index.js"), file("test/slugify.test.js"
 test("tasks for different issues that changed the same file are reported by that file", () => {
   const text = plain(renderEn(element(sharedFile(), sharedFileFiles())));
   assert.ok(text.includes(modals.split.mixed({ paths: ["src/index.js"], issues: ["#1", "#2"] })));
-  assert.match(text, /src\/index\.js holds changes for #1 and #2\. BELL PR cannot separate changes inside a file/);
+  assert.match(text, /src\/index\.js holds changes for #1 and #2; BELL PR can't split a file/);
   assert.doesNotMatch(text, /strips trailing dashes" cites/);
 });
 

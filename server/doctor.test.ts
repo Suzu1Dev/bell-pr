@@ -387,7 +387,7 @@ test("Claude Code outside the supported versions works with a warning", async (t
   assert.equal(tool.version, "2.2.0");
   assert.equal(
     tool.detail,
-    "Claude Code 2.2.0 is outside the versions BELL PR supports (2.1.292 or later, before 2.2). Agents still start, but BELL PR has not checked that this release applies its sandbox and hook settings.",
+    "Claude Code 2.2.0 is unsupported (BELL PR supports 2.1.292 or later, before 2.2). Agents still start, but BELL PR's sandbox and hook settings are untested on it.",
   );
   // Only a warning: Claude Code still counts as ready and runs are not refused.
   assert.equal(check(report, "provider-ready").status, "ok");
@@ -926,7 +926,10 @@ test("only Codex installed, with the switch off, asks for Claude Code and does n
     row.detail,
     "1.0.0 supports Claude Code only; Codex support is disabled.\nInstall Claude Code.",
   );
-  assert.equal(row.fixes, undefined);
+  assert.deepEqual(
+    row.fixes?.map((fix) => fix.command),
+    ["npm install -g @anthropic-ai/claude-code", "claude auth login"],
+  );
   assert.equal(check(again, "codex").status, "skip");
   assert.equal(check(again, "codex").reason, "disabled");
   assert.equal(check(again, "codex").required, false);

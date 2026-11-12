@@ -922,7 +922,7 @@ test("HTTP errors follow X-Bell-Locale: validation, the guard, the error handler
       {
         status: 403,
         error:
-          "BELL PR does not accept this address. Use the address it printed at start (`bell-pr open` prints it again), or set BELLPR_PUBLIC_URL to reach it at another address.",
+          "BELL PR rejects this address. Use the startup address (`bell-pr open` prints it again) or set BELLPR_PUBLIC_URL to use another.",
       },
     );
     assert.deepEqual(
@@ -1213,7 +1213,7 @@ else if (args[0] === 'pr' && args[1] === 'create') {
     assert.equal(f.run.publishedBranch, f.run.branch);
     await assert.rejects(
       f.workbench.draft(f.run.id, { ...f.run.draft, publishBranch: "other-branch" }),
-      (error: AppError) => error.statusCode === 409 && /不能改分支/.test(error.message),
+      (error: AppError) => error.statusCode === 409 && /改名會另開 PR/.test(error.message),
     );
     // The pushed commit cannot take a different message; the person must restore it or start over.
     await f.workbench.draft(f.run.id, {
@@ -1947,7 +1947,7 @@ test("agent turns use the Codex read budget by default and a longer, announced o
         error instanceof AppError &&
         error.statusCode === 504 &&
         error.message ===
-          "claude 執行逾時（已等待 37.5 分鐘）。較高的思考強度或大型專案需要更久；可降低思考強度、改用較快的模型，或提高 BELLPR_AGENT_TIMEOUT_SCALE。",
+          "claude 執行逾時（37.5 分鐘）。請調低思考強度、換較快的模型或提高 BELLPR_AGENT_TIMEOUT_SCALE；大型專案需要更久。",
     );
 
     const scaled = new Workbench(f.store, undefined, {

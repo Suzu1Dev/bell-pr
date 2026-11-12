@@ -57,7 +57,7 @@ const m: Translation<typeof en> = {
   },
   revise: {
     action: "退回並補充意見",
-    hint: "拆解不合理、範圍太大、少了測試子任務或相依奇怪時，寫下原因，Lead 會重擬。這是練習「怎麼拆任務」的機會。",
+    hint: "拆解不合理、範圍太大、少了測試子任務或相依奇怪？寫下原因，Lead 會重擬。可藉此練習拆任務。",
     label: "退回計畫的意見",
     placeholder:
       "例如：把 API 與 UI 拆成兩個子任務，並加一個只負責測試的子任務。",
@@ -67,7 +67,7 @@ const m: Translation<typeof en> = {
   },
   retry: {
     partial: ({ kept, retried }) =>
-      `${kept} 個已整合的子任務不會重跑。${retried} 個失敗或受阻的子任務會丟棄舊的工作目錄，從新的快照重新開始。`,
+      `${kept} 個已整合的子任務不會重跑。${retried} 個失敗或受阻的會丟棄舊工作目錄，從新快照重來。`,
     integrationOnly:
       "所有子任務都已整合；重試只會重新執行 Lead 整合與獨立審查。",
     notStarted: "尚有未開始的子任務；若計畫尚未核准，重試會先回到等待核准。",
@@ -142,16 +142,16 @@ const m: Translation<typeof en> = {
   setupNeeds: {
     title: "需要你在這台電腦準備的環境",
     intro:
-      "Agent 以當時的權限與環境無法完成下列檢查。指令是 Agent 的建議，執行前請對照專案文件確認。裝好後，你可以在工作目錄重跑這些檢查，之後的貢獻也能直接執行。使用完整權限時，Agent 可以先嘗試安裝；需要密碼或它無法完成的項目仍由你處理。",
+      "以現有權限與環境，Agent 無法完成這些檢查。建議指令請先對照專案文件。裝好後可在工作目錄重跑檢查，之後的貢獻也能直接跑。完整權限下 Agent 可先試著安裝；密碼提示或無法處理的仍要你來。",
     reportedBy: ({ names }) => `回報者：${names}`,
     round: ({ number }) => `修正第 ${number} 輪`,
     agent: ({ name, id }) => `${name}（${id}）`,
     handOffAction: "讓 Agent 準備這些環境",
     handOffNote:
-      "這個任務使用完整權限：Agent 可以在沒有沙箱的情況下用你的帳號安裝你選擇的項目，再重跑因此受阻的檢查。開始前你會先確認要交出的指令。",
-    handOffUnsafe: `這個指令會下載後執行或串接其他指令，或以 pipe 交給 shell 或其他直譯器，${product.name} 不會把它交給 Agent；請自行確認後執行。`,
+      "完整權限下，Agent 可在沙箱外以你的帳號安裝你選的項目，再重跑受阻的檢查。你會先確認確切指令。",
+    handOffUnsafe: `這個指令會下載後執行或串接，或以 pipe 交給 shell 或其他直譯器，${product.name} 不會交給 Agent；請自行確認後執行。`,
     allHandled:
-      "Agent 回報可交給它的項目都已安裝或原本就有，詳細內容在「協作」分頁；這裡剩下的項目請自行執行。",
+      "Agent 回報可交給它的項目都已安裝或原本就有（詳見「協作」分頁）；剩下的請自行執行。",
     outcomeLine: ({ outcome, time }) => `Agent 回報：${outcome}（${time}）`,
     unreportedLine: ({ time }) => `${time} 的環境準備沒有回報這一項的結果。`,
     resultsTitle: "環境準備結果（Agent 回報）",
@@ -166,19 +166,19 @@ const m: Translation<typeof en> = {
     dialog: {
       title: "要讓 Agent 準備這台電腦的環境嗎？",
       intro:
-        "這些指令是先前的 Agent 讀專案時提出的建議，請先確認。Agent 只會執行你勾選、且與專案文件相符的指令；它可以加上 -y 等非互動參數、以 sudo -n 執行 sudo、更新套件索引，但不會換成別的指令。之後它會確認每個項目、重跑因此受阻的檢查，並逐項回報。",
+        "這些是先前 Agent 建議的指令，請先確認。Agent 只跑你勾選且符合專案文件的指令；可加 -y 等非互動參數、改用 sudo -n、更新套件索引，但不會換成別的指令。之後逐項確認、重跑受阻檢查並回報。",
       choose: "要交給 Agent 的指令",
       sudoTag: "使用 sudo",
       limit: ({ limit }) => `每輪最多 ${limit} 項，其餘留在清單上，下一輪再處理。`,
       sudoPasswordless: ({ user }) =>
-        `${user} 在這台電腦使用 sudo 不需要密碼，Agent 可以用 root 權限執行這些 sudo 指令；但若 sudo 規則限制了可以免密碼執行的指令，則以規則為準。`,
+        `${user} 在這台電腦可免密碼使用 sudo，Agent 能以 root 執行這些 sudo 指令，除非 sudo 規則另有限制。`,
       sudoPassword: ({ user }) =>
-        `${user} 在這台電腦使用 sudo 需要密碼，而 Agent 不會輸入密碼，因此需要 sudo 的項目會交回給你。若 sudo 規則允許某個指令免密碼執行，Agent 會改以 root 執行該指令。其餘請自行執行，或在模型設定開啟「免密碼 sudo」；開啟後，你帳號下的每個程式都能以 root 執行任何指令。`,
+        `${user} 在這台電腦用 sudo 需要密碼，Agent 不會輸入，所以需要 sudo 的項目會交回給你，除非 sudo 規則允許免密碼執行。也可在模型設定開啟「免密碼 sudo」，但這等於讓你帳號下的所有程式都有 root 權限。`,
       sudoMissing: "這台電腦沒有安裝 sudo，需要 sudo 的項目會交回給你。",
-      sudoUnknown: `${product.name} 無法確認這台電腦的 sudo 是否需要密碼。Agent 只會用 sudo -n 執行，遇到密碼提示就會停下，該項目交回給你。`,
+      sudoUnknown: `${product.name} 無法確認這台電腦的 sudo 是否需要密碼。Agent 只用 sudo -n，遇到密碼提示就停下並交回給你。`,
       runs: "Agent 會在沒有沙箱的情況下用你的帳號執行。用量計入你自己的帳號。",
       review:
-        "Agent 被要求不修改程式碼。它若變更檔案（例如安裝步驟改寫的 lockfile），該檔案會取消已審閱標記。檔案或 PR 草稿的 Validation、Limitations 有變動時，已核准的貢獻會退回審閱。",
+        "Agent 被要求不改程式碼。它改到的檔案（如改寫的 lockfile）會失去已審閱標記。檔案或 PR 草稿的 Validation、Limitations 一有變動，已核准的貢獻就退回審閱。",
       stop: "可以在「協作」分頁查看進度並停止。停止不會還原已安裝的內容。已經透過 sudo 開始的安裝也可能繼續完成。",
       confirm: ({ count }) => `開始處理（${count} 項）`,
       starting: "正在啟動 Agent…",
@@ -187,7 +187,7 @@ const m: Translation<typeof en> = {
   guide: "嚮導",
   howItWorks: "運作方式",
   protocolNote: ({ provider }) =>
-    `${product.name} 使用共享任務、獨立工作目錄及回合間訊息協作。這是由 ${provider} 逐回合驅動的 ${product.name} 實作，並非 Claude Code 原生 Agent Teams。`,
+    `${product.name} 自行實作協作，由 ${provider} 逐回合驅動：共享任務、獨立工作目錄、回合間訊息。這並非 Claude Code 原生 Agent Teams。`,
 };
 
 export default m;

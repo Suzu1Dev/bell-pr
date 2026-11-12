@@ -211,7 +211,7 @@ test("resolveConfig refuses settings that cannot work, in the request locale", (
       [{}, { BELLPR_PUBLIC_URL: "https://user:pw@bell.example.com" }, /BELLPR_PUBLIC_URL/],
       [{}, { BELLPR_PUBLIC_URL: "not a url" }, /BELLPR_PUBLIC_URL/],
       // Plain http only for this computer.
-      [{}, { BELLPR_PUBLIC_URL: "http://bell.example.com" }, /https for any address other than this computer/],
+      [{}, { BELLPR_PUBLIC_URL: "http://bell.example.com" }, /https \(http only on this computer\)/],
       [{}, { BELLPR_PUBLIC_URL: "http://192.168.1.5:4311" }, /BELLPR_PUBLIC_URL/],
       [{}, { BELLPR_ALLOWED_ORIGINS: "https://*.example.com" }, /BELLPR_ALLOWED_ORIGINS/],
       [{}, { BELLPR_MAX_ACTIVE_RUNS: "0" }, /BELLPR_MAX_ACTIVE_RUNS/],
@@ -1778,7 +1778,7 @@ test("an occupied port exits non-zero and points to bell-pr open", async () => {
     const { code } = await second.exited;
     assert.notEqual(code, 0);
     const output = second.stdout() + second.stderr();
-    assert.match(output, /BELL PR is already running at http:\/\/127\.0\.0\.1:\d+\. Run `bell-pr open` to open it; add --data-dir <dir> if that BELL PR was started with another data directory\./);
+    assert.match(output, /BELL PR is already running at http:\/\/127\.0\.0\.1:\d+\. Run `bell-pr open` to open it, with --data-dir <dir> if it uses another data directory\./);
     // The port is checked before anything is written.
     assert.equal(existsSync(otherData), false);
 
@@ -1818,6 +1818,120 @@ test("SIGHUP and SIGTERM shut down cleanly and remove the lock file", async () =
       assert.equal(code, 0, `${signal}: ${server.stderr()}`);
       assert.equal(existsSync(lock), false, signal);
     }
+  } finally {
+    await box.cleanup();
+  }
+});
+
+/** Waits until the process exits, or fails while it is still running. */
+async function finished(launched: Launched, timeoutMs = 30_000) {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(
+      () =>
+        reject(
+          new Error(
+            `BELL PR was still running.\nstdout: ${launched.stdout()}\nstderr: ${launched.stderr()}`,
+          ),
+        ),
+      timeoutMs,
+    );
+  });
+  try {
+    return await Promise.race([launched.exited, timeout]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+test("a first start listens when the only required failure is the provider", async () => {
+  const box = await sandbox();
+  const port = await freePort();
+  const server = launch(
+    cliEntry,
+    ["start", "--port", String(port), "--data-dir", box.data],
+    box.env,
+  );
+  try {
+    await started(server);
+    assert.match(server.stdout(), new RegExp(`→ http://127\\.0\\.0\\.1:${port}`));
+    assert.doesNotMatch(server.stderr(), /did not start/);
+    assert.equal((await get(`http://127.0.0.1:${port}/`)).status, 200);
+    assert.equal((await stop(server)).code, 0, server.stderr());
+  } finally {
+    if (server.child.exitCode === null && server.child.signalCode === null) await stop(server);
+    await box.cleanup();
+  }
+});
+
+test("a second start also listens when the only required failure is the provider", async () => {
+  const box = await sandbox();
+  const listen = async () => {
+    const port = await freePort();
+    const server = launch(
+      cliEntry,
+      ["start", "--port", String(port), "--data-dir", box.data],
+      box.env,
+    );
+    try {
+      await started(server);
+      assert.match(server.stdout(), new RegExp(`→ http://127\\.0\\.0\\.1:${port}`));
+      assert.doesNotMatch(server.stderr(), /did not start/);
+      assert.equal((await get(`http://127.0.0.1:${port}/`)).status, 200);
+      assert.equal((await stop(server)).code, 0, server.stderr());
+    } finally {
+      if (server.child.exitCode === null && server.child.signalCode === null) await stop(server);
+    }
+  };
+  try {
+    await listen();
+    assert.equal(existsSync(box.data), true);
+    await listen();
+  } finally {
+    await box.cleanup();
+  }
+});
+
+test("a start exits 1 when another required check fails, alone or with the provider", async () => {
+  const box = await sandbox();
+  const bin = path.join(box.directory, "bin");
+  const refuse = async (name: string, dataDir: string) => {
+    const port = await freePort();
+    const server = launch(
+      cliEntry,
+      ["start", "--port", String(port), "--data-dir", dataDir],
+      { ...box.env, PATH: bin },
+    );
+    try {
+      const result = await finished(server);
+      assert.equal(result.code, 1, `${name}\n${server.stderr()}`);
+      assert.match(server.stderr(), /did not start/, name);
+      assert.match(server.stderr(), /✗ Git/, name);
+      assert.doesNotMatch(server.stdout(), /→ http/, name);
+      const probe = createServer();
+      probe.listen(port, "127.0.0.1");
+      await once(probe, "listening");
+      await new Promise<void>((resolve) => probe.close(() => resolve()));
+      return server.stderr();
+    } finally {
+      await stop(server);
+    }
+  };
+  try {
+    assert.match(await refuse("git and the provider", box.data), /✗ AI provider/);
+    writeFileSync(
+      path.join(bin, "codex"),
+      `#!/bin/sh
+case "$1" in
+  --version) echo "codex-cli 0.159.0" ;;
+  login) echo "Logged in using ChatGPT" ;;
+  *) exit 1 ;;
+esac
+`,
+      { mode: 0o755 },
+    );
+    const gitOnly = await refuse("git alone", path.join(box.directory, "git-only"));
+    assert.doesNotMatch(gitOnly, /✗ AI provider/);
   } finally {
     await box.cleanup();
   }

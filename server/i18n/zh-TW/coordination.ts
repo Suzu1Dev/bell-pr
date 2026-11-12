@@ -15,7 +15,7 @@ const m: Translation<typeof en> = {
   },
   recovery: {
     undecided: ({ project }) =>
-      `${project} 的一次整合被中斷，而整合分支已看不出它是否完成；在管理員結案之前，${project} 不接受任何變更。其他專案不受影響。`,
+      `${project} 的一次整合被中斷，整合分支已看不出是否完成；管理員結案前，${project} 不接受變更。其他專案不受影響。`,
     nothingToSettle: "這個專案沒有等待結案的中斷整合。",
     stalePending: "這個專案等待結案的中斷整合與指定的不同。請重新讀取專案。",
     branchElsewhere: ({ current }) =>

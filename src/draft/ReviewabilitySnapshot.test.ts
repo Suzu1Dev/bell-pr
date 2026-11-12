@@ -58,7 +58,7 @@ test("the snapshot of the sample shows its numbers, a green band labelled as BEL
   assert.equal(demoSnapshot.band, "small");
   const html = english({ onAskSplit() {} });
   assert.match(html, /<h3 id="reviewability-[^"]+"><svg[\s\S]*?<\/svg> How reviewable is this change\?<\/h3>/);
-  assert.match(html, /<span class="reviewability-band is-ok" title="BELL PR&#x27;s size bands are its own defaults/);
+  assert.match(html, /<span class="reviewability-band is-ok" title="BELL PR defaults, not this project&#x27;s rule/);
   assert.match(html, />Small · BELL PR default<\/span>/);
   assert.deepEqual(numbers(html), {
     "Changed lines": String(demoSnapshot.changedLines),

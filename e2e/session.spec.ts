@@ -74,7 +74,7 @@ test("an existing session handles draft limitations, blocks concurrent edits, an
     await expect(composer).toHaveValue(/Retry tests have not run/);
     await page.getByRole("button", { name: session.send, exact: true }).click();
     expect(sent).toContain("Retry tests have not run");
-    expect(sent).toContain("Put completed verification in Validation");
+    expect(sent).toContain("Move completed checks to Validation");
     expect(sent).toContain("keep only remaining gaps and constraints in Limitations");
     await expect(composer).toBeDisabled();
     await page.getByRole("tab", { name: workspace.tabs.draft, exact: true }).click();

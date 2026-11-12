@@ -25,7 +25,7 @@ export default {
   slowDown: ({ seconds }: { seconds: number }) =>
     `Too many requests in a short time. Try again in ${seconds} ${seconds === 1 ? "second" : "seconds"}.`,
   invalidScope: ({ max }: { max: number }) =>
-    `Name at least one file or folder of the repository, each as a path of at most ${max} characters. Some paths cannot be held, such as one outside the repository or one with special characters.`,
+    `Name at least one repository file or folder, each path at most ${max} characters. Some can't be held, such as paths outside the repository or with special characters.`,
   tooManyScopes: ({ max }: { max: number }) => `One hold takes at most ${max} paths.`,
   conflict: "Someone already holds a path that overlaps yours. Nothing was held.",
   dependencyUnknown: "This work depends on a task this repository does not have. Nothing was held.",
@@ -35,7 +35,7 @@ export default {
   unknownClaim: "This repository has no hold with this id.",
   ended: "This hold has already ended.",
   doneNotSaved:
-    "The hold has ended, but its task could not be marked done, and now it never can be. Work that waits for it has to name another task. The log on the host has the details.",
+    "The hold ended, but its task can never be marked done now. Work waiting on it must name another task. See the log on the host.",
   notHolder: "Only the person who holds these paths can release them.",
   staleFence: "This hold has changed since the board was read. Reload the board, then try again.",
   refused: "Group work refused this request.",

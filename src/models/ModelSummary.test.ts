@@ -118,7 +118,7 @@ test("English renders say what was passed and what the CLI reported", () => {
   );
   assert.match(claude, /<dd>Extra high · xhigh<\/dd>/);
   assert.match(claude, /<dt>Network<\/dt><dd>Web access allowed<\/dd>/);
-  assert.match(claude, /The model is the one the Claude Code CLI reported/);
+  assert.match(claude, /The model is what the Claude Code CLI reported/);
 
   const cliDefault = renderEnglish({
     execution: {

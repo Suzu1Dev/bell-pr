@@ -13,12 +13,18 @@ export function CopyCommand({
   command,
   label,
   copyLabel,
+  codeClassName,
+  codeLabel,
 }: {
   command: string;
   /** What the command does, shown above it. */
   label?: string;
   /** The copy button's name for screen readers; "Copy the command: …" by default. */
   copyLabel?: string;
+  /** Extra class on the command itself. Welcome uses it for a one-line scroller. */
+  codeClassName?: string;
+  /** Accessible name when the command scrolls instead of wrapping. */
+  codeLabel?: string;
 }) {
   const t = useT("setup").copy;
   const code = useRef<HTMLElement>(null);
@@ -54,7 +60,15 @@ export function CopyCommand({
     <div className="copy-command">
       {label && <span className="copy-command-label">{label}</span>}
       <div className="copy-command-row">
-        <code ref={code}>{command}</code>
+        <code
+          ref={code}
+          className={codeClassName}
+          tabIndex={codeLabel ? 0 : undefined}
+          role={codeLabel ? "region" : undefined}
+          aria-label={codeLabel}
+        >
+          {command}
+        </code>
         <button
           type="button"
           className="button secondary copy-command-button"

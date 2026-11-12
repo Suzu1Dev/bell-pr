@@ -71,11 +71,14 @@ test("the example draws both columns' steps and marks the ones that differ; a ca
   // Each chain sits between its column's heading and its prose; no new heading.
   assert.match(html, /<h4>修改前<\/h4><ol class="explain-example-steps">/);
   assert.match(html, /修改後<\/h4><ol class="explain-example-steps">/);
+  // The card opens by itself when it has a diagram, and stays closed with prose only.
+  assert.match(html, /<details class="explain-card explain-card-example" open="">/);
   const { beforeSteps: _before, afterSteps: _after, ...stepless } = example;
   for (const without of [stepless, { ...example, afterSteps: [] }]) {
     const plain = render({ ...file, explanation: { ...file.explanation!, example: without } });
     assert.doesNotMatch(plain, /explain-example-steps|這一步不同/);
     assert.match(plain, /<h4>修改前<\/h4>/);
+    assert.match(plain, /<details class="explain-card explain-card-example">/);
   }
 });
 
@@ -362,7 +365,7 @@ test("the reports tab offers a re-review button for real runs only and shows the
     );
   const idle = render({ onRerunReview() {} });
   assert.match(idle, /重新執行審查/);
-  assert.match(idle, /不會改變已審閱與核准狀態/);
+  assert.match(idle, /不影響審閱與核准/);
   assert.doesNotMatch(idle, /disabled=""/);
   const busy = render({ onRerunReview() {}, reviewBusy: true });
   assert.match(busy, /正在重新審查…/);

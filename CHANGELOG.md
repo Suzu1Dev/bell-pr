@@ -137,7 +137,8 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   whose path is not in the repository is drawn as outside it. Each file's
   plain-language example also returns its before and after as up to five
   steps each, drawn in the Before and After boxes with the steps that
-  differ marked by border, icon and text for screen readers. The learning
+  differ marked by border, icon and text for screen readers; an example
+  with these steps opens by itself, one in prose only stays closed. The learning
   record export lists the same steps. BELL PR draws both from the
   Agent's short fields with its own HTML and CSS; the Agent writes no
   drawing. Analyses and explanations saved earlier load as before and show
@@ -155,6 +156,14 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   can be reached from the remote branch, the pull request, or another ref.
   If it may be the only copy, it stays, and the log says why. Deleting a
   ref that is already gone is not an error.
+- **Start now listens when the provider is the only required check that
+  fails,** on the first start and on every later one. The first time,
+  Welcome shows how to install Codex CLI, Claude Code or the
+  Antigravity CLI, with the same commands and documentation links as the
+  guides. Any other required check, alone or together with the provider,
+  still prints the checklist and exits 1. `bell-pr doctor` still exits 1
+  when the provider is not ready. `bell-pr start --force` still starts
+  when another required check fails.
 - **The data-directory lock is written whole.** Where the file system
   supports hard links, a start writes its lock aside and links it into
   place, so no other start reads it half written. A stale lock is removed
@@ -191,7 +200,11 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   ("the Lead", "Reviewer", "Test analyst"), and Chinese text calls the
   command deny rules 指令 deny 規則, as the full access notice does. Several buttons and tabs were renamed: "Activity",
   "Overview", "Explain it back now", "Approve and preview the PR",
-  "Publish Draft PR", "Check again" and "Code changes" among them. Saved
+  "Publish Draft PR", "Check again" and "Code changes" among them. The 191
+  longest messages that may change (over 25 English words each) are
+  about a fifth shorter, counted on the rendered text: English from 7,260
+  to 5,666 words (−22%) and Chinese from 9,684 to 7,493 Han characters
+  (−23%). They keep the facts, warnings and next steps they gave. Saved
   runs and stored messages keep the wording they were saved with.
 - **The docs link to the official documentation for outside facts.**
   Statements about Claude Code, Codex, Antigravity, the GitHub CLI,
