@@ -47,6 +47,22 @@ without JavaScript, all seven commands are visible together.
   the brand copies drift from `public/`. See `docs/brand.md`.
 - **Checks.** `node site/check-site.mjs` checks links, resources, the
   no-inline-script rule, the screenshot copies and the 5 MB size budget.
+  On each `zh-tw/` page it checks visible text, and `alt`, `title`,
+  `aria-label`, `placeholder`, `label`, the document title, and
+  `description`, `og:title`, `og:description`, `twitter:title` and
+  `twitter:description`. The Latin-letter check skips text inside `code`,
+  `pre` or `kbd`. An unclosed `code`, `pre`, `kbd`, `script`, `style` or
+  `title` tag fails the check, because the text after it would not be read.
+  After the kept English names in `check-site.mjs` are removed, any remaining
+  Latin letter fails, whether or not the English page contains that string.
+  A language-switch link with `lang="en"` or `hreflang="en"` keeps the
+  English autonym and is not checked.
+  A CJK character and a Latin letter or digit need a space between them,
+  including in those attributes and inside `code`, `pre` and `kbd`. Inline
+  tags in between do not count, a new block does, and full-width punctuation
+  needs no space. In `site.js` the zh side of `isZh ? zh : en` must not be
+  English. The mutation test is `test/check-site.test.mjs`; it is not part of
+  the site.
   Missing `.mp4`/`.webm` under `assets/video/` are allowed (deploy-only) and
   those extensions do not count toward the size budget.
   `node site/check-site.mjs --browser --port <port>` also loads every page in
@@ -82,10 +98,10 @@ and runs `render-generated-regions.ts --write`.
 
 | Value | Where | What appears |
 | --- | --- | --- |
-| `publicRepoUrl` | Footer of every page | "Source" (`<publicRepoUrl>`), "Apache-2.0 license" (`<publicRepoUrl>/blob/main/LICENSE`) and "Report an issue" (`<publicRepoUrl>/issues`) |
-| `supportEmail` | Footer of every page | "Support" (mailto) |
-| `securityEmail` | Footer of every page | "Report a vulnerability" (mailto) |
-| `docsUrl` | Footer of every page | "Documentation" |
+| `publicRepoUrl` | Footer of every page | "Source" / "原始碼" (`<publicRepoUrl>`), "Apache-2.0 license" / "Apache-2.0 授權" (`<publicRepoUrl>/blob/main/LICENSE`) and "Report an issue" / "回報問題" (`<publicRepoUrl>/issues`) |
+| `supportEmail` | Footer of every page | "Support" / "支援" (mailto) |
+| `securityEmail` | Footer of every page | "Report a vulnerability" / "回報安全性漏洞" (mailto) |
+| `docsUrl` | Footer of every page | "Documentation" / "說明文件" |
 | `homepageUrl` | `<head>` of every page | `og:url` and an absolute `og:image` (social networks need absolute URLs) |
 
 While every link of a footer column is empty, the footer hides the whole

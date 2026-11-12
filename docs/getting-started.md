@@ -640,7 +640,10 @@ and PRs, including closed PRs. If those checks succeed and find none, it
 keeps your files and draft, backs up the old commit locally and returns the
 contribution to review. Review and approve again before publishing. Recovery
 does not publish anything; if a branch or PR exists, or the checks cannot
-finish, it leaves the contribution unchanged.
+finish, it leaves the contribution unchanged. After a later publish succeeds,
+or when the run is removed, that backup is deleted only if the commit is
+already reachable from the remote branch, the pull request, or another ref.
+If it may be the only copy, it stays.
 
 ## 8. After publishing
 

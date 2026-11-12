@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test, { after, before } from "node:test";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { readDiff } from "./git.js";
@@ -83,6 +83,7 @@ async function fixture() {
   const bin = path.join(directory, "bin");
   const modeFile = path.join(directory, "mode");
   const callsFile = path.join(directory, "calls.jsonl");
+  const remoteHeadFile = path.join(directory, "remote-head");
   await mkdir(bin);
   await writeFile(modeFile, "fork-fail");
   await writeFile(callsFile, "");
@@ -93,7 +94,11 @@ const fs = require('node:fs');
 const { spawnSync } = require('node:child_process');
 const args = process.argv.slice(2);
 fs.appendFileSync(${JSON.stringify(callsFile)}, JSON.stringify(['git', ...args]) + '\\n');
-if (args.includes('push') || args.includes('ls-remote')) process.exit(0);
+if (args.includes('ls-remote')) {
+  try { process.stdout.write(fs.readFileSync(${JSON.stringify(remoteHeadFile)}, 'utf8')); } catch (error) {}
+  process.exit(0);
+}
+if (args.includes('push')) process.exit(0);
 if (args.includes('fetch') || args.includes('clone')) process.exit(98);
 const result = spawnSync(${JSON.stringify(realGit)}, args, { stdio: 'inherit', env: process.env });
 process.exit(result.status ?? 1);
@@ -123,49 +128,59 @@ process.exit(97);
   );
   const previousPath = process.env.PATH;
   process.env.PATH = `${bin}${path.delimiter}${previousPath}`;
-  const store = new Store(path.join(directory, "data"));
-  await store.initialize();
-  const workbench = new Workbench(store);
-  const repo: Repository = {
-    id: "11111111-1111-4111-8111-111111111111",
-    name: "example",
-    owner: "test-owner",
-    fullName: "test-owner/example",
-    path: repository,
-    defaultBranch: "main",
-    url: "https://github.com/test-owner/example",
-  };
-  store.data.repos.push(repo);
-  const run = reviewRun("ref-run1", repo, repository, baseSha);
-  run.draft.commitMessage = "Improve the greeting";
-  store.data.runs.push(run);
-  await git(repository, ["checkout", "-q", "-b", run.branch]);
-  await writeFile(
-    path.join(repository, "hello.ts"),
-    'export const hello = "after";\n',
-  );
-  for (const file of await readDiff(run))
-    await workbench.review(run.id, file.path, true, file.fingerprint);
-  await workbench.approve(run.id, { ...run.draft });
-  const calls = async () =>
-    (await readFile(callsFile, "utf8"))
-      .trim()
-      .split("\n")
-      .filter(Boolean)
-      .map((line) => JSON.parse(line) as string[]);
-  return {
-    repository,
-    workbench,
-    run,
-    baseSha,
-    calls,
-    mode: (value: string) => writeFile(modeFile, value),
-    cleanup: async () => {
-      process.env.PATH = previousPath;
-      await workbench.shutdown();
-      await rm(directory, { recursive: true, force: true });
-    },
-  };
+  let workbench: Workbench | undefined;
+  try {
+    const store = new Store(path.join(directory, "data"));
+    await store.initialize();
+    workbench = new Workbench(store);
+    const repo: Repository = {
+      id: "11111111-1111-4111-8111-111111111111",
+      name: "example",
+      owner: "test-owner",
+      fullName: "test-owner/example",
+      path: repository,
+      defaultBranch: "main",
+      url: "https://github.com/test-owner/example",
+    };
+    store.data.repos.push(repo);
+    const run = reviewRun("ref-run1", repo, repository, baseSha);
+    run.draft.commitMessage = "Improve the greeting";
+    store.data.runs.push(run);
+    await git(repository, ["checkout", "-q", "-b", run.branch]);
+    await writeFile(
+      path.join(repository, "hello.ts"),
+      'export const hello = "after";\n',
+    );
+    for (const file of await readDiff(run))
+      await workbench.review(run.id, file.path, true, file.fingerprint);
+    await workbench.approve(run.id, { ...run.draft });
+    const calls = async () =>
+      (await readFile(callsFile, "utf8"))
+        .trim()
+        .split("\n")
+        .filter(Boolean)
+        .map((line) => JSON.parse(line) as string[]);
+    const opened = workbench;
+    return {
+      repository,
+      workbench: opened,
+      run,
+      baseSha,
+      calls,
+      mode: (value: string) => writeFile(modeFile, value),
+      remoteHead: (value: string) => writeFile(remoteHeadFile, value),
+      cleanup: async () => {
+        process.env.PATH = previousPath;
+        await opened.shutdown();
+        await rm(directory, { recursive: true, force: true });
+      },
+    };
+  } catch (error) {
+    process.env.PATH = previousPath;
+    if (workbench) await workbench.shutdown().catch(() => undefined);
+    await rm(directory, { recursive: true, force: true });
+    throw error;
+  }
 }
 
 test("a publish that fails after the commit and before a push target is archived by recovery, and a retry reuses that ref", async () => {
@@ -224,7 +239,7 @@ test("a publish that fails after the commit and before a push target is archived
   }
 });
 
-test("the recovery ref is removed after a later publish succeeds", { skip: "the recovery ref is left in place after a successful publish and after the run is removed; to be decided in a follow-up PR" }, async () => {
+test("the recovery ref is removed after a later publish succeeds", async () => {
   const f = await fixture();
   try {
     await assert.rejects(
@@ -237,6 +252,8 @@ test("the recovery ref is removed after a later publish succeeds", { skip: "the 
     const ref = `refs/bellpr/publish-recovery/${f.run.id}/${commit}`;
     await f.workbench.recoverPublish(f.run.id, commit);
     assert.equal(await recoveryRefs(f.repository), `${ref} ${commit}`);
+    // The old commit is the remote branch head, so it is not the only copy.
+    await f.remoteHead(`${commit}\trefs/heads/${f.run.branch}\n`);
     await f.mode("write");
     await f.workbench.approve(f.run.id, { ...f.run.draft });
     const published = await f.workbench.publish(
@@ -248,12 +265,18 @@ test("the recovery ref is removed after a later publish succeeds", { skip: "the 
     assert.equal(published.prUrl, prUrl);
     assert.notEqual(published.publishCommit, commit);
     assert.equal(await recoveryRefs(f.repository), "");
+    await f.workbench.publish(
+      f.run.id,
+      published.approvedFingerprint!,
+      ["facts-unknown"],
+    );
+    assert.equal(await recoveryRefs(f.repository), "");
   } finally {
     await f.cleanup();
   }
 });
 
-test("the recovery ref is removed when the run is removed", { skip: "the recovery ref is left in place after a successful publish and after the run is removed; to be decided in a follow-up PR" }, async () => {
+test("the recovery ref is removed when the run is removed", async () => {
   const f = await fixture();
   try {
     await assert.rejects(
@@ -268,6 +291,102 @@ test("the recovery ref is removed when the run is removed", { skip: "the recover
     assert.equal(await recoveryRefs(f.repository), `${ref} ${commit}`);
     await f.workbench.removeRun(f.run.id);
     assert.equal(await recoveryRefs(f.repository), "");
+    assert.equal(
+      (await git(f.repository, ["rev-parse", f.run.branch])).stdout.trim(),
+      commit,
+    );
+  } finally {
+    await f.cleanup();
+  }
+});
+
+test("the recovery ref of an unpushed commit is kept, including when the run is removed", async () => {
+  const f = await fixture();
+  try {
+    await assert.rejects(
+      f.workbench.publish(f.run.id, f.run.approvedFingerprint!, [
+        "facts-unknown",
+      ]),
+    );
+    const commit = f.run.publishCommit;
+    assert.ok(commit);
+    const ref = `refs/bellpr/publish-recovery/${f.run.id}/${commit}`;
+    await f.workbench.recoverPublish(f.run.id, commit);
+    assert.equal(await recoveryRefs(f.repository), `${ref} ${commit}`);
+    await git(f.repository, ["update-ref", `refs/heads/${f.run.branch}`, f.baseSha]);
+    const fingerprint = "c".repeat(64);
+    f.run.approvedFingerprint = fingerprint;
+    f.run.status = "published";
+    f.run.prUrl = prUrl;
+    f.run.headRepository = "test-owner/example";
+    f.run.publishedBranch = f.run.branch;
+    await f.workbench.publish(f.run.id, fingerprint, ["facts-unknown"]);
+    assert.equal(await recoveryRefs(f.repository), `${ref} ${commit}`);
+    await f.workbench.removeRun(f.run.id);
+    assert.equal(await recoveryRefs(f.repository), `${ref} ${commit}`);
+    const logs = path.join(f.workbench.store.directory, "logs");
+    const text = (
+      await Promise.all(
+        (await readdir(logs))
+          .filter((name) => name.endsWith(".log"))
+          .map((name) => readFile(path.join(logs, name), "utf8")),
+      )
+    ).join("\n");
+    assert.match(
+      text,
+      new RegExp(`Keeping ${ref}: ${commit} is not reachable`),
+    );
+  } finally {
+    await f.cleanup();
+  }
+});
+
+test("a sync snapshot does not count as another copy of an unpushed recovery commit", async () => {
+  const f = await fixture();
+  try {
+    await assert.rejects(
+      f.workbench.publish(f.run.id, f.run.approvedFingerprint!, [
+        "facts-unknown",
+      ]),
+    );
+    const commit = f.run.publishCommit;
+    assert.ok(commit);
+    const ref = `refs/bellpr/publish-recovery/${f.run.id}/${commit}`;
+    await f.workbench.recoverPublish(f.run.id, commit);
+    await git(f.repository, ["update-ref", `refs/heads/${f.run.branch}`, f.baseSha]);
+    const tree = (
+      await git(f.repository, ["rev-parse", `${commit}^{tree}`])
+    ).stdout.trim();
+    const snapshot = (
+      await git(f.repository, ["commit-tree", tree, "-p", commit], {
+        input: "BELL: checkout before syncing with the target branch\n",
+      })
+    ).stdout.trim();
+    const syncRef = `refs/bellpr/sync/${f.run.id}`;
+    await git(f.repository, ["update-ref", syncRef, snapshot]);
+    const fingerprint = "d".repeat(64);
+    f.run.approvedFingerprint = fingerprint;
+    f.run.status = "published";
+    f.run.prUrl = prUrl;
+    f.run.headRepository = "test-owner/example";
+    f.run.publishedBranch = f.run.branch;
+    await f.workbench.publish(f.run.id, fingerprint, ["facts-unknown"]);
+    assert.equal(await recoveryRefs(f.repository), `${ref} ${commit}`);
+    f.run.worktreePath = path.join(
+      f.workbench.store.directory,
+      "worktrees",
+      f.run.id,
+    );
+    await f.workbench.removeWorkspace(f.run.id);
+    assert.equal(await recoveryRefs(f.repository), `${ref} ${commit}`);
+    assert.equal(
+      (
+        await git(f.repository, ["show-ref", "--verify", "--quiet", syncRef], {
+          allowedCodes: [0, 1],
+        })
+      ).code,
+      1,
+    );
   } finally {
     await f.cleanup();
   }
