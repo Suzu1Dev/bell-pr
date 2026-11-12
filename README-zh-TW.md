@@ -87,7 +87,7 @@ Homebrew、Bun、mise 與 Windows 安裝腳本等方式，請見[安裝指南](d
 
 ## 設定與資料
 
-在「設定」調整語言、模型、學習選項與同時執行的任務數。連接埠、環境變數與 CLI 選項請見[設定說明](docs/configuration.md)及 [.env.example](.env.example)。
+在「設定」調整語言、**BELL PR Group** 團隊協作、模型、學習選項與同時執行的任務數。連接埠、環境變數與 CLI 選項請見[設定說明](docs/configuration.md)、[團隊協作](docs/group-work.md)及 [.env.example](.env.example)。
 
 專案、worktree、筆記與設定預設存於 `~/.bellpr`，可用 `--data-dir` 或 `BELLPR_DATA_DIR` 指定其他目錄。備份前請先停止 BELL PR，再複製整個目錄；紀錄含有絕對路徑，還原時需使用相同路徑。更新、復原與版本相容性請見[升級說明](docs/upgrading.md)。
 

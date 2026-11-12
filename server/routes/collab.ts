@@ -15,7 +15,7 @@
  * and a sentence of group work's own, and nothing the coordinator or git
  * wrote.
  */
-import type { Express, RequestHandler, Response } from "express";
+import type { IRouter, RequestHandler, Response } from "express";
 import { z } from "zod";
 import type {
   CollabInfo,
@@ -98,7 +98,7 @@ export function collabParticipant(host: CollabHost): RequestHandler {
 }
 
 export function registerCollabRoutes(
-  app: Express,
+  app: IRouter,
   host: CollabHost,
   { store, devices, tokenFile }: { store: Store; devices?: DeviceTokens; tokenFile?: string },
 ) {

@@ -16,7 +16,7 @@
  * it. A path, a title or an id from a request is never the key of a plain
  * object: the side file's records are read through sideEntry.
  */
-import type { Express, RequestHandler, Response } from "express";
+import type { IRouter, RequestHandler, Response } from "express";
 import { z } from "zod";
 import type {
   CollabAddProjectResponse,
@@ -221,7 +221,7 @@ function inTurns() {
 
 /** Registers the routes and returns the hub, so a removal can end a removed person's waiting requests. */
 export function registerCollabBoardRoutes(
-  app: Express,
+  app: IRouter,
   host: CollabHost,
   { store, participant }: { store: Store; participant: RequestHandler },
 ) {

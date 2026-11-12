@@ -18,6 +18,7 @@ import {
   readFileSync,
   readlinkSync,
   realpathSync,
+  renameSync,
   rmSync,
   statSync,
   utimesSync,
@@ -46,6 +47,7 @@ import {
   baseUrl,
   browserHost,
   dataPaths,
+  envFlag,
   isLoopbackHost,
   isWildcardHost,
   resolveConfig,
@@ -59,6 +61,7 @@ import { Store } from "./store.js";
 import { PasswordlessSudo } from "./sudo.js";
 import { SudoAudit } from "./sudo-audit.js";
 import { sudoTestOverrides } from "./sudo-test-overrides.js";
+import { AppError } from "./types.js";
 import { Workbench } from "./workbench.js";
 import { issueWriterLock, type WriterLock } from "./writer-lock.js";
 
@@ -312,9 +315,10 @@ function lockInfo(port: number, host?: string, url?: string): LockInfo {
   };
 }
 
-/** A lock this process took: whether its file is still this one's, and its release. */
+/** A lock this process took: whether its file is still this one's, its in-place update, and its release. */
 interface HeldLock {
   holds(): boolean;
+  rewrite(info: LockInfo): void;
   release(): void;
 }
 
@@ -466,7 +470,8 @@ function removeStale(
  * is held. A lock that another start wrote in its place is never renewed,
  * so it lapses as its own holder's would.
  */
-function holdLock(file: string, text: string): HeldLock {
+function holdLock(file: string, initialText: string): HeldLock {
+  let text = initialText;
   heldLocks.add(file);
   const holds = () => heldLocks.has(file) && readLockText(file) === text;
   const renewal = setInterval(() => {
@@ -481,6 +486,28 @@ function holdLock(file: string, text: string): HeldLock {
   renewal.unref();
   return {
     holds,
+    rewrite: (info: LockInfo) => {
+      if (!holds()) throw new AppError((m) => m.collab.stopped, 503);
+      const nextText = `${JSON.stringify(info)}\n`;
+      const temp = `${file}.new-${process.pid}-${randomBytes(4).toString("hex")}`;
+      try {
+        writeFileSync(temp, nextText, { flag: "wx", mode: 0o600 });
+        if (info.strict === true) {
+          // Strict group work requires hard links on this filesystem, just like acquireWriterLock.
+          const probe = `${temp}.ln`;
+          try {
+            linkSync(temp, probe);
+          } finally {
+            rmSync(probe, { force: true });
+          }
+        }
+        if (!holds()) throw new AppError((m) => m.collab.stopped, 503);
+        renameSync(temp, file);
+        text = nextText;
+      } finally {
+        rmSync(temp, { force: true });
+      }
+    },
     release: () => {
       clearInterval(renewal);
       // Only remove the lock while it is still ours.
@@ -727,15 +754,23 @@ export async function startServer(
   try {
     mkdirSync(config.dataDir, { recursive: true, mode: 0o700 });
     await loadOrCreateApiToken(paths.apiToken);
+    const env = options.env ?? process.env;
+    const appSettings = new AppSettingsService(config.dataDir, {
+      env,
+      cliGroup: Boolean(config.collab && !envFlag(env.BELLPR_GROUP)),
+    });
+    const resolvedDataDir = path.resolve(config.dataDir);
+    const initialGroup = Boolean(config.collab || appSettings.get().groupWork);
     // Group work needs the strict lock; it still names this address.
-    const writerLock = config.collab
-      ? await acquireWriterLock(config.dataDir, { port: config.port, host: config.host, url })
-      : undefined;
-    const { release: releaseLock } = writerLock ?? await acquireLock(
+    const heldLock = await acquireLock(
       paths.lock,
-      lockInfo(config.port, config.host, url),
-      config.dataDir,
+      {
+        ...lockInfo(config.port, config.host, url),
+        ...(initialGroup ? { strict: true } : {}),
+      },
+      resolvedDataDir,
     );
+    const releaseLock = () => heldLock.release();
     cleanups.push(releaseLock);
     // A process.exit() that skips shutdown still frees the data directory.
     process.on("exit", releaseLock);
@@ -783,7 +818,6 @@ export async function startServer(
     // The saved settings apply before the store loads: the notes that
     // recovery writes on interrupted runs follow the language chosen in the
     // app, not BELLPR_LOCALE.
-    const appSettings = new AppSettingsService(config.dataDir);
     activateAppSettings(appSettings);
     cleanups.push(() => deactivateAppSettings(appSettings));
     const store = new Store(config.dataDir);
@@ -804,8 +838,52 @@ export async function startServer(
       cleanups.push(() => helper.stop());
       await sudo.cleanUpAtStartup().catch((error: unknown) => log.warn("sudo.startup_cleanup_failed", { error }));
     }
-    if (writerLock)
-      collab = await openCollabHost({ dataDir: config.dataDir, lock: writerLock });
+    const issueLock = () =>
+      issueWriterLock({
+        dataDir: resolvedDataDir,
+        holds: heldLock.holds,
+        release: heldLock.release,
+      });
+    if (initialGroup)
+      collab = await openCollabHost({ dataDir: resolvedDataDir, lock: issueLock() });
+    let groupTransitions: Promise<void> = Promise.resolve();
+    const onGroupWorkChange = (enabled: boolean) => {
+      const next = groupTransitions.then(async () => {
+        if (stopping) throw new AppError((m) => m.collab.stopped, 503);
+        if (enabled) {
+          if (collab) return;
+          heldLock.rewrite({
+            ...lockInfo(config.port, config.host, url),
+            strict: true,
+          });
+          try {
+            const host = await openCollabHost({
+              dataDir: resolvedDataDir,
+              lock: issueLock(),
+            });
+            collab = host;
+            app?.locals.setCollab?.(host);
+          } catch (error) {
+            try {
+              heldLock.rewrite(lockInfo(config.port, config.host, url));
+            } catch {
+              // Lock was already replaced or released.
+            }
+            throw error;
+          }
+          return;
+        }
+        if (collab) {
+          const closing = collab;
+          collab = undefined;
+          app?.locals.setCollab?.(undefined);
+          await closing.close();
+        }
+        heldLock.rewrite(lockInfo(config.port, config.host, url));
+      });
+      groupTransitions = next.catch(() => undefined);
+      return next;
+    };
     app = createApp(workbench, {
       ...(sudo ? { sudo } : {}),
       port: config.port,
@@ -819,6 +897,7 @@ export async function startServer(
       readApiToken: () => readApiToken(paths.apiToken),
       apiTokenFile: paths.apiToken,
       ...(collab ? { collab } : {}),
+      onGroupWorkChange,
       suiteLinks: config.suiteLinks,
     });
     handler = app;

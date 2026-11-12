@@ -6,7 +6,9 @@ person at the host, and teammates who reach it from
 that BELL PR is set up as one group, and each person joins the group under
 a name, as a member or an admin.
 
-Today it is switched on, set up, and people are invited from the command
+Today it can be switched on right in **Settings → BELL PR Group** (or from
+the command line and environment), and people can set up, invite, join and
+take holds on [the Group page](#the-group-page) as well as from the command
 line and the API. Once people have joined, an admin adds repositories to
 the group, and each person says which files and folders they are working on
 by taking a [hold](#holds). BELL PR refuses a hold that meets one already
@@ -28,14 +30,23 @@ The design behind it is in
 
 ## Switch it on
 
-Start BELL PR with `--group`, or set `BELLPR_GROUP=1` (in the environment
-or in an `--env-file`):
+On the host computer, open **Settings → BELL PR Group** (`#/settings/group`)
+and turn **Host BELL PR Group on this computer** on. BELL PR upgrades
+`bellpr.lock` to the strict lock in place, opens the Group board right away
+without a restart, and saves `groupWork: true` in `app-settings.json` so
+later `bell-pr start` runs keep it on. Turning the switch off closes the
+group host and returns to the ordinary lock while keeping existing
+`collab.json` and `coordination.json` files in the data directory. Paired
+devices (`bpd_*`) cannot toggle this setting (`403` `hostOnly`).
+
+You can also start BELL PR with `--group`, or set `BELLPR_GROUP=1` (in the
+environment or in an `--env-file`), which locks the setting in Settings:
 
 ```sh
 bell-pr start --group
 ```
 
-Without the switch nothing changes: there is no `/api/collab` route (the
+Without the setting or startup switch nothing changes: there is no `/api/collab` route (the
 API answers its usual 404), `GET /api/status` has no `collab` field, the
 data directory's lock is the ordinary one, and no new file is written.
 One thing is the same in every BELL PR, with or without the switch: text
@@ -87,8 +98,8 @@ linked into place.
 
 With group work on, the sidebar of the app has a **Group** item, and the
 page is at `#/group`. Without the switch the sidebar has no such item, and
-that address says that group work is off and shows the line that turns it
-on.
+that address says that group work is off, links to **Settings → BELL PR
+Group**, and shows the command line that turns it on.
 
 **What it shows.** One repository of the group at a time. At the top are
 its name (a picker when the group has more than one, or when an admin can

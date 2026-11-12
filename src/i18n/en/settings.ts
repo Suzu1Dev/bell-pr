@@ -16,6 +16,7 @@ const settings = {
   nav: { label: "Settings sections" },
   sections: {
     general: "General",
+    group: `${product.name} Group`,
     provider: "AI provider",
     safety: "Agent safety",
     learning: "Learning",
@@ -81,6 +82,41 @@ const settings = {
       resetYes: "Reset and reload",
       resetFailed:
         "This browser does not allow clearing the sample project's progress.",
+    },
+  },
+  group: {
+    title: `${product.name} Group`,
+    intro:
+      "Coordinate paths and prerequisite tasks with teammates on one shared board, hosted directly on this computer.",
+    cardTitle: `Enable ${product.name} Group`,
+    cardText:
+      `Turns this ${product.name} into a live group host right away and keeps it on across restarts, without needing the --group flag each time.`,
+    label: `Host ${product.name} Group on this computer`,
+    help:
+      "Uses strict single-writer locking on the data directory, opens the Group board in the sidebar, and guards Agent edits and pull request publishing against teammates' held paths.",
+    flagHint:
+      `Started with --group. Restart ${product.name} without --group to change this setting here.`,
+    hostOnly:
+      `Only a browser signed in at the host computer can turn ${product.name} Group on or off.`,
+    turnedOn: `${product.name} Group is on.`,
+    turnedOff: `${product.name} Group is off. Saved group records stay in the data directory.`,
+    openBoard: "Open Group board",
+    status: {
+      off: "Off",
+      notSetUp: "On · Ready to set up",
+      ready: "Active",
+      stopped: "Stopped",
+    },
+    how: {
+      title: `How ${product.name} Group works`,
+      intro: "Everything runs locally on this host with no external account or cloud service.",
+      holds:
+        "Teammates claim folders or files on the live board before starting work, and can mark tasks that must finish first.",
+      guards:
+        `${product.name} refuses overlapping holds, blocks publishing changes that touch a teammate's held path, and stops an Agent run that edits one.`,
+      devices:
+        `Pair teammates' browsers on the host with ${product.binNames[0]} pair, then create one-time invite codes on the Group board.`,
+      openDevices: "Manage paired devices in General",
     },
   },
   provider: {
@@ -232,6 +268,8 @@ const settings = {
           "1 allows unsandboxed Claude Code and Antigravity Agents.",
         BELLPR_REQUIRE_UNDERSTANDING_CHECK:
           "1 keeps the understanding check on and locks the setting. No value turns it off.",
+        BELLPR_GROUP:
+          `1 turns ${product.name} Group on and locks the setting; 0 keeps it off.`,
         BELLPR_RETENTION_DAYS:
           "Days to keep the files of stopped and failed runs: 1 to 365, default 14.",
         BELLPR_LOG_LEVEL:

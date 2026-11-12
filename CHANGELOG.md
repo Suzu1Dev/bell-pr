@@ -72,6 +72,17 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   and removing a person stay API-only. Without the switch the page says
   how to turn group work on, and the sidebar has no Group item.
   `docs/group-work.md` describes it.
+- **BELL PR Group can be turned on and off in Settings.** **Settings → BELL PR
+  Group** (`#/settings/group`) hosts group work from the browser at the host
+  computer without restarting the server: turning it on upgrades
+  `bellpr.lock` to the strict single-writer lock in place, opens `/api/collab`
+  and the sidebar's **Group** board right away, enables hold guards on agent
+  runs and publishing, and saves `groupWork` in `app-settings.json` for later
+  starts. Turning it off closes the group host and returns to the ordinary
+  lock while keeping `collab.json` and `coordination.json` on disk.
+  `BELLPR_GROUP` (`1` or `0`) and `--group` lock the setting in Settings, and
+  paired devices (`bpd_*`) are refused with `403` `hostOnly`. The landing
+  site highlights **BELL PR Group** in English and Traditional Chinese.
 - **BELL PR checks its own writes against other people's holds.** In a
   repository of the group, BELL PR publishes no change (first pull request
   or follow-up round) that touches a path someone else holds: the publish

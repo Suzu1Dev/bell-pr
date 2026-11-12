@@ -231,18 +231,46 @@ test("withAppSettings gives the sources back to the service that was active befo
   assert.equal(currentLocale(), "zh-TW");
 });
 
-for (const field of ["skipUnderstandingCheck", "hideTryFirst"] as const)
+for (const field of ["skipUnderstandingCheck", "hideTryFirst", "groupWork"] as const)
   test(`a file written by a newer build with ${field} still loads in an older build`, () => {
     // The older build's schema has no such field; its lenient read drops it.
     const older = lenientRead(
       field === "skipUnderstandingCheck"
         ? appSettingsSchema.omit({ skipUnderstandingCheck: true })
-        : appSettingsSchema.omit({ hideTryFirst: true }),
+        : field === "hideTryFirst"
+          ? appSettingsSchema.omit({ hideTryFirst: true })
+          : appSettingsSchema.omit({ groupWork: true }),
     );
     const written = { locale: "en", [field]: true };
     assert.deepEqual(older.parse(written), { locale: "en" });
     assert.deepEqual(appSettingsSchema.parse(written), written);
   });
+
+test("BELLPR_GROUP and --group lock groupWork and explain how to unlock it", async (t) => {
+  const directory = await dataDir(t);
+  const byEnv = new AppSettingsService(directory, { env: { BELLPR_GROUP: "1" } });
+  assert.deepEqual(byEnv.view(), {
+    settings: { groupWork: true },
+    lockedBy: { groupWork: "BELLPR_GROUP" },
+  });
+  const byFlag = new AppSettingsService(directory, { env: {}, cliGroup: true });
+  assert.deepEqual(byFlag.view(), {
+    settings: { groupWork: true },
+    lockedBy: { groupWork: "--group" },
+  });
+  await assert.rejects(
+    withLocale("en", () => byFlag.update({ groupWork: false })),
+    (error: unknown) => {
+      assert.ok(error instanceof AppError);
+      assert.equal(error.statusCode, 409);
+      assert.equal(
+        error.message,
+        'The setting "BELL PR Group" comes from the --group startup flag. Restart BELL PR without --group to change it here.',
+      );
+      return true;
+    },
+  );
+});
 
 test("BELLPR_REQUIRE_UNDERSTANDING_CHECK=1 keeps the check on and locks the setting; no value turns it off", async (t) => {
   const directory = await dataDir(t);

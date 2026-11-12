@@ -7,6 +7,7 @@ import {
   Info,
   Languages,
   ShieldCheck,
+  Users,
   Wrench,
   type LucideIcon,
 } from "lucide-react";
@@ -23,6 +24,7 @@ import { AboutSection } from "./AboutSection";
 import { DataSection } from "./DataSection";
 import { EnvironmentSection } from "./EnvironmentSection";
 import { GeneralSection } from "./GeneralSection";
+import { GroupSection } from "./GroupSection";
 import { LearningSection } from "./LearningSection";
 import { PerformanceSection } from "./PerformanceSection";
 import { ProviderSection } from "./ProviderSection";
@@ -59,6 +61,7 @@ interface SettingsPageProps {
 
 const icons: Record<SettingsSection, LucideIcon> = {
   general: Languages,
+  group: Users,
   provider: Cpu,
   safety: ShieldCheck,
   learning: GraduationCap,
@@ -120,6 +123,17 @@ export function SettingsPage({
 
   let content;
   switch (section) {
+    case "group":
+      content = (
+        <GroupSection
+          settings={settings}
+          collab={status?.collab}
+          groupHref={serializeRoute({ name: "group", ...(flags ? { flags } : {}) })}
+          generalHref={sectionHref("general", flags)}
+          onSaved={() => void reloadStatus()}
+        />
+      );
+      break;
     case "provider":
       content = (
         <ProviderSection

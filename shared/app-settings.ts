@@ -42,6 +42,11 @@ export const appSettingsSchema = z.object({
    * the plain reveal. Absent means false: the prompts are shown.
    */
   hideTryFirst: z.boolean().optional(),
+  /**
+   * Hosts BELL PR Group on this computer, like `--group` or `BELLPR_GROUP=1`.
+   * Absent means false: group work is off unless `--group` or `BELLPR_GROUP=1` turns it on.
+   */
+  groupWork: z.boolean().optional(),
 });
 
 export type AppSettings = z.infer<typeof appSettingsSchema>;

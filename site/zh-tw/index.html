@@ -36,6 +36,7 @@
         <a class="brand" href="index.html"><img src="../assets/brand/logo-wordmark.svg" alt="BELL PR" width="104" height="34"></a>
         <nav class="site-nav" aria-label="主選單">
           <ul>
+            <li><a href="#group">Group 協作</a></li>
             <li><a href="#demo">示範影片</a></li>
             <li><a href="#how-it-works">運作方式</a></li>
             <li><a href="install.html">安裝</a></li>
@@ -52,6 +53,10 @@
     <main id="main">
       <section class="hero">
         <div class="wrap">
+          <a class="release-callout" href="#group">
+            <span class="release-pill">本版重大更新</span>
+            <span class="release-brand"><span>BELL PR</span> <span class="group-dream-inline">Group</span></span> <span class="release-copy">在「設定」直接開啟團隊即時路徑佔用與前置任務協作 →</span>
+          </a>
           <p class="eyebrow">開源 · 以本機為主 · 用自己的話解釋回去 · 無遙測</p>
           <h1>從 vibe coding 到真正搞懂為什麼。</h1>
           <p class="lead">你的 AI Agent 團隊負責跑腿。你理解每一項變更、用自己的話解釋回去，只送出維護者樂意審查的內容。BELL PR 在你自己的電腦上執行，搭配你已在用的 AI 程式設計 CLI 與 GitHub CLI，而且只會開啟經你核准的 Draft pull request。</p>
@@ -174,6 +179,75 @@ brew install suzu1dev/bell-pr/bell-pr<!-- /generated:install-commands --></code>
             </div>
           </div>
           <p class="hero-note">依 Apache-2.0 免費開源，不需 BELL PR 帳號。真實貢獻需要 Git，以及已登入的 GitHub CLI 與 Codex CLI、Claude Code 或 Antigravity CLI。</p>
+        </div>
+      </section>
+
+      <section class="section section-group" id="group" aria-labelledby="group-title">
+        <div class="wrap">
+          <div class="section-head">
+            <p class="eyebrow group-eyebrow">本版重大功能 · 團隊協作</p>
+            <div class="group-lockup" aria-hidden="true">
+              <img class="group-wordmark" src="../assets/brand/logo-wordmark.svg" alt="" width="136" height="44">
+              <span class="group-dream-badge">Group</span>
+            </div>
+            <h2 id="group-title"><span class="group-brand-text">BELL PR</span> <span class="group-dream-word">Group</span> 登場：在設定裡一鍵開啟團隊協作。</h2>
+            <p>和同學或隊友一起貢獻同一個專案嗎？現在只要在「設定 → BELL PR Group」開啟開關（或執行 <code>bell-pr <wbr>start <wbr>--group</code>），你的電腦就能直接主持共用的即時協作看板——免雲端帳號、免額外伺服器，在 Agent 動手或發布 pull request 前先看清誰佔用了哪些路徑。</p>
+          </div>
+          <div class="group-showcase">
+            <div class="group-preview" aria-label="BELL PR Group 即時協作看板預覽">
+              <div class="group-preview-top">
+                <span class="group-preview-setting">設定 → BELL PR Group</span>
+                <span class="group-preview-on">已開啟 · 運作中</span>
+              </div>
+              <div class="group-preview-bar">
+                <code>suzu1dev/bell-pr</code>
+                <div class="group-preview-people">
+                  <span class="group-avatar">嵐</span>
+                  <span class="group-avatar">辰</span>
+                  <span class="group-avatar">凱</span>
+                  <span class="group-live-pill">即時</span>
+                </div>
+              </div>
+              <ul class="group-hold-list">
+                <li class="group-hold-item">
+                  <div class="group-hold-meta">
+                    <strong>小嵐</strong>
+                    <span>目前佔用中</span>
+                  </div>
+                  <div class="group-hold-paths">
+                    <code>src/settings/</code>
+                    <code>server/index.ts</code>
+                  </div>
+                  <p class="group-hold-title">在設定開啟 BELL PR Group 與嚴格寫入鎖定</p>
+                </li>
+                <li class="group-hold-item">
+                  <div class="group-hold-meta">
+                    <strong>宇辰</strong>
+                    <span>前置：開啟 BELL PR Group</span>
+                  </div>
+                  <div class="group-hold-paths">
+                    <code>site/</code>
+                  </div>
+                  <p class="group-hold-title">網站 BELL PR Group 夢幻視覺更新</p>
+                </li>
+              </ul>
+              <p class="group-preview-guard">寫入保護已啟用：自動拒絕重疊佔用，並攔截改到隊友路徑的 Agent 任務與 pull request 發布。</p>
+            </div>
+            <ul class="group-cards">
+              <li class="card">
+                <h3>設定內直接開啟，重啟自動保留</h3>
+                <p>在「設定 → BELL PR Group」切換開關，BELL PR 會立即升級資料目錄的單一寫入鎖定並開啟「小組」看板，下次啟動也會自動保留設定。</p>
+              </li>
+              <li class="card">
+                <h3>即時路徑佔用與前置任務</h3>
+                <p>動工前先佔用資料夾或檔案路徑，並勾選需先完成的前置任務；選擇「完成並釋出」後，等待中的後續任務就會立即解鎖。</p>
+              </li>
+              <li class="card">
+                <h3>保護 Agent 執行與 Draft PR</h3>
+                <p>透過 <code>bell-pr <wbr>pair</code> 與一次性邀請碼配對隊友瀏覽器；若 Agent 改到他人佔用路徑會立即停止，並拒絕發布重疊變更。</p>
+              </li>
+            </ul>
+          </div>
         </div>
       </section>
 
@@ -406,6 +480,10 @@ brew install suzu1dev/bell-pr/bell-pr<!-- /generated:install-commands --></code>
               <p>只有在你選擇、或專案要求時。草稿結尾可有一行可編輯的文字，說明 AI 程式設計 Agent 協助準備變更且你已審查。除非你開啟，或專案自己的規則要求揭露，否則該行預設關閉。若專案要求揭露，BELL PR 在說明寫入前不會發布。請遵守各專案對 AI 輔助貢獻的規則；原始碼 repository 中的 <code>docs/<wbr>contributing-responsibly.md</code> 說明負責任使用的意義。</p>
             </details>
             <details>
+              <summary>怎麼和隊友一起使用 BELL PR Group？</summary>
+              <p>在主機開啟「設定 → BELL PR Group」（或執行 <code>bell-pr <wbr>start <wbr>--group</code>），接著用 <code>bell-pr <wbr>pair</code> 配對隊友的瀏覽器，並在「小組」頁面產生 10 分鐘有效的一次性邀請碼。每位隊友在動工前先佔用路徑或設定前置任務，BELL PR 就會自動保護這些路徑不被其他人的 Agent 或 Draft PR 覆寫。</p>
+            </details>
+            <details>
               <summary>可以關閉理解檢查嗎？</summary>
               <p>可以，在「設定 → 學習」中，經確認後關閉（確認會說明變更內容）。每個檔案仍須審查，你仍須核准 pull request；所有專案規則、issue 與節奏檢查仍適用，且未做檢查就核准的執行會永久標示。</p>
             </details>
@@ -425,6 +503,7 @@ brew install suzu1dev/bell-pr/bell-pr<!-- /generated:install-commands --></code>
           <nav class="footer-col" aria-labelledby="footer-product">
             <h2 id="footer-product">產品</h2>
             <ul>
+              <li><a href="index.html#group">BELL PR Group</a></li>
               <li><a href="index.html#how-it-works">運作方式</a></li>
               <li><a href="install.html">安裝</a></li>
             </ul>

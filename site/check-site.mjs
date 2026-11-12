@@ -102,6 +102,7 @@ const listedInReadme = (value) => readme.includes(value);
  */
 const keptInEnglish = [
   "Apache License",
+  "BELL PR Group",
   "Claude Code",
   "Antigravity",
   "PowerShell",
@@ -136,6 +137,7 @@ const keptInEnglish = [
   "macOS",
   "Linux",
   "Windows",
+  "Group",
   "issue",
   "Shell",
   "WSL2",

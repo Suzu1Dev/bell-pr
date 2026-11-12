@@ -126,8 +126,10 @@ export interface AppOptions {
    * and device tokens next to it under the data directory.
    */
   apiTokenFile?: string;
-  /** Group work's host (collab-host.ts), when BELL PR was started with --group. */
+  /** Group work's host (collab-host.ts), when BELL PR Group is on. */
   collab?: CollabHost;
+  /** Called by PUT /api/app-settings when `groupWork` changes at runtime. */
+  onGroupWorkChange?: (enabled: boolean) => Promise<void>;
   /** The other BELL products' origins (BELLPR_SUITE_LINKS); none by default. */
   suiteLinks?: SuiteLinks;
 }
@@ -235,12 +237,25 @@ export function createApp(workbench: Workbench, options: AppOptions = {}) {
       pairing: new Pairing(path.dirname(tokenFile), devices),
       publicUrl: options.publicUrl,
     });
-  if (options.collab) {
-    app.locals.collab = options.collab;
-    registerCollabRoutes(app, options.collab, { store: workbench.store, devices, tokenFile });
-    // Agent turns, teammates and plans respect the group's holds too.
-    workbench.guardHolds(options.collab);
-  }
+  let collabRouter: express.Router | undefined;
+  const setCollab = (host?: CollabHost) => {
+    options.collab = host;
+    if (host) {
+      const router = express.Router();
+      registerCollabRoutes(router, host, { store: workbench.store, devices, tokenFile });
+      collabRouter = router;
+      app.locals.collab = host;
+      // Agent turns, teammates and plans respect the group's holds too.
+      workbench.guardHolds(host);
+    } else {
+      collabRouter = undefined;
+      delete app.locals.collab;
+      workbench.guardHolds(undefined);
+    }
+  };
+  app.locals.setCollab = setCollab;
+  if (options.collab) setCollab(options.collab);
+  app.use((req, res, next) => (collabRouter ? collabRouter(req, res, next) : next()));
   if ((options.platform ?? process.platform) === "linux") registerSudoRoutes(app, deps);
   app.use("/api", (_req, res) => {
     res.status(404).json({ error: sm().common.notFound });

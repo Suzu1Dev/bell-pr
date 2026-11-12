@@ -905,6 +905,81 @@ test("with --group a start takes the strict lock under its real address, reports
   }
 });
 
+test("groupWork in app-settings toggles BELL PR Group live, persists across restarts, and refuses paired devices", async () => {
+  const { DeviceTokens } = await import("./device-tokens.js");
+  const box = await sandbox();
+  try {
+    const first = await startedHere(box);
+    try {
+      assert.equal("strict" in first.lock, false);
+      const token = readFileSync(path.join(box.data, "api-token"), "utf8").trim();
+      const paired = await new DeviceTokens(box.data).add("Teammate laptop", token);
+      const putSettings = (body: unknown, bearer = token) =>
+        fetch(`${first.running.url}/api/app-settings`, {
+          method: "PUT",
+          headers: {
+            authorization: `Bearer ${bearer}`,
+            "content-type": "application/json",
+            origin: first.running.url,
+          },
+          body: JSON.stringify(body),
+        });
+
+      // A paired device may not toggle BELL PR Group on the host.
+      const denied = await putSettings({ groupWork: true }, paired.token);
+      assert.equal(denied.status, 403);
+      assert.equal((await denied.json()).reason, "hostOnly");
+
+      // Turning groupWork on upgrades bellpr.lock and mounts /api/collab without a restart.
+      const enabled = await putSettings({ groupWork: true });
+      assert.equal(enabled.status, 200);
+      assert.equal((await enabled.json()).settings.groupWork, true);
+      assert.equal(
+        JSON.parse(readFileSync(path.join(box.data, "bellpr.lock"), "utf8")).strict,
+        true,
+      );
+      const statusOn = await get(`${first.running.url}/api/status`, first.auth);
+      assert.deepEqual(JSON.parse(statusOn.body).collab, { state: "notSetUp" });
+      const collabOn = await get(`${first.running.url}/api/collab`, first.auth);
+      assert.equal(collabOn.status, 200);
+    } finally {
+      await first.running.shutdown();
+    }
+
+    // Next plain start keeps BELL PR Group on from app-settings.json, and can turn it off live.
+    const second = await startedHere(box);
+    try {
+      assert.equal(second.lock.strict, true);
+      const info = await get(`${second.running.url}/api/collab`, second.auth);
+      assert.equal(info.status, 200);
+
+      const disabled = await fetch(`${second.running.url}/api/app-settings`, {
+        method: "PUT",
+        headers: {
+          ...second.auth,
+          "content-type": "application/json",
+          origin: second.running.url,
+        },
+        body: JSON.stringify({ groupWork: false }),
+      });
+      assert.equal(disabled.status, 200);
+      assert.equal(
+        "strict" in JSON.parse(readFileSync(path.join(box.data, "bellpr.lock"), "utf8")),
+        false,
+      );
+      const absent = await get(`${second.running.url}/api/collab`, second.auth);
+      assert.equal(absent.status, 404);
+      const statusOff = await get(`${second.running.url}/api/status`, second.auth);
+      assert.equal("collab" in JSON.parse(statusOff.body), false);
+    } finally {
+      await second.running.shutdown();
+    }
+    assert.deepEqual(lockLitter(box.data), []);
+  } finally {
+    await box.cleanup();
+  }
+});
+
 test("shutdown lets group work in flight land before the server closes and the lock goes", async () => {
   const box = await sandbox();
   try {

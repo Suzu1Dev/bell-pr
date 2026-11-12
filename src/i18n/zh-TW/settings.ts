@@ -12,6 +12,7 @@ const m: Translation<typeof en> = {
   nav: { label: "設定分類" },
   sections: {
     general: "一般",
+    group: `${product.name} Group`,
     provider: "AI 服務",
     safety: "Agent 安全",
     learning: "學習",
@@ -70,6 +71,38 @@ const m: Translation<typeof en> = {
       resetConfirm: "要讓示範專案從頭開始嗎？這個瀏覽器中的示範進度會被清除，頁面會重新載入。",
       resetYes: "重設並重新載入",
       resetFailed: "這個瀏覽器不允許清除示範專案的進度。",
+    },
+  },
+  group: {
+    title: `${product.name} Group`,
+    intro: "直接在這台電腦上主持共用的即時協作看板，與隊友協調檔案路徑佔用與前置任務順序。",
+    cardTitle: `開啟 ${product.name} Group`,
+    cardText:
+      `立即在這台電腦啟動團隊協作並保留設定，之後重新啟動 ${product.name} 也會自動開啟，不必每次加上 --group 參數。`,
+    label: `在這台電腦主持 ${product.name} Group 團隊協作`,
+    help:
+      "啟用資料目錄的嚴格單一寫入鎖定、在側邊欄顯示「小組」看板，並在 Agent 修改檔案或發布 pull request 時自動保護隊友佔用的路徑。",
+    flagHint:
+      `啟動時帶了 --group 參數。請在不帶 --group 的情況下重新啟動 ${product.name}，才能在這裡切換。`,
+    hostOnly: `只有在主機電腦登入的瀏覽器可以開啟或關閉 ${product.name} Group。`,
+    turnedOn: `已開啟 ${product.name} Group。`,
+    turnedOff: `已關閉 ${product.name} Group。既有小組紀錄仍保留在資料目錄中。`,
+    openBoard: "開啟小組看板",
+    status: {
+      off: "未開啟",
+      notSetUp: "已開啟 · 待建立小組",
+      ready: "運作中",
+      stopped: "已停止",
+    },
+    how: {
+      title: `${product.name} Group 運作方式`,
+      intro: "所有協作資料都保留在這台主機本機，不需要額外註冊帳號或雲端服務。",
+      holds: "隊友在動工前先於即時看板佔用資料夾或檔案路徑，並可勾選必須先完成的前置任務。",
+      guards:
+        `${product.name} 會拒絕重疊的路徑佔用、阻擋發布改到隊友佔用路徑的變更，並在 Agent 改到他人佔用路徑時立即停止任務。`,
+      devices:
+        `先在主機執行 ${product.binNames[0]} pair 配對隊友的瀏覽器，再到「小組」看板產生一次性邀請碼讓隊友加入。`,
+      openDevices: "前往「一般」管理已配對裝置",
     },
   },
   provider: {
@@ -197,6 +230,7 @@ const m: Translation<typeof en> = {
         BELLPR_ALLOW_UNSANDBOXED_AGENTS: "設為 1 允許 Claude Code 與 Antigravity Agent 在沙箱外執行。",
         BELLPR_REQUIRE_UNDERSTANDING_CHECK: "設為 1 會保持理解檢查開啟並鎖定這項設定。沒有任何值能關閉它。",
         BELLPR_RETENTION_DAYS: "保留已停止與失敗工作檔案的天數：1 到 365，預設 14。",
+        BELLPR_GROUP: `設為 1 會開啟 ${product.name} Group 並鎖定這項設定；設為 0 則保持關閉。`,
         BELLPR_LOG_LEVEL: "伺服器記錄的詳細程度：debug、info（預設）、warn 或 error。",
       },
     },

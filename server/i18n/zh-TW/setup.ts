@@ -34,9 +34,12 @@ const m: Translation<typeof en> = {
       agentTimeoutScale: "Agent 時間上限倍數",
       allowUnsandboxedAgents: "允許 Claude Code 與 Antigravity Agent 不用沙箱",
       retentionDays: "已結束任務的檔案保留天數",
+      groupWork: `${product.name} Group`,
     },
     locked: ({ setting, variable }) =>
-      `「${setting}」這項設定來自環境變數 ${variable}。請修改或移除這個變數，再重新啟動 ${product.name}。`,
+      variable.startsWith("--")
+        ? `「${setting}」這項設定來自啟動參數 ${variable}。請在不帶 ${variable} 的情況下重新啟動 ${product.name}，才能在這裡修改。`
+        : `「${setting}」這項設定來自環境變數 ${variable}。請修改或移除這個變數，再重新啟動 ${product.name}。`,
   },
   busy: {
     analysisRunning: "這個專案正在分析中。請等分析完成後再刪除專案。",

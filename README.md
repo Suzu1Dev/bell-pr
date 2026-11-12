@@ -157,9 +157,11 @@ authentication and the limits of these protections.
 
 ## Configuration and data
 
-Change language, models, learning options and concurrency in **Settings**.
+Change language, **BELL PR Group** team coordination, models, learning
+options and concurrency in **Settings**.
 For ports, environment variables and CLI options, see
-[Configuration](docs/configuration.md) and [.env.example](.env.example).
+[Configuration](docs/configuration.md), [Group work](docs/group-work.md)
+and [.env.example](.env.example).
 
 BELL PR stores its projects, worktrees, notes and settings in `~/.bellpr`;
 use `--data-dir` or `BELLPR_DATA_DIR` to choose another directory.

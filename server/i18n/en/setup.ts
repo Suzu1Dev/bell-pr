@@ -56,9 +56,12 @@ export default {
       agentTimeoutScale: "Agent time limit scale",
       allowUnsandboxedAgents: "Allow unsandboxed Claude Code and Antigravity Agents",
       retentionDays: "Days to keep a finished run's files",
+      groupWork: `${product.name} Group`,
     },
     locked: ({ setting, variable }: { setting: string; variable: string }) =>
-      `The setting "${setting}" comes from the ${variable} environment variable. Change or remove the variable, then restart ${product.name}.`,
+      variable.startsWith("--")
+        ? `The setting "${setting}" comes from the ${variable} startup flag. Restart ${product.name} without ${variable} to change it here.`
+        : `The setting "${setting}" comes from the ${variable} environment variable. Change or remove the variable, then restart ${product.name}.`,
   },
   /** Deleting while a project analysis runs. */
   busy: {
