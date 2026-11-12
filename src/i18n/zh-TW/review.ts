@@ -82,7 +82,6 @@ const m: Translation<typeof en> = {
   panel: {
     label: "程式碼學習助手",
     title: "讀懂每一項變更",
-    subtitle: "從發生什麼，到為什麼這樣做",
     demoBadge: "示範",
     liveBadge: "AI",
     tabsLabel: "學習面板",
@@ -109,7 +108,6 @@ const m: Translation<typeof en> = {
       alternatives: "如果換個做法？",
       selfCheck: "考考自己",
     },
-    exampleIntro: "先用一個情境，看懂修改前後的差別。",
     exampleScenario: "想像這個情境",
     exampleBefore: "修改前",
     exampleAfter: "修改後",

@@ -586,7 +586,6 @@ test("the respect checks move from the preflight list to the checklist rows", ()
   // Only respect checks left: the list says the text is clear and points below.
   const respectOnly = renderEnglish(english, { checks: checks.slice(1), rules: sampleRules, facts, issueUrl: "#sample-issue-42" });
   assert.doesNotMatch(respectOnly, /draft-guidance-preflight-clear/);
-  assert.doesNotMatch(respectOnly, /No check needs your attention/);
 });
 
 test("checks made without the facts still leave no row OK against the facts passed in", () => {

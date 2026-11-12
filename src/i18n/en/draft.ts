@@ -40,13 +40,6 @@ const draft = {
       repository: "Follows the project's rules",
       linux: "Linux principles · adapted for PRs",
     },
-    empty: {
-      rules: "Checks the rules and the template",
-      sources: "Cites a source for each suggestion",
-      choice: "You choose what to apply",
-      demo: "Try the whole flow with sample documents; nothing is read from or changed in a remote project.",
-      real: "For runs whose changes are done; older runs can add a draft suggestion here too.",
-    },
     warnings: "What was read and what to confirm",
     rules: {
       title: "What this draft is based on",
@@ -258,15 +251,8 @@ const draft = {
     },
     /** The publish preflight for the saved draft. */
     preflight: {
-      title: "Checks before publishing",
-      intro:
-        "Publishing runs the same checks on the saved draft. A blocking check stops publishing until you fix it; the others ask you to confirm.",
       block: "Blocks publishing",
       confirm: "Needs your confirmation",
-      clear: "No check needs your attention in the saved draft.",
-      /** The text checks are clear, and the maintainer checklist holds the rest. */
-      textClear:
-        "The checks on the text are clear. The maintainer checklist below shows the rest.",
     },
   },
   /**

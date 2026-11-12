@@ -10,7 +10,6 @@ export default {
   fullCancel: "Keep working directory only",
   summary: "Full access (sandbox and command deny rules lifted)",
   workspaceHelp: "Codex uses its working-directory sandbox. Claude Code and Antigravity keep their OS sandbox and command deny rules unless you separately allowed them without a sandbox. Read-only roles remain restricted.",
-  fullHelp: "Writable agents run as your account without a sandbox or command deny rules. They may install packages, change system settings and use passwordless sudo. Untrusted project text could influence them and affect this computer. Use this only for projects you trust. Read-only roles keep their restrictions.",
   sudoTitle: "Passwordless sudo",
   sudoDisclosure,
   loadFailed: ({ message }: { message: string }) => `Could not read sudo status: ${message}`,

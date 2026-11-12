@@ -96,9 +96,6 @@ const m: Translation<typeof en> = {
     taskPlaceholder: "例如：為 API client 加入智慧重試",
     goal: "這次想完成什麼？",
     goalPlaceholder: "描述需求、相關檔案、預期行為與驗收方式…",
-    lead: "Team lead",
-    teammates: ({ count }) => `${count} 位隊友`,
-    reviewers: "Reviewer + Test analyst",
     usage: ({ provider }) =>
       `任務會使用本機已登入的 ${provider} CLI 執行，消耗該帳號的用量。完成後等待你審閱。`,
     saveDemo: "播放示範團隊",

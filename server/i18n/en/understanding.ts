@@ -64,8 +64,6 @@ const understanding = {
     "Your answer is already saved, and it stays as you answered it before the reference showed. Reload to see it.",
   attemptSkipped: "A skipped attempt has no answer.",
   attemptEmpty: "Send a quiz answer or a road choice.",
-  /** A learning-loop feature this build does not have yet. */
-  notImplemented: "This part of BELL PR is not available in this build yet.",
   feedbackTagUnpublished:
     "Maintainer feedback can be tagged once the pull request is published and its feedback is read.",
   feedbackTagEmpty:

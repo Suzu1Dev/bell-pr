@@ -10,8 +10,6 @@ const fmt = formatters("en");
 
 export default {
   checklist: {
-    title: "Environment",
-    intro: `What ${product.name} needs on this computer, and how to fix what is missing.`,
     recheck: "Check again",
     rechecking: "Checking…",
     checking: "Checking your environment…",

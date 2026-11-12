@@ -72,7 +72,6 @@ const common = {
     close: "Close",
     copy: "Copy",
     retry: "Retry",
-    learnMore: "Learn more",
   },
   /** Marks an optional form field, next to its label. */
   optional: "Optional",

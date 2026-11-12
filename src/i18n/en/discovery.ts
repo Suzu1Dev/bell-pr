@@ -12,7 +12,6 @@ import type { AgentTeam } from "../../../shared/team";
 const fmt = formatters("en");
 
 const discovery = {
-  eyebrow: "FIND YOUR NEXT CONTRIBUTION",
   /** The page heading in two lines; the second line is emphasized. */
   title: {
     lead: "Find a project",
@@ -26,7 +25,6 @@ const discovery = {
     lead: "Search GitHub for projects that match your interests. ",
     rest: "AI checks contribution rules and suggests a starting task.",
   },
-  heroCaption: "GitHub → your next step",
   form: {
     heading: "What are you interested in?",
     hint: "Interests and language can be left blank.",
@@ -125,24 +123,6 @@ const discovery = {
     retryTitle: "Change the criteria and look for the next opportunity.",
     retryBody:
       "There isn't enough evidence for a suitable item yet. Try fewer keywords, a wider difficulty or a lower minimum star count.",
-    angles: {
-      rules: {
-        title: "Project rules",
-        detail: "Learn how to take part first",
-      },
-      activity: {
-        title: "Popularity and activity",
-        detail: "See signs of active maintenance",
-      },
-      needs: {
-        title: "User needs",
-        detail: "Check who the change helps",
-      },
-      barrier: {
-        title: "Barrier to entry",
-        detail: "Find a first step you can manage",
-      },
-    },
   },
   results: {
     label: "Recommended contributions",

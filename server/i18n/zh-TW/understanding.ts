@@ -41,7 +41,6 @@ const understanding: Translation<typeof en> = {
   attemptAnswered: "你的答案已經儲存，會維持你在看到參考答案前的回答。請重新載入查看。",
   attemptSkipped: "略過的作答沒有答案。",
   attemptEmpty: "請送出測驗答案或做法選擇。",
-  notImplemented: "這個版本的 BELL PR 還沒有這項功能。",
   feedbackTagUnpublished: "發布 PR 並讀取維護者回饋後，才能標記回饋。",
   feedbackTagEmpty: "請送出一個品味面向、「有預料到」或「出乎意料」，或一句教訓。",
   feedbackTagUnknown: "這則留言不在最近一次讀取的回饋裡。請重新讀取回饋後再標記。",

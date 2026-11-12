@@ -30,7 +30,6 @@ const m: Translation<typeof en> = {
     newTask: "新增貢獻",
     sampleHeading: "示範",
     demoRunTitle: "SDK 智慧重試機制",
-    demoBadge: "範例",
     allRuns: "查看全部貢獻",
     practiceReady: ({ count }) => `${count} 則可練習`,
     practiceReadyLabel: ({ count }) => `有 ${count} 則練習可以做了`,

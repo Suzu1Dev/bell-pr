@@ -9,9 +9,7 @@ const m: Translation<typeof en> = {
     body: "新建立的任務會使用共享任務板、相依排程與每位隊友的獨立工作目錄。以下保留原本的執行紀錄。",
   },
   boardLabel: "共享任務與團隊訊息",
-  eyebrow: "SHARED TASKS · INDEPENDENT CONTEXTS",
   title: "AI 團隊分工",
-  intro: "Lead 拆解與整合，每位 teammate 有自己的工作目錄與上下文。",
   runtime: {
     demo: "團隊協作示範",
     engine: ({ provider }) => provider,

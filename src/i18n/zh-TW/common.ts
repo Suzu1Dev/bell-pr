@@ -59,7 +59,6 @@ const m: Translation<typeof en> = {
     close: "關閉",
     copy: "複製",
     retry: "重試",
-    learnMore: "了解更多",
   },
   optional: "選填",
   language: { label: "語言" },

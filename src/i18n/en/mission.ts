@@ -33,9 +33,7 @@ type DroppedPathField = NonNullable<
 const mission = {
   overview: {
     background: "Project background and other contribution ideas",
-    kicker: "PROJECT CONTEXT",
     title: "Project background",
-    lead: "See the reason behind every contribution from the user's side.",
     update: "Update to the latest version",
     updating: "Updating…",
     /** `updatedAt` arrives formatted for the locale. */
@@ -181,7 +179,6 @@ const mission = {
     evidence: "Analysis evidence",
   } satisfies Record<DroppedPathField, string>,
   brief: {
-    kicker: "THIS CONTRIBUTION",
     title: "What difference will this change make?",
     problem: "The problem to solve",
     motivation: "Why it is worth improving now",

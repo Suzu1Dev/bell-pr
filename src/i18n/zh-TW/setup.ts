@@ -4,8 +4,6 @@ import type en from "../en/setup";
 
 const m: Translation<typeof en> = {
   checklist: {
-    title: "工作環境",
-    intro: `${product.name} 在這台電腦上需要的工具，以及缺少時的修正方式。`,
     recheck: "重新檢查",
     rechecking: "檢查中…",
     checking: "正在檢查你的工作環境…",

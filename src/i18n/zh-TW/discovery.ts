@@ -5,7 +5,6 @@ import type en from "../en/discovery";
 const fmt = formatters("zh-TW");
 
 const m: Translation<typeof en> = {
-  eyebrow: "FIND YOUR NEXT CONTRIBUTION",
   title: {
     lead: "尋找可貢獻的",
     emphasis: "專案",
@@ -14,7 +13,6 @@ const m: Translation<typeof en> = {
     lead: "依興趣搜尋 GitHub 專案，",
     rest: "由 AI 核對貢獻規範並建議起步任務。",
   },
-  heroCaption: "GitHub → 你的下一步",
   form: {
     heading: "你對什麼有興趣？",
     hint: "興趣與程式語言可以留白。",
@@ -99,12 +97,6 @@ const m: Translation<typeof en> = {
     retryTitle: "換個條件，找找下一個機會。",
     retryBody:
       "目前沒有足夠證據支持適合的項目。試著減少關鍵字、放寬難度，或降低最低星數。",
-    angles: {
-      rules: { title: "專案規範", detail: "先理解怎麼參與" },
-      activity: { title: "熱度與活動", detail: "看見持續維護的訊號" },
-      needs: { title: "使用者需求", detail: "確認改動能幫助誰" },
-      barrier: { title: "投入門檻", detail: "找到做得到的第一步" },
-    },
   },
   results: {
     label: "推薦貢獻清單",

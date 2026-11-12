@@ -113,7 +113,6 @@ const settings = {
     intro:
       "Agents run the project's code on this computer. These settings decide what they may reach.",
     sandbox: {
-      title: "Claude Code sandbox",
       text: "Claude Code agents that edit files run every command in the operating-system sandbox. Writes stay in the run's working directory and Claude Code's temporary folders. The network is closed. Your own Claude Code user settings can widen the sandbox (proxy ports, allowed domains or paths, excluded commands, plugin language servers). The Codex CLI uses its own sandbox. Antigravity agents that edit files run their commands in the Antigravity CLI's terminal sandbox. Writes stay in the working directory. The network is closed.",
     },
     unsandboxed: {

@@ -79,19 +79,6 @@ const workspace = {
       "The edits are still in the working directory. Put the files back, or check again after the holder releases the hold or a group admin revokes it.",
     legacyBody:
       "Put these files back, or check current holds again.",
-    legacyTaskStopped:
-      "This subtask touched files someone else held, so its edits weren't added. Retry once the hold is released or revoked.",
-    item: ({
-      path,
-      holder,
-      title,
-      since,
-    }: {
-      path: string;
-      holder: string;
-      title: string;
-      since: string;
-    }) => `${path}: held by ${holder} for “${title}” (since ${since})`,
     itemMeta: ({
       holder,
       title,
@@ -119,8 +106,6 @@ const workspace = {
     restoreCancelAction: "Cancel",
     restoreFailed:
       "Couldn't finish putting these files back; some may already be back. Reload to check, then try again or put them back by hand in the working directory.",
-    restoreStale:
-      "The working directory changed, so nothing was restored. Refresh the file list and try again.",
     recheckFailed: ({ name }: { name: string }) =>
       `Couldn't check file holds right now. Try again in a moment, or fix group work on the host and restart ${name} if it has stopped.`,
   },
@@ -176,7 +161,6 @@ const workspace = {
     passed: "You explained it back. Ready to approve.",
     checkOff:
       "Understanding check off: approval needs only your reviewed ticks.",
-    learning: "Not just a review: a lesson in code, too.",
     hint: "Select code to ask the Agent about it.",
     hintByHand: "Select code to ask the guide about it.",
     reviewed: ({ reviewed, total }: { reviewed: number; total: number }) =>
@@ -295,7 +279,6 @@ const workspace = {
       "In 2 to 4 sentences: what problem does this solve, what does the change do, and what could break?",
     roundPrompt:
       "What does this round change, and which review comment does it answer?",
-    summaryLabel: "Your explanation",
     words: ({ count, min }: { count: number; min: number }) =>
       `${count} of at least ${min} words`,
     moved:
@@ -378,11 +361,7 @@ const workspace = {
   },
   activity: {
     runTitle: "How it ran",
-    runText:
-      "The task board is above; the full log, error messages and the stop button stay here. Development runs in a separate Git worktree, and after the review you decide when to submit.",
     teamTitle: "Your Agent team",
-    teamText:
-      "Each role has its own job, and everything happens here. Development runs in a separate Git worktree, and after the review you decide when to submit.",
     stopReview: "Stop the re-review",
     stopTask: "Stop the task",
     log: "Run log",
@@ -395,11 +374,7 @@ const workspace = {
   },
   draft: {
     publishOptions: "Commit message and branch",
-    loadingGuide: "Loading the draft guidelines…",
     heading: "PR title and description",
-    subheading:
-      "Polish the draft so maintainers can understand your contribution easily.",
-    label: "DRAFT PR",
     recoverPublish: "Recover unfinished publish",
     recoveryHelp: "The last publish attempt left a local commit. Recovery checks the remote, keeps your code and draft, and returns this contribution to review.",
     recoveryNeedsSave: "Save your draft edits before recovering the publish attempt.",
@@ -442,7 +417,6 @@ const workspace = {
     reviewAction: "Review changes",
     editAction: "Edit draft",
     title: "Before you publish",
-    text: "A clear PR is the start of a good collaboration.",
     allReviewed: "All files reviewed",
     files: ({ reviewed, total }: { reviewed: number; total: number }) =>
       plural(total) === "one"
@@ -450,13 +424,10 @@ const workspace = {
         : `${reviewed} / ${total} files`,
     saved: "PR draft saved",
     unsaved: "There are unsaved edits",
-    canAdjust: "You can come back and adjust it any time",
     commitReady: "This round's commit message is written",
     commitMissing: "Write which review comments this round addresses",
-    commitBecomes: "Pushing makes it a new commit on the PR branch",
     noPlaceholders: "Nothing left to fill in in the description",
     noDescription: "No description yet",
-    placeholdersStay: "TODOs and blanks to fill in never reach GitHub",
     taskItems: "Checkboxes in the description",
     taskItemsHelp: `Only tick what you really finished or checked. ${product.name} and the model never tick them for you. Ticking rewrites the description above, so remember to save.`,
     noSection: "No section",
@@ -584,16 +555,8 @@ const workspace = {
     commitPreview: "Commit message",
     commitPreviewDemo: "Commit message",
     bodyPreview: "PR description",
-    bodyPreviewWords: ({ count }: { count: number }) =>
-      plural(count) === "one"
-        ? `PR description sent to GitHub (about ${count} word)`
-        : `PR description sent to GitHub (about ${count} words)`,
     /** The demo sends nothing to GitHub. */
     bodyPreviewDemo: "PR description preview",
-    bodyPreviewDemoWords: ({ count }: { count: number }) =>
-      plural(count) === "one"
-        ? `PR description preview (about ${count} word)`
-        : `PR description preview (about ${count} words)`,
     confirmLegend: "Confirm each item before publishing",
     checksTitle: "Before it reaches the maintainers",
     allClear: "Every check passes.",

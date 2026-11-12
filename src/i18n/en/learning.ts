@@ -35,7 +35,6 @@ const learning = {
   loadingMore: "Loading…",
   loadMoreFailed: ({ error }: { error: string }) =>
     `More notes could not be loaded: ${error}`,
-  noRealNotes: "No notes from your own contributions yet",
   emptyTitle: "You have no learning notes yet",
   emptyBody:
     "Import a repository on the Repositories page and start a contribution. Once it reaches review, the explanation of each file is collected here automatically.",
@@ -50,7 +49,6 @@ const learning = {
   aiGenerated: "AI-generated",
   /** Heading of what the person wrote about the file themselves. */
   yourNote: "Your note",
-  noteRun: "Contribution",
   generatedAt: "Generated",
   /** For a file with only the person's note: when it was last saved. */
   noteSaved: "Note saved",

@@ -1,4 +1,4 @@
-/** The discovery, learning and agent team pages (Traditional Chinese, Taiwan). */
+/** The discovery and agent team pages (Traditional Chinese, Taiwan). */
 import type { Translation } from "../../../shared/i18n/locale";
 import { providerLabels } from "../../../shared/models";
 import type en from "../en/pages";
@@ -7,13 +7,7 @@ const m: Translation<typeof en> = {
   discovery: {
     loading: "正在載入貢獻探索…",
   },
-  learning: {
-    noteTitle: "你的下一個問題，就是下一個進步。",
-    noteText:
-      "在工作台選取程式碼並提問。對話依檔案保留於目前工作階段，讓每個問題都有上下文。",
-  },
   team: {
-    eyebrow: "為協作而生",
     title: "AI 團隊如何分工",
     intro: "從拆解問題到交叉審查，讓專業分工融入你的開發流程。",
     assign: "指派新任務",

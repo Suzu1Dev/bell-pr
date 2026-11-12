@@ -29,13 +29,6 @@ const m: Translation<typeof en> = {
       repository: "依專案規範",
       linux: "Linux 原則 · PR 調整版",
     },
-    empty: {
-      rules: "核對規範與範本",
-      sources: "每個建議附上依據",
-      choice: "由你選擇套用",
-      demo: "使用示範文件體驗完整流程，不會讀取或修改遠端專案。",
-      real: "適用於已完成變更的任務；舊任務也可以在這裡補上草稿建議。",
-    },
     warnings: "閱讀範圍與待確認事項",
     rules: {
       title: "這份草稿的撰寫依據",
@@ -196,12 +189,8 @@ const m: Translation<typeof en> = {
       applyHint: "下方預覽會依這個選擇顯示，套用建議時也會一併放入編輯器；記得儲存草稿。",
     },
     preflight: {
-      title: "發布前檢查",
-      intro: "發布時會對已儲存的草稿執行相同檢查。阻擋項目修正前無法發布；其他項目需要你確認。",
       block: "阻擋發布",
       confirm: "需要你確認",
-      clear: "已儲存的草稿沒有需要處理的檢查項目。",
-      textClear: "文字的檢查都沒問題，其餘項目請看下方的維護者檢查清單。",
     },
   },
   yourWords: {

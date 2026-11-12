@@ -13,9 +13,7 @@ const version = (sha?: string) => (sha ? `分析版本 ${sha}` : "分析版本")
 const m: Translation<typeof en> = {
   overview: {
     background: "專案背景與其他貢獻方向",
-    kicker: "PROJECT CONTEXT",
     title: "專案背景",
-    lead: "從使用者的角度，理解每一次貢獻的理由。",
     update: "更新到最新版本",
     updating: "正在更新…",
     updateHelp: ({ branch, updatedAt }) =>
@@ -114,7 +112,6 @@ const m: Translation<typeof en> = {
     evidence: "分析依據",
   },
   brief: {
-    kicker: "THIS CONTRIBUTION",
     title: "這次變更，會帶來什麼不同？",
     problem: "這次想解決的問題",
     motivation: "為什麼值得現在改善",

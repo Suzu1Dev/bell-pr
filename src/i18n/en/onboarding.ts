@@ -5,8 +5,6 @@ export default {
   title: `Welcome to ${product.name}`,
   intro: "A few steps get you ready.",
   progress: "Setup steps",
-  stepOf: ({ step, total }: { step: number; total: number }) =>
-    `Step ${step} of ${total}`,
   steps: {
     language: "Language",
     environment: "Environment",
@@ -28,8 +26,6 @@ export default {
   provider: {
     title: "Your AI provider",
     text: "Agents use the AI provider you choose here for runs and project analysis. You can change it later in the model settings.",
-    auto: ({ provider }: { provider: string }) =>
-      `${provider} is installed and signed in, so your agents use it.`,
     choose: "More than one AI provider is ready. Which one should your agents use?",
     none: "No AI provider is ready yet. Install and sign in to the Codex CLI, Claude Code or the Antigravity CLI (see the previous step), then check again. You can still take the sample tour.",
     checking: "Checking which AI providers are ready…",

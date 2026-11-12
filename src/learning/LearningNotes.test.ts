@@ -376,7 +376,6 @@ test("the English empty and loading pages point to the Repositories page", () =>
   const html = renderEnglish({ initial: { runs: [] } });
   assert.match(html, /You have no learning notes yet/);
   assert.match(html, /Import a repository on the Repositories page/);
-  assert.doesNotMatch(html, /No notes from your own contributions yet/);
   const loading = renderEnglish({ initial: undefined, loadPage: () => new Promise(() => {}) });
   assert.match(loading, /Loading your notes…/);
   assert.doesNotMatch(loading, /You have no learning notes yet/);

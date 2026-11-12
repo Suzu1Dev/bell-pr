@@ -39,7 +39,6 @@ const app = {
     sampleHeading: "Sample",
     /** The demo run's short name in the recent list. */
     demoRunTitle: "SDK smart retries",
-    demoBadge: "Sample",
     allRuns: "View all contributions",
     /** On the Learning item while practice items are due; hidden at 0. */
     practiceReady: ({ count }: { count: number }) => `${count} ready`,

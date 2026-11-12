@@ -192,7 +192,7 @@ test("a published sample keeps its approve button off and links to no PR", () =>
   assert.match(real, /href="https:\/\/github\.com\/acme\/widgets\/pull\/3"/);
   assert.match(real, /View pull request/);
   assert.match(real, /Published PR changes/);
-  assert.doesNotMatch(real, /footer-reviewed|Not just a review: a lesson in code, too\./);
+  assert.doesNotMatch(real, /footer-reviewed/);
   assert.match(renderZh(element({ run: { ...realRun, status: "published" } })), /已發布的 PR 變更/);
   assert.match(html, /footer-reviewed/);
 });

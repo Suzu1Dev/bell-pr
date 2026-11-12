@@ -1,17 +1,11 @@
-/** The discovery, learning and agent team pages (English). */
+/** The discovery and agent team pages (English). */
 import { providerLabels } from "../../../shared/models";
 
 const pages = {
   discovery: {
     loading: "Loading contribution discovery…",
   },
-  learning: {
-    noteTitle: "Your next question is your next step forward.",
-    noteText:
-      "Select code in the workbench and ask about it. Conversations are kept per file for this session, so every question has its context.",
-  },
   team: {
-    eyebrow: "BUILT TO COLLABORATE",
     title: "How the AI team works",
     intro:
       "From breaking down the problem to cross-review, specialized roles fit into how you already work.",

@@ -23,7 +23,6 @@ const m: Translation<typeof en> = {
   loadMore: "載入更多",
   loadingMore: "載入中…",
   loadMoreFailed: ({ error }) => `無法載入更多筆記：${error}`,
-  noRealNotes: "尚無真實任務的筆記",
   emptyTitle: "還沒有屬於你的學習筆記",
   emptyBody:
     "先在「專案」頁匯入專案並新增貢獻；進入審閱後，每個檔案的解說會自動彙整到這裡。",
@@ -34,7 +33,6 @@ const m: Translation<typeof en> = {
   tip: "提示",
   aiGenerated: "AI 生成",
   yourNote: "你的筆記",
-  noteRun: "任務",
   generatedAt: "產生時間",
   noteSaved: "筆記儲存時間",
   sampleContent: "示範內容",

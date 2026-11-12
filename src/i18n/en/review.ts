@@ -163,7 +163,6 @@ const review = {
   panel: {
     label: "Code learning assistant",
     title: "Understand every change",
-    subtitle: "What changed, and why",
     /** The mode badge and the badge on demo answers. */
     demoBadge: "Demo",
     liveBadge: "AI",
@@ -195,8 +194,6 @@ const review = {
       alternatives: "What if it were done differently?",
       selfCheck: "Quiz yourself",
     },
-    exampleIntro:
-      "Start with a scenario to see how things differ before and after the change.",
     exampleScenario: "Picture this",
     exampleBefore: "Before the change",
     exampleAfter: "After the change",

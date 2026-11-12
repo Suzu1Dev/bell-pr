@@ -19,10 +19,7 @@ const team = {
     body: "New runs use the shared task board, dependency scheduling and a separate working directory for each teammate. The original run log is kept below.",
   },
   boardLabel: "Shared tasks and team messages",
-  eyebrow: "SHARED TASKS · INDEPENDENT CONTEXTS",
   title: "Agent team",
-  intro:
-    "The lead splits up and integrates the work; each teammate has its own working directory and context.",
   runtime: {
     demo: "Sample team collaboration",
     engine: ({ provider }: { provider: string }) => provider,

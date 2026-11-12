@@ -105,10 +105,6 @@ const modals = {
     goal: "What do you want to get done?",
     goalPlaceholder:
       "Describe the need, related files, expected behavior and how to verify it…",
-    lead: "Team lead",
-    teammates: ({ count }: { count: number }) =>
-      plural(count) === "one" ? `${count} teammate` : `${count} teammates`,
-    reviewers: "Reviewer + Test analyst",
     usage: ({ provider }: { provider: string }) =>
       `The task runs with the ${provider} CLI signed in on this computer and counts against that account's usage. When it finishes, it waits for your review.`,
     saveDemo: "Play the sample team",

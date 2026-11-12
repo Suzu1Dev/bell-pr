@@ -6,7 +6,6 @@ const m: Translation<typeof en> = {
   title: `歡迎使用 ${product.name}`,
   intro: "幾個步驟就能準備就緒。",
   progress: "設定步驟",
-  stepOf: ({ step, total }) => `第 ${step} 步，共 ${total} 步`,
   steps: {
     language: "語言",
     environment: "工作環境",
@@ -28,7 +27,6 @@ const m: Translation<typeof en> = {
   provider: {
     title: "你的 AI 服務",
     text: "Agent 執行任務與分析專案時會使用你在這裡選擇的 AI 服務。之後可以在模型設定中變更。",
-    auto: ({ provider }) => `${provider} 已安裝並登入，你的 Agent 會使用它。`,
     choose: "有不只一個 AI 服務已就緒。你的 Agent 要使用哪一個？",
     none: "目前還沒有就緒的 AI 服務。請安裝並登入 Codex CLI、Claude Code 或 Antigravity CLI（見上一步），再重新檢查。你仍可以先看示範導覽。",
     checking: "正在檢查哪些 AI 服務已就緒…",

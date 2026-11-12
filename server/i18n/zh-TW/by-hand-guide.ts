@@ -5,7 +5,6 @@ import type en from "../en/by-hand-guide.js";
 const guide: Translation<typeof en> = {
   aboutYourChange: "這是關於你的變更；下一步請用「提示」。",
   rungTooHigh: "請依序要這一步的提示，一次一個。",
-  canBeWrong: "嚮導也可能出錯。請拿程式碼與你的測試核對它指出的地方。",
   notNow: "嚮導會在你寫變更的期間給提示、回答問題；任務在規劃或發布時不會。",
   planOnly: "嚮導會在你確認計畫之前問你計畫的事。",
   planFirst: "請先儲存至少一個你自己計畫裡的步驟；嚮導問的是你的計畫，不是它自己的。",

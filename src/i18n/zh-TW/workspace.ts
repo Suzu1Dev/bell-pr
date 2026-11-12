@@ -57,10 +57,6 @@ const m: Translation<typeof en> = {
       "變更仍留在工作目錄。你可以還原這些檔案，或等對方釋出、小組管理員撤銷佔用後重新檢查。",
     legacyBody:
       "你可以還原這些檔案，或重新檢查目前的佔用狀態。",
-    legacyTaskStopped:
-      "這個子任務改到別人佔用的檔案，改動未加入這份貢獻。等佔用釋出或收回後即可重試。",
-    item: ({ path, holder, title, since }) =>
-      `${path}：由 ${holder} 為「${title}」佔用（${since} 起）`,
     itemMeta: ({ holder, title, since }) =>
       `由 ${holder} 為「${title}」佔用 · ${since} 起`,
     itemPathOnly: ({ path }) => `${path}（被他人佔用）`,
@@ -78,8 +74,6 @@ const m: Translation<typeof en> = {
     restoreCancelAction: "取消",
     restoreFailed:
       "無法完成還原，部分檔案可能已還原。請重新整理確認後再試，或在工作目錄手動還原。",
-    restoreStale:
-      "工作目錄已有新的變更，未執行還原。請重新整理檔案清單後再試。",
     recheckFailed: ({ name }) =>
       `目前無法確認檔案佔用狀態。請稍後再試；若小組協作已停止，請先在主機修復並重新啟動 ${name}。`,
   },
@@ -125,7 +119,6 @@ const m: Translation<typeof en> = {
   footer: {
     passed: "你已用自己的話講過一遍，可以核准了。",
     checkOff: "理解檢查已關閉：核准只需要你的審閱勾選。",
-    learning: "不只是 review，也是一次 code learning。",
     hint: "選取程式碼，就能向 Agent 追問。",
     hintByHand: "選取程式碼，就能向嚮導提問。",
     reviewed: ({ reviewed, total }) => `${reviewed} / ${total} 已審閱`,
@@ -223,7 +216,6 @@ const m: Translation<typeof en> = {
     explainTitle: "1. 講一遍",
     explainPrompt: "用 2 到 4 句話說明：這解決什麼問題、改了什麼、可能弄壞什麼？",
     roundPrompt: "這一輪改了什麼？回應的是哪一則 review 意見？",
-    summaryLabel: "你的說明",
     words: ({ count, min }) => `${count} 字，至少 ${min} 字`,
     moved: "你講完之後，變更的內容又不同了。你的說明還正確嗎？",
     stillAccurate: "仍然正確",
@@ -295,11 +287,7 @@ const m: Translation<typeof en> = {
   },
   activity: {
     runTitle: "執行過程",
-    runText:
-      "任務板在上方；完整紀錄、錯誤訊息與停止操作保留在這裡。開發在獨立的 Git worktree 中執行，審查完成後由你決定何時送出。",
     teamTitle: "你的 Agent team",
-    teamText:
-      "每個角色各司其職，所有過程都在這裡。開發在獨立的 Git worktree 中執行，審查完成後由你決定何時送出。",
     stopReview: "停止重新審查",
     stopTask: "停止任務",
     log: "執行紀錄",
@@ -312,10 +300,7 @@ const m: Translation<typeof en> = {
   },
   draft: {
     publishOptions: "提交訊息與分支",
-    loadingGuide: "正在載入草稿規範…",
     heading: "PR 標題與說明",
-    subheading: "調整草稿，讓維護者輕鬆理解你的貢獻。",
-    label: "DRAFT PR",
     recoverPublish: "恢復未完成的發佈",
     recoveryHelp: "上次發佈留下了本機 commit。恢復時會檢查遠端，保留程式碼與草稿，並讓這份貢獻回到審閱。",
     recoveryNeedsSave: "請先儲存草稿的修改，再恢復未完成的發佈。",
@@ -354,18 +339,14 @@ const m: Translation<typeof en> = {
     reviewAction: "審閱修改",
     editAction: "編輯草稿",
     title: "發布前待完成",
-    text: "一份清楚的 PR，是一次好合作的開始。",
     allReviewed: "已審閱所有檔案",
     files: ({ reviewed, total }) => `${reviewed} / ${total} 個檔案`,
     saved: "PR 草稿已儲存",
     unsaved: "有尚未儲存的編輯",
-    canAdjust: "可隨時返回調整內容",
     commitReady: "這一輪的提交訊息已填好",
     commitMissing: "請寫下這一輪處理了哪些 review 意見",
-    commitBecomes: "推送時會成為 PR 分支上的新 commit",
     noPlaceholders: "說明沒有待填寫的內容",
     noDescription: "還沒有說明",
-    placeholdersStay: "TODO 與待填空格不會送到 GitHub",
     taskItems: "說明中的勾選項目",
     taskItemsHelp: `只勾你真正完成或確認的項目。${product.name} 和模型不會替你勾。勾選會直接改寫上方說明，記得儲存。`,
     noSection: "未分段",
@@ -450,9 +431,7 @@ const m: Translation<typeof en> = {
     commitPreview: "提交訊息",
     commitPreviewDemo: "提交訊息",
     bodyPreview: "PR 說明",
-    bodyPreviewWords: ({ count }) => `會送到 GitHub 的 PR 說明（約 ${count} 字）`,
     bodyPreviewDemo: "PR 說明預覽",
-    bodyPreviewDemoWords: ({ count }) => `PR 說明預覽（約 ${count} 字）`,
     confirmLegend: "發布前請逐項確認",
     checksTitle: "送到維護者面前之前",
     allClear: "所有檢查都通過。",
