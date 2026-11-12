@@ -412,7 +412,7 @@ test("409 heldByOther on restore updates conflicts and closes the modal, 409 bus
     );
     assert.equal(notes[3]?.message, "Join the group on the Group page first.");
     assert.equal(notes[4]?.message, "Join the group on the Group page first.");
-    assert.match(notes[5]?.message ?? "", /Couldn't put these files back/);
+    assert.match(notes[5]?.message ?? "", /Couldn't finish putting these files back/);
     assert.match(notes[6]?.message ?? "", /Couldn't check file holds right now/);
   } finally {
     await view.unmount();

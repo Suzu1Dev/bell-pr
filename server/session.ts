@@ -194,7 +194,7 @@ export function sessionPrompt(input: {
       from: entry.role === "user" ? "person" : entry.role,
       text: entry.heldPaths?.length
         ? heldStop(entry.heldPaths)
-        : isTurnHeldByOtherMessage(entry.content)
+        : entry.role === "agent" && isTurnHeldByOtherMessage(entry.content)
           ? legacyHeldStop
           : entry.content.slice(0, historyContentLimit),
       ...(entry.questions?.length ? { questionsAsked: entry.questions } : {}),

@@ -4,7 +4,7 @@
  * syncs, file explanations, function walkthroughs, the person's notes, the understanding check,
  * try-first attempts, feedback tags, practice schedules, GitHub facts,
  * overrides, test reasons and the Learn-by-hand record) and only the open
- * run reads them; the lists
+ * run reads them (`owners` is small, but no list shows who started a run); the lists
  * only need id, title, repo, branch and status (and the "Check off" mark,
  * `understandingCheckOff`). The learning page reads explanations and notes
  * from GET /api/learning.
@@ -20,6 +20,7 @@ export const runDetailFields = [
   "sync",
   "heldChanges",
   "heldPaths",
+  "owners",
   "explanations",
   "walkthroughs",
   "notes",

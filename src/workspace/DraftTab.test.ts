@@ -631,7 +631,7 @@ test("SyncPanel lists upstream changes under your hold for unpublished runs, no-
 
   const zhSynced = renderZh(element({ run: unpublishedSynced }));
   assert.match(zhSynced, /你佔用範圍內的變更/);
-  assert.match(zhSynced, /在你佔用期間，<code>main<\/code> 上有提交改到這些檔案；發佈前請先確認。/);
+  assert.match(zhSynced, /在你佔用期間，<code>main<\/code> 上有提交改到這些檔案；發布前請先確認。/);
   assert.match(zhSynced, /<code>src\/api\/users\.ts<\/code>\s*<span>（abc1234、def5678）<\/span>/);
 
   const noOpRun: Run = {

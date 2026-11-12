@@ -737,7 +737,8 @@ test("a new run starts at once when the last one shows its result and the run is
   };
   for (let index = 1; index <= 3; index++) {
     // As the Tests card does: Run again as soon as the result shows and busy is gone.
-    await en(() => f.byHand.runTests(f.run.id, {}));
+    const started = await en(() => f.byHand.runTests(f.run.id, {}));
+    assert.equal(started.run.byHand?.busy?.kind, "tests");
     while ((f.run.byHand?.tests?.length ?? 0) < index || f.run.byHand?.busy) await sleep(5);
   }
   assert.deepEqual(

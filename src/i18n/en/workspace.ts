@@ -115,7 +115,7 @@ const workspace = {
     restoreConfirmAction: "Put these files back",
     restoreCancelAction: "Cancel",
     restoreFailed:
-      "Couldn't put these files back. Nothing in the working directory was changed; reload and try again, or restore them by hand.",
+      "Couldn't finish putting these files back. Reload to see what changed, then try again or restore them by hand.",
     restoreStale:
       "The working directory changed, so nothing was restored. Refresh the file list and try again.",
     recheckFailed: ({ name }: { name: string }) =>

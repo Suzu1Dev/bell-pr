@@ -121,6 +121,7 @@ test("every detail field is left out", () => {
       "heldPaths",
       "logs",
       "notes",
+      "owners",
       "prFeedback",
       "practice",
       "reports",

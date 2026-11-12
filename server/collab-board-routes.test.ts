@@ -139,8 +139,8 @@ async function group(t: TestContext, options?: Parameters<typeof collabFixture>[
   };
 }
 
-/** The fields a refusal of group work may have. */
-const refusalFields = ["reason", "error", "conflicts", "retryAfter", "invalid", "unknown", "pending"];
+/** The fields a refusal in the access table may have: no row there names a dependency. */
+const refusalFields = ["reason", "error", "conflicts", "retryAfter", "invalid"];
 const fieldsOf = (reply: Reply) => Object.keys(reply.json).sort();
 
 /**

@@ -80,13 +80,6 @@ export function runBusy(
   );
 }
 
-/**
- * Moves an unpublished run onto the latest commit of its target branch.
- * The checkout is saved as a local snapshot commit first, then three-way
- * merged with the new base; the result stays uncommitted on top of it, so
- * the person reviews it like any change. Conflicts are left as markers that
- * block approval until resolved, and the sync can be undone.
- */
 function heldUpstreamLog(branch: string, heldChanges: readonly HeldUpstreamChange[]) {
   const m = sm().run.sync;
   return m.heldChangedUpstream({
@@ -95,6 +88,13 @@ function heldUpstreamLog(branch: string, heldChanges: readonly HeldUpstreamChang
   });
 }
 
+/**
+ * Moves an unpublished run onto the latest commit of its target branch.
+ * The checkout is saved as a local snapshot commit first, then three-way
+ * merged with the new base; the result stays uncommitted on top of it, so
+ * the person reviews it like any change. Conflicts are left as markers that
+ * block approval until resolved, and the sync can be undone.
+ */
 export async function syncRun(ctx: WorkbenchContext, id: string, asker?: HoldsAsker) {
   if (ctx.stopping()) throw new AppError(shuttingDown(), 503);
   return logged("sync", { runId: id }, () => syncRunLocked(ctx, id, asker));
@@ -426,8 +426,8 @@ async function undoSyncLocked(ctx: WorkbenchContext, id: string) {
     delete run.sync;
     delete run.heldChanges;
     if (run.heldPaths) {
-      const remaining = await changedPaths(run);
       try {
+        const remaining = await changedPaths(run);
         const stillHeld = ctx.holds
           ? ctx.holds.conflicts(run, remaining).map(({ path: heldPath }) => heldPath)
           : remaining.filter((candidate) =>
@@ -439,7 +439,7 @@ async function undoSyncLocked(ctx: WorkbenchContext, id: string) {
         if (stillHeld.length) run.heldPaths = [...new Set(stillHeld)];
         else delete run.heldPaths;
       } catch {
-        /* Group work stopped (holdsUnknown): keep run.heldPaths intact without aborting local undo. */
+        /* Group work stopped (holdsUnknown), or the checkout could not be compared: keep run.heldPaths intact without aborting local undo. */
       }
     }
     if (run.status === "approved") run.status = "review";

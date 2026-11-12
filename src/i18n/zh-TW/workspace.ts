@@ -75,7 +75,7 @@ const m: Translation<typeof en> = {
     restoreConfirmAction: "還原這些檔案",
     restoreCancelAction: "取消",
     restoreFailed:
-      "無法還原這些檔案。工作目錄未變動，請重新整理後再試，或在工作目錄手動還原。",
+      "無法完成還原，部分檔案可能已還原。請重新整理確認後再試，或在工作目錄手動還原。",
     restoreStale:
       "工作目錄已有新的變更，未執行還原。請重新整理檔案清單後再試。",
     recheckFailed: ({ name }) =>

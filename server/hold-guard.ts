@@ -24,6 +24,7 @@ import { nameOf, taskKey, taskOf } from "./collab-board.js";
 import { sideEntry, type CollabHost } from "./collab-host.js";
 import { notJoined } from "./collab-refusal.js";
 import { currentLocale, sm, withLocale } from "./i18n/index.js";
+import { log } from "./log.js";
 import type { HoldCheck } from "./publish.js";
 import { assertGitConfigSafe, git } from "./process.js";
 import { participantOf } from "./routes/collab.js";
@@ -209,7 +210,10 @@ export async function knownBranchTip(
  * Files under the caller's own holds on `run.repoId` that first-parent
  * commits on `target` changed since each hold's recorded base commit
  * (`<hold base>..<target>`). Returns commit short SHAs only, never subjects
- * or other people's holds.
+ * or other people's holds. Reads at most the newest 500 first-parent commits
+ * of each range; an older change is not reported. Empty while group work is
+ * stopped or the repository is outside the group: the check is a warning
+ * and never refuses a sync.
  */
 export async function heldUpstreamChanges(
   host: CollabHost,
@@ -248,7 +252,16 @@ export async function heldUpstreamChanges(
       "--end-of-options",
       `${base}..${target}`,
       "--",
-    ]).catch(() => undefined);
+    ]).catch((error: unknown) => {
+      // Nothing is reported for this hold base; the host's log says why.
+      log.warn("hold_guard.upstream_unread", {
+        repoId: run.repoId,
+        base: base.slice(0, 7),
+        target: target.slice(0, 7),
+        error,
+      });
+      return undefined;
+    });
     if (!listed?.stdout) continue;
     const scopes = [...scopeSet];
     const meets = (file: string) =>
@@ -346,7 +359,8 @@ export function holdGuard(host: CollabHost, asker: HoldsAsker) {
 
 /**
  * Who starts a run, saved on it as `owners`: the participant ids that count
- * as "you" for the request that starts it, by the same rules as publishing.
+ * as "you" for the request that starts it, by the same rules as publishing
+ * (the first `maxRunOwners` of them, by id).
  * Undefined when nobody in the group joined from that device; such a run
  * counts every hold as someone else's. A request the group refuses (a token
  * it does not know, group work that stopped) is no refusal in a repository

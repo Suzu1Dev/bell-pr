@@ -633,10 +633,14 @@ test("POST /api/runs/:id/holds/restore refuses symlink and path-traversal escape
   // 3. Traversal or `.git` path recorded in `run.heldPaths`.
   for (const unsafePath of ["../precious.txt", ".git/config"]) {
     const unsafeRun = await s.makeRun([s.ben.id], { heldPaths: [unsafePath] });
+    // Where "../precious.txt" leads from the checkout.
+    const beside = path.join(path.dirname(unsafeRun.worktreePath), "precious.txt");
+    await writeFile(beside, "DO NOT TOUCH\n");
     await write(unsafeRun.worktreePath, "README.md", "Safe local edit\n");
     const unsafeReply = await s.restore(unsafeRun.id, s.who.member);
     assert.equal(unsafeReply.status, 422, `${unsafePath}: ${unsafeReply.body}`);
     assert.equal(await readFile(path.join(unsafeRun.worktreePath, "README.md"), "utf8"), "Safe local edit\n");
+    assert.equal(await readFile(beside, "utf8"), "DO NOT TOUCH\n");
   }
 });
 
@@ -732,6 +736,10 @@ for (const locale of ["en", "zh-TW"] as const) {
         items: [`src/api/users.ts — Ada: “${secretTitle}”`],
       }),
     );
+    // The person quoting the stop: their own words reach the agent as written.
+    const quoted = withLocale(locale, () =>
+      sm().run.local.turnHeldByOther({ items: ["what does this stop mean?"] }),
+    );
 
     const run = await s.makeRun([s.ben.id], {
       status: "failed",
@@ -758,6 +766,7 @@ for (const locale of ["en", "zh-TW"] as const) {
             failed: true,
             changedFiles: ["src/api/users.ts"],
           },
+          { id: "m3", role: "user", content: quoted, at: new Date().toISOString() },
         ],
       },
     });
@@ -767,7 +776,7 @@ for (const locale of ["en", "zh-TW"] as const) {
     await s.f.start();
     s.f.workbench.status = agentsReady;
     assert.equal(s.f.workbench.run(run.id).heldPaths, undefined);
-    assert.equal(s.f.workbench.run(run.id).session?.messages.length, 2);
+    assert.equal(s.f.workbench.run(run.id).session?.messages.length, 3);
     assert.equal(s.f.workbench.run(run.id).session?.messages[1].heldPaths, undefined);
 
     // Recheck clears legacy `run.error` and `run.sync.report` and transitions failed -> review.
@@ -785,6 +794,7 @@ for (const locale of ["en", "zh-TW"] as const) {
     const sessionPromptText = s.turns.find((turn) => turn.role === "session")!.prompt;
     const draftPromptText = s.turns.filter((turn) => turn.role === "draft").at(-1)!.prompt;
     assert.equal(sessionPromptText.includes(genericLine), true);
+    assert.equal(sessionPromptText.includes("what does this stop mean?"), true);
     assert.equal(draftPromptText.includes(genericLine), true);
     for (const turn of s.turns) {
       for (const secret of ["Ada", secretTitle]) {

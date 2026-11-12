@@ -519,6 +519,7 @@ after(() => skipUnderstandingCheckInTests());
 test("parallel non-overlapping holds: two members run write turns concurrently, GroupPage store & check/work reflect live state without leaking private titles, and both publish cleanly", async (t) => {
   let bothEntered = () => {};
   let arrived = 0;
+  let overlapped = true;
   const barrier = new Promise<void>((resolve) => {
     bothEntered = resolve;
   });
@@ -527,7 +528,8 @@ test("parallel non-overlapping holds: two members run write turns concurrently, 
     if (input.role === "session") {
       arrived += 1;
       if (arrived >= 2) bothEntered();
-      await Promise.race([barrier, delay(5_000)]);
+      await Promise.race([barrier, delay(5_000, undefined, { ref: false })]);
+      if (arrived < 2) overlapped = false;
       if (input.prompt.includes("EDIT_USERS_API")) {
         await writeCheckoutFile(
           input.cwd,
@@ -617,6 +619,7 @@ test("parallel non-overlapping holds: two members run write turns concurrently, 
     s.sendSessionTurn(adaRun.id, s.who.admin, "EDIT_USERS_API"),
     s.sendSessionTurn(benRun.id, s.who.member, "EDIT_WEB_SHELL"),
   ]);
+  assert.ok(overlapped, "the two write turns did not run at the same time");
   assert.equal(adaTurn.failed, undefined, adaTurn.content);
   assert.equal(benTurn.failed, undefined, benTurn.content);
   assert.equal(s.f.workbench.run(adaRun.id).heldPaths, undefined);

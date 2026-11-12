@@ -334,7 +334,7 @@ const m: Translation<typeof en> = {
     },
     heldChanges: "你佔用範圍內的變更",
     heldChangesNote:
-      "在你佔用期間，{branch} 上有提交改到這些檔案；發佈前請先確認。",
+      "在你佔用期間，{branch} 上有提交改到這些檔案；發布前請先確認。",
     heldChangesCommits: ({ commits }) => `（${commits.join("、")}）`,
   },
   followUps: {
