@@ -18,10 +18,29 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   with the code through `POST /api/collab/join` and gets a participant
   token, sent in `x-bell-participant` next to the app token; an admin can
   remove a person and, when asked, unpair the device they joined from.
-  There is no Group page yet, and nothing is protected at write time:
-  admin and member only decide who may invite and remove people. Without
-  the switch nothing changes, except that a participant token is masked
-  (under Changed). `docs/group-work.md` describes it.
+  Group work keeps nobody from writing anything: admin and member only
+  decide who may invite and remove people, add repositories and revoke a
+  hold (next entry). Without the switch nothing changes, except that a
+  participant token is masked (under Changed). `docs/group-work.md`
+  describes it.
+- **The group's repositories, holds on files and folders, and a live feed,
+  through the API.** A group admin adds a repository this BELL PR has
+  (`POST /api/collab/projects`), and the group gets its own bare copy of
+  its default branch in `collab/` in the data directory. Each person says
+  what they are working on by taking a hold: a title and up to 50 files or
+  folders (`POST /api/collab/projects/<id>/work`). A folder holds
+  everything inside it, and letter case is ignored. BELL PR refuses a hold
+  that meets one already held and names who holds what; `check` asks the
+  same question without taking anything. The holder releases a hold, an
+  admin revokes one, and removing a person ends what they hold.
+  `GET /api/collab/projects/<id>/feed` answers with the repository's
+  board, the people of the group and what is held now, and waits up to 25
+  seconds for the next change. A hold does not stop a tool, an editor or a
+  push from writing outside it, and BELL PR's agents do not read holds.
+  The group's record keeps every ended hold and nothing cleans it up: once
+  it is full (8 MiB) new holds are refused until the host resets group
+  storage, which `docs/troubleshooting.md` describes. The paths that
+  cannot be held and every limit are in `docs/group-work.md`.
 - **With group work on, the data-directory lock is the strict one.** It is
   never replaced because of its age. After a crash that leaves a lock
   whose holder cannot be confirmed (another container or machine, an older
@@ -29,15 +48,32 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   removes the lock file. `bell-pr start --group` never reuses a BELL PR
   that runs without group work: it says to stop that one first and exits
   with 1.
-- **A coordination core for several people on one project, its claims not
-  reachable yet.** `server/coordination.ts` grants claims on files all or
-  nothing, waits for task dependencies, and moves a dedicated branch one
+- **The Group page: who holds what, in the app.** With group work on, the
+  sidebar has a **Group** item (`#/group`). The page shows one repository
+  of the group: its people and who is looking at the board now, and each
+  hold with its holder, title, paths and time, kept current from the feed
+  without a reload. Under **Start work** you type a title and paths, and
+  the page says before you take the hold whether another one is in the way
+  and whose; the answer updates by itself when the board changes. You
+  release your own holds, and an admin revokes someone else's after one
+  question. The person at the host starts group work and adds a repository
+  there, an admin invites with a one-time code, and a paired device joins
+  by typing it. A chip says whether the board is live, updated every 10
+  seconds or reconnecting. Using the same identity on another device and
+  removing a person stay API-only. The page shows holds and stops nothing:
+  a hold still does not keep a tool, an editor or a push from writing
+  outside it. Without the switch the page says how to turn group work on,
+  and the sidebar has no Group item. `docs/group-work.md` describes it.
+- **A coordination core for several people on one project, its integration
+  not reachable yet.** `server/coordination.ts` grants claims on files all
+  or nothing, waits for task dependencies, and moves a dedicated branch one
   checked change at a time, as `docs/multiuser-collaboration.md` describes.
-  Only group work opens it, to add the people of a group; nothing in the
-  app, the CLI or any listener reaches its tasks, claims or integration,
-  and it protects nothing at write time: a shell, an editor or an agent
-  can still write outside a claim. Working together on one project is not
-  safer yet.
+  Only group work opens it: to add the people and the repositories of a
+  group, and to claim, release and revoke for its holds. Nothing in the
+  app, the CLI or any listener reaches its dependencies or its
+  integration, and it protects nothing at write time: a shell, an editor
+  or an agent can still write outside a claim. Working together on one
+  project is not safer yet.
 - **An admin can reopen a failed coordination task, in the core only.** The
   task keeps its claims, their reasons and fences, and records who reopened
   it and when. Members cannot reopen a task, and an integrated task never

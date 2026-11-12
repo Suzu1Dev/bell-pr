@@ -239,7 +239,9 @@ const workspace = {
       `Could not load the check: ${message}`,
     retry: "Try again",
     plan: ({ questions, lines }: { questions: number; lines: number }) =>
-      `${plural(questions) === "one" ? `${questions} file question` : `${questions} file questions`} for ${plural(lines) === "one" ? `${lines} changed line` : `${lines} changed lines`}. ${product.name} defaults: none up to 15 lines, 1 up to 100, 2 up to 400, 3 above.`,
+      `${lines} changed lines · ${questions} file ${plural(questions) === "one" ? "question" : "questions"}`,
+    planHelp: "How questions are selected",
+    planRules: "Default: no file questions up to 15 changed lines, 1 up to 100, 2 up to 400, and 3 above 400. Explaining the change and recording untested behavior are still required.",
     fill: "Fill with the sample answer",
     explainTitle: "1. Explain",
     explainPrompt:
@@ -344,21 +346,10 @@ const workspace = {
     emptyLog: "The log appears here once the task starts.",
     emptyFilter: "This role has no log entries yet.",
   },
-  /** Defaults of the contribution brief built from a run's settings. */
-  brief: {
-    motivation:
-      "The value of this contribution still has to be confirmed by the task's needs and its acceptance results.",
-    before:
-      "The problem in the task description exists today; the team confirms how far it reaches while planning.",
-    beforeByHand:
-      "The problem in the task description exists today; you and the guide find how far it reaches while you plan.",
-    after:
-      "Improve the current behavior as the task asks; not yet verified to be achieved.",
-    risk: "Before submitting, check compatibility, regression tests and user-facing behavior.",
-  },
   draft: {
+    publishOptions: "Commit message and branch",
     loadingGuide: "Loading the draft guidelines…",
-    heading: "Good changes deserve a good description.",
+    heading: "PR title and description",
     subheading:
       "Polish the draft so maintainers can understand your contribution easily.",
     label: "DRAFT PR",
@@ -398,7 +389,12 @@ const workspace = {
     save: "Save draft",
   },
   checklist: {
-    title: "One last look before you submit.",
+    open: "View publishing checklist",
+    understandingAction: "Explain the change",
+    completed: "Completed checks",
+    reviewAction: "Review changes",
+    editAction: "Edit draft",
+    title: "Before you publish",
     text: "A clear PR is the start of a good collaboration.",
     allReviewed: "All files reviewed",
     files: ({ reviewed, total }: { reviewed: number; total: number }) =>
@@ -415,7 +411,7 @@ const workspace = {
     noDescription: "No description yet",
     placeholdersStay: "TODOs and blanks to fill in never reach GitHub",
     taskItems: "Checkboxes in the description",
-    taskItemsHelp: `Only tick what you really finished or checked. ${product.name} and the model never tick them for you; ticking rewrites the description on the left, so remember to save.`,
+    taskItemsHelp: `Only tick what you really finished or checked. ${product.name} and the model never tick them for you; ticking rewrites the description above, so remember to save.`,
     noSection: "No section",
     samePr: "Push to the same PR",
     samePrHelp:

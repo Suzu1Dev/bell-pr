@@ -7,8 +7,8 @@ import { product } from "../../../shared/product";
 const repos = {
   list: {
     eyebrow: "YOUR REPOSITORIES",
-    title: "Your next contribution starts here.",
-    intro: "Bring in the projects you care about and turn ideas into real changes.",
+    title: "Projects",
+    intro: "Open an imported project or add one.",
     import: "Import repository",
     discoveryTitle: "Not sure which project to contribute to yet?",
     discoveryText:
@@ -39,7 +39,7 @@ const repos = {
     chooseDirection: "Choose a contribution direction",
   },
   import: {
-    title: "Bring in your next contribution.",
+    title: "Import a project",
     subtitle:
       "Paste a GitHub link or owner/repository, or the full path of a local Git project.",
     source: "Repository source",

@@ -20,7 +20,7 @@ const repo: Repo = {
 
 test("the guide reads in English with no Chinese left", () => {
   const html = renderEn(createElement(HelpModal, { closeModal() {} }));
-  assert.match(html, /<h2 id="modal-title">From an idea to your next PR\.<\/h2>/);
+  assert.match(html, /<h2 id="modal-title">How to contribute<\/h2>/);
   assert.match(html, /<strong>Understand every change<\/strong>/);
   assert.match(html, />Start exploring<\/button>/);
   assert.match(html, /aria-label="Close dialog"/);
@@ -55,7 +55,7 @@ test("the runs list reads in English with no Chinese left", () => {
     closeModal() {},
   });
   const html = renderEn(element);
-  assert.match(html, /<h2 id="modal-title">Every idea has its progress\.<\/h2>/);
+  assert.match(html, /<h2 id="modal-title">Contributions<\/h2>/);
   assert.match(html, /<small>octo\/widgets · fix\/retry<\/small><\/span><em>In progress<\/em>/);
   assert.match(html, /<small>Interactive demo · /);
   assert.match(html, />New contribution<\/button>/);

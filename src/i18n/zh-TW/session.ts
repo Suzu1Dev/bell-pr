@@ -6,7 +6,7 @@ const messages: Translation<typeof en> = {
   "attention": "有待處理",
   "busy": "Agent 正在這個工作目錄中作業，完成後再操作。",
   "label": "和 Agent 協作",
-  "empty": "說明你希望 Agent 做什麼，例如修正失敗的檢查或補上測試。Agent 會在這個工作尚未送出的工作目錄中修改程式碼並執行檢查；每一輪結束後，這裡會列出改動的檔案、實際執行的指令與它提出的問題。",
+  "empty": "說明下一步要修改什麼。AI 會在這份尚未送出的工作目錄修改程式碼並執行檢查，完成後請確認結果。",
   "progress": "Agent 目前的進度",
   "working": "Agent 正在工作",
   "stop": "停止",
