@@ -650,7 +650,7 @@ export function TeamBoard({
               {!team.tasks.some((task) =>
                 group.states.includes(task.status),
               ) && (
-                <div className="team-lane-empty">{!finished && emptyLane(group.id)}</div>
+                <div className="team-lane-empty">{emptyLane(group.id)}</div>
               )}
             </section>
           ))}
