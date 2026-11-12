@@ -375,9 +375,14 @@ async function execute(
       if (note) ctx.log(run, "system", note);
       log.info("by-hand.tests.finished", { runId: run.id, outcome, ms });
     } finally {
-      if (run.byHand?.busy?.kind === "tests") delete run.byHand.busy;
-      release();
-      await ctx.store.save();
+      // Write the result while busy, then write again with busy cleared.
+      try {
+        await ctx.store.save();
+      } finally {
+        if (run.byHand?.busy?.kind === "tests") delete run.byHand.busy;
+        release();
+        await ctx.store.save();
+      }
     }
   });
 }

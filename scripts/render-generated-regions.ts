@@ -28,6 +28,11 @@
  *   Fenced Markdown or escaped HTML command text. Installers use homepageUrl
  *   when set, otherwise the public GitHub repository. Empty publicRepoUrl
  *   hides the block. HTML callers provide the surrounding <code> element.
+ *   mise pins `publishedInstallVersion` from scripts/published-version.mjs.
+ *   The pin is a stable MAJOR.MINOR.PATCH and may lead package.json and the
+ *   Homebrew formula while a release is still open. --check and --write fail
+ *   when it is a lower semver than a stable version in either file. A
+ *   prerelease in those files is not compared. npx, npm and bun stay unpinned.
  *
  * Layout: when the opening comment stands alone on its line, the content
  * goes on the lines between the comments, at the comment's indentation.
@@ -40,8 +45,10 @@
  * (paths relative to the current directory).
  *
  * Exit status: 0 when every region is current (or was written), 1 when
- * --check finds a stale region or the self-test fails, 2 on a usage error
- * or a malformed region.
+ * --check finds a stale region, publishedInstallVersion is not a stable
+ * MAJOR.MINOR.PATCH or is a lower semver than the stable version in
+ * package.json or the formula, or the self-test fails, 2 on a usage
+ * error or a malformed region.
  */
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
@@ -49,6 +56,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { publishedInstallVersion } from "./published-version.mjs";
 import {
   product as productInfo,
   type ProductInfo,
@@ -325,11 +333,7 @@ function installCommands(region: Region, format: Format, where: string, context:
   } else if (method === "bun") {
     lines = [`bun add --global ${pkg}`];
   } else if (method === "mise") {
-    // Use the formula's published release, not a package version still being prepared.
-    const formula = fs.readFileSync(path.join(repoRoot, "Formula", `${productInfo.npmPackage}.rb`), "utf8");
-    const version = /^ {2}version "([0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?)"$/m.exec(formula)?.[1];
-    if (!version) throw new RegionError(`${where}: Homebrew formula has no published version.`);
-    lines = [`MISE_NPM_PACKAGE_MANAGER=npm mise use -g node@24 npm:${pkg}@${version}`];
+    lines = [`MISE_NPM_PACKAGE_MANAGER=npm mise use -g node@24 npm:${pkg}@${publishedInstallVersion}`];
   } else {
     lines = [
       "& {",
@@ -422,6 +426,91 @@ export function discoverTargets(root: string, env: NodeJS.ProcessEnv = process.e
     .sort();
 }
 
+interface Semver {
+  core: [number, number, number];
+  pre: string[] | undefined;
+}
+
+const stableInstallVersion = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/;
+
+function parseSemver(value: string): Semver | undefined {
+  const match = /^(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?(?:\+[0-9A-Za-z.-]+)?$/.exec(value);
+  if (!match) return undefined;
+  return { core: [Number(match[1]), Number(match[2]), Number(match[3])], pre: match[4]?.split(".") };
+}
+
+/** Negative when `left` is a lower semver than `right`. Undefined when either is not semver. */
+function compareSemver(left: string, right: string): number | undefined {
+  const a = parseSemver(left);
+  const b = parseSemver(right);
+  if (!a || !b) return undefined;
+  for (let i = 0; i < 3; i++) if (a.core[i] !== b.core[i]) return a.core[i] < b.core[i] ? -1 : 1;
+  if (!a.pre && !b.pre) return 0;
+  if (!a.pre) return 1;
+  if (!b.pre) return -1;
+  const count = Math.max(a.pre.length, b.pre.length);
+  for (let i = 0; i < count; i++) {
+    const x = a.pre[i];
+    const y = b.pre[i];
+    if (x === undefined) return -1;
+    if (y === undefined) return 1;
+    const xNum = /^\d+$/.test(x);
+    const yNum = /^\d+$/.test(y);
+    if (xNum && yNum) {
+      if (Number(x) !== Number(y)) return Number(x) < Number(y) ? -1 : 1;
+    } else if (xNum !== yNum) return xNum ? -1 : 1;
+    else if (x !== y) return x < y ? -1 : 1;
+  }
+  return 0;
+}
+
+function publishedVersionDrift(published: string, compared: { file: string; version: string }[]): string[] {
+  return compared.flatMap(({ file, version }) => {
+    if (parseSemver(version)?.pre) return [];
+    const order = compareSemver(published, version);
+    if (order === undefined)
+      return [`publishedInstallVersion ${published} and ${file} ${version} must both be semver. Update scripts/published-version.mjs.`];
+    if (order < 0)
+      return [`publishedInstallVersion ${published} is lower than ${file} ${version}. Update scripts/published-version.mjs.`];
+    return [];
+  });
+}
+
+/** Versions the install pin must not trail. Absent package.json means a fixture, not this repo. */
+function releaseVersions(root: string): { file: string; version: string }[] | undefined {
+  if (!fs.existsSync(path.join(root, "package.json"))) return undefined;
+  const formulaRel = `Formula/${productInfo.npmPackage}.rb`;
+  const formulaPath = path.join(root, formulaRel);
+  let version: unknown;
+  try {
+    version = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8")).version;
+  } catch (caught) {
+    const message = caught instanceof Error ? caught.message : String(caught);
+    throw new RegionError(`cannot read package.json: ${message}`);
+  }
+  if (!fs.existsSync(formulaPath))
+    throw new RegionError(`${formulaRel} is missing, so publishedInstallVersion cannot be compared with the formula.`);
+  const formulaVersion = /^ {2}version "([0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?)"$/m.exec(
+    fs.readFileSync(formulaPath, "utf8"),
+  )?.[1];
+  if (typeof version !== "string" || !formulaVersion)
+    throw new RegionError(`package.json or ${formulaRel} has no version to compare with publishedInstallVersion.`);
+  return [
+    { file: "package.json", version },
+    { file: formulaRel, version: formulaVersion },
+  ];
+}
+
+function publishedVersionProblems(root: string, published = publishedInstallVersion): string[] {
+  if (!stableInstallVersion.test(published)) {
+    return [
+      `publishedInstallVersion ${published} must be a stable MAJOR.MINOR.PATCH with no leading zeros, prerelease, or build metadata. Update scripts/published-version.mjs.`,
+    ];
+  }
+  const compared = releaseVersions(root);
+  return compared ? publishedVersionDrift(published, compared) : [];
+}
+
 export interface MainOptions {
   root?: string;
   cwd?: string;
@@ -448,6 +537,11 @@ export function main(args: string[], options: MainOptions = {}): number {
     return 2;
   }
   try {
+    const drift = publishedVersionProblems(root);
+    if (drift.length) {
+      for (const line of drift) error(`render-generated-regions: ${line}`);
+      return 1;
+    }
     const files = targetsGiven
       ? rest.slice(1).map((file) => {
           const full = path.resolve(cwd, file);
@@ -612,8 +706,23 @@ function selfTest(): number {
     assert.deepEqual(renderText(html.text, "install.html", installerContext).stale, []);
     if (method === "brew") assert.match(html.text, /workbench\nbrew install/);
     if (method === "powershell") assert.match(html.text, /&amp; \{/);
-    if (method === "npx") assert.ok(html.text.includes(`npx ${product.npmPackage}`));
-    if (method === "npm") assert.ok(html.text.includes(`npm install -g ${product.npmPackage}`));
+    if (method === "npx") {
+      assert.ok(html.text.includes(`npx ${product.npmPackage}`));
+      assert.ok(!html.text.includes(`npx ${product.npmPackage}@`));
+    }
+    if (method === "npm") {
+      assert.ok(html.text.includes(`npm install -g ${product.npmPackage}`));
+      assert.ok(!html.text.includes(`npm install -g ${product.npmPackage}@`));
+    }
+    if (method === "bun") {
+      assert.ok(html.text.includes(`bun add --global ${product.npmPackage}`));
+      assert.ok(!html.text.includes(`bun add --global ${product.npmPackage}@`));
+    }
+    if (method === "mise") {
+      const command = `MISE_NPM_PACKAGE_MANAGER=npm mise use -g node@24 npm:${product.npmPackage}@${publishedInstallVersion}`;
+      assert.ok(html.text.includes(command));
+      assert.ok(rendered.text.includes("```sh\n" + command + "\n```"));
+    }
   }
   const hostedInstaller = { product: { ...installerContext.product, homepageUrl: "https://install.example.test" } };
   assert.match(renderText(install("curl"), "install.md", hostedInstaller).text, /https:\/\/install\.example\.test\/install \| sh/);
@@ -695,6 +804,49 @@ function selfTest(): number {
     assert.equal(run("--check"), 2, "a malformed region is a usage error");
   } finally {
     fs.rmSync(temp, { recursive: true, force: true });
+  }
+
+  // publishedInstallVersion may lead package.json and the formula, not trail them.
+  const versions = fs.mkdtempSync(path.join(os.tmpdir(), "bellpr-versions-"));
+  try {
+    const formulaRel = `Formula/${productInfo.npmPackage}.rb`;
+    const writeVersions = (pkg: string, formulaVersion: string) => {
+      fs.mkdirSync(path.join(versions, "Formula"), { recursive: true });
+      fs.writeFileSync(path.join(versions, "package.json"), JSON.stringify({ version: pkg }));
+      fs.writeFileSync(
+        path.join(versions, formulaRel),
+        `class Example < Formula\n  version "${formulaVersion}"\n`,
+      );
+    };
+    const update = "Update scripts/published-version.mjs.";
+    writeVersions("1.2.0", "1.2.0");
+    assert.deepEqual(publishedVersionProblems(versions, "1.1.1"), [
+      `publishedInstallVersion 1.1.1 is lower than package.json 1.2.0. ${update}`,
+      `publishedInstallVersion 1.1.1 is lower than ${formulaRel} 1.2.0. ${update}`,
+    ]);
+    writeVersions("1.1.1", "1.1.1");
+    assert.deepEqual(publishedVersionProblems(versions, "1.1.1"), []);
+    writeVersions("1.1.0", "1.0.0");
+    assert.deepEqual(publishedVersionProblems(versions, "1.1.1"), []);
+    writeVersions("1.2.0-beta.1", "1.1.0");
+    assert.deepEqual(publishedVersionProblems(versions, "1.1.1"), []);
+    writeVersions("1.1.0", "1.2.0-beta.1");
+    assert.deepEqual(publishedVersionProblems(versions, "1.1.1"), []);
+    writeVersions("1.2.0", "1.1.1");
+    assert.deepEqual(publishedVersionProblems(versions, "1.1.1"), [
+      `publishedInstallVersion 1.1.1 is lower than package.json 1.2.0. ${update}`,
+    ]);
+    writeVersions("1.1.1", "1.2.0");
+    assert.deepEqual(publishedVersionProblems(versions, "1.1.1"), [
+      `publishedInstallVersion 1.1.1 is lower than ${formulaRel} 1.2.0. ${update}`,
+    ]);
+    const invalid = (value: string) =>
+      `publishedInstallVersion ${value} must be a stable MAJOR.MINOR.PATCH with no leading zeros, prerelease, or build metadata. Update scripts/published-version.mjs.`;
+    for (const value of ["01.1.1", "1.1.1+build.5", "1.2.0-beta.1"]) {
+      assert.deepEqual(publishedVersionProblems(versions, value), [invalid(value)]);
+    }
+  } finally {
+    fs.rmSync(versions, { recursive: true, force: true });
   }
   console.log("render-generated-regions self-test: ok");
   return 0;
