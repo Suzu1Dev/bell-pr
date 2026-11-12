@@ -22,6 +22,6 @@ export default {
   enabling: "Configuring…",
   remove: `Remove ${product.name}'s sudo rule`,
   removing: "Removing…",
-  help: ({ user }: { user: string }) => `Enter the password once to create /etc/sudoers.d/bell-pr-agent for ${user}. The password is sent only to sudo for this setup and is never saved or logged. This rule grants ${user} root privileges without a password, including every program and agent running as that account.`,
+  help: ({ user }: { user: string }) => `Enter the password once to create /etc/sudoers.d/bell-pr-agent for ${user}. The password is sent only to sudo for this setup and is never saved or logged. This rule grants ${user} root privileges without a password, including every program and Agent running as that account.`,
   failed: "The operation did not finish. Please try again.",
 };

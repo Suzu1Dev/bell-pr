@@ -47,7 +47,7 @@ const flow = {
   /** The log line of Ready for review with the guide's review. */
   readyReview: "You marked your change ready for review and asked the guide to review it.",
   /** The log line of handing the task to the agent team. */
-  left: "You handed this task to the agent team. This run stays as it is.",
+  left: "You handed this task to the Agent team. This run stays as it is.",
   /** The job of the guide's review at Ready (the review itself is server/by-hand-guide.ts). */
   review: {
     done: "The guide reviewed your change.",

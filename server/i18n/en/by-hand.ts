@@ -14,16 +14,16 @@ const byHand = {
   guide,
   tests,
   /** The write guard in runAgent: a write turn of a Learn-by-hand run. */
-  noWriteTurn: `${product.name}'s agents have no write access in a Learn-by-hand run, so ${product.name} did not start this turn.`,
+  noWriteTurn: `${product.name}'s Agents have no write access in a Learn-by-hand run, so ${product.name} did not start this turn.`,
   /** The canary stopped a turn (DESIGN v1.2 F2). */
-  agentWrite: `${product.name} stopped an agent that tried to change files in a Learn-by-hand run.`,
+  agentWrite: `${product.name} stopped an Agent that tried to change files in a Learn-by-hand run.`,
   /** A Learn-by-hand part this build does not have yet. */
   notYet: "This part of Learn by hand is not available in this build yet.",
   /** A Learn-by-hand route called on an agent run. */
   notByHand: "This is only for Learn-by-hand runs.",
   /** Retry of a Learn-by-hand run past its plan. */
   retryRefused:
-    "A Learn-by-hand run goes on from your own edits, so there is no agent work to retry. Start a new run to begin again.",
+    "A Learn-by-hand run goes on from your own edits, so there is no Agent work to retry. Start a new run to begin again.",
   /** Retry of a failed or cancelled run with the guide's outline and no confirmed plan. */
   backToPlan: "Back to your plan: nothing runs until you confirm it.",
   /** An AI follow-up round on a Learn-by-hand run (until v1.2.1). */

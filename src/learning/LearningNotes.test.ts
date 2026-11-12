@@ -288,7 +288,7 @@ test("English notes render the page, the filters and each note in English", () =
   const html = renderEnglish();
   assert.doesNotMatch(html, /LEARN BY CONTRIBUTING/);
   assert.match(html, /Learning notes/);
-  assert.match(html, /AI agents that reviewed each change wrote these explanations, and they can be wrong\./);
+  assert.match(html, /AI Agents that reviewed each change wrote these explanations, and they can be wrong\./);
   assert.match(html, /placeholder="Search concepts, tips, files or contributions"/);
   assert.match(html, /<option value=""[^>]*>All contributions<\/option>/);
   assert.match(html, /<option value="run-new">Fix the token cache<\/option>/);

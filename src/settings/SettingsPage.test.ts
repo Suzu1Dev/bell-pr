@@ -276,7 +276,7 @@ test("Agent safety shows the sandbox, the unsandboxed opt-in, web access and the
   assert.match(html, /<h3>Claude Code sandbox<\/h3><span class="service-status">Check<\/span>/);
   assert.match(html, /Not available: install bubblewrap and socat\./);
   assert.match(html, /<code>sudo apt install bubblewrap socat<\/code>/);
-  assert.match(html, /<input id="[^"]+" type="checkbox" aria-describedby="[^"]+"\/><div class="settings-switch-body"><label for="[^"]+">Allow unsandboxed Claude Code and Antigravity agents<\/label>/);
+  assert.match(html, /<input id="[^"]+" type="checkbox" aria-describedby="[^"]+"\/><div class="settings-switch-body"><label for="[^"]+">Allow unsandboxed Claude Code and Antigravity Agents<\/label>/);
   assert.match(html, /<h3>Web access<\/h3>/);
   assert.doesNotMatch(html, /pro-badge|Pro feature|needs Pro/);
   assert.match(html, /<a class="settings-link" href="#\/settings\/provider\?present=1">Open AI provider settings<\/a>/);

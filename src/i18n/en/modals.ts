@@ -49,12 +49,12 @@ const modals = {
         text: "Import a GitHub link or a local path and pick the project to contribute to.",
       },
       team: {
-        title: "Direct the agent team",
+        title: "Direct the Agent team",
         text: "Describe what you need clearly, so the planning, building and review roles can split the work.",
       },
       understand: {
         title: "Understand every change",
-        text: "Switch files to read the diff; click a line number, or hold Shift to select a block of code, and ask the agent. Mark the file as reviewed once you understand it.",
+        text: "Switch files to read the diff; click a line number, or hold Shift to select a block of code, and ask the Agent. Mark the file as reviewed once you understand it.",
       },
       submit: {
         title: "Edit and publish the PR",
@@ -96,7 +96,7 @@ const modals = {
     importOther: "Import another project",
     recommendations: "See AI-recommended directions first",
     demoNote:
-      "Demo settings can be changed freely; no real agent starts. The sample team plays its run again from the start. Import your repository to start building.",
+      "Demo settings can be changed freely; no real Agent starts. The sample team plays its run again from the start. Import your repository to start building.",
     loadingSettings: "Loading this project's contribution settings…",
     reloadSettings: "Reload project settings",
     saveDefault: "Save as default settings",
@@ -109,7 +109,7 @@ const modals = {
       `The task runs with the ${provider} CLI signed in on this computer and counts against that account's usage. When it finishes, it waits for your review.`,
     saveDemo: "Play the sample team",
     planFirst: "Generate the team plan",
-    start: "Start the agent team",
+    start: "Start the Agent team",
   },
 };
 

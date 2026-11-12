@@ -186,23 +186,23 @@ const team = {
   setupNeeds: {
     title: "Setup this computer needs from you",
     intro:
-      "The agent could not finish these checks with the permissions and environment it had. Each command is an agent's suggestion: check it against the project's documentation before you run it. After installing, you can rerun the checks in the working directory, and later contributions can run them directly. With Full access, the agent can try the installs first; a password prompt or anything else it cannot resolve still needs you.",
+      "The Agent could not finish these checks with the permissions and environment it had. Each command is an Agent's suggestion: check it against the project's documentation before you run it. After installing, you can rerun the checks in the working directory, and later contributions can run them directly. With Full access, the Agent can try the installs first; a password prompt or anything else it cannot resolve still needs you.",
     reportedBy: ({ names }: { names: string }) => `Reported by ${names}`,
     /** Who reported a need: a follow-up round, by its number among the run's rounds. */
     round: ({ number }: { number: number }) => `Follow-up round ${number}`,
     /** …or a teammate, by its name and the id the task board shows. */
     agent: ({ name, id }: { name: string; id: string }) => `${name} (${id})`,
     /** Handing the list to an agent on a Full access run (src/team/SetupHandOff.tsx). */
-    handOffAction: "Let the agent set this up",
+    handOffAction: "Let the Agent set this up",
     handOffNote:
-      "This run has Full access, so an agent can install the items you choose, without the sandbox and with your account, then rerun the checks they blocked. You confirm the exact commands first.",
-    handOffUnsafe: `${product.name} never hands this command to an agent: it downloads something and runs or chains it, or pipes into a shell or another interpreter. Check it and run it yourself.`,
+      "This run has Full access, so an Agent can install the items you choose, without the sandbox and with your account, then rerun the checks they blocked. You confirm the exact commands first.",
+    handOffUnsafe: `${product.name} never hands this command to an Agent: it downloads something and runs or chains it, or pipes into a shell or another interpreter. Check it and run it yourself.`,
     allHandled:
-      "The agent reports every item it can take as installed or already present. The Collaborate tab has the details; anything left here is yours to run.",
+      "The Agent reports every item it can take as installed or already present. The Collaborate tab has the details; anything left here is yours to run.",
     outcomeLine: ({ outcome, time }: { outcome: string; time: string }) => `Agent reports: ${outcome} (${time})`,
     unreportedLine: ({ time }: { time: string }) => `The setup turn at ${time} ended without a result for this item.`,
-    resultsTitle: "Setup results (the agent's report)",
-    agentAccount: "The agent's note:",
+    resultsTitle: "Setup results (the Agent's report)",
+    agentAccount: "The Agent's note:",
     outcomes: {
       installed: "installed",
       present: "already present",
@@ -211,26 +211,26 @@ const team = {
       unreported: "no result",
     },
     dialog: {
-      title: "Let the agent set up this computer?",
+      title: "Let the Agent set up this computer?",
       intro:
-        "Earlier agents suggested these commands while reading the project, so check them. The agent runs only the ones you tick and only when they match the project's documentation. It may add non-interactive flags such as -y, run sudo as sudo -n and refresh the package index, but never swaps in another command. It then verifies each item, reruns the checks they blocked and reports each one.",
+        "Earlier Agents suggested these commands while reading the project, so check them. The Agent runs only the ones you tick and only when they match the project's documentation. It may add non-interactive flags such as -y, run sudo as sudo -n and refresh the package index, but never swaps in another command. It then verifies each item, reruns the checks they blocked and reports each one.",
       choose: "Commands to hand over",
       sudoTag: "uses sudo",
       limit: ({ limit }: { limit: number }) =>
         `At most ${limit} items per turn; the rest stay on the list for the next turn.`,
       sudoPasswordless: ({ user }: { user: string }) =>
-        `sudo runs without a password for ${user} here, so the agent can run these sudo commands as root, unless a sudo rule limits which commands may run that way.`,
+        `sudo runs without a password for ${user} here, so the Agent can run these sudo commands as root, unless a sudo rule limits which commands may run that way.`,
       sudoPassword: ({ user }: { user: string }) =>
-        `sudo asks ${user} for a password here, and the agent never enters one. So an item that needs sudo comes back to you. If a sudo rule lets a command run without a password, the agent runs that command as root instead. Run the rest yourself, or turn on Passwordless sudo in the model settings; that lets every process under your account run any command as root.`,
+        `sudo asks ${user} for a password here, and the Agent never enters one. So an item that needs sudo comes back to you. If a sudo rule lets a command run without a password, the Agent runs that command as root instead. Run the rest yourself, or turn on Passwordless sudo in the model settings; that lets every process under your account run any command as root.`,
       sudoMissing: "sudo is not installed here, so items that need it come back to you.",
-      sudoUnknown: `${product.name} could not tell whether sudo needs a password here. The agent runs sudo only as sudo -n, so a password prompt stops that item and it comes back to you.`,
-      runs: "The agent runs without the sandbox, with your account. Usage counts against your own account.",
+      sudoUnknown: `${product.name} could not tell whether sudo needs a password here. The Agent runs sudo only as sudo -n, so a password prompt stops that item and it comes back to you.`,
+      runs: "The Agent runs without the sandbox, with your account. Usage counts against your own account.",
       review:
-        "The agent is told not to change code. A file it does change, such as a lockfile an install step rewrites, loses its review mark. A change to the files or to the PR draft's Validation and Limitations returns an approved contribution to review.",
+        "The Agent is told not to change code. A file it does change, such as a lockfile an install step rewrites, loses its review mark. A change to the files or to the PR draft's Validation and Limitations returns an approved contribution to review.",
       stop: "Follow and stop it on the Collaborate tab. Stopping does not undo what was installed. An install already started through sudo may finish anyway.",
       confirm: ({ count }: { count: number }) =>
-        `Start the agent (${count === 1 ? "1 command" : `${count} commands`})`,
-      starting: "Starting the agent…",
+        `Start the Agent (${count === 1 ? "1 command" : `${count} commands`})`,
+      starting: "Starting the Agent…",
     },
   },
   /** The disclosure holding the protocol note. */

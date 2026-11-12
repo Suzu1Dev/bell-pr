@@ -67,7 +67,7 @@ const collab = {
   keep: "Keep it",
   nothingHeld: ({ time }: { time: string }) => `Nothing is held, as of ${time}.`,
   honesty:
-    `${product.name} refuses a hold that overlaps another, publishes no change to paths someone else holds, and stops a run whose agent changed a held path; that change stays in the working directory. It cannot stop an editor, a terminal tool or a direct git push.`,
+    `${product.name} refuses a hold that overlaps another, publishes no change to paths someone else holds, and stops a run whose Agent changed a held path; that change stays in the working directory. It cannot stop an editor, a terminal tool or a direct git push.`,
   join: {
     title: "Join this group",
     body: "Ask an admin of this group for an invite code. A code works once, for 10 minutes.",

@@ -511,7 +511,7 @@ const mission = {
       info: "For your information",
     },
     effect: {
-      ban: `${product.name}'s agents write every change, so it won't publish one here. You can still practise locally.`,
+      ban: `${product.name}'s Agents write every change, so it won't publish one here. You can still practise locally.`,
       banAmbiguous: "You decide whether it covers AI-assisted contributions.",
       disclose: "Until the description says that AI helped.",
       understand:
@@ -621,7 +621,7 @@ const mission = {
     pacing: ({ open, budget }: { open: number; budget: number }) =>
       `${product.name} won't publish this while you have ${n(open)} open pull requests here, at least twice your limit of ${n(budget)}.`,
     lesson:
-      "Issues labelled for newcomers are how people learn a project by writing the fix themselves. When an agent team takes one, the next newcomer loses that chance. Consider a help-wanted issue instead.",
+      "Issues labelled for newcomers are how people learn a project by writing the fix themselves. When an Agent team takes one, the next newcomer loses that chance. Consider a help-wanted issue instead.",
     practiseLocally: "Start and practise locally",
     startAnyway: "Start anyway",
     back: "Back",

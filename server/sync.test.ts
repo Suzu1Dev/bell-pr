@@ -670,7 +670,7 @@ test("a conflict resolution works in the run's locale, whatever the locale of th
     assert.match(prompt, /labelled "latest main"/);
     assert.equal(
       f.run.logs.at(-1)?.message,
-      "The agent resolved the merge conflicts; review these files one by one.",
+      "The Agent resolved the merge conflicts; review these files one by one.",
     );
     const agent = f.run.agents.find((entry) => entry.id === "sync");
     assert.equal(agent?.detail, "Conflicts resolved; waiting for review");

@@ -36,7 +36,7 @@ const pages = {
         scope: "Quality checks · You submit",
       },
     },
-    noteTitle: "The agents build; you keep the final say.",
+    noteTitle: "The Agents build; you keep the final say.",
     noteText: `Uses the ${providerLabels.codex}, ${providerLabels.claude} or ${providerLabels.antigravity} CLI signed in on this computer. Each task gets its own branch and goes to review when done; no PR is opened automatically.`,
   },
 };

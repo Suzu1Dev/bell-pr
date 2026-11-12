@@ -15,7 +15,7 @@ export default {
   back: "Back",
   language: {
     title: "Choose your language",
-    text: `${product.name} shows its pages, explanations and agent reports in this language. You can change it any time in Settings.`,
+    text: `${product.name} shows its pages, explanations and Agent reports in this language. You can change it any time in Settings.`,
     label: "Language",
   },
   environment: {
@@ -26,11 +26,11 @@ export default {
   provider: {
     title: "Your AI provider",
     text: "Agents use the AI provider you choose here for runs and project analysis. You can change it later in the model settings.",
-    choose: "More than one AI provider is ready. Which one should your agents use?",
+    choose: "More than one AI provider is ready. Which one should your Agents use?",
     none: "No AI provider is ready yet. Install and sign in to the Codex CLI, Claude Code or the Antigravity CLI (see the previous step), then check again. You can still take the sample tour.",
     checking: "Checking which AI providers are ready…",
     saving: "Saving…",
-    saved: ({ provider }: { provider: string }) => `Your agents use ${provider}.`,
+    saved: ({ provider }: { provider: string }) => `Your Agents use ${provider}.`,
     saveFailed: ({ message }: { message: string }) =>
       `The AI provider could not be saved: ${message}`,
     codexNote:

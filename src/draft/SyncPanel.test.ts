@@ -168,7 +168,7 @@ test("the English panel explains the base, the conflicts and why it waits, witho
   assert.doesNotMatch(html, /class="sync-conflicts" role=/);
   assert.match(html, /the side marked <code>latest main<\/code>/);
   assert.match(html, /the side marked <code>this contribution<\/code> is this contribution/);
-  assert.equal(button(html, "Ask the agent to resolve the conflicts"), "enabled");
+  assert.equal(button(html, "Ask the Agent to resolve the conflicts"), "enabled");
   assert.equal(button(html, "Sync to the latest target branch"), "disabled");
   assert.match(html, /Resolve the conflicts from the last sync before you sync again/);
   assert.match(html, /Undo sync/);
@@ -216,10 +216,10 @@ test("a Learn-by-hand run has no conflict agent: the person resolves the markers
     conflicts: ["src/hello.ts"],
   };
   const agent = renderEn(panel({ ...base, sync }));
-  assert.equal(button(agent, "Ask the agent to resolve the conflicts"), "enabled");
+  assert.equal(button(agent, "Ask the Agent to resolve the conflicts"), "enabled");
   const html = renderEn(panel({ ...base, learnByHand: true, sync }));
   assertNoHan(html);
-  assert.equal(button(html, "Ask the agent to resolve the conflicts"), "absent");
+  assert.equal(button(html, "Ask the Agent to resolve the conflicts"), "absent");
   assert.ok(!/ask the agent/i.test(html));
   assert.ok(html.includes("Resolve the markers by hand; BELL PR re-checks them when you refresh the diff on the Code changes tab."));
   // The published PR's sync round reads the same way, in Traditional Chinese too.

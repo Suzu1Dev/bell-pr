@@ -16,7 +16,7 @@ const learning = {
     "Every explanation generated while you review a contribution stays here, so you can revisit a concept across contributions.",
   /** Under the intro: who wrote the explanations, and that they can be wrong. */
   aiNote:
-    "AI agents that reviewed each change wrote these explanations, and they can be wrong. Check them against the code before you rely on them.",
+    "AI Agents that reviewed each change wrote these explanations, and they can be wrong. Check them against the code before you rely on them.",
   keyword: "Keyword",
   keywordPlaceholder: "Search concepts, tips, files or contributions",
   run: "Contribution",

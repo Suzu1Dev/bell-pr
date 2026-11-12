@@ -115,7 +115,7 @@ test("the provider step picks the only ready provider and lets the person choose
   assert.match(only, /Uses the Claude Code CLI you installed and signed in to \(Claude plan or Anthropic API key\)\. Usage counts against your own account\./);
   assert.doesNotMatch(only, /subscription|API billing/i);
   const choice = renderEn(welcome("provider", { doctor: doctor(both) }));
-  assert.match(choice, /<legend>More than one AI provider is ready\. Which one should your agents use\?<\/legend>/);
+  assert.match(choice, /<legend>More than one AI provider is ready\. Which one should your Agents use\?<\/legend>/);
   assert.equal(choice.match(/type="radio" name="welcome-provider"/g)?.length, 2);
   const empty = renderEn(welcome("provider", { doctor: doctor(none) }));
   assert.match(empty, /No AI provider is ready yet\./);

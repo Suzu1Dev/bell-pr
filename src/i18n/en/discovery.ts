@@ -169,7 +169,7 @@ const discovery = {
     /** An opportunity whose issue is labelled for newcomers: practice for the person, not work for the agent team. */
     learnByHand: "Learn by hand: write this one yourself",
     learnByHandHint:
-      "The issue is labelled for newcomers. Writing the fix yourself is how you learn the project, so the agent team does not take it. Read the plan and the sources, then open the issue.",
+      "The issue is labelled for newcomers. Writing the fix yourself is how you learn the project, so the Agent team does not take it. Read the plan and the sources, then open the issue.",
     openIssue: "Open the issue",
     /** Learn by hand (DESIGN v1.2 F1, F12): the task dialog then shows the project's case. */
     startByHand: "Start learning by hand",
@@ -184,10 +184,10 @@ const discovery = {
    */
   byHand: {
     legend: "Who writes the code?",
-    agents: "The agent team writes it",
+    agents: "The Agent team writes it",
     hand: "You write it (Learn by hand)",
-    handText: `The guide plans with you, gives hints and reviews your change when you ask. ${product.name}'s agents can't edit your files in this run. You'll explain the change back without help before you publish it.`,
-    sample: "The sample shows the agent team. Learn by hand works on your own projects.",
+    handText: `The guide plans with you, gives hints and reviews your change when you ask. ${product.name}'s Agents can't edit your files in this run. You'll explain the change back without help before you publish it.`,
+    sample: "The sample shows the Agent team. Learn by hand works on your own projects.",
     start: "Plan with the guide",
     fit: "Fit the guide to the project's rules",
     full: "Every kind of help, practise locally",

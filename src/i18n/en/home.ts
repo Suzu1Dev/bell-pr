@@ -6,7 +6,7 @@ const home = {
     heading: "Start here",
     sample: {
       title: "Try the sample project",
-      text: "Walk through a finished contribution: the project's rules, the agent team's plan, explaining the change back and the pull request draft. No setup needed.",
+      text: "Walk through a finished contribution: the project's rules, the Agent team's plan, explaining the change back and the pull request draft. No setup needed.",
     },
     import: {
       title: "Import a project",

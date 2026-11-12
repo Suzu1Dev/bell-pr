@@ -20,13 +20,13 @@ const runStates: Record<RunStatus, string> = {
   cancelled: "cancelled",
 };
 const followUpAgentCommitted =
-  "The agent made its own commit or switched branches; the branch is back on the pushed PR, and the edits stay in the working directory for your review.";
+  "The Agent made its own commit or switched branches; the branch is back on the pushed PR, and the edits stay in the working directory for your review.";
 
 /** Run pipeline messages: run logs, agent details and run errors. */
 export default {
   /** Logged once on a run whose Claude agent ran without the OS sandbox. */
   unsandboxedNotice:
-    "This Claude agent ran without the OS sandbox because unsandboxed Claude agents are allowed (in Settings or with BELLPR_ALLOW_UNSANDBOXED_AGENTS=1).",
+    "This Claude Agent ran without the OS sandbox because unsandboxed Claude Agents are allowed (in Settings or with BELLPR_ALLOW_UNSANDBOXED_AGENTS=1).",
   /** What an agent card says the agent is doing (its `detail`). */
   agents: {
     lead: "Analysing the project and breaking down the request",
@@ -36,7 +36,7 @@ export default {
     memberRetry: "Waiting to claim the task again in a new working directory",
     running: ({ cli }: { cli: string }) => `Running ${cli}…`,
     waitingForSlot: ({ queued }: { queued: number }) =>
-      `Waiting for other agents to finish (${queued} queued)`,
+      `Waiting for other Agents to finish (${queued} queued)`,
     complete: "Done; the report is ready to read",
     failed: "Stopped or failed",
     rerunWaiting: "Waiting to review again…",
@@ -103,7 +103,7 @@ export default {
     }) =>
       `${name} started. Model: ${model ?? `${cli} CLI default (not recorded)`}; reasoning effort: ${effort ?? "model default"}${web ? "; web access allowed" : ""}${timeout ? `; ${timeout}` : ""}.${inbox ? ` ${count(inbox, "team message", "team messages")} arrived at the start of this turn.` : ""}`,
     waitingForSlot: ({ queued }: { queued: number }) =>
-      `Waiting for other agents to finish (${queued} queued).`,
+      `Waiting for other Agents to finish (${queued} queued).`,
     structuredResult:
       "Answer received; checking its sources and content.",
     checkFinished: ({ outcome }: { outcome: string }) =>
@@ -125,7 +125,7 @@ export default {
     }) =>
       `${cli} reported the model in use: ${model} (${requested ? `--model ${requested} was passed` : "no --model was passed"}${version ? `, CLI ${version}` : ""}).`,
     noReport: ({ cli }: { cli: string }) => `${cli} returned no report.`,
-    noTeam: "This run has no agent team.",
+    noTeam: "This run has no Agent team.",
     messageTargetClosed:
       "This teammate or task has finished and cannot take messages; send it to the lead.",
     messageLength: "Team messages must be 1 to 4000 characters.",
@@ -151,13 +151,13 @@ export default {
       "Task dependencies or file assignments stop the team from continuing; check the task board.",
     creatingWorktree: "Creating a separate Git worktree.",
     legacyRun:
-      "Older runs cannot be assigned to a team again; start a new agent team run.",
+      "Older runs cannot be assigned to a team again; start a new Agent team run.",
     planCreated: ({ tasks, max }: { tasks: number; max: number }) =>
       `Created ${count(tasks, "task", "tasks")} with dependencies and file scopes; up to ${count(max, "teammate works", "teammates work")} at once.`,
     awaitingApproval:
       "Waiting for you to approve the plan; no code has been changed yet.",
     noChanges:
-      "The agent team produced no code changes. Check the task reports or adjust the direction.",
+      "The Agent team produced no code changes. Check the task reports or adjust the direction.",
     done: ({ files }: { files: number }) =>
       `Team development and the independent review are done: ${count(files, "changed file waits", "changed files wait")} for your file-by-file review.`,
     draftIncomplete: "The PR draft suggestion did not finish; try again.",
@@ -352,8 +352,8 @@ export default {
   /** Checking the request's assumption again on a finished run. */
   premise: {
     tooEarly: "Wait for development to finish before checking the premise.",
-    busy: "An agent, a review or an explanation is still working on this run; check the premise once it finishes.",
-    incomplete: "The agent's premise check was incomplete.",
+    busy: "An Agent, a review or an explanation is still working on this run; check the premise once it finishes.",
+    incomplete: "The Agent's premise check was incomplete.",
     /** One line in the run's log; `changed` says whether the verdict is new. */
     checked: ({ verdict, changed }: { verdict: "holds" | "refuted" | "unclear"; changed: boolean }) =>
       `Premise check: ${{ holds: "the assumption holds", refuted: "the assumption does not hold", unclear: "the assumption could not be confirmed" }[verdict]}. ${changed ? "The code walkthroughs, and the explanations not answered yet, are made again with this verdict." : "The verdict did not change."}`,
@@ -368,7 +368,7 @@ export default {
       "The changes are larger than 100 KB, so no code walkthrough is made automatically.",
     overLimit: ({ limit }: { limit: number }) =>
       `This change touches more than ${limit} code files, and code walkthroughs are made automatically for the first ${limit} only; ask about the others in the Ask tab.`,
-    incomplete: "The agent's code walkthrough was incomplete.",
+    incomplete: "The Agent's code walkthrough was incomplete.",
     tooEarly: "Wait for development to finish before generating code walkthroughs.",
     stopped: "The code walkthrough stopped; you can retry it.",
     failed: "Generating the code walkthrough failed; try again.",
@@ -569,27 +569,27 @@ export default {
       "Undid the sync; the run is back to the content and base it had before.",
     noConflicts: "There are no sync conflicts to resolve.",
     conflictsGone:
-      "Every conflict marker is already resolved; the agent is not needed.",
+      "Every conflict marker is already resolved; the Agent is not needed.",
     resolveRequested: ({ files }: { files: string[] }) =>
-      `Asked the agent to resolve the merge conflicts in ${count(files.length, "file", "files")}: ${list(files)}.`,
+      `Asked the Agent to resolve the merge conflicts in ${count(files.length, "file", "files")}: ${list(files)}.`,
     agentCommitted:
-      "The agent made its own commit or switched branches; that was undone, and its edits stay in the working directory for your review.",
+      "The Agent made its own commit or switched branches; that was undone, and its edits stay in the working directory for your review.",
     resolved:
-      "The agent resolved the merge conflicts; review these files one by one.",
+      "The Agent resolved the merge conflicts; review these files one by one.",
     stillConflicted: ({ files }: { files: string[] }) =>
-      `Conflict markers remain after the agent: ${list(files)}; edit them yourself or ask the agent again.`,
+      `Conflict markers remain after the Agent: ${list(files)}; edit them yourself or ask the Agent again.`,
     stopped:
-      "Stopped resolving the conflicts; the edited files are kept, and you can finish yourself or ask the agent again.",
+      "Stopped resolving the conflicts; the edited files are kept, and you can finish yourself or ask the Agent again.",
     /** `reason` is an error message without its final period. */
     failed: ({ reason }: { reason: string }) =>
-      `${reason.replace(/[.\u3002]+$/u, "")}; the edited files are kept, and you can finish yourself or ask the agent again.`,
+      `${reason.replace(/[.\u3002]+$/u, "")}; the edited files are kept, and you can finish yourself or ask the Agent again.`,
     incompleteReason: "Resolving the conflicts did not finish",
     incomplete: "Resolving the conflicts did not finish.",
     conflictsOpen: ({ files }: { files: string[] }) =>
-      `These files still have merge conflict markers: ${list(files)}. Resolve the conflicts first (the agent can do it for you).`,
+      `These files still have merge conflict markers: ${list(files)}. Resolve the conflicts first (the Agent can do it for you).`,
     mergeFailed: "Could not compute the merge result.",
     answerIncomplete:
-      "The agent's answer about the conflict resolution is incomplete",
+      "The Agent's answer about the conflict resolution is incomplete",
     heldChangedUpstream: ({
       branch,
       items,
@@ -632,7 +632,7 @@ export default {
         : `Requested follow-up round ${round} from ${count(feedback, "maintainer feedback item", "maintainer feedback items")}.`,
     agentCommitted: followUpAgentCommitted,
     noChanges:
-      "The agent changed no files; read its explanation below and, if needed, adjust the selected feedback or your note and try again.",
+      "The Agent changed no files; read its explanation below and, if needed, adjust the selected feedback or your note and try again.",
     done: ({
       round,
       agentCommitted,
@@ -654,7 +654,7 @@ export default {
     /** Discarding a round whose working files were already removed. */
     discardedWithoutFiles:
       "Discarded the follow-up round; its changes went with the working files removed earlier.",
-    answerIncomplete: "The agent's answer about the round is incomplete",
+    answerIncomplete: "The Agent's answer about the round is incomplete",
     pushUnknown: "Cannot confirm whether this round was pushed to the PR.",
     remoteMoved: ({ branch }: { branch: string }) =>
       `The PR branch ${branch} on GitHub has commits from outside ${product.name} (for example a suggestion applied on GitHub, a maintainer's push or an updated branch). ${product.name} does not overwrite them and cannot continue the round; handle it on GitHub or discard the round.`,
@@ -683,7 +683,7 @@ export default {
     review:
       "The service restarted, so the review rerun stopped; the earlier reports are kept",
     conflicts:
-      "The service restarted, so resolving the conflicts stopped; the edited files are kept, and you can finish yourself or ask the agent again.",
+      "The service restarted, so resolving the conflicts stopped; the edited files are kept, and you can finish yourself or ask the Agent again.",
     round:
       "The service restarted, so this follow-up round stopped; you can review the edits kept in the working directory, write a commit message and push, or discard the round.",
     run: "The service restarted, so the run stopped. Its working directory is kept and you can read the diff; for a team run, retry the failed subtasks on the task board, and integrated subtasks do not run again.",
@@ -768,7 +768,7 @@ export default {
     autoHeld:
       "This plan covers files someone else in the group holds, so it waits for your approval instead of starting on its own.",
     agentsHoldsUnknown: ({ name }: { name: string }) =>
-      `Can't check file holds because group work has stopped, so the agents can't change files. Fix group work on the host and restart ${name}, or start ${name} without --group.`,
+      `Can't check file holds because group work has stopped, so the Agents can't change files. Fix group work on the host and restart ${name}, or start ${name} without --group.`,
     heldChangedUpstream: ({ branch }: { branch: string }) =>
       `Commits on ${branch} changed files under your hold since you took it. Check those changes before publishing.`,
     heldChangedUpstreamItem: ({

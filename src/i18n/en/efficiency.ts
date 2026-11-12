@@ -36,13 +36,13 @@ const efficiency = {
   /** The credit behind the mode chip: its tooltip and the panel it opens. */
   credit: {
     text: ({ version }: { version: string }) =>
-      `The efficiency modes build on Ponytail ${version} by DietrichGebert (MIT license). Lean gives the agents a short adaptation of its principles, Full gives them its complete rules, and Off adds neither.`,
+      `The efficiency modes build on Ponytail ${version} by DietrichGebert (MIT license). Lean gives the Agents a short adaptation of its principles, Full gives them its complete rules, and Off adds neither.`,
     link: "Ponytail upstream project",
   },
   inputTokens: "Input tokens",
   cachedInputTokens: "Of which cached",
   outputTokens: "Output tokens",
-  agentTime: "Total agent time",
+  agentTime: "Total Agent time",
   running: "Running",
   /** A count the CLI did not report; never shown as zero. */
   notReported: "Not reported",

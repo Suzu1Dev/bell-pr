@@ -456,7 +456,7 @@ test("while group work is stopped, a write turn does not start: 503 holdsUnknown
   assert.equal(stopped.failed, true);
   assert.equal(
     stopped.content,
-    "Can't check file holds because group work has stopped, so the agents can't change files. Fix group work on the host and restart BELL PR, or start BELL PR without --group.",
+    "Can't check file holds because group work has stopped, so the Agents can't change files. Fix group work on the host and restart BELL PR, or start BELL PR without --group.",
   );
   assert.equal(s.turns.some((turn) => turn.role === "session"), false);
 });

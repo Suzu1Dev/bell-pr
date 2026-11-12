@@ -43,11 +43,11 @@ test("the Draft tab's guide passes a Learn-by-hand run to the panel, which shows
   assert.match(html, /<svg[^>]*class="lucide lucide-loader-circle[^"]* spin"/);
   // The clean run's rule row waits for the server's list instead of the mirror's copy.
   assert.match(html, /data-row="rules">[\s\S]*?The saved draft hasn&#x27;t been checked yet\./);
-  assert.doesNotMatch(html, /AI agents wrote this change/);
+  assert.doesNotMatch(html, /AI Agents wrote this change/);
   // An agent run keeps the suggestion and the mirror's copy.
   const agent = guide({ run: { ...demo.run, contributionFacts: undefined } });
   assert.match(agent, /draft-guidance-generate/);
-  assert.match(agent, /AI agents wrote this change/);
+  assert.match(agent, /AI Agents wrote this change/);
 });
 
 test("a run fitted to rules that don't name planning help offers no question on how to split it", () => {

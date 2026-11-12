@@ -66,7 +66,7 @@ test("stored rules are grouped by kind, each with the effect publishing has", ()
   const groups = [...html.matchAll(/<section class="rules-card-group"><h3>([^<]+)<\/h3>/g)].map((match) => match[1]);
   assert.deepEqual(groups, ["AI-assisted contributions", "Saying that AI helped", "Notes addressed to AI agents"]);
   assert.match(html, /4 rules quoted from the 3 files BELL PR read\./);
-  assert.match(html, /BELL PR&#x27;s agents write every change, so it won&#x27;t publish one here\./);
+  assert.match(html, /BELL PR&#x27;s Agents write every change, so it won&#x27;t publish one here\./);
   assert.match(html, /Asks you to confirm<\/span><span>You decide whether it covers AI-assisted contributions\.<\/span>/);
   assert.match(html, /<code>docs\/AI_POLICY\.md:12<\/code>/);
   assert.match(html, /Files BELL PR read · 3/);
@@ -264,7 +264,7 @@ test("in a Learn-by-hand run, a contribution ban never says that agents write ev
   const lock = { kinds: ["explain", "answer"] as HelpKind[], at, rulesCheckedAt: at, rules: [{ kind: "ban", path: ban.path, line: ban.line, quote: ban.quote, allows: ban.allows! }] };
   const run = (byHand: Run["byHand"], agents = ["lead", "reviewer", "tester"]) =>
     ({ id: "run-1", learnByHand: true, agents: agents.map((id) => ({ id, name: id, role: id, status: "complete", detail: "" })), byHand }) as unknown as Run;
-  const agentLine = /agents write every change/;
+  const agentLine = /Agents write every change/;
   // Fitted to the rule when it started: publishing can ask for the quoted confirm.
   const fitted = english({ rules, byHandRun: run({ helpLock: lock }) });
   assert.doesNotMatch(fitted, agentLine);

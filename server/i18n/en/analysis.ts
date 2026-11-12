@@ -343,7 +343,7 @@ export default {
       line: string;
       title: boolean;
     }) =>
-      `${title ? "The subject is the PR title. " : ""}${label} asks for an AI trailer (“${quote}”), so the message ends with ${line}, which names the agent that wrote this change.`,
+      `${title ? "The subject is the PR title. " : ""}${label} asks for an AI trailer (“${quote}”), so the message ends with ${line}, which names the Agent that wrote this change.`,
     ruleQuoteMismatch:
       "A rule quoted in the PR draft does not match its source. Generate it again.",
     templateNotUsed:

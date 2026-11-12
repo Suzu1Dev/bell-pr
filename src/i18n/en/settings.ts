@@ -113,17 +113,17 @@ const settings = {
     intro:
       "Agents run the project's code on this computer. These settings decide what they may reach.",
     sandbox: {
-      text: "Claude Code agents that edit files run every command in the operating-system sandbox. Writes stay in the run's working directory and Claude Code's temporary folders. The network is closed. Your own Claude Code user settings can widen the sandbox (proxy ports, allowed domains or paths, excluded commands, plugin language servers). The Codex CLI uses its own sandbox. Antigravity agents that edit files run their commands in the Antigravity CLI's terminal sandbox. Writes stay in the working directory. The network is closed.",
+      text: "Claude Code Agents that edit files run every command in the operating-system sandbox. Writes stay in the run's working directory and Claude Code's temporary folders. The network is closed. Your own Claude Code user settings can widen the sandbox (proxy ports, allowed domains or paths, excluded commands, plugin language servers). The Codex CLI uses its own sandbox. Antigravity Agents that edit files run their commands in the Antigravity CLI's terminal sandbox. Writes stay in the working directory. The network is closed.",
     },
     unsandboxed: {
-      label: "Allow unsandboxed Claude Code and Antigravity agents",
+      label: "Allow unsandboxed Claude Code and Antigravity Agents",
       help: "Used only when the sandbox is unavailable. While this is off, a run that would need it is refused instead.",
-      confirmTitle: "Allow agents without the sandbox?",
+      confirmTitle: "Allow Agents without the sandbox?",
       confirmText:
-        "When the sandbox is unavailable, Claude Code and Antigravity agents that edit files will run without it. They can then read and change anything your user account can, such as other projects, your SSH keys and the sign-ins of your tools. Allow it only for projects you trust.",
+        "When the sandbox is unavailable, Claude Code and Antigravity Agents that edit files will run without it. They can then read and change anything your user account can, such as other projects, your SSH keys and the sign-ins of your tools. Allow it only for projects you trust.",
       confirmBadge:
-        "Every run where an agent worked without the sandbox carries a badge in the Workbench, and its log says so.",
-      confirm: "Allow unsandboxed agents",
+        "Every run where an Agent worked without the sandbox carries a badge in the Workbench, and its log says so.",
+      confirm: "Allow unsandboxed Agents",
       cancel: "Keep the sandbox",
     },
     web: {
@@ -183,7 +183,7 @@ const settings = {
   },
   performance: {
     title: "Performance",
-    intro: "How much work runs at once, and how long an agent turn may take.",
+    intro: "How much work runs at once, and how long an Agent turn may take.",
     maxActiveRuns: {
       label: "Runs at the same time",
       help: "1 to 8. Runs beyond the limit wait in the queue.",
@@ -199,7 +199,7 @@ const settings = {
     queue: ({ count }: { count: number }) =>
       `Up to ${number(count)} runs can be running, queued or waiting for plan approval at once.`,
     usage:
-      "Running many agents at once uses your provider account faster. Heavy parallel use of a personal Claude plan may exceed its intended individual use.",
+      "Running many Agents at once uses your provider account faster. Heavy parallel use of a personal Claude plan may exceed its intended individual use.",
     save: "Save limits",
     saved: "Limits saved.",
     invalid: ({ min, max }: { min: number; max: number }) =>
@@ -229,7 +229,7 @@ const settings = {
         BELLPR_AGENT_TIMEOUT_SCALE:
           "Agent timeout multiplier: 0.5 to 10, default 1.",
         BELLPR_ALLOW_UNSANDBOXED_AGENTS:
-          "1 allows unsandboxed Claude Code and Antigravity agents.",
+          "1 allows unsandboxed Claude Code and Antigravity Agents.",
         BELLPR_REQUIRE_UNDERSTANDING_CHECK:
           "1 keeps the understanding check on and locks the setting. No value turns it off.",
         BELLPR_RETENTION_DAYS:
@@ -299,7 +299,7 @@ const settings = {
       ai: "Your code and questions go to the provider of the AI coding CLI you use, under your own account.",
       github:
         "GitHub receives what the GitHub CLI and Git send under your account: clones and searches, and only after you approve, a branch and a draft pull request.",
-      web: "Web access for agents is off unless you turn it on.",
+      web: "Web access for Agents is off unless you turn it on.",
       rest: "Everything else stays in the data directory.",
     },
   },

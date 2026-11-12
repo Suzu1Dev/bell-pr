@@ -716,7 +716,7 @@ test("a clean Learn-by-hand run's rule rows come only from the server's checks, 
       assert.match(waiting, /is-unknown/);
       assert.ok(waiting.includes("The saved draft hasn&#x27;t been checked yet."));
       // An unclean run gets the agent run's check, the same here as on the server.
-      assert.ok(checklistRow(render(undefined, byHandRun(false)), "rules").includes("AI agents wrote this change"));
+      assert.ok(checklistRow(render(undefined, byHandRun(false)), "rules").includes("AI Agents wrote this change"));
     } finally {
       byHandRulesDecisionInTests();
     }
@@ -750,7 +750,7 @@ test("a published Learn-by-hand run's rules row quotes the rules instead of wait
   const row = checklistRow(html, "rules");
   assert.ok(!row.includes("hasn&#x27;t been checked") && !/is-unknown|is-block/.test(row), row);
   assert.ok(row.includes("We decline AI-generated contributions."));
-  assert.ok(!html.includes("BELL PR won") && !html.includes("AI agents wrote this change"));
+  assert.ok(!html.includes("BELL PR won") && !html.includes("AI Agents wrote this change"));
 });
 
 test("a Learn-by-hand run published through the quoted confirm keeps its rules row on the confirm, never OK", () => {

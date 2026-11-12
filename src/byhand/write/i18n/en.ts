@@ -46,11 +46,11 @@ const en = {
   },
   guide: {
     title: "The guide",
-    clean: `${name}'s agents can't edit files in this run.`,
+    clean: `${name}'s Agents can't edit files in this run.`,
     // The record's words (src/byhand/record/i18n), so a run says it one way everywhere.
     unclean: ({ reason }: { reason: string }) => `${name} makes no Learn-by-hand claim for this run: ${reason}.`,
-    reasons: { "agent-writes": "an agent tried to change files", agents: "agents other than the guide, the reviewer and the test analyst joined it",
-      tasks: "it was planned as team tasks", rounds: "an AI follow-up round ran on it", resolutions: "an agent resolved its merge conflicts" } as Record<string, string>,
+    reasons: { "agent-writes": "an Agent tried to change files", agents: "Agents other than the guide, the reviewer and the test analyst joined it",
+      tasks: "it was planned as team tasks", rounds: "an AI follow-up round ran on it", resolutions: "an Agent resolved its merge conflicts" } as Record<string, string>,
     fitted: ({ kinds }: { kinds: string }) =>
       `This run is fitted to the project's rules: the guide offers only ${kinds}. Publishing asks you to confirm the project's quoted rule.`,
     blocked: ({ clause }: { clause: string }) => `${name} won't publish this run here: ${clause}. Practise freely.`,
@@ -95,9 +95,9 @@ const en = {
     smaller: "Make this step smaller",
     openPlan: "Open your plan",
     park: "Park this step",
-    leave: "Hand this task to the agent team",
-    leaveText: `Your edits stay in this run's folder. The new run starts from the target branch, and ${name}'s agents write it.`,
-    leaveGo: "Hand it to the agent team",
+    leave: "Hand this task to the Agent team",
+    leaveText: `Your edits stay in this run's folder. The new run starts from the target branch, and ${name}'s Agents write it.`,
+    leaveGo: "Hand it to the Agent team",
   },
   talk: {
     label: "Talk it through",
@@ -150,7 +150,7 @@ const en = {
     testFirst: "Run your tests on this version first; the tests are the judge.",
     aiRules: "This project has rules about AI use. Check them before asking for an AI review.",
     noReview: "This run is fitted to the project's rules, and they don't name AI review, so the guide doesn't review here. Your tests are the judge.",
-    cost: "The review takes about 2 agent turns.",
+    cost: "The review takes about 2 Agent turns.",
     quiet: "Nothing is explained or reviewed until you say it's ready.",
     confirm: "Mark it ready",
   },

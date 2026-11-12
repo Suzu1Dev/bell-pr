@@ -10,11 +10,11 @@ const en = {
   claimed: ({ claim, quotes }: { claim: string; quotes: string }) => `${claim} ${quotes}`,
   unclean: ({ reason }: { reason: string }) => `${product.name} makes no Learn-by-hand claim for this run: ${reason}.`,
   reasons: {
-    "agent-writes": "an agent tried to change files",
-    agents: "agents other than the guide, the reviewer and the test analyst joined it",
+    "agent-writes": "an Agent tried to change files",
+    agents: "Agents other than the guide, the reviewer and the test analyst joined it",
     tasks: "it was planned as team tasks",
     rounds: "an AI follow-up round ran on it",
-    resolutions: "an agent resolved its merge conflicts",
+    resolutions: "an Agent resolved its merge conflicts",
   },
   removed: ({ count }: { count: number }) =>
     `${product.name} removed code from ${count === 1 ? "1 answer before you saw it" : `${count} answers before you saw them`}.`,

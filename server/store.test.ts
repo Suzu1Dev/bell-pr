@@ -325,7 +325,7 @@ test("an interrupted conflict resolution or follow-up round is explained in the 
   assert.equal(synced.sync?.resolving, false);
   assert.equal(
     synced.sync?.report,
-    "The service restarted, so resolving the conflicts stopped; the edited files are kept, and you can finish yourself or ask the agent again.",
+    "The service restarted, so resolving the conflicts stopped; the edited files are kept, and you can finish yourself or ask the Agent again.",
   );
 
   // A zh-TW run whose follow-up round was running, under an en default.

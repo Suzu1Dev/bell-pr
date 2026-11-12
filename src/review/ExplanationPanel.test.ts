@@ -628,7 +628,7 @@ test("an English render of the chat tab has no Han in its own text", () => {
   for (const preset of Object.values(en.review.presets))
     assert.ok(welcome.includes(preset.replace(/'/g, "&#x27;")), preset);
   assert.match(welcome, /Take your understanding further/);
-  assert.match(welcome, /aria-label="Question for the agent"/);
+  assert.match(welcome, /aria-label="Question for the Agent"/);
   assert.match(welcome, /placeholder="Which part do you want to explore\?"/);
   assert.match(welcome, /Enter to send · Shift \+ Enter for a new line/);
   const file = { ...englishFile("src/utils/retry.ts"), fingerprint: "new" };

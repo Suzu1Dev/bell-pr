@@ -221,7 +221,7 @@ const review = {
       "Comparing against the actual diff to prepare a concrete scenario, the reasons behind the design and what to check while reviewing.",
     pendingTitle: "The explanation will be ready automatically",
     pendingBody:
-      "Once the agents finish the change, the explanation is prepared here.",
+      "Once the Agents finish the change, the explanation is prepared here.",
   },
   /** The learner's own note on the explanation tab. */
   note: {
@@ -306,7 +306,7 @@ const review = {
     you: "You",
     stale: "About an earlier version",
     loading: "Reading the change…",
-    inputLabel: "Question for the agent",
+    inputLabel: "Question for the Agent",
     placeholder: "Which part do you want to explore?",
     placeholderBlocked: "No explanation is available for this file right now",
     contextAttached: "File diff attached",

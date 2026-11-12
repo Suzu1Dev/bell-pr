@@ -664,7 +664,7 @@ test("a project that asks for an AI trailer gets it on the suggested commit mess
   assert.deepEqual(suggested.sources, ["contributing"]);
   assert.match(
     suggested.rationale,
-    /^CONTRIBUTING\.md asks for Fixes lines\. CONTRIBUTING\.md asks for an AI trailer \(“4\. Disclose AI assistance[^”]+”\), so the message ends with Assisted-by: Claude Code, which names the agent that wrote this change\.$/,
+    /^CONTRIBUTING\.md asks for Fixes lines\. CONTRIBUTING\.md asks for an AI trailer \(“4\. Disclose AI assistance[^”]+”\), so the message ends with Assisted-by: Claude Code, which names the Agent that wrote this change\.$/,
   );
   // Without a message from the model the PR title is the subject, and the rule is the source.
   const made = parse(null, { assistant: "Codex" })!;

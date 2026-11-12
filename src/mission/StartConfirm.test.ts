@@ -42,7 +42,7 @@ test("the good-first-issue lesson is two sentences and a pointer to help-wanted 
   const html = renderEn(confirm([{ id: "learning" }]));
   assertNoHan(html);
   assert.deepEqual(lines(html), [
-    "Issues labelled for newcomers are how people learn a project by writing the fix themselves. When an agent team takes one, the next newcomer loses that chance. Consider a help-wanted issue instead.",
+    "Issues labelled for newcomers are how people learn a project by writing the fix themselves. When an Agent team takes one, the next newcomer loses that chance. Consider a help-wanted issue instead.",
   ]);
   assert.match(html, /Start anyway<\/button>/);
   assert.match(renderZh(confirm([{ id: "learning" }])), /仍要開始/);

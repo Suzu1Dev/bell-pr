@@ -429,7 +429,7 @@ test("steps record done, parked, the why after R3 or R4, an R3 choice and R0 use
   assert.ok(run.byHand!.leftAt);
   assert.deepEqual(run.byHand!.exits!.map((entry) => entry.exit), ["smaller", "leave"]);
   assert.equal(run.status, "review");
-  assert.equal(run.logs.at(-1)?.message, "You handed this task to the agent team. This run stays as it is.");
+  assert.equal(run.logs.at(-1)?.message, "You handed this task to the Agent team. This run stays as it is.");
 });
 
 test("Ready for review binds the current fingerprint; a stale one and an empty change are refused, and a second review needs a test run", async (t) => {
