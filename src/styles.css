@@ -3264,6 +3264,7 @@ button {
 .agent-card p,
 .field-help,
 .callout p,
+.callout.origin-ignored p,
 .checklist-item {
   font-size: var(--text-xs);
 }
@@ -3276,7 +3277,7 @@ button {
 .explain-header h2,
 .nav-item,
 .page-title p,
-.repository-card > p,
+.repository-card p,
 .team-role > p,
 .note-card p {
   font-size: var(--text-md);
