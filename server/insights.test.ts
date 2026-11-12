@@ -1202,11 +1202,13 @@ test("citations of tracked but unsampled files are kept, marked or dropped by fi
           { path: "hello.ts", why: "問候文字的來源。", lookFor: "匯出的常數。" },
           { path: "nope.ts", why: "不存在的檔案。", lookFor: "什麼都看不到。" },
         ],
-        // Only kept modules stay; README.md was read but is no module, nope/thing.ts was dropped.
+        // README.md and server/part-00.ts are tracked but no module; .env is sensitive.
         flow: [
           { label: "讀說明", path: "README.md", passes: "用法" },
           { label: "前端入口", path: "src/App.tsx", passes: "請求" },
-          { label: "伺服器", path: "server/", passes: "回應" },
+          { label: "伺服器", path: "server/", passes: "呼叫" },
+          { label: "伺服器的一部分", path: "server/part-00.ts", passes: "設定" },
+          { label: "讀設定", path: ".env", passes: "回應" },
           { label: "不存在的模組", path: "nope/thing.ts", passes: "" },
         ],
         evidence: [
@@ -1237,11 +1239,14 @@ test("citations of tracked but unsampled files are kept, marked or dropped by fi
       { path: "hello.ts", why: "問候文字的來源。", lookFor: "匯出的常數。", sampled: false },
     ]);
     assert.deepEqual(insights.evidence, [{ path: "README.md", note: "描述工具用途與執行方式" }]);
-    // A flow step citing anything but a kept module is kept, drawn outside the repository.
+    // A sampled file and a file inside the kept server/ module keep their paths;
+    // a sensitive or invented path is kept as a step drawn outside the repository.
     assert.deepEqual(insights.flow, [
-      { label: "讀說明", path: "", passes: "用法" },
+      { label: "讀說明", path: "README.md", passes: "用法" },
       { label: "前端入口", path: "src/App.tsx", passes: "請求" },
-      { label: "伺服器", path: "server/", passes: "回應" },
+      { label: "伺服器", path: "server/", passes: "呼叫" },
+      { label: "伺服器的一部分", path: "server/part-00.ts", passes: "設定" },
+      { label: "讀設定", path: "", passes: "回應" },
       { label: "不存在的模組", path: "", passes: "" },
     ]);
     assert.deepEqual(insights.recommendations.map((entry) => entry.id), ["greeting-tests"]);

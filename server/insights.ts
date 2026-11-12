@@ -500,10 +500,10 @@ function validateAnalysis<
     });
   if ("modules" in value) {
     value.modules = keep("modules", value.modules, ["sampled", "known", "directory"]);
-    // A flow step citing anything but a kept module is drawn as outside the repository.
-    const modulePaths = new Set(value.modules.map((entry) => entry.path));
+    // A flow step may cite any tracked file or directory, such as a file inside a
+    // directory module; any other path is drawn as outside the repository.
     value.flow = value.flow.map((step) =>
-      modulePaths.has(step.path) ? step : { ...step, path: "" },
+      cite(step.path) === "unknown" ? { ...step, path: "" } : step,
     );
     value.readingPath = keep("readingPath", value.readingPath, ["sampled", "known"]).map(
       ({ path, why, lookFor }) =>

@@ -90,7 +90,7 @@ export interface RecommendationVerification {
 export interface ProjectFlowStep {
   /** A short name: a few words. */
   label: string;
-  /** One of the analysis's module paths, or "" for something outside the repository. */
+  /** A module path or another tracked path, or "" for something outside the repository. */
   path: string;
   /** What moves from this step to the next, in a few words; "" on the last step. */
   passes: string;

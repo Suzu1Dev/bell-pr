@@ -22,7 +22,7 @@ const zhTW: DemoContent = buildDemoContent({
         afterSteps: [
           { label: "請求失敗", changed: false },
           { label: "先判斷值不值得重試", changed: true },
-          { label: "隨機等待，一輪比一輪長", changed: true },
+          { label: "在逐輪變大的上限內隨機等待", changed: true },
           { label: "請求錯開送出", changed: true },
         ],
       },
@@ -90,7 +90,7 @@ const zhTW: DemoContent = buildDemoContent({
           "編輯器可以依新型別提示 `retry: { baseDelay: 500, maxDelay: 5000 }`。這個檔案定義的是設定規格，實際等待與重試仍由其他程式碼執行。",
         beforeSteps: [
           { label: "打開 client 設定", changed: false },
-          { label: "只看到次數與固定 delay", changed: true },
+          { label: "找不到 retry 設定", changed: true },
         ],
         afterSteps: [
           { label: "打開 client 設定", changed: false },

@@ -24,7 +24,7 @@ const en: DemoContent = buildDemoContent({
         afterSteps: [
           { label: "A request fails", changed: false },
           { label: "Check the error is worth retrying", changed: true },
-          { label: "Wait a random time, longer each round", changed: true },
+          { label: "Wait at random, under a growing cap", changed: true },
           { label: "The tries spread out", changed: true },
         ],
       },
@@ -92,7 +92,7 @@ const en: DemoContent = buildDemoContent({
           "With the new types, the editor can suggest `retry: { baseDelay: 500, maxDelay: 5000 }`. This file only describes the options; other code does the actual waiting and retrying.",
         beforeSteps: [
           { label: "Open the client options", changed: false },
-          { label: "Find only a count and a fixed delay", changed: true },
+          { label: "Find no retry setting there", changed: true },
         ],
         afterSteps: [
           { label: "Open the client options", changed: false },
