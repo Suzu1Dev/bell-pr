@@ -201,7 +201,7 @@ ever counted as a pass.
 Open the project and choose **Analyze the project**. An agent reads a
 sample of the source code, read-only, and writes what the project does,
 who uses it, how its parts fit together and where to start reading. When
-the agent traces a main flow through the modules, it is also drawn as a
+the Agent traces a main flow through the modules, it is also drawn as a
 diagram, step by step, with that prose as its caption. It
 also suggests up to five contribution directions. Each one quotes the code
 or documents it is based on, and BELL PR checks that every quote really is

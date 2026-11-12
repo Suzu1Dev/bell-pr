@@ -139,7 +139,7 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   steps each, drawn in the Before and After boxes with the steps that
   differ marked by border, icon and text for screen readers. The learning
   record export lists the same steps. BELL PR draws both from the
-  agent's short fields with its own HTML and CSS; the agent writes no
+  Agent's short fields with its own HTML and CSS; the Agent writes no
   drawing. Analyses and explanations saved earlier load as before and show
   no diagram, and an explanation is not made again for it.
 
