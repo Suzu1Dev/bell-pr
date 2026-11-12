@@ -5,7 +5,9 @@
 import { createHash, randomBytes, scrypt as scryptCallback, timingSafeEqual } from "node:crypto";
 
 export const accountTokenPattern = /^bpa_[A-Za-z0-9_-]{43}$/;
+export const inviteTokenPattern = /^bpi_[A-Za-z0-9_-]{43}$/;
 const usernamePattern = /^[a-z0-9][a-z0-9._-]{1,31}$/;
+const emailPattern = /^[^\s@]+@[^\s@]+$/;
 const scryptKeyLen = 32;
 
 function scryptAsync(password: string, salt: Buffer): Promise<Buffer> {
@@ -32,6 +34,28 @@ export function normalizeUsername(raw: unknown): string | undefined {
   if (typeof raw !== "string") return undefined;
   const cleaned = raw.trim().toLowerCase();
   return usernamePattern.test(cleaned) ? cleaned : undefined;
+}
+
+/** Normalizes an email address to lowercase, or returns undefined if invalid. */
+export function normalizeEmail(raw: unknown): string | undefined {
+  if (typeof raw !== "string") return undefined;
+  const cleaned = raw.trim().toLowerCase();
+  return cleaned.length >= 3 && cleaned.length <= 160 && emailPattern.test(cleaned)
+    ? cleaned
+    : undefined;
+}
+
+/** Extracts a `bpi_…` token from either a bare token or a `/pair#invite=…` URL. */
+export function extractInviteToken(raw: unknown): string | undefined {
+  if (typeof raw !== "string") return undefined;
+  const trimmed = raw.trim();
+  if (inviteTokenPattern.test(trimmed)) return trimmed;
+  const hashIdx = trimmed.indexOf("#");
+  if (hashIdx >= 0) {
+    const token = new URLSearchParams(trimmed.slice(hashIdx + 1)).get("invite")?.trim() ?? "";
+    if (inviteTokenPattern.test(token)) return token;
+  }
+  return undefined;
 }
 
 /** Validates a password length (8 to 128 characters). */
@@ -62,6 +86,39 @@ export async function verifyPassword(password: string, stored: string | undefine
 export function issueAccountSessionToken(): { token: string; tokenHash: string } {
   const token = `bpa_${randomBytes(32).toString("base64url")}`;
   return { token, tokenHash: sha256Hex(token) };
+}
+
+/** Issues a new `bpi_` invite link token and its SHA-256 digest for `collab.json`. */
+export function issueInviteToken(): { token: string; tokenHash: string } {
+  const token = `bpi_${randomBytes(32).toString("base64url")}`;
+  return { token, tokenHash: sha256Hex(token) };
+}
+
+/**
+ * Matches a presented `bpi_` invite token (or `#invite=` URL) against `collab.json`'s
+ * `emailInvites` map in constant time across active entries.
+ */
+export function verifyInviteToken<T extends { tokenHash: string; expiresAt: string }>(
+  presented: unknown,
+  invites: Record<string, T> | undefined,
+  nowMs = Date.now(),
+): { id: string; invite: T } | undefined {
+  const token = extractInviteToken(presented);
+  if (!token || !invites) return undefined;
+  const digest = sha256Hex(token);
+  let matched: { id: string; invite: T } | undefined;
+  for (const [id, invite] of Object.entries(invites)) {
+    const expires = Date.parse(invite.expiresAt);
+    if (
+      invite.tokenHash.length === 64 &&
+      digestsEqual(digest, invite.tokenHash) &&
+      Number.isFinite(expires) &&
+      expires > nowMs
+    ) {
+      matched = { id, invite };
+    }
+  }
+  return matched;
 }
 
 /**

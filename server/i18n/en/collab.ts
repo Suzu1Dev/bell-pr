@@ -38,10 +38,14 @@ export default {
     "The hold ended, but its task can never be marked done now. Work waiting on it must name another task. See the log on the host.",
   notHolder: "Only the person who holds these paths can release them.",
   staleFence: "This hold has changed since the board was read. Reload the board, then try again.",
-  invalidCredentials: "Wrong username or password, or this account is disabled.",
+  invalidCredentials: "Wrong username, email or password, or this account is disabled.",
   usernameTaken: "Someone in this group already uses this username.",
+  emailTaken: "Someone in this group already uses this email address.",
+  invalidEmail: "Enter a valid email address.",
+  inviteEmailMismatch: ({ email }: { email: string }) =>
+    `This invite is reserved for ${email}. Register with that email address.`,
   invalidAccountInput:
-    "Enter a username of 2 to 32 letters, digits, dots, underscores or hyphens, and a password of 8 to 128 characters.",
+    "Enter a valid email or username (2 to 32 letters, digits, dots, underscores or hyphens), and a password of 8 to 128 characters.",
   tailscaleUnavailable:
     `Tailscale identity is not available on this connection. Open ${name} through Tailscale Serve with --tailscale-auth enabled, or sign in with a username and password.`,
   tailscaleUnlinked: ({ login }: { login: string }) =>

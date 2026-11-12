@@ -83,16 +83,16 @@ export const secretPatterns: readonly SecretPattern[] = [
     blocks: true,
   },
   {
-    // Participant and account session tokens (coordination.ts, collab-auth.ts):
-    // bpc_ or bpa_ and exactly 43 base64url characters, so an identifier such
+    // Participant, account session and invite tokens (coordination.ts, collab-auth.ts):
+    // bpc_, bpa_ or bpi_ and 43 base64url characters, so an identifier such
     // as bpc_frame_buffer_config stays.
-    pattern: /\bbp[ca]_[A-Za-z0-9_-]{43}(?![A-Za-z0-9_-])/g,
+    pattern: /\bbp[cai]_[A-Za-z0-9_-]{43}(?![A-Za-z0-9_-])/g,
     replacement: "[REDACTED]",
     blocks: true,
   },
   {
-    // A pairing code in a /pair?code= or /pair#code= link (pair-qr.ts).
-    pattern: /([?#&]code=)[^&#\s"']+/gi,
+    // A pairing or invite token in a /pair?code=, /pair#code= or /pair#invite= link.
+    pattern: /([?#&](?:code|invite)=)[^&#\s"']+/gi,
     replacement: "$1[REDACTED]",
     blocks: false,
   },

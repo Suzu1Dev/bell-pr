@@ -221,7 +221,7 @@ function publicCollabAuth(req: Request) {
     return true;
   return (
     req.method === "POST" &&
-    /^\/api\/collab\/auth\/(?:login|register|tailscale)$/i.test(req.path)
+    /^\/api\/collab\/auth\/(?:login|register|tailscale|invite-info)$/i.test(req.path)
   );
 }
 

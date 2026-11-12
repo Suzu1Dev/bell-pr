@@ -195,13 +195,13 @@ test("add a repository: the group gets its own bare copy of the default branch, 
     ],
     storage: await storage(),
   }]);
-  // A member is told the group's repositories, and nothing of this BELL PR's others.
+  // Every active group member sees addable repositories and can add projects to the group.
   const asMember = await list(who.member);
-  assert.deepEqual([asMember.status, asMember.json], [200, { projects: [] }]);
+  assert.deepEqual([asMember.status, asMember.json], [before.status, before.json]);
 
-  assert.equal(outcome(await add(who.member, { repoId: widgets.id })), "403 adminOnly");
+  assert.equal(outcome(await add(who.stranger, { repoId: widgets.id })), "403 notJoined");
   for (const repoId of ["repo-none", "__proto__", "constructor"])
-    assert.equal(outcome(await add(who.admin, { repoId })), "400 unknownRepository", repoId);
+    assert.equal(outcome(await add(who.member, { repoId })), "400 unknownRepository", repoId);
   for (const body of [{}, { repoId: 7 }, { repoId: widgets.id, name: "Widgets" }])
     assert.equal((await add(who.admin, body)).status, 400, JSON.stringify(body));
   assert.equal(existsSync(f.paths.collabRepos), false);
@@ -240,7 +240,7 @@ test("add a repository: the group gets its own bare copy of the default branch, 
     addable: [{ repoId: gadgets.id, name: "local/gadgets" }],
     storage: await storage(),
   });
-  assert.deepEqual((await list(who.member)).json, { projects: [{ id, name: "local/widgets" }] });
+  assert.deepEqual((await list(who.member)).json, after.json);
 
   // A copy that fails, or one the coordinator then refuses, leaves no folder and
   // no entry, and the answer says nothing of this computer.
@@ -270,10 +270,10 @@ test("add a repository: the group gets its own bare copy of the default branch, 
   });
   assert.equal((await g.board(id)).project.name, "local/widgets");
 
-  // A name longer than the side file takes is cut to what it takes.
+  // A name longer than the side file takes is cut to what it takes; a regular member can add it.
   const long = await g.repository("long");
   long.fullName = `local/${"n".repeat(200)}`;
-  const cut = await add(who.admin, { repoId: long.id });
+  const cut = await add(who.member, { repoId: long.id });
   assert.deepEqual([cut.status, cut.json.project.name], [201, long.fullName.slice(0, 200)]);
   await f.nothingLeaked();
 });
@@ -1051,7 +1051,7 @@ test("who may use the repositories and the boards: people of the group, and no 4
       "POST",
       "/projects",
       { repoId: "repo-none" },
-      { member: "403 adminOnly", admin: "400 unknownRepository" },
+      { member: "400 unknownRepository", admin: "400 unknownRepository" },
     ],
     ["GET", `${at}/feed`, undefined, { member: "200", admin: "200" }],
     ["POST", `${at}/check`, { scopes: ["src"] }, { member: "200", admin: "200" }],

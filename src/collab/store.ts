@@ -339,6 +339,16 @@ export function createGroupStore() {
       restart();
     },
     join,
+    async register(payload: {
+      code: string;
+      email?: string;
+      name?: string;
+      username?: string;
+      password: string;
+    }) {
+      const result = await api<CollabJoinResponse>("/collab/auth/register", send("POST", payload));
+      resetAfterAuth(result);
+    },
     async login(username: string, password: string) {
       const result = await api<CollabJoinResponse>(
         "/collab/auth/login",

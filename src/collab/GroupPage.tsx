@@ -33,6 +33,7 @@ import type {
   CollabFileDependency,
   CollabHold,
   CollabInfo,
+  CollabInviteInfoResponse,
   CollabInviteResponse,
   CollabMemberRecord,
   CollabTasksResponse,
@@ -43,6 +44,7 @@ import { product } from "../../shared/product";
 import { api, ApiError, send } from "../api";
 import type { Status } from "../app/hooks/useAppData";
 import { useFormat, useT, type Messages } from "../i18n";
+import { parseInviteInput } from "../PairPage";
 import { participantToken } from "./participant";
 import { Modal } from "../modals/Modal";
 import { CopyCommand } from "../setup/CopyCommand";
@@ -354,7 +356,7 @@ export function BootstrapAdminCard({
   );
 }
 
-/** Unjoined card: invite code (+ optional reusable account), team username/password login, or Tailscale. */
+/** Unjoined card: invite link/code (+ email/username account), team login, or Tailscale. */
 function JoinAuthCard({
   store,
   info,
@@ -370,10 +372,36 @@ function JoinAuthCard({
   );
   const [code, setCode] = useState("");
   const [withAccount, setWithAccount] = useState(false);
+  const [email, setEmail] = useState("");
+  const [emailLocked, setEmailLocked] = useState(false);
+  const [displayName, setDisplayName] = useState("");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const request = useRequest();
   const error = request.error || refused;
+  const linkToken = parseInviteInput(code);
+
+  useEffect(() => {
+    if (tab !== "invite" || !linkToken) {
+      setEmailLocked(false);
+      return;
+    }
+    let cancelled = false;
+    void api<CollabInviteInfoResponse>("/collab/auth/invite-info", send("POST", { code: linkToken }))
+      .then((res) => {
+        if (cancelled) return;
+        if (res.valid && res.email) {
+          setEmail(res.email);
+          setEmailLocked(true);
+        } else {
+          setEmailLocked(false);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [tab, linkToken]);
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
@@ -381,7 +409,15 @@ function JoinAuthCard({
       if (tab === "login") {
         await store.login(username.trim(), password);
       } else if (tab === "tailscale") {
-        await store.loginTailscale(code.trim() || undefined);
+        await store.loginTailscale((linkToken ?? code.trim()) || undefined);
+      } else if (linkToken || (withAccount && email.trim())) {
+        await store.register({
+          code: linkToken ?? code.trim(),
+          ...(email.trim() ? { email: email.trim() } : {}),
+          ...(displayName.trim() ? { name: displayName.trim() } : {}),
+          ...(username.trim() ? { username: username.trim() } : {}),
+          password,
+        });
       } else {
         await store.join(
           code.trim(),
@@ -399,7 +435,12 @@ function JoinAuthCard({
       ? Boolean(username.trim() && password.length >= 8)
       : tab === "tailscale"
         ? true
-        : Boolean(code.trim() && (!withAccount || (username.trim() && password.length >= 8)));
+        : linkToken
+          ? Boolean(email.trim() && password.length >= 8)
+          : Boolean(
+              code.trim() &&
+                (!withAccount || ((email.trim() || username.trim()) && password.length >= 8)),
+            );
 
   return (
     <form className="settings-card" onSubmit={submit}>
@@ -470,15 +511,15 @@ function JoinAuthCard({
             className="text-input"
             id="join-code"
             value={code}
-            maxLength={32}
+            maxLength={300}
             autoComplete="off"
-            autoCapitalize="characters"
+            autoCapitalize="off"
             spellCheck={false}
             onChange={(event) => setCode(event.target.value)}
           />
         </>
       )}
-      {tab === "invite" && (
+      {tab === "invite" && !linkToken && (
         <div className="draft-task-items">
           <label>
             <input
@@ -490,21 +531,61 @@ function JoinAuthCard({
           </label>
         </div>
       )}
-      {(tab === "login" || (tab === "invite" && withAccount)) && (
+      {tab === "invite" && (Boolean(linkToken) || withAccount) && (
         <>
-          <label className="field-label" htmlFor="group-username">
-            {t.auth.username}
+          <label className="field-label" htmlFor="group-email">
+            {t.auth.email}
           </label>
           <input
             className="text-input"
-            id="group-username"
-            value={username}
-            maxLength={32}
-            placeholder={t.auth.usernamePlaceholder}
-            autoComplete="username"
+            id="group-email"
+            type="email"
+            value={email}
+            readOnly={emailLocked}
+            maxLength={160}
+            placeholder={t.auth.emailPlaceholder}
+            autoComplete="email"
             autoCapitalize="off"
-            onChange={(event) => setUsername(event.target.value)}
+            onChange={(event) => setEmail(event.target.value)}
           />
+          {Boolean(linkToken) && (
+            <>
+              <label className="field-label" htmlFor="group-display-name">
+                {t.auth.displayName}
+              </label>
+              <input
+                className="text-input"
+                id="group-display-name"
+                value={displayName}
+                maxLength={40}
+                autoComplete="name"
+                onChange={(event) => setDisplayName(event.target.value)}
+              />
+            </>
+          )}
+        </>
+      )}
+      {(tab === "login" || (tab === "invite" && (Boolean(linkToken) || withAccount))) && (
+        <>
+          {!linkToken && (
+            <>
+              <label className="field-label" htmlFor="group-username">
+                {tab === "login" ? t.auth.loginId : t.auth.username}
+              </label>
+              <input
+                className="text-input"
+                id="group-username"
+                value={username}
+                maxLength={tab === "login" ? 160 : 32}
+                placeholder={
+                  tab === "login" ? t.auth.loginIdPlaceholder : t.auth.usernamePlaceholder
+                }
+                autoComplete="username"
+                autoCapitalize="off"
+                onChange={(event) => setUsername(event.target.value)}
+              />
+            </>
+          )}
           <label className="field-label" htmlFor="group-password">
             {t.auth.password}
           </label>
@@ -540,16 +621,39 @@ function JoinAuthCard({
   );
 }
 
-/** Name and role, then the code, which is shown once. */
-function InviteDialog({ store, onClose }: { store: Store; onClose: () => void }) {
+/** Invite by email/shareable link or classic one-time invite code. */
+export function InviteDialog({
+  store,
+  onClose,
+}: {
+  store: Pick<Store, "call">;
+  onClose: () => void;
+}) {
   const t = useT("collab");
   const words = t.inviteDialog;
   const actions = useT("common").actions;
   const format = useFormat();
+  const [email, setEmail] = useState("");
   const [name, setName] = useState("");
   const [admin, setAdmin] = useState(false);
   const [invite, setInvite] = useState<CollabInviteResponse>();
   const request = useRequest();
+
+  const createLink = () => {
+    void request.run(async () =>
+      setInvite(
+        await store.call<CollabInviteResponse>(
+          "/invites",
+          send("POST", {
+            link: true,
+            ...(email.trim() ? { email: email.trim() } : {}),
+            ...(admin ? { admin: true } : {}),
+          }),
+        ),
+      ),
+    );
+  };
+
   const create = (event: FormEvent) => {
     event.preventDefault();
     void request.run(async () =>
@@ -561,24 +665,59 @@ function InviteDialog({ store, onClose }: { store: Store; onClose: () => void })
       ),
     );
   };
+
+  const isLink = Boolean(invite?.inviteToken);
+  const shareUrl =
+    invite?.inviteToken && typeof window !== "undefined" && window.location.origin && window.location.origin !== "null"
+      ? `${window.location.origin}/pair#invite=${invite.inviteToken}`
+      : (invite?.inviteUrl ?? invite?.code ?? "");
+  const mailtoHref =
+    isLink && invite?.email
+      ? `mailto:${encodeURIComponent(invite.email)}?subject=${encodeURIComponent(words.emailSubject)}&body=${encodeURIComponent(words.emailBody({ url: shareUrl }))}`
+      : "";
+
   return (
     <Modal
       key={invite ? "code" : "name"}
-      title={invite ? words.codeFor({ name: name.trim() }) : words.title}
+      title={
+        invite
+          ? isLink
+            ? invite.email
+              ? words.linkFor({ email: invite.email })
+              : words.linkTitle
+            : words.codeFor({ name: name.trim() })
+          : words.title
+      }
       subtitle={
         invite &&
-        (admin ? words.asAdmin : words.member)({
-          name: name.trim(),
-          time: format.time(invite.expiresAt),
-        })
+        (isLink
+          ? invite.email
+            ? words.linkReserved({
+                email: invite.email,
+                time: format.dateTime(invite.expiresAt),
+              })
+            : words.linkOpen({ time: format.dateTime(invite.expiresAt) })
+          : (admin ? words.asAdmin : words.member)({
+              name: name.trim(),
+              time: format.time(invite.expiresAt),
+            }))
       }
       mark={<UserPlus size={23} />}
       onClose={onClose}
     >
       {invite ? (
         <>
-          <CopyCommand command={invite.code} label={t.join.code} copyLabel={words.copy} />
+          <CopyCommand
+            command={isLink ? shareUrl : invite.code}
+            label={isLink ? words.linkLabel : t.join.code}
+            copyLabel={isLink ? words.copyLink : words.copy}
+          />
           <div className="modal-actions">
+            {mailtoHref && (
+              <a className="button secondary" href={mailtoHref}>
+                {words.sendEmail}
+              </a>
+            )}
             <button type="button" className="button primary" onClick={onClose}>
               {words.done}
             </button>
@@ -586,6 +725,34 @@ function InviteDialog({ store, onClose }: { store: Store; onClose: () => void })
         </>
       ) : (
         <form onSubmit={create}>
+          <div className="group-admin-create">
+            <h3>{words.emailHeading}</h3>
+            <label className="field-label" htmlFor="invite-email">
+              {words.email}
+            </label>
+            <input
+              className="text-input"
+              id="invite-email"
+              type="email"
+              value={email}
+              maxLength={160}
+              placeholder={words.emailPlaceholder}
+              autoComplete="off"
+              autoCapitalize="off"
+              onChange={(event) => setEmail(event.target.value)}
+            />
+            <p className="field-help">{words.emailHelp}</p>
+            <button
+              type="button"
+              className="button primary"
+              aria-disabled={request.busy}
+              disabled={Boolean(email.trim() && !email.includes("@"))}
+              onClick={createLink}
+            >
+              {words.createLink}
+            </button>
+          </div>
+          <h3>{words.codeHeading}</h3>
           <label className="field-label" htmlFor="invite-name">
             {words.name} <span>{t.shownOnBoard}</span>
           </label>
@@ -628,10 +795,11 @@ function InviteDialog({ store, onClose }: { store: Store; onClose: () => void })
   );
 }
 
-/** Member self-service dialog to set or update their own username/password. */
+/** Member self-service dialog to set or update their own email/username/password. */
 function AccountDialog({ store, me, onClose }: { store: Store; me: Me; onClose: () => void }) {
   const t = useT("collab");
   const actions = useT("common").actions;
+  const [email, setEmail] = useState(me.email ?? "");
   const [username, setUsername] = useState(me.username ?? "");
   const [password, setPassword] = useState("");
   const [saved, setSaved] = useState(false);
@@ -644,12 +812,14 @@ function AccountDialog({ store, me, onClose }: { store: Store; me: Me; onClose: 
       await store.call(
         `/people/${encodeURIComponent(me.id)}`,
         send("PATCH", {
+          ...(email.trim() !== (me.email ?? "") ? { email: email.trim() || null } : {}),
           ...(username.trim() ? { username: username.trim() } : {}),
           ...(password ? { password } : {}),
         }),
       );
       setPassword("");
       setSaved(true);
+      store.reload();
     });
   };
 
@@ -661,6 +831,20 @@ function AccountDialog({ store, me, onClose }: { store: Store; me: Me; onClose: 
       onClose={onClose}
     >
       <form onSubmit={save}>
+        <label className="field-label" htmlFor="my-account-email">
+          {t.auth.email}
+        </label>
+        <input
+          className="text-input"
+          id="my-account-email"
+          type="email"
+          value={email}
+          maxLength={160}
+          placeholder={t.auth.emailPlaceholder}
+          autoComplete="email"
+          autoCapitalize="off"
+          onChange={(event) => setEmail(event.target.value)}
+        />
         <label className="field-label" htmlFor="my-account-username">
           {t.auth.username}
         </label>
@@ -704,7 +888,9 @@ function AccountDialog({ store, me, onClose }: { store: Store; me: Me; onClose: 
           <button
             className="button primary"
             aria-disabled={request.busy}
-            disabled={!username.trim() && password.length < 8}
+            disabled={
+              email.trim() === (me.email ?? "") && !username.trim() && password.length < 8
+            }
           >
             {t.accountDialog.save}
           </button>
@@ -727,6 +913,7 @@ function AdminMembersDialog({ store, me, onClose }: { store: Store; me: Me; onCl
   const [admin, setAdmin] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
+  const [editEmail, setEditEmail] = useState("");
   const [editUsername, setEditUsername] = useState("");
   const [editPassword, setEditPassword] = useState("");
   const [editTailscale, setEditTailscale] = useState("");
@@ -746,6 +933,7 @@ function AdminMembersDialog({ store, me, onClose }: { store: Store; me: Me; onCl
   const beginEdit = (member: CollabMemberRecord) => {
     setEditingId(member.id);
     setEditName(member.name);
+    setEditEmail(member.email ?? "");
     setEditUsername(member.username ?? "");
     setEditPassword("");
     setEditTailscale(member.tailscaleLogin ?? "");
@@ -755,6 +943,7 @@ function AdminMembersDialog({ store, me, onClose }: { store: Store; me: Me; onCl
     void request.run(async () => {
       const patch: Record<string, unknown> = {};
       if (editName.trim() && editName.trim() !== member.name) patch.name = editName.trim();
+      if (editEmail.trim() !== (member.email ?? "")) patch.email = editEmail.trim() || null;
       if (editUsername.trim() && editUsername.trim() !== (member.username ?? ""))
         patch.username = editUsername.trim();
       if (editPassword.length >= 8) patch.password = editPassword;
@@ -913,6 +1102,7 @@ function AdminMembersDialog({ store, me, onClose }: { store: Store; me: Me; onCl
                 </strong>
                 <div className="mission-evidence-paths">
                   <code>{member.admin ? words.roleAdmin : words.roleMember}</code>
+                  {member.email && <code>{member.email}</code>}
                   {member.username && <code>@{member.username}</code>}
                   {member.tailscaleLogin && <code>{member.tailscaleLogin}</code>}
                   {member.disabled && <code>{words.disabledBadge}</code>}
@@ -929,6 +1119,21 @@ function AdminMembersDialog({ store, me, onClose }: { store: Store; me: Me; onCl
                         value={editName}
                         maxLength={40}
                         onChange={(event) => setEditName(event.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <label className="field-label" htmlFor={`edit-email-${member.id}`}>
+                        {t.auth.email}
+                      </label>
+                      <input
+                        className="text-input"
+                        id={`edit-email-${member.id}`}
+                        type="email"
+                        value={editEmail}
+                        maxLength={160}
+                        placeholder={t.auth.emailPlaceholder}
+                        autoCapitalize="off"
+                        onChange={(event) => setEditEmail(event.target.value)}
                       />
                     </div>
                     <div>
@@ -1952,6 +2157,108 @@ function Board(props: BoardProps) {
   );
 }
 
+/** Dialog allowing any active group member (admin or non-admin) to add or import a project. */
+export function AddProjectDialog({
+  store,
+  addable,
+  onClose,
+}: {
+  store: Pick<Store, "add">;
+  addable?: { repoId: string; name: string }[];
+  onClose: () => void;
+}) {
+  const t = useT("collab");
+  const actions = useT("common").actions;
+  const [selectedRepoId, setSelectedRepoId] = useState(addable?.[0]?.repoId ?? "");
+  const [source, setSource] = useState("");
+  const request = useRequest();
+
+  const addExisting = (event: FormEvent) => {
+    event.preventDefault();
+    if (!selectedRepoId) return;
+    void request.run(async () => {
+      await store.add(selectedRepoId);
+      onClose();
+      focusSoon(".group-page h1");
+    });
+  };
+
+  const importAndAdd = (event: FormEvent) => {
+    event.preventDefault();
+    if (!source.trim()) return;
+    void request.run(async () => {
+      const imported = await api<{ repo: { id: string } }>(
+        "/repos",
+        send("POST", { source: source.trim() }),
+      );
+      await store.add(imported.repo.id);
+      onClose();
+      focusSoon(".group-page h1");
+    });
+  };
+
+  return (
+    <Modal title={t.addARepository} mark={<FolderGit2 size={22} />} onClose={onClose}>
+      {addable && addable.length > 0 && (
+        <form className="group-admin-create" onSubmit={addExisting}>
+          <label className="field-label" htmlFor="dialog-add-repo">
+            {t.repository}
+          </label>
+          <select
+            className="text-input"
+            id="dialog-add-repo"
+            value={selectedRepoId}
+            aria-disabled={request.busy}
+            onChange={(event) => setSelectedRepoId(event.target.value)}
+          >
+            {addable.map((repo) => (
+              <option key={repo.repoId} value={repo.repoId}>
+                {repo.name}
+              </option>
+            ))}
+          </select>
+          <button className="button primary" aria-disabled={request.busy} disabled={!selectedRepoId}>
+            {t.addRepository}
+          </button>
+        </form>
+      )}
+      <form onSubmit={importAndAdd}>
+        <label className="field-label" htmlFor="dialog-import-source">
+          {t.importSource}
+        </label>
+        <input
+          className="text-input"
+          id="dialog-import-source"
+          value={source}
+          maxLength={4096}
+          placeholder={t.importSourcePlaceholder}
+          autoComplete="off"
+          autoCapitalize="off"
+          onChange={(event) => setSource(event.target.value)}
+        />
+        {request.busy && (
+          <p className="field-help import-cloning" role="status">
+            {t.adding}
+          </p>
+        )}
+        {request.error && (
+          <p className="inline-error" role="alert">
+            {request.error}
+          </p>
+        )}
+        <div className="modal-actions">
+          <button type="button" className="button secondary" onClick={onClose}>
+            {actions.cancel}
+          </button>
+          <button className="button primary" aria-disabled={request.busy} disabled={!source.trim()}>
+            {t.importAndAdd}
+          </button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
 export function GroupPage({ status }: { status: Status | null }) {
   const t = useT("collab");
   const format = useFormat();
@@ -1964,6 +2271,7 @@ export function GroupPage({ status }: { status: Status | null }) {
     return store.close;
   }, [store, on]);
   const [inviting, setInviting] = useState(false);
+  const [addingProject, setAddingProject] = useState(false);
   const [managingMembers, setManagingMembers] = useState(false);
   const [editingAccount, setEditingAccount] = useState(false);
   const adding = useRequest();
@@ -2054,7 +2362,16 @@ export function GroupPage({ status }: { status: Status | null }) {
         </button>
       </form>
     ) : (
-      <p className="settings-card">{me.admin ? t.nothingToAdd : t.noRepository}</p>
+      <div className="settings-card">
+        <p>{t.nothingToAdd}</p>
+        <button
+          type="button"
+          className="button primary"
+          onClick={() => setAddingProject(true)}
+        >
+          {t.importAndAdd}
+        </button>
+      </div>
     );
   } else if (!held && state.link === "reconnecting") {
     card = (
@@ -2141,6 +2458,16 @@ export function GroupPage({ status }: { status: Status | null }) {
                 +{people.length - circles.length}
               </span>
             )}
+            {project && me && (
+              <button
+                type="button"
+                className="button secondary"
+                onClick={() => setAddingProject(true)}
+              >
+                <FolderGit2 size={15} aria-hidden="true" />
+                {t.addARepository}
+              </button>
+            )}
             {me && (
               <button
                 type="button"
@@ -2191,6 +2518,13 @@ export function GroupPage({ status }: { status: Status | null }) {
         />
       ) : (
         card
+      )}
+      {addingProject && me && (
+        <AddProjectDialog
+          store={store}
+          addable={state.addable}
+          onClose={() => setAddingProject(false)}
+        />
       )}
       {inviting && canInvite && <InviteDialog store={store} onClose={() => setInviting(false)} />}
       {editingAccount && me && (

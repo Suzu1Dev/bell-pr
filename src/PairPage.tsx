@@ -1,37 +1,101 @@
-import { useState } from "react";
-import type { CollabAuthStatus, CollabJoinResponse } from "../shared/collab";
+import { useEffect, useState } from "react";
+import type {
+  CollabAuthStatus,
+  CollabInviteInfoResponse,
+  CollabJoinResponse,
+} from "../shared/collab";
 import { api, ApiError, deviceInfoStorageKey, deviceTokenStorageKey, send } from "./api";
 import { keepParticipantToken } from "./collab/participant";
 import { useT } from "./i18n";
 
 export type PairMode = "device" | "login" | "register" | "tailscale";
 
+/** Extracts a `bpi_…` invite token from a bare token or a `/pair#invite=…` URL. */
+export function parseInviteInput(raw: string): string | undefined {
+  const trimmed = raw.trim();
+  if (/^bpi_[A-Za-z0-9_-]{43}$/.test(trimmed)) return trimmed;
+  const idx = trimmed.indexOf("#");
+  if (idx >= 0) {
+    const token = new URLSearchParams(trimmed.slice(idx + 1)).get("invite")?.trim() ?? "";
+    if (/^bpi_[A-Za-z0-9_-]{43}$/.test(token)) return token;
+  }
+  return undefined;
+}
+
+/** Consume QR / invite hash data before any asynchronous bootstrap work. */
+export function takePairHash(win: Pick<Window, "location" | "history">): {
+  code: string;
+  invite: string;
+} {
+  const params = new URLSearchParams(win.location.hash.replace(/^#/, ""));
+  const code = params.get("code") ?? "";
+  const invite = params.get("invite") ?? "";
+  win.history.replaceState(win.history.state, "", win.location.pathname);
+  return { code, invite };
+}
+
 /** Consume QR hash data before any asynchronous bootstrap work. */
 export function takePairCode(win: Pick<Window, "location" | "history">): string {
-  const code = new URLSearchParams(win.location.hash.replace(/^#/, "")).get("code") ?? "";
-  win.history.replaceState(win.history.state, "", win.location.pathname);
-  return code;
+  return takePairHash(win).code;
 }
 
 export function PairPage({
   initialCode = "",
+  initialInvite = "",
   initialMode = "device",
   tailscaleLogin: presetTailscaleLogin,
 }: {
   initialCode?: string;
+  initialInvite?: string;
   initialMode?: PairMode;
   tailscaleLogin?: string;
 }) {
   const t = useT("common").pair;
-  const [mode, setMode] = useState<PairMode>(initialMode);
+  const [mode, setMode] = useState<PairMode>(initialInvite ? "register" : initialMode);
   const [code, setCode] = useState(initialCode);
   const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [emailLocked, setEmailLocked] = useState(false);
+  const [memberName, setMemberName] = useState("");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [inviteCode, setInviteCode] = useState("");
+  const [inviteCode, setInviteCode] = useState(initialInvite);
   const [detectedTailscale, setDetectedTailscale] = useState(presetTailscaleLogin ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const linkToken = parseInviteInput(inviteCode);
+
+  useEffect(() => {
+    if (mode !== "register" || !linkToken) {
+      setEmailLocked(false);
+      return;
+    }
+    let cancelled = false;
+    void api<CollabInviteInfoResponse>("/collab/auth/invite-info", {
+      ...send("POST", { code: linkToken }),
+      browserSessionOnly: true,
+      credentials: "omit",
+    })
+      .then((info) => {
+        if (cancelled) return;
+        if (!info.valid) {
+          setEmailLocked(false);
+          setError(t.team.inviteInvalid);
+          return;
+        }
+        setError("");
+        if (info.email) {
+          setEmail(info.email);
+          setEmailLocked(true);
+        } else {
+          setEmailLocked(false);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [mode, linkToken, t.team.inviteInvalid]);
 
   const chooseMode = (next: PairMode) => {
     setMode(next);
@@ -57,7 +121,7 @@ export function PairPage({
       );
       localStorage.setItem(deviceTokenStorageKey, result.deviceToken);
     }
-    window.location.replace("/");
+    window.location.replace("/#/group");
   };
 
   const pair = async () => {
@@ -103,8 +167,18 @@ export function PairPage({
         mode === "login"
           ? { username: username.trim(), password, ...trimmedDevice }
           : mode === "register"
-            ? { code: inviteCode.trim(), username: username.trim(), password, ...trimmedDevice }
-            : { ...(inviteCode.trim() ? { code: inviteCode.trim() } : {}), ...trimmedDevice };
+            ? {
+                code: linkToken ?? inviteCode.trim(),
+                ...(email.trim() ? { email: email.trim() } : {}),
+                ...(memberName.trim() ? { name: memberName.trim() } : {}),
+                ...(username.trim() ? { username: username.trim() } : {}),
+                password,
+                ...trimmedDevice,
+              }
+            : {
+                ...(inviteCode.trim() ? { code: linkToken ?? inviteCode.trim() } : {}),
+                ...trimmedDevice,
+              };
       const result = await api<CollabJoinResponse>(path, {
         ...send("POST", payload),
         browserSessionOnly: true,
@@ -176,20 +250,47 @@ export function PairPage({
                   onChange={(event) => setInviteCode(event.target.value)}
                   required={mode === "register"}
                   autoComplete="off"
-                  autoCapitalize="characters"
+                  autoCapitalize="off"
+                />
+              </>
+            )}
+            {mode === "register" && (
+              <>
+                <label htmlFor="pair-email">{t.team.email}</label>
+                <input
+                  id="pair-email"
+                  type="email"
+                  value={email}
+                  readOnly={emailLocked}
+                  required={Boolean(linkToken) || !username.trim()}
+                  maxLength={160}
+                  placeholder={t.team.emailHint}
+                  autoComplete="email"
+                  autoCapitalize="off"
+                  onChange={(event) => setEmail(event.target.value)}
+                />
+                <label htmlFor="pair-member-name">{t.team.displayName}</label>
+                <input
+                  id="pair-member-name"
+                  value={memberName}
+                  maxLength={40}
+                  autoComplete="name"
+                  onChange={(event) => setMemberName(event.target.value)}
                 />
               </>
             )}
             {(mode === "login" || mode === "register") && (
               <>
-                <label htmlFor="pair-username">{t.team.username}</label>
+                <label htmlFor="pair-username">
+                  {mode === "register" ? t.team.usernameOptional : t.team.username}
+                </label>
                 <input
                   id="pair-username"
                   value={username}
                   onChange={(event) => setUsername(event.target.value)}
-                  required
-                  minLength={3}
-                  maxLength={32}
+                  required={mode === "login"}
+                  minLength={mode === "login" ? 2 : undefined}
+                  maxLength={mode === "login" ? 160 : 32}
                   placeholder={t.team.usernameHint}
                   autoComplete="username"
                   autoCapitalize="off"

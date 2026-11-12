@@ -40,11 +40,26 @@ const sideSchema = z.strictObject({
         disabledAt: stamp,
         /** The paired device they joined from, when it was one. */
         deviceId: z.string().max(64).optional(),
-        /** Optional team login handle (lowercase ASCII) and scrypt password hash. */
+        /** Optional team login handle (lowercase ASCII), email and scrypt password hash. */
         username: z.string().max(40).optional(),
+        email: z.string().max(160).optional(),
         passwordHash: z.string().max(200).optional(),
         /** Optional Tailscale user login (`user@domain`) for automatic tailnet identity mapping. */
         tailscaleLogin: z.string().max(120).optional(),
+      }),
+    )
+    .optional(),
+  /** Shareable email/link invitations (`bpi_…`, stored as SHA-256 hex digest). */
+  emailInvites: z
+    .record(
+      z.string().max(64),
+      z.strictObject({
+        tokenHash: z.string().max(64),
+        email: z.string().max(160).optional(),
+        admin: z.literal(true).optional(),
+        createdBy: z.string().max(64).optional(),
+        createdAt: z.string().max(40),
+        expiresAt: z.string().max(40),
       }),
     )
     .optional(),
@@ -142,8 +157,8 @@ export function sideEntry<T>(record: Record<string, T> | undefined, id: string):
   return record && Object.hasOwn(record, id) ? record[id] : undefined;
 }
 
-/** A generated id the coordinator or side-file accepts: a person (`m-`), a project (`p-`), a task (`t-`) or a dependency rule (`d-`). */
-export const collabId = (prefix: "m" | "p" | "t" | "d") => `${prefix}-${randomBytes(5).toString("hex")}`;
+/** A generated id the coordinator or side-file accepts: a person (`m-`), a project (`p-`), a task (`t-`), a dependency rule (`d-`) or an invite (`i-`). */
+export const collabId = (prefix: "m" | "p" | "t" | "d" | "i") => `${prefix}-${randomBytes(5).toString("hex")}`;
 
 /** The side file: undefined when there is none, "damaged" when it cannot be used. */
 async function readSide(file: string): Promise<CollabSide | "damaged" | undefined> {

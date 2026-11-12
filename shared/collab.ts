@@ -40,7 +40,14 @@ export interface CollabInfo extends CollabStatus {
   tailscaleLogin?: string;
   tailscaleName?: string;
   /** Who the participant token belongs to; absent when missing, unknown or removed. */
-  me?: { id: string; name: string; admin?: true; username?: string; tailscaleLogin?: string };
+  me?: {
+    id: string;
+    name: string;
+    admin?: true;
+    username?: string;
+    email?: string;
+    tailscaleLogin?: string;
+  };
 }
 
 /** POST /api/collab/setup → 201. */
@@ -49,11 +56,22 @@ export interface CollabSetupResponse {
   groupId: string;
 }
 
-/** POST /api/collab/invites → 201. The code is shown only here, once. */
+/** POST /api/collab/invites → 201. The code/link token is shown only here, once. */
 export interface CollabInviteResponse {
   code: string;
+  inviteToken?: string;
+  inviteUrl?: string;
+  email?: string;
   /** ISO 8601. */
   expiresAt: string;
+}
+
+/** POST /api/collab/auth/invite-info → 200. */
+export interface CollabInviteInfoResponse {
+  valid: boolean;
+  email?: string;
+  admin?: true;
+  expiresAt?: string;
 }
 
 /** POST /api/collab/join → 201. The token is given only here, again for a code made for oneself. */
@@ -63,6 +81,7 @@ export interface CollabJoinResponse {
   name: string;
   admin?: true;
   username?: string;
+  email?: string;
   tailscaleLogin?: string;
   token: string;
   /** Returned when joining/signing in from an unpaired remote browser over VPN/Tailscale. */
@@ -76,6 +95,7 @@ export interface CollabMemberRecord {
   name: string;
   admin?: true;
   username?: string;
+  email?: string;
   tailscaleLogin?: string;
   joinedAt?: string;
   disabled?: true;

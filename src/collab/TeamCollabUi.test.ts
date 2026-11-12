@@ -33,7 +33,9 @@ test("PairPage renders team account, invite registration and Tailscale modes in 
       assert.match(zhHtml, /帳號名稱/);
     } else if (mode === "register") {
       assert.match(enHtml, /Create account &amp; join/);
+      assert.match(enHtml, /Email/);
       assert.match(zhHtml, /建立帳號並加入/);
+      assert.match(zhHtml, /電子郵件信箱/);
     } else {
       assert.match(enHtml, /Detected Tailscale identity: ada@example\.com/);
       assert.match(zhHtml, /偵測到 Tailscale 身分：ada@example\.com/);

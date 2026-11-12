@@ -252,6 +252,7 @@ export function createApp(workbench: Workbench, options: AppOptions = {}) {
       store: workbench.store,
       devices,
       tokenFile,
+      publicUrl: options.publicUrl,
       tailscaleAuth: options.tailscaleAuth,
       remoteBootstrap: Boolean(options.trustVpn || options.tailscaleAuth),
     });

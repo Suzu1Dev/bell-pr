@@ -1,7 +1,7 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
-import { PairPage, takePairCode } from "./PairPage";
+import { PairPage, takePairHash } from "./PairPage";
 import { adoptApiToken } from "./api";
 import { parsePresentationFlags } from "./app/presentation";
 import {
@@ -19,8 +19,10 @@ import "./workspace-v2.css";
 // The address from `bell-pr open` carries the API token in the fragment.
 // Store it and drop it from the address before the router reads the hash.
 adoptApiToken(window);
-const isPairPage = window.location.pathname === "/pair";
-const pairCode = isPairPage ? takePairCode(window) : "";
+const hasRootInvite =
+  window.location.pathname === "/" && /(?:^|[#&])invite=bpi_[A-Za-z0-9_-]{43}/.test(window.location.hash);
+const isPairPage = window.location.pathname === "/pair" || hasRootInvite;
+const pairHash = isPairPage ? takePairHash(window) : { code: "", invite: "" };
 
 const root = ReactDOM.createRoot(document.getElementById("root")!);
 
@@ -28,7 +30,11 @@ function render(locale: Locale) {
   root.render(
     <React.StrictMode>
       <LocaleProvider locale={locale}>
-        {isPairPage ? <PairPage initialCode={pairCode} /> : <App />}
+        {isPairPage ? (
+          <PairPage initialCode={pairHash.code} initialInvite={pairHash.invite} />
+        ) : (
+          <App />
+        )}
       </LocaleProvider>
     </React.StrictMode>,
   );

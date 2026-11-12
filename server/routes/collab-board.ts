@@ -328,18 +328,17 @@ export function registerCollabBoardRoutes(
   };
 
   app.get("/api/collab/projects", participant, async (_req, res) => {
-    const body: CollabProjectsResponse = { projects: projects.list() };
-    if ((res.locals.actor as Actor).role === "admin") {
-      body.addable = await projects.addable();
-      const storage = await projects.storage();
-      if (storage) body.storage = storage;
-    }
+    const body: CollabProjectsResponse = {
+      projects: projects.list(),
+      addable: await projects.addable(),
+    };
+    const storage = await projects.storage();
+    if (storage) body.storage = storage;
     res.json(body);
   });
 
   app.post("/api/collab/projects", participant, async (req, res) => {
     const { repoId } = addSchema.parse(req.body);
-    if ((res.locals.actor as Actor).role !== "admin") throw adminOnly();
     const body: CollabAddProjectResponse = { project: await projects.add(repoId) };
     res.status(201).json(body);
   });

@@ -2,9 +2,9 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { createElement } from "react";
 import { renderEn, renderZh } from "./test-utils/render";
-import { PairPage, takePairCode } from "./PairPage";
+import { PairPage, parseInviteInput, takePairCode, takePairHash } from "./PairPage";
 
-test("QR code is consumed and the hash stripped immediately", () => {
+test("QR code and invite link hash are consumed and stripped immediately", () => {
   let replaced: unknown;
   const win = {
     location: { hash: "#code=TEST-CODE", search: "", pathname: "/pair" },
@@ -12,6 +12,17 @@ test("QR code is consumed and the hash stripped immediately", () => {
   };
   assert.equal(takePairCode(win as unknown as Pick<Window, "location" | "history">), "TEST-CODE");
   assert.equal(replaced, "/pair");
+
+  const token = `bpi_${"A".repeat(43)}`;
+  const inviteWin = {
+    location: { hash: `#invite=${token}`, search: "", pathname: "/pair" },
+    history: { state: null, replaceState: (_state: unknown, _title: string, url: unknown) => { replaced = url; } },
+  };
+  assert.deepEqual(
+    takePairHash(inviteWin as unknown as Pick<Window, "location" | "history">),
+    { code: "", invite: token },
+  );
+  assert.equal(parseInviteInput(`https://example.test:20002/pair#invite=${token}`), token);
 });
 
 test("query code is ignored", () => {

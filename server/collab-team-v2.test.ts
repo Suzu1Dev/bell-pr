@@ -853,3 +853,117 @@ test("Team review sign-offs, rationales, handoff TODOs, preflight gate, and lear
   const refreshedRun = f.workbench.run(run.id);
   assert.equal(refreshedRun.teamRecords?.fileReviews?.["src/handler.ts"], undefined);
 });
+
+test("Email & link invitations, email self-registration, email login, and member project addition", async (t: TestContext) => {
+  const f = await collabFixture(t);
+  const cast = await f.cast();
+  const sources = await mkdtemp(path.join(os.tmpdir(), "bell-collab-email-"));
+  t.after(() => rm(sources, { recursive: true, force: true }));
+
+  const repoPath = await createGitRepo(sources, "member-added-repo", {
+    "src/index.ts": "export const ready = true;\n",
+  });
+  const repo = await f.workbench.importRepository(repoPath);
+
+  // 1. Targeted email invite (`alice@example.com`)
+  const targeted = await f.post("/invites", cast.who.admin, {
+    email: "Alice@Example.com",
+  });
+  assert.equal(targeted.status, 201, targeted.body);
+  assert.equal(targeted.json.email, "alice@example.com");
+  assert.match(targeted.json.inviteToken, /^bpi_[A-Za-z0-9_-]{43}$/);
+  assert.match(targeted.json.inviteUrl, /\/pair#invite=bpi_/);
+
+  // Pre-registration invite-info returns reserved email without leaking token hash
+  const infoReply = await f.post("/auth/invite-info", {}, { code: targeted.json.inviteUrl });
+  assert.equal(infoReply.status, 200, infoReply.body);
+  assert.equal(infoReply.json.valid, true);
+  assert.equal(infoReply.json.email, "alice@example.com");
+
+  // Registering with a different email against a targeted invite is refused
+  const wrongEmail = await f.post("/auth/register", {}, {
+    code: targeted.json.inviteToken,
+    email: "intruder@example.com",
+    password: "strong-password-123",
+  });
+  assert.equal(outcome(wrongEmail), "403 inviteEmailMismatch");
+
+  // Alice self-registers using her email + password (without pre-created account or username)
+  const aliceReg = await f.post("/auth/register", {}, {
+    code: targeted.json.inviteUrl,
+    email: "alice@example.com",
+    name: "Alice Lin",
+    password: "strong-password-123",
+  });
+  assert.equal(aliceReg.status, 201, aliceReg.body);
+  assert.equal(aliceReg.json.name, "Alice Lin");
+  assert.equal(aliceReg.json.email, "alice@example.com");
+  assert.equal(aliceReg.json.admin, undefined);
+  assert.match(aliceReg.json.token, /^bpa_/);
+
+  // Targeted email invite is single-use once redeemed
+  const replay = await f.post("/auth/register", {}, {
+    code: targeted.json.inviteToken,
+    email: "alice2@example.com",
+    password: "strong-password-123",
+  });
+  assert.equal(outcome(replay), "400 invalidCode");
+
+  // Alice can sign back in with her email + password
+  const aliceLogin = await f.post("/auth/login", {}, {
+    username: "ALICE@example.com",
+    password: "strong-password-123",
+  });
+  assert.equal(aliceLogin.status, 200, aliceLogin.body);
+  assert.equal(aliceLogin.json.id, aliceReg.json.id);
+  assert.equal(aliceLogin.json.email, "alice@example.com");
+
+  // 2. Alice (a regular non-admin member!) sees `addable` and adds a project to the group
+  assert.match(aliceLogin.json.deviceToken, /^bpd_/);
+  const aliceHeaders = {
+    authorization: `Bearer ${aliceLogin.json.deviceToken}`,
+    [participantHeader]: aliceLogin.json.token,
+  };
+  const listForAlice = await f.send("GET", "/api/collab/projects", aliceHeaders);
+  assert.equal(listForAlice.status, 200, listForAlice.body);
+  assert.deepEqual(listForAlice.json.addable, [
+    { repoId: repo.id, name: "local/member-added-repo" },
+  ]);
+
+  const addedByAlice = await f.post("/projects", aliceHeaders, { repoId: repo.id });
+  assert.equal(addedByAlice.status, 201, addedByAlice.body);
+  assert.equal(addedByAlice.json.project.name, "local/member-added-repo");
+
+  // 3. Open shareable invite link allows multiple teammates to self-register with distinct emails
+  const openLink = await f.post("/invites", cast.who.admin, { link: true });
+  assert.equal(openLink.status, 201, openLink.body);
+  assert.equal(openLink.json.email, undefined);
+  assert.match(openLink.json.inviteToken, /^bpi_/);
+
+  const bobReg = await f.post("/auth/register", {}, {
+    code: openLink.json.inviteToken,
+    email: "bob@example.com",
+    password: "bob-password-123",
+  });
+  assert.equal(bobReg.status, 201, bobReg.body);
+  assert.equal(bobReg.json.name, "bob");
+  assert.equal(bobReg.json.email, "bob@example.com");
+
+  // Duplicate email is rejected
+  const dupBob = await f.post("/auth/register", {}, {
+    code: openLink.json.inviteToken,
+    email: "bob@example.com",
+    password: "another-password-123",
+  });
+  assert.equal(outcome(dupBob), "409 emailTaken");
+
+  // Another teammate (Carol) uses the same open link with her own email
+  const carolReg = await f.post("/auth/register", {}, {
+    code: openLink.json.inviteUrl,
+    email: "carol@example.com",
+    name: "Carol",
+    password: "carol-password-123",
+  });
+  assert.equal(carolReg.status, 201, carolReg.body);
+  assert.equal(carolReg.json.email, "carol@example.com");
+});

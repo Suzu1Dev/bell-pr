@@ -38,10 +38,13 @@ const m: Translation<typeof en> = {
     "佔用已結束，但任務再也無法標記為完成。相依它的工作須改為相依其他任務。詳情見主機的記錄。",
   notHolder: "只有佔用這些路徑的人可以釋出它們。",
   staleFence: "這項佔用在看板讀取之後有了變更。請重新載入看板再試。",
-  invalidCredentials: "帳號或密碼不正確，或這個帳號已被停用。",
+  invalidCredentials: "帳號、信箱或密碼不正確，或這個帳號已被停用。",
   usernameTaken: "這個小組裡已經有人使用這個帳號名稱。",
+  emailTaken: "這個小組裡已經有人使用這個信箱。",
+  invalidEmail: "請輸入有效的電子郵件信箱。",
+  inviteEmailMismatch: ({ email }) => `這份邀請專屬於 ${email}，請使用該信箱註冊。`,
   invalidAccountInput:
-    "請輸入 2 至 32 個英數字、點號、底線或連字號組成的帳號名稱，以及 8 至 128 個字元的密碼。",
+    "請輸入有效的信箱或帳號名稱（2 至 32 個英數字、點號、底線或連字號），以及 8 至 128 個字元的密碼。",
   tailscaleUnavailable:
     "這個連線未提供已驗證的 Tailscale 身分。請透過啟用 --tailscale-auth 的 Tailscale Serve 連線，或改用帳號密碼登入。",
   tailscaleUnlinked: ({ login }) =>
