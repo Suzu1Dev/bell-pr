@@ -62,7 +62,7 @@ test("an applied proposal says the editor holds its unrevised text and cannot be
   assert.match(pending, /套用建議草稿/);
   const applied = render(demoDraftPreparation, true);
   assert.match(applied, /已套用/);
-  assert.match(applied, /會原樣送到 GitHub/);
+  assert.match(applied, /說明會原樣發布/);
   assert.match(applied, /<button[^>]*disabled=""[^>]*>[\s\S]*?已套用/);
 });
 
@@ -107,7 +107,7 @@ test("the zh-TW template note and commit explanation keep their inline markup", 
     proposal: { ...demoDraftPreparation.proposal!, rules: [] },
   });
   assert.match(html, /依照「<strong>[^<]+<\/strong>」整理段落。/);
-  assert.match(html, /附上 <code>Signed-off-by: 姓名 &lt;email&gt;<\/code>，表示/);
+  assert.match(html, /附 <code>Signed-off-by: 姓名 &lt;email&gt;<\/code>，聲明/);
 });
 
 // English sample data with the demo's structure, so English renders carry no
@@ -199,7 +199,7 @@ test("the English panel renders every state, label and source kind without Han",
   assert.match(html, /Apply the suggested draft/);
   assert.match(html, /Suggested commit message/);
   assert.match(html, /Based on:<a /);
-  assert.match(html, /<p class="draft-guidance-commit-why">This suggestion only lays out the format the rules ask for\. The sign-off is your own statement: type it into the commit message field yourself; the model never fills it in\.<\/p>/);
+  assert.match(html, /<p class="draft-guidance-commit-why">This only shows the required format\. The sign-off is your own statement: type it into the commit message yourself\. The model never adds it\.<\/p>/);
   assert.match(html, /<summary>Why do projects ask for <code>type\(scope\)<\/code> or a sign-off\?<\/summary>/);
   assert.match(html, /<code>Signed-off-by: Your Name &lt;email&gt;<\/code>/);
   assert.match(html, /Base <code>0123456<\/code>/);

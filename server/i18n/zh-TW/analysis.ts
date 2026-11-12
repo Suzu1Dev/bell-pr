@@ -112,7 +112,7 @@ const m: Translation<typeof en> = {
           updated: "最近更新",
           stars: "星數最多",
         }[sort]
-      }的專案，每個專案最多 3 個開放中的 issue，每個 issue 最後 3 則留言。標籤不保證實際難度，也不保證工作仍可認領。讀取：僅 GitHub community profile 在根目錄、.github、docs 找到的 README、CONTRIBUTING 與 PR 範本。未讀取：帳號共用規範、多範本目錄、外部連結。`,
+      }的專案，各最多 3 個開放中 issue，每個 issue 最後 3 則留言。標籤不保證難度或仍可認領。讀取：GitHub community profile 在根目錄、.github、docs 找到的 README、CONTRIBUTING、PR 範本。未讀取：帳號共用規範、多範本目錄、外部連結。`,
     screening: ({ repository }) =>
       `正在檢查 ${repository} 的 issue、貢獻文件與維護者回應。`,
     repositoryUnconfirmed: ({ repository }) =>
@@ -137,7 +137,7 @@ const m: Translation<typeof en> = {
     noPushTime: "GitHub 未提供可驗證的最後推送時間。",
     candidateBytesLimit: "來源已達每個專案 30 KB 上限，部分內容未讀取。",
     requestLimit:
-      "探索達到 36 次請求或 90 秒上限，已保留取得的結果；尚未完整讀取其餘候選來源。",
+      "探索達 36 次請求或 90 秒上限，已保留現有結果；其餘候選來源未讀完。",
     noCandidates:
       "候選資料未能通過公開狀態與來源驗證，這次沒有可分析的專案；可稍後重試或調整條件。",
   },
@@ -157,7 +157,7 @@ const m: Translation<typeof en> = {
     documentLimit: "文件取樣達到 16 份或 80 KB 上限；尚未完整檢查所有規範。",
     readFailed: ({ label }) => `${label} 讀取失敗，尚未確認其規範。`,
     searchScope:
-      "本機規範搜尋範圍（基準版本）：根目錄、.github、docs 與 documentation 內常見的貢獻指南、README、維護者文件及 PR 範本；根目錄的 AGENTS.md／CLAUDE.md；.github/workflows 中會自動檢查 PR 的流程。文件中連往其他位置的連結未讀取。",
+      "本機規範搜尋範圍（基準版本）：根目錄、.github、docs 與 documentation 內常見的貢獻指南、README、維護者文件及 PR 範本；根目錄的 AGENTS.md／CLAUDE.md；.github/workflows 中檢查 PR 的流程。未追蹤文件內的連結。",
     automationLimit: ({ max, remaining }) =>
       `自動檢查流程最多收錄 ${max} 份；其餘 ${remaining} 個 workflow 尚未檢查。`,
     workflowScanLimit: ({ total, max }) =>
@@ -168,7 +168,7 @@ const m: Translation<typeof en> = {
     noRemote:
       "未提供可驗證的 github.com 專案網址，尚未檢查 GitHub 維護者討論與帳號共用預設規範。",
     metadataFailed:
-      "GitHub 維護者討論與帳號共用資訊讀取失敗（可能是權限、連線或 API 限制）；不能據此判定沒有額外規範。",
+      "讀不到 GitHub 的維護者討論與帳號共用資訊（或因權限、連線、API 限制）；仍可能有其他規範。",
     defaultsTruncated:
       "帳號共用 .github 的檔案清單已截斷；尚未完整檢查預設規範。",
     defaultsNotPublic:
@@ -178,7 +178,7 @@ const m: Translation<typeof en> = {
     defaultsFailed:
       "帳號共用 .github 預設規範讀取失敗；尚未確認是否存在適用規範。",
     maintainerSample:
-      "維護者偏好僅取樣最近更新的 3 個已合併 PR，各最多 5 則留言及 5 則 review；已合併不等於規範認可，仍需人工確認適用性。",
+      "維護者偏好取自最近更新的 3 個已合併 PR，各最多 5 則留言與 5 則 review。已合併不代表認可，請逐項確認。",
     maintainerComment: ({ number, association }) =>
       `PR #${number} · ${association} 留言`,
     maintainerReview: ({ number, association }) =>
@@ -192,7 +192,7 @@ const m: Translation<typeof en> = {
       "提交訊息建議不能包含 Signed-off-by 等署名欄位；簽署只能由本人輸入。",
     commitMessageSource: "提交訊息建議引用的來源不存在，請重新產生。",
     commitTrailer: ({ label, quote, line, title }) =>
-      `${title ? "主旨沿用 PR 標題。" : ""}${label} 要求加上 AI trailer（「${quote}」），所以訊息最後一行是 ${line}，寫明這次變更由哪個 Agent 撰寫。`,
+      `${title ? "主旨沿用 PR 標題。" : ""}${label} 要求 AI trailer（「${quote}」），所以訊息以 ${line} 結尾，註明撰寫的 Agent。`,
     ruleQuoteMismatch: "PR 草稿的規範引用無法對應來源，請重新產生。",
     templateNotUsed: "PR 草稿未採用目標專案提供的範本，請重新產生。",
     templateHeadingsMissing: "PR 草稿缺少專案範本的段落標題，請重新產生。",
@@ -204,7 +204,7 @@ const m: Translation<typeof en> = {
     placeholdersInBody: ({ lines }) =>
       `PR 草稿把待辦事項或未填的範本欄位寫進了會送到 GitHub 的說明（第 ${lines} 行），請重新產生。`,
     provisionalLinuxPolicy:
-      "來源查找有範圍限制或未完成項目，暫用 Linux 投稿寫作原則；發布前請人工確認專案規定。",
+      "來源查找受限或未完成，暫用 Linux 投稿寫作原則；發布前請確認專案規定。",
     noSafeDiff: "目前沒有可用來撰寫 PR 的安全程式碼差異。",
     diffTooLarge: "差異超過 PR 草稿的 100 KB 上限；請拆分變更後重試。",
   },

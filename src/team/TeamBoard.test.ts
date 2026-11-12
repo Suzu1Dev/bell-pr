@@ -68,7 +68,7 @@ test("a failed real run offers the retry form, opens failure reasons and marks c
   };
   const html = renderZh(board(run, false, async () => {}));
   assert.match(html, /重試失敗的子任務/);
-  assert.match(html, /1 個已整合的子任務不會重跑。1 個失敗或受阻的子任務/);
+  assert.match(html, /1 個已整合的子任務不會重跑。1 個失敗或受阻的會丟棄舊工作目錄/);
   assert.match(html, /aria-label="給重試子任務的補充說明"/);
   assert.match(html, /獨立工作目錄已清理/);
   assert.match(html, /查看失敗原因/);
@@ -301,7 +301,7 @@ test("the English board renders every phase without Han", () => {
   assert.doesNotMatch(sample, /Waits for/);
   assert.match(sample, /The app saw 2 commands run/);
   assert.match(sample, /Delivered · Sample/);
-  assert.match(sample, /BELL PR coordinates the team/);
+  assert.match(sample, /BELL PR runs its own coordination/);
   const integrating = renderEn(
     board(runs.find(([name]) => name === "integrating")![1], false),
   );
@@ -360,7 +360,7 @@ test("English plan revisions and retries use whole sentences with English plural
   );
   assert.match(
     retry,
-    /1 subtask already integrated will not run again\. 1 subtask that failed or was blocked will discard its old working directory/,
+    /1 subtask already integrated won&#x27;t rerun\. 1 subtask that failed or was blocked restarts from a fresh snapshot, discarding its old working directory/,
   );
   assert.match(retry, /View the failure reason/);
   assert.match(retry, /Retry failed subtasks/);
@@ -620,9 +620,9 @@ test("the protocol note sits in a How it works disclosure", () => {
   const html = english(englishRun);
   assert.match(
     html,
-    /<details class="team-how"><summary><svg[^>]*>[\s\S]*?<\/svg>How it works<svg[^>]*>[\s\S]*?<\/svg><\/summary><p class="team-protocol-note"><svg[^>]*>[\s\S]*?<\/svg>BELL PR coordinates the team[^<]*It is not Claude Code&#x27;s native Agent Teams\.<\/p><\/details>/,
+    /<details class="team-how"><summary><svg[^>]*>[\s\S]*?<\/svg>How it works<svg[^>]*>[\s\S]*?<\/svg><\/summary><p class="team-protocol-note"><svg[^>]*>[\s\S]*?<\/svg>BELL PR runs its own coordination[^<]*It is not Claude Code&#x27;s native Agent Teams\.<\/p><\/details>/,
   );
-  assert.match(renderZh(board(demoRunZh, true)), /<summary>[\s\S]*?運作方式[\s\S]*?並非 Claude Code 原生 Agent Teams/);
+  assert.match(renderZh(board(demoRunZh, true)), /<summary>[\s\S]*?運作方式[\s\S]*?這並非 Claude Code 原生 Agent Teams/);
 });
 
 test("the message list can take focus and is named for screen readers", () => {

@@ -973,12 +973,6 @@
   outline-offset: 0;
   box-shadow: var(--focus-ring-inset);
 }
-/* The global ring is drawn outside the box; these scroll, so it would be clipped. */
-:root .mission-idea-list:focus-visible,
-:root .mission-section-nav ul:focus-visible {
-  outline-offset: 0;
-  box-shadow: var(--focus-ring-inset);
-}
 .mission-idea-new {
   border-color: var(--color-brand-300);
 }

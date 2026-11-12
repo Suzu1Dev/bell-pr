@@ -318,7 +318,7 @@ test("a follow-up round previews its commit and pushes to the PR branch instead 
     { followUp: { ...round, kind: "sync" } },
   );
   assert.match(sync, /<h2 id="modal-title">把同步結果推送到 PR。<\/h2>/);
-  assert.match(sync, /這會在 PR 分支加上一個合併 commit/);
+  assert.match(sync, /一個合併 commit 把最新的目標分支帶進 PR 分支/);
 });
 
 const round = {

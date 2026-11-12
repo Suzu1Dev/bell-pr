@@ -21,9 +21,9 @@ export default {
       ? "Set up this machine: 1 item from the setup checklist, then rerun the check it blocked."
       : `Set up this machine: ${count} items from the setup checklist, then rerun the checks they blocked.`,
   setupFullAccessOnly:
-    "Only a run that started with Full access can hand its setup to an Agent. Run the commands yourself, or start a new contribution with Full access.",
+    "Only a Full access run can hand setup to an Agent. Run the commands yourself, or start a new contribution with Full access.",
   setupNotListed: "That setup item is no longer on this run's list. Reload the run and choose again.",
-  setupUnsafe: `${product.name} never hands an Agent a command that downloads something and runs or chains it, or pipes into a shell or another interpreter. Check it and run it yourself.`,
+  setupUnsafe: `${product.name} never gives an Agent a command that downloads and runs or chains something, or pipes into a shell or interpreter. Check and run it yourself.`,
   draftUpdated:
     "Updated the PR draft's verification results and remaining limitations.",
   stopped: "This conversation turn was stopped",

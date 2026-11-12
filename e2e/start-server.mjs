@@ -143,7 +143,7 @@ async function completeOnboarding(context) {
  * Resolves with the base URL, the data dir and stop().
  */
 export async function launchServer(options = {}) {
-  const { env = {}, seed, settingsPut = true } = options;
+  const { env = {}, seed, settingsPut = true, force = true } = options;
   const port = options.port ?? (await freePort());
   const temp = await mkdtemp(path.join(os.tmpdir(), "bellpr-e2e-"));
   const home = path.join(temp, "home");
@@ -168,9 +168,10 @@ export async function launchServer(options = {}) {
     });
     child = spawn(
       process.execPath,
-      // Fake CLIs fail the readiness gate. --force is what keeps these
-      // servers, including the sample tour, able to start.
-      [bin, "start", "--force", "--no-open", "--port", String(port)],
+      // Fake CLIs fail the provider check. --force is what keeps these
+      // servers, including the sample tour, able to start when another
+      // required check fails too. Pass force: false to start without it.
+      [bin, "start", ...(force ? ["--force"] : []), "--no-open", "--port", String(port)],
       {
         cwd: root,
         env: serverEnvironment({ home, dataDir, fakeBin, env }),

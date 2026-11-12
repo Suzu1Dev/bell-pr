@@ -15,9 +15,9 @@ export default {
   setupRequested: ({ count }: { count: number }) =>
     `請準備這台機器的環境：環境清單中的 ${count} 個項目，並重跑因此受阻的檢查。`,
   setupFullAccessOnly:
-    "只有以完整權限開始的任務，才能把環境準備交給 Agent。請自行執行這些指令，或用完整權限開始新的貢獻。",
+    "只有完整權限的任務能把環境準備交給 Agent。請自行執行指令，或以完整權限開始新貢獻。",
   setupNotListed: "這個環境項目已經不在這個任務的清單上，請重新載入後再選擇。",
-  setupUnsafe: `${product.name} 不會把「下載後執行或串接其他指令」或「以 pipe 交給 shell 或其他直譯器」的指令交給 Agent；請自行確認後執行。`,
+  setupUnsafe: `${product.name} 不會把「下載後執行或串接」或「pipe 給 shell 或直譯器」的指令交給 Agent；請自行確認後執行。`,
   draftUpdated: "已更新 PR 草稿的驗證結果與剩餘限制。",
   stopped: "這輪對話已停止",
   failed: "這輪對話未完成",

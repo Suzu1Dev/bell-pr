@@ -78,7 +78,7 @@ const mission = {
       `try ${n(attempt)} of ${n(attempts)}`,
     /** `elapsed` arrives as a clock time such as "3:05". */
     elapsed: ({ elapsed }: { elapsed: string }) => `Running for ${elapsed}`,
-    note: "The bar shows the time used against this step's time limit, not how much of the work is done. When a step has no time limit to show, the bar only moves.",
+    note: "The bar shows time used against this step's limit, not work done. Without a limit, it just moves.",
   },
   project: {
     sourceDemo: "Sample analysis",
@@ -112,9 +112,9 @@ const mission = {
     unknown:
       "The project has been updated. This analysis comes from an earlier version and the changes cannot be listed; re-analyze before you settle on a direction.",
     sameContent:
-      "The version changed, but the files this analysis cites are the same. Other changes may still affect the overview; re-analyze before you settle on a direction.",
+      "The version changed, but no cited file did. Other changes may still affect the overview; re-analyze before choosing a direction.",
     uncited: ({ changed, sha }: { changed: number; sha?: string }) =>
-      `At least ${amount(changed, "file", "files")} changed ${since(sha)}. The files this analysis cites did not change, but other changes may still affect the overview; re-analyze before you settle on a direction.`,
+      `At least ${amount(changed, "file", "files")} changed ${since(sha)}, none of them cited. They may still affect the overview; re-analyze before choosing a direction.`,
     /** `files` arrives as a list formatted for the locale; `capped` means the server listed its maximum. */
     cited: ({
       changed,
@@ -129,7 +129,7 @@ const mission = {
       capped: boolean;
       files: string;
     }) =>
-      `At least ${amount(changed, "file", "files")} changed ${since(sha)}, including ${capped ? `${n(cited)} or more files` : amount(cited, "file", "files")} that this analysis cites: ${files}. Re-analyze before you settle on a direction.`,
+      `At least ${amount(changed, "file", "files")} changed ${since(sha)}, including ${capped ? `${n(cited)} or more cited files` : amount(cited, "cited file", "cited files")}: ${files}. Re-analyze before choosing a direction.`,
   },
   /** The sticky nav that links to the overview's sections. */
   sections: {
@@ -201,16 +201,16 @@ const mission = {
     premiseRefuted: "Based on an assumption the check refuted",
     premiseUnclear: "Based on an unconfirmed assumption",
     impactRefuted:
-      "The premise check found that the assumption does not hold: the problem and impact described above from it do not happen. Go by the check and the Lead's integration report.",
+      "The premise check refuted this assumption, so the problem and impact above don't happen. Rely on the check and the Lead's integration report.",
     premiseMissing:
-      "This contribution was made before premise checks, so whether the request's assumption holds was not recorded. The lead can check it once against the current code and the review reports. The code walkthroughs, and the explanations you have not answered yet, are then made again with the verdict.",
+      "This contribution predates premise checks, so its assumption was never checked. The Lead can check it once against current code and review reports. Code walkthroughs and unanswered explanations then update to match.",
     premiseCheck: "Check the premise against the review",
     premiseRecheck: "Check the premise again",
     premiseChecking: "Checking the premise…",
     premiseRecheckNote:
       "If the verdict changes, the code walkthroughs, and the explanations you have not answered yet, are made again with it.",
     pending:
-      "The user impact of this contribution has not been analyzed yet. Your original request is kept here; once the analysis is done, it is tied to a concrete motivation and acceptance checks.",
+      "User impact is not analyzed yet. Your request is kept here; the analysis will tie it to a motivation and acceptance checks.",
   },
   evidence: {
     none: "No file evidence yet; confirm it before you start.",
@@ -275,11 +275,11 @@ const mission = {
     droppedIdeas: ({ count }: { count: number }) =>
       `Skipped ${amount(count, "recommendation", "recommendations")} whose quotes failed the check`,
     droppedIdeasNote:
-      "These recommendations quoted text that was not in the excerpts sent to the model, so only their title and reason are kept. The rest of the analysis is saved as usual, and you can generate more recommendations to make up for them.",
+      "Their quotes weren't in the excerpts the model saw, so only title and reason are kept. The rest is saved; generate more to replace them.",
     droppedPaths: ({ count }: { count: number }) =>
       `Skipped ${amount(count, "note", "notes")} citing unsampled or missing files`,
     droppedPathsNote:
-      "The model read only the sampled files, so notes that cite other files cannot be checked and were skipped. The rest of the analysis is saved as usual.",
+      "The model read only sampled files, so notes citing others couldn't be checked. The rest is saved.",
     /** Where a dropped recommendation came from. */
     rounds: {
       analysis: "Project analysis",
@@ -384,7 +384,7 @@ const mission = {
     },
     issue: {
       label: "Related issue link",
-      help: "Only GitHub issue URLs are accepted. With one, the PR draft can write Fixes or Refs #number. Before you submit, comment on the issue to say you will work on it.",
+      help: "GitHub issue URLs only. The PR draft can then write Fixes or Refs #number. Before publishing, claim the issue in a comment.",
     },
     model: {
       heading: "Model and reasoning effort",
@@ -395,7 +395,7 @@ const mission = {
         claude:
           "Uses the Claude Code CLI you installed and signed in to (Claude plan or Anthropic API key). Usage counts against your own account. Available models depend on your plan.",
         antigravity:
-          "Uses the Antigravity CLI (agy) you installed and signed in to (Google account, Gemini API key or Google Cloud credentials). Usage counts against your own account, and the models listed depend on it. Antigravity does not start in a project that ships Antigravity hooks, MCP servers, plugins, agents or skills.",
+          "Uses the Antigravity CLI (agy) you installed and signed in to (Google account, Gemini API key or Google Cloud credentials). Usage counts against your own account. Listed models depend on it. It won't start in projects shipping Antigravity hooks, MCP servers, plugins, agents or skills.",
       } satisfies Record<AgentProvider, string>,
       /** A provider in the list with its state, for example "Codex — not signed in". */
       providerOption: ({ provider, state }: { provider: string; state: string }) =>
@@ -430,7 +430,7 @@ const mission = {
       webPages: "Let Agents read web pages",
       antigravityWeb: "Antigravity can always search the web, including during project analysis and discovery. This switch only controls reading web pages.",
       webAccessHelp:
-        "Applies to tasks and follow-ups. Project analysis and discovery do not use these tools. Web content is treated as untrusted. Command-line network access still follows the chosen permissions.",
+        "Only for tasks and follow-ups, not analysis or discovery. Web content is treated as untrusted. Terminal network access still follows your permissions.",
       error: ({ message }: { message: string }) =>
         `${message} Your saved choice is kept.`,
       loadFailed: ({ provider }: { provider: string }) =>
@@ -445,7 +445,7 @@ const mission = {
         full: "Full",
         off: "Off",
       } satisfies Record<PonytailMode, string>,
-      help: "Lean: a short rule set that curbs overbuilding. Full: more rules, preferring existing code and native features. Off: lets you compare results and usage across modes.",
+      help: "Lean: short rules against overbuilding. Full: more rules, favoring existing code and native features. Off: compare results and usage.",
       link: "About Ponytail",
     },
     team: {
@@ -531,7 +531,7 @@ const mission = {
     notFound: ({ files }: { files: number }) =>
       `Not found in the ${amount(files, "file", "files")} ${product.name} read. Some projects publish their rules on a website or wiki; check before you publish.`,
     noFiles:
-      "No contributing guide, policy or pull request template was there to read. Some projects publish their rules on a website or wiki; check before you publish.",
+      "No contributing guide, policy or pull request template found. Some projects publish their rules on a website or wiki; check before you publish.",
     couldntCheck: ({ reason }: { reason: string }) => `Couldn't check: ${reason}`,
     notRead: "the rules have not been read yet. Choose Check again to read them.",
     filesRead: ({ count }: { count: number }) =>
@@ -625,7 +625,7 @@ const mission = {
     pacing: ({ open, budget }: { open: number; budget: number }) =>
       `${product.name} won't publish this while you have ${n(open)} open pull requests here, at least twice your limit of ${n(budget)}.`,
     lesson:
-      "Issues labelled for newcomers are how people learn a project by writing the fix themselves. When an Agent team takes one, the next newcomer loses that chance. Consider a help-wanted issue instead.",
+      "Newcomer issues teach people a project through their own fix; an Agent team taking one costs the next newcomer that chance. Try a help-wanted issue instead.",
     practiseLocally: "Start and practise locally",
     startAnyway: "Start anyway",
     back: "Back",

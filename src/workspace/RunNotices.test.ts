@@ -63,7 +63,7 @@ test("the unsandboxed badge links to the safety settings and explains itself", (
   assert.match(html, /Ran without sandbox/);
   assert.match(
     html,
-    /<span id="unsandboxed-help" class="unsandboxed-help" role="tooltip">You allowed Agents to run without the operating system&#x27;s sandbox/,
+    /<span id="unsandboxed-help" class="unsandboxed-help" role="tooltip">You let Agents skip the OS sandbox, so they could read or change files outside the working directory\./,
   );
   assertNoHan(html);
   assert.match(renderZh(createElement(UnsandboxedBadge)), /未使用沙箱執行/);
@@ -81,7 +81,7 @@ test("a run approved without the understanding check keeps a badge that says wha
   assert.match(approved, /<a href="#\/settings\/learning" aria-describedby="check-off-help">/);
   assertNoHan(approved);
   const setting = renderEn(createElement(UnderstandingOffBadge, { approved: false }));
-  assert.match(setting, /The understanding check is off, so you can approve without explaining the change back\./);
+  assert.match(setting, /You can approve without explaining the change back\. Runs approved this way stay marked\./);
   assert.match(renderZh(createElement(UnderstandingOffBadge, { approved: true })), /理解檢查已關閉/);
 });
 

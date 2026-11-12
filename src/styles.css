@@ -70,10 +70,10 @@ a {
 :root .rv-line:focus-visible,
 :root .review-toolbar:focus-visible,
 :root .file-tree:focus-visible,
-:root .rv-code-scroll:focus-visible,
 :root .mission-idea-list:focus-visible,
 :root .mission-section-nav ul:focus-visible,
 :root .publish-body-preview pre:focus-visible {
+  outline-offset: 0;
   box-shadow: var(--focus-ring-inset);
 }
 a {

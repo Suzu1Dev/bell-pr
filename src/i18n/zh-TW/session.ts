@@ -36,7 +36,7 @@ const messages: Translation<typeof en> = {
   "copyFailed": "無法複製指令。",
   "limitationsNotice": "PR 草稿的 Limitations 段落寫著還有未完成或沒有驗證的項目。",
   "limitationsAction": "請 Agent 處理這些未完成的項目",
-  "limitationsIntro": "PR 草稿的 Limitations 寫到以下項目尚未完成或沒有驗證，請在可以做到的範圍內補做（修正程式碼、補測試、執行檢查），做不到的請說明原因並問我需要什麼。請將已執行的驗證寫入 Validation，Limitations 只保留尚未覆蓋的項目與實際限制，並修正兩段中過時的說明：\n\n",
+  "limitationsIntro": "處理下方 PR 草稿 Limitations 的項目：盡量補做，做不到的說明原因並告訴我需要什麼。已完成的驗證移到 Validation，Limitations 只留缺口與實際限制，並修正兩段過時的說明：\n\n",
   "blocks": {
     "running": "這輪對話完成後才能開始下一輪。",
     "publishing": "正在發布 PR，完成後才能和 Agent 協作。",

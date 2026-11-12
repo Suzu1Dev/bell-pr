@@ -607,7 +607,8 @@ export function ExplanationPanel({
                   </h3>
                   <MarkdownContent>{explanation.reason}</MarkdownContent>
                 </section>
-                <details className="explain-card explain-card-example" open={!explanation.example}>
+                {/* Open when there is a diagram to see, so it is not missed behind the summary. */}
+                <details className="explain-card explain-card-example" open={!explanation.example || exampleSteps}>
                   <summary><MessageCircle size={15} /> {t.explain.cards.example}</summary>
                   {explanation.example ? (
                     <>

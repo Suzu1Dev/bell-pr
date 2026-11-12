@@ -538,6 +538,10 @@ not. `bell-pr doctor` warns, and does not fail, when Full access is saved and
 when passwordless sudo is available. It tells BELL PR's rule file apart from
 another rule. On Linux it runs `sudo -n true` and uses only the exit code.
 It does not run that command on other platforms, or when sudo is not installed.
+It reports an error when BELL PR's rule file is past its expiry time or has
+no valid one, with the command that removes it. It reads only the file's
+expiry line and never changes the file; `bell-pr doctor --sudoers-path <file>`
+inspects another file.
 
 The Full access confirmation and its help show:
 
@@ -545,7 +549,24 @@ The Full access confirmation and its help show:
 
 On Linux, the optional sudo control accepts a password to install a validated
 `/etc/sudoers.d/bell-pr-agent` rule granting the user
-account that runs BELL PR `NOPASSWD: ALL`.
+account that runs BELL PR `NOPASSWD: ALL` for a set time.
+Every enable asks for the password and a duration from 1 minute to 8 hours
+(1 hour by default); there is no setting without an end. The rule is checked
+with `visudo -c`, staged next to the target as mode 0440 owned by root and
+the account's group, checked again and renamed into place. Its comment line
+`# bell-pr-expires-at:` records the end time in UTC. BELL PR removes the rule
+when the time is up, and at startup removes a rule past its time or without
+one. Removal is confirmed by checking that the file is gone. While sudo
+already needs no password, enabling is refused with 409 before any password
+is sent; remove the rule, or wait until it ends, and enable it again.
+Only the install token may use the control, from this computer
+(a loopback address), with the host `localhost`, `127.0.0.1` or `[::1]`,
+and without `X-Forwarded-For`, `Forwarded`, `X-Forwarded-Host`,
+`X-Forwarded-Proto` or `X-Real-IP`. A paired device, the
+`BELLPR_PUBLIC_URL` host and `*.ts.net` hosts get 403.
+Enable, disable, expiry, startup removal and refused requests are appended to
+`audit/sudo.jsonl` in the data directory, one JSON object per line; refused
+requests are recorded up to 10 a minute, then counted in one line.
 The password is passed to sudo over standard input, never saved or logged, and
 cleared from the input after submission. This grants that account passwordless
 root commands, including to processes outside BELL PR. Three failed password
@@ -574,8 +595,13 @@ The sudo panel and the doctor warning for that file show:
   local checkout is cloned there as well (`--no-hardlinks`, no submodules):
   runs never add worktrees or branches to your own repository. If the
   checkout's origin is on GitHub, BELL PR's clone points at GitHub and runs
-  fetch from there; otherwise the clone keeps no remote and runs start from
-  its own branches. A project that an earlier version imported in place
+  fetch from there. That origin is the first URL saved in the checkout, so a
+  global `url.*.insteadOf` rewrite does not change which project it is. An
+  origin whose URL contains userinfo is not used as a GitHub source: the
+  project is imported as a local one, and that address is not stored or
+  logged. Otherwise the clone keeps no remote and runs start from its own
+  branches.
+  A project that an earlier version imported in place
   moves to such a clone when its next run starts, once none of its runs
   still has a worktree in your repository; until then its runs, new ones
   included, keep working there. Branches those runs already added stay in

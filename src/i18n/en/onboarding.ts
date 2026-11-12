@@ -27,7 +27,17 @@ export default {
     title: "Your AI provider",
     text: "Agents use the AI provider you choose here for runs and project analysis. You can change it later in the model settings.",
     choose: "More than one AI provider is ready. Which one should your Agents use?",
-    none: "No AI provider is ready yet. Install and sign in to the Codex CLI, Claude Code or the Antigravity CLI (see the previous step), then check again. You can still take the sample tour.",
+    none: `No AI provider is ready yet. Install and sign in to one, as the same user that runs ${product.name}, then check again. You can still take the sample tour.`,
+    codexDocs: "See the Codex CLI for other ways to install it.",
+    codexDocsLabel: "Codex CLI",
+    codexDocsUrl: "https://github.com/openai/codex",
+    claudeDocs: "See the Claude Code documentation for other ways to install it.",
+    claudeDocsLabel: "Claude Code documentation",
+    claudeDocsUrl: "https://code.claude.com/docs/en/overview",
+    commandLabel: ({ command }: { command: string }) => `Scroll the command: ${command}`,
+    antigravityDocs: "See the Antigravity documentation for other ways to install it.",
+    antigravityDocsLabel: "Antigravity documentation",
+    antigravityDocsUrl: "https://antigravity.google/docs",
     checking: "Checking which AI providers are ready…",
     saving: "Saving…",
     saved: ({ provider }: { provider: string }) => `Your Agents use ${provider}.`,
@@ -50,7 +60,7 @@ export default {
      * the step has no line of its own under its title.
      */
     importText:
-      "Bring a project from GitHub or from this computer and start contributing. Every contribution ends with you explaining the change back; you can change that in Settings → Learning.",
+      "Import from GitHub or this computer. Each contribution ends with you explaining the change back; turn that off in Settings → Learning.",
     /** While BELLPR_REQUIRE_UNDERSTANDING_CHECK keeps the check on: Settings can't change it. */
     importTextLocked:
       "Bring a project from GitHub or from this computer and start contributing. Every contribution ends with you explaining the change back.",

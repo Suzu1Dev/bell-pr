@@ -80,7 +80,7 @@ const team = {
   },
   revise: {
     action: "Send back with feedback",
-    hint: "If the split does not make sense, the scope is too large, a test task is missing or the dependencies look odd, write down why. The lead then re-plans. It is a chance to practice splitting work into tasks.",
+    hint: "Split looks wrong, scope too large, a test task missing or odd dependencies? Say why and the Lead re-plans. Good practice in splitting work.",
     label: "Feedback on the plan",
     placeholder:
       "For example: split the API and the UI into two tasks, and add a task that only writes tests.",
@@ -91,7 +91,7 @@ const team = {
   },
   retry: {
     partial: ({ kept, retried }: { kept: number; retried: number }) =>
-      `${subtaskCount(kept)} already integrated will not run again. ${subtaskCount(retried)} that failed or ${retried === 1 ? "was blocked will discard its old working directory" : "were blocked will discard their old working directories"} and start again from a fresh snapshot.`,
+      `${subtaskCount(kept)} already integrated won't rerun. ${subtaskCount(retried)} that failed or ${retried === 1 ? "was blocked restarts from a fresh snapshot, discarding its old working directory" : "were blocked restart from a fresh snapshot, discarding their old working directories"}.`,
     integrationOnly:
       "All subtasks are integrated; a retry only runs the Lead's integration and the independent review again.",
     notStarted:
@@ -186,7 +186,7 @@ const team = {
   setupNeeds: {
     title: "Setup this computer needs from you",
     intro:
-      "The Agent could not finish these checks with the permissions and environment it had. Each command is an Agent's suggestion: check it against the project's documentation before you run it. After installing, you can rerun the checks in the working directory, and later contributions can run them directly. With Full access, the Agent can try the installs first; a password prompt or anything else it cannot resolve still needs you.",
+      "The Agent couldn't finish these checks with its permissions and environment. Check each suggested command against the project's documentation first. After installing, rerun the checks in the working directory; later contributions run them directly. With Full access, the Agent can try installing first; password prompts and what it can't resolve still need you.",
     reportedBy: ({ names }: { names: string }) => `Reported by ${names}`,
     /** Who reported a need: a follow-up round, by its number among the run's rounds. */
     round: ({ number }: { number: number }) => `Follow-up round ${number}`,
@@ -195,10 +195,10 @@ const team = {
     /** Handing the list to an agent on a Full access run (src/team/SetupHandOff.tsx). */
     handOffAction: "Let the Agent set this up",
     handOffNote:
-      "This run has Full access, so an Agent can install the items you choose, without the sandbox and with your account, then rerun the checks they blocked. You confirm the exact commands first.",
-    handOffUnsafe: `${product.name} never hands this command to an Agent: it downloads something and runs or chains it, or pipes into a shell or another interpreter. Check it and run it yourself.`,
+      "With Full access, an Agent can install your chosen items unsandboxed, under your account, then rerun the checks they blocked. You confirm the exact commands first.",
+    handOffUnsafe: `${product.name} never hands this command to an Agent: it downloads and runs or chains something, or pipes into a shell or interpreter. Check and run it yourself.`,
     allHandled:
-      "The Agent reports every item it can take as installed or already present. The Collaborate tab has the details; anything left here is yours to run.",
+      "The Agent reports every item it can take as installed or already present (details: Collaborate tab). Run what's left here yourself.",
     outcomeLine: ({ outcome, time }: { outcome: string; time: string }) => `Agent reports: ${outcome} (${time})`,
     unreportedLine: ({ time }: { time: string }) => `The setup turn at ${time} ended without a result for this item.`,
     resultsTitle: "Setup results (the Agent's report)",
@@ -213,20 +213,20 @@ const team = {
     dialog: {
       title: "Let the Agent set up this computer?",
       intro:
-        "Earlier Agents suggested these commands while reading the project, so check them. The Agent runs only the ones you tick and only when they match the project's documentation. It may add non-interactive flags such as -y, run sudo as sudo -n and refresh the package index, but never swaps in another command. It then verifies each item, reruns the checks they blocked and reports each one.",
+        "Earlier Agents suggested these commands; check them. The Agent runs only ticked ones matching the project's documentation. It may add non-interactive flags like -y, use sudo -n and refresh the package index, but never swaps in another command. Then it verifies each item, reruns blocked checks and reports.",
       choose: "Commands to hand over",
       sudoTag: "uses sudo",
       limit: ({ limit }: { limit: number }) =>
         `At most ${limit} items per turn; the rest stay on the list for the next turn.`,
       sudoPasswordless: ({ user }: { user: string }) =>
-        `sudo runs without a password for ${user} here, so the Agent can run these sudo commands as root, unless a sudo rule limits which commands may run that way.`,
+        `${user} has passwordless sudo here, so the Agent can run these sudo commands as root, unless a sudo rule restricts them.`,
       sudoPassword: ({ user }: { user: string }) =>
-        `sudo asks ${user} for a password here, and the Agent never enters one. So an item that needs sudo comes back to you. If a sudo rule lets a command run without a password, the Agent runs that command as root instead. Run the rest yourself, or turn on Passwordless sudo in the model settings; that lets every process under your account run any command as root.`,
+        `sudo asks ${user} for a password here, and the Agent never enters one, so sudo items come back to you unless a sudo rule allows them passwordless. Or turn on Passwordless sudo in the model settings, which gives every process under your account root.`,
       sudoMissing: "sudo is not installed here, so items that need it come back to you.",
-      sudoUnknown: `${product.name} could not tell whether sudo needs a password here. The Agent runs sudo only as sudo -n, so a password prompt stops that item and it comes back to you.`,
+      sudoUnknown: `${product.name} could not tell whether sudo needs a password here. The Agent uses only sudo -n; a password prompt returns that item to you.`,
       runs: "The Agent runs without the sandbox, with your account. Usage counts against your own account.",
       review:
-        "The Agent is told not to change code. A file it does change, such as a lockfile an install step rewrites, loses its review mark. A change to the files or to the PR draft's Validation and Limitations returns an approved contribution to review.",
+        "The Agent is told not to change code; any file it changes (say, a rewritten lockfile) loses its review mark. Changes to files or the PR draft's Validation and Limitations return an approved contribution to review.",
       stop: "Follow and stop it on the Collaborate tab. Stopping does not undo what was installed. An install already started through sudo may finish anyway.",
       confirm: ({ count }: { count: number }) =>
         `Start the Agent (${count === 1 ? "1 command" : `${count} commands`})`,
@@ -238,7 +238,7 @@ const team = {
   guide: "The guide",
   howItWorks: "How it works",
   protocolNote: ({ provider }: { provider: string }) =>
-    `${product.name} coordinates the team with shared tasks, separate working directories and messages between turns. This is ${product.name}'s own implementation, driven turn by turn by ${provider}. It is not Claude Code's native Agent Teams.`,
+    `${product.name} runs its own coordination, turn by turn through ${provider}: shared tasks, separate working directories, messages between turns. It is not Claude Code's native Agent Teams.`,
 };
 
 export default team;

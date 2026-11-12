@@ -321,7 +321,8 @@ async function start(args: string[], ctx: Context): Promise<number | undefined> 
   };
   if (await reuseRunning()) return 0;
   // Before anything listens: the same required checks as `bell-pr doctor`.
-  // --force is how the sample tour still opens when no AI provider is ready.
+  // The provider check alone still lets this start listen, the first time
+  // and every later start. --force starts when another required check failed.
   if (values.force) {
     ctx.stderr.write(`${sm().cli.start.forced}\n`);
   } else {
@@ -329,7 +330,7 @@ async function start(args: string[], ctx: Context): Promise<number | undefined> 
       dataDir: config.dataDir,
       port: config.port,
     });
-    if (!readiness.ready) {
+    if (!readiness.ready && !readiness.providerOnly) {
       if (await reuseRunning()) return 0;
       ctx.stderr.write(readiness.text);
       ctx.stderr.write(`${sm().cli.start.notReady}\n`);

@@ -73,7 +73,7 @@ const understanding = {
   practiceKeyUnknown:
     "This practice item is no longer part of this run. Reload the practice deck.",
   restatementRequired: ({ min, max }: { min: number; max: number }) =>
-    `In your own words, restate what the maintainer asks for in each selected comment: one line of at least ${min} words and at most ${max} characters per comment.`,
+    `Restate each selected comment's request in your own words: one line, at least ${min} words and at most ${max} characters.`,
   debriefNoRecords:
     "There is nothing to debrief yet. Take the understanding check, or read and tag maintainer feedback, on a run of this project first.",
   debriefInvalid:

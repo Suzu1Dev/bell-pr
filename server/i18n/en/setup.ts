@@ -95,6 +95,7 @@ export default {
   fixes: {
     installGit: "Install Git",
     useWsl: `Install WSL2 and run ${product.name} inside it`,
+    removeSudoRule: `Remove ${product.name}'s sudo rule`,
     installGh: "Install the GitHub CLI",
     signInGh: "Sign in to GitHub",
     addWorkflowScope: "Allow pushing workflow changes",
@@ -140,7 +141,7 @@ export default {
       min: string;
       below: string;
     }) =>
-      `Claude Code ${version} is outside the versions ${product.name} supports (${min} or later, before ${below}). Agents still start, but ${product.name} has not checked that this release applies its sandbox and hook settings.`,
+      `Claude Code ${version} is unsupported (${product.name} supports ${min} or later, before ${below}). Agents still start, but ${product.name}'s sandbox and hook settings are untested on it.`,
     identityMissing:
       "Not set: Git does not know your name and e-mail address, so nothing can be committed or published.",
     identityAutodetected: ({ email }: { email: string }) =>
@@ -168,7 +169,7 @@ export default {
     antigravitySandboxReady:
       "Available: Antigravity Agents that edit files run their commands in its terminal sandbox.",
     antigravitySandboxRestricted:
-      "Not available: this Linux system does not let the Antigravity CLI create user namespaces (kernel.apparmor_restrict_unprivileged_userns), so Antigravity Agents cannot edit files. docs/troubleshooting.md explains the options.",
+      "Not available: this Linux system blocks user namespaces for the Antigravity CLI (kernel.apparmor_restrict_unprivileged_userns), so Antigravity Agents cannot edit files. See docs/troubleshooting.md.",
     antigravitySandboxUnsupported:
       "Not available on this platform, so Antigravity Agents cannot edit files.",
     antigravitySandboxAllowed:
@@ -176,6 +177,8 @@ export default {
     fullAccessDisclosure,
     sudoDisclosure,
     passwordlessSudoInstalled: `BELL PR's passwordless sudo rule is installed. ${sudoDisclosure}`,
+    passwordlessSudoExpired: "BELL PR's passwordless sudo rule is past its expiry time but still present. Remove it.",
+    passwordlessSudoNoExpiry: "BELL PR's passwordless sudo rule has no valid expiry time. Remove it.",
     passwordlessSudoExternal: `Passwordless sudo is available through another rule. ${sudoDisclosure}`,
     providersReady: ({ providers }: { providers: string[] }) =>
       `Ready: ${fmt.list(providers)}.`,
@@ -237,7 +240,7 @@ export default {
     dataDir: ({ path }: { path: string }) => `Data directory: ${path}`,
     /** The line above a fix command. */
     fix: ({ label }: { label: string }) => `${label}:`,
-    usage: `Usage: ${product.binNames[0]} doctor [--json] [--data-dir <dir>]`,
+    usage: `Usage: ${product.binNames[0]} doctor [--json] [--data-dir <dir>] [--sudoers-path <file>]`,
     unknownArgument: ({ argument }: { argument: string }) =>
       `Unknown argument "${argument}".`,
   },

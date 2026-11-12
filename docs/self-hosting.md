@@ -24,13 +24,13 @@ bell-pr
 ```
 
 `bell-pr` (also `bellpr`) starts the server and prints a line such as
-the one below when every required `bell-pr doctor` check passed. If one
-failed, start exits before it listens and prints each failed check with
-the command that fixes it. `bell-pr start --force` starts anyway and
-prints a warning: use that for the sample tour when no AI provider is
-signed in. A service should stay without `--force`, so it only runs once
-the tools are ready. A real agent run is still refused until a provider
-is signed in.
+the one below when every required `bell-pr doctor` check passed, and also
+when the AI provider is the only required check that fails. The first time,
+Welcome shows how to install one. If any other required check fails, alone or
+together with the provider, start exits before it listens and prints each
+failed check with the command that fixes it. `bell-pr start --force`
+starts anyway and prints a warning. A real agent run is still refused
+until a provider is signed in.
 
 ```text
 BELL PR <version> → http://127.0.0.1:4311

@@ -196,5 +196,5 @@ test("an isolated Learn-by-hand turn filters Claude Code's failed result too, an
   }) as Execute;
   const slow = await fixture(t, { learnByHand: true, provider: "claude", execute: timedOut });
   await assert.rejects(slow.turn("Where is the retry loop?", true), (error: unknown) =>
-    error instanceof AppError && error.statusCode === 504 && /raise BELLPR_AGENT_TIMEOUT_SCALE\.$/.test(error.message));
+    error instanceof AppError && error.statusCode === 504 && /BELLPR_AGENT_TIMEOUT_SCALE; large projects need more time\.$/.test(error.message));
 });
