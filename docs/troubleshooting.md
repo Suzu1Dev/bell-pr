@@ -398,8 +398,9 @@ Published runs are never cleaned up automatically; only you can free them.
 
 ### `git_config_unsafe`
 
-"This repository's Git configuration sets …, which can make Git run other
-programs or send credentials elsewhere." (HTTP 409). The project's own
+"This repository's Git config sets …, which can make Git run other programs
+or send credentials elsewhere, so BELL PR won't run Git in it."
+(HTTP 409). The project's own
 `.git/config` (or a worktree's `config.worktree`) defines a filter, a diff
 or merge driver, a signing program, a credential helper, protocol rules,
 URL rewrites or an include. BELL PR's own clones never have them, so
@@ -600,8 +601,8 @@ there, then publish again.
   Removing the lock while its BELL PR still runs lets two processes write
   the same data directory; the one that lost the lock then stops group
   work (`notSingleWriter` below).
-- **"Another BELL PR start is replacing a lock left behind in this data
-  directory …"**: before a start replaces a lock left by a crash, it
+- **"Another BELL PR start is replacing this data directory's stale lock
+  …"**: before a start replaces a lock left by a crash, it
   writes a claim file beside it, `bellpr.lock.takeover-…`, and removes it
   a moment later. This one is still there: another start is at work, or
   one stopped part-way. Wait about half a minute and start again: a start
@@ -614,8 +615,8 @@ there, then publish again.
   where there is no lock, only a leftover claim, and it can leave an empty
   `bellpr.lock` behind: once the claim is gone, the next start clears
   that by itself.
-- **"BELL PR cannot tell whether the start that was replacing a lock left
-  behind in this data directory has stopped …"**: the same claim file, on
+- **"BELL PR cannot tell whether the start replacing this data directory's
+  stale lock has stopped …"**: the same claim file, on
   a data directory used with [group work](group-work.md). There a claim
   stays, however old it is, until the process that wrote it is shown to
   have stopped. Make

@@ -12,7 +12,7 @@ const m: Translation<typeof en> = {
     subtitle: "讓每個 PR 只包含一項修正，方便維護者獨立審查。",
     creates: "每份貢獻會從同一個基底 commit 建立自己的分支、檔案與 PR 草稿。",
     original: "這份貢獻會維持原樣，並標記為已拆分。",
-    filesOnly: `${product.name} 只會將一個檔案分配給一份貢獻，不會把檔案切成幾部分。涉及同一個檔案的修正無法在這裡分開。`,
+    filesOnly: "一個檔案只歸一份貢獻，同一檔案裡的修正無法分開。",
     testEach: `${product.name} 無法確認各部分能否獨立運作。發布前，請分別執行每份貢獻的測試。`,
     contribution: ({ number }) => `貢獻 ${number}`,
     titleLabel: ({ number }) => `貢獻 ${number} 的標題`,
@@ -28,9 +28,9 @@ const m: Translation<typeof en> = {
     pathLimit: ({ count }) => `每份貢獻最多可分配 ${count} 個檔案。`,
     suggestionLimit: ({ count }) => `僅預先分配前 ${count} 個部分。請分配其餘檔案，或讓它們只留在原本那份。`,
     mixed: ({ paths, issues }) =>
-      `${fmt.list(paths, { type: "unit" })} 含有 ${fmt.list(issues, { type: "unit" })} 的變更，而 ${product.name} 無法把檔案裡的變更分開。請自行分開，或維持在同一份。`,
+      `${fmt.list(paths, { type: "unit" })} 含有 ${fmt.list(issues, { type: "unit" })} 的變更，${product.name} 無法拆開檔案。請自行拆分，或維持在同一份。`,
     linked: ({ issues }) =>
-      `計畫把 ${fmt.list(issues, { type: "unit" })} 的任務連在一起，所以它們算作同一個部分。如果某項修正能獨立運作，可以把它的檔案放進自己的一份貢獻，或維持在同一份。`,
+      `計畫把 ${fmt.list(issues, { type: "unit" })} 的任務連成同一部分。能獨立運作的修正可移到自己的一份貢獻。`,
     submit: "拆分",
     submitting: "拆分中…",
   },
@@ -49,7 +49,7 @@ const m: Translation<typeof en> = {
       },
       understand: {
         title: "理解每個變更",
-        text: "切換檔案閱讀差異；點選行號，或按住 Shift 選擇一段程式碼，向 Agent 提問。理解後勾選「已審閱」。",
+        text: "閱讀每個差異；點選行號或按住 Shift 選取一段，向 Agent 提問。理解後勾選「已審閱」。",
       },
       submit: {
         title: "編輯並發布 PR",
@@ -66,8 +66,8 @@ const m: Translation<typeof en> = {
     newContribution: "新增貢獻",
     freeSpace: "釋放磁碟空間",
     freeSpaceLabel: ({ title }) => `釋放磁碟空間：${title}`,
-    freeConfirm: `要移除這項貢獻的工作檔案嗎？包括它的 Git worktree、隊友的工作目錄，以及它在 ${product.name} 專案副本中的分支。貢獻本身、筆記與解說都會保留，但無法再顯示它的程式碼變更。`,
-    freeConfirmPublished: `要移除這項已發布貢獻的工作檔案嗎？包括它的 Git worktree、隊友的工作目錄，以及它在 ${product.name} 專案副本中的分支。之後它就無法再開始一輪修正，也無法同步。貢獻本身、筆記與解說都會保留。`,
+    freeConfirm: `要移除這項貢獻的 Git worktree、隊友的工作目錄，以及 ${product.name} 專案副本中的分支嗎？貢獻、筆記與解說會保留，但無法再顯示變更。`,
+    freeConfirmPublished: `要移除這項已發布貢獻的 Git worktree、隊友的工作目錄，以及 ${product.name} 專案副本中的分支嗎？之後無法再做一輪修正或同步。貢獻、筆記與解說會保留。`,
     freeYes: "釋放磁碟空間",
     filesRemoved: "檔案已移除",
     deleteRun: "刪除貢獻",
@@ -88,7 +88,7 @@ const m: Translation<typeof en> = {
     importOther: "匯入其他專案",
     recommendations: "先看 AI 推薦方向",
     demoNote:
-      "示範設定可以自由調整；不會啟動真實 AI。示範團隊會從頭重新播放它的工作。請匯入你的專案開始開發。",
+      "設定可任意試，不會啟動真實 Agent，示範團隊會重播任務。匯入專案即可開發。",
     loadingSettings: "正在載入這個專案的貢獻設定…",
     reloadSettings: "重新載入專案設定",
     saveDefault: "儲存為預設設定",
@@ -97,7 +97,7 @@ const m: Translation<typeof en> = {
     goal: "這次想完成什麼？",
     goalPlaceholder: "描述需求、相關檔案、預期行為與驗收方式…",
     usage: ({ provider }) =>
-      `任務會使用本機已登入的 ${provider} CLI 執行，消耗該帳號的用量。完成後等待你審閱。`,
+      `使用本機已登入的 ${provider} CLI，用量計入該帳號。完成後等你審閱。`,
     saveDemo: "播放示範團隊",
     planFirst: "產生團隊計畫",
     start: "開始任務",

@@ -29,7 +29,7 @@ const byHand = {
   /** An AI follow-up round on a Learn-by-hand run (until v1.2.1). */
   followUpRefused: `In Learn by hand, push follow-up commits from the run's folder with your own Git; ${product.name} takes them over at the next feedback read.`,
   /** The conflict agent on a Learn-by-hand run. */
-  resolveByHand: `In Learn by hand, resolve the conflict markers by hand in the run's folder; ${product.name} finds the ones left each time it reads the change.`,
+  resolveByHand: `In Learn by hand, resolve the conflict markers by hand in the run's folder; ${product.name} finds any left each time it reads the change.`,
   /** Explanations, walkthroughs, the premise check and the review before Ready. */
   notReady: "Mark your changes ready for review first.",
   /** A Learn-by-hand agent answer not in its schema's form; nothing is stored. */

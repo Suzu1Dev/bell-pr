@@ -14,7 +14,7 @@ const modals = {
     subtitle: "Give each pull request one fix that a maintainer can review on its own.",
     creates: "Each contribution gets its own branch, files and PR draft from the same base commit.",
     original: "This contribution stays as it is, marked as split.",
-    filesOnly: `${product.name} gives a file to one contribution only and does not cut files into parts. Fixes that touch the same file cannot be separated here.`,
+    filesOnly: "A file goes to one contribution only, so fixes in the same file stay together.",
     testEach: `${product.name} cannot check that each part works alone. Run each part's tests before publishing.`,
     contribution: ({ number }: { number: number }) => `Contribution ${number}`,
     titleLabel: ({ number }: { number: number }) => `Contribution ${number} title`,
@@ -33,9 +33,9 @@ const modals = {
     suggestionLimit: ({ count }: { count: number }) =>
       `Only the first ${count} ${plural(count) === "one" ? "part is" : "parts are"} assigned. Place the remaining files or leave them only in the original.`,
     mixed: ({ paths, issues }: { paths: string[]; issues: string[] }) =>
-      `${list(paths)} ${plural(paths.length) === "one" ? "holds" : "hold"} changes for ${list(issues)}. ${product.name} cannot separate changes inside a file: split them by hand, or keep them together.`,
+      `${list(paths)} ${plural(paths.length) === "one" ? "holds" : "hold"} changes for ${list(issues)}; ${product.name} can't split a file. Split by hand, or keep them together.`,
     linked: ({ issues }: { issues: string[] }) =>
-      `The plan links the tasks for ${list(issues)}, so they form one part. If a fix works on its own, give its files their own contribution, or keep them together.`,
+      `The plan links the tasks for ${list(issues)} into one part. A fix that works alone can move to its own contribution.`,
     submit: "Split",
     submitting: "Splitting…",
   },
@@ -54,7 +54,7 @@ const modals = {
       },
       understand: {
         title: "Understand every change",
-        text: "Switch files to read the diff; click a line number, or hold Shift to select a block of code, and ask the Agent. Mark the file as reviewed once you understand it.",
+        text: "Read each diff; click a line number, or hold Shift to select a block, and ask the Agent. Mark files reviewed once understood.",
       },
       submit: {
         title: "Edit and publish the PR",
@@ -71,9 +71,9 @@ const modals = {
     newContribution: "New contribution",
     freeSpace: "Free disk space",
     freeSpaceLabel: ({ title }: { title: string }) => `Free disk space: ${title}`,
-    freeConfirm: `Remove this contribution's working files? They are its Git worktree, its teammates' working directories and its branch in ${product.name}'s own copy of the project. The contribution, its notes and its explanations stay. Its changes can no longer be shown.`,
+    freeConfirm: `Remove this contribution's Git worktree, teammates' working directories and branch in ${product.name}'s project copy? The contribution, notes and explanations stay; its changes can no longer be shown.`,
     /** The same for a published run, whose checkout follow-ups and syncing need. */
-    freeConfirmPublished: `Remove this published contribution's working files? They are its Git worktree, its teammates' working directories and its branch in ${product.name}'s own copy of the project. Follow-up rounds and syncing stop working for it. The contribution, its notes and its explanations stay.`,
+    freeConfirmPublished: `Remove this published contribution's Git worktree, teammates' working directories and branch in ${product.name}'s project copy? Follow-up rounds and syncing stop working. The contribution, notes and explanations stay.`,
     freeYes: "Free disk space",
     /** Marks a run whose working files were removed. */
     filesRemoved: "Files removed",
@@ -96,7 +96,7 @@ const modals = {
     importOther: "Import another project",
     recommendations: "See AI-recommended directions first",
     demoNote:
-      "Demo settings can be changed freely; no real Agent starts. The sample team plays its run again from the start. Import your repository to start building.",
+      "Try any setting: no real Agent starts, and the sample team replays its run. Import your repository to start building.",
     loadingSettings: "Loading this project's contribution settings…",
     reloadSettings: "Reload project settings",
     saveDefault: "Save as default settings",
@@ -106,7 +106,7 @@ const modals = {
     goalPlaceholder:
       "Describe the need, related files, expected behavior and how to verify it…",
     usage: ({ provider }: { provider: string }) =>
-      `The task runs with the ${provider} CLI signed in on this computer and counts against that account's usage. When it finishes, it waits for your review.`,
+      `Uses the ${provider} CLI signed in on this computer; usage counts against that account. Then it awaits your review.`,
     saveDemo: "Play the sample team",
     planFirst: "Generate the team plan",
     start: "Start the Agent team",

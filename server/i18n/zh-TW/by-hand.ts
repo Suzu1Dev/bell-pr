@@ -16,7 +16,7 @@ const byHand: Translation<typeof en> = {
   retryRefused: "親手學的任務是從你自己的修改接著做，沒有 Agent 的工作可以重試。要從頭開始，請建立新的任務。",
   backToPlan: "回到你的計畫：在你確認之前，什麼都不會執行。",
   followUpRefused: `在親手學裡，後續的 commit 請在這個任務的資料夾用你自己的 Git 推送；${product.name} 會在下次讀取回饋時接手。`,
-  resolveByHand: `在親手學裡，請在這個任務的資料夾親手解決衝突標記；${product.name} 每次讀取變更時都會找出還沒解決的。`,
+  resolveByHand: `在親手學裡，請在這個任務的資料夾親手解決衝突標記；${product.name} 每次讀取變更都會找出剩下的。`,
   notReady: "請先把你的變更標成可以審查了。",
   badAnswer: "嚮導的回答格式不符，所以沒有儲存任何內容。請再試一次。",
   busy: "嚮導正在處理這個任務。請等它完成，或先停止它。",

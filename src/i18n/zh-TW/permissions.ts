@@ -11,7 +11,7 @@ const messages: Translation<typeof en> = {
   fullConfirm: "使用完整權限",
   fullCancel: "維持工作目錄權限",
   summary: "完整權限（取消沙箱與指令 deny 規則）",
-  workspaceHelp: "Codex 使用工作目錄沙箱。Claude Code 與 Antigravity 保留作業系統沙箱與指令 deny 規則，除非你另外允許在無沙箱時執行。唯讀角色仍維持限制。",
+  workspaceHelp: "Codex：工作目錄沙箱。Claude Code 與 Antigravity：作業系統沙箱與指令 deny 規則，除非你允許在沙箱外執行。唯讀角色仍受限。",
   sudoTitle: "免密碼 sudo",
   sudoDisclosure,
   loadFailed: ({ message }) => `無法讀取 sudo 狀態：${message}`,
@@ -24,7 +24,7 @@ const messages: Translation<typeof en> = {
   enabling: "設定中…",
   remove: `移除 ${product.name} 的 sudo 規則`,
   removing: "移除中…",
-  help: ({ user }) => `輸入一次密碼，為帳號 ${user} 建立免密碼 sudo 規則（/etc/sudoers.d/bell-pr-agent）。密碼只交給 sudo 完成這一次設定，不會被儲存或寫入記錄。這條規則讓帳號 ${user} 不需密碼就能取得 root 權限，包含以它執行的所有程式與 Agent。`,
+  help: ({ user }) => `輸入一次密碼，為帳號 ${user} 建立 /etc/sudoers.d/bell-pr-agent。密碼只交給 sudo，不會被儲存或寫入記錄。之後以 ${user} 執行的所有程式與 Agent 都能免密碼取得 root 權限。`,
   failed: "操作未完成，請再試一次。",
 };
 export default messages;

@@ -198,7 +198,7 @@ test("an open follow-up round keeps the PR text as published and asks for this r
   assert.match(html, /依回饋修正的紀錄/);
   assert.match(html, /放棄這一輪/);
   assert.doesNotMatch(html, /正在載入草稿規範/);
-  assert.match(html, /這一輪只會在 PR 分支加上一個新的 commit/);
+  assert.match(html, /這一輪在 PR 分支加一個新 commit/);
   assert.match(tag(html, /id="pr-title"/), /disabled=""/);
   assert.match(tag(html, /aria-label="PR 說明"/), /disabled=""/);
   assert.match(tag(html, /id="pr-publish-branch"/), /disabled=""/);
@@ -220,7 +220,7 @@ test("an open follow-up round keeps the PR text as published and asks for this r
       draftCommitMessage: "Merge branch 'main' into fix/run1",
     },
   );
-  assert.match(sync, /這次同步會在 PR 分支加上一個合併 commit/);
+  assert.match(sync, /這次同步在 PR 分支加一個合併 commit/);
   assert.match(sync, /checklist-item checked[^>]*>.*?這一輪的提交訊息已填好<small><\/small>/);
 });
 
@@ -375,7 +375,7 @@ test("maintainer feedback and the next round's form read in English with no Chin
     ),
   );
   assert.match(draft, /Before you publish/);
-  assert.match(draft, /There is no PR description yet\./);
+  assert.match(draft, /No PR description yet\./);
   assert.match(draft, /0 \/ 0 files/);
   assert.match(draft, /There are unsaved edits/);
   assert.match(draft, /Publish as a Draft PR/);
@@ -401,7 +401,7 @@ test("the feedback summary formats the time, the checks and the labels for the l
     english,
     /Read at [^<]*2026[^<]* · CI 2 checks: 1 passed, 0 in progress, 1 failed \(overall FAILURE\) · Labels: needs: tests, docs</,
   );
-  assert.match(english, /A “needs:” label usually means/);
+  assert.match(english, /“needs:” labels usually mean/);
   assert.match(english, /No reviews or comments yet\./);
   assertNoHan(english);
   const chinese = render({ run: withChecks });

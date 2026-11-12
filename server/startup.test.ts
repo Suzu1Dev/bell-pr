@@ -211,7 +211,7 @@ test("resolveConfig refuses settings that cannot work, in the request locale", (
       [{}, { BELLPR_PUBLIC_URL: "https://user:pw@bell.example.com" }, /BELLPR_PUBLIC_URL/],
       [{}, { BELLPR_PUBLIC_URL: "not a url" }, /BELLPR_PUBLIC_URL/],
       // Plain http only for this computer.
-      [{}, { BELLPR_PUBLIC_URL: "http://bell.example.com" }, /https for any address other than this computer/],
+      [{}, { BELLPR_PUBLIC_URL: "http://bell.example.com" }, /https \(http only on this computer\)/],
       [{}, { BELLPR_PUBLIC_URL: "http://192.168.1.5:4311" }, /BELLPR_PUBLIC_URL/],
       [{}, { BELLPR_ALLOWED_ORIGINS: "https://*.example.com" }, /BELLPR_ALLOWED_ORIGINS/],
       [{}, { BELLPR_MAX_ACTIVE_RUNS: "0" }, /BELLPR_MAX_ACTIVE_RUNS/],
@@ -1778,7 +1778,7 @@ test("an occupied port exits non-zero and points to bell-pr open", async () => {
     const { code } = await second.exited;
     assert.notEqual(code, 0);
     const output = second.stdout() + second.stderr();
-    assert.match(output, /BELL PR is already running at http:\/\/127\.0\.0\.1:\d+\. Run `bell-pr open` to open it; add --data-dir <dir> if that BELL PR was started with another data directory\./);
+    assert.match(output, /BELL PR is already running at http:\/\/127\.0\.0\.1:\d+\. Run `bell-pr open` to open it, with --data-dir <dir> if it uses another data directory\./);
     // The port is checked before anything is written.
     assert.equal(existsSync(otherData), false);
 

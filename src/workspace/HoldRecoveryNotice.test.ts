@@ -64,7 +64,7 @@ test("the stopped-run card renders Muse's English and Chinese copy with path-onl
   const html = renderEn(element());
   assertNoHan(html);
   assert.match(html, /Stopped: this run changed files someone else holds/);
-  assert.match(html, /The edits are still in the working directory\./);
+  assert.match(html, /Edits stay in the working directory\./);
   assert.match(html, /src\/very\/long\/path\/that\/wraps\.ts \(held by another member\)/);
   assert.match(html, />Put these files back<\/button>/);
   assert.match(html, />Check again<\/button>/);
@@ -409,7 +409,7 @@ test("409 heldByOther on restore updates conflicts and closes the modal, 409 bus
     );
     assert.equal(notes[3]?.message, "Join the group on the Group page first.");
     assert.equal(notes[4]?.message, "Join the group on the Group page first.");
-    assert.match(notes[5]?.message ?? "", /Couldn't finish putting these files back/);
+    assert.match(notes[5]?.message ?? "", /Couldn't put every file back/);
     assert.match(notes[6]?.message ?? "", /Couldn't check file holds right now/);
   } finally {
     await view.unmount();

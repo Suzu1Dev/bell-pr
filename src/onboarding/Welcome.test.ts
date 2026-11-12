@@ -235,9 +235,9 @@ test("the last step offers the tour, an import and discovery, which waits for th
   // Every contribution ends with the understanding check, and the setting can change it.
   assert.match(
     html,
-    /Every contribution ends with you explaining the change back; you can change that in Settings → Learning\./,
+    /Each contribution ends with you explaining the change back; turn that off in Settings → Learning\./,
   );
-  assert.match(renderZh(welcome("start")), /每一份貢獻最後都由你用自己的話講一遍；可在「設定 → 學習」調整。/);
+  assert.match(renderZh(welcome("start")), /每份貢獻最後都由你用自己的話講一遍；可在「設定 → 學習」關閉。/);
   // While the variable keeps the check on, Settings can't change it, so Welcome doesn't say so.
   setCheckSettingsForTests({ settings: {}, lockedBy: { skipUnderstandingCheck: "BELLPR_REQUIRE_UNDERSTANDING_CHECK" } });
   try {

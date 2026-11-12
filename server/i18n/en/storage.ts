@@ -42,7 +42,7 @@ export default {
       "Files for this run were cleaned up to free disk space. Reports and notes are kept.",
     /** Syncing a published PR or starting a follow-up round after the files were removed. */
     removedPublished:
-      "Files for this run were removed to free disk space, so its pull request can no longer be synced or given a follow-up round here. Reports and notes are kept. Update the pull request's branch on GitHub directly.",
+      "Files were removed to free disk space: this pull request can't be synced or get a follow-up round here. Reports and notes are kept. Update its branch on GitHub.",
     /** A run log line after the person freed the space. */
     removedLog: ({ bytes }: { bytes: number }) =>
       `Removed this run's working files and freed ${size(bytes)}; reports, notes and explanations are kept.`,

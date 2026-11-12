@@ -156,7 +156,7 @@ test("a link back to this BELL PR stops the start, in the CLI's language and wit
           () => resolveConfig(flags, { ...env, BELLPR_SUITE_LINKS: value }),
           (error: unknown) =>
             error instanceof ConfigError &&
-            error.message.startsWith(locale === "en" ? "BELLPR_SUITE_LINKS must" : "BELLPR_SUITE_LINKS 必須") &&
+            error.message.startsWith(locale === "en" ? "BELLPR_SUITE_LINKS takes" : "BELLPR_SUITE_LINKS 須為") &&
             !error.message.includes(value.slice(value.indexOf("=") + 1)) &&
             !error.message.includes("private-path"),
           `${locale} ${value}`,

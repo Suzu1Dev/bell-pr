@@ -251,7 +251,7 @@ test("a fitted case names the kinds of help and quotes the first carve-out", () 
   assertNoHan(text);
   assert.equal(
     text,
-    `BELL PR can publish a learn-by-hand run here only if the guide stays within what the project's own text says is fine (explanations and answers: "${carveOut}"), and only after you confirm the project's quoted rule. The maintainers decide whether your change fits.`,
+    `To publish here, the guide must stay within what the project's own text allows (explanations and answers: "${carveOut}"), and you must confirm its quoted rule. The maintainers decide whether your change fits.`,
   );
   assert.match(byHandReasonText(reason!, discoveryZh.byHand, "zh-TW"), /解說和回答/);
 });

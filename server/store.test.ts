@@ -251,7 +251,7 @@ test("restart recovery explains each interrupted run in the run's own locale", a
   const [zh, older] = first.data.runs;
   assert.equal(
     zh.error,
-    "服務重新啟動，任務已停止。工作目錄仍保留，可檢視差異；團隊任務可在任務板重試失敗的子任務，已整合的子任務不會重跑。",
+    "服務重新啟動，任務已停止。工作目錄與差異保留。團隊任務可在任務板重試失敗的子任務，已整合的不重跑。",
   );
   assert.equal(
     zh.team?.tasks[0].error,
@@ -278,7 +278,7 @@ test("restart recovery explains each interrupted run in the run's own locale", a
   const [en, review] = second.data.runs;
   assert.equal(
     en.error,
-    "The service restarted, so the run stopped. Its working directory is kept and you can read the diff; for a team run, retry the failed subtasks on the task board, and integrated subtasks do not run again.",
+    "The service restarted, so the run stopped. Its working directory and diff are kept. Team runs can retry failed subtasks on the task board; integrated ones don't rerun.",
   );
   assert.equal(
     en.team?.tasks[0].error,
@@ -354,7 +354,7 @@ test("an interrupted conflict resolution or follow-up round is explained in the 
   assert.equal(round.followUps?.[0].status, "review");
   assert.equal(
     round.followUps?.[0].error,
-    "服務重新啟動，這一輪已停止；工作目錄保留的修改可以審閱、寫好提交訊息後推送，或放棄這一輪。",
+    "服務重新啟動，這一輪已停止。請審閱工作目錄保留的修改、寫提交訊息後推送，或放棄這一輪。",
   );
 });
 

@@ -37,7 +37,7 @@ const pages = {
       },
     },
     noteTitle: "The Agents build; you keep the final say.",
-    noteText: `Uses the ${providerLabels.codex}, ${providerLabels.claude} or ${providerLabels.antigravity} CLI signed in on this computer. Each task gets its own branch and goes to review when done; no PR is opened automatically.`,
+    noteText: `Uses your signed-in ${providerLabels.codex}, ${providerLabels.claude} or ${providerLabels.antigravity} CLI. Each task gets its own branch and waits for review; no PR opens automatically.`,
   },
 };
 

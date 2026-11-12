@@ -97,14 +97,14 @@ const m: Translation<typeof en> = {
     title: "Agent 安全",
     intro: "Agent 會在這台電腦上執行專案的程式碼，這些設定決定它們能接觸到哪些東西。",
     sandbox: {
-      text: "會修改檔案的 Claude Code Agent 在作業系統沙箱裡執行每個指令。寫入只限於該工作的工作目錄與 Claude Code 的暫存資料夾。網路是關閉的。你自己的 Claude Code 使用者設定可能放寬沙箱（proxy 連接埠、允許的網域或路徑、排除的指令、外掛的語言伺服器）。Codex CLI 使用它自己的沙箱。會修改檔案的 Antigravity Agent 在 Antigravity CLI 的終端機沙箱裡執行指令。寫入只限於工作目錄。網路是關閉的。",
+      text: "會修改檔案的 Agent 每個指令都在沙箱執行：Claude Code 用作業系統沙箱，Antigravity 用其 CLI 的終端機沙箱。寫入只限工作目錄（及 Claude Code 暫存資料夾）。網路關閉。你的 Claude Code 設定可放寬其沙箱（proxy 連接埠、允許網域或路徑、排除指令、外掛語言伺服器）。Codex 用自己的沙箱。",
     },
     unsandboxed: {
       label: "允許 Claude Code 與 Antigravity Agent 在沙箱外執行",
       help: "只在沙箱無法使用時才會用到。關閉時，需要它的工作會被拒絕。",
       confirmTitle: "要允許 Agent 在沙箱外執行嗎？",
       confirmText:
-        "沙箱無法使用時，會修改檔案的 Claude Code 與 Antigravity Agent 將在沙箱外執行，因此能讀取與修改你的使用者帳號可以存取的一切，例如其他專案、你的 SSH 金鑰與各個工具的登入資訊。請只對你信任的專案這樣做。",
+        "沙箱無法使用時，會修改檔案的 Claude Code 與 Antigravity Agent 會在沙箱外執行，能讀寫你帳號可存取的一切：其他專案、SSH 金鑰、工具的登入資訊。只用於信任的專案。",
       confirmBadge: "只要有 Agent 在沙箱外工作過，該工作在貢獻工作台會帶有標記，紀錄中也會註明。",
       confirm: "允許在沙箱外執行",
       cancel: "維持使用沙箱",
@@ -127,7 +127,7 @@ const m: Translation<typeof en> = {
     intro: `${product.name} 如何在你核准之前請你確認自己理解變更，以及審閱時如何請你先想一想。`,
     check: {
       title: "理解檢查",
-      text: "核准 pull request 之前，你要用自己的話講一遍這個變更、回答幾個相關問題，並自己對照參考答案評分。不會有 AI 模型替你評分。",
+      text: "你用自己的話講一遍變更、回答幾個問題，並自己對照參考答案評分。不由 AI 模型評分。",
       label: "核准前，請我用自己的話講一遍每個變更",
       help: "開啟時，需針對最新版本的變更完成檢查，才能核准與發布。",
       lockedBy: ({ variable }) =>
@@ -151,7 +151,7 @@ const m: Translation<typeof en> = {
     tryFirst: {
       title: "先試著答",
       label: "先請我作答，再顯示答案",
-      help: "預設開啟。你先作答：每個檔案的問題、猜猜另一種改法，以及程式碼解說裡每段的「考考自己」。之後才顯示答案與其他做法。關閉後，它們會收在單純的顯示按鈕或摺疊後面，不需要填寫。",
+      help: "預設開啟。涵蓋每個檔案的問題、猜另一種做法，以及程式碼解說每段的「考考自己」。關閉時，點一下就會顯示答案。",
     },
   },
   performance: {
@@ -187,7 +187,7 @@ const m: Translation<typeof en> = {
     },
     advanced: {
       summary: "進階：環境變數",
-      text: `${product.name} 啟動前設定的環境變數優先於這裡的設定。該設定會顯示為由環境設定。修改後請重新啟動 ${product.name}。`,
+      text: `${product.name} 啟動前設的環境變數會覆蓋此處設定（標示為環境設定）。修改後須重啟 ${product.name}。`,
       documentation: "詳見說明文件。",
       variables: {
         BELLPR_DATA_DIR: "資料目錄的位置（也可用 --data-dir）。預設是家目錄中的 .bellpr 資料夾。",
@@ -237,7 +237,7 @@ const m: Translation<typeof en> = {
     retention: {
       title: "自動清理",
       label: "保留已停止與失敗工作檔案的天數",
-      help: "1 到 365。已停止或失敗的工作在這麼多天沒有動靜後，工作檔案會被移除；紀錄、報告與筆記會保留。已發布的工作會一直保留，直到你釋放它。",
+      help: "1 到 365，自最後活動起算。任務的紀錄、報告與筆記會保留。已發布的任務會保留到你釋放為止。",
       save: "儲存",
     },
     erase: {
@@ -253,7 +253,7 @@ const m: Translation<typeof en> = {
       title: "哪些資料會離開這台電腦",
       none: `${product.name} 不傳送遙測、分析或當機報告，也沒有自己的帳號或雲端服務。`,
       ai: "你的程式碼與問題會以你自己的帳號，送到你使用的 AI 程式開發 CLI 的服務提供者。",
-      github: "GitHub 會收到 GitHub CLI 與 Git 以你的帳號傳送的內容：複製與搜尋，以及只在你核准後才建立的分支與 draft pull request。",
+      github: "GitHub 會收到 GitHub CLI 與 Git 以你帳號送出的複製與搜尋；分支與 draft pull request 要你核准後才建立。",
       web: "除非你開啟，Agent 不會存取網路。",
       rest: "其他一切都留在資料目錄中。",
     },

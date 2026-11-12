@@ -60,7 +60,7 @@ export default {
      * the step has no line of its own under its title.
      */
     importText:
-      "Bring a project from GitHub or from this computer and start contributing. Every contribution ends with you explaining the change back; you can change that in Settings → Learning.",
+      "Import from GitHub or this computer. Each contribution ends with you explaining the change back; turn that off in Settings → Learning.",
     /** While BELLPR_REQUIRE_UNDERSTANDING_CHECK keeps the check on: Settings can't change it. */
     importTextLocked:
       "Bring a project from GitHub or from this computer and start contributing. Every contribution ends with you explaining the change back.",
