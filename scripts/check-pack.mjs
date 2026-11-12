@@ -52,10 +52,7 @@
 // page (group work, part 3) with Node.js 22.22.1: all JS 489.7 kB in 54
 // files, 491.7 kB on CI's Node.js 24. The page added 9.2 kB: its own chunk
 // (6.6 kB) and its en and zh-TW texts, so the all-JS budget rose from
-// 490 kB to 500 kB. Measured with the Welcome install-command fade on
-// Node.js 22: all CSS 45.1 kB (45087 bytes). The fade reuses properties
-// already in the sheet, so deleting it only frees 73 bytes and the file
-// stays over 45 kB. The all-CSS budget rose from 45 kB to 46 kB.
+// 490 kB to 500 kB.
 //
 // Exit status: 0 when every check passes, 1 when one fails, 2 on a usage or
 // setup error.
@@ -80,7 +77,7 @@ const budgets = {
   woff2: 12,
   largestJsGzip: 116 * kB,
   totalJsGzip: 500 * kB,
-  totalCssGzip: 46 * kB,
+  totalCssGzip: 45 * kB,
 };
 const required = [
   "package.json",
