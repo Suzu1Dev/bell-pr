@@ -133,6 +133,10 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- **A sync snapshot does not count as another copy of a recovered commit.**
+  `refs/bellpr/sync/<run>` is removed with the run's files, so a
+  publish-recovery ref is kept when that snapshot is the only other ref
+  that can reach the commit.
 - **A publish-recovery ref is deleted only when its commit is already
   reachable.** After a later publish succeeds, or when a run is removed,
   `refs/bellpr/publish-recovery/<run>/<commit>` is deleted if that commit

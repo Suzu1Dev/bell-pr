@@ -262,7 +262,10 @@ async function recoveryCommitReachable(
   ).stdout
     .split("\n")
     .map((name) => name.trim())
-    .filter((name) => name && name !== ref);
+    // A sync snapshot is deleted with the workspace, so it is not another copy.
+    .filter(
+      (name) => name && name !== ref && !name.startsWith("refs/bellpr/sync/"),
+    );
   if (holders.length) return true;
   const branch = run.publishedBranch ?? run.branch;
   const here = { ...run, worktreePath: cwd };
