@@ -97,6 +97,7 @@ test.describe("the sample project", () => {
   test("Start with this direction shows the sample's facts as green chips", async ({ page }) => {
     const requests = recordRequests(page);
     await page.goto("/#/runs/demo-run/overview?locale=en");
+    await page.locator(".mission-context > summary").click();
     await page.getByRole("button", { name: mission.ideas.choose }).first().click();
     const dialog = page.getByRole("dialog", { name: modals.newTask.title });
     const facts = dialog.locator(".before-start");
@@ -124,11 +125,12 @@ test.describe("the sample project", () => {
     const checklist = page.locator(".draft-checklist");
     await expect(checklist.getByRole("heading", { name: draft.guidance.checklist.title })).toBeVisible();
     const rows = checklist.locator(".draft-checklist-row");
-    await expect(rows).toHaveCount(8);
-    await expect(rows.locator("strong")).toHaveText(Object.values(draft.guidance.checklist.rows));
-    await expect(checklist.locator(".draft-checklist-why")).toHaveCount(8);
+    await expect(rows).toHaveCount(7);
+    expect((await rows.locator("strong").allTextContents()).sort()).toEqual(Object.entries(draft.guidance.checklist.rows).filter(([id]) => id !== "understanding").map(([, label]) => label).sort());
+    await expect(checklist.getByRole("button", { name: "Explain the change" })).toBeVisible();
+    await expect(checklist.locator(".draft-checklist-why")).toHaveCount(7);
     // Every row says where it stands; the next test checks which.
-    await expect(rows.locator(".draft-checklist-status")).toHaveCount(8);
+    await expect(rows.locator(".draft-checklist-status")).toHaveCount(7);
   });
 
   test("MERGE-STEP: with L2D's props the snapshot shows and the respect rows are green", async ({ page }) => {
@@ -155,12 +157,13 @@ test.describe("the sample project", () => {
       await expect(page.locator(".rules-card figure")).toHaveCount(3);
       await settled(page);
       await expectNoOverflow(page);
+      await page.locator(".mission-context > summary").click();
       await page.getByRole("button", { name: mission.ideas.choose }).first().click();
       await expect(page.locator(".before-start-chip")).toHaveCount(5);
       await settled(page);
       await expectNoOverflow(page);
       await page.goto("/#/runs/demo-run/draft?locale=en");
-      await expect(page.locator(".draft-checklist-row")).toHaveCount(8);
+      await expect(page.locator(".draft-checklist-row")).toHaveCount(7);
       await settled(page);
       await expectNoOverflow(page);
     });

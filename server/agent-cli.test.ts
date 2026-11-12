@@ -122,6 +122,10 @@ test("Codex arguments keep the existing sandbox, approval and schema flags", asy
       ...codexSandboxConfig("write", "/work/tree"),
       "-c",
       'approval_policy="never"',
+      "-c",
+      'web_search="disabled"',
+      "-c",
+      "features.apps=false",
       "--json",
       "--color",
       "never",
@@ -593,17 +597,23 @@ test("web access adds Claude Code's WebSearch/WebFetch and Codex live search for
     assert.equal(value(off.args, "--tools"), tools);
     assert.equal(value(off.args, "--allowedTools"), allowed);
     assert.deepEqual(await agentCommand(claude, { cwd: "/work/tree", access }), off);
-    // Codex 0.159 `exec` rejects --search; the live search config override is the only addition.
+    // Codex 0.159 `exec` rejects --search, so search is a config override. Codex searches a
+    // cached index by default, so off is passed as "disabled"; the value is the only difference.
     const codexOn = await agentCommand(codex, { cwd: "/work/tree", access, web: true });
     const codexOff = await agentCommand(codex, { cwd: "/work/tree", access });
     const index = codexOn.args.indexOf('web_search="live"');
     assert.ok(index > 0 && codexOn.args[index - 1] === "-c");
+    assert.equal(codexOff.args[index], 'web_search="disabled"');
     assert.deepEqual(
-      codexOn.args.filter((_arg, position) => position !== index - 1 && position !== index),
-      codexOff.args,
+      codexOn.args.filter((_arg, position) => position !== index),
+      codexOff.args.filter((_arg, position) => position !== index),
     );
     assert.ok(!codexOn.args.includes("--search"));
-    assert.doesNotMatch(JSON.stringify(codexOff.args), /web_search/);
+    assert.equal(codexOff.args.filter((arg) => arg.startsWith("web_search=")).length, 1);
+    // ChatGPT apps carry a search tool of their own, so they are off either way.
+    assert.ok(codexOn.args.includes("features.apps=false"));
+    assert.ok(codexOff.args.includes("features.apps=false"));
+    assert.deepEqual(await agentCommand(codex, { cwd: "/work/tree", access, web: false }), codexOff);
   }
   // curl and wget stay denied with web on: WebFetch is the sanctioned way to read a page.
   const write = await agentCommand(claude, { cwd: "/work/tree", access: "write", web: true });
@@ -615,11 +625,12 @@ test("web access adds Claude Code's WebSearch/WebFetch and Codex live search for
     "Bash(wget:*)",
   ]);
   assert.equal(value(write.args, "--permission-mode"), "acceptEdits");
-  // Analysis and discovery use "none": the flag never reaches the CLI there.
+  // Analysis and discovery use "none": the flag never reaches the CLI there, and Codex search is off.
   for (const execution of [claude, codex]) {
     const none = await agentCommand(execution, { cwd: "/work/tree", access: "none", web: true });
     assert.deepEqual(none, await agentCommand(execution, { cwd: "/work/tree", access: "none" }));
-    assert.doesNotMatch(JSON.stringify(none.args), /WebSearch|WebFetch|web_search/);
+    assert.doesNotMatch(none.args.join(" "), /WebSearch|WebFetch|web_search="live"/);
+    assert.equal(execution === codex, none.args.includes('web_search="disabled"'));
   }
 });
 
@@ -1482,5 +1493,7 @@ test("explicit full access affects write turns only and retains isolation from r
   }
   const codex = await agentCommand({ ...execution, provider: "codex" }, { cwd: "/work/tree", access: "write" });
   assert.equal(codex.args[codex.args.indexOf("--sandbox") + 1], "danger-full-access");
+  // Codex defaults to live search in a full access sandbox; web access off still turns it off.
+  assert.ok(codex.args.includes('web_search="disabled"'));
   assert.ok(codex.args.includes("--ignore-rules"));
 });

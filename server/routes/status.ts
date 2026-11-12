@@ -9,8 +9,8 @@ import type { RouteDeps } from "./types.js";
  * CLI readiness, the doctor report seen the way /api/status always
  * answered (which agent CLIs are installed and signed in, the GitHub
  * account, and whether every required check passed), with the run limits,
- * what a start had to repair in state.json, and the version; and the model
- * catalogs.
+ * what a start had to repair in state.json, where group work stands when
+ * BELL PR hosts it, and the version; and the model catalogs.
  */
 export function registerStatusRoutes(
   app: Express,
@@ -19,10 +19,12 @@ export function registerStatusRoutes(
   app.get("/api/status", async (_req, res) => {
     // The CLI checks share the doctor's 10-second probe results.
     const recovery = workbench.store.recovery;
+    const collab = options.collab?.status();
     res.json({
       ...(await workbench.status()),
       limits: workbench.limits,
       ...(recovery ? { recovery } : {}),
+      ...(collab ? { collab } : {}),
       version: options.version ?? version,
     });
   });

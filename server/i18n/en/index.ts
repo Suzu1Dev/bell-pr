@@ -1,6 +1,7 @@
 import analysis from "./analysis.js";
 import byHand from "./by-hand.js";
 import cli from "./cli.js";
+import collab from "./collab.js";
 import common from "./common.js";
 import contribution from "./contribution.js";
 import coordination from "./coordination.js";
@@ -27,4 +28,5 @@ export default {
   contribution,
   byHand,
   coordination,
+  collab,
 };

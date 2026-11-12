@@ -160,9 +160,6 @@ export function Welcome({
         ))}
       </ol>
       <div className="welcome-card">
-        <p className="welcome-step-of">
-          {t.stepOf({ step: index + 1, total: welcomeSteps.length })}
-        </p>
         <h2 ref={heading} tabIndex={-1}>
           <StepIcon size={22} aria-hidden="true" />
           <span>
@@ -324,7 +321,7 @@ function ProviderStep({
       )}
       {onlyOne && (
         <div className="welcome-provider-card">
-          <strong>{t.auto({ provider: providerLabels[onlyOne] })}</strong>
+          <strong>{providerLabels[onlyOne]}</strong>
           <p>{note(onlyOne)}</p>
         </div>
       )}

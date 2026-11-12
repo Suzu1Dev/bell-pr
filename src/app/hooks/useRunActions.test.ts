@@ -18,7 +18,9 @@ import {
   withSampleFeedback,
   type RunActions,
 } from "./useRunActions";
-import type { DraftEditor } from "./useDraftEditor";
+import { keepParticipantToken } from "../../collab/participant";
+import { useDraftEditor, type DraftEditor } from "./useDraftEditor";
+import { useRunRounds, type RunRounds } from "./useRunRounds";
 import type { TaskSetup } from "./useTaskSetup";
 import { getDemo } from "../../demo";
 import type { DiffFile, Run } from "../../types";
@@ -676,6 +678,283 @@ test("starting a task on a project asks before discarding the open run's unsaved
     assert.deepEqual(asked, ["POST /api/runs"]);
     assert.deepEqual(shell.shown.map((run) => run.id), ["run-new"]);
   } finally {
+    await shell.unmount();
+  }
+});
+
+test("held-file recovery uses the participant header, refreshes restore diffs, and rereads a held recheck", async (t) => {
+  const realFetch = globalThis.fetch;
+  const storage = Object.getOwnPropertyDescriptor(globalThis, "localStorage");
+  t.after(() => {
+    globalThis.fetch = realFetch;
+    if (storage) Object.defineProperty(globalThis, "localStorage", storage);
+    else delete (globalThis as Record<string, unknown>).localStorage;
+  });
+  Object.defineProperty(globalThis, "localStorage", {
+    configurable: true,
+    value: { getItem: (key: string) => key === "bellpr-participant-token" ? "participant-token" : null },
+  });
+  const heldRun: Run = { ...base, status: "failed", heldPaths: ["src/held.ts"] };
+  const restoredRun: Run = { ...heldRun, status: "review" };
+  delete restoredRun.heldPaths;
+  const heldAgain: Run = { ...heldRun, heldPaths: ["docs/guide.md"] };
+  const files = [{ path: "src/other.ts" } as DiffFile];
+  const conflict = { path: "docs/guide.md", holder: "Dee", title: "Guide work", since: "2026-11-10T09:00:00Z" };
+  const calls: { method: string; url: string; body?: string; participant: string | null }[] = [];
+  let rechecks = 0;
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    const method = init?.method ?? "GET";
+    calls.push({
+      method,
+      url,
+      body: typeof init?.body === "string" ? init.body : undefined,
+      participant: new Headers(init?.headers).get("X-Bell-Participant"),
+    });
+    if (url.endsWith("/holds/restore")) return respond({ run: restoredRun, restored: ["src/held.ts"] });
+    if (url.endsWith("/diff")) return respond({ files });
+    if (url.endsWith("/holds/recheck")) {
+      rechecks++;
+      if (rechecks === 1)
+        return respond({ error: "Still held", reason: "heldByOther", held: [conflict] }, 409);
+      return respond({ run: restoredRun });
+    }
+    if (url === "/api/runs/r") return respond({ run: heldAgain });
+    throw new Error(`unexpected request ${method} ${url}`);
+  }) as typeof fetch;
+  const shell = await mountActions(heldRun);
+  try {
+    const restored = await act(() => shell.actions().restoreHeldPaths());
+    assert.deepEqual(restored, { restored: 1, files });
+    assert.deepEqual(await act(() => shell.actions().recheckHeldPaths()), [conflict]);
+    assert.deepEqual(await act(() => shell.actions().recheckHeldPaths()), []);
+    assert.deepEqual(calls.map(({ method, url }) => [method, url]), [
+      ["POST", "/api/runs/r/holds/restore"],
+      ["GET", "/api/runs/r/diff"],
+      ["POST", "/api/runs/r/holds/recheck"],
+      ["GET", "/api/runs/r"],
+      ["POST", "/api/runs/r/holds/recheck"],
+    ]);
+    for (const call of calls.filter(({ method }) => method === "POST")) {
+      assert.equal(call.body, "{}");
+      assert.equal(call.participant, "participant-token");
+    }
+    assert.deepEqual(shell.shown, [restoredRun, heldAgain, restoredRun]);
+    assert.deepEqual(shell.shownFiles, [files]);
+  } finally {
+    await shell.unmount();
+  }
+});
+
+test("held-file recovery omits X-Bell-Participant when no participant token is stored or blank", async (t) => {
+  const realFetch = globalThis.fetch;
+  const storage = Object.getOwnPropertyDescriptor(globalThis, "localStorage");
+  t.after(() => {
+    globalThis.fetch = realFetch;
+    if (storage) Object.defineProperty(globalThis, "localStorage", storage);
+    else delete (globalThis as Record<string, unknown>).localStorage;
+  });
+  let rawToken: string | null = null;
+  Object.defineProperty(globalThis, "localStorage", {
+    configurable: true,
+    value: { getItem: () => rawToken },
+  });
+  const heldRun: Run = { ...base, status: "failed", heldPaths: ["src/held.ts"] };
+  const restoredRun: Run = { ...heldRun, status: "review" };
+  delete restoredRun.heldPaths;
+  const headersSeen: Headers[] = [];
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    if ((init?.method ?? "GET") === "POST") headersSeen.push(new Headers(init?.headers));
+    if (url.endsWith("/holds/recheck")) return respond({ run: restoredRun });
+    if (url.endsWith("/holds/restore")) return respond({ run: restoredRun, restored: [] });
+    if (url.endsWith("/diff")) return respond({ files: [] });
+    throw new Error(`unexpected ${url}`);
+  }) as typeof fetch;
+  const shell = await mountActions(heldRun);
+  try {
+    await act(() => shell.actions().recheckHeldPaths());
+    rawToken = "   ";
+    await act(() => shell.actions().restoreHeldPaths());
+    assert.equal(headersSeen.length, 2);
+    for (const headers of headersSeen) assert.equal(headers.has("X-Bell-Participant"), false);
+  } finally {
+    await shell.unmount();
+  }
+});
+
+test("held-file recovery skips mutating state or fetching stale diffs when runIdRef changes mid-request, and refreshes on 409 heldByOther restore", async (t) => {
+  const realFetch = globalThis.fetch;
+  t.after(() => {
+    globalThis.fetch = realFetch;
+  });
+  const heldRun: Run = { ...base, status: "failed", heldPaths: ["src/held.ts"] };
+  const remainingRun: Run = { ...heldRun, heldPaths: ["docs/guide.md"] };
+  const files = [{ path: "docs/guide.md" } as DiffFile];
+  const conflict = { path: "docs/guide.md", holder: "Dee", title: "Guide work", since: "2026-11-10T09:00:00Z" };
+  const runIdRef = { current: "r" };
+  const urls: string[] = [];
+  let mode: "switch-on-restore" | "switch-on-recheck" | "restore-conflict" = "switch-on-restore";
+
+  globalThis.fetch = (async (input: RequestInfo | URL) => {
+    const url = String(input);
+    urls.push(url);
+    if (mode === "switch-on-restore" && url.endsWith("/holds/restore")) {
+      runIdRef.current = "other-run";
+      return respond({ run: { ...heldRun, status: "review", heldPaths: undefined }, restored: ["src/held.ts"] });
+    }
+    if (mode === "switch-on-recheck" && url.endsWith("/holds/recheck")) {
+      runIdRef.current = "other-run";
+      return respond({ error: "Still held", reason: "heldByOther", held: [conflict] }, 409);
+    }
+    if (mode === "restore-conflict" && url.endsWith("/holds/restore")) {
+      return respond({ error: "Still held", reason: "heldByOther", held: [conflict] }, 409);
+    }
+    if (url === "/api/runs/r") return respond({ run: remainingRun });
+    if (url === "/api/runs/r/diff") return respond({ files });
+    throw new Error(`unexpected ${url}`);
+  }) as typeof fetch;
+
+  const shell = await mountActions(heldRun, { runIdRef, file: { path: "src/held.ts" } as DiffFile });
+  try {
+    const switchedRestore = await act(() => shell.actions().restoreHeldPaths());
+    assert.deepEqual(switchedRestore, { restored: 1 });
+    assert.deepEqual(shell.shown, []);
+    assert.deepEqual(shell.shownFiles, []);
+    assert.deepEqual(urls, ["/api/runs/r/holds/restore"]);
+
+    urls.length = 0;
+    runIdRef.current = "r";
+    mode = "switch-on-recheck";
+    const switchedRecheck = await act(() => shell.actions().recheckHeldPaths());
+    assert.deepEqual(switchedRecheck, [conflict]);
+    assert.deepEqual(shell.shown, []);
+    assert.deepEqual(urls, ["/api/runs/r/holds/recheck"]);
+
+    urls.length = 0;
+    runIdRef.current = "r";
+    mode = "restore-conflict";
+    await assert.rejects(async () => { await act(() => shell.actions().restoreHeldPaths()); }, /Still held/);
+    assert.deepEqual(shell.shown, [remainingRun]);
+    assert.deepEqual(shell.shownFiles, [files]);
+  } finally {
+    await shell.unmount();
+  }
+});
+
+test("run creation, preflight, publish, and sync send X-Bell-Participant when stored or kept in memory and omit it when blank or absent", async (t) => {
+  const realFetch = globalThis.fetch;
+  const storage = Object.getOwnPropertyDescriptor(globalThis, "localStorage");
+  t.after(() => {
+    globalThis.fetch = realFetch;
+    keepParticipantToken("");
+    if (storage) Object.defineProperty(globalThis, "localStorage", storage);
+    else delete (globalThis as Record<string, unknown>).localStorage;
+  });
+  let rawToken: string | null = "  participant-token  ";
+  let storageThrows = false;
+  Object.defineProperty(globalThis, "localStorage", {
+    configurable: true,
+    value: {
+      getItem: (key: string) => {
+        if (storageThrows) throw new Error("storage blocked");
+        return key === "bellpr-participant-token" ? rawToken : null;
+      },
+      setItem: (_key: string, value: string) => {
+        if (storageThrows) throw new Error("storage blocked");
+        rawToken = value;
+      },
+    },
+  });
+
+  const approved: Run = { ...base, id: "r", status: "approved", approvedFingerprint: "fp-1" };
+  const created: Run = { ...base, id: "run-created", repoId: "repo-2", status: "queued" };
+  const published: Run = { ...approved, status: "published", prUrl: "https://example.test/pull/9" };
+  const seen: { key: string; participant: string | null }[] = [];
+
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    const method = init?.method ?? "GET";
+    const participant = new Headers(init?.headers).get("X-Bell-Participant");
+    if (method === "POST" && url === "/api/runs") {
+      seen.push({ key: "POST /api/runs", participant });
+      return respond({ run: created }, 202);
+    }
+    if (method === "GET" && url === "/api/runs/r/preflight") {
+      seen.push({ key: "GET /api/runs/r/preflight", participant });
+      return respond({ checks: [] });
+    }
+    if (method === "POST" && url === "/api/runs/r/publish") {
+      seen.push({ key: "POST /api/runs/r/publish", participant });
+      return respond({ run: published });
+    }
+    if (method === "POST" && url === "/api/runs/r/sync") {
+      seen.push({ key: "POST /api/runs/r/sync", participant });
+      return respond({ run: approved, updated: false, conflicts: [] });
+    }
+    if (method === "GET" && url === "/api/runs/r/diff") return respond({ files: [] });
+    throw new Error(`unexpected request ${method} ${url}`);
+  }) as typeof fetch;
+
+  let editor!: DraftEditor;
+  let rounds!: RunRounds;
+  function ExtraHooks() {
+    editor = useDraftEditor({
+      run: approved,
+      setRun() {},
+      demo: false,
+      runIdRef: { current: approved.id },
+      notify() {},
+      setBusy() {},
+    });
+    rounds = useRunRounds({
+      run: approved,
+      setRun() {},
+      runIdRef: { current: approved.id },
+      setFiles() {},
+      setBusy() {},
+      notify() {},
+      setTab() {},
+    });
+    return null;
+  }
+
+  const shell = await mountActions(approved);
+  const extra = await mount(createElement(ExtraHooks));
+  const submit = { preventDefault() {} } as FormEvent;
+  const exerciseFourCalls = async () => {
+    seen.length = 0;
+    await act(() => shell.actions().startTask(submit));
+    await act(() => editor.loadPublishChecks(approved.id, approved.approvedFingerprint));
+    await act(() => shell.actions().publish());
+    await act(() => rounds.syncToLatest());
+    assert.deepEqual(
+      seen.map((entry) => entry.key),
+      [
+        "POST /api/runs",
+        "GET /api/runs/r/preflight",
+        "POST /api/runs/r/publish",
+        "POST /api/runs/r/sync",
+      ],
+    );
+  };
+
+  try {
+    await exerciseFourCalls();
+    for (const entry of seen) assert.equal(entry.participant, "participant-token");
+
+    for (const empty of [null, "   "]) {
+      rawToken = empty;
+      await exerciseFourCalls();
+      for (const entry of seen) assert.equal(entry.participant, null);
+    }
+
+    storageThrows = true;
+    keepParticipantToken("  memory-token  ");
+    await exerciseFourCalls();
+    for (const entry of seen) assert.equal(entry.participant, "memory-token");
+  } finally {
+    await extra.unmount();
     await shell.unmount();
   }
 });

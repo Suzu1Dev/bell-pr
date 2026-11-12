@@ -17,7 +17,7 @@ const draft = {
   /** DraftGuidancePanel: the project's rules, the suggested draft and its sources. */
   guidance: {
     eyebrow: "CONTRIBUTION GUIDE",
-    title: "Write a PR that maintainers can follow",
+    title: "Draft suggestions",
     intro:
       "Read the contribution rules and the template first, then turn this contribution into a clear draft.",
     status: {
@@ -124,7 +124,9 @@ const draft = {
      * the unsaved etiquette checkboxes.
      */
     checklist: {
-      title: "The maintainer checklist",
+      sources: "Sources",
+      completed: ({ passed, off }: { passed: number; off: number }) => `${passed} passed${off ? ` · ${off} off` : ""}`,
+      title: "Before you publish",
       intro:
         "What maintainers check before they spend time on a pull request, read from the project's rules, GitHub and this change. Publishing runs the same checks.",
       rulesRead: ({ date }: { date: string }) => `Rules read ${date}`,
@@ -294,6 +296,7 @@ const draft = {
    * reference.
    */
   reviewability: {
+    reference: "How size is assessed and recent project examples",
     title: "How reviewable is this change?",
     bands: {
       small: "Small",
@@ -443,6 +446,11 @@ const draft = {
       unpublished: ({ latest, ours }: { latest: string; ours: string }) =>
         `In each file, the side marked ${latest} is the target branch's current content and the side marked ${ours} is this contribution. You cannot approve until every conflict marker is removed. Resolve the markers by hand; ${product.name} re-checks them when you refresh the diff on the Code changes tab. Changed files still need a file-by-file review.`,
     },
+    heldChanges: "Changes under your hold",
+    heldChangesNote:
+      "Commits on {branch} changed these files since you took your hold. Check them before you publish.",
+    heldChangesCommits: ({ commits }: { commits: readonly string[] }) =>
+      `(${commits.join(", ")})`,
   },
   /** FollowUpRounds: the rounds of changes after maintainer review. */
   followUps: {

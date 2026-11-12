@@ -174,7 +174,7 @@ test("the document title names each page, also after the language changes", asyn
     await page.goto(`/${hash}`);
     await expect(page).toHaveTitle(title);
   }
-  // "Repositories" reads the same in both languages; "Settings" does not.
+  // Page titles follow the selected language and keep it across reloads.
   for (const [hash, en, zh] of [
     ["#/repos", app.pages.repos, appZh.pages.repos],
     ["#/settings", app.pages.settings, appZh.pages.settings],
@@ -707,4 +707,3 @@ test("the global setup finished onboarding on the shared server", async ({ reque
   const { settings } = await response.json();
   expect(Date.parse(settings.onboardingCompletedAt)).not.toBeNaN();
 });
-

@@ -9,18 +9,98 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
-- **A coordination core for several people on one project, not reachable
-  yet.** `server/coordination.ts` grants claims on files all or nothing,
-  waits for task dependencies, and moves a dedicated branch one checked
-  change at a time, as `docs/multiuser-collaboration.md` describes.
-  Nothing in the app, the CLI or any listener calls it, and it protects
-  nothing at write time: a shell, an editor or an agent can still write
-  outside a claim. Working together on one project is not safer yet.
+- **Group work for the people who share one BELL PR, from the command
+  line and the API.** `bell-pr start --group` (or `BELLPR_GROUP=1`) turns
+  it on. The person at the host sets the group up with
+  `bell-pr group setup` and invites each person by name with a one-time
+  code (`bell-pr group invite <name> [--admin]`); `bell-pr group status`
+  says whether group work is not set up, ready or stopped. A person joins
+  with the code through `POST /api/collab/join` and gets a participant
+  token, sent in `x-bell-participant` next to the app token; an admin can
+  remove a person and, when asked, unpair the device they joined from.
+  Admin and member only decide who may invite and remove people, add
+  repositories and revoke a hold (next entry). Without the switch nothing changes, except that a
+  participant token is masked (under Changed). `docs/group-work.md`
+  describes it.
+- **The group's repositories, holds on files and folders, and a live feed,
+  through the API.** A group admin adds a repository this BELL PR has
+  (`POST /api/collab/projects`), and the group gets its own bare copy of
+  its default branch in `collab/` in the data directory. Each person says
+  what they are working on by taking a hold: a title and up to 50 files or
+  folders (`POST /api/collab/projects/<id>/work`). A folder holds
+  everything inside it, and letter case is ignored. BELL PR refuses a hold
+  that meets one already held and names who holds what; `check` asks the
+  same question without taking anything. The holder releases a hold, an
+  admin revokes one, and removing a person ends what they hold.
+  `GET /api/collab/projects/<id>/feed` answers with the repository's
+  board, the people of the group and what is held now, and waits up to 25
+  seconds for the next change. A hold does not stop a tool, an editor or a
+  push outside BELL PR from writing to a held path; what BELL PR checks of
+  its own writes is in the entry "BELL PR checks its own writes against
+  other people's holds" below.
+  The group's record keeps every ended hold and nothing cleans it up: once
+  it is full (8 MiB) new holds are refused until the host resets group
+  storage, which `docs/troubleshooting.md` describes. The paths that
+  cannot be held and every limit are in `docs/group-work.md`.
+- **With group work on, the data-directory lock is the strict one.** It is
+  never replaced because of its age. After a crash that leaves a lock
+  whose holder cannot be confirmed (another container or machine, an older
+  build, an unreadable file), the next start is refused until a person
+  removes the lock file. `bell-pr start --group` never reuses a BELL PR
+  that runs without group work: it says to stop that one first and exits
+  with 1.
+- **The Group page: who holds what, in the app.** With group work on, the
+  sidebar has a **Group** item (`#/group`). The page shows one repository
+  of the group: its people and who is looking at the board now, and each
+  hold with its holder, title, paths and time, kept current from the feed
+  without a reload. Under **Start work** you type a title and paths, and
+  the page says before you take the hold whether another one is in the way
+  and whose; the answer updates by itself when the board changes. You
+  release your own holds, and an admin revokes someone else's after one
+  question. The person at the host starts group work and adds a repository
+  there, an admin invites with a one-time code, and a paired device joins
+  by typing it. A chip says whether the board is live, updated every 10
+  seconds or reconnecting. Under **Must finish first** you tick the tasks
+  that must be finished before yours starts, and your own hold has
+  **Finish & release** (the task is done, so work that waits for it can
+  start) and **Release only**. Using the same identity on another device
+  and removing a person stay API-only. Without the switch the page says
+  how to turn group work on, and the sidebar has no Group item.
+  `docs/group-work.md` describes it.
+- **BELL PR checks its own writes against other people's holds.** In a
+  repository of the group, BELL PR publishes no change (first pull request
+  or follow-up round) that touches a path someone else holds: the publish
+  dialog lists the files and who holds them. A plan that covers such a
+  path cannot be approved, Codex and Claude Code turns get other people's
+  held paths read-only in the sandbox, and a teammate's change over one is
+  not integrated. A turn that still changed such a file stops the run,
+  with the change left in the checkout: the run page lists the files with
+  **Put these files back** (**Put this file back** for one file; to the
+  run's base, after one question; other changed files stay) and **Check
+  again**, also
+  `POST /api/runs/<id>/holds/restore` and `/holds/recheck`. A run keeps
+  who started it (`owners`) and the files that stopped it (`heldPaths`).
+  Sync and the first publish report commits on the target branch that
+  changed files under your own hold. Work can wait for other work
+  (`dependsOn`, releasing with `"done": true`, and
+  `GET /api/collab/projects/<id>/tasks`). An editor, a terminal tool or a
+  push outside BELL PR is not checked, and nothing is locked in a checkout
+  or on GitHub. While group work has stopped, nothing is published and no
+  turn that may change files starts in a repository of the group. Without
+  the switch nothing is checked. `docs/group-work.md` has the details.
+- **A coordination core for several people on one project, its integration
+  not reachable yet.** `server/coordination.ts` grants claims on files all
+  or nothing, waits for task dependencies, and moves a dedicated branch one
+  checked change at a time, as `docs/multiuser-collaboration.md` describes.
+  Only group work opens it: to add the people and the repositories of a
+  group, and to claim, release and revoke for its holds. Nothing in the
+  app, the CLI or any listener reaches its dependencies or its
+  integration, and the core itself checks no write against a claim: the
+  checks against holds are group work's (the entry above).
 - **An admin can reopen a failed coordination task, in the core only.** The
   task keeps its claims, their reasons and fences, and records who reopened
   it and when. Members cannot reopen a task, and an integrated task never
-  reopens. Like the rest of the coordination core, nothing in the app, the
-  CLI or any listener reaches it yet.
+  reopens. Nothing in the app, the CLI or any listener reaches it yet.
 - **An interrupted integration the branch cannot settle when the
   coordinator opens closes only its own project, in the core only.** Other
   projects keep working; the closed one refuses every change, keeps its
@@ -38,7 +118,18 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   from the checks. Every coordination Git command now turns it off, even
   where the repository's config turns it on. Other files in that
   directory, such as object files, packs and alternates, are still trusted,
-  and nothing in the app, the CLI or any listener reaches the core yet.
+  and nothing in the app, the CLI or any listener runs those commands yet.
+- **BELL Suite link (contract v1).** `BELLPR_SUITE_LINKS` tells this BELL PR
+  where BELL Explain and BELL Personal are, on the same computer or tailnet,
+  and a switcher between the BELL products shows once a link is set.
+  `GET /api/suite/manifest` and `GET /api/suite/today` describe BELL PR and
+  the runs that wait for you or for BELL PR: two counts and, for each run
+  listed, its id and route, title, state with a fixed phrase, and time.
+  Nothing else about a run is sent. Both stay behind the access token like
+  the rest of the API, and no existing protection changes. No other BELL
+  product can read the feed yet, because BELL PR has no read-only
+  credential to give one. [BELL Suite link](docs/bell-suite.md) has the
+  details.
 
 ### Changed
 
@@ -46,14 +137,27 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   supports hard links, a start writes its lock aside and links it into
   place, so no other start reads it half written. A stale lock is removed
   only after a start claims it, so two starts that find the same stale
-  lock cannot remove the lock either of them then writes. A lock taken
+  lock cannot remove the lock either of them then writes. A claim left by
+  a start that stopped is cleared by the next start once its process is
+  gone, and one that names no start, outside coordination, once it is 30
+  seconds old;
+  a claim that stays, like a lock that cannot be read, is named in the
+  refusal. Without hard links, a start gives up a lock it wrote in place
+  when another start had claimed it empty, so both cannot run; a leftover
+  claim there can refuse a start until it is removed. A lock taken
   for coordination is never replaced until its holder is shown to have
-  stopped; nothing takes one yet. Tests now hold an integration after its
+  stopped; group work takes one. Tests now hold an integration after its
   last lock check, and put holders and starts in real separate PID
   namespaces where bubblewrap can make them: no start of this version
   takes such a lock, running, paused or expired. A lock a person removes
   or replaces while its holder runs is still outside that rule: an
   integration already past its last lock check still moves the branch.
+- **A participant token is masked like other tokens, in every BELL PR.**
+  Text shaped exactly like one (`bpc_` and 43 letters, digits, `-` or `_`)
+  is masked in logs, Agent answers and drafts; a changed file that holds
+  it is held back from review, and a draft that holds it cannot be
+  published. This applies with or without group work. A longer or shorter
+  name that starts with `bpc_` is left as it is.
 
 ### Fixed
 
@@ -84,6 +188,19 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   retry" instead of "Ready to claim", since nothing starts it until you
   retry. Long titles and descriptions, even with no space to break at, now
   wrap inside their card.
+- **Codex's web search tool is now off while web access is off.** BELL PR
+  passed Codex a search setting only with web access on. Codex searches a
+  cached index by default, and live in a full access sandbox, so its agents
+  could search the web with the switch off, in project analysis and
+  discovery too (seen with Codex CLI 0.167). Every Codex turn now states
+  the setting: `web_search="live"` with web access on, and
+  `web_search="disabled"` otherwise.
+- **Codex agents no longer get ChatGPT apps (connectors).** With a ChatGPT
+  sign-in, Codex offers its apps to every turn. They include a web search
+  tool that stays available with web search disabled (seen with Codex CLI
+  0.167), and the run log did not record its queries. Every Codex turn now
+  starts with `features.apps=false`, with web access on or off, as BELL PR
+  already keeps your own MCP servers away from agents.
 
 ## [1.1.0] - 2026-11-04
 

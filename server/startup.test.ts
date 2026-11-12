@@ -3,9 +3,11 @@ import assert from "node:assert/strict";
 import { spawn, type ChildProcess } from "node:child_process";
 import { createHash } from "node:crypto";
 import { once } from "node:events";
-import {
+import fs, {
+  chmodSync,
   cpSync,
   existsSync,
+  lstatSync,
   mkdirSync,
   readdirSync,
   readFileSync,
@@ -16,12 +18,15 @@ import {
 } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { request } from "node:http";
+import { syncBuiltinESMExports } from "node:module";
 import { createServer, type AddressInfo } from "node:net";
 import { tmpdir, uptime } from "node:os";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 import { baseUrl, resolveConfig, ConfigError, defaultStaticDir } from "./config.js";
 import { createApp } from "./app.js";
 import { version } from "./build-info.js";
+import type { CollabHost } from "./collab-host.js";
 import { acquireWriterLock, lockHolderRunning, startServer, StartupError } from "./index.js";
 import { withLocale } from "./i18n/index.js";
 import { Store } from "./store.js";
@@ -799,6 +804,183 @@ test("a strict lock is replaced once its holder is shown to have stopped here, a
   }
 });
 
+test("group work is on only with --group or BELLPR_GROUP", () => {
+  const home = path.join(tmpdir(), "bell-pr-config-home");
+  assert.equal(resolveConfig({ group: true }, {}, home).collab, true);
+  assert.equal(resolveConfig({}, { BELLPR_GROUP: "1" }, home).collab, true);
+  for (const [flags, env] of [
+    [{}, {}],
+    [{ group: false }, {}],
+    [{}, { BELLPR_GROUP: "0" }],
+    [{}, { BELLPR_GROUP: "" }],
+  ] as const)
+    assert.equal("collab" in resolveConfig(flags, env, home), false);
+});
+
+/** A start in this process, the install token's header, and the lock it wrote. */
+async function startedHere(box: Awaited<ReturnType<typeof sandbox>>, group?: boolean) {
+  const port = await freePort();
+  const running = await startServer({
+    config: resolveConfig({ port, dataDir: box.data, group }, box.env),
+    handleExit: false,
+    print: () => {},
+  });
+  const token = readFileSync(path.join(box.data, "api-token"), "utf8").trim();
+  const lockText = readFileSync(path.join(box.data, "bellpr.lock"), "utf8");
+  return {
+    running,
+    port,
+    auth: { authorization: `Bearer ${token}` },
+    lockText,
+    lock: JSON.parse(lockText),
+  };
+}
+const groupFiles = (data: string) =>
+  ["collab.json", "coordination.json"].filter((name) => existsSync(path.join(data, name)));
+
+test("without --group a start is as before: an ordinary lock, no collab in /api/status, no group route or file", async () => {
+  const box = await sandbox();
+  try {
+    const { running, port, auth, lock } = await startedHere(box);
+    try {
+      assert.deepEqual([lock.port, lock.url, "strict" in lock], [port, running.url, false]);
+      const status = await get(`${running.url}/api/status`, auth);
+      assert.equal(status.status, 200);
+      assert.equal("collab" in JSON.parse(status.body), false);
+      // The group routes are not there: the answer of any path the API does not have.
+      const unknown = await get(`${running.url}/api/no-such-route`, auth);
+      for (const route of ["/api/collab", "/api/collab/projects"]) {
+        const absent = await get(`${running.url}${route}`, auth);
+        assert.equal(absent.status, 404, route);
+        assert.equal(absent.body, unknown.body, route);
+      }
+      assert.equal(running.app.locals.collab, undefined);
+    } finally {
+      await running.shutdown();
+    }
+    assert.deepEqual(groupFiles(box.data), []);
+  } finally {
+    await box.cleanup();
+  }
+});
+
+test("with --group a start takes the strict lock under its real address, reports group work and refuses a second start", async () => {
+  const box = await sandbox();
+  try {
+    const plain = await startedHere(box);
+    await plain.running.shutdown();
+    const { running, port, auth, lock, lockText } = await startedHere(box, true);
+    try {
+      // The ordinary lock and one field more, so `bell-pr open` still finds the instance.
+      assert.deepEqual(Object.keys(lock), [...Object.keys(plain.lock), "strict"]);
+      assert.deepEqual(
+        [lock.pid, lock.port, lock.host, lock.url, lock.strict],
+        [process.pid, port, "127.0.0.1", running.url, true],
+      );
+      const status = await get(`${running.url}/api/status`, auth);
+      assert.deepEqual(JSON.parse(status.body).collab, { state: "notSetUp" });
+      const info = await get(`${running.url}/api/collab`, auth);
+      assert.deepEqual([info.status, JSON.parse(info.body)], [200, { state: "notSetUp", host: true }]);
+      // Asking wrote nothing: the files come with setup.
+      assert.deepEqual(groupFiles(box.data), []);
+
+      // A second start on this data directory is refused, with group work or without.
+      for (const group of [true, false])
+        await assert.rejects(
+          startServer({
+            config: resolveConfig({ port: await freePort(), dataDir: box.data, group }, box.env),
+            handleExit: false,
+            print: () => {},
+          }),
+          StartupError,
+        );
+      assert.equal(readFileSync(path.join(box.data, "bellpr.lock"), "utf8"), lockText);
+    } finally {
+      await running.shutdown();
+    }
+    assert.equal(existsSync(path.join(box.data, "bellpr.lock")), false);
+    assert.deepEqual(lockLitter(box.data), []);
+  } finally {
+    await box.cleanup();
+  }
+});
+
+test("shutdown lets group work in flight land before the server closes and the lock goes", async () => {
+  const box = await sandbox();
+  try {
+    const { running } = await startedHere(box, true);
+    try {
+      const collab = running.app.locals.collab as CollabHost;
+      await collab.setUp();
+      let release!: () => void;
+      const gate = new Promise<void>((resolve) => (release = resolve));
+      const work = collab.run(async () => {
+        await gate;
+        return collab.coordinator().addParticipant("m-0000000001", "member");
+      });
+      let stopped = false;
+      const stopping = running.shutdown().then(() => (stopped = true));
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      // Still waiting for the work: the server has not closed and the lock is held.
+      assert.deepEqual(
+        [stopped, running.server.listening, existsSync(path.join(box.data, "bellpr.lock"))],
+        [false, true, true],
+      );
+      assert.deepEqual(collab.status(), { state: "stopped", reason: "closed" });
+      release();
+      // The write needed the lock, so it landed before the lock went.
+      const { id } = await work;
+      await stopping;
+      assert.equal(existsSync(path.join(box.data, "bellpr.lock")), false);
+      assert.equal(running.server.listening, false);
+      assert.ok(readFileSync(path.join(box.data, "coordination.json"), "utf8").includes(id));
+      await assert.rejects(collab.run(async () => undefined));
+    } finally {
+      await running.shutdown();
+    }
+  } finally {
+    await box.cleanup();
+  }
+});
+
+test("a signal leaves the workbench its time to stop after group work that never lands", async () => {
+  const box = await sandbox();
+  const stoppedFile = path.join(box.directory, "workbench-stopped");
+  // In the child, group work never settles and the workbench takes 2 seconds to stop.
+  const script = `
+    import { writeFileSync } from "node:fs";
+    const [port, dataDir, stoppedFile] = process.argv.slice(1);
+    const { startServer } = await import("./server/index.ts");
+    const { Workbench } = await import("./server/workbench.ts");
+    const shutdown = Workbench.prototype.shutdown;
+    Workbench.prototype.shutdown = async function () {
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+      await shutdown.call(this);
+      writeFileSync(stoppedFile, "");
+    };
+    const { app } = await startServer({ flags: { port, dataDir, group: true }, print: () => {} });
+    await app.locals.collab.setUp();
+    void app.locals.collab.run(() => new Promise(() => {}));
+    process.kill(process.pid, "SIGTERM");
+  `;
+  try {
+    const child = spawn(
+      process.execPath,
+      ["--import", "tsx", "--input-type=module", "-e", script, String(await freePort()), box.data, stoppedFile],
+      { cwd: repoRoot, env: box.env, stdio: ["ignore", "ignore", "pipe"] },
+    );
+    let stderr = "";
+    child.stderr!.setEncoding("utf8").on("data", (chunk: string) => (stderr += chunk));
+    const [code] = await once(child, "exit");
+    assert.equal(code, 0, stderr);
+    // Group work waited its 4 seconds; the hard exit still left the workbench its own.
+    assert.equal(existsSync(stoppedFile), true);
+    assert.equal(existsSync(path.join(box.data, "bellpr.lock")), false);
+  } finally {
+    await box.cleanup();
+  }
+});
+
 test("a takeover claim left by a start that stopped is cleared; one whose start still runs keeps the stale lock", async () => {
   const box = await sandbox();
   // A live Node.js process stands in for a start that is removing the lock.
@@ -846,6 +1028,466 @@ test("a takeover claim left by a start that stopped is cleared; one whose start 
     }
   } finally {
     claimer.kill("SIGKILL");
+    await box.cleanup();
+  }
+});
+
+/** The takeover claim file of the lock at `file` that reads `text`. */
+const claimFile = (file: string, text: string) =>
+  `${file}.takeover-${createHash("sha256").update(text).digest("hex").slice(0, 16)}`;
+
+/** A start on the box's data directory under each rule; each resolves to what stops it. */
+const lockStarts = (box: { data: string; env: NodeJS.ProcessEnv }) => ({
+  strict: async () => {
+    const lock = await acquireWriterLock(box.data);
+    return () => lock.release();
+  },
+  ordinary: async () => {
+    const running = await startServer({
+      config: resolveConfig({ port: await freePort(), dataDir: box.data }, box.env),
+      handleExit: false,
+      print: () => {},
+    });
+    return () => running.shutdown();
+  },
+});
+
+/** The message a start is refused with; a start that goes through is stopped and fails. */
+async function refusedWith(start: () => Promise<() => unknown>) {
+  let stop: () => unknown;
+  try {
+    stop = await start();
+  } catch (error) {
+    assert.ok(error instanceof StartupError, String(error));
+    return error.message;
+  }
+  await stop();
+  return assert.fail("the start was not refused");
+}
+
+/** A refusal that names a process that does not exist. */
+const processZero = /(process|行程) 0\b/;
+
+test("an ordinary start clears a takeover claim that names no start once it is older than the lease; one that names a running process stays, and the refusal names it", async () => {
+  const box = await sandbox();
+  // A live Node.js process: a start suspended before it removed the lock, or a
+  // program that got the pid of one that crashed. Nothing here tells them apart.
+  const claimer = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], { stdio: "ignore" });
+  try {
+    await once(claimer, "spawn");
+    mkdirSync(box.data, { recursive: true });
+    const file = path.join(box.data, "bellpr.lock");
+    const starts = lockStarts(box);
+    const probe = await acquireWriterLock(box.data);
+    const here = { ...JSON.parse(readFileSync(file, "utf8")), strict: undefined };
+    probe.release();
+    const gone = await gonePid();
+    const stale = JSON.stringify({ ...here, pid: gone });
+    const claim = claimFile(file, stale);
+    const leave = (text: string, written: number) => {
+      writeFileSync(file, stale);
+      writeFileSync(claim, text);
+      utimesSync(claim, new Date(written), new Date(written));
+    };
+    const stays = async (name: string, text: string, written: number) => {
+      leave(text, written);
+      const message = await refusedWith(starts.ordinary);
+      assert.ok(message.includes(claim), `${name}: ${message}`);
+      assert.doesNotMatch(message, new RegExp(`\\b${gone}\\b`), name);
+      assert.equal(readFileSync(file, "utf8"), stale, name);
+      assert.equal(readFileSync(claim, "utf8"), text, name);
+    };
+    const lapsed = Date.now() - 31_000;
+    // Resumed, a suspended start would remove the lock taken since: age shows nothing.
+    const running = JSON.stringify({ ...here, pid: claimer.pid, strict: false });
+    await stays("a running process, just now", running, Date.now());
+    await stays("a running process, a lease ago", running, lapsed);
+    await stays("a running process, an hour ago", running, Date.now() - 3_600_000);
+    // Power was lost before the claim's text reached the disk: it names no start.
+    await stays("nothing, just now", "", Date.now());
+    // Dated an hour ahead: the clock was stepped back since.
+    await stays("nothing, dated ahead", "", Date.now() + 3_600_000);
+    // A takeover lasts milliseconds: a lease later, that start has stopped.
+    leave("", lapsed);
+    const stop = await starts.ordinary();
+    try {
+      assert.equal(JSON.parse(readFileSync(file, "utf8")).pid, process.pid);
+      assert.deepEqual(lockLitter(box.data), []);
+    } finally {
+      await stop();
+    }
+  } finally {
+    claimer.kill("SIGKILL");
+    await box.cleanup();
+  }
+});
+
+test("under the strict rule a takeover claim stays however old it is, and the refusal names it", async () => {
+  const box = await sandbox();
+  // A live Node.js process stands in for a start suspended before it removed the lock.
+  const claimer = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], { stdio: "ignore" });
+  try {
+    await once(claimer, "spawn");
+    mkdirSync(box.data, { recursive: true });
+    const file = path.join(box.data, "bellpr.lock");
+    const starts = lockStarts(box);
+    const probe = await acquireWriterLock(box.data);
+    const here = { ...JSON.parse(readFileSync(file, "utf8")), strict: undefined };
+    probe.release();
+    const gone = await gonePid();
+    const hourAgo = new Date(Date.now() - 3_600_000);
+    // The rule is the start's, the stale lock's or the claim's own.
+    const cases = [
+      { name: "a strict start", start: starts.strict, lock: false, claim: false },
+      { name: "a strict stale lock", start: starts.ordinary, lock: true, claim: false },
+      { name: "a strict claim", start: starts.ordinary, lock: false, claim: true },
+    ];
+    for (const { name, start, ...strict } of cases) {
+      const stale = JSON.stringify({ ...here, pid: gone, strict: strict.lock || undefined });
+      const claim = claimFile(file, stale);
+      const named = JSON.stringify({ ...here, pid: claimer.pid, strict: strict.claim });
+      // One that names no start stays as well; it cannot carry the rule itself.
+      for (const text of strict.claim ? [named] : [named, ""]) {
+        writeFileSync(file, stale);
+        writeFileSync(claim, text);
+        utimesSync(claim, hourAgo, hourAgo);
+        const message = await refusedWith(start);
+        assert.ok(message.includes(claim), `${name}: ${message}`);
+        assert.doesNotMatch(message, new RegExp(`\\b${gone}\\b`), name);
+        assert.equal(readFileSync(file, "utf8"), stale, name);
+        assert.equal(readFileSync(claim, "utf8"), text, name);
+        assert.deepEqual(lockLitter(box.data), [path.basename(claim)], name);
+        await rm(claim);
+      }
+    }
+  } finally {
+    claimer.kill("SIGKILL");
+    await box.cleanup();
+  }
+});
+
+/** Waits until a start is halted at `hook` (test/lock-stall.mjs), or fails with its output. */
+async function halted(launched: Launched, hook: string, timeoutMs = 30_000) {
+  const deadline = Date.now() + timeoutMs;
+  while (!existsSync(`${hook}.reached`)) {
+    if (launched.child.exitCode !== null || Date.now() > deadline)
+      assert.fail(
+        `The start was not halted.\nstdout: ${launched.stdout()}\nstderr: ${launched.stderr()}`,
+      );
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+}
+
+/** A real start that test/lock-stall.mjs halts once at `where`, until `<hook>.go` is there. */
+async function haltingStart(
+  box: { data: string; env: NodeJS.ProcessEnv },
+  hook: string,
+  where: NodeJS.ProcessEnv,
+) {
+  const preload = pathToFileURL(path.join(repoRoot, "test", "lock-stall.mjs")).href;
+  return launch(
+    cliEntry,
+    ["start", "--force", "--port", String(await freePort()), "--data-dir", box.data],
+    {
+      ...box.env,
+      NODE_OPTIONS: `${box.env.NODE_OPTIONS ?? ""} --import=${preload}`,
+      LOCK_TEST_HOOK: hook,
+      ...where,
+    },
+  );
+}
+
+test("a start held up while it writes its takeover claim in place removes neither the lock nor the claim of the start that cleared it", async () => {
+  const box = await sandbox();
+  const launched: Launched[] = [];
+  try {
+    mkdirSync(box.data, { recursive: true });
+    const file = path.join(box.data, "bellpr.lock");
+    const probe = await acquireWriterLock(box.data);
+    const here = { ...JSON.parse(readFileSync(file, "utf8")), strict: undefined };
+    probe.release();
+    const stale = JSON.stringify({ ...here, pid: await gonePid() });
+    writeFileSync(file, stale);
+    const claim = claimFile(file, stale);
+    const claims = "\\.takeover-[0-9a-f]{16}$";
+    // Hard links fail for its claim: the first start creates the claim in place
+    // and is held up before it writes it. The claim lies empty for over a lease.
+    const firstHook = path.join(box.directory, "first");
+    const first = await haltingStart(box, firstHook, {
+      LOCK_TEST_NO_LINK: claims,
+      LOCK_TEST_STALL_WRITE: claims,
+    });
+    launched.push(first);
+    await halted(first, firstHook);
+    assert.equal(statSync(claim).size, 0);
+    const lapsed = new Date(Date.now() - 31_000);
+    utimesSync(claim, lapsed, lapsed);
+    // The second clears the empty claim, writes its own and is held up just
+    // before it removes the stale lock.
+    const secondHook = path.join(box.directory, "second");
+    const second = await haltingStart(box, secondHook, {
+      LOCK_TEST_STALL_REMOVE: "bellpr\\.lock$",
+    });
+    launched.push(second);
+    await halted(second, secondHook);
+    const claimer = () => JSON.parse(readFileSync(claim, "utf8")).pid;
+    assert.equal(claimer(), second.child.pid);
+    // The first goes on. Its text went into the file it created, which the
+    // claim path no longer leads to: the claim there is the second's, and it
+    // may remove neither that claim nor the lock, or two starts would get the
+    // lock, and coordination would lose one it took in between.
+    writeFileSync(`${firstHook}.go`, "");
+    const ended = await Promise.race([
+      first.exited.then(({ code }) => code),
+      started(first).then(() => "started"),
+    ]);
+    assert.equal(ended, 1, first.stdout() + first.stderr());
+    assert.ok(first.stderr().includes(claim), first.stderr());
+    assert.equal(readFileSync(file, "utf8"), stale);
+    assert.equal(claimer(), second.child.pid);
+    // Coordination that starts now finds the lock claimed, not free to take.
+    const message = await refusedWith(lockStarts(box).strict);
+    assert.ok(message.includes(claim), message);
+    assert.equal(readFileSync(file, "utf8"), stale);
+    // The second goes on, and is the one start that has the data directory.
+    writeFileSync(`${secondHook}.go`, "");
+    await started(second);
+    assert.equal(JSON.parse(readFileSync(file, "utf8")).pid, second.child.pid);
+    assert.deepEqual(lockLitter(box.data), []);
+  } finally {
+    // A halted start handles no signal.
+    for (const { child } of launched) child.kill("SIGKILL");
+    await Promise.all(launched.map(({ exited }) => exited));
+    await box.cleanup();
+  }
+});
+
+test("a start held up while it writes its lock or its claim in place leaves the file to the start that claimed it empty", async () => {
+  const cases = [
+    { written: "lock", files: "bellpr\\.lock$" },
+    { written: "claim", files: "\\.takeover-[0-9a-f]{16}$" },
+  ];
+  for (const { written, files } of cases) {
+    const box = await sandbox();
+    const launched: Launched[] = [];
+    try {
+      mkdirSync(box.data, { recursive: true });
+      const file = path.join(box.data, "bellpr.lock");
+      const probe = await acquireWriterLock(box.data);
+      const here = { ...JSON.parse(readFileSync(file, "utf8")), strict: undefined };
+      probe.release();
+      const stale = JSON.stringify({ ...here, pid: await gonePid() });
+      // The claim is written for a stale lock; the lock where there is none.
+      if (written === "claim") writeFileSync(file, stale);
+      const target = written === "claim" ? claimFile(file, stale) : file;
+      // Hard links fail for it: the first start creates the file in place and
+      // is held up before it writes it.
+      const firstHook = path.join(box.directory, "first");
+      const first = await haltingStart(box, firstHook, {
+        LOCK_TEST_NO_LINK: files,
+        LOCK_TEST_STALL_WRITE: files,
+      });
+      launched.push(first);
+      await halted(first, firstHook);
+      assert.equal(statSync(target).size, 0, written);
+      // An empty lock is removed at once, an empty claim once it is a lease old.
+      const lapsed = new Date(Date.now() - 31_000);
+      if (written === "claim") utimesSync(target, lapsed, lapsed);
+      // The second finds the file empty, claims it and is held up just before
+      // it removes it.
+      const secondHook = path.join(box.directory, "second");
+      const second = await haltingStart(box, secondHook, { LOCK_TEST_STALL_REMOVE: files });
+      launched.push(second);
+      await halted(second, secondHook);
+      const claim = claimFile(target, "");
+      assert.equal(JSON.parse(readFileSync(claim, "utf8")).pid, second.child.pid, written);
+      // The first goes on. Were its text to stay, the file would be its own,
+      // and the second would still remove what lies at the path: the lock of
+      // whichever start took it since, be it coordination, or the claim under
+      // which the first replaces the stale lock. The file stays empty instead.
+      writeFileSync(`${firstHook}.go`, "");
+      const ended = await Promise.race([
+        first.exited.then(({ code }) => code),
+        started(first).then(() => "started"),
+      ]);
+      assert.equal(ended, 1, first.stdout() + first.stderr());
+      // Never the lock itself: a person told to remove it could remove a later start's.
+      assert.ok(first.stderr().includes(written === "claim" ? target : claim), first.stderr());
+      assert.equal(readFileSync(target, "utf8"), "", written);
+      // Coordination that starts now does not get the lock either.
+      const message = await refusedWith(lockStarts(box).strict);
+      assert.ok(message.includes(target), message);
+      assert.equal(readFileSync(target, "utf8"), "", written);
+      if (written === "claim") assert.equal(readFileSync(file, "utf8"), stale);
+      // The second goes on, and is the one start that has the data directory.
+      writeFileSync(`${secondHook}.go`, "");
+      await started(second);
+      assert.equal(JSON.parse(readFileSync(file, "utf8")).pid, second.child.pid, written);
+      assert.deepEqual(lockLitter(box.data), [], written);
+    } finally {
+      // A halted start handles no signal.
+      for (const { child } of launched) child.kill("SIGKILL");
+      await Promise.all(launched.map(({ exited }) => exited));
+      await box.cleanup();
+    }
+  }
+});
+
+const readableWhateverTheMode =
+  process.platform === "win32"
+    ? "Windows has no file mode that keeps its owner from reading a file"
+    : process.getuid?.() === 0
+      ? "root reads a file whatever its mode"
+      : false;
+
+test("no start replaces a lock file it cannot read, and the refusal names the file", { skip: readableWhateverTheMode }, async () => {
+  const box = await sandbox();
+  try {
+    mkdirSync(box.data, { recursive: true });
+    const file = path.join(box.data, "bellpr.lock");
+    const starts = lockStarts(box);
+    const hourAgo = new Date(Date.now() - 3_600_000);
+    // As after its mode or owner was changed, or a start as another user was
+    // killed before it removed its lock.
+    const left = JSON.stringify({ pid: await gonePid(), port: 4311, version });
+    writeFileSync(file, left);
+    chmodSync(file, 0);
+    utimesSync(file, hourAgo, hourAgo);
+    for (const [name, start] of Object.entries(starts)) {
+      const message = await refusedWith(start);
+      assert.ok(message.includes(file), `${name}: ${message}`);
+      assert.doesNotMatch(message, processZero, name);
+      // An ordinary start gives the system's reason; the strict rule has its own words.
+      if (name === "ordinary") assert.match(message, /EACCES/);
+      assert.equal(statSync(file).mode & 0o777, 0, name);
+      assert.deepEqual(lockLitter(box.data), [], name);
+    }
+    chmodSync(file, 0o600);
+    assert.equal(readFileSync(file, "utf8"), left);
+    await rm(file);
+    // A running coordination's lock, last renewed an hour ago, as when its
+    // process was suspended: its age does not show that it stopped.
+    const held = await acquireWriterLock(box.data);
+    chmodSync(file, 0);
+    utimesSync(file, hourAgo, hourAgo);
+    const message = await refusedWith(starts.ordinary);
+    assert.ok(message.includes(file), message);
+    chmodSync(file, 0o600);
+    assert.equal(held.holds(), true);
+    held.release();
+    assert.deepEqual(lockLitter(box.data), []);
+  } finally {
+    await box.cleanup();
+  }
+});
+
+test("an ordinary start reads the lock again after a read that failed; a lock that stays unreadable is refused and left", async (t) => {
+  const box = await sandbox();
+  try {
+    mkdirSync(box.data, { recursive: true });
+    const file = path.join(box.data, "bellpr.lock");
+    const starts = lockStarts(box);
+    const probe = await acquireWriterLock(box.data);
+    const here = { ...JSON.parse(readFileSync(file, "utf8")), strict: undefined };
+    probe.release();
+    // A crashed holder's lock: a start that reads it replaces it.
+    const stale = JSON.stringify({ ...here, pid: await gonePid() });
+    writeFileSync(file, stale);
+    // The next `failing` reads of the lock fail, as over a network file system.
+    let failing = 0;
+    const read = fs.readFileSync;
+    const failingRead = (...args: Parameters<typeof read>) => {
+      if (args[0] === file && failing > 0) {
+        failing -= 1;
+        throw Object.assign(new Error(`ESTALE: stale file handle, open '${file}'`), {
+          code: "ESTALE",
+        });
+      }
+      return read(...args);
+    };
+    t.mock.method(fs, "readFileSync", failingRead as typeof read);
+    syncBuiltinESMExports();
+    // Every read fails: the start gives up after its last attempt.
+    failing = Infinity;
+    const message = await refusedWith(starts.ordinary);
+    failing = 0;
+    assert.ok(message.includes(file) && message.includes("ESTALE"), message);
+    assert.equal(readFileSync(file, "utf8"), stale);
+    assert.deepEqual(lockLitter(box.data), []);
+    // Under the strict rule the first read that fails is enough.
+    failing = 3;
+    assert.ok((await refusedWith(starts.strict)).includes(file));
+    assert.equal(failing, 2);
+    failing = 0;
+    assert.equal(readFileSync(file, "utf8"), stale);
+    // One read fails: the next attempt reads the stale lock and replaces it.
+    failing = 1;
+    const stop = await starts.ordinary();
+    try {
+      assert.equal(failing, 0);
+      assert.equal(JSON.parse(readFileSync(file, "utf8")).pid, process.pid);
+      assert.deepEqual(lockLitter(box.data), []);
+    } finally {
+      await stop();
+    }
+  } finally {
+    t.mock.restoreAll();
+    syncBuiltinESMExports();
+    await box.cleanup();
+  }
+});
+
+test("a lock path that holds nothing a start can read or replace is refused by naming it", async () => {
+  const box = await sandbox();
+  try {
+    mkdirSync(box.data, { recursive: true });
+    const file = path.join(box.data, "bellpr.lock");
+    const starts = lockStarts(box);
+    const cases: Array<[string, () => void]> = [["a directory", () => mkdirSync(file)]];
+    // It is there for a start that creates the lock and gone for one that reads it.
+    if (process.platform !== "win32")
+      cases.push(["a link to nowhere", () => symlinkSync(path.join(box.data, "nowhere"), file)]);
+    for (const [name, occupy] of cases) {
+      occupy();
+      for (const start of [starts.strict, starts.ordinary]) {
+        const message = await refusedWith(start);
+        assert.ok(message.includes(file), `${name}: ${message}`);
+        assert.doesNotMatch(message, processZero, name);
+      }
+      assert.ok(lstatSync(file), name);
+      assert.deepEqual(lockLitter(box.data), [], name);
+      await rm(file, { recursive: true });
+    }
+  } finally {
+    await box.cleanup();
+  }
+});
+
+test("a stale lock that a start could not replace is not reported as a running process", {
+  skip: process.platform === "win32" && "making a symbolic link needs a privilege there",
+}, async () => {
+  const box = await sandbox();
+  try {
+    mkdirSync(box.data, { recursive: true });
+    const file = path.join(box.data, "bellpr.lock");
+    const probe = await acquireWriterLock(box.data);
+    const here = { ...JSON.parse(readFileSync(file, "utf8")), strict: undefined };
+    probe.release();
+    const gone = await gonePid();
+    const stale = JSON.stringify({ ...here, pid: gone });
+    writeFileSync(file, stale);
+    // A link to nowhere at the claim path: it is there for a start that
+    // creates its claim and gone for one that reads it.
+    const claim = claimFile(file, stale);
+    symlinkSync(path.join(box.data, "nowhere"), claim);
+    for (const [name, start] of Object.entries(lockStarts(box))) {
+      const message = await refusedWith(start);
+      assert.ok(message.includes(file), `${name}: ${message}`);
+      assert.doesNotMatch(message, new RegExp(`\\b${gone}\\b`), name);
+      assert.equal(readFileSync(file, "utf8"), stale, name);
+      assert.deepEqual(lockLitter(box.data), [path.basename(claim)], name);
+    }
+  } finally {
     await box.cleanup();
   }
 });

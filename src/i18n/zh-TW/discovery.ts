@@ -7,12 +7,12 @@ const fmt = formatters("zh-TW");
 const m: Translation<typeof en> = {
   eyebrow: "FIND YOUR NEXT CONTRIBUTION",
   title: {
-    lead: "找到值得投入的",
-    emphasis: "下一個貢獻。",
+    lead: "尋找可貢獻的",
+    emphasis: "專案",
   },
   intro: {
-    lead: "從真實的使用者需求出發，讓 AI 幫你讀懂規範、評估門檻，",
-    rest: "找到適合學習，也能帶來改變的開發機會。",
+    lead: "依興趣搜尋 GitHub 專案，",
+    rest: "由 AI 核對貢獻規範並建議起步任務。",
   },
   heroCaption: "GitHub → 你的下一步",
   form: {
@@ -30,6 +30,7 @@ const m: Translation<typeof en> = {
       any: "不限難度",
     },
     sort: "搜尋排序",
+    sortHelp: "排序方式說明",
     sortHint:
       "最近更新：反映近期活動，但結果隨專案更新而變動。相關度：GitHub best match，可能含久未維護的專案，已排除封存專案並顯示最近推送時間。星數：知名度高，競爭與審查門檻也較高。",
     minStars: "最低星數",
@@ -94,8 +95,8 @@ const m: Translation<typeof en> = {
   searchedAt: ({ date }) => `查詢時間 ${date ?? "未提供"}`,
   limitations: ({ count }) => `這次搜尋的範圍與限制 · ${fmt.number(count)}`,
   empty: {
-    title: "好的貢獻，從理解需求開始。",
-    body: "按下推薦後，我們會查閱 GitHub 公開專案與 issues，再從這四個角度整理機會。",
+    title: "尚未搜尋",
+    body: "在上方設定興趣與條件，再按「推薦貢獻項目」。",
     retryTitle: "換個條件，找找下一個機會。",
     retryBody:
       "目前沒有足夠證據支持適合的項目。試著減少關鍵字、放寬難度，或降低最低星數。",
@@ -110,7 +111,7 @@ const m: Translation<typeof en> = {
     label: "推薦貢獻清單",
     eyebrow: "YOUR CONTRIBUTION SHORTLIST",
     previousEyebrow: "PREVIOUS RESULTS",
-    title: "從這些機會，邁出第一步。",
+    title: "推薦貢獻項目",
     previousTitle: "上一份推薦，仍在這裡。",
     note: ({ sort }) =>
       `依你選的「${sort}」排序取 12 個候選、驗證後最多 6 個；順序由分析整理，不是 GitHub 全站排名。實作前仍需確認 issue 最新狀態與維護者意願。`,
