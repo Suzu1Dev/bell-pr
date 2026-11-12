@@ -106,7 +106,7 @@ test("the stale notice reports changed and cited files, and never suggests skipp
   });
   assert.match(
     cited,
-    /自分析版本 0123456後有至少 3 個檔案變動，其中 1 個是本份分析引用的檔案：src\/client\.ts。重新分析後再確認貢獻方向。/,
+    /自分析版本 0123456後至少 3 個檔案有變動，其中 1 個被引用：src\/client\.ts。重新分析後再選方向。/,
   );
 
   const uncited = render({
@@ -114,22 +114,22 @@ test("the stale notice reports changed and cited files, and never suggests skipp
     stale: true,
     staleDetail: { changedFiles: 2, citedChanged: [] },
   });
-  assert.match(uncited, /分析引用的檔案未變動，但全貌仍可能受其他變更影響/);
-  assert.match(uncited, /重新分析後再確認貢獻方向/);
+  assert.match(uncited, /都未被引用，但仍可能影響全貌/);
+  assert.match(uncited, /重新分析後再選方向/);
 
   const sameContent = render({
     insights: analyzed,
     stale: true,
     staleDetail: { changedFiles: 0, citedChanged: [] },
   });
-  assert.match(sameContent, /版本已變更，但分析引用的檔案內容相同/);
-  assert.match(sameContent, /重新分析後再確認貢獻方向/);
+  assert.match(sameContent, /版本已變更，但引用的檔案沒變/);
+  assert.match(sameContent, /重新分析後再選方向/);
 
   for (const html of [unknown, cited, uncited, sameContent]) {
     assert.match(html, /專案版本已更新，請先重新分析專案，再產出更多建議。/);
     assert.match(html, /disabled="" aria-describedby="mission-more-description"/);
   }
-  assert.doesNotMatch(render({ insights: analyzed }), /重新分析後再確認貢獻方向/);
+  assert.doesNotMatch(render({ insights: analyzed }), /重新分析後再(確認貢獻方向|選方向)/);
 });
 
 test("unsampled reading steps are marked and dropped citations are listed; old caches show neither", () => {
@@ -404,7 +404,7 @@ test("the English stale notices name the changed and cited files in one sentence
   });
   assert.match(
     cited,
-    /At least 3 files changed since the analyzed version 0123456, including 2 files that this analysis cites: src\/client\.ts, src\/retry\.ts\. Re-analyze before you settle on a direction\./,
+    /At least 3 files changed since the analyzed version 0123456, including 2 cited files: src\/client\.ts, src\/retry\.ts\. Re-analyze before choosing a direction\./,
   );
   assert.match(cited, /The project has a newer version\. Re-analyze it before you generate more recommendations\./);
 
@@ -415,7 +415,7 @@ test("the English stale notices name the changed and cited files in one sentence
   });
   assert.match(
     one,
-    /At least 1 file changed since the analyzed version, including 1 file that this analysis cites: src\/client\.ts\./,
+    /At least 1 file changed since the analyzed version, including 1 cited file: src\/client\.ts\./,
   );
 
   const capped = renderEnglish({
@@ -425,7 +425,7 @@ test("the English stale notices name the changed and cited files in one sentence
       citedChanged: Array.from({ length: 12 }, (_, index) => `f${index}.ts`),
     },
   });
-  assert.match(capped, /At least 1,250 files changed .*, including 12 or more files that this analysis cites: f0\.ts, f1\.ts/);
+  assert.match(capped, /At least 1,250 files changed .*, including 12 or more cited files: f0\.ts, f1\.ts/);
 });
 
 /** The "Generate 5 more" button, as rendered. */
@@ -787,7 +787,7 @@ test("the contribution brief shows the premise verdict and labels what still sta
   // The request's wording is kept but labelled on both cards that copy it.
   assert.equal(refuted.match(/依你的假設，查證後不成立/g)?.length, 1);
   assert.match(refuted, /若此假設成立，候選人重新整理後就無法開始面試。/);
-  assert.match(refuted, /上面依假設描述的問題與影響實際上不會發生/);
+  assert.match(refuted, /上述問題與影響不會發生/);
   // A check can be made again; the button appears only with the action.
   assert.doesNotMatch(refuted, /重新查核前提/);
   const recheck = render({
@@ -800,7 +800,7 @@ test("the contribution brief shows the premise verdict and labels what still sta
 
   // A run made before premise checks offers one; without the action, nothing is offered.
   const missing = render({ run: { ...base, team }, brief, onCheckPremise() {} });
-  assert.match(missing, /這個貢獻建立時還沒有前提查核/);
+  assert.match(missing, /這個貢獻早於前提查核/);
   assert.match(missing, /依審查結果查核前提/);
   assert.doesNotMatch(missing, /依你的假設/);
   assert.doesNotMatch(render({ run: { ...base, team }, brief }), /依審查結果查核前提/);

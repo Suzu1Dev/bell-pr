@@ -11,10 +11,10 @@ const m: Translation<typeof en> = {
   invalidJson: "請求內容不是有效的 JSON。",
   payloadTooLarge: "請求內容過大。",
   internalError: "操作未完成；請檢查本機服務記錄。",
-  hostNotAllowed: `${product.name} 不接受這個位址。請改用它啟動時印出的位址（執行 \`${bin} open\` 可再印一次）；要從其他位址連線，請設定 BELLPR_PUBLIC_URL。`,
+  hostNotAllowed: `${product.name} 不接受這個位址。請用啟動位址（\`${bin} open\` 可再印出），或設定 BELLPR_PUBLIC_URL 改用其他位址。`,
   crossOriginNotAllowed: "不允許跨來源請求。",
   jsonRequired: "變更操作必須使用 application/json。",
-  apiTokenRequired: `這個請求需要這份 ${product.name} 的 API token。請在這台電腦執行 \`${bin} open\` 開啟帶有 token 的頁面，或以 Authorization: Bearer <token> 或 X-Bell-Token 標頭送出。`,
+  apiTokenRequired: `缺少這份 ${product.name} 的 API token。在這台電腦執行 \`${bin} open\` 會帶 token 開啟；API 用戶端請以 Authorization: Bearer <token> 或 X-Bell-Token 標頭送出。`,
   unsupportedProvider: "不支援這個 AI 服務。",
   suite: {
     summary: "貢獻與審查",

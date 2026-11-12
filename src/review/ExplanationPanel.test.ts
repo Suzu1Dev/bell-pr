@@ -365,7 +365,7 @@ test("the reports tab offers a re-review button for real runs only and shows the
     );
   const idle = render({ onRerunReview() {} });
   assert.match(idle, /重新執行審查/);
-  assert.match(idle, /不會改變已審閱與核准狀態/);
+  assert.match(idle, /不影響審閱與核准/);
   assert.doesNotMatch(idle, /disabled=""/);
   const busy = render({ onRerunReview() {}, reviewBusy: true });
   assert.match(busy, /正在重新審查…/);

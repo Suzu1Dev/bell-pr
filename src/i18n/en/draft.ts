@@ -65,7 +65,7 @@ const draft = {
     preview: "Preview the suggested draft",
     apply: {
       appliedNote:
-        "The editor above holds this suggestion's text unchanged. The description is sent to GitHub as it is, so put it in your own words before you publish.",
+        "The editor holds this suggestion unchanged. It goes to GitHub as written: put it in your own words first.",
       note: "You can still edit after applying; the draft is updated when you save.",
       applied: "Applied",
       apply: "Apply the suggested draft",
@@ -81,12 +81,12 @@ const draft = {
         signOff: "Signed-off-by: Your Name <email>",
       },
       /** Always shown under the suggestion. */
-      note: "This suggestion only lays out the format the rules ask for. The sign-off is your own statement: type it into the commit message field yourself; the model never fills it in.",
+      note: "This only shows the required format. The sign-off is your own statement: type it into the commit message yourself. The model never adds it.",
       /** Label of the disclosure that holds `why`. */
       whyTitle: ({ typeScope }: { typeScope: string }) =>
         `Why do projects ask for ${typeScope} or a sign-off?`,
       why: ({ subject, signOff }: { subject: string; signOff: string }) =>
-        `Projects that use Conventional Commits generate their changelog and choose the version number from subjects such as ${subject}. In CI, commitlint rejects commits in any other format. Projects that use the DCO require ${signOff} on every commit. It states that you have the right to contribute the code under the project's license. The DCO bot checks the commit trailer, not the PR description.`,
+        `Conventional Commits projects derive the changelog and version from subjects such as ${subject}. In CI, commitlint rejects other formats. DCO projects require ${signOff} on every commit, certifying your right to contribute the code under the project's license. The DCO bot checks the commit trailer, not the PR description.`,
     },
     meta: {
       base: ({ commit }: { commit: string }) => `Base ${commit}`,
@@ -218,7 +218,7 @@ const draft = {
     },
     linux: {
       note: ({ guide }: { guide: string }) =>
-        `The motivation, change and verification principles in the ${guide} serve as a fallback, adapted to the GitHub PR format. Sign-off lines such as Signed-off-by must be confirmed by you and are never filled in automatically.`,
+        `The motivation, change and verification principles in the ${guide} are the fallback, adapted to GitHub PRs. Add sign-offs such as Signed-off-by yourself; nothing fills them in.`,
       guide: "Linux kernel's patch submission guidelines",
     },
     /** The run is published: the panel stays for reference, without actions. */
@@ -289,7 +289,7 @@ const draft = {
     } satisfies Record<ReviewabilityBand, string>,
     /** The band chip; `band` is one of `bands`. */
     band: ({ band }: { band: string }) => `${band} · ${product.name} default`,
-    bandHelp: `${product.name}'s size bands are its own defaults, not this project's rule: small up to 100 changed lines, medium up to 400, large up to 1,000, very large above 1,000 lines or 20 files. The 100 and 1,000 marks come from Google's guidance on small changes. This project's own merged pull requests are the real reference.`,
+    bandHelp: `${product.name} defaults, not this project's rule: small up to 100 changed lines, medium up to 400, large up to 1,000, very large above 1,000 lines or 20 files. 100 and 1,000 follow Google's small-change guidance. This project's merged PRs are the real reference.`,
     lines: "Changed lines",
     files: "Files",
     tests: "Test files changed",
@@ -317,7 +317,7 @@ const draft = {
     askSplit: "Ask how to split it",
     splitNow: "Split into contributions",
     parts: ({ count }: { count: number }) =>
-      `The plan has ${fmt.number(count)} groups of files that do not depend on one another. If each is its own fix, each can be a contribution of its own.`,
+      `The plan has ${fmt.number(count)} independent file groups. If each is a separate fix, each can be its own contribution.`,
     weakened: "Weakened tests",
     weakenedLead:
       "Each skipped, deleted or loosened test needs a one-line reason before you publish: why is the change right?",
@@ -388,7 +388,7 @@ const draft = {
     title: "Target branch",
     intro: {
       published: ({ branch, commit }: { branch: string; commit: string }) =>
-        `Based on ${branch} at ${commit}. Syncing merges the latest ${branch} into the PR. After your review, one merge commit is pushed. Nothing is force-pushed and the PR description stays the same.`,
+        `Based on ${branch} at ${commit}. Syncing merges the latest ${branch} into the PR: one merge commit, pushed after your review. Nothing is force-pushed; the description doesn't change.`,
       unpublished: ({ branch, commit }: { branch: string; commit: string }) =>
         `Based on ${branch} at ${commit}. Syncing moves your changes onto the latest ${branch}. Files that ${branch} changed need another review. You can undo the sync.`,
     },
@@ -414,9 +414,9 @@ const draft = {
         : `Conflict markers remain in ${open} of ${total} files.`,
     conflictHelp: {
       published: ({ latest, ours }: { latest: string; ours: string }) =>
-        `In each file, the side marked ${latest} is the target branch's current content and the side marked ${ours} is this pull request. You cannot approve until every conflict marker is removed: edit the files in the working directory yourself and then refresh the diff on the Code changes tab, or ask the Agent to resolve them. Changed files still need a file-by-file review.`,
+        `${latest} marks the target branch's current content and ${ours} marks this pull request. Approval waits until every conflict marker is gone. Edit the files in the working directory and refresh the diff in Code changes, or let the Agent resolve them. Then review each changed file.`,
       unpublished: ({ latest, ours }: { latest: string; ours: string }) =>
-        `In each file, the side marked ${latest} is the target branch's current content and the side marked ${ours} is this contribution. You cannot approve until every conflict marker is removed: edit the files in the working directory yourself and then refresh the diff on the Code changes tab, or ask the Agent to resolve them. Changed files still need a file-by-file review.`,
+        `${latest} marks the target branch's current content and ${ours} marks this contribution. Approval waits until every conflict marker is gone. Edit the files in the working directory and refresh the diff in Code changes, or let the Agent resolve them. Then review each changed file.`,
     },
     allResolved:
       "All conflict markers are removed; changed files still need a file-by-file review.",
@@ -425,9 +425,9 @@ const draft = {
     /** A Learn-by-hand run has no conflict agent (DESIGN v1.2 F2): the person resolves the markers. */
     byHand: {
       published: ({ latest, ours }: { latest: string; ours: string }) =>
-        `In each file, the side marked ${latest} is the target branch's current content and the side marked ${ours} is this pull request. You cannot approve until every conflict marker is removed. Resolve the markers by hand; ${product.name} re-checks them when you refresh the diff on the Code changes tab. Changed files still need a file-by-file review.`,
+        `${latest} marks the target branch's current content and ${ours} marks this pull request. Approval waits until every conflict marker is gone. Resolve them by hand, then refresh the diff in Code changes to re-check. Then review each changed file.`,
       unpublished: ({ latest, ours }: { latest: string; ours: string }) =>
-        `In each file, the side marked ${latest} is the target branch's current content and the side marked ${ours} is this contribution. You cannot approve until every conflict marker is removed. Resolve the markers by hand; ${product.name} re-checks them when you refresh the diff on the Code changes tab. Changed files still need a file-by-file review.`,
+        `${latest} marks the target branch's current content and ${ours} marks this contribution. Approval waits until every conflict marker is gone. Resolve them by hand, then refresh the diff in Code changes to re-check. Then review each changed file.`,
     },
     heldChanges: "Changes under your hold",
     heldChangesNote:
@@ -439,7 +439,7 @@ const draft = {
   followUps: {
     title: "Changes made after review",
     intro:
-      "Each round you review and approve becomes a new commit on the PR branch. The PR title and description stay as they are, and you still reply to reviewers on GitHub yourself.",
+      "Each round you approve becomes a new commit on the PR branch. The title and description don't change. Reply to reviewers on GitHub yourself.",
     status: {
       running: "Making changes",
       review: "Waiting for review and push",

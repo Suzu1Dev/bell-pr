@@ -18,13 +18,13 @@ export default {
       commitMessage: "In the commit message",
     })[field],
   localPaths:
-    "The PR text contains a path on this computer, which can show your user name and how your folders are organised. Confirm that you want to publish it, or remove it.",
+    "The PR text contains a path on this computer, which can reveal your user name and folder layout. Confirm to publish it, or remove it.",
   localPath: ({ path }: { path: string }) => `Found: ${path}`,
   workflows:
-    "This change edits GitHub Actions workflows or other CI configuration. Maintainers check such changes closely, and pushing a workflow file needs the GitHub CLI's workflow scope.",
+    "This change edits GitHub Actions workflows or other CI config, which maintainers check closely. Pushing a workflow file needs the GitHub CLI's workflow scope.",
   workflowFile: ({ path }: { path: string }) => `Changed: ${path}`,
   authorEmail: ({ emails }: { emails: string[] }) =>
     fmt.plural(emails.length) === "one"
-      ? `The commit will carry the e-mail address ${fmt.list(emails)}, which anyone can read on GitHub. To keep it private, set your GitHub no-reply address with git config user.email; this is asked only once.`
-      : `The commit will carry the e-mail addresses ${fmt.list(emails)}, which anyone can read on GitHub. To keep them private, set your GitHub no-reply address with git config user.email; this is asked only once per address.`,
+      ? `Anyone on GitHub can read the commit's e-mail address ${fmt.list(emails)}. To keep it private, set your GitHub no-reply address with git config user.email. You are asked once.`
+      : `Anyone on GitHub can read the commit's e-mail addresses ${fmt.list(emails)}. To keep them private, set your GitHub no-reply address with git config user.email. You are asked once per address.`,
 };

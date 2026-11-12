@@ -126,7 +126,7 @@ test("only a Full access run hands its stored setup commands to an agent, and ne
     assert.throws(() => setupHandOffNeeds({ ...run, modelExecution: { source: "cli-default" } }, [safe.command]), refused(409, /Full access/));
     assert.throws(() => setupHandOffNeeds({ ...run, modelExecution: undefined }, [safe.command]), refused(409, /Full access/));
     assert.throws(() => setupHandOffNeeds(run, ["sudo apt-get install -y something-else"]), refused(409, /no longer on this run's list/));
-    assert.throws(() => setupHandOffNeeds(run, [unsafe.command]), refused(422, /downloads something/));
+    assert.throws(() => setupHandOffNeeds(run, [unsafe.command]), refused(422, /downloads and runs or chains/));
   });
 });
 

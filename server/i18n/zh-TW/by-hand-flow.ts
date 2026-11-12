@@ -32,12 +32,12 @@ const flow: Translation<typeof en> = {
     pushFirst: `請先推送你的 commit；它們出現在 Pull Request 的分支上之後，${product.name} 就會接手。`,
     commitFirst: "請先在這個任務的資料夾提交或捨棄你的修改。",
     switchBack: ({ branch }) => `這個任務的資料夾目前不在它的分支 ${branch} 上。請先切換回這個分支；${product.name} 只接手這個分支上的 commit。`,
-    pullFirst: `Pull Request 的分支上有這個任務的資料夾還沒有的 commit。請先把它們拉進這個任務的資料夾；資料夾和分支一致之後，${product.name} 就會接手你的 commit。`,
+    pullFirst: `Pull Request 的分支上有這個任務的資料夾還沒有的 commit。請先拉進來；資料夾與分支一致後，${product.name} 就會接手你的 commit。`,
     adopted: ({ commits }) => `已接手你從這個任務的資料夾推送到 Pull Request 分支的 ${commits} 個 commit。`,
   },
   discard: {
-    committed: "這一輪開始之後，你在這個任務的資料夾建立了 commit；放棄這一輪會讓這些 commit 消失。請保留這一輪，或先用你自己的 Git 把這些 commit 移出這個任務的分支。",
-    ownFiles: ({ files }) => `這個任務的資料夾裡有不屬於這一輪的檔案：${list(files)}。${product.name} 不會刪除它們；請先把它們移出這個任務的資料夾，再放棄這一輪。`,
+    committed: "這一輪開始後，你在這個任務的資料夾建立了 commit，放棄這一輪會丟失它們。請保留，或先用 Git 把它們移出任務分支。",
+    ownFiles: ({ files }) => `這個任務的資料夾裡有不屬於這一輪的檔案：${list(files)}。${product.name} 不會刪除它們；請先移出，再放棄這一輪。`,
   },
 };
 

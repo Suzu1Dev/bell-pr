@@ -23,7 +23,7 @@ const m: Translation<typeof en> = {
   },
   credit: {
     text: ({ version }) =>
-      `效率模式以 DietrichGebert 的 Ponytail ${version}（MIT 授權）為基礎：輕量模式提供 Agent 其原則的精簡改寫，完整模式提供完整規則，關閉則兩者都不加入。`,
+      `效率模式以 DietrichGebert 的 Ponytail ${version}（MIT 授權）為基礎：輕量給 Agent 精簡改寫的原則，完整給完整規則，關閉都不給。`,
     link: "Ponytail 原始專案",
   },
   inputTokens: "輸入 tokens",
@@ -37,7 +37,7 @@ const m: Translation<typeof en> = {
   usageNote: ({ calls, measured }) =>
     `${fmt.number(calls)} 次呼叫 · 用量回報 ${fmt.number(measured)} / ${fmt.number(calls)} 次${
       measured < calls ? "，僅加總已回報部分。" : "。"
-    }快取已包含於輸入；時間為各次執行加總，並非等待時間。`,
+    }輸入 tokens 含快取；時間為各呼叫總和，非等待時間。`,
   byRole: ({ count }) => `依角色分項（${fmt.number(count)} 類）`,
   columns: {
     role: "角色",

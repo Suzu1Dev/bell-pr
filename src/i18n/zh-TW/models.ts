@@ -27,7 +27,7 @@ const m: Translation<typeof en> = {
   withCliVersion: ({ model, version }) => `${model}（CLI ${version}）`,
   providerDefault: ({ provider }) => `${provider} 預設`,
   sourceReported: ({ provider }) =>
-    `這是 ${product.name} 傳給 ${provider} 的設定。模型是 ${provider} CLI 回報的，不是服務提供者的帳單資料。`,
+    `這是 ${product.name} 傳給 ${provider} 的設定。模型是 ${provider} CLI 回報的，並非來自帳單。`,
   sourceUnreported: ({ provider }) =>
     `這是 ${product.name} 傳給 ${provider} 的設定。CLI 沒有回報實際使用的模型。`,
 };

@@ -9,7 +9,7 @@ export default {
   fullConfirm: "Use Full access",
   fullCancel: "Keep working directory access",
   summary: "Full access (sandbox and command deny rules lifted)",
-  workspaceHelp: "Codex uses its working-directory sandbox. Claude Code and Antigravity keep their OS sandbox and command deny rules unless you separately allowed them without a sandbox. Read-only roles remain restricted.",
+  workspaceHelp: "Codex: its working-directory sandbox. Claude Code and Antigravity: their OS sandbox and command deny rules, unless you allowed unsandboxed Agents. Read-only roles stay restricted.",
   sudoTitle: "Passwordless sudo",
   sudoDisclosure,
   loadFailed: ({ message }: { message: string }) => `Could not read sudo status: ${message}`,
@@ -22,6 +22,6 @@ export default {
   enabling: "Configuring…",
   remove: `Remove ${product.name}'s sudo rule`,
   removing: "Removing…",
-  help: ({ user }: { user: string }) => `Enter the password once to create /etc/sudoers.d/bell-pr-agent for ${user}. The password is sent only to sudo for this setup and is never saved or logged. This rule grants ${user} root privileges without a password, including every program and Agent running as that account.`,
+  help: ({ user }: { user: string }) => `Enter the password once to create /etc/sudoers.d/bell-pr-agent for ${user}. It goes only to sudo and is never saved or logged. Every program and Agent running as ${user} then gets passwordless root.`,
   failed: "The operation did not finish. Please try again.",
 };

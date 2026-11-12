@@ -92,7 +92,7 @@ test("the three explicit states: found, not found in the files read, couldn't ch
     /<p class="rules-card-state">Not found in the 3 files BELL PR read\. Some projects publish their rules on a website or wiki; check before you publish\.<\/p>/,
   );
   const nothingRead = english({ rules: { ...stored, findings: [], filesRead: [] } });
-  assert.match(nothingRead, /No contributing guide, policy or pull request template was there to read\./);
+  assert.match(nothingRead, /No contributing guide, policy or pull request template found\./);
   for (const html of [notFound, nothingRead]) assert.doesNotMatch(html, /no policy/i);
   // The door, by GitHub's own fields.
   const door = (value: ContributionRules["door"]) =>
@@ -268,7 +268,7 @@ test("in a Learn-by-hand run, a contribution ban never says that agents write ev
   // Fitted to the rule when it started: publishing can ask for the quoted confirm.
   const fitted = english({ rules, byHandRun: run({ helpLock: lock }) });
   assert.doesNotMatch(fitted, agentLine);
-  assert.match(fitted, /<span class="rules-card-effect is-confirm">[\s\S]*?Asks you to confirm<\/span><span>This run was fitted to it, so publishing can ask you to confirm the quoted rule instead of blocking\. The maintainers decide whether your change fits\.<\/span>/);
+  assert.match(fitted, /<span class="rules-card-effect is-confirm">[\s\S]*?Asks you to confirm<\/span><span>This run was fitted to it, so publishing can ask you to confirm it, not block\. The maintainers decide whether your change fits\.<\/span>/);
   // Started with every kind of help where it could have been fitted: the run's reason.
   const full = english({ rules, byHandRun: run({}) });
   assert.doesNotMatch(full, agentLine);
@@ -280,5 +280,5 @@ test("in a Learn-by-hand run, a contribution ban never says that agents write ev
   assert.match(fitted, /Until the description says that AI helped\./);
   assert.match(english({ rules, byHandRun: run({ helpLock: lock }, ["lead", "member-1"]) }), agentLine);
   assert.match(english({ rules }), agentLine);
-  assert.match(renderZh(card({ rules, byHandRun: run({ helpLock: lock }) })), /這個任務開始時就配合了這條規則/);
+  assert.match(renderZh(card({ rules, byHandRun: run({ helpLock: lock }) })), /這個任務開始時已配合此規則/);
 });

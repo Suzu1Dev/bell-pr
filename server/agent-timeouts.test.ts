@@ -83,7 +83,7 @@ test("command()'s 504 gets the timeout advice and an explained exit failure its 
   assert.equal(replaced.statusCode, 504);
   assert.equal(
     replaced.message,
-    "claude 執行逾時（已等待 15 分鐘）。較高的思考強度或大型專案需要更久；可降低思考強度、改用較快的模型，或提高 BELLPR_AGENT_TIMEOUT_SCALE。",
+    "claude 執行逾時（15 分鐘）。請調低思考強度、換較快的模型或提高 BELLPR_AGENT_TIMEOUT_SCALE；大型專案需要更久。",
   );
   const failure = new AppError("codex 執行失敗：exit 1", 422);
   assert.equal(withAgentTimeoutHint(failure, "codex", 240_000), failure);
@@ -129,7 +129,7 @@ test("time limits and command failures are worded in the locale in effect", asyn
     assert.ok(replaced instanceof AppError);
     assert.equal(
       replaced.message,
-      "claude timed out after 15 minutes. A higher reasoning effort or a large project needs more time: lower the effort, choose a faster model, or raise BELLPR_AGENT_TIMEOUT_SCALE.",
+      "claude timed out after 15 minutes. Lower the reasoning effort, use a faster model or raise BELLPR_AGENT_TIMEOUT_SCALE; large projects need more time.",
     );
     const explained = withAgentTimeoutHint(
       new AppError('claude failed: {"type":"result","is_error":true}', 422),

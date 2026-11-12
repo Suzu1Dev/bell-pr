@@ -102,7 +102,7 @@ test("an installed bwrap that cannot create a sandbox, as in Docker, does not co
       error instanceof AppError &&
       error.statusCode === 503 &&
       error.code === "claude_sandbox_unavailable" &&
-      /installed but cannot create a sandbox/.test(error.message) &&
+      /installed but can't create one here/.test(error.message) &&
       error.fixes?.length === 2 &&
       error.fixes[0].command.includes("--security-opt systempaths=unconfined") &&
       error.fixes[1].command === "BELLPR_ALLOW_UNSANDBOXED_AGENTS=1 bell-pr",
