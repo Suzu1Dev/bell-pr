@@ -322,9 +322,11 @@ const wordCharacter = /[\p{L}\p{N}]/u;
 /**
  * Escapes what Markdown would hide or turn into markup in plain text: a
  * tag-like `<Dialog>` or `Vec<u8>` (raw HTML is dropped, never shown), an
- * entity, a backslash, and underscores that would emphasize, as in
- * `__init__.py`. An underscore inside a word (`snake_case`) never does, so
- * it stays. Web addresses are left as they are.
+ * entity, a backslash, underscores that would emphasize, as in
+ * `__init__.py`, and a single asterisk that could open emphasis, as in
+ * `*_read/*_write` or `src/*.c`. An underscore inside a word (`snake_case`)
+ * never emphasizes, so it stays; so do `**bold**` and a `* ` list marker.
+ * Web addresses are left as they are.
  */
 function escapePlain(text: string) {
   return text
@@ -332,7 +334,7 @@ function escapePlain(text: string) {
     .map((part, index) =>
       index % 2
         ? part
-        : part.replace(/[\\<&_]/g, (character, offset: number) =>
+        : part.replace(/[\\<&_]|(?<!\*)\*(?![*\s])/g, (character, offset: number) =>
             character === "_" &&
             wordCharacter.test(part[offset - 1] ?? "") &&
             wordCharacter.test(part[offset + 1] ?? "")
@@ -406,15 +408,30 @@ export function briefMarkdown(text: string) {
     .join("\n");
 }
 
-/** Request and direction text as Markdown, its line breaks kept as written. */
-function BriefText({ text }: { text: string }) {
+/**
+ * Request, direction and Agent text as Markdown, its line breaks kept as
+ * written, so paragraphs, numbered steps and `code` read as the writer set them.
+ */
+function BriefText({ text, className }: { text: string; className?: string }) {
   return (
-    <Suspense fallback={<p>{text}</p>}>
-      <div className="mission-brief-text">
+    <Suspense fallback={<p className={className}>{text}</p>}>
+      <div className={className ? `mission-brief-text ${className}` : "mission-brief-text"}>
         <MarkdownContent>{briefMarkdown(text)}</MarkdownContent>
       </div>
     </Suspense>
   );
+}
+
+/** The summary's first line, shown as the card's heading. */
+function summaryLead(summary: string) {
+  const end = summary.indexOf("\n");
+  return end < 0 ? summary : summary.slice(0, end).trim();
+}
+
+/** The rest of the summary, after its first line; "" when it has one line. */
+function summaryRest(summary: string) {
+  const end = summary.indexOf("\n");
+  return end < 0 ? "" : summary.slice(end + 1).trim();
 }
 
 function Brief({
@@ -882,7 +899,7 @@ export function ProjectOverview({
                 <span className="mission-journey-number">
                   {String(index + 1).padStart(2, "0")}
                 </span>
-                <p>{step}</p>
+                <BriefText text={step} />
               </li>
             ))}
           </ol>
@@ -949,14 +966,16 @@ export function ProjectOverview({
                 ))}
               </ol>
               {insights.howItFitsTogether && (
-                <figcaption>{insights.howItFitsTogether}</figcaption>
+                <figcaption>
+                  <BriefText text={insights.howItFitsTogether} />
+                </figcaption>
               )}
             </figure>
           ) : (
             insights.howItFitsTogether && (
               <div className="mission-reading-flow">
                 <span>{t.reading.flow}</span>
-                <p>{insights.howItFitsTogether}</p>
+                <BriefText text={insights.howItFitsTogether} />
               </div>
             )
           )}
@@ -982,7 +1001,7 @@ export function ProjectOverview({
                       {t.reading.unsampled}
                     </span>
                   )}
-                  <p>{step.why}</p>
+                  <BriefText text={step.why} />
                   <p>
                     <strong>{t.reading.lookFor}</strong>
                     {step.lookFor}
@@ -1327,8 +1346,14 @@ export function ProjectOverview({
                   : t.project.sourceAi}
               </span>
             </div>
-            <h3 id="mission-purpose-title">{insights.summary}</h3>
-            <p className="mission-project-purpose">{insights.purpose}</p>
+            <h3 id="mission-purpose-title">{summaryLead(insights.summary)}</h3>
+            {summaryRest(insights.summary) && (
+              <BriefText
+                className="mission-project-summary"
+                text={summaryRest(insights.summary)}
+              />
+            )}
+            <BriefText className="mission-project-purpose" text={insights.purpose} />
             {insights.audience.length > 0 && (
               <div className="mission-audience">
                 <span>
@@ -1729,7 +1754,7 @@ export function ProjectOverview({
                         )}
                       </div>
                       <h3 id={`${ideaAnchor(idea.id)}-title`}>{idea.title}</h3>
-                      <p className="mission-idea-problem">{idea.problem}</p>
+                      <BriefText className="mission-idea-problem" text={idea.problem} />
                       <div className="mission-idea-impact">
                         <Users size={15} />
                         <p>
@@ -1742,11 +1767,13 @@ export function ProjectOverview({
                           {t.ideas.approach}
                           <ChevronRight size={14} />
                         </summary>
-                        <p>{idea.approach}</p>
+                        <BriefText text={idea.approach} />
                         {idea.acceptance.length > 0 && (
                           <ul>
                             {idea.acceptance.map((item, itemIndex) => (
-                              <li key={itemIndex}>{item}</li>
+                              <li key={itemIndex}>
+                                <BriefText text={item} />
+                              </li>
                             ))}
                           </ul>
                         )}

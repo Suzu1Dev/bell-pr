@@ -310,14 +310,14 @@
   margin: 0 0 14px;
   container-type: inline-size;
 }
-.mission-flow ol {
+.mission-flow > ol {
   display: flex;
   flex-direction: column;
   margin: 10px 0 0;
   padding: 0;
   list-style: none;
 }
-.mission-flow li {
+.mission-flow > ol > li {
   display: flex;
   flex-direction: column;
   min-width: 0;
@@ -376,15 +376,15 @@
   color: var(--color-text-secondary);
 }
 @container (min-width: 820px) {
-  .mission-flow-few ol {
+  .mission-flow-few > ol {
     flex-direction: row;
   }
   /* Each step but the last also holds its arrow, so the nodes share the rest evenly. */
-  .mission-flow-few li {
+  .mission-flow-few > ol > li {
     flex: 1 1 5rem;
     flex-direction: row;
   }
-  .mission-flow-few li:last-child {
+  .mission-flow-few > ol > li:last-child {
     flex-basis: 0;
   }
   .mission-flow-few .mission-flow-step {
@@ -456,7 +456,7 @@
   line-height: 1.8;
   color: var(--color-text-secondary);
 }
-.mission-reading-steps p strong,
+.mission-reading-steps li > p > strong,
 .mission-reading-context p strong {
   display: block;
   font-size: var(--text-xs);
@@ -584,6 +584,21 @@
 }
 .mission-brief-text .markdown-content > :last-child {
   margin-bottom: 0;
+}
+/* Agent text in the Markdown view keeps the gap its paragraph had. */
+.mission-project-summary {
+  max-width: 880px;
+  margin: 0 0 10px;
+  font-size: 15px;
+  line-height: 1.95;
+  color: var(--color-text-secondary);
+}
+.mission-reading-flow > .mission-brief-text,
+.mission-reading-steps .mission-brief-text {
+  margin-top: 6px;
+}
+.mission-idea-approach > .mission-brief-text {
+  margin: 12px 0 8px;
 }
 .mission-brief-text :is(ul, ol) {
   margin: 4px 0 10px;
