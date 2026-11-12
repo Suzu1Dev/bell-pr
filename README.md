@@ -60,13 +60,18 @@ npx bell-pr
 
 BELL PR checks your environment, then opens `http://127.0.0.1:4311` in your
 browser. In Welcome, choose your language and AI provider, then import a
-project or explore contribution ideas. If a required check fails,
-startup stops and prints the commands to fix it.
+project or explore contribution ideas. When the AI provider is the only
+required check that fails, it still opens. The first time, Welcome shows
+how to install one; the tour is on that screen. If another required check
+fails, startup stops and prints the commands to fix it.
 
 ### Try the sample project
 
 With Node.js installed, you can try the review flow before setting up
-GitHub or an AI provider:
+GitHub or an AI provider. When the AI provider is the only required check
+that fails, `npx bell-pr` still opens. The first time, Welcome shows how
+to install one; the sample tour is on that screen. When another required
+check fails, start with:
 
 ```sh
 npx bell-pr start --force

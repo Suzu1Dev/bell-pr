@@ -156,6 +156,14 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   can be reached from the remote branch, the pull request, or another ref.
   If it may be the only copy, it stays, and the log says why. Deleting a
   ref that is already gone is not an error.
+- **Start now listens when the provider is the only required check that
+  fails,** on the first start and on every later one. The first time,
+  Welcome shows how to install Codex CLI, Claude Code or the
+  Antigravity CLI, with the same commands and documentation links as the
+  guides. Any other required check, alone or together with the provider,
+  still prints the checklist and exits 1. `bell-pr doctor` still exits 1
+  when the provider is not ready. `bell-pr start --force` still starts
+  when another required check fails.
 - **The data-directory lock is written whole.** Where the file system
   supports hard links, a start writes its lock aside and links it into
   place, so no other start reads it half written. A stale lock is removed

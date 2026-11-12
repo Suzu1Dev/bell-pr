@@ -54,26 +54,33 @@ problem.
 
 ### With no AI provider
 
-`bell-pr start` does not listen until every required check passes. With
-none of the Codex CLI, Claude Code and the Antigravity CLI installed and
-signed in, it exits
-and prints **Not ready**, then this line, before the commands that fix
-each check:
+When the AI provider is the only required check that fails, `bell-pr start`
+still listens. The first time, Welcome shows how to install and sign in
+to one CLI, as the same user that runs BELL PR:
+
+- Codex CLI: `npm install -g @openai/codex`, then `codex login`.
+  See the [Codex CLI](https://github.com/openai/codex) for other ways to
+  install it.
+- Claude Code: `npm install -g @anthropic-ai/claude-code`, then
+  `claude auth login`. See the
+  [Claude Code documentation](https://code.claude.com/docs/en/overview)
+  for other ways to install it.
+- Antigravity CLI: `curl -fsSL https://antigravity.google/cli/install.sh | bash`,
+  then run `agy` once to sign in.
+
+The sample tour is on that Welcome screen. It makes no AI call and sends
+nothing to GitHub. A real agent run still waits until a provider is ready.
+
+If any other required check fails, alone or together with the provider,
+`bell-pr start` exits and prints **Not ready**, then this line, before the
+commands that fix each check:
 
 ```text
 No AI provider yet? See the sample tour: bell-pr start --force
 ```
 
-`bell-pr start --force` opens BELL PR so you can take the sample tour. The
-tour makes no AI call and sends nothing to GitHub. A real agent run still
-waits until a provider is ready. Install and sign in to one, as the same
-user that runs BELL PR:
-
-- Codex CLI: `npm install -g @openai/codex`, then `codex login`
-- Claude Code: `npm install -g @anthropic-ai/claude-code`, then
-  `claude auth login`
-
-The Welcome screen runs the same check once BELL PR is open.
+`bell-pr start --force` starts anyway. `bell-pr doctor` still exits 1 when
+the provider is not ready.
 
 ## Start BELL PR
 

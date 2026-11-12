@@ -128,6 +128,9 @@ test("the provider step picks the only ready provider and lets the person choose
   const blocked = renderEn(welcome("provider", { doctor: doctor(onlyCodex) }));
   assert.match(blocked, /1\.0\.0 supports Claude Code only; Codex support is disabled\./);
   assert.match(blocked, /Install Claude Code\./);
+  assert.match(blocked, /See the <a[^>]*>Claude Code documentation<\/a> for other ways to install it\./);
+  assert.doesNotMatch(blocked, /See the Codex CLI/);
+  assert.doesNotMatch(blocked, /Antigravity documentation/);
   assert.doesNotMatch(blocked, /No AI provider is ready yet/);
   providerReady.detail = "1.0.0 只支援 Claude Code；Codex 已停用。\n請安裝 Claude Code。";
   const blockedZh = renderZh(welcome("provider", { doctor: doctor(onlyCodex) }));
@@ -135,6 +138,93 @@ test("the provider step picks the only ready provider and lets the person choose
   assert.match(blockedZh, /請安裝 Claude Code。/);
   const loading = renderEn(welcome("provider", { doctor: doctor(null) }));
   assert.match(loading, /Checking which AI providers are ready…/);
+});
+
+test("with no provider ready, Welcome shows how to install one", () => {
+  const missing = {
+    ...none,
+    checks: none.checks.map((check) =>
+      check.id === "provider-ready"
+        ? {
+            ...check,
+            status: "fail" as const,
+            reason: "none-ready",
+            detail:
+              "Install and sign in to the Codex CLI, Claude Code or the Antigravity CLI: BELL PR needs at least one.",
+            fixes: [
+              { label: "Install the Codex CLI", command: "npm install -g @openai/codex" },
+              { label: "Sign in to Codex", command: "codex login" },
+              { label: "Install Claude Code", command: "npm install -g @anthropic-ai/claude-code" },
+              { label: "Sign in to Claude Code", command: "claude auth login" },
+              {
+                label: "Install the Antigravity CLI",
+                command: "curl -fsSL https://antigravity.google/cli/install.sh | bash",
+              },
+              { label: "Start the Antigravity CLI once to sign in", command: "agy" },
+            ],
+          }
+        : check,
+    ),
+  };
+  const html = renderEn(welcome("provider", { doctor: doctor(missing) }));
+  assertNoHan(html);
+  assert.match(html, /<h1 id="welcome-title">Welcome to BELL PR<\/h1>/);
+  assert.match(html, /No AI provider is ready yet\./);
+  for (const command of [
+    "npm install -g @openai/codex",
+    "codex login",
+    "npm install -g @anthropic-ai/claude-code",
+    "claude auth login",
+    "curl -fsSL https://antigravity.google/cli/install.sh | bash",
+    "agy",
+  ])
+    assert.match(
+      html,
+      new RegExp(
+        `<code class="welcome-command" tabindex="0" role="region" aria-label="Scroll the command: ${command.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}">${command.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}</code>`,
+      ),
+      command,
+    );
+  assert.match(html, /href="https:\/\/github.com\/openai\/codex"/);
+  assert.match(html, /See the <a[^>]*>Codex CLI<\/a> for other ways to install it\./);
+  assert.match(html, /href="https:\/\/code\.claude\.com\/docs\/en\/overview"/);
+  assert.match(html, /See the <a[^>]*>Claude Code documentation<\/a> for other ways to install it\./);
+  assert.match(html, /href="https:\/\/antigravity.google\/docs"/);
+  assert.match(html, /See the <a[^>]*>Antigravity documentation<\/a> for other ways to install it\./);
+  const zh = renderZh(welcome("provider", { doctor: doctor(missing) }));
+  assert.match(zh, /歡迎使用 BELL PR/);
+  assert.match(
+    zh,
+    /<code class="welcome-command" tabindex="0" role="region" aria-label="左右捲動指令：npm install -g @openai\/codex">npm install -g @openai\/codex<\/code>/,
+  );
+  assert.match(zh, /其他安裝方式請見 <a[^>]*>Codex CLI<\/a>/);
+  assert.match(zh, /href="https:\/\/github.com\/openai\/codex"/);
+  assert.match(zh, /其他安裝方式請見 <a[^>]*>Claude Code 文件<\/a>/);
+  assert.match(zh, /href="https:\/\/code\.claude\.com\/docs\/en\/overview"/);
+  assert.match(zh, /其他安裝方式請見 <a[^>]*>Antigravity 文件<\/a>/);
+  assert.match(zh, /href="https:\/\/antigravity.google\/docs"/);
+});
+
+test("a provider that is not ready shows only that provider's install link", () => {
+  const chosen = {
+    ...none,
+    checks: none.checks.map((check) =>
+      check.id === "provider-ready"
+        ? {
+            ...check,
+            status: "fail" as const,
+            reason: "chosen-not-ready",
+            params: { provider: "claude" },
+            fixes: [{ label: "Sign in to Claude Code", command: "claude auth login" }],
+          }
+        : check,
+    ),
+  };
+  const html = renderEn(welcome("provider", { doctor: doctor(chosen) }));
+  assert.match(html, /claude auth login/);
+  assert.match(html, /Claude Code documentation/);
+  assert.doesNotMatch(html, /See the Codex CLI/);
+  assert.doesNotMatch(html, /Antigravity documentation/);
 });
 
 test("the last step offers the tour, an import and discovery, which waits for the GitHub CLI", () => {
