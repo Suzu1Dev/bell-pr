@@ -122,6 +122,10 @@ test("Codex arguments keep the existing sandbox, approval and schema flags", asy
       ...codexSandboxConfig("write", "/work/tree"),
       "-c",
       'approval_policy="never"',
+      "-c",
+      'web_search="disabled"',
+      "-c",
+      "features.apps=false",
       "--json",
       "--color",
       "never",
@@ -593,17 +597,23 @@ test("web access adds Claude Code's WebSearch/WebFetch and Codex live search for
     assert.equal(value(off.args, "--tools"), tools);
     assert.equal(value(off.args, "--allowedTools"), allowed);
     assert.deepEqual(await agentCommand(claude, { cwd: "/work/tree", access }), off);
-    // Codex 0.159 `exec` rejects --search; the live search config override is the only addition.
+    // Codex 0.159 `exec` rejects --search, so search is a config override. Codex searches a
+    // cached index by default, so off is passed as "disabled"; the value is the only difference.
     const codexOn = await agentCommand(codex, { cwd: "/work/tree", access, web: true });
     const codexOff = await agentCommand(codex, { cwd: "/work/tree", access });
     const index = codexOn.args.indexOf('web_search="live"');
     assert.ok(index > 0 && codexOn.args[index - 1] === "-c");
+    assert.equal(codexOff.args[index], 'web_search="disabled"');
     assert.deepEqual(
-      codexOn.args.filter((_arg, position) => position !== index - 1 && position !== index),
-      codexOff.args,
+      codexOn.args.filter((_arg, position) => position !== index),
+      codexOff.args.filter((_arg, position) => position !== index),
     );
     assert.ok(!codexOn.args.includes("--search"));
-    assert.doesNotMatch(JSON.stringify(codexOff.args), /web_search/);
+    assert.equal(codexOff.args.filter((arg) => arg.startsWith("web_search=")).length, 1);
+    // ChatGPT apps carry a search tool of their own, so they are off either way.
+    assert.ok(codexOn.args.includes("features.apps=false"));
+    assert.ok(codexOff.args.includes("features.apps=false"));
+    assert.deepEqual(await agentCommand(codex, { cwd: "/work/tree", access, web: false }), codexOff);
   }
   // curl and wget stay denied with web on: WebFetch is the sanctioned way to read a page.
   const write = await agentCommand(claude, { cwd: "/work/tree", access: "write", web: true });
@@ -615,11 +625,13 @@ test("web access adds Claude Code's WebSearch/WebFetch and Codex live search for
     "Bash(wget:*)",
   ]);
   assert.equal(value(write.args, "--permission-mode"), "acceptEdits");
-  // Analysis and discovery use "none": the flag never reaches the CLI there.
+  // Analysis and discovery use "none": the flag never reaches the CLI there, and Codex search is off.
   for (const execution of [claude, codex]) {
     const none = await agentCommand(execution, { cwd: "/work/tree", access: "none", web: true });
     assert.deepEqual(none, await agentCommand(execution, { cwd: "/work/tree", access: "none" }));
-    assert.doesNotMatch(JSON.stringify(none.args), /WebSearch|WebFetch|web_search/);
+    assert.doesNotMatch(none.args.join(" "), /WebSearch|WebFetch|web_search="live"/);
+    assert.equal(execution === codex, none.args.includes('web_search="disabled"'));
+    assert.equal(execution === codex, none.args.includes("features.apps=false"));
   }
 });
 
@@ -1087,7 +1099,7 @@ test("Claude Code retries, rate limits and denied tools are notices, never error
   assert.equal(rejected.length, 1);
   assert.equal(rejected[0].kind, "notice");
   const message = rejected[0].kind === "notice" ? rejected[0].message : "";
-  assert.match(message, /^Claude 額度已達上限，等待重置中（5 小時滾動視窗/);
+  assert.match(message, /^Claude 用量已達上限，等待重置中（5 小時滾動視窗/);
   assert.match(message, /已用 100%/);
   // The reset time is formatted for the locale, never with a hard-coded tag.
   assert.ok(
@@ -1101,7 +1113,7 @@ test("Claude Code retries, rate limits and denied tools are notices, never error
       type: "rate_limit_event",
       rate_limit_info: { status: "allowed_warning", rateLimitType: "unknown_window" },
     }),
-    [{ kind: "notice", message: "Claude 額度接近上限（unknown_window）。" }],
+    [{ kind: "notice", message: "Claude 用量接近上限（unknown_window）。" }],
   );
   assert.deepEqual(read({ type: "rate_limit_event" }), []);
   assert.deepEqual(
@@ -1286,8 +1298,8 @@ test("retryTransientAuth reruns a retryable attempt up to twice with the product
   );
   assert.deepEqual(waits, [15_000, 45_000]);
   assert.deepEqual(notices, [
-    "Claude Code 正在更新登入憑證（其他行程持有更新鎖），15 秒後重試（第 2/3 次）。",
-    "Claude Code 正在更新登入憑證（其他行程持有更新鎖），45 秒後重試（第 3/3 次）。",
+    "Claude Code 正在等另一個行程更新完登入狀態，15 秒後重試（第 2/3 次）。",
+    "Claude Code 正在等另一個行程更新完登入狀態，45 秒後重試（第 3/3 次）。",
   ]);
   // A third retryable result is returned as is; the caller turns it into the final failure.
   attempts = 0;
@@ -1454,7 +1466,7 @@ test("agent CLI notices, outcomes and failures follow the locale in effect", asy
       error.message === "The operation was cancelled.",
   );
   assert.deepEqual(notices, [
-    "Claude Code is refreshing its sign-in while another process holds the refresh lock; next try in 15 seconds (attempt 2 of 3).",
+    "Claude Code is waiting for another process to finish refreshing its sign-in; next try in 15 seconds (attempt 2 of 3).",
   ]);
 });
 
@@ -1482,5 +1494,9 @@ test("explicit full access affects write turns only and retains isolation from r
   }
   const codex = await agentCommand({ ...execution, provider: "codex" }, { cwd: "/work/tree", access: "write" });
   assert.equal(codex.args[codex.args.indexOf("--sandbox") + 1], "danger-full-access");
+  // Codex defaults to live search in a full access sandbox; web access off still turns it off.
+  assert.ok(codex.args.includes('web_search="disabled"'));
+  // Full access does not bring ChatGPT apps back.
+  assert.ok(codex.args.includes("features.apps=false"));
   assert.ok(codex.args.includes("--ignore-rules"));
 });

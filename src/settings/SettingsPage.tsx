@@ -188,7 +188,6 @@ export function SettingsPage({
     <section className="page-content settings-page">
       <div className="page-title">
         <div>
-          <span className="eyebrow">{t.eyebrow}</span>
           <h1 tabIndex={-1}>{t.title}</h1>
           <p>{t.intro}</p>
         </div>

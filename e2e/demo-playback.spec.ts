@@ -155,7 +155,7 @@ test("demo=play plays the sample from queued to a published sample PR, with no t
       await expect(reviewed).toBeChecked();
     }
     // Approval waits for the understanding check, as on a real run.
-    await page.getByRole("button", { name: workspace.footer.explainBack }).click();
+    await page.locator(".review-footer").getByRole("button", { name: workspace.footer.explainBack }).click();
     await expect(page.locator(".explain-panel")).toHaveCount(0);
     await passCheck(page);
     await page.getByRole("button", { name: workspace.footer.approvePr }).click();

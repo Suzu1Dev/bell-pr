@@ -152,7 +152,7 @@ test("with learnByHand, area-reserved still blocks LLVM's 'use' wording and an o
 test("an agent run's ai-ban and area-reserved copy and outcome do not change", () => {
   const agent = checksFor(rulesWith(ban(gentoo), area(llvm)), undefined, goodFirstIssue);
   assert.deepEqual(ids(agent), ["ai-ban:block", "area-reserved:block"]);
-  assert.match(agent[0].message, /^The project's rules do not accept AI-assisted contributions, and AI agents wrote this change\./);
+  assert.match(agent[0].message, /^The project's rules do not accept AI-assisted contributions, and AI Agents wrote this change\./);
   assert.match(agent[1].message, /pick an issue that isn't reserved\.$/);
   assert.deepEqual([...overridableCheckIds], ["issue-has-pr"]);
 });

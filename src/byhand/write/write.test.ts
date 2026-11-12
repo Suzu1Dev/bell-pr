@@ -110,7 +110,7 @@ test("after a first draft the guide's step names can be shown, and an early reve
 
 test("a run fitted to rules that don't name planning help keeps the outline closed", () => {
   const fitted = html(plan({ guidePlan, helpLock: lock }, {}, { status: "awaiting_plan" }));
-  assert.ok(fitted.includes(apostrophes("doesn't name planning help: the guide's outline stays closed.")));
+  assert.ok(fitted.includes(apostrophes("they don't name planning help, so the guide's outline stays closed.")));
   assert.doesNotMatch(fitted, /I don&#x27;t know where to start|step names/);
   // Nothing on the panel promises the outline later.
   assert.doesNotMatch(fitted, /folded until/i);
@@ -169,7 +169,7 @@ const thread = [
 
 test("the guide says the agents can't edit files, lists the steps, and offers the next hint behind the attempt gate", () => {
   const text = html(guide({ plan: { steps, savedAt: at }, thread, hints: { s2: { rung: 1, at, fingerprint } } }));
-  assert.ok(text.includes(apostrophes("BELL PR's agents can't edit files in this run.")));
+  assert.ok(text.includes(apostrophes("BELL PR's Agents can't edit files in this run.")));
   assert.match(text, /<li aria-current="step"><span id="run-1-on-s2">Cap the retries at three<\/span>/);
   for (const chip of ["Setup and tools", "This project", "A concept", "My change"]) assert.ok(text.includes(chip), chip);
   // R1 given at this version: R2 waits for an attempt.
@@ -245,13 +245,13 @@ test("with no rung left on the step, \"My change\" isn't offered either", () => 
 
 test("a run whose history withdrew the claim says why instead of the in-run line", () => {
   const text = html(guide({ agentWrites: 1 }));
-  assert.doesNotMatch(text, /agents can&#x27;t edit files/);
+  assert.doesNotMatch(text, /Agents can&#x27;t edit files/);
   // The record's own words (src/byhand/record), so the run says it one way everywhere.
-  assert.ok(text.includes("BELL PR makes no Learn-by-hand claim for this run: an agent tried to change files."));
+  assert.ok(text.includes("BELL PR makes no Learn-by-hand claim for this run: an Agent tried to change files."));
   assert.ok(html(guide({}, {}, { agents: [{ id: "a1", name: "Ada", role: "teammate", status: "complete", detail: "" }] as Run["agents"] })).includes(
-    "BELL PR makes no Learn-by-hand claim for this run: agents other than the guide, the reviewer and the test analyst joined it.",
+    "BELL PR makes no Learn-by-hand claim for this run: Agents other than the guide, the Reviewer and the Test analyst joined it.",
   ));
-  assert.ok(renderZh(guide({ agentWrites: 1 })).includes("BELL PR 不為這個工作做親手學的聲明：有 agent 試圖修改檔案。"));
+  assert.ok(renderZh(guide({ agentWrites: 1 })).includes("BELL PR 不為這個任務做親手學的聲明：有 Agent 試圖修改檔案。"));
 });
 
 test("a fitted run names its help set and offers no hint, test help or review outside it", () => {
@@ -323,7 +323,7 @@ test("a test run that did not finish says why it may have stopped, never that th
   const confirmed = { testCommand: { suggestion: "npm test", confirmed: { command: "npm test", confirmedAt: at } } };
   const text = html(guide({ tests: [{ at, command: "npm test", changeFingerprint: fingerprint, outcome: "error", ms: 9 }] }, confirmed));
   assert.ok(text.includes("It did not finish."));
-  assert.ok(text.includes("BELL PR stopped them for too much output, or the command could not start; the run log in Agent activity says which."));
+  assert.ok(text.includes("BELL PR stopped them for too much output, or the command could not start; the run log in “Activity” says which."));
   assert.doesNotMatch(text, /could not run/);
   assert.match(renderZh(guide({ tests: [{ at, command: "npm test", changeFingerprint: fingerprint, outcome: "error", ms: 9 }] }, confirmed)), /結果沒有跑完。/);
 });
@@ -336,7 +336,7 @@ test("Ready for review states the version's facts and offers the guide's review"
   assert.ok(text.includes("1 file changed, +4 −1."));
   assert.ok(text.includes("Not run since your last edit."));
   assert.match(text, /<input type="checkbox" checked=""\/><span class="mission-plan-copy"><strong>Ask the guide to review it<\/strong><small>The guide reads your change/);
-  assert.ok(text.includes("The review takes about 2 agent turns."));
+  assert.ok(text.includes("The review takes about 2 Agent turns."));
   assert.ok(text.includes(apostrophes("Nothing is explained or reviewed until you say it's ready.")));
   assert.equal(renderEn(ready({}, { open: false })), "");
   assert.match(html(ready({}, { aiRules: true })), /This project has rules about AI use\./);
@@ -360,7 +360,7 @@ test("a second review waits for a test run at the new version, and a fitted run 
   assert.match(html(ready({ ready: { at, changeFingerprint: fingerprint, review: true } })), /<input type="checkbox" checked=""\/>/);
   const fitted = html(ready({ helpLock: lock }));
   assert.doesNotMatch(fitted, /Ask the guide to review it/);
-  assert.ok(fitted.includes(apostrophes("doesn't name AI review, so the guide doesn't review here; your tests are the judge.")));
+  assert.ok(fitted.includes(apostrophes("they don't name AI review, so the guide doesn't review here. Your tests are the judge.")));
 });
 
 test("an answer's own text stays plain text: an open code fence in it swallows nothing BELL renders after it", () => {

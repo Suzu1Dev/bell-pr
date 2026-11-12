@@ -148,7 +148,6 @@ export function ReadinessMessage({
           <div key={requirement} className="readiness-item">
             <p className="readiness-reason">
               <strong>{t.readiness[requirement]}</strong>
-              <span>{t.readiness.unavailable}</span>
             </p>
             {checks
               .filter((check) => check.detail)

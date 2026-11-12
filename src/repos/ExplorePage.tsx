@@ -40,7 +40,6 @@ export function ExplorePage({
     <section className="page-content explore-page">
       <div className="page-title">
         <div>
-          <span className="eyebrow">{t.eyebrow}</span>
           <h1 tabIndex={-1}>{exploreRepo.fullName}</h1>
           <p>{t.intro}</p>
         </div>

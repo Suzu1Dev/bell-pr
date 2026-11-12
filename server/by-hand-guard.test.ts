@@ -102,7 +102,7 @@ test("runAgent refuses a write turn of a Learn-by-hand run before any agent runs
   const f = await fixture(t);
   await assert.rejects(
     withLocale("en", () => runAgent(f.ctx, f.run, "lead", "Edit retry.ts.", new AbortController().signal, false)),
-    refused(/^BELL PR's agents have no write access in a Learn-by-hand run/),
+    refused(/^BELL PR's Agents have no write access in a Learn-by-hand run/),
   );
   assert.equal(f.calls.length, 0);
   assert.equal(f.run.agents[0].status, "waiting");

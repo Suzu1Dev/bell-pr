@@ -40,6 +40,14 @@ const example = {
   scenario: "使用者打開頁面，查看這個模組提供的數字。",
   before: "原本提供的數字是 1。",
   after: "現在提供的數字是 2；其他顯示方式不變。",
+  beforeSteps: [
+    { label: "打開頁面", changed: false },
+    { label: "看到數字 1", changed: true },
+  ],
+  afterSteps: [
+    { label: "打開頁面", changed: false },
+    { label: "看到數字 2", changed: true },
+  ],
 };
 const alternatives =
   "也可以改成由呼叫端傳入數字；這次沒有這樣做，因為只有一個呼叫者。當數字需要依環境變動時再改採。";
@@ -74,6 +82,9 @@ test("explanations retain bounded complete diffs, exclude blocked content, and r
   assert.match(prompt, /"alternatives":"at least one other viable approach/);
   assert.match(prompt, /"lookup":\["1 to 3 searchable keywords/);
   assert.match(prompt, /"selfCheck":\{"question":"one question/);
+  assert.match(prompt, /"beforeSteps":\[\{"label":"one step of that same situation before this change/);
+  assert.match(prompt, /beforeSteps and afterSteps draw that same situation as 2–5 short steps/);
+  assert.match(prompt, /return two empty arrays/);
   assert.throws(
     () => explanationBatches([diff("huge.ts", "字".repeat(40_000))]),
     /100 KB/,
@@ -97,6 +108,13 @@ test("explanations retain bounded complete diffs, exclude blocked content, and r
   assert.equal(parsed.summary, "更清楚的輸出");
   assert.deepEqual(parsed.lookup, lookup);
   assert.deepEqual(parsed.selfCheck, selfCheck);
+  assert.deepEqual(parsed.example, example);
+  // A change with no sequence answers two empty step lists.
+  const noSteps = { ...example, beforeSteps: [], afterSteps: [] };
+  assert.deepEqual(
+    parseExplanations(JSON.stringify({ files: [{ ...answer.files[0], example: noSteps }] }), [files[0]])[0].example,
+    noSteps,
+  );
   // Alternatives, lookup keywords and the self-check are required on the
   // model output side, exactly like the example.
   for (const incomplete of [
@@ -112,10 +130,17 @@ test("explanations retain bounded complete diffs, exclude blocked content, and r
         parseExplanations(JSON.stringify({ files: [incomplete] }), [files[0]]),
       /格式不完整/,
     );
+  const { beforeSteps: _steps, ...withoutSteps } = example;
   for (const invalidExample of [
     undefined,
     { scenario: "情境", before: "原本" },
     { scenario: "情境", before: "原本", after: "  " },
+    // The agent schema requires both step lists, at most five strict steps each.
+    withoutSteps,
+    { ...example, afterSteps: Array.from({ length: 6 }, () => example.afterSteps[0]) },
+    { ...example, afterSteps: [{ label: " ", changed: true }] },
+    { ...example, afterSteps: [{ label: "看到數字 2" }] },
+    { ...example, afterSteps: [{ ...example.afterSteps[0], note: "多的欄位" }] },
   ])
     assert.throws(
       () =>
@@ -168,6 +193,8 @@ test("explanation and mentor prompts ask for the locale's language and length un
   assert.ok(chinese.includes(respondIn("zh-TW")));
   assert.match(chinese, /Traditional Chinese/);
   assert.match(chinese, /a short concept title \(at most 25 Chinese characters\)/);
+  assert.match(english, /before this change \(at most 8 words\)/);
+  assert.match(chinese, /before this change \(at most 20 Chinese characters\)/);
   const chineseGuide = withLocale("zh-TW", guide);
   assert.ok(chineseGuide.includes(respondIn("zh-TW")));
   assert.match(chineseGuide, /1–3 searchable keywords \(English terms in parentheses\)\. Cite/);
@@ -191,8 +218,9 @@ test("in English, oversized diffs and malformed explanations are reported in Eng
   );
 });
 
-test("ready cards saved without alternatives or a self-check stay ready; only a missing example migrates", () => {
-  const files = [diff("a.ts"), diff("b.ts")];
+test("ready cards saved without alternatives, a self-check or example steps stay ready; only a missing example migrates", () => {
+  const files = [diff("a.ts"), diff("b.ts"), diff("c.ts")];
+  const { beforeSteps: _before, afterSteps: _after, ...stepless } = example;
   const legacy = {
     summary: "舊摘要",
     reason: "舊原因",
@@ -211,12 +239,19 @@ test("ready cards saved without alternatives or a self-check stay ready; only a 
         status: "ready",
         content: legacy,
       },
+      "c.ts": {
+        fingerprint: files[2].fingerprint,
+        status: "ready",
+        content: { ...legacy, example: stepless },
+      },
     },
   } as unknown as Run;
   synchronizeExplanations(run, files);
   assert.equal(files[0].explanationStatus, "ready");
   assert.equal(files[0].explanation?.selfCheck, undefined);
   assert.equal(files[1].explanationStatus, "pending");
+  assert.equal(files[2].explanationStatus, "ready");
+  assert.deepEqual(files[2].explanation?.example, stepless);
 });
 
 test("guide prompt carries contribution context, the ready explanation card and named reports before the conversation", () => {

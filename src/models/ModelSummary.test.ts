@@ -20,13 +20,13 @@ const renderEnglish = (props: Props) => {
 
 test("Codex and records without a reported model keep the 未回報 wording", () => {
   const codex = render({ execution: { source: "cli-default" } });
-  assert.match(codex, /Codex 預設（型號未回報）/);
-  assert.match(codex, /服務端實際使用的模型未另外回報/);
+  assert.match(codex, /Codex 預設（模型未回報）/);
+  assert.match(codex, /CLI 沒有回報實際使用的模型/);
   const claude = render({
     execution: { provider: "claude", model: "opus", source: "selected" },
   });
   assert.match(claude, /<dd>opus<\/dd>/);
-  assert.match(claude, /服務端實際使用的模型未另外回報/);
+  assert.match(claude, /CLI 沒有回報實際使用的模型/);
   assert.doesNotMatch(claude, /回報 /);
 });
 
@@ -41,10 +41,10 @@ test("a reported Claude Code model shows the passed alias, the resolved model an
   });
   assert.match(
     selected,
-    /<dd>傳入 haiku → 回報 claude-haiku-4-5-20251001（CLI 2\.1\.292）<\/dd>/,
+    /<dd>指定 haiku · CLI 回報 claude-haiku-4-5-20251001（CLI 2\.1\.292）<\/dd>/,
   );
-  assert.match(selected, /Claude Code CLI 回報的實際模型/);
-  assert.doesNotMatch(selected, /未另外回報|本次執行呼叫過的模型/);
+  assert.match(selected, /模型是 Claude Code CLI 回報的/);
+  assert.doesNotMatch(selected, /沒有回報實際使用的模型|本次執行呼叫過的模型/);
 
   const cliDefault = render({
     execution: {
@@ -56,7 +56,7 @@ test("a reported Claude Code model shows the passed alias, the resolved model an
       },
     },
   });
-  assert.match(cliDefault, /<dd>未傳入 --model → 回報 claude-sonnet-4-5<\/dd>/);
+  assert.match(cliDefault, /<dd>預設模型 · CLI 回報 claude-sonnet-4-5<\/dd>/);
   assert.match(
     cliDefault,
     /本次執行呼叫過的模型<\/dt><dd>claude-sonnet-4-5、claude-haiku-4-5-20251001<\/dd>/,
@@ -91,8 +91,8 @@ test("English renders say what was passed and what the CLI reported", () => {
   assert.match(codex, /<strong>Run model<\/strong>/);
   assert.match(codex, /<dd>Codex default \(model not reported\)<\/dd>/);
   assert.match(codex, /<dt>Reasoning effort<\/dt><dd>Codex default<\/dd>/);
-  assert.match(codex, /The model the service actually used was not reported\./);
-  assert.match(codex, /settings BELL PR passed to Codex/);
+  assert.match(codex, /The CLI did not report which model was used\./);
+  assert.match(codex, /settings BELL PR sent to Codex/);
 
   const claude = renderEnglish({
     execution: {
@@ -110,7 +110,7 @@ test("English renders say what was passed and what the CLI reported", () => {
   });
   assert.match(
     claude,
-    /<dd>Passed haiku → reported claude-haiku-4-5-20251001 \(CLI 2\.1\.292\)<\/dd>/,
+    /<dd>Requested haiku · CLI reported claude-haiku-4-5-20251001 \(CLI 2\.1\.292\)<\/dd>/,
   );
   assert.match(
     claude,
@@ -118,7 +118,7 @@ test("English renders say what was passed and what the CLI reported", () => {
   );
   assert.match(claude, /<dd>Extra high · xhigh<\/dd>/);
   assert.match(claude, /<dt>Network<\/dt><dd>Web access allowed<\/dd>/);
-  assert.match(claude, /the model the Claude Code CLI reported/);
+  assert.match(claude, /The model is the one the Claude Code CLI reported/);
 
   const cliDefault = renderEnglish({
     execution: {
@@ -127,7 +127,7 @@ test("English renders say what was passed and what the CLI reported", () => {
       reported: { model: "claude-sonnet-4-5" },
     },
   });
-  assert.match(cliDefault, /<dd>No --model passed → reported claude-sonnet-4-5<\/dd>/);
+  assert.match(cliDefault, /<dd>Default model · CLI reported claude-sonnet-4-5<\/dd>/);
 });
 
 test("English analysis, sample and unrecorded summaries", () => {
@@ -172,7 +172,7 @@ test("an effort shows its CLI id only where the label does not already read as i
 
 test("full access is shown in both languages only when the run recorded it", () => {
   const execution = { source: "cli-default", agentAccess: "full" } as const;
-  assert.match(render({ execution }), /完整權限（取消沙箱與指令拒絕規則）/);
+  assert.match(render({ execution }), /完整權限（取消沙箱與指令 deny 規則）/);
   assert.match(renderEnglish({ execution }), /Full access \(sandbox and command deny rules lifted\)/);
   assert.doesNotMatch(render({ execution: { source: "cli-default" } }), /完整權限/);
 });

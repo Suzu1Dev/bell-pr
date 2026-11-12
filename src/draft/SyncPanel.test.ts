@@ -38,13 +38,14 @@ test("an unpublished run shows its base, its conflicts with the agent action, an
       to: "a".repeat(40),
       snapshot: "c".repeat(40),
       conflicts: ["src/hello.ts"],
-      report: "仍有衝突標記：src/hello.ts。",
+      report: "已合併兩邊的修改。",
     },
   });
   assert.match(html, /<code>main<\/code> 的 <code>aaaaaaa<\/code>/);
   assert.match(html, /上次同步：<code>bbbbbbb<\/code>/);
   assert.match(html, /src\/hello\.ts/);
   assert.match(html, /仍有衝突標記/);
+  assert.match(html, /已合併兩邊的修改。/);
   assert.equal(button(html, "請 Agent 解決衝突"), "enabled");
   assert.match(html, /復原同步/);
   // The server refuses another sync until these conflicts are resolved.
@@ -109,7 +110,7 @@ test("an unpublished run that cannot sync says why", () => {
   for (const status of ["running", "failed", "cancelled"] as const) {
     const html = render({ ...base, status });
     assert.equal(button(html, "同步到最新目標分支"), "disabled", status);
-    assert.match(html, /只有審閱中、已核准或等待計畫核准的工作可以同步/, status);
+    assert.match(html, /只有審閱中、已核准或等待計畫核准的任務可以同步/, status);
   }
   assert.doesNotMatch(render(base), /只有審閱中/);
 });
@@ -157,7 +158,7 @@ test("the English panel explains the base, the conflicts and why it waits, witho
   const html = renderEn(panel({ ...base, sync }));
   assert.match(
     html,
-    /This contribution is based on <code>main<\/code> at <code>aaaaaaa<\/code>\. Syncing moves these changes/,
+    /Based on <code>main<\/code> at <code>aaaaaaa<\/code>\. Syncing moves your changes onto the latest <code>main<\/code>\./,
   );
   assert.match(html, /Last sync: <code>bbbbbbb<\/code> to <code>aaaaaaa<\/code>, /);
   // Each file says its state in words; the count is announced politely.
@@ -167,7 +168,7 @@ test("the English panel explains the base, the conflicts and why it waits, witho
   assert.doesNotMatch(html, /class="sync-conflicts" role=/);
   assert.match(html, /the side marked <code>latest main<\/code>/);
   assert.match(html, /the side marked <code>this contribution<\/code> is this contribution/);
-  assert.equal(button(html, "Ask the agent to resolve the conflicts"), "enabled");
+  assert.equal(button(html, "Ask the Agent to resolve the conflicts"), "enabled");
   assert.equal(button(html, "Sync to the latest target branch"), "disabled");
   assert.match(html, /Resolve the conflicts from the last sync before you sync again/);
   assert.match(html, /Undo sync/);
@@ -215,10 +216,10 @@ test("a Learn-by-hand run has no conflict agent: the person resolves the markers
     conflicts: ["src/hello.ts"],
   };
   const agent = renderEn(panel({ ...base, sync }));
-  assert.equal(button(agent, "Ask the agent to resolve the conflicts"), "enabled");
+  assert.equal(button(agent, "Ask the Agent to resolve the conflicts"), "enabled");
   const html = renderEn(panel({ ...base, learnByHand: true, sync }));
   assertNoHan(html);
-  assert.equal(button(html, "Ask the agent to resolve the conflicts"), "absent");
+  assert.equal(button(html, "Ask the Agent to resolve the conflicts"), "absent");
   assert.ok(!/ask the agent/i.test(html));
   assert.ok(html.includes("Resolve the markers by hand; BELL PR re-checks them when you refresh the diff on the Code changes tab."));
   // The published PR's sync round reads the same way, in Traditional Chinese too.

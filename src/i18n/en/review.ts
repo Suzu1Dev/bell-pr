@@ -74,7 +74,7 @@ const review = {
       plural(count) === "one"
         ? `${count} line selected`
         : `${count} lines selected`,
-    idleHint: "Click any line and the agent will explain it",
+    idleHint: "Click a line to ask about it",
     /** A Learn-by-hand run: the guide answers a question about the selected lines. */
     idleHintGuide: "Click any line to ask the guide about it",
     /** The name on the Shift key cap. */
@@ -163,7 +163,6 @@ const review = {
   panel: {
     label: "Code learning assistant",
     title: "Understand every change",
-    subtitle: "What changed, and why",
     /** The mode badge and the badge on demo answers. */
     demoBadge: "Demo",
     liveBadge: "AI",
@@ -195,13 +194,13 @@ const review = {
       alternatives: "What if it were done differently?",
       selfCheck: "Quiz yourself",
     },
-    exampleIntro:
-      "Start with a scenario to see how things differ before and after the change.",
     exampleScenario: "Picture this",
     exampleBefore: "Before the change",
     exampleAfter: "After the change",
+    /** Read by screen readers only, before an example step that differs. */
+    exampleStepChanged: "This step differs:",
     exampleFailed:
-      "The plain-language example isn't ready yet. You can keep reading the rest of the explanation.",
+      "The plain-language example couldn't be prepared. You can keep reading the rest of the explanation.",
     retryBusy: "Preparing other explanations…",
     retryExample: "Prepare the example again",
     examplePending: "Adding a plain-language example",
@@ -214,17 +213,17 @@ const review = {
       "Sample content isn't live AI output and doesn't represent test results.",
     evidenceLive:
       "The explanation is based on the current diff. Check the source code and tests to confirm the actual behavior.",
-    failedTitle: "This explanation isn't ready yet",
+    failedTitle: "The explanation couldn't be prepared",
     failedBody:
       "Something went wrong while preparing the explanation. You can still review the change as usual.",
     retry: "Prepare the explanation again",
-    failedNote: "It will appear right here when it's done",
+    failedNote: "After you retry, it appears right here",
     generatingTitle: "Turning the change into plain language",
     generatingBody:
       "Comparing against the actual diff to prepare a concrete scenario, the reasons behind the design and what to check while reviewing.",
     pendingTitle: "The explanation will be ready automatically",
     pendingBody:
-      "Once the agents finish the change, the explanation is prepared here.",
+      "Once the Agents finish the change, the explanation is prepared here.",
   },
   /** The learner's own note on the explanation tab. */
   note: {
@@ -256,16 +255,16 @@ const review = {
     rerun: "Run the review again",
     rerunBusy: "Running the review again…",
     rerunNote:
-      "Runs the Reviewer and Test analyst again on the current diff in the workspace (read-only; it counts toward your CLI usage). Reports are only suggestions and don't change what you have reviewed or approved.",
-    emptyTitle: "No review reports for this run yet",
+      "Runs the Reviewer and Test analyst again on the current diff in the working directory (read-only; it counts toward your CLI usage). Reports are only suggestions and don't change what you have reviewed or approved.",
+    emptyTitle: "No review reports for this contribution yet",
     emptyBody:
       "Once the Lead's integration, the Reviewer and the Test analyst have finished, their full reports appear here.",
     intro:
-      "These are independent static reviews, not execution results. Each report is shown in full, with the number of paragraphs that mention the current file.",
+      "Independent static reviews: the code was read, not run. Each report is shown in full.",
     orderTitle: "Reading order suggested by the Lead",
     orderIntro:
       "A common approach is to read definitions and interfaces first, then their callers, with tests first or last. The Lead's integration summary explains why this order was chosen. The file list on the left can switch to this suggested order.",
-    staticBadge: "Independent static review, not an execution result",
+    staticBadge: "Static review",
     mentions: ({ count }: { count: number }) =>
       plural(count) === "one"
         ? `Mentions this file in ${count} paragraph`
@@ -274,7 +273,7 @@ const review = {
     evidenceDemo:
       "Sample reports aren't live AI output and don't represent test results.",
     evidenceLive:
-      "Each role wrote its report by reading the code, not running it. Only the commands and output a report lists explicitly count as test results.",
+      "Only the commands and output a report lists explicitly count as test results.",
   },
   /** Maintainer comments on the current file from the published PR. */
   feedback: {
@@ -309,7 +308,7 @@ const review = {
     you: "You",
     stale: "About an earlier version",
     loading: "Reading the change…",
-    inputLabel: "Question for the agent",
+    inputLabel: "Question for the Agent",
     placeholder: "Which part do you want to explore?",
     placeholderBlocked: "No explanation is available for this file right now",
     contextAttached: "File diff attached",
@@ -380,7 +379,7 @@ const review = {
       } satisfies Record<SelfGrade, string>,
       /** Partly or Missed at Sure or Think so. */
       confidentMiss:
-        "This is the most useful kind of miss: it comes back in your practice deck.",
+        "This is the most useful kind of miss: it comes back in Practice.",
     },
     road: {
       guessLabel: "Before you look: how else could this be done?",
@@ -410,7 +409,7 @@ const review = {
     /** `paths` lists the sample's files that have one, each shown as code. */
     demoOnly: ({ paths }: { paths: string }) =>
       `The sample has a code walkthrough for ${paths} only; open it from the file list to see one.`,
-    failedTitle: "The code walkthrough isn't finished",
+    failedTitle: "The code walkthrough couldn't be prepared",
     failedBody:
       "Something went wrong while preparing the code walkthrough; the changes can still be reviewed.",
     retry: "Prepare the code walkthrough again",
@@ -460,9 +459,9 @@ const review = {
       plural(count) === "one"
         ? "1 more file is past the display limit; see the full diff on GitHub."
         : `${count} more files are past the display limit; see the full diff on GitHub.`,
-    unpublished: `This contribution has not sent its PR yet. ${product.name} keeps the changes uncommitted until you publish and makes the first commit then; every review round and every sync with the target branch adds one more commit here.`,
+    unpublished: `No PR yet, so the changes are still uncommitted. ${product.name} makes the first commit when you publish. Each review round and each sync with the target branch then adds one more commit here.`,
     unpublishedDemo:
-      "The sample has not sent a PR, so it has no commits yet. Below is the sample's history as it looks after the first push, one review round and a merge of the target branch.",
+      "The sample has not published a PR, so it has no commits yet. Below is the sample's history as it looks after the first push, one review round and a merge of the target branch.",
     publishedDemo:
       "The sample PR's commits: the first push, one review round and a merge of the target branch. Nothing was sent to GitHub.",
     loading: "Reading the commit history…",

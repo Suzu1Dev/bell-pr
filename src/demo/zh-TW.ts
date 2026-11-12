@@ -14,6 +14,17 @@ const zhTW: DemoContent = buildDemoContent({
           "預設每次都固定等 **1 秒**再試。大家若同時失敗，就可能又在同一時間送出下一批請求。",
         after:
           "每次等待時間改為隨機抽選，預設前兩輪分別小於 **1 秒、2 秒**，讓請求錯開；若錯誤不適合重試，也能直接停止。這只增加恢復的機會，仍可能在次數用盡後失敗。",
+        beforeSteps: [
+          { label: "請求失敗", changed: false },
+          { label: "固定等 1 秒", changed: true },
+          { label: "大家同時再試", changed: true },
+        ],
+        afterSteps: [
+          { label: "請求失敗", changed: false },
+          { label: "先判斷值不值得重試", changed: true },
+          { label: "在逐輪變大的上限內隨機等待", changed: true },
+          { label: "請求錯開送出", changed: true },
+        ],
       },
       summary:
         "請求失敗時，不再每次固定等 1 秒，而是逐步拉長等待時間，並加上一點隨機性。短暫的網路問題，就有機會自動恢復。",
@@ -35,11 +46,22 @@ const zhTW: DemoContent = buildDemoContent({
     "src/client.ts": {
       example: {
         scenario:
-          "你打開帳戶頁面，程式用 GET 讀取資料，但伺服器暫時回傳 `503`，並附上一段錯誤說明。",
+          "你打開帳號頁面，程式用 GET 讀取資料，但伺服器暫時回傳 `503`，並附上一段錯誤說明。",
         before:
           "這段程式沒有先檢查 HTTP 是否成功，會直接把回覆當成 JSON 資料讀取；即使是 `503`，也不會因為這個狀態碼而重試。",
         after:
           "程式先認出 `503` 是可重試的錯誤，再交給重試工具處理。服務若及時恢復，就有機會拿到資料；超過上限仍會回報失敗。像 `401` 這類問題則直接回報，不會反覆嘗試。",
+        beforeSteps: [
+          { label: "向伺服器要你的資料", changed: false },
+          { label: "伺服器回傳 503", changed: false },
+          { label: "照樣當成 JSON 讀取", changed: true },
+        ],
+        afterSteps: [
+          { label: "向伺服器要你的資料", changed: false },
+          { label: "伺服器回傳 503", changed: false },
+          { label: "認出 503 可以重試", changed: true },
+          { label: "再試，直到上限", changed: true },
+        ],
       },
       summary:
         "把重試能力接進 GET 請求。暫時性伺服器錯誤和網路錯誤可以再試，像 401 或 404 這些需要使用者修正的問題則直接回報。",
@@ -66,6 +88,15 @@ const zhTW: DemoContent = buildDemoContent({
           "原本的型別只列出重試次數與固定等待 `delay`；`ClientOptions` 也沒有 `retry` 欄位，無法從這份介面得知新的設定方式。",
         after:
           "編輯器可以依新型別提示 `retry: { baseDelay: 500, maxDelay: 5000 }`。這個檔案定義的是設定規格，實際等待與重試仍由其他程式碼執行。",
+        beforeSteps: [
+          { label: "打開 client 設定", changed: false },
+          { label: "找不到 retry 設定", changed: true },
+        ],
+        afterSteps: [
+          { label: "打開 client 設定", changed: false },
+          { label: "編輯器提示 baseDelay 與 maxDelay", changed: true },
+          { label: "填入 500 與 5000", changed: true },
+        ],
       },
       summary:
         "把重試次數、等待上限和錯誤判斷定義成明確的 TypeScript 介面，使用 SDK 的人可以在編輯器裡直接看到說明。",
@@ -92,6 +123,16 @@ const zhTW: DemoContent = buildDemoContent({
           "這個新增的測試檔尚不存在；光看重試程式寫得合理，並不能當作這兩種情境已通過驗證的證據。",
         after:
           "測試先安排「第一次失敗、第二次成功」，用虛擬時間快轉 500 毫秒，檢查是否拿到 `ok`；另一個測試檢查不准重試時只呼叫一次。這是在增加檢查，不是更改使用者的請求行為，也不代表測試已實際通過。",
+        beforeSteps: [
+          { label: "修改重試程式", changed: false },
+          { label: "沒有測試檢查它", changed: true },
+        ],
+        afterSteps: [
+          { label: "修改重試程式", changed: false },
+          { label: "安排先失敗一次、再成功", changed: true },
+          { label: "虛擬時間快轉 500 毫秒", changed: true },
+          { label: "確認拿到 ok", changed: true },
+        ],
       },
       summary:
         "新增兩個可重複執行的測試：暫時失敗之後能成功，以及不符合條件的錯誤只執行一次。測試使用虛擬時間，不需要真的等待。",
@@ -118,6 +159,17 @@ const zhTW: DemoContent = buildDemoContent({
           "這段 README 只介紹 HTTP 用戶端，讀者無法從這裡得知重試設定、哪些錯誤會再試，以及如何替換舊欄位。",
         after:
           "文件提供完整設定範例，說明改用 `baseDelay`，並把預設次數寫成「第一次請求之外再試 3 次」。工程師更容易照著升級；文件本身不會改變程式執行行為。",
+        beforeSteps: [
+          { label: "在舊設定看到 delay: 1000", changed: false },
+          { label: "打開 README", changed: false },
+          { label: "找不到重試的說明", changed: true },
+        ],
+        afterSteps: [
+          { label: "在舊設定看到 delay: 1000", changed: false },
+          { label: "打開 README", changed: false },
+          { label: "讀到升級說明", changed: true },
+          { label: "改用 baseDelay", changed: true },
+        ],
       },
       summary:
         "補上使用方式、預設行為與升級說明。讓使用者不必讀原始碼，也知道哪些錯誤會重試、最多等多久、設定要怎麼寫。",
@@ -200,6 +252,12 @@ const zhTW: DemoContent = buildDemoContent({
     },
     howItFitsTogether:
       "呼叫端依 src/types.ts 的設定建立 src/client.ts 的 client；client 的 GET 直接呼叫 fetch，把 JSON 回傳給畫面。src/utils/retry.ts 目前是獨立 helper，示範 diff 中尚未被 client 引用；「client 將來會包住 retry」是建議方向，不是現況。",
+    flow: [
+      { label: "畫面需要資料", passes: "要 GET 的路徑" },
+      { label: "client 呼叫 fetch", passes: "HTTP 請求" },
+      { label: "API 伺服器回覆", passes: "回應" },
+      { label: "client 回傳 JSON", passes: "" },
+    ],
     evidence: {
       "README.md":
         "示範專案將自己定義為供現代應用程式使用的小型、有型別 HTTP client。",
@@ -497,7 +555,7 @@ const zhTW: DemoContent = buildDemoContent({
   prFeedback: {
     bodies: {
       review:
-        "謝謝，這個改動很清楚，測試也好讀。合併前還有兩件事：\n\n1. 把 `retry.delay` 改名會讓既有設定失效。請讓 `delay` 再支援一個 minor 版本，並在使用時輸出棄用警告。\n2. 希望補一個重試用盡的測試：超過 `maxRetries` 後，應拋出最後一次的錯誤。",
+        "謝謝，這個變更很清楚，測試也好讀。合併前還有兩件事：\n\n1. 把 `retry.delay` 改名會讓既有設定失效。請讓 `delay` 再支援一個 minor 版本，並在使用時輸出棄用警告。\n2. 希望補一個重試用盡的測試：超過 `maxRetries` 後，應拋出最後一次的錯誤。",
       "retry-after":
         "429 和 503 常會附上 `Retry-After` 標頭。有這個標頭時，等待時間能不能參考它？想另開 issue 後續處理也可以。",
     },

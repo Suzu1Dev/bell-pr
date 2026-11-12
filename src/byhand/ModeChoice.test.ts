@@ -53,9 +53,9 @@ test("the task dialog offers the agent team and Learn by hand, the team first", 
   const html = renderEn(choice());
   assertNoHan(html);
   assert.match(html, /<legend class="field-label">Who writes the code\?<\/legend>/);
-  assert.match(radio(html, "The agent team writes it"), /checked=""/);
+  assert.match(radio(html, "The Agent team writes it"), /checked=""/);
   assert.doesNotMatch(radio(html, "You write it \\(Learn by hand\\)"), /checked|disabled/);
-  assert.ok(html.includes("BELL PR&#x27;s agents can&#x27;t edit your files in this run."));
+  assert.ok(html.includes("BELL PR&#x27;s Agents can&#x27;t edit your files in this run."));
   // Nothing about the project's rules while the team writes.
   assert.doesNotMatch(html, /mode-case|mode-fit/);
   assert.match(renderZh(choice()), /你自己寫（親手學）/);
@@ -65,7 +65,7 @@ test("the sample shows the agent team only, and says where Learn by hand works",
   const html = renderEn(choice({ sample: true, mode: "hand", rulesCase: blocked }));
   assertNoHan(html);
   assert.match(radio(html, "You write it \\(Learn by hand\\)"), /disabled=""/);
-  assert.ok(html.includes("The sample shows the agent team. Learn by hand works on your own projects."));
+  assert.ok(html.includes("The sample shows the Agent team. Learn by hand works on your own projects."));
   assert.doesNotMatch(html, /mode-case/);
 });
 

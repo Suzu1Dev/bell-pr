@@ -1,10 +1,12 @@
 import { useEffect, useId, useRef, useState } from "react";
 import {
   AlertCircle,
+  ArrowDown,
   ArrowRight,
   ArrowUp,
   ArrowUpRight,
   BookOpen,
+  Diff,
   Eye,
   FileCode2,
   FlaskConical,
@@ -21,7 +23,7 @@ import {
   Sparkles,
   Workflow,
 } from "lucide-react";
-import type { LearnerNote } from "../../shared/explanations";
+import type { ExampleStep, LearnerNote } from "../../shared/explanations";
 import { parseLocale, type Locale } from "../../shared/i18n/locale";
 import type { PrFeedbackItem } from "../../shared/pr-feedback";
 import { parseReviewOrder } from "../../shared/review-order";
@@ -37,6 +39,7 @@ import { useFormat, useLocale, useT } from "../i18n";
 import type { ChatMessage, DiffFile, Run } from "../types";
 import { MaintainerFeedback } from "./MaintainerFeedback";
 import { inPanel } from "./focus";
+import { InlineCode } from "./InlineCode";
 import { usePanelStrings } from "./i18n";
 import { MarkdownContent } from "./MarkdownContent";
 import { QuizAttempt } from "./QuizAttempt";
@@ -126,6 +129,29 @@ export function ProvenanceLabel({ demo }: { demo: boolean }) {
       {demo ? <BookOpen size={13} /> : <Sparkles size={13} />}
       {demo ? t.provenance.sample : t.provenance.ai}
     </p>
+  );
+}
+
+/** One column of the example drawn as a chain of steps; a step that differs is marked by more than colour. */
+function ExampleSteps({ steps }: { steps: ExampleStep[] }) {
+  const t = useT("review");
+  return (
+    <ol className="explain-example-steps">
+      {steps.map((step, index) => (
+        <li key={index}>
+          {index > 0 && <ArrowDown size={13} aria-hidden="true" />}
+          <span className={`explain-example-step${step.changed ? " explain-example-step-changed" : ""}`}>
+            {step.changed && <Diff size={12} aria-hidden="true" />}
+            {step.changed && (
+              <span className="visually-hidden">{t.explain.exampleStepChanged} </span>
+            )}
+            <span>
+              <InlineCode text={step.label} />
+            </span>
+          </span>
+        </li>
+      ))}
+    </ol>
   );
 }
 
@@ -391,6 +417,9 @@ export function ExplanationPanel({
     conceptHeading.trim().length <= 100 &&
     conceptBody.length > 0;
   const status = file.explanationStatus || (explanation ? "ready" : "pending");
+  // Drawn only with both sides: cards saved before the diagram, and changes with no sequence, have none.
+  const { beforeSteps = [], afterSteps = [] } = explanation?.example ?? {};
+  const exampleSteps = beforeSteps.length > 0 && afterSteps.length > 0;
   const questionCount = messages.filter(
     (message) => message.role === "user",
   ).length;
@@ -593,6 +622,7 @@ export function ExplanationPanel({
                       <div className="explain-example-comparison">
                         <div className="explain-example-before">
                           <h4>{t.explain.exampleBefore}</h4>
+                          {exampleSteps && <ExampleSteps steps={beforeSteps} />}
                           <MarkdownContent>
                             {explanation.example.before}
                           </MarkdownContent>
@@ -602,6 +632,7 @@ export function ExplanationPanel({
                             <ArrowRight size={13} />
                             {t.explain.exampleAfter}
                           </h4>
+                          {exampleSteps && <ExampleSteps steps={afterSteps} />}
                           <MarkdownContent>
                             {explanation.example.after}
                           </MarkdownContent>

@@ -1,17 +1,11 @@
-/** The discovery, learning and agent team pages (English). */
+/** The discovery and agent team pages (English). */
 import { providerLabels } from "../../../shared/models";
 
 const pages = {
   discovery: {
     loading: "Loading contribution discovery…",
   },
-  learning: {
-    noteTitle: "Your next question is your next step forward.",
-    noteText:
-      "Select code in the workbench and ask about it. Conversations are kept per file for this session, so every question has its context.",
-  },
   team: {
-    eyebrow: "BUILT TO COLLABORATE",
     title: "How the AI team works",
     intro:
       "From breaking down the problem to cross-review, specialized roles fit into how you already work.",
@@ -26,7 +20,7 @@ const pages = {
       teammates: {
         name: "Teammates",
         role: "Separate contexts, parallel work",
-        text: "Each teammate has its own worktree; dependencies finish first, and work that does not conflict runs at the same time.",
+        text: "Each teammate has its own working directory; dependencies finish first, and work that does not conflict runs at the same time.",
         scope: "2 to 4 teammates · Shared task board",
       },
       inbox: {
@@ -38,11 +32,11 @@ const pages = {
       review: {
         name: "Review & tests",
         role: "Independent review after integration",
-        text: "Changes kept within their file scopes are integrated in order, then an independent reviewer and test analyst check the result.",
+        text: "Changes kept within their file scopes are integrated in order, then an independent Reviewer and Test analyst check the result.",
         scope: "Quality checks · You submit",
       },
     },
-    noteTitle: "The agents build; you keep the final say.",
+    noteTitle: "The Agents build; you keep the final say.",
     noteText: `Uses the ${providerLabels.codex}, ${providerLabels.claude} or ${providerLabels.antigravity} CLI signed in on this computer. Each task gets its own branch and goes to review when done; no PR is opened automatically.`,
   },
 };

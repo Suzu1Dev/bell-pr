@@ -31,7 +31,7 @@ const understanding = {
   notOpen:
     "The understanding check can be taken while the run waits for your review or approval, not while it runs or publishes.",
   changed:
-    "The changes moved since you opened the check. Reload it to see the questions for the latest version.",
+    "The changes were updated after you opened the check. Reload it to see the questions for the latest version.",
   unknownQuestion:
     "One of the answers is not for a question of the current check. Reload the check and answer again.",
   alreadyLocked:
@@ -64,10 +64,8 @@ const understanding = {
     "Your answer is already saved, and it stays as you answered it before the reference showed. Reload to see it.",
   attemptSkipped: "A skipped attempt has no answer.",
   attemptEmpty: "Send a quiz answer or a road choice.",
-  /** A learning-loop feature this build does not have yet. */
-  notImplemented: "This part of BELL PR is not available in this build yet.",
   feedbackTagUnpublished:
-    "Maintainer feedback can be tagged once the pull request is sent and its feedback is read.",
+    "Maintainer feedback can be tagged once the pull request is published and its feedback is read.",
   feedbackTagEmpty:
     "Send a taste dimension, Saw it coming or Surprised me, or a lesson.",
   feedbackTagUnknown:

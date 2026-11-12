@@ -215,17 +215,20 @@ export async function enforceAgentSandbox(
     label: messages.allowFix,
     command: `BELLPR_ALLOW_UNSANDBOXED_AGENTS=1 ${product.binNames[0]}`,
   };
-  if (provider === "antigravity")
+  if (provider === "antigravity") {
+    const restricted = detection.reason?.startsWith("restricted:");
     throw new AppError(
-      detection.reason?.startsWith("restricted:")
-        ? messages.antigravityRestricted
-        : messages.antigravityUnavailable,
+      restricted ? messages.antigravityRestricted : messages.antigravityUnavailable,
       503,
       {
         code: "antigravity_sandbox_unavailable",
-        fixes: [{ label: messages.claudeFix, command: "claude auth login" }, allowFix],
+        // Claude Code's sandbox can need the same Ubuntu setting, so switching is not offered there.
+        fixes: restricted
+          ? [allowFix]
+          : [{ label: messages.claudeFix, command: "claude auth login" }, allowFix],
       },
     );
+  }
   // Installed but blocked, as in a container: installing it again or
   // switching to Codex, whose sandbox is blocked the same way, cannot help.
   if (detection.reason === "unusable:bwrap")

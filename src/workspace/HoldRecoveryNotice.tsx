@@ -326,7 +326,7 @@ export function HoldRecoveryNotice({
       </section>
       {current.confirming && (
         <Modal title={t.holdStop.restoreConfirmTitle}
-          subtitle={legacy ? t.holdStop.legacyBody : t.holdStop.restoreConfirmBody({ count: paths.length })}
+          subtitle={legacy ? t.holdStop.restoreConfirmLegacyBody : t.holdStop.restoreConfirmBody({ count: paths.length })}
           mark={<TriangleAlert size={22} aria-hidden="true" />}
           onClose={closeConfirm}>
           <div className="modal-actions">

@@ -8,6 +8,7 @@ import { fileURLToPath } from "node:url";
 import { getDemo } from "../src/demo/index.js";
 import { assertNoHan } from "../src/test-utils/render.js";
 import { locales } from "./i18n/locale.js";
+import type { ChangeExplanation } from "./explanations.js";
 import { buildLearningExport } from "./learning-export.js";
 import type { Repository, RunCore } from "./types.js";
 
@@ -119,6 +120,44 @@ test("a demo-like run exports in English without any Han, and in zh-TW on reques
     buildLearningExport(demoLikeRun, demoLikeRepo, "zh-TW"),
     /^# 學習紀錄：Make retries back off\n[\s\S]*## 檔案解說/,
   );
+});
+
+test("the example's steps are exported when both sides have them, marking the steps that differ", () => {
+  const withExample = (example: NonNullable<ChangeExplanation["example"]>): RunCore => ({
+    ...demoLikeRun,
+    explanations: {
+      "src/retry.ts": {
+        ...demoLikeRun.explanations!["src/retry.ts"],
+        content: { ...demoLikeRun.explanations!["src/retry.ts"].content!, example },
+      },
+    },
+  });
+  const example = { scenario: "A request fails.", before: "Wait 1 second.", after: "Wait at random." };
+  const beforeSteps = [
+    { label: "A request fails", changed: false },
+    { label: "Wait exactly 1 second", changed: true },
+  ];
+  const afterSteps = [
+    { label: "A request fails", changed: false },
+    { label: "Wait at random", changed: true },
+  ];
+  const plain = "**In everyday terms**\n\n- Scenario: A request fails.\n- Before: Wait 1 second.\n- After: Wait at random.";
+  const english = buildLearningExport(withExample({ ...example, beforeSteps, afterSteps }), demoLikeRepo, "en");
+  assert.ok(
+    english.includes(
+      `${plain}\n- Before, step by step: A request fails → Wait exactly 1 second (differs)\n- After, step by step: A request fails → Wait at random (differs)\n\n`,
+    ),
+  );
+  assert.match(
+    buildLearningExport(withExample({ ...example, beforeSteps, afterSteps }), demoLikeRepo, "zh-TW"),
+    /- 修改前的步驟：A request fails → Wait exactly 1 second（不同）\n- 修改後的步驟：A request fails → Wait at random（不同）\n/,
+  );
+  // Without steps on either side, the example exports as before.
+  for (const steps of [{}, { beforeSteps, afterSteps: [] }]) {
+    const markdown = buildLearningExport(withExample({ ...example, ...steps }), demoLikeRepo, "en");
+    assert.ok(markdown.includes(`${plain}\n\n`));
+    assert.doesNotMatch(markdown, /step by step/);
+  }
 });
 
 test("the bundled demo run and repository fit the builder in every locale", () => {

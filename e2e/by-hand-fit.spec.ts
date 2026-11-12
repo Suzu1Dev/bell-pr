@@ -72,7 +72,7 @@ async function readRules(api: APIRequestContext) {
 /** Opens the task dialog on the project with Learn by hand chosen and a task written. */
 async function openDialog(page: Page) {
   await page.goto("/#/home?locale=en");
-  await page.getByRole("button", { name: "New task" }).first().click();
+  await page.getByRole("button", { name: "New contribution" }).first().click();
   const dialog = page.getByRole("dialog");
   await dialog.locator("#task-repo").selectOption(repoId);
   await dialog.getByText(mode.hand).click();

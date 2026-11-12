@@ -34,7 +34,7 @@ export default {
     /** A run log line when a queued run starts again after a restart. */
     resumed: "The service restarted; this run is queued again.",
     /** A retry of a run that has no plan yet. */
-    retryPlanning: "Retrying the run: the lead plans the task again.",
+    retryPlanning: "Retrying the run: the Lead plans the task again.",
   },
   /** A run's working files on disk. */
   workspace: {
