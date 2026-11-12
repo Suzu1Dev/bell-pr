@@ -4,8 +4,6 @@ import type en from "../en/setup";
 
 const m: Translation<typeof en> = {
   checklist: {
-    title: "工作環境",
-    intro: `${product.name} 在這台電腦上需要的工具，以及缺少時的修正方式。`,
     recheck: "重新檢查",
     rechecking: "檢查中…",
     checking: "正在檢查你的工作環境…",
@@ -46,7 +44,7 @@ const m: Translation<typeof en> = {
     summaryReady: `${product.name} 需要的一切都已就緒。`,
     summaryNotReady: ({ count }) => `有 ${count} 個必要項目需要處理。`,
     summaryBlocked: ({ count }) =>
-      `可以開始使用，但還有 ${count} 個項目需要修正，否則有些步驟無法進行。`,
+      `可以開始使用；還有 ${count} 個項目修正後，所有步驟才能進行。`,
     summaryWarnings: ({ count }) => `已就緒，另有 ${count} 個項目值得留意。`,
     openDetails: "開啟工作環境設定",
   },
@@ -60,8 +58,7 @@ const m: Translation<typeof en> = {
     checking: "正在檢查你的工作環境…",
     provider: "這需要 AI 服務：請安裝並登入 Codex CLI、Claude Code 或 Antigravity CLI。",
     gh: "這需要已安裝並登入的 GitHub CLI。",
-    "git-identity": "這需要你的 Git 名字與電子郵件地址，每個提交都會帶有它們。",
-    unavailable: "修正之前無法使用。",
+    "git-identity": "這需要你的 Git 名字與電子郵件地址，每個 commit 都會帶有它們。",
     detail: ({ check, detail }) => `${check}：${detail}`,
   },
 };

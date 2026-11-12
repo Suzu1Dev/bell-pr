@@ -699,13 +699,20 @@ export function DraftGuidancePanel({
                   })}
                 </p>
               )}
-              <p className="draft-guidance-commit-why">
-                {rich(t.commit.why, {
-                  typeScope: <code>{t.commit.code.typeScope}</code>,
-                  subject: <code>{t.commit.code.subject}</code>,
-                  signOff: <code>{t.commit.code.signOff}</code>,
-                })}
-              </p>
+              <p className="draft-guidance-commit-why">{t.commit.note}</p>
+              <details className="draft-guidance-commit-why draft-checklist-why">
+                <summary>
+                  {rich(t.commit.whyTitle, {
+                    typeScope: <code>{t.commit.code.typeScope}</code>,
+                  })}
+                </summary>
+                <p>
+                  {rich(t.commit.why, {
+                    subject: <code>{t.commit.code.subject}</code>,
+                    signOff: <code>{t.commit.code.signOff}</code>,
+                  })}
+                </p>
+              </details>
             </div>
           )}
         </>

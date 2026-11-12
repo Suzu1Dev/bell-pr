@@ -36,7 +36,8 @@ import { assertSecretsHidden, redactSamples } from "./redact-samples.js";
 import { AppError } from "./types.js";
 import { Store } from "./store.js";
 import { sm, withLocale } from "./i18n/index.js";
-import { respondIn } from "./prompt-language.js";
+import { lengthHint, respondIn } from "./prompt-language.js";
+import type { Locale } from "../shared/i18n/locale.js";
 
 /** The JSON data object sent after the prompt sentences and before the Ponytail guidance. */
 function payload(input: string) {
@@ -68,6 +69,10 @@ const validAnalysis = () => ({
   ],
   howItFitsTogether:
     "README.md 描述的命令列用法最終輸出 hello.ts 匯出的常數；此取樣沒有看到其他模組引用它，呼叫方式屬於推論。",
+  flow: [
+    { label: "使用者執行工具", path: "", passes: "執行指令" },
+    { label: "輸出問候文字", path: "hello.ts", passes: "" },
+  ],
   evidence: [{ path: "README.md", note: "描述工具用途與執行方式" }],
   recommendations: [
     {
@@ -328,7 +333,11 @@ test("analysis uses bounded read-only structured Codex context and excludes secr
       assert.ok(schema.required.includes("recommendations"));
       assert.ok(schema.required.includes("readingPath"));
       assert.ok(schema.required.includes("howItFitsTogether"));
+      assert.ok(schema.required.includes("flow"));
+      assert.deepEqual(schema.properties.flow.items.required, ["label", "path", "passes"]);
       assert.match(options.input!, /readingPath lists 3–8 supplied files/);
+      assert.match(options.input!, /flow draws that same flow as 2–6 steps/);
+      assert.match(options.input!, /Output has only [^.]*howItFitsTogether, flow, evidence/);
       assert.match(options.input!, /Explicitly label inferences/);
       assert.match(options.input!, /untrusted DATA/);
       assert.match(options.input!, /BELL Ponytail efficiency guidance/);
@@ -392,7 +401,7 @@ test("analysis uses bounded read-only structured Codex context and excludes secr
   }
 });
 
-test("the analysis prompt asks for the request's language", async () => {
+test("the analysis prompt asks for the request's language and length units", async () => {
   const f = await fixture();
   try {
     const stub = fakeCodex();
@@ -415,10 +424,14 @@ test("the analysis prompt asks for the request's language", async () => {
     await withLocale("zh-TW", () => service.generate(f.repo.id));
     const chinese = prompts()[1];
     assert.ok(chinese.includes(respondIn("zh-TW")));
-    assert.equal(
-      english.replace(respondIn("en"), ""),
-      chinese.replace(respondIn("zh-TW"), ""),
-    );
+    assert.match(english, /label is a short name \(at most 4 words\)/);
+    assert.match(chinese, /label is a short name \(at most 12 Chinese characters\)/);
+    // Only the language and its length units differ.
+    const neutral = (prompt: string, locale: Locale) =>
+      prompt
+        .replace(respondIn(locale), "")
+        .replaceAll(lengthHint(locale, { words: 4, chars: 12 }), "");
+    assert.equal(neutral(english, "en"), neutral(chinese, "zh-TW"));
   } finally {
     await f.cleanup();
   }
@@ -681,7 +694,7 @@ test("cached analysis is stale after dirty content or HEAD changes, including ed
   }
 });
 
-test("a stale analysis whose base commit is unknown reports stale without a change listing, and caches without a reading path still load", async () => {
+test("a stale analysis whose base commit is unknown reports stale without a change listing, and caches without a reading path or flow still load", async () => {
   const f = await fixture();
   try {
     const service = new ProjectInsightsService(f.store, {
@@ -698,6 +711,7 @@ test("a stale analysis whose base commit is unknown reports stale without a chan
     cache.insights.baseSha = "0123456789abcdef0123456789abcdef01234567";
     delete cache.insights.readingPath;
     delete cache.insights.howItFitsTogether;
+    delete cache.insights.flow;
     await writeFile(cachePath, JSON.stringify(cache));
     await writeFile(
       path.join(f.repository, "hello.ts"),
@@ -706,7 +720,8 @@ test("a stale analysis whose base commit is unknown reports stale without a chan
     const result = await service.get(f.repo.id);
     const {
       readingPath: _readingPath,
-      howItFitsTogether: _flow,
+      howItFitsTogether: _prose,
+      flow: _flow,
       ...legacyInsights
     } = original.insights;
     assert.deepEqual(result, {
@@ -784,8 +799,15 @@ test("malformed AI output and nonexistent or sensitive evidence never replace ca
       command: fakeCodex().execute,
     });
     const saved = await first.generate(f.repo.id);
+    const { flow: _flow, ...withoutFlow } = validAnalysis();
+    const step = validAnalysis().flow[0];
     const responses: unknown[] = [
       { summary: "Missing required fields" },
+      // The agent schema requires the flow, at most six steps, each with a label.
+      withoutFlow,
+      { ...validAnalysis(), flow: Array.from({ length: 7 }, () => step) },
+      { ...validAnalysis(), flow: [{ ...step, label: " " }] },
+      { ...validAnalysis(), flow: [{ label: step.label, path: "" }] },
       {
         ...validAnalysis(),
         evidence: [{ path: "missing.ts", note: "Invented evidence" }],
@@ -1003,8 +1025,8 @@ test("recommendations whose quotes do not match are dropped and reported while t
         reasons: [
           /^引文在 hello\.ts 找不到：「Export const hello =」$/,
           /^引文在 hello\.ts 找不到：「export const hello ==」$/,
-          /^evidence 路徑 README\.md 缺對應引文$/,
-          /^引文路徑 README\.md 不在這項建議的 evidence 清單：「A command-line greeting tool\.」$/,
+          /^依據路徑 README\.md 缺對應引文$/,
+          /^引文路徑 README\.md 不在這項建議的依據清單：「A command-line greeting tool\.」$/,
         ],
       },
     ];
@@ -1180,6 +1202,15 @@ test("citations of tracked but unsampled files are kept, marked or dropped by fi
           { path: "hello.ts", why: "問候文字的來源。", lookFor: "匯出的常數。" },
           { path: "nope.ts", why: "不存在的檔案。", lookFor: "什麼都看不到。" },
         ],
+        // README.md and server/part-00.ts are tracked but no module; .env is sensitive.
+        flow: [
+          { label: "讀說明", path: "README.md", passes: "用法" },
+          { label: "前端入口", path: "src/App.tsx", passes: "請求" },
+          { label: "伺服器", path: "server/", passes: "呼叫" },
+          { label: "伺服器的一部分", path: "server/part-00.ts", passes: "設定" },
+          { label: "讀設定", path: ".env", passes: "回應" },
+          { label: "不存在的模組", path: "nope/thing.ts", passes: "" },
+        ],
         evidence: [
           { path: "README.md", note: "描述工具用途與執行方式" },
           { path: "hello.ts", note: "內容未讀，不能當依據" },
@@ -1208,6 +1239,16 @@ test("citations of tracked but unsampled files are kept, marked or dropped by fi
       { path: "hello.ts", why: "問候文字的來源。", lookFor: "匯出的常數。", sampled: false },
     ]);
     assert.deepEqual(insights.evidence, [{ path: "README.md", note: "描述工具用途與執行方式" }]);
+    // A sampled file and a file inside the kept server/ module keep their paths;
+    // a sensitive or invented path is kept as a step drawn outside the repository.
+    assert.deepEqual(insights.flow, [
+      { label: "讀說明", path: "README.md", passes: "用法" },
+      { label: "前端入口", path: "src/App.tsx", passes: "請求" },
+      { label: "伺服器", path: "server/", passes: "呼叫" },
+      { label: "伺服器的一部分", path: "server/part-00.ts", passes: "設定" },
+      { label: "讀設定", path: "", passes: "回應" },
+      { label: "不存在的模組", path: "", passes: "" },
+    ]);
     assert.deepEqual(insights.recommendations.map((entry) => entry.id), ["greeting-tests"]);
     assert.deepEqual(insights.verification, {
       droppedRecommendations: [
@@ -1642,6 +1683,8 @@ test("more recommendations request five new proposals per call, append atomicall
     const { recommendations: _old, ...originalOverview } = original;
     const { recommendations: _new, recommendationExpansion: _expansion, ...expandedOverview } = expanded;
     assert.deepEqual(expandedOverview, originalOverview);
+    assert.equal(original.flow?.length, 2);
+    assert.deepEqual(expanded.flow, original.flow);
     assert.deepEqual(expanded.sample, original.sample);
     assert.equal(expanded.sample?.sampledFiles, 2);
     assert.equal((await service.getSettings(f.repo.id)).outcome, "產出期間更新的偏好");

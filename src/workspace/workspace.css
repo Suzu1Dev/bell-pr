@@ -291,7 +291,7 @@
   }
 }
 
-/* "Take the check now" under the file list's heading; the check takes the
+/* "Explain it back now" under the file list's heading; the check takes the
    explanation's place while it is open (understanding.css styles the
    check itself). */
 .file-panel .check-link {

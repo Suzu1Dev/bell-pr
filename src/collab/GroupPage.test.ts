@@ -21,7 +21,7 @@ test("the answer is one box: nothing in the way, or who holds what", () => {
 
   const nothing = box(free);
   assert.deepEqual(boxes(nothing), ['class="split-info"']);
-  assert.match(nothing, /<p>Nothing in the way, in what BELL checked<\/p>/);
+  assert.match(nothing, /<p>No one holds these paths, as far as BELL PR checked<\/p>/);
   assert.match(nothing, updates);
 
   const another = box(held());
@@ -92,7 +92,7 @@ test("a selected prerequisite stays visible after its unfinished hold leaves the
 
 test("where group work is off the page says how to start it", () => {
   const html = renderEn(createElement(GroupPage, { status: { codex: true, github: true } }));
-  assert.match(html, /<h1[^>]*>Who holds what\?<\/h1>/);
+  assert.match(html, /<h1[^>]*>Who holds which paths\?<\/h1>/);
   assert.match(html, /<h2>Group work is off for this BELL PR\.<\/h2>/);
   assert.ok(html.includes("bell-pr start --group"));
   assertNoHan(html);

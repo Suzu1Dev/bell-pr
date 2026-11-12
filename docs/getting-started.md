@@ -21,21 +21,28 @@ You need:
 - **The GitHub CLI** (`gh`), signed in with `gh auth login`, to import from
   GitHub, publish pull requests and find projects
   ([cli.github.com](https://cli.github.com/)).
-  To check, run `gh auth status`. Tokens in your system keyring are not covered:
+  To check, run `gh auth status`. Tokens in your system keyring
+  ([where `gh` stores them](https://cli.github.com/manual/gh_auth_login)) are not covered:
   the agent can still read your GitHub token via `gh auth token`. Your main
   protection is a fine-grained token with the minimum permissions you need.
+  [GitHub documents](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens#personal-access-tokens-classic)
+  that only classic personal access tokens have write access to public
+  repositories that you or your organizations do not own. If publishing fails
+  with a fine-grained token, use a classic token.
 - **An AI coding CLI**, installed and signed in, as the same user that runs
   BELL PR. Either one is enough:
   - the Codex CLI: `npm install -g @openai/codex`, then `codex login`.
     BELL PR uses the Codex CLI you installed and signed in to. Usage counts
     against your own account.
-  - Claude Code: `npm install -g @anthropic-ai/claude-code`, then
+  - [Claude Code](https://code.claude.com/docs/en/setup): `npm install -g @anthropic-ai/claude-code`, then
     `claude auth login`. BELL PR uses the Claude Code CLI you installed and
     signed in to (Claude plan or Anthropic API key). Usage counts against
     your own account.
 - **On Linux, bubblewrap and socat**, so Claude Code agents that edit files
-  run in the operating-system sandbox (`sudo apt-get install bubblewrap
-  socat` on Debian and Ubuntu). macOS has its sandbox built in.
+  run in the
+  [operating-system sandbox](https://code.claude.com/docs/en/sandboxing#set-up-linux-and-wsl2)
+  (`sudo apt-get install bubblewrap socat` on Debian and Ubuntu). macOS has
+  its sandbox built in.
 
 BELL PR runs on macOS and Linux. Windows uses WSL2, with every tool above
 installed and signed in inside the same distribution; native Windows is not
@@ -129,9 +136,9 @@ The first time you open BELL PR, a short Welcome takes you through:
 2. **Environment**: the same check as `bell-pr doctor`, with a copy button
    for every fix command. You can continue and fix the rest later in
    **Settings → Environment**.
-3. **AI provider**: if one agent CLI is ready, your agents use it; if both
-   are, you choose. You can change it later in the model settings.
-4. **Get started**: take the sample tour, import a repository, or find a
+3. **AI provider**: if one agent CLI is ready, your agents use it; if more
+   than one is, you choose. You can change it later in **Settings → AI provider**.
+4. **Get started**: take the sample tour, import a project, or find a
    project to contribute to.
 
 ## Try the sample project
@@ -146,7 +153,7 @@ your browser.
 Open it from Home (**Try the sample project**) or from **Sample** in the
 sidebar.
 
-## 1. Import a repository
+## 1. Import a project
 
 On **Repositories**, import a project in any of these forms:
 
@@ -193,7 +200,9 @@ ever counted as a pass.
 
 Open the project and choose **Analyze the project**. An agent reads a
 sample of the source code, read-only, and writes what the project does,
-who uses it, how its parts fit together and where to start reading. It
+who uses it, how its parts fit together and where to start reading. When
+the Agent traces a main flow through the modules, it is also drawn as a
+diagram, step by step, with that prose as its caption. It
 also suggests up to five contribution directions. Each one quotes the code
 or documents it is based on, and BELL PR checks that every quote really is
 in the files the agent read; a recommendation whose quotes do not match is
@@ -204,11 +213,11 @@ code changes, the analysis is marked out of date; analyze again to
 refresh it.
 
 While it runs, the page lists its steps and shows how long the agent has
-worked against the longest it will wait, with any notice from the CLI, such
-as a retry or a rate limit. The bar fills with that time, not with how much
-work is left, and only moves while no try is being timed, such as while
-the files are read or before it tries again. **Generate 5 more** shows the
-same.
+worked against the step's time limit, with any notice from the CLI, such
+as a retry or a rate limit. The bar shows that time, not how much of the
+work is done. When a step has no time limit to show, such as while the
+files are read or before it tries again, the bar only moves.
+**Generate 5 more** shows the same.
 
 ## 3. Choose a direction
 
@@ -245,14 +254,14 @@ practise locally. For an issue labelled for newcomers, the dialog also
 explains why such issues are best written by hand.
 
 The same form sets the team size (2 to 4 teammates), whether you approve
-the plan before development, and the efficiency mode. The agent, model and
+the plan before development, and the efficiency mode. The AI provider, model and
 reasoning effort are shared by every project; each run records the ones it
 started with.
 
 ## 4. Let the agent team work
 
 Start the run with **Generate the team plan** (with plan approval) or
-**Start the agent team**. Everything happens in **Agent activity**:
+**Start the Agent team**. Everything happens in **Activity**:
 
 - The **Lead** splits the work into tasks, each with the files it may
   change and what it depends on. Before it plans, it checks any
@@ -270,10 +279,10 @@ Start the run with **Generate the team plan** (with plan approval) or
   shares, and each task that touches those files says **Also changed in**
   and names them. This counts contributions in progress, in review or
   approved (their plan while it is still to be carried out, and what their
-  working copy changed), and ones with a pull request for what it changes,
+  working directory changed), and ones with a pull request for what it changes,
   until their change to a file is in this run's base commit, also after a
   squash merge. A pull request you read as merged or closed (**Read
-  feedback**) no longer counts, nor does a contribution whose working copy
+  feedback**) no longer counts, nor does a contribution whose working directory
   was removed before it was published. The parts of one split never count
   against each other or the original, and an original that was split counts
   only for the files none of its parts holds.
@@ -284,8 +293,8 @@ Start the run with **Generate the team plan** (with plan approval) or
   started without plan approval waits for your approval instead, also after
   **Stop** and a retry. A Learn by hand plan's files are checked the same
   way at **This is my plan**. BELL PR only reads its own records and
-  working copies for this, without changing them; nothing is saved or
-  sent, and the temporary copy of a working copy's Git index it reads
+  working directories for this, without changing them; nothing is saved or
+  sent, and the temporary copy of a working directory's Git index it reads
   through is deleted right after.
 - A file scope the Lead writes without a trailing `/` that is a directory
   in the base commit, such as `src`, is read as `src/`, so it covers the
@@ -302,17 +311,17 @@ Start the run with **Generate the team plan** (with plan approval) or
   the overall conclusion; the Reviewer opens by saying whether it agrees
   and adds only what the summary lacks, and the Test analyst keeps the one
   list of checks still to run.
-- With the default **Working directory (default)** access, agents are told not to change
+- With **Working directory access (default)**, agents are told not to change
   your machine: no `sudo`, no global or
   user-level installs. When a check needs something the machine lacks, the
-  teammate reports it, and **Overview & motivation** lists it under "Setup
-  this machine needs from you" with a suggested command and who reported
+  teammate reports it, and **Overview** lists it under "Setup
+  this computer needs from you" with a suggested command and who reported
   it. Check the command against the project's documentation before you run
-  it; the checklist itself never runs a command. Explicit **Full access** in the model
-  settings lets writable agents install required tools and use available sudo
-  privileges outside the checkout. Read the [access settings](security-model.md#explicit-full-access)
+  it; the checklist itself never runs a command. Explicit **Full access** under
+  **Settings → AI provider** lets writable agents install required tools and use available sudo
+  privileges outside the working directory. Read the [access settings](security-model.md#explicit-full-access)
   before enabling it; read-only roles keep their restrictions. On a Full
-  access run in review or approved, **Let the agent set this up** opens the commands for
+  access run in review or approved, **Let the Agent set this up** opens the commands for
   you to tick and confirm, at most 10 per turn, then hands them to one
   Collaborate turn, which runs without the sandbox and with your account.
   The agent is told to run only the ticked commands that match the
@@ -339,14 +348,14 @@ layout from before you entered it.
 
 Before publishing an agent contribution, the **Collaborate** tab lets you ask
 an agent to finish missing checks, add tests or fix failures in the run's working
-copy. The draft's Limitations shortcut fills the message box for you to review
-and send. The setup checklist's **Let the agent set this up** (Full access runs
+directory. The draft's Limitations shortcut fills the message box for you to review
+and send. The setup checklist's **Let the Agent set this up** (Full access runs
 only) starts its turn once you confirm the commands; the agent is told not to
 change code in that turn, and when the turn finishes, its per-item results
 appear in the conversation and on the checklist. Each message starts a fresh agent call with recent conversation and
 the existing reports as context; it uses your own CLI account.
 
-The conversation lists changed files, commands BELL actually observed, checks
+The conversation lists changed files, commands that actually ran, checks
 the agent says it did not run, and any questions or missing setup. A command's
 exit status alone does not establish that a test was meaningful. A changed file
 loses its review mark and gets fresh explanations, and an approved contribution
@@ -375,7 +384,8 @@ When the team is done, the run waits for your review in **Code changes**:
 - Beside it, an **explanation** of the file in plain language: a concrete
   example of the behavior before and after, what changed and why, the
   concepts involved, what to check, another way it could have been done and
-  a question to test yourself.
+  a question to test yourself. When the example is a sequence, its before
+  and after are also drawn as steps, with the steps that differ marked.
 - **Ask**: click a line (Shift for several) and ask the agent about it.
   Answers are saved with the run.
 - **Reviews**: the Lead's summary and the Reviewer's and Test analyst's
@@ -387,11 +397,11 @@ When the team is done, the run waits for your review in **Code changes**:
   way to see it and a question to check yourself. A function the change adds whole has no
   earlier version to walk through, so it points to the explanation
   instead. Walkthroughs are written one file at a time, the selected file
-  first, and are kept for that version of the diff. The walkthrough's
-  question is a hint: click it to see its answer. Unlike the
-  explanation's "Quiz yourself", it does not ask for your answer first,
-  nothing is recorded, and it does not count toward the understanding
-  check.
+  first, and are kept for that version of the diff. Each
+  part's "Check yourself" question works like the explanation's "Quiz
+  yourself" (see **Try first** below): it asks for your answer before it
+  shows one, and in an Agent run a graded answer can count toward the
+  understanding check. In a Learn by hand run it counts toward nothing.
 - **Unchanged code**: the bar between two changes says how many unchanged
   lines it hides; show 20 more above or below, or all of them, and
   **Whole file** shows the whole file between the changes. The lines are
@@ -418,7 +428,7 @@ counts toward the understanding check, so you are not asked it twice.
 Very small files (lockfiles, generated files, whitespace-only changes and
 tiny docs edits) get no prompts; in Python, YAML, Makefiles and other
 files where indentation is syntax, a changed indent counts as a real
-change. **Settings → Learning → Try-first prompts during review** turns
+change. **Settings → Learning → Ask me to answer before the answers show** turns
 the prompts off; the answers then sit behind a plain reveal button.
 
 You can also change the code yourself: edit the files in the run's folder
@@ -429,7 +439,7 @@ explanations and need another review.
 Explanations and answers come from an AI and can be wrong. Check them
 against the code.
 
-**Overview & motivation** leads with this contribution's brief: the premise
+**Overview** leads with this contribution's brief: the premise
 check, the problem and the motivation, before and after, and how to
 validate it, in Markdown as written. The project's analysis follows as its
 background in an expandable section, together with other contribution
@@ -441,8 +451,8 @@ explanations you have not answered from yet.
 ## 6. Explain it back
 
 When every file is marked Reviewed, the footer's button reads **Explain it
-back**. It opens a short check next to the diff; **Take the check now** in
-the Changes header opens it earlier if you want to test yourself first
+back**. It opens a short check next to the diff; **Explain it back now** in
+the Code changes header opens it earlier if you want to test yourself first
 (the Reviewed ticks are still required). While it is open the check is
 closed book: the explanations, notes and questions to the agent are
 hidden, and the diff and the file list stay. A maintainer will ask you
@@ -548,13 +558,13 @@ one issue, the split dialog says so. It names each file whose tasks cite more
 than one issue, because BELL PR cannot separate fixes inside a file: split
 those by hand or keep them together. When an issue is in no such file, it
 says that the plan links the tasks, and you can move a fix's files apart.
-**Split into contributions** on the Draft tab, beside
+**Split into contributions** on the PR draft tab, beside
 **Ask how to split it**, turns the parts into separate contributions: 2 to
 8 contributions, each with a title of up to 120 characters and 1 to 150
 files. A file goes to one new contribution or is left out of them all, and
 stays in the original. BELL PR does not cut a file into hunks, so a file
 that two fixes both touch cannot be separated. Each new contribution gets
-its own branch and working copy at the same base commit and target branch
+its own branch and working directory at the same base commit and target branch
 as the original, with its files as they are now (your hand edits included),
 the plan tasks that changed them, and the explanations, walkthroughs, notes
 and review marks for those files. It does not carry over the original's pull
@@ -565,7 +575,7 @@ a banner asks you to publish the parts instead. Files BELL PR holds back from
 review (binary, sensitive, containing a secret, or symbolic links) cannot be
 moved; they can only be left out. The split is offered for a run in review
 or approved that is not published, is not a Learn-by-hand run and still has
-its working copy; it is not offered on the sample run. Conflicts a sync left
+its working directory; it is not offered on the sample run. Conflicts a sync left
 must be resolved before the split, as before approval. BELL PR cannot check
 that a part works on its own, because one part's tests may need another
 part, so run each part's tests. When a plan task of one part depends on a
@@ -577,13 +587,13 @@ commit. Deleting a part removes it from the parts that build on it, and
 splitting a part again passes what it builds on to its new parts; deleting
 those new parts makes the parts that built on them build on that part again.
 
-**The maintainer checklist** shows, row by row, the project's rules,
+The **Before you publish** checklist shows, row by row, the project's rules,
 whether pull requests are open to you, the linked issue, your pace in this
 repository, your own words, reviewability, disclosing AI help and the
 understanding check, together with file review and draft-saving status.
 Unfinished, blocked and unknown items stay visible. Completed checks are
 collapsed, with separate counts for passed and turned-off checks. Sources and
-explanations can be expanded. **View publishing checklist** jumps there from
+explanations can be expanded. **Go to “Before you publish”** jumps there from
 the editor. Commit messages and branch names are under **Commit message and
 branch**.
 
@@ -596,7 +606,7 @@ it or you turn the note on; when the project requires a disclosure,
 publishing waits until the description has one.
 
 Once every file is reviewed and you explained the change back, choose
-**Approve and prepare the PR**. The last dialog shows the branch and the
+**Approve and preview the PR**. The last dialog shows the branch and the
 exact description GitHub will receive, and under **Before it reaches the
 maintainers** it lists the checks grouped by topic: Couldn't check, the
 project's rules, the issue, your pace here, your words and reviewability,
@@ -618,17 +628,17 @@ and safety. When the dialog opens, BELL PR reads the GitHub facts once.
   hard to review, your pace in this repository, or a fact BELL PR
   **couldn't check**. An unknown fact is never counted as a pass.
 
-**Submit Draft PR** reads the GitHub facts again, then pushes the branch
+**Publish Draft PR** reads the GitHub facts again, then pushes the branch
 (to a fork under your account when you cannot push to the project) and
 opens a Draft PR. Nothing is ever force-pushed.
 
 If a failed attempt left a local commit and you then changed the files or
 commit message, save the draft and choose **Recover unfinished publish** on
-the Draft tab. This is available only when that attempt stopped before
+the PR draft tab. This is available only when that attempt stopped before
 pushing began. BELL PR checks the project and your fork for matching branches
 and PRs, including closed PRs. If those checks succeed and find none, it
 keeps your files and draft, backs up the old commit locally and returns the
-contribution to review. Review and approve again before submitting. Recovery
+contribution to review. Review and approve again before publishing. Recovery
 does not publish anything; if a branch or PR exists, or the checks cannot
 finish, it leaves the contribution unchanged. After a later publish succeeds,
 or when the run is removed, that backup is deleted only if the commit is
@@ -640,7 +650,7 @@ If it may be the only copy, it stays.
 - **Sync to the latest target branch** when the project moved on: BELL PR
   merges the latest target branch into your work (for a published PR, as
   one merge commit). Files the target branch changed need another review.
-  Conflicts can be resolved by hand or with **Ask the agent to resolve the
+  Conflicts can be resolved by hand or with **Ask the Agent to resolve the
   conflicts**; an unpublished run's sync can be undone.
 - **Maintainer feedback**: **Read feedback** reads the reviews, comments
   and CI results of your PR once, when you press it, and shows them file
@@ -651,7 +661,7 @@ If it may be the only copy, it stays.
   the understanding check sits beside the maintainers' own comments. Tag
   each comment with what it raised and whether you **Saw it coming** or it
   **Surprised me**; a surprise asks for one "Lesson for next time" and goes
-  to your practice deck. The outcome line states facts only, such as
+  to **Practice**. The outcome line states facts only, such as
   "Merged" or "No response yet".
 - **Follow-up rounds**: tick the comments you want handled and, for
   each one, write in your own words what the maintainer is asking for (at
@@ -659,7 +669,7 @@ If it may be the only copy, it stays.
   maintainer's comment only as context, then changes the code. You review
   each file, explain the round back (while the understanding check is on),
   and push the round as one new commit to the same PR.
-- **Choose which changes to read**: the Changes tab defaults to the current
+- **Choose which changes to read**: the Code changes tab defaults to the current
   feedback round, compared with the previous PR head. Files unchanged in
   that round do not need another review, and reverting an earlier edit or
   deleting a file added in the PR appears in this round's diff. The selector in the code toolbar

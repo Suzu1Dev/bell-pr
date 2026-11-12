@@ -49,7 +49,7 @@ test("when sudo is passwordless through another rule, the panel says BELL will n
 });
 
 test("a machine without sudo, a failed status read, and a refused change each say what happened", () => {
-  assert.match(render({ status: { ...needsPassword, available: false } }), /這台機器沒有 sudo 指令/);
+  assert.match(render({ status: { ...needsPassword, available: false } }), /這台電腦沒有 sudo 指令/);
   assert.match(render({ status: undefined, loadError: "連線失敗" }), /無法讀取 sudo 狀態：連線失敗/);
   const refused = render({ error: "密碼不正確；再輸錯 2 次會暫停 15 分鐘。" });
   assert.match(refused, /role="alert"[^>]*>密碼不正確；再輸錯 2 次會暫停 15 分鐘。/);

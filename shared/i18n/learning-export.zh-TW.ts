@@ -9,7 +9,7 @@ const fmt = formatters("zh-TW");
 const messages: Translation<typeof en> = {
   title: ({ title }) => `# 學習紀錄：${title}`,
   disclaimer:
-    "> 本紀錄的解說、問答中的回答與審查內容由 agent 產生，可能有誤；標示為「你的」的部分是你自己寫的。程式碼與結論仍需自行驗證。",
+    "> 本紀錄的解說、問答中的回答與審查內容由 Agent 產生，可能有誤；標示為「你的」的部分是你自己寫的。程式碼與結論仍需自行驗證。",
   repository: ({ fullName }) => `- Repository：${fullName}`,
   branch: ({ branch, baseBranch }) => `- 分支：${branch} → ${baseBranch}`,
   createdAt: ({ createdAt }) => `- 建立時間：${createdAt}`,
@@ -28,13 +28,22 @@ const messages: Translation<typeof en> = {
     feedbackTags: "你標記的維護者回饋",
     overrides: "你略過的檢查與理由",
   },
-  noPullRequest: "尚未送出 PR。",
+  noPullRequest: "尚未發布 PR。",
   noExplanations: "尚未產生解說。",
   explanationStatus: ({ status }) => `解說狀態：${status}`,
   explanationStatusWithError: ({ status, error }) =>
     `解說狀態：${status}（${error}）`,
-  example: ({ scenario, before, after }) =>
-    `**白話文舉例**\n\n- 情境：${scenario}\n- 修改前：${before}\n- 修改後：${after}`,
+  example: ({ scenario, before, after, beforeSteps = [], afterSteps = [] }) => {
+    const chain = (steps: typeof beforeSteps) =>
+      steps
+        .map((step) => (step.changed ? `${step.label}（不同）` : step.label))
+        .join(" → ");
+    const steps =
+      beforeSteps.length && afterSteps.length
+        ? `\n- 修改前的步驟：${chain(beforeSteps)}\n- 修改後的步驟：${chain(afterSteps)}`
+        : "";
+    return `**白話文舉例**\n\n- 情境：${scenario}\n- 修改前：${before}\n- 修改後：${after}${steps}`;
+  },
   fields: {
     summary: "改了什麼",
     reason: "為什麼改",
@@ -101,7 +110,7 @@ export default messages;
 export const byHand: Translation<typeof enByHand> = {
   title: "親手學",
   claim: `${product.name} 的 agent 沒有寫入權限，也沒有給你這份變更的任何程式碼。`,
-  withdrawn: `${product.name} 在這個工作裡看到 agent 修改過檔案，所以不為它做親手學的聲明。`,
+  withdrawn: `${product.name} 在這個任務裡看到 Agent 修改過檔案，所以不為它做親手學的聲明。`,
   fitted: ({ kinds }) => `開始時就配合了專案的規範：嚮導只提供${kinds}。`,
   helps: ({ helps }) => `- 嚮導的協助：${helps}`,
   predictions: ({ right, judged, unsure }) => `- 每次修改後的第一個預測，${judged} 次中對了 ${right} 次；不確定 ${unsure} 次`,

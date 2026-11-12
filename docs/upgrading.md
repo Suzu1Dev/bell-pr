@@ -33,7 +33,7 @@ cp -a ~/.bellpr ~/bellpr-backup-$(date +%Y%m%d)
 ```
 
 Copy all of it: the run records in `state.json` point at the clones and
-working copies next to them, which hold changes that exist nowhere else
+working directories next to them, which hold changes that exist nowhere else
 yet. Restore a backup to the **same path**: `state.json` and Git's
 worktree records contain absolute paths, so a data directory moved to
 another path or another computer does not work as it is. BELL PR also

@@ -7,9 +7,8 @@ const fmt = formatters("zh-TW");
 const number = (value: number) => fmt.number(value);
 
 const m: Translation<typeof en> = {
-  eyebrow: "設定",
-  title: "讓工作環境準備就緒。",
-  intro: "語言、AI 服務、Agent 安全、學習、上限與資料。這裡的設定都只保留在這台電腦上。",
+  title: "設定",
+  intro: "這裡的設定都只保留在這台電腦上。",
   nav: { label: "設定分類" },
   sections: {
     general: "一般",
@@ -58,32 +57,32 @@ const m: Translation<typeof en> = {
     },
     language: {
       title: "語言",
-      text: "介面的語言，也是之後新的貢獻、專案分析與問答使用的語言；已開始的貢獻沿用開始時的語言，已經產生的內容不會翻譯。",
+      text: "介面與之後新的貢獻、專案分析、問答都使用這個語言。已開始的貢獻沿用原本的語言。已經產生的內容不會翻譯。",
       label: "語言",
     },
     sample: {
-      title: "範例專案",
-      text: "範例專案用範例資料走過一次完整的貢獻，不需要任何工具或帳號就能試用每個步驟。",
-      show: "顯示範例專案",
-      showHelp: "開始你自己的貢獻後，範例仍留在側邊欄。關閉時，你有自己的貢獻後範例就會隱藏。",
-      reset: "重設範例專案",
-      resetHelp: "清除這個瀏覽器中範例專案的審閱進度、草稿與方向設定。",
-      resetConfirm: "要讓範例專案從頭開始嗎？這個瀏覽器中的範例進度會被清除，頁面會重新載入。",
+      title: "示範專案",
+      text: "示範專案用示範資料走過一次完整的貢獻，不需要任何工具或帳號就能試用每個步驟。",
+      show: "顯示示範專案",
+      showHelp: "開始你自己的貢獻後，示範專案仍留在側邊欄。關閉時，你有自己的貢獻後示範專案就會隱藏。",
+      reset: "重設示範專案",
+      resetHelp: "清除這個瀏覽器中示範專案的審閱進度、草稿與方向設定。",
+      resetConfirm: "要讓示範專案從頭開始嗎？這個瀏覽器中的示範進度會被清除，頁面會重新載入。",
       resetYes: "重設並重新載入",
-      resetFailed: "這個瀏覽器不允許清除範例專案的進度。",
+      resetFailed: "這個瀏覽器不允許清除示範專案的進度。",
     },
   },
   provider: {
     title: "AI 服務",
     intro: "Agent 透過這台電腦上的 AI 程式開發 CLI 工作：已安裝並登入的 Codex CLI、Claude Code 或 Antigravity CLI。",
-    needOne: "你至少需要一個 AI 服務。請安裝並登入 Codex CLI、Claude Code 或 Antigravity CLI，指令列在下方。",
+    needOne: "你至少需要一個 AI 服務。請安裝並登入其中一個，指令列在下方。",
     readyWith: ({ providers }) => `已可使用 ${fmt.list(providers)}。`,
     description: {
-      codex: "使用你已安裝並登入的 Codex CLI，用量計入你自己的帳戶。",
+      codex: "使用你已安裝並登入的 Codex CLI。用量計入你自己的帳號。",
       claude:
-        "使用你已安裝並登入的 Claude Code CLI（Claude 方案或 Anthropic API 金鑰），用量計入你自己的帳戶。",
+        "使用你已安裝並登入的 Claude Code CLI（Claude 方案或 Anthropic API 金鑰）。用量計入你自己的帳號。",
       antigravity:
-        "使用你已安裝並登入的 Antigravity CLI（agy；Google 帳號、Gemini API 金鑰或 Google Cloud 憑證），用量計入你自己的帳戶。",
+        "使用你已安裝並登入的 Antigravity CLI（agy；Google 帳號、Gemini API 金鑰或 Google Cloud 憑證）。用量計入你自己的帳號。",
     },
     fixesTitle: "請執行以下指令完成設定：",
     models: {
@@ -98,8 +97,7 @@ const m: Translation<typeof en> = {
     title: "Agent 安全",
     intro: "Agent 會在這台電腦上執行專案的程式碼，這些設定決定它們能接觸到哪些東西。",
     sandbox: {
-      title: "Claude Code 沙箱",
-      text: "會修改檔案的 Claude Code Agent 在作業系統沙箱裡執行每個指令：寫入只限於該工作的 checkout 與 Claude Code 的暫存資料夾，網路也是關閉的。你自己的 Claude Code 使用者設定可能放寬沙箱（proxy 連接埠、允許的網域或路徑、排除的指令、外掛的語言伺服器）。Codex CLI 使用它自己的沙箱。會修改檔案的 Antigravity Agent 在 Antigravity CLI 的終端機沙箱裡執行指令，寫入限於 checkout，網路也是關閉的。",
+      text: "會修改檔案的 Claude Code Agent 在作業系統沙箱裡執行每個指令。寫入只限於該工作的工作目錄與 Claude Code 的暫存資料夾。網路是關閉的。你自己的 Claude Code 使用者設定可能放寬沙箱（proxy 連接埠、允許的網域或路徑、排除的指令、外掛的語言伺服器）。Codex CLI 使用它自己的沙箱。會修改檔案的 Antigravity Agent 在 Antigravity CLI 的終端機沙箱裡執行指令。寫入只限於工作目錄。網路是關閉的。",
     },
     unsandboxed: {
       label: "允許 Claude Code 與 Antigravity Agent 在沙箱外執行",
@@ -107,7 +105,7 @@ const m: Translation<typeof en> = {
       confirmTitle: "要允許 Agent 在沙箱外執行嗎？",
       confirmText:
         "沙箱無法使用時，會修改檔案的 Claude Code 與 Antigravity Agent 將在沙箱外執行，因此能讀取與修改你的使用者帳號可以存取的一切，例如其他專案、你的 SSH 金鑰與各個工具的登入資訊。請只對你信任的專案這樣做。",
-      confirmBadge: "只要有 Agent 在沙箱外工作過，該工作在工作區會帶有標記，紀錄中也會註明。",
+      confirmBadge: "只要有 Agent 在沙箱外工作過，該工作在貢獻工作台會帶有標記，紀錄中也會註明。",
       confirm: "允許在沙箱外執行",
       cancel: "維持使用沙箱",
     },
@@ -126,7 +124,7 @@ const m: Translation<typeof en> = {
   },
   learning: {
     title: "學習",
-    intro: `${product.name} 如何在你核准之前請你確認自己理解變更，以及審查時如何請你先想一想。`,
+    intro: `${product.name} 如何在你核准之前請你確認自己理解變更，以及審閱時如何請你先想一想。`,
     check: {
       title: "理解檢查",
       text: "核准 pull request 之前，你要用自己的話講一遍這個變更、回答幾個相關問題，並自己對照參考答案評分。不會有 AI 模型替你評分。",
@@ -137,10 +135,10 @@ const m: Translation<typeof en> = {
       confirmTitle: "不用自己的話講一遍就核准？",
       confirmLost: "你將可以核准一個自己沒有講解過的 pull request。",
       confirmKept:
-        "每個檔案仍須審閱，pull request 仍由你親自核准，專案規則、issue 與發佈節奏的檢查也都照常進行。",
+        "每個檔案仍須審閱，pull request 仍由你親自核准，專案規則、issue 與發布節奏的檢查也都照常進行。",
       confirmRecorded:
-        "沒有經過檢查就核准的任務會永久標記為「檢查已關閉」：在工作區、你的學習紀錄與匯出檔中都看得到。",
-      confirmBack: "你隨時可以重新開啟；屆時已核准的任務在發佈前也必須先通過檢查。",
+        "沒有經過檢查就核准的任務會永久標記為「檢查已關閉」：在貢獻工作台、你的學習紀錄與匯出檔中都看得到。",
+      confirmBack: "你隨時可以重新開啟；屆時已核准的任務在發布前也必須先通過檢查。",
       keep: "保留檢查",
       turnOff: "關閉檢查",
     },
@@ -152,28 +150,28 @@ const m: Translation<typeof en> = {
     },
     tryFirst: {
       title: "先試著答",
-      label: "審查時先試著答",
-      help: "預設開啟：每個檔案的解說會先請你回答它的問題、猜猜另一種改法，程式碼解說也會先請你回答每段的「考考自己」，再顯示答案與其他做法。關閉後，它們會收在單純的顯示按鈕或摺疊後面，不需要填寫。",
+      label: "先請我作答，再顯示答案",
+      help: "預設開啟。你先作答：每個檔案的問題、猜猜另一種改法，以及程式碼解說裡每段的「考考自己」。之後才顯示答案與其他做法。關閉後，它們會收在單純的顯示按鈕或摺疊後面，不需要填寫。",
     },
   },
   performance: {
     title: "效能",
     intro: "同時進行多少工作，以及單次 Agent 回合最多能花多久。",
     maxActiveRuns: {
-      label: "同時執行的工作數",
+      label: "同時執行的任務數",
       help: "1 到 8。超過上限的工作會排隊等待。",
     },
     maxAgentProcesses: {
       label: "同時執行的 Agent CLI 行程數",
-      help: "1 到 32。每位 teammate、Reviewer 與 Test analyst 各需要一個，所有工作、專案分析與探索共用。",
+      help: "1 到 32。每位隊友、Reviewer 與 Test analyst 各需要一個，所有工作、專案分析與探索共用。",
     },
     agentTimeoutScale: {
       label: "Agent 逾時倍數",
       help: "0.5 到 10。大型專案或較高的思考強度逾時時，請調高它。",
     },
-    queue: ({ count }) => `執行中、排隊中與等待確認計畫的工作合計最多 ${number(count)} 個。`,
+    queue: ({ count }) => `執行中、排隊中與等待核准計畫的工作合計最多 ${number(count)} 個。`,
     usage:
-      "同時執行多個 Agent 會更快消耗你在服務提供者的帳戶用量。在個人 Claude 方案上大量平行使用，可能超出該方案預期的個人使用範圍。",
+      "同時執行多個 Agent 會更快消耗你在服務提供者的帳號用量。在個人 Claude 方案上大量平行使用，可能超出該方案預期的個人使用範圍。",
     save: "儲存上限",
     saved: "上限已儲存。",
     invalid: ({ min, max }) => `請輸入 ${number(min)} 到 ${number(max)} 之間的數字。`,
@@ -189,23 +187,23 @@ const m: Translation<typeof en> = {
     },
     advanced: {
       summary: "進階：環境變數",
-      text: `${product.name} 啟動前設定的環境變數優先於這裡的設定，該設定會顯示為由環境設定。修改後請重新啟動 ${product.name}。`,
+      text: `${product.name} 啟動前設定的環境變數優先於這裡的設定。該設定會顯示為由環境設定。修改後請重新啟動 ${product.name}。`,
       documentation: "詳見說明文件。",
       variables: {
         BELLPR_DATA_DIR: "資料目錄的位置（也可用 --data-dir）。預設是家目錄中的 .bellpr 資料夾。",
-        BELLPR_MAX_ACTIVE_RUNS: "同時執行的工作數：1 到 8，預設 2。",
+        BELLPR_MAX_ACTIVE_RUNS: "同時執行的任務數：1 到 8，預設 2。",
         BELLPR_MAX_AGENT_PROCESSES: "同時執行的 Agent CLI 行程數：1 到 32，預設 3。",
         BELLPR_AGENT_TIMEOUT_SCALE: "Agent 逾時倍數：0.5 到 10，預設 1。",
         BELLPR_ALLOW_UNSANDBOXED_AGENTS: "設為 1 允許 Claude Code 與 Antigravity Agent 在沙箱外執行。",
         BELLPR_REQUIRE_UNDERSTANDING_CHECK: "設為 1 會保持理解檢查開啟並鎖定這項設定。沒有任何值能關閉它。",
         BELLPR_RETENTION_DAYS: "保留已停止與失敗工作檔案的天數：1 到 365，預設 14。",
-        BELLPR_LOG_LEVEL: "伺服器紀錄的詳細程度：debug、info（預設）、warn 或 error。",
+        BELLPR_LOG_LEVEL: "伺服器記錄的詳細程度：debug、info（預設）、warn 或 error。",
       },
     },
   },
   data: {
     title: "資料與隱私",
-    intro: `${product.name} 把所有資料保存在這台電腦上的一個資料目錄。沒有 ${product.name} 雲端，也沒有遙測。`,
+    intro: `${product.name} 把所有資料保存在這台電腦上的一個資料目錄。`,
     dataDir: {
       title: "資料目錄",
       copyLabel: "複製資料目錄的路徑",
@@ -221,9 +219,9 @@ const m: Translation<typeof en> = {
       analyses: "專案分析",
       logs: "紀錄",
       runs: "工作的檔案",
-      runsHelp: "每個工作的工作副本與 teammates 的 checkout。釋放空間後，工作的紀錄、報告與筆記都會保留。",
-      published: "已發佈的工作",
-      publishedHelp: "已發佈的工作會保留 checkout，因為後續修改回合與同步需要它。不再需要時再釋放。",
+      runsHelp: "每個工作的工作目錄與隊友的獨立工作目錄。釋放空間後，工作的紀錄、報告與筆記都會保留。",
+      published: "已發布的工作",
+      publishedHelp: "已發布的工作會保留工作目錄，因為之後每一輪修正與同步都需要它。不再需要時再釋放。",
       others: "其他工作",
       noRuns: "沒有任何工作在磁碟上留有檔案。",
       runMeta: ({ status, date }) => `${status} · ${date}`,
@@ -231,15 +229,15 @@ const m: Translation<typeof en> = {
       freeLabel: ({ title }) => `釋放「${title}」的空間`,
       freeing: "釋放中…",
       freed: ({ size }) => `已釋放 ${size}。`,
-      confirmFree: "要釋放這個工作的檔案嗎？之後就無法在這裡審閱或發佈它的變更。",
-      confirmPublished: "要釋放這個已發佈工作的 checkout 嗎？之後它就無法進行後續修改回合與同步。",
+      confirmFree: "要釋放這個任務的檔案嗎？之後就無法在這裡審閱或發布它的變更。",
+      confirmPublished: "要釋放這個已發布工作的工作目錄嗎？之後它就無法再做一輪修正或同步。",
       outside: "位於資料目錄之外",
       busy: "進行中",
     },
     retention: {
       title: "自動清理",
       label: "保留已停止與失敗工作檔案的天數",
-      help: "1 到 365。已停止或失敗的工作在這麼多天沒有動靜後，工作檔案會被移除；紀錄、報告與筆記會保留。已發佈的工作會一直保留，直到你釋放它。",
+      help: "1 到 365。已停止或失敗的工作在這麼多天沒有動靜後，工作檔案會被移除；紀錄、報告與筆記會保留。已發布的工作會一直保留，直到你釋放它。",
       save: "儲存",
     },
     erase: {
@@ -254,8 +252,8 @@ const m: Translation<typeof en> = {
     privacy: {
       title: "哪些資料會離開這台電腦",
       none: `${product.name} 不傳送遙測、分析或當機報告，也沒有自己的帳號或雲端服務。`,
-      ai: "你的程式碼與問題會以你自己的帳戶，送到你使用的 AI 程式開發 CLI 的服務提供者。",
-      github: "GitHub 會收到 GitHub CLI 與 Git 以你的帳戶傳送的內容：複製與搜尋，以及只在你核准後才建立的分支與 draft pull request。",
+      ai: "你的程式碼與問題會以你自己的帳號，送到你使用的 AI 程式開發 CLI 的服務提供者。",
+      github: "GitHub 會收到 GitHub CLI 與 Git 以你的帳號傳送的內容：複製與搜尋，以及只在你核准後才建立的分支與 draft pull request。",
       web: "除非你開啟，Agent 不會存取網路。",
       rest: "其他一切都留在資料目錄中。",
     },
@@ -270,8 +268,7 @@ const m: Translation<typeof en> = {
   },
   modelDialog: {
     title: "設定貢獻模型",
-    subtitle:
-      "所有專案共用的 Agent、模型與思考強度，套用到之後建立的任務與專案分析。",
+    subtitle: "所有專案共用，套用到之後建立的任務與專案分析。",
     loading: "正在載入模型設定…",
     reload: "重新載入模型設定",
     close: "關閉",

@@ -16,6 +16,17 @@ const en: DemoContent = buildDemoContent({
           "It always waits a fixed **1 second** before the next try. If everyone fails together, the next wave of requests lands at the same moment too.",
         after:
           "Each wait is now drawn at random: under **1 second** at first, then under **2 seconds**, so requests spread out. Errors that are not worth retrying stop right away. This raises the odds of recovery; the request can still fail once the retries run out.",
+        beforeSteps: [
+          { label: "A request fails", changed: false },
+          { label: "Wait exactly 1 second", changed: true },
+          { label: "Everyone tries again at once", changed: true },
+        ],
+        afterSteps: [
+          { label: "A request fails", changed: false },
+          { label: "Check the error is worth retrying", changed: true },
+          { label: "Wait at random, under a growing cap", changed: true },
+          { label: "The tries spread out", changed: true },
+        ],
       },
       summary:
         "Instead of always waiting 1 second after a failure, the wait grows each time and gets a little randomness. A brief network problem now has a chance to clear up on its own.",
@@ -42,6 +53,17 @@ const en: DemoContent = buildDemoContent({
           "The code never checks whether the HTTP call succeeded. It reads the reply as JSON right away, and a `503` does not lead to a retry.",
         after:
           "The code now recognizes `503` as a retryable error and hands it to the retry helper. If the service recovers in time, your data arrives; past the limit, the failure is still reported. Problems such as `401` are reported at once, with no retry.",
+        beforeSteps: [
+          { label: "Ask the server for your data", changed: false },
+          { label: "The server answers 503", changed: false },
+          { label: "Read the error as JSON anyway", changed: true },
+        ],
+        afterSteps: [
+          { label: "Ask the server for your data", changed: false },
+          { label: "The server answers 503", changed: false },
+          { label: "Spot 503 as worth retrying", changed: true },
+          { label: "Try again, up to the limit", changed: true },
+        ],
       },
       summary:
         "Wires retries into GET requests. Temporary server errors and network errors can try again. Problems the user has to fix, such as 401 or 404, are reported right away.",
@@ -68,6 +90,15 @@ const en: DemoContent = buildDemoContent({
           "The old type listed only the retry count and a fixed `delay`. `ClientOptions` had no `retry` field, so the interface gave no hint of the new settings.",
         after:
           "With the new types, the editor can suggest `retry: { baseDelay: 500, maxDelay: 5000 }`. This file only describes the options; other code does the actual waiting and retrying.",
+        beforeSteps: [
+          { label: "Open the client options", changed: false },
+          { label: "Find no retry setting there", changed: true },
+        ],
+        afterSteps: [
+          { label: "Open the client options", changed: false },
+          { label: "The editor suggests baseDelay and maxDelay", changed: true },
+          { label: "Fill in 500 and 5000", changed: true },
+        ],
       },
       summary:
         "Defines the retry count, the wait ceilings and the error check as an explicit TypeScript interface. People using the SDK see the documentation right in their editor.",
@@ -94,6 +125,16 @@ const en: DemoContent = buildDemoContent({
           "This new test file did not exist yet. Retry code that looks reasonable is not evidence that either case works.",
         after:
           'One test sets up "fail once, then succeed", moves virtual time forward by 500 ms and checks that the result is `ok`. The other checks that a disallowed retry calls the operation only once. These tests add checks; they do not change user requests, and they have not actually been run.',
+        beforeSteps: [
+          { label: "Change the retry code", changed: false },
+          { label: "No test checks it", changed: true },
+        ],
+        afterSteps: [
+          { label: "Change the retry code", changed: false },
+          { label: "Fake one failure, then a success", changed: true },
+          { label: "Skip 500 ms of virtual time", changed: true },
+          { label: "Check that the result is ok", changed: true },
+        ],
       },
       summary:
         "Adds two repeatable tests: a temporary failure that then succeeds, and an excluded error that runs only once. The tests use virtual time, so nothing really waits.",
@@ -120,6 +161,17 @@ const en: DemoContent = buildDemoContent({
           "The README only introduced the HTTP client. It said nothing about retry settings, which errors are retried or how to replace the old field.",
         after:
           'The docs give a complete config example, switch to `baseDelay`, and spell out the default as "3 retries after the first attempt". Upgrading gets easier; the docs themselves do not change how the code runs.',
+        beforeSteps: [
+          { label: "Find delay: 1000 in the old config", changed: false },
+          { label: "Open the README", changed: false },
+          { label: "Find no word on retries", changed: true },
+        ],
+        afterSteps: [
+          { label: "Find delay: 1000 in the old config", changed: false },
+          { label: "Open the README", changed: false },
+          { label: "Read the migration note", changed: true },
+          { label: "Switch to baseDelay", changed: true },
+        ],
       },
       summary:
         "Adds usage, default behavior and upgrade notes. Without reading the source, users learn which errors are retried, how long the waits can get and how to configure it.",
@@ -224,6 +276,12 @@ const en: DemoContent = buildDemoContent({
     },
     howItFitsTogether:
       'Callers create the client in src/client.ts with options typed in src/types.ts. Its GET calls fetch directly and hands the JSON to the page. src/utils/retry.ts is a separate helper: before this change, the client imports it but never calls it. "The client will wrap retry" is the suggested direction, not the current state.',
+    flow: [
+      { label: "The page asks for data", passes: "a path to GET" },
+      { label: "The client calls fetch", passes: "an HTTP request" },
+      { label: "The API server replies", passes: "the response" },
+      { label: "The client returns JSON", passes: "" },
+    ],
     evidence: {
       "README.md":
         "The sample project calls itself a small, typed HTTP client for modern apps.",

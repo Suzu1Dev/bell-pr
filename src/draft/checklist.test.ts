@@ -64,7 +64,7 @@ test("the sample's checks are all clear, so every row is green", () => {
   assert.match(byId.issue.sources.join("\n"), /GitHub state: OPEN/);
   assert.match(byId.issue.sources.join("\n"), /A maintainer said: “PRs welcome for the retry cap\.”/);
   assert.deepEqual(byId.pacing.lines, ["Your open PRs here: 0 of 1 (BELL PR default)."]);
-  assert.match(byId.reviewability.lines[0], /^Small by BELL PR's default bands: \d+ changed lines in \d+ files\.$/);
+  assert.match(byId.reviewability.lines[0], /^Small \(BELL PR default\): \d+ changed lines in \d+ files\.$/);
   assert.deepEqual(byId.disclosure.lines, ["The project asks for a disclosure, and the description has one."]);
   assert.deepEqual(byId.understanding.lines, ["You explained the change back."]);
   // The sample's description was never edited: the row says what was compared, not who wrote it.

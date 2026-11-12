@@ -48,7 +48,7 @@ test("commits are labelled by where they came from, link to the PR, and open to 
       onFile() {},
     }),
   );
-  for (const label of ["初次送出", "依 review 修正第 1 輪", "同步目標分支", "接續 GitHub 上的提交"])
+  for (const label of ["初次發布", "第 1 輪修正", "同步目標分支", "接續 GitHub 上的 commit"])
     assert.match(html, new RegExp(label));
   assert.match(html, /href="https:\/\/github\.com\/o\/r\/pull\/7\/commits\/bbbbbbb/);
   assert.match(html, /合併 commit：/);
@@ -63,15 +63,15 @@ test("commits are labelled by where they came from, link to the PR, and open to 
 
 test("an unpublished contribution or the demo explains why there are no commits yet", () => {
   const unpublished = renderToStaticMarkup(createElement(CommitHistory, { run: { ...demoRun, id: "r" }, demo: false }));
-  assert.match(unpublished, /這個貢獻還沒送出 PR/);
+  assert.match(unpublished, /還沒發布 PR，所以修改仍未提交。/);
   const demo = renderToStaticMarkup(createElement(CommitHistory, { run: demoRun, demo: true }));
-  assert.match(demo, /示範資料還沒有送出 PR/);
+  assert.match(demo, /示範資料還沒有發布 PR/);
 });
 
 test("the sample shows its own history, labelled as a sample, with every commit's files", () => {
   const html = renderEn(createElement(CommitHistory, { run: getDemo("en").run, demo: true }));
   assertNoHan(html);
-  assert.match(html, /The sample has not sent a PR, so it has no commits yet\./);
+  assert.match(html, /The sample has not published a PR, so it has no commits yet\./);
   for (const label of ["First push", "Review round 1", "Merged the target branch"])
     assert.match(html, new RegExp(label));
   // The sample links nowhere: its PR exists on no server.

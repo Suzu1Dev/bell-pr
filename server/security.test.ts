@@ -202,7 +202,7 @@ test("a teammate checkout whose .git pointer was forged is not used", async (t) 
   const pointerPath = path.join(taskPath, ".git");
   const genuine = await readFile(pointerPath, "utf8");
   const forged = (error: unknown) =>
-    error instanceof AppError && error.statusCode === 409 && /checkout/.test(error.message);
+    error instanceof AppError && error.statusCode === 409 && /working directory/.test(error.message);
   // Another repository's worktree with a believable name.
   const other = path.join(directory, "other");
   const otherSha = await repository(other, { "b.ts": "b\n" });

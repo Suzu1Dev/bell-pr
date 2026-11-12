@@ -5,7 +5,6 @@ import type en from "../en/discovery";
 const fmt = formatters("zh-TW");
 
 const m: Translation<typeof en> = {
-  eyebrow: "FIND YOUR NEXT CONTRIBUTION",
   title: {
     lead: "尋找可貢獻的",
     emphasis: "專案",
@@ -14,13 +13,12 @@ const m: Translation<typeof en> = {
     lead: "依興趣搜尋 GitHub 專案，",
     rest: "由 AI 核對貢獻規範並建議起步任務。",
   },
-  heroCaption: "GitHub → 你的下一步",
   form: {
-    heading: "你想從哪裡開始？",
-    hint: "留白也可以，我們先幫你找方向",
+    heading: "你對什麼有興趣？",
+    hint: "興趣與程式語言可以留白。",
     interests: "感興趣的領域",
     interestsPlaceholder: "例如：accessibility、developer tools",
-    interestsHint: "以 GitHub 關鍵字搜尋；多個詞會一起篩選。",
+    interestsHint: "以 GitHub 關鍵字搜尋；填多個詞時，專案必須全部符合。",
     language: "程式語言",
     languagePlaceholder: "不限，例如 TypeScript",
     difficulty: "可接受的難度",
@@ -32,16 +30,16 @@ const m: Translation<typeof en> = {
     sort: "搜尋排序",
     sortHelp: "排序方式說明",
     sortHint:
-      "最近更新：反映近期活動，但結果隨專案更新而變動。相關度：GitHub best match，可能含久未維護的專案，已排除封存專案並顯示最近推送時間。星數：知名度高，競爭與審查門檻也較高。",
+      "最近更新：近期有活動的專案，結果常變動。相關度：GitHub 的最佳符合，可能含久未維護的專案（已排除封存專案，並顯示最近推送時間）。星數：知名專案，競爭多、審查門檻高。",
     minStars: "最低星數",
     advanced: "模型與效率設定",
-    agent: "Agent",
+    agent: "AI 服務",
     model: "分析模型",
     defaultModel: ({ provider }) => `使用 ${provider} 預設模型`,
-    modelNotInCatalog: ({ model }) => `${model}（目錄未提供）`,
+    modelNotInCatalog: ({ model }) => `${model}（不在清單中）`,
     reasoningEffort: "思考強度",
     modelDefault: "模型預設",
-    effortNotInCatalog: ({ effort }) => `${effort}（已儲存，目錄未提供）`,
+    effortNotInCatalog: ({ effort }) => `${effort}（已儲存，不在清單中）`,
     ponytailMode: "效率模式",
     ponytailCredit: "效率模式以 DietrichGebert 的 Ponytail（MIT）為基礎。",
     ponytailModes: {
@@ -50,9 +48,9 @@ const m: Translation<typeof en> = {
       off: "關閉",
     },
     accountHint: ({ provider }) =>
-      `分析會沿用你的 ${provider} 登入，使用模型用量。模型目錄不代表帳號具有所有模型的使用權限。`,
-    publicDataOnly: "查閱公開資料，選定項目後再開始規劃。",
-    submit: "推薦貢獻項目",
+      `分析會使用你的 ${provider} 登入，用量計入你自己的帳號。清單中的模型，你的帳號不一定都能使用。`,
+    publicDataOnly: "只讀取公開資料；選定項目後才開始規劃。",
+    submit: "尋找貢獻項目",
   },
   sorts: {
     updated: "最近更新",
@@ -61,7 +59,7 @@ const m: Translation<typeof en> = {
   },
   sample: {
     title: "示範結果，非即時資料",
-    body: "這些虛構專案用來示範探索會找到什麼；內容並非來自 GitHub 或 AI，也無法匯入。",
+    body: "這些專案是虛構的；內容並非來自 GitHub 或 AI，也無法匯入。",
   },
   languages: {
     en: "英文",
@@ -75,7 +73,6 @@ const m: Translation<typeof en> = {
   loading: "正在讀取探索紀錄…",
   progress: {
     label: "探索進度",
-    eyebrow: "RESEARCH IN PROGRESS",
     stop: "停止探索",
     phases: {
       searching: {
@@ -92,30 +89,22 @@ const m: Translation<typeof en> = {
       },
     },
   },
-  searchedAt: ({ date }) => `查詢時間 ${date ?? "未提供"}`,
+  searchedAt: ({ date }) => (date ? `查詢時間 ${date}` : "未記錄查詢時間"),
   limitations: ({ count }) => `這次搜尋的範圍與限制 · ${fmt.number(count)}`,
   empty: {
     title: "尚未搜尋",
-    body: "在上方設定興趣與條件，再按「推薦貢獻項目」。",
+    body: "在上方設定興趣與條件，再按「尋找貢獻項目」。",
     retryTitle: "換個條件，找找下一個機會。",
     retryBody:
       "目前沒有足夠證據支持適合的項目。試著減少關鍵字、放寬難度，或降低最低星數。",
-    angles: {
-      rules: { title: "專案規範", detail: "先理解怎麼參與" },
-      activity: { title: "熱度與活動", detail: "看見持續維護的訊號" },
-      needs: { title: "使用者需求", detail: "確認改動能幫助誰" },
-      barrier: { title: "投入門檻", detail: "找到做得到的第一步" },
-    },
   },
   results: {
     label: "推薦貢獻清單",
-    eyebrow: "YOUR CONTRIBUTION SHORTLIST",
-    previousEyebrow: "PREVIOUS RESULTS",
     title: "推薦貢獻項目",
     previousTitle: "上一份推薦，仍在這裡。",
     note: ({ sort }) =>
-      `依你選的「${sort}」排序取 12 個候選、驗證後最多 6 個；順序由分析整理，不是 GitHub 全站排名。實作前仍需確認 issue 最新狀態與維護者意願。`,
-    sampleNote: "即時搜尋會依你選的排序取 12 個候選，檢查後最多保留 6 個，結果就像這些示範。",
+      `依「${sort}」排序取 12 個候選，檢查後最多保留 6 個。順序來自分析，不是 GitHub 排名。動工前請確認 issue 最新狀態與維護者意願。`,
+    sampleNote: "即時搜尋會依你選的排序取 12 個候選，檢查後最多保留 6 個。",
     previousNote: ({ date }) =>
       date
         ? `這是 ${date} 的結果，未反映本次搜尋。`
@@ -129,26 +118,26 @@ const m: Translation<typeof en> = {
   },
   card: {
     languageUnknown: "未標示語言",
-    lastPush: ({ date }) => `最近推送 ${date ?? "未提供"}`,
+    lastPush: ({ date }) => (date ? `最近推送 ${date}` : "最近推送時間不明"),
     whoItHelps: "這次貢獻，可以幫助誰？",
     whyItFits: "為什麼適合投入",
     effort: "預估投入",
     effortNote: "AI 估計，尚未檢視完整程式碼。",
     rulesSummary: "貢獻規範與熱度判讀",
-    rules: "參與前，先讀這些規定",
+    rules: "參與前，先讀這些規範",
     popularity: "熱度快照",
     planSummary: "第一步、驗收方式與待確認事項",
     firstSteps: "建議從這裡開始",
     acceptanceChecks: "如何確認完成（尚未執行）",
     risks: "投入之前，再確認",
     evidence: ({ count }) => `推薦依據與原文 · ${fmt.number(count)} 則`,
-    chooseHint: "選擇後匯入專案，帶入可編輯的任務設定。",
-    sampleHint: "示範專案無法選擇；即時探索會找到可匯入的真實專案。",
-    choose: "選擇此項目",
+    chooseHint: "會帶入任務設定，可再修改。",
+    sampleHint: "示範專案無法匯入。",
+    choose: "匯入專案並設定任務",
     importing: "正在匯入專案…",
     learnByHand: "親手學：這一個請自己寫",
     learnByHandHint:
-      "這個 issue 有新手標籤。親手寫修正才是認識專案的方式，所以 agent 團隊不會接手。先讀計畫與來源，再開啟 issue。",
+      "這個 issue 有新手標籤。親手寫修正才是認識專案的方式，所以 Agent 團隊不會接手。先讀計畫與來源，再開啟 issue。",
     openIssue: "開啟 issue",
     startByHand: "開始親手學",
     reservedOutput: `這個專案會關閉這類 issue 上由 AI 產生的 Pull Request。只有專案自己的文字點名了嚮導提供的每一種協助，而且你確認過被引用的規範之後，${product.name} 才能為它發布親手學的任務；任務對話框會說明是哪一種情況。`,
@@ -157,8 +146,8 @@ const m: Translation<typeof en> = {
     legend: "誰來寫程式碼？",
     agents: "Agent 團隊來寫",
     hand: "你自己寫（親手學）",
-    handText: `嚮導和你一起規劃、給提示，並在你要求時審查你的修改。這個任務裡，${product.name} 的 agent 無法修改你的檔案。送出之前，你要在沒有協助的情況下把修改解釋一遍。`,
-    sample: "示範專案只示範 agent 團隊。親手學請用你自己的專案。",
+    handText: `嚮導和你一起規劃、給提示，並在你要求時審查你的修改。這個任務裡，${product.name} 的 Agent 無法修改你的檔案。發布之前，你要在沒有協助的情況下把修改解釋一遍。`,
+    sample: "示範專案只示範 Agent 團隊。親手學請用你自己的專案。",
     start: "和嚮導一起規劃",
     fit: "讓嚮導配合專案規範",
     full: "所有協助都要，只在本機練習",
