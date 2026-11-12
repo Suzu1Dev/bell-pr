@@ -558,7 +558,7 @@ const execFileAsync = promisify(execFile);
  */
 async function repoDriverOverrides(cwd: string, gitDir?: string): Promise<string[]> {
   if (!existsSync(cwd)) return [];
-  let stdout = "";
+  let stdout: string;
   try {
     const result = await execFileAsync(
       "git",

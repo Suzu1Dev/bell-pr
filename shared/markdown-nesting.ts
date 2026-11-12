@@ -604,7 +604,6 @@ function read(markdown: string, limit: number, budget: number): boolean {
     header = undefined;
     if (sureEnded) {
       sureFence = undefined;
-      sureEnded = false;
       work.mute(false);
       work.paragraph(at);
     }
