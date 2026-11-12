@@ -80,6 +80,11 @@ const tailscaleLoginSchema = z.strictObject({
   code: z.string().max(32).optional(),
   deviceName: deviceName.max(40).optional(),
 });
+const bootstrapSchema = z.strictObject({
+  name: deviceName.max(40),
+  username: z.string().max(64).optional(),
+  password: z.string().max(128).optional(),
+});
 const createPersonSchema = z.strictObject({
   name: deviceName.max(40),
   username: z.string().max(64),
@@ -88,6 +93,7 @@ const createPersonSchema = z.strictObject({
   tailscaleLogin: z.string().max(120).optional(),
 });
 const updatePersonSchema = z.strictObject({
+  name: deviceName.max(40).optional(),
   admin: z.boolean().optional(),
   disabled: z.boolean().optional(),
   username: z.string().max(64).optional(),
@@ -164,11 +170,13 @@ export function registerCollabRoutes(
     devices,
     tokenFile,
     tailscaleAuth = false,
+    remoteBootstrap = false,
   }: {
     store: Store;
     devices?: DeviceTokens;
     tokenFile?: string;
     tailscaleAuth?: boolean;
+    remoteBootstrap?: boolean;
   },
 ) {
   const invites = new CollabInvites();
@@ -228,6 +236,21 @@ export function registerCollabRoutes(
       if (actor?.role === "admin") ids.add(id);
     }
     return ids;
+  };
+
+  /**
+   * On a remote VPN/Tailscale server (--trust-vpn or --tailscale-auth), the
+   * owner connects from a remote browser rather than localhost. Until the
+   * first admin joins, an authenticated remote caller may initialize group
+   * work and claim the initial admin seat; once an active admin exists, only
+   * admins can invite or promote others.
+   */
+  const canRemoteBootstrap = (): boolean => {
+    if (!remoteBootstrap) return false;
+    const { state } = host.status();
+    if (state === "notSetUp") return true;
+    if (state === "ready") return activeAdminIds(host.side()).size === 0;
+    return false;
   };
 
   /**
@@ -455,10 +478,15 @@ export function registerCollabRoutes(
 
   app.post("/api/collab/auth/tailscale", async (req, res) => {
     const body = tailscaleLoginSchema.parse(req.body);
-    if (!ready(host, res)) return;
     const rateKey = checkRateLimit(req);
     const ts = readTailscaleIdentity(req, tailscaleAuth);
     if (!ts) throw refuse(403, "tailscaleUnavailable", (m) => m.collab.tailscaleUnavailable);
+    if (remoteBootstrap && host.status().state === "notSetUp") {
+      await host.run(async () => {
+        if (host.status().state === "notSetUp") await host.setUp();
+      });
+    }
+    if (!ready(host, res)) return;
     const side = host.side();
     const existingEntry = Object.entries(side.people ?? {}).find(
       ([, person]) =>
@@ -616,11 +644,13 @@ export function registerCollabRoutes(
       status.state === "ready" ? participantOf(host, req.get(participantHeader)) : undefined;
     const ts = readTailscaleIdentity(req, tailscaleAuth);
     const { groupId } = host.side();
+    const hostCaller = atHost(res);
     const body: CollabInfo = {
       ...status,
       ...(groupId ? { groupId } : {}),
-      host: atHost(res),
-      ...(ts ? { tailscaleAvailable: true, tailscaleLogin: ts.login } : {}),
+      host: hostCaller,
+      ...(!hostCaller && canRemoteBootstrap() ? { canBootstrap: true as const } : {}),
+      ...(ts ? { tailscaleAvailable: true, tailscaleLogin: ts.login, tailscaleName: ts.name } : {}),
       ...(found ? { me: identity(found) } : {}),
     };
     res.json(body);
@@ -628,10 +658,71 @@ export function registerCollabRoutes(
 
   app.post("/api/collab/setup", async (req, res) => {
     emptySchema.parse(req.body);
-    if (!atHost(res)) throw refuse(403, "hostOnly", (m) => m.collab.hostOnly);
+    if (!atHost(res) && !canRemoteBootstrap())
+      throw refuse(403, "hostOnly", (m) => m.collab.hostOnly);
     await host.run(() => host.setUp());
     const body: CollabSetupResponse = { state: "ready", groupId: host.side().groupId ?? "" };
     res.status(201).json(body);
+  });
+
+  app.post("/api/collab/bootstrap", async (req, res) => {
+    const body = bootstrapSchema.parse(req.body);
+    if (host.status().state === "stopped") {
+      ready(host, res);
+      return;
+    }
+    if (!atHost(res) && !canRemoteBootstrap()) {
+      if (remoteBootstrap && host.status().state === "ready") throw adminOnly();
+      throw refuse(403, "hostOnly", (m) => m.collab.hostOnly);
+    }
+    let username: string | undefined;
+    let passwordHash: string | undefined;
+    if (body.username !== undefined || body.password !== undefined) {
+      username = normalizeUsername(body.username);
+      if (!username || !validPassword(body.password)) throw invalidAccountInput();
+      passwordHash = await hashPassword(body.password);
+    }
+    const ts = readTailscaleIdentity(req, tailscaleAuth);
+    const deviceId: string | undefined = res.locals.deviceId;
+    const { token: sessionToken, tokenHash } = issueAccountSessionToken();
+    const created: CollabJoinResponse = await host.run(async () => {
+      if (!atHost(res) && host.status().state === "ready" && activeAdminIds(host.side()).size > 0)
+        throw adminOnly();
+      if (host.status().state === "notSetUp") await host.setUp();
+      if (username && usernameOwner(host.side(), username)) throw usernameTaken();
+      const tsTaken =
+        ts &&
+        Object.values(host.side().people ?? {}).some(
+          (person) => !person.removedAt && person.tailscaleLogin?.toLowerCase() === ts.login,
+        );
+      const { id, token: coordToken } = await host
+        .coordinator()
+        .addParticipant(collabId("m"), "admin");
+      const boundTs = ts && !tsTaken ? ts.login : undefined;
+      await host.saveSide((draft) => {
+        (draft.people ??= {})[id] = {
+          name: body.name,
+          joinedAt: new Date().toISOString(),
+          admin: true,
+          ...(deviceId !== undefined ? { deviceId } : {}),
+          ...(username ? { username } : {}),
+          ...(passwordHash ? { passwordHash } : {}),
+          ...(boundTs ? { tailscaleLogin: boundTs } : {}),
+        };
+        if (username || boundTs) saveAccountSession(draft, id, tokenHash);
+      });
+      return {
+        groupId: host.side().groupId ?? "",
+        id,
+        name: body.name,
+        admin: true as const,
+        ...(username ? { username } : {}),
+        ...(boundTs ? { tailscaleLogin: boundTs } : {}),
+        token: username || boundTs ? sessionToken : coordToken,
+      };
+    });
+    log.info(`group: ${created.id} bootstrapped admin`);
+    res.status(201).json(created);
   });
 
   app.post("/api/collab/invites", (req, res) => {
@@ -644,9 +735,9 @@ export function registerCollabRoutes(
       if (!found) throw notJoined();
       invite = { self: { id: found.actor.id, token } };
     } else {
-      // The person at the host can always invite: that is how the first admin joins.
+      // The person at the host (or remote bootstrap caller before any admin joins) can invite the first admin.
       let by: string | undefined;
-      if (!atHost(res)) {
+      if (!atHost(res) && !canRemoteBootstrap()) {
         if (!found) throw notJoined();
         if (found.actor.role !== "admin") throw adminOnly();
         by = found.actor.id;
@@ -885,6 +976,7 @@ export function registerCollabRoutes(
           const entry = sideEntry(draft.people, id);
           if (!entry || entry.removedAt)
             throw refuse(404, "unknownPerson", (m) => m.collab.unknownPerson);
+          if (body.name !== undefined) entry.name = body.name;
           if (body.admin !== undefined) {
             if (body.admin) entry.admin = true;
             else delete entry.admin;
@@ -909,10 +1001,10 @@ export function registerCollabRoutes(
         });
         if (body.disabled === true) {
           hub.forget(id);
-          hub.changed();
           await revokeAllHoldsOf(actor, id);
           invites.drop(id);
         }
+        hub.changed();
         return memberRecordOf(id, personOf(host, id)!);
       });
       res.json({ person: updated });

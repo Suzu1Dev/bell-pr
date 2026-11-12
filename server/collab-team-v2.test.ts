@@ -179,31 +179,72 @@ test("VPN/Tailscale HTTP guard, team accounts, loopback Tailscale auth, and Admi
   });
   assert.equal(protectedReply.status, 401);
 
-  // 3. Set up group at host, then bootstrap first Admin via verified loopback Tailscale header
+  // 3. Remote setup & first-admin bootstrap without needing localhost install token!
   const installHeaders = { authorization: `Bearer ${installToken}` };
-  const setup = await httpSend(port, "POST", "/api/collab/setup", installHeaders, {});
-  assert.equal(setup.status, 201, setup.body);
+  const pairCodeInit = await httpSend(port, "POST", "/api/pair/codes", installHeaders, {
+    name: "Remote Browser",
+  });
+  assert.equal(pairCodeInit.status, 201);
+  const remotePaired = await httpSend(
+    port,
+    "POST",
+    "/api/pair",
+    { host: "100.64.0.10:4311" },
+    { code: pairCodeInit.json.code, name: "Remote Browser" },
+  );
+  assert.equal(remotePaired.status, 201);
+  const remoteDeviceHeaders = {
+    host: "100.64.0.10:4311",
+    authorization: `Bearer ${remotePaired.json.token}`,
+    "tailscale-user-login": "ada@example.com",
+    "tailscale-user-name": "Ada",
+  };
 
+  // Before setup, remote paired device sees `canBootstrap: true` instead of being stuck at host-only
+  const preSetupInfo = await httpSend(port, "GET", "/api/collab", remoteDeviceHeaders);
+  assert.equal(preSetupInfo.status, 200);
+  assert.equal(preSetupInfo.json.state, "notSetUp");
+  assert.equal(preSetupInfo.json.host, false);
+  assert.equal(preSetupInfo.json.canBootstrap, true);
+  assert.equal(preSetupInfo.json.tailscaleLogin, "ada@example.com");
+  assert.equal(preSetupInfo.json.tailscaleName, "Ada");
+
+  // Remote bootstrap initializes `notSetUp -> ready`, creates first Admin, sets account & binds Tailscale
   const adaTs = await httpSend(
     port,
     "POST",
-    "/api/collab/auth/tailscale",
-    {
-      "tailscale-user-login": "ada@example.com",
-      "tailscale-user-name": "Ada",
-    },
-    { deviceName: "Ada Ubuntu Laptop" },
+    "/api/collab/bootstrap",
+    remoteDeviceHeaders,
+    { name: "Ada", username: "ada_admin", password: "ada-strong-password" },
   );
   assert.equal(adaTs.status, 201, adaTs.body);
   assert.equal(adaTs.json.admin, true);
+  assert.equal(adaTs.json.username, "ada_admin");
   assert.equal(adaTs.json.tailscaleLogin, "ada@example.com");
   assert.match(adaTs.json.token, accountTokenPattern);
-  assert.match(adaTs.json.deviceToken, /^bpd_/);
   assert.equal(redact(`token=${adaTs.json.token}`).includes(adaTs.json.token), false);
+
+  // Once an active admin exists, an unjoined remote device no longer gets `canBootstrap` and cannot bootstrap
+  const postSetupUnjoined = await httpSend(port, "GET", "/api/collab", {
+    host: "100.64.0.10:4311",
+    authorization: `Bearer ${remotePaired.json.token}`,
+  });
+  assert.equal(postSetupUnjoined.json.canBootstrap, undefined);
+  const secondBootstrap = await httpSend(
+    port,
+    "POST",
+    "/api/collab/bootstrap",
+    {
+      host: "100.64.0.10:4311",
+      authorization: `Bearer ${remotePaired.json.token}`,
+    },
+    { name: "Intruder" },
+  );
+  assert.equal(outcome(secondBootstrap), "403 adminOnly");
 
   const adaHeaders: Record<string, string> = {
     host: "100.64.0.10:4311",
-    authorization: `Bearer ${adaTs.json.deviceToken}`,
+    authorization: `Bearer ${remotePaired.json.token}`,
     [participantHeader]: adaTs.json.token,
   };
 
@@ -251,9 +292,16 @@ test("VPN/Tailscale HTTP guard, team accounts, loopback Tailscale auth, and Admi
     [participantHeader]: benLogin.json.token,
   };
 
-  // 5. Admin people management: list, create account directly, role guard (`lastAdmin`), disable & lockout
+  // 5. Admin people & remote tool management: list, create account, pair code, edit identity, role guard (`lastAdmin`), disable & lockout
   const nonAdminPeople = await httpSend(port, "GET", "/api/collab/people", benHeaders);
   assert.equal(outcome(nonAdminPeople), "403 adminOnly");
+  const nonAdminPairCode = await httpSend(port, "POST", "/api/pair/codes", benHeaders, {});
+  assert.equal(nonAdminPairCode.status, 403);
+  const remoteAdminPairCode = await httpSend(port, "POST", "/api/pair/codes", adaHeaders, {
+    name: "Teammate Tablet",
+  });
+  assert.equal(remoteAdminPairCode.status, 201, remoteAdminPairCode.body);
+  assert.equal(typeof remoteAdminPairCode.json.code, "string");
 
   const createCy = await httpSend(port, "POST", "/api/collab/people", adaHeaders, {
     name: "Cy",
@@ -263,6 +311,16 @@ test("VPN/Tailscale HTTP guard, team accounts, loopback Tailscale auth, and Admi
   });
   assert.equal(createCy.status, 201, createCy.body);
   assert.equal(createCy.json.person.username, "cy_ops");
+
+  const renameCy = await httpSend(
+    port,
+    "PATCH",
+    `/api/collab/people/${createCy.json.person.id}`,
+    adaHeaders,
+    { name: "Cy Ops" },
+  );
+  assert.equal(renameCy.status, 200);
+  assert.equal(renameCy.json.person.name, "Cy Ops");
 
   const listed = await httpSend(port, "GET", "/api/collab/people", adaHeaders);
   assert.equal(listed.status, 200);

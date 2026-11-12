@@ -9,7 +9,7 @@
  * revoke any device, so a paired phone can revoke a lost one.
  */
 import path from "node:path";
-import type { Express, RequestHandler, Response } from "express";
+import type { Express, Request, RequestHandler, Response } from "express";
 import { z } from "zod";
 import type { PairCodeResponse, PairLockedResponse, PairRedeemResponse } from "../../shared/pairing.js";
 import { readApiToken, rotateApiToken } from "../api-token.js";
@@ -49,19 +49,29 @@ function sendLocked(res: Response, locked: PairLocked) {
 export function registerPairingRoutes(
   app: Express,
   tokenFile: string,
-  { devices, pairing, publicUrl }: { devices: DeviceTokens; pairing: Pairing; publicUrl: AppOptions["publicUrl"] },
+  {
+    devices,
+    pairing,
+    publicUrl,
+    isAdmin,
+  }: {
+    devices: DeviceTokens;
+    pairing: Pairing;
+    publicUrl: AppOptions["publicUrl"];
+    isAdmin?: (req: Request) => boolean;
+  },
 ) {
   const dataDir = path.dirname(tokenFile);
   app.use(["/api/pair", "/api/devices"], pairingHeaders);
 
-  /** The install token, when the request was made with it; else answers and returns undefined. */
-  const installOnly = (res: Response): string | undefined => {
+  /** The install token, when the request was made with it (or by a group admin when `allowAdmin` is set). */
+  const installOnly = (req: Request, res: Response, allowAdmin = false): string | undefined => {
     const token = readApiToken(tokenFile);
     if (!token) {
       res.status(401).json({ error: sm().common.apiTokenRequired });
       return undefined;
     }
-    if (res.locals.deviceId !== undefined) {
+    if (res.locals.deviceId !== undefined && !(allowAdmin && isAdmin?.(req))) {
       res.status(403).json({ error: "install_token_required" });
       return undefined;
     }
@@ -75,7 +85,7 @@ export function registerPairingRoutes(
 
   app.post("/api/pair/codes", async (req, res) => {
     const { name } = createCodeSchema.parse(req.body);
-    const token = installOnly(res);
+    const token = installOnly(req, res, true);
     if (!token) return;
     const result = await pairing.createCode(token, name);
     if (result.status === "locked") return sendLocked(res, result);
@@ -110,7 +120,7 @@ export function registerPairingRoutes(
 
   app.post("/api/pair/unlock", async (req, res) => {
     emptySchema.parse(req.body);
-    if (!installOnly(res)) return;
+    if (!installOnly(req, res, true)) return;
     await pairing.unlock();
     res.status(204).end();
   });
@@ -123,7 +133,7 @@ export function registerPairingRoutes(
 
   app.post("/api/devices/rotate", async (req, res) => {
     emptySchema.parse(req.body);
-    if (!installOnly(res)) return;
+    if (!installOnly(req, res, false)) return;
     await rotateApiToken(tokenFile);
     await clearPairing(dataDir);
     res.status(204).end();

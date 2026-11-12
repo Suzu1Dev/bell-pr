@@ -43,7 +43,8 @@ import { DeviceTokens } from "./device-tokens.js";
 import { Pairing } from "./pairing.js";
 import { registerPairingRoutes } from "./routes/pairing.js";
 import type { CollabHost } from "./collab-host.js";
-import { registerCollabRoutes } from "./routes/collab.js";
+import { participantHeader } from "./coordination-routes.js";
+import { participantOf, registerCollabRoutes } from "./routes/collab.js";
 
 /** Masks secrets in string values, which may quote command output. */
 function redactValues<T extends Record<string, unknown>>(values?: T) {
@@ -240,6 +241,10 @@ export function createApp(workbench: Workbench, options: AppOptions = {}) {
       devices,
       pairing: new Pairing(path.dirname(tokenFile), devices),
       publicUrl: options.publicUrl,
+      isAdmin: (req) =>
+        options.collab && options.collab.status().state === "ready"
+          ? participantOf(options.collab, req.get(participantHeader))?.actor.role === "admin"
+          : false,
     });
   if (options.collab) {
     app.locals.collab = options.collab;
@@ -248,6 +253,7 @@ export function createApp(workbench: Workbench, options: AppOptions = {}) {
       devices,
       tokenFile,
       tailscaleAuth: options.tailscaleAuth,
+      remoteBootstrap: Boolean(options.trustVpn || options.tailscaleAuth),
     });
     // Agent turns, teammates and plans respect the group's holds too.
     workbench.guardHolds(options.collab);

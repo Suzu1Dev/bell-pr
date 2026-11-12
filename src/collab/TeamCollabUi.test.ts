@@ -219,3 +219,33 @@ test("ExplanationPanel Team tab and DiffView render reviewer sign-offs, rational
   assertNoHan(enDiff);
   assert.match(enDiff, /1 team review/);
 });
+
+test("BootstrapAdminCard renders remote admin setup with auto-detected Tailscale in en and zh-TW", async () => {
+  const { BootstrapAdminCard } = await import("./GroupPage");
+  const info = {
+    state: "notSetUp" as const,
+    host: false,
+    canBootstrap: true as const,
+    tailscaleAvailable: true,
+    tailscaleLogin: "owner@example.com",
+    tailscaleName: "Owner",
+  };
+  const en = renderEn(
+    createElement(BootstrapAdminCard, {
+      store: { async start() {} },
+      info,
+    }),
+  );
+  assertNoHan(en);
+  assert.match(en, /Set up team collaboration as admin/);
+  assert.match(en, /owner@example\.com/);
+
+  const zh = renderZh(
+    createElement(BootstrapAdminCard, {
+      store: { async start() {} },
+      info,
+    }),
+  );
+  assert.match(zh, /從遠端啟用團隊協作並成為管理員/);
+  assert.match(zh, /owner@example\.com/);
+});

@@ -12,7 +12,6 @@ import type {
   CollabFileDependency,
   CollabHold,
   CollabInfo,
-  CollabInviteResponse,
   CollabJoinResponse,
   CollabMemberActivity,
   CollabProject,
@@ -354,17 +353,14 @@ export function createGroupStore() {
       );
       resetAfterAuth(result);
     },
-    /** At the host: sets group work up when it is not, then joins as its admin. */
-    async start(name: string) {
-      if (state.info?.state === "notSetUp") {
-        await api("/collab/setup", send("POST"));
-        set({ info: { ...state.info, state: "ready" } });
-      }
-      const { code } = await api<CollabInviteResponse>(
-        "/collab/invites",
-        send("POST", { name, admin: true }),
-      );
-      await join(code);
+    /** At the host or remote bootstrap: initializes group work when needed and joins as admin. */
+    async start(name: string, credentials?: { username?: string; password?: string }) {
+      const payload =
+        credentials?.username && credentials.password
+          ? { name, username: credentials.username, password: credentials.password }
+          : { name };
+      const result = await api<CollabJoinResponse>("/collab/bootstrap", send("POST", payload));
+      resetAfterAuth(result);
     },
     /** Adds a repository of this instance to the group and shows its board; can take minutes. */
     async add(repoId: string) {

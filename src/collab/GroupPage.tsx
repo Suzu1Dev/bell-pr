@@ -9,7 +9,6 @@ import {
   useState,
   useSyncExternalStore,
   type FormEvent,
-  type InputHTMLAttributes,
   type ReactNode,
 } from "react";
 import {
@@ -39,10 +38,12 @@ import type {
   CollabTasksResponse,
 } from "../../shared/collab";
 import type { Formatters } from "../../shared/i18n/locale";
+import type { PairCodeResponse } from "../../shared/pairing";
 import { product } from "../../shared/product";
-import { ApiError, send } from "../api";
+import { api, ApiError, send } from "../api";
 import type { Status } from "../app/hooks/useAppData";
 import { useFormat, useT, type Messages } from "../i18n";
+import { participantToken } from "./participant";
 import { Modal } from "../modals/Modal";
 import { CopyCommand } from "../setup/CopyCommand";
 import { createGroupStore, reasonOf, type GroupState } from "./store";
@@ -235,47 +236,108 @@ export function HoldAnswer({ answer }: { answer?: Answer }) {
   );
 }
 
-/** A state shown as one card with one field and one button: first set-up at the host. */
-function FieldCard({
-  words,
-  label,
+/** First set-up as admin (either locally at the host or remotely over VPN/Tailscale). */
+export function BootstrapAdminCard({
+  store,
+  info,
   refused,
-  action,
-  ...field
 }: {
-  words: { title: string; body: string; submit: string };
-  label: ReactNode;
+  store: Pick<Store, "start">;
+  info: CollabInfo;
   refused?: string;
-  action: (value: string) => Promise<unknown>;
-} & InputHTMLAttributes<HTMLInputElement>) {
-  const [value, setValue] = useState("");
+}) {
+  const t = useT("collab");
+  const [name, setName] = useState(info.tailscaleName ?? "");
+  const [withAccount, setWithAccount] = useState(false);
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
   const request = useRequest();
   const error = request.error || refused;
+  const remote = Boolean(info.canBootstrap);
+  const canSubmit =
+    Boolean(name.trim()) && (!withAccount || (Boolean(username.trim()) && password.length >= 8));
+
   return (
     <form
       className="settings-card"
       onSubmit={(event) => {
         event.preventDefault();
-        void request.run(() => action(value.trim()).then(() => focusSoon(".group-page h1")));
+        void request.run(() =>
+          store
+            .start(
+              name.trim(),
+              withAccount ? { username: username.trim(), password } : undefined,
+            )
+            .then(() => focusSoon(".group-page h1")),
+        );
       }}
     >
       <div className="section-heading">
         <div>
-          <h2>{words.title}</h2>
-          <p>{words.body}</p>
+          <h2>{remote ? t.host.remoteTitle : t.host.title}</h2>
+          <p>{remote ? t.host.remoteBody : t.host.body}</p>
         </div>
       </div>
-      <label className="field-label" htmlFor={field.id}>
-        {label}
+      {info.tailscaleLogin && (
+        <div className="split-info">
+          <Info size={16} aria-hidden="true" />
+          <div>
+            <p>{t.host.tailscaleAutoBind({ login: info.tailscaleLogin })}</p>
+          </div>
+        </div>
+      )}
+      <label className="field-label" htmlFor="host-name">
+        {t.host.name} <span>{t.shownOnBoard}</span>
       </label>
       <input
         className="text-input"
-        value={value}
+        id="host-name"
+        value={name}
+        maxLength={40}
         autoComplete="off"
         aria-describedby={error ? "card-error" : undefined}
-        onChange={(event) => setValue(event.target.value)}
-        {...field}
+        onChange={(event) => setName(event.target.value)}
       />
+      <div className="draft-task-items">
+        <label>
+          <input
+            type="checkbox"
+            checked={withAccount}
+            onChange={(event) => setWithAccount(event.target.checked)}
+          />
+          <span>{t.auth.optionalAccount}</span>
+        </label>
+      </div>
+      {withAccount && (
+        <>
+          <label className="field-label" htmlFor="bootstrap-username">
+            {t.auth.username}
+          </label>
+          <input
+            className="text-input"
+            id="bootstrap-username"
+            value={username}
+            maxLength={32}
+            placeholder={t.auth.usernamePlaceholder}
+            autoComplete="username"
+            autoCapitalize="off"
+            onChange={(event) => setUsername(event.target.value)}
+          />
+          <label className="field-label" htmlFor="bootstrap-password">
+            {t.auth.password}
+          </label>
+          <input
+            className="text-input"
+            id="bootstrap-password"
+            type="password"
+            value={password}
+            maxLength={128}
+            placeholder={t.auth.passwordPlaceholder}
+            autoComplete="new-password"
+            onChange={(event) => setPassword(event.target.value)}
+          />
+        </>
+      )}
       {error && (
         <p className="inline-error" role="alert" id="card-error">
           {error}
@@ -284,9 +346,9 @@ function FieldCard({
       <button
         className="button primary full-width"
         aria-disabled={request.busy}
-        disabled={!value.trim()}
+        disabled={!canSubmit}
       >
-        {words.submit}
+        {t.host.submit}
       </button>
     </form>
   );
@@ -663,6 +725,12 @@ function AdminMembersDialog({ store, me, onClose }: { store: Store; me: Me; onCl
   const [password, setPassword] = useState("");
   const [tailscaleLogin, setTailscaleLogin] = useState("");
   const [admin, setAdmin] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editUsername, setEditUsername] = useState("");
+  const [editPassword, setEditPassword] = useState("");
+  const [editTailscale, setEditTailscale] = useState("");
+  const [pairCreated, setPairCreated] = useState<PairCodeResponse | null>(null);
   const request = useRequest();
 
   const load = async () => {
@@ -674,6 +742,40 @@ function AdminMembersDialog({ store, me, onClose }: { store: Store; me: Me; onCl
     void request.run(load);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const beginEdit = (member: CollabMemberRecord) => {
+    setEditingId(member.id);
+    setEditName(member.name);
+    setEditUsername(member.username ?? "");
+    setEditPassword("");
+    setEditTailscale(member.tailscaleLogin ?? "");
+  };
+
+  const saveEdit = (member: CollabMemberRecord) =>
+    void request.run(async () => {
+      const patch: Record<string, unknown> = {};
+      if (editName.trim() && editName.trim() !== member.name) patch.name = editName.trim();
+      if (editUsername.trim() && editUsername.trim() !== (member.username ?? ""))
+        patch.username = editUsername.trim();
+      if (editPassword.length >= 8) patch.password = editPassword;
+      if (editTailscale.trim() !== (member.tailscaleLogin ?? ""))
+        patch.tailscaleLogin = editTailscale.trim() || null;
+      if (Object.keys(patch).length) {
+        await store.call(`/people/${encodeURIComponent(member.id)}`, send("PATCH", patch));
+        await load();
+        store.reload();
+      }
+      setEditingId(null);
+    });
+
+  const createPairCode = () =>
+    void request.run(async () => {
+      const created = await api<PairCodeResponse>("/pair/codes", {
+        ...send("POST", {}),
+        headers: { "x-bell-participant": participantToken() },
+      });
+      setPairCreated(created);
+    });
 
   const createMember = (event: FormEvent) => {
     event.preventDefault();
@@ -815,38 +917,143 @@ function AdminMembersDialog({ store, me, onClose }: { store: Store; me: Me; onCl
                   {member.tailscaleLogin && <code>{member.tailscaleLogin}</code>}
                   {member.disabled && <code>{words.disabledBadge}</code>}
                 </div>
+                {editingId === member.id && (
+                  <div className="group-admin-grid">
+                    <div>
+                      <label className="field-label" htmlFor={`edit-name-${member.id}`}>
+                        {words.displayName}
+                      </label>
+                      <input
+                        className="text-input"
+                        id={`edit-name-${member.id}`}
+                        value={editName}
+                        maxLength={40}
+                        onChange={(event) => setEditName(event.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <label className="field-label" htmlFor={`edit-user-${member.id}`}>
+                        {t.auth.username}
+                      </label>
+                      <input
+                        className="text-input"
+                        id={`edit-user-${member.id}`}
+                        value={editUsername}
+                        maxLength={32}
+                        placeholder={t.auth.usernamePlaceholder}
+                        autoCapitalize="off"
+                        onChange={(event) => setEditUsername(event.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <label className="field-label" htmlFor={`edit-pass-${member.id}`}>
+                        {t.auth.password}
+                      </label>
+                      <input
+                        className="text-input"
+                        id={`edit-pass-${member.id}`}
+                        type="password"
+                        value={editPassword}
+                        maxLength={128}
+                        placeholder={words.newPasswordPlaceholder}
+                        onChange={(event) => setEditPassword(event.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <label className="field-label" htmlFor={`edit-ts-${member.id}`}>
+                        {words.tailscaleLabel}
+                      </label>
+                      <input
+                        className="text-input"
+                        id={`edit-ts-${member.id}`}
+                        value={editTailscale}
+                        maxLength={120}
+                        placeholder={words.tailscalePlaceholder}
+                        autoCapitalize="off"
+                        onChange={(event) => setEditTailscale(event.target.value)}
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
-              {member.id !== me.id && (
-                <div className="group-release">
+              <div className="group-release">
+                {editingId === member.id ? (
+                  <>
+                    <button
+                      type="button"
+                      className="button primary"
+                      aria-disabled={request.busy}
+                      disabled={
+                        !editName.trim() ||
+                        (Boolean(editPassword) && editPassword.length < 8)
+                      }
+                      onClick={() => saveEdit(member)}
+                    >
+                      {words.saveEdit}
+                    </button>
+                    <button
+                      type="button"
+                      className="button secondary"
+                      onClick={() => setEditingId(null)}
+                    >
+                      {words.cancelEdit}
+                    </button>
+                  </>
+                ) : (
                   <button
                     type="button"
                     className="button secondary"
                     aria-disabled={request.busy}
-                    onClick={() => updateMember(member.id, { admin: !member.admin })}
+                    onClick={() => beginEdit(member)}
                   >
-                    {member.admin ? words.makeMember : words.makeAdmin}
+                    {words.edit}
                   </button>
-                  <button
-                    type="button"
-                    className="button secondary"
-                    aria-disabled={request.busy}
-                    onClick={() => updateMember(member.id, { disabled: !member.disabled })}
-                  >
-                    {member.disabled ? words.enable : words.disable}
-                  </button>
-                  <button
-                    type="button"
-                    className="button danger"
-                    aria-disabled={request.busy}
-                    onClick={() => removeMember(member.id)}
-                  >
-                    {words.remove}
-                  </button>
-                </div>
-              )}
+                )}
+                {member.id !== me.id && (
+                  <>
+                    <button
+                      type="button"
+                      className="button secondary"
+                      aria-disabled={request.busy}
+                      onClick={() => updateMember(member.id, { admin: !member.admin })}
+                    >
+                      {member.admin ? words.makeMember : words.makeAdmin}
+                    </button>
+                    <button
+                      type="button"
+                      className="button secondary"
+                      aria-disabled={request.busy}
+                      onClick={() => updateMember(member.id, { disabled: !member.disabled })}
+                    >
+                      {member.disabled ? words.enable : words.disable}
+                    </button>
+                    <button
+                      type="button"
+                      className="button danger"
+                      aria-disabled={request.busy}
+                      onClick={() => removeMember(member.id)}
+                    >
+                      {words.remove}
+                    </button>
+                  </>
+                )}
+              </div>
             </li>
           ))}
         </ul>
+      </div>
+      <div className="group-admin-members">
+        <h3>{words.pairHeading}</h3>
+        <p className="field-help">{words.pairHelp}</p>
+        <button
+          type="button"
+          className="button secondary"
+          aria-disabled={request.busy}
+          onClick={createPairCode}
+        >
+          {words.pairCreate}
+        </button>
+        {pairCreated && <CopyCommand command={pairCreated.code} />}
       </div>
       <div className="modal-actions">
         <button type="button" className="button secondary" onClick={onClose}>
@@ -1800,19 +2007,8 @@ export function GroupPage({ status }: { status: Status | null }) {
       </div>
     );
   } else if (info && !me) {
-    card = info.host ? (
-      <FieldCard
-        id="host-name"
-        words={t.host}
-        label={
-          <>
-            {t.host.name} <span>{t.shownOnBoard}</span>
-          </>
-        }
-        refused={state.refused}
-        maxLength={40}
-        action={store.start}
-      />
+    card = info.host || info.canBootstrap ? (
+      <BootstrapAdminCard store={store} info={info} refused={state.refused} />
     ) : info.state === "notSetUp" ? (
       <p className="settings-card">{t.setUpAtHost}</p>
     ) : (

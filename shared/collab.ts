@@ -34,8 +34,11 @@ export interface CollabInfo extends CollabStatus {
   groupId?: string;
   /** The request came with the install token: the person at the host. */
   host: boolean;
+  /** Remote VPN/Tailscale deployment with no active admin yet: this caller may set up and join as admin. */
+  canBootstrap?: true;
   tailscaleAvailable?: boolean;
   tailscaleLogin?: string;
+  tailscaleName?: string;
   /** Who the participant token belongs to; absent when missing, unknown or removed. */
   me?: { id: string; name: string; admin?: true; username?: string; tailscaleLogin?: string };
 }
