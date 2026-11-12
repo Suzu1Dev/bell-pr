@@ -188,6 +188,19 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   retry" instead of "Ready to claim", since nothing starts it until you
   retry. Long titles and descriptions, even with no space to break at, now
   wrap inside their card.
+- **Codex's web search tool is now off while web access is off.** BELL PR
+  passed Codex a search setting only with web access on. Codex searches a
+  cached index by default, and live in a full access sandbox, so its agents
+  could search the web with the switch off, in project analysis and
+  discovery too (seen with Codex CLI 0.167). Every Codex turn now states
+  the setting: `web_search="live"` with web access on, and
+  `web_search="disabled"` otherwise.
+- **Codex agents no longer get ChatGPT apps (connectors).** With a ChatGPT
+  sign-in, Codex offers its apps to every turn. They include a web search
+  tool that stays available with web search disabled (seen with Codex CLI
+  0.167), and the run log did not record its queries. Every Codex turn now
+  starts with `features.apps=false`, with web access on or off, as BELL PR
+  already keeps your own MCP servers away from agents.
 
 ## [1.1.0] - 2026-11-04
 
