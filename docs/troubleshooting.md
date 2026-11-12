@@ -329,7 +329,9 @@ sandboxes can need the same Ubuntu setting. Claude Code documents that
 [Ubuntu's AppArmor restriction can keep its sandbox from starting](https://code.claude.com/docs/en/sandboxing#apparmor-restriction-stops-bubblewrap).
 Codex's sandboxing documentation says that on Ubuntu 24.04 Codex may still
 warn that it cannot create the needed user namespace after bubblewrap is
-installed.
+installed. The same documentation says that on Ubuntu 25.04 bubblewrap from
+Ubuntu's package repository should work without extra AppArmor setup, and
+that the `apparmor` package ships the `bwrap-userns-restrict` profile.
 
 `bell-pr doctor` shows the state as "Antigravity sandbox". macOS needs
 `sandbox-exec`, which it has built in; on other platforms BELL PR reports

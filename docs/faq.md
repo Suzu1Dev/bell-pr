@@ -193,8 +193,8 @@ the minimum permissions you need.
 [GitHub documents](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens#personal-access-tokens-classic)
 that only classic personal access tokens have write access to public
 repositories that you or your organizations do not own. If publishing fails
-with a fine-grained token, use a classic token with the `repo` or
-`public_repo` permission. Claude Code is also denied BELL PR's own
+with a fine-grained token, use a classic token.
+Claude Code is also denied BELL PR's own
 data outside its checkout. The project's own agent instructions and settings
 are never loaded. If you allow unsandboxed Claude Code agents, they have your
 full user rights, and those runs are marked. The

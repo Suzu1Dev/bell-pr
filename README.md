@@ -132,8 +132,7 @@ and limits, or follow [Getting started](docs/getting-started.md) for a full walk
   [GitHub documents](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens#personal-access-tokens-classic)
   that only classic personal access tokens have write access to public
   repositories that you or your organizations do not own. If publishing fails
-  with a fine-grained token, use a classic token with the `repo` or
-  `public_repo` permission.
+  with a fine-grained token, use a classic token.
 - **Broader access is optional.** Full access or allowing unsandboxed agents
   gives writable agents your user permissions. Linux's optional passwordless
   sudo grants root access to every process under that user. Use these options

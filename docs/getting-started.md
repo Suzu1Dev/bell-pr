@@ -28,8 +28,7 @@ You need:
   [GitHub documents](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens#personal-access-tokens-classic)
   that only classic personal access tokens have write access to public
   repositories that you or your organizations do not own. If publishing fails
-  with a fine-grained token, use a classic token with the `repo` or
-  `public_repo` permission.
+  with a fine-grained token, use a classic token.
 - **An AI coding CLI**, installed and signed in, as the same user that runs
   BELL PR. Either one is enough:
   - the Codex CLI: `npm install -g @openai/codex`, then `codex login`.
