@@ -116,9 +116,9 @@ const messages: Translation<typeof en> = {
     rulesUnread: `無法確認專案的規則：${product.name} 還沒讀過它們。`,
     reasons: {
       "gh-missing": "沒有安裝 GitHub CLI（gh）。",
-      "signed-out": "GitHub CLI 還沒登入。請執行 gh auth login，再檢查一次。",
+      "signed-out": "GitHub CLI 還沒登入。請執行 gh auth login，然後重新檢查。",
       timeout: "GitHub 沒有及時回應。",
-      "rate-limited": "已達 GitHub 的速率上限。請等幾分鐘，再檢查一次。",
+      "rate-limited": "已達 GitHub 的速率上限。請等幾分鐘，然後重新檢查。",
       "not-found": "GitHub 找不到它，或你的帳號看不到它。",
       forbidden: "GitHub 拒絕了你的帳號的這個請求。",
       "github-error": "GitHub 回應了錯誤。",

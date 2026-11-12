@@ -22,7 +22,7 @@ const m: Translation<typeof en> = {
         name: "Teammates",
         role: "獨立上下文與並行開發",
         text: "每位成員有獨立工作目錄；先完成相依任務，互不衝突的工作可同時執行。",
-        scope: "2 至 4 位 Teammates · 共享任務板",
+        scope: "2 至 4 位隊友 · 共享任務板",
       },
       inbox: {
         name: "Team inbox",

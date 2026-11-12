@@ -273,7 +273,7 @@ const m: Translation<typeof en> = {
     },
     issue: {
       label: "相關 issue 連結",
-      help: "只接受 GitHub issue 網址。填了之後，PR 草稿才能寫 Fixes／Refs #編號。送出前請先在 issue 留言表明要處理。",
+      help: "只接受 GitHub issue 網址。填了之後，PR 草稿才能寫 Fixes／Refs #編號。發布前請先在 issue 留言表明要處理。",
     },
     model: {
       heading: "模型與思考強度",

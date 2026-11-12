@@ -176,14 +176,14 @@ test("the demo previews its PR body and needs neither Git nor the GitHub CLI", (
   assert.match(html, /你的示範貢獻，準備好了。/);
   assert.match(html, /你已審閱所有檔案。以下是 PR 的預覽。/);
   assert.match(html, /這是互動示範，不會推送任何內容，也不會在 GitHub 建立 PR/);
-  assert.match(html, /開啟範例 Draft PR/);
+  assert.match(html, /開啟示範 Draft PR/);
   assert.match(html, /<strong>PR 標題<\/strong><pre>Add retry backoff<\/pre>/);
   assert.match(html, /<strong>PR 說明預覽<\/strong><pre>## Summary\n\nRetries GET requests\.<\/pre>/);
   assert.doesNotMatch(html, /會送到 GitHub/);
   assert.doesNotMatch(html, /readiness-notice/);
   assert.doesNotMatch(html, /Commit 作者/);
   // Its checks load with the sample's rules; until then nothing is "sent".
-  assert.match(html, /<button class="button primary" disabled="">.*開啟範例 Draft PR<\/button>/);
+  assert.match(html, /<button class="button primary" disabled="">.*開啟示範 Draft PR<\/button>/);
   assert.doesNotMatch(html, /正在向 GitHub 確認/);
 });
 

@@ -155,7 +155,7 @@ test("only an unfinished local publish offers recovery, with a save-first and bu
     prUrl: undefined, publishedBranch: undefined, headRepository: undefined, followUps: undefined,
   };
   const available = render({ run: interrupted });
-  assert.match(available, /恢復未完成的發佈/);
+  assert.match(available, /恢復未完成的發布/);
   assert.match(available, /檢查遠端，保留程式碼與草稿/);
   assert.doesNotMatch(tag(available, /aria-describedby="publish-recovery-help"/), /disabled=""/);
   const dirty = render({ run: interrupted }, { draftDirty: true });
@@ -176,7 +176,7 @@ test("only an unfinished local publish offers recovery, with a save-first and bu
     { run: { ...interrupted, headRepository: "acme/widgets" } },
     { run: { ...interrupted, followUps: [open] } },
     { run: { ...interrupted, status: "running" as const } },
-  ]) assert.doesNotMatch(render({ run: interrupted, ...props }), /恢復未完成的發佈/);
+  ]) assert.doesNotMatch(render({ run: interrupted, ...props }), /恢復未完成的發布/);
   const english = renderEn(element({ run: interrupted }));
   assert.match(english, /Recover unfinished publish/);
   assert.match(english, /checks the remote, keeps your code and draft/);

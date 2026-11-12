@@ -104,9 +104,9 @@ const m: Translation<typeof en> = {
     listenFailed: ({ address, reason }) =>
       `${name} 無法在 ${address} 監聽：${reason}`,
     failed: ({ reason }) => `${name} 未能啟動：${reason}`,
-    forced: `警告：--force 已略過就緒檢查。執行 \`${bin} doctor\` 可查看缺少的項目。範例導覽不需要 AI 服務；真實的 Agent 任務需要。`,
+    forced: `警告：--force 已略過就緒檢查。執行 \`${bin} doctor\` 可查看缺少的項目。示範導覽不需要 AI 服務；真實的 Agent 任務需要。`,
     notReady: `${name} 沒有啟動。上方清單列出每一項失敗的必要檢查與修正指令。`,
-    sampleTour: `還沒有 AI 服務？先看範例導覽：${bin} start --force`,
+    sampleTour: `還沒有 AI 服務？先看示範導覽：${bin} start --force`,
     uiMissing: ({ path }) =>
       `網頁介面尚未建置：${path} 中沒有 index.html。請在 ${name} 原始碼資料夾執行 \`npm run build\` 後重新啟動；在此之前只有 API 可用。`,
     uiMissingTitle: `${name}：網頁介面尚未建置`,

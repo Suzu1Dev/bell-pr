@@ -229,7 +229,7 @@ const m: Translation<typeof en> = {
       freeLabel: ({ title }) => `釋放「${title}」的空間`,
       freeing: "釋放中…",
       freed: ({ size }) => `已釋放 ${size}。`,
-      confirmFree: "要釋放這個工作的檔案嗎？之後就無法在這裡審閱或發布它的變更。",
+      confirmFree: "要釋放這個任務的檔案嗎？之後就無法在這裡審閱或發布它的變更。",
       confirmPublished: "要釋放這個已發布工作的工作目錄嗎？之後它就無法再做一輪修正或同步。",
       outside: "位於資料目錄之外",
       busy: "進行中",

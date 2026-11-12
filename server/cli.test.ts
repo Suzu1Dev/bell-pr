@@ -622,7 +622,7 @@ test("bell-pr start exits 1 before it listens when doctor is not ready", async (
       ),
     );
     assert.equal(zhCode, 1);
-    const zhSample = "還沒有 AI 服務？先看範例導覽：bell-pr start --force";
+    const zhSample = "還沒有 AI 服務？先看示範導覽：bell-pr start --force";
     const zhHeadlineAt = zh.indexOf("尚未就緒");
     const zhSampleAt = zh.indexOf(zhSample);
     const zhFixAt = zh.indexOf("\n        npm install -g @openai/codex\n");

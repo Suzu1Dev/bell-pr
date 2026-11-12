@@ -24,7 +24,7 @@ const m: Translation<typeof en> = {
     running: "進行中",
     review: "等待你的審閱",
     approved: "已核准",
-    published: "已送出 PR",
+    published: "已發布 PR",
     failed: "執行失敗",
     cancelled: "已停止",
   },

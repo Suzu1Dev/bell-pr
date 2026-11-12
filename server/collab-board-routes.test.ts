@@ -470,7 +470,7 @@ test("dependsOn: work is held only once each task it names is done; a task not d
     pending: [{ taskId: api.taskId, title: "API", held: true }],
   }]);
   const inChinese = await ui([api.taskId], { ...who.dee, "x-bell-locale": "zh-TW" });
-  assert.equal(inChinese.json.error, "這項工作相依的任務還沒完成，所以這次沒有佔用任何路徑。");
+  assert.equal(inChinese.json.error, "這個任務相依的任務還沒完成，所以這次沒有佔用任何路徑。");
   // Blocked comes first: the paths are free, and would be in the way of nobody.
   assert.deepEqual(await f.files(), kept);
   assert.deepEqual((await g.board(project)).held, [api]);

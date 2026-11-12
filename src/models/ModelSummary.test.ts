@@ -20,7 +20,7 @@ const renderEnglish = (props: Props) => {
 
 test("Codex and records without a reported model keep the 未回報 wording", () => {
   const codex = render({ execution: { source: "cli-default" } });
-  assert.match(codex, /Codex 預設（型號未回報）/);
+  assert.match(codex, /Codex 預設（模型未回報）/);
   assert.match(codex, /CLI 沒有回報實際使用的模型/);
   const claude = render({
     execution: { provider: "claude", model: "opus", source: "selected" },

@@ -9,7 +9,7 @@ const m: Translation<typeof en> = {
   exportLearning: "匯出學習紀錄（Markdown）",
   newContribution: "新增貢獻",
   repositoryFallback: "Repository",
-  demoMeta: "範例資料 · 不會送出至 GitHub",
+  demoMeta: "示範資料 · 不會送出至 GitHub",
   progress: "貢獻進度",
   steps: {
     define: { title: "定義任務", description: "設定你的貢獻目標" },
@@ -77,7 +77,7 @@ const m: Translation<typeof en> = {
     recheckFailed: ({ name }) =>
       `目前無法確認檔案佔用狀態。請稍後再試；若小組協作已停止，請先在主機修復並重新啟動 ${name}。`,
   },
-  sampleReview: "範例審閱",
+  sampleReview: "示範審閱",
   humanReview: "人工審閱",
   overlap: {
     label: "與你其他貢獻的重疊",
@@ -301,9 +301,9 @@ const m: Translation<typeof en> = {
   draft: {
     publishOptions: "提交訊息與分支",
     heading: "PR 標題與說明",
-    recoverPublish: "恢復未完成的發佈",
-    recoveryHelp: "上次發佈留下了本機 commit。恢復時會檢查遠端，保留程式碼與草稿，並讓這份貢獻回到審閱。",
-    recoveryNeedsSave: "請先儲存草稿的修改，再恢復未完成的發佈。",
+    recoverPublish: "恢復未完成的發布",
+    recoveryHelp: "上次發布留下了本機 commit。恢復時會檢查遠端，保留程式碼與草稿，並讓這份貢獻回到審閱。",
+    recoveryNeedsSave: "請先儲存草稿的修改，再恢復未完成的發布。",
     syncNotice:
       "這次同步會在 PR 分支加上一個合併 commit，PR 標題與說明維持原樣。請先在「程式碼變更」審閱目標分支改到的檔案，再確認下方的提交訊息。",
     roundNotice:
@@ -362,7 +362,7 @@ const m: Translation<typeof en> = {
     predict: "預測維護者",
   },
   published: {
-    publishing: "正在開啟範例 Draft PR…",
+    publishing: "正在開啟示範 Draft PR…",
   },
   feedback: {
     title: "維護者回饋",
@@ -459,7 +459,7 @@ const m: Translation<typeof en> = {
     waitingPr: ({ number }) => `先閱讀 PR #${number} 的審查意見（開啟 GitHub）`,
     confirmNote: `勾選只代表你知道這些項目還沒處理、願意照目前的說明發布。${product.name} 不會因此改動說明或替你勾選任何項目。這些確認也不會寫進 PR。想先修改，請按「返回編輯草稿」。`,
     back: "返回編輯草稿",
-    finishDemo: "開啟範例 Draft PR",
+    finishDemo: "開啟示範 Draft PR",
     sending: "正在發布…",
     pushing: "正在推送…",
     pushRound: "推送這一輪",
@@ -489,12 +489,12 @@ const m: Translation<typeof en> = {
       "已開始依目前差異重新審查，報告完成後會出現在「審查者怎麼看」。",
     imported: ({ name }) => `已匯入 ${name}`,
     demoPlaybackStarted:
-      "範例團隊開始工作：這裡播放預先寫好的執行過程，不會啟動 Agent，也不會送出任何內容到 GitHub。",
-    demoStopped: "範例團隊已停止。可從「新增貢獻」重新開始。",
+      "示範團隊開始工作：這裡播放預先寫好的執行過程，不會啟動 Agent，也不會送出任何內容到 GitHub。",
+    demoStopped: "示範團隊已停止。可從「新增貢獻」重新開始。",
     chatFailed: ({ message }) => `這次未能取得回答：${message}`,
     roundPushed: "已把這一輪推送到 PR，分支上多了一個 commit。",
     prCreated: "GitHub Draft PR 已建立",
-    publishRecovered: "已恢復未完成的發佈，程式碼與草稿已保留；請重新審閱變更後再核准。",
+    publishRecovered: "已恢復未完成的發布，程式碼與草稿已保留；請重新審閱變更後再核准。",
     feedbackRead: ({ count }) => `已讀取 ${count} 則維護者回饋。`,
     branchInvalid:
       "分支名稱只能用英數字與 . _ - /，不能有 ..，也不能以 . 或 .lock 結尾。",

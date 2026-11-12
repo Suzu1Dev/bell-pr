@@ -35,7 +35,7 @@ const zhTW: DemoContent = buildDemoContent({
     "src/client.ts": {
       example: {
         scenario:
-          "你打開帳戶頁面，程式用 GET 讀取資料，但伺服器暫時回傳 `503`，並附上一段錯誤說明。",
+          "你打開帳號頁面，程式用 GET 讀取資料，但伺服器暫時回傳 `503`，並附上一段錯誤說明。",
         before:
           "這段程式沒有先檢查 HTTP 是否成功，會直接把回覆當成 JSON 資料讀取；即使是 `503`，也不會因為這個狀態碼而重試。",
         after:
@@ -497,7 +497,7 @@ const zhTW: DemoContent = buildDemoContent({
   prFeedback: {
     bodies: {
       review:
-        "謝謝，這個改動很清楚，測試也好讀。合併前還有兩件事：\n\n1. 把 `retry.delay` 改名會讓既有設定失效。請讓 `delay` 再支援一個 minor 版本，並在使用時輸出棄用警告。\n2. 希望補一個重試用盡的測試：超過 `maxRetries` 後，應拋出最後一次的錯誤。",
+        "謝謝，這個變更很清楚，測試也好讀。合併前還有兩件事：\n\n1. 把 `retry.delay` 改名會讓既有設定失效。請讓 `delay` 再支援一個 minor 版本，並在使用時輸出棄用警告。\n2. 希望補一個重試用盡的測試：超過 `maxRetries` 後，應拋出最後一次的錯誤。",
       "retry-after":
         "429 和 503 常會附上 `Retry-After` 標頭。有這個標頭時，等待時間能不能參考它？想另開 issue 後續處理也可以。",
     },

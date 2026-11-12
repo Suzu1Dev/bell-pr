@@ -206,7 +206,7 @@ const discovery = {
       `${product.name} can publish a learn-by-hand run here only if the guide stays within what the project's own text says is fine (${kinds}: "${quote}"), and only after you confirm the project's quoted rule. The maintainers decide whether your change fits.`,
     /** A rule from BELL's owner-signed list of rules projects publish outside their repositories (F14). */
     registry: ({ date }: { date: string }) => `From ${product.name}'s checked list · checked on ${date}`,
-    /** The Agent activity tab's plan heading in a Learn-by-hand run, by team phase (no agent team works in it). */
+    /** The Activity tab's plan heading in a Learn-by-hand run, by team phase (no agent team works in it). */
     board: {
       planning: "The guide is reading the code",
       awaiting_approval: "Your turn: write your plan",

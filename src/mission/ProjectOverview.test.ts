@@ -421,7 +421,7 @@ test("Generate 5 more is always open on a real analysis, with no chip and no upg
   const zh = render({ insights: analyzed });
   assert.match(moreButton(zh), /產出 5 個新建議<\/button>$/);
   assert.doesNotMatch(moreButton(zh), /disabled|pro-badge/);
-  assert.match(moreReason(zh) ?? "", /^沿用這個專案已儲存的模型設定。/);
+  assert.match(moreReason(zh) ?? "", /^沿用已儲存的模型設定。/);
 });
 
 test("Generate 5 more waits for a newer analysis, and stops at 30 recommendations per project", () => {

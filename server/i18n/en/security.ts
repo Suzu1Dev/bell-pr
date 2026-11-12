@@ -17,17 +17,17 @@ export default {
     dockerFix:
       "In Docker, add these options to docker run (see docs/docker.md)",
     codexFix:
-      "Or sign in to Codex and choose it as the provider under Settings → Models",
+      "Or sign in to Codex and choose it as the provider under Settings → AI provider",
     allowFix: `Or allow unsandboxed agents under Settings → Agent safety, or start ${product.name} with this variable (agents then run with your full user rights)`,
     /** An Antigravity write agent whose terminal sandbox cannot start (503). */
-    antigravityUnavailable: `Antigravity agents that edit files and run commands need the Antigravity CLI's terminal sandbox, which is not available on this computer (on Linux it needs user namespaces; on macOS, sandbox-exec). Choose Claude Code or Codex under Settings → Models, or allow unsandboxed agents under Settings → Agent safety.`,
+    antigravityUnavailable: `Antigravity agents that edit files and run commands need the Antigravity CLI's terminal sandbox, which is not available on this computer (on Linux it needs user namespaces; on macOS, sandbox-exec). Choose Claude Code or Codex under Settings → AI provider, or allow unsandboxed agents under Settings → Agent safety.`,
     /** Linux withholds user namespaces from the Antigravity CLI (Ubuntu 24.04 and later by default). */
-    antigravityRestricted: `Antigravity agents that edit files and run commands need the Antigravity CLI's terminal sandbox. It cannot start here, because this Linux system does not let programs create user namespaces (kernel.apparmor_restrict_unprivileged_userns, the Ubuntu default since 24.04). To fix it, allow user namespaces as docs/troubleshooting.md explains, or allow unsandboxed agents under Settings → Agent safety. Choosing Claude Code or Codex under Settings → Models may not help: their sandboxes can need the same Ubuntu setting.`,
+    antigravityRestricted: `Antigravity agents that edit files and run commands need the Antigravity CLI's terminal sandbox. It cannot start here, because this Linux system does not let programs create user namespaces (kernel.apparmor_restrict_unprivileged_userns, the Ubuntu default since 24.04). To fix it, allow user namespaces as docs/troubleshooting.md explains, or allow unsandboxed agents under Settings → Agent safety. Choosing Claude Code or Codex under Settings → AI provider may not help: their sandboxes can need the same Ubuntu setting.`,
     claudeFix:
-      "Or sign in to Claude Code and choose it as the provider under Settings → Models",
+      "Or sign in to Claude Code and choose it as the provider under Settings → AI provider",
     /** The working directory holds customizations the Antigravity CLI would load (422). */
     antigravityWorkspaceConfig: ({ paths }: { paths: string[] }) =>
-      `This project contains Antigravity customizations (${list(paths)}). The Antigravity CLI would load them for every agent, and their hooks and MCP servers run outside any sandbox, so ${product.name} does not start Antigravity in it. Choose Claude Code or Codex under Settings → Models to work on this project.`,
+      `This project contains Antigravity customizations (${list(paths)}). The Antigravity CLI would load them for every agent, and their hooks and MCP servers run outside any sandbox, so ${product.name} does not start Antigravity in it. Choose Claude Code or Codex under Settings → AI provider to work on this project.`,
   },
   /** BELLPR_ALLOWED_ORIGINS (or an origin given to the request guard) is not valid. */
   invalidOrigins:

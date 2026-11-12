@@ -20,7 +20,7 @@ const m: Translation<typeof en> = {
   reasoningEffort: "思考強度",
   network: "網路",
   webAccessAllowed: "已允許上網",
-  defaultModelUnreported: ({ provider }) => `${provider} 預設（型號未回報）`,
+  defaultModelUnreported: ({ provider }) => `${provider} 預設（模型未回報）`,
   passedAndReported: ({ passed, reported }) =>
     `指定 ${passed} · CLI 回報 ${reported}`,
   defaultAndReported: ({ reported }) => `預設模型 · CLI 回報 ${reported}`,
