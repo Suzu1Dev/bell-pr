@@ -526,7 +526,9 @@ export function PublishModal({
           {demo
             ? t.finishDemo
             : busy
-              ? t.sending
+              ? followUp
+                ? t.pushing
+                : t.sending
               : followUp
                 ? t.pushRound
                 : t.submit}

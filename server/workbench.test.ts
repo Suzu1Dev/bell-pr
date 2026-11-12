@@ -956,7 +956,7 @@ test("HTTP errors follow X-Bell-Locale: validation, the guard, the error handler
       body: JSON.stringify({ fingerprint: "a".repeat(64) }),
     }), {
       status: 409,
-      error: "The approved version changed or expired; reload, review and approve again before you publish the PR.",
+      error: "The approved version changed or expired; reload, review and approve again.",
     });
     assert.deepEqual(await errorOf("en", "/api/repos", {
       body: JSON.stringify({ source: "./relative/path" }),

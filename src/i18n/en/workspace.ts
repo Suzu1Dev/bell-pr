@@ -507,7 +507,7 @@ const workspace = {
   followUp: {
     title: "Keep fixing from feedback",
     intro:
-      "Tick the feedback above that you want handled, and add a note if needed. An agent edits the existing worktree; when it finishes, you review each file, confirm the commit message, and push it as a new commit to the same PR. The PR title and description stay as they are; reply to reviewers on GitHub yourself.",
+      "Tick the feedback above that you want handled; add a note if needed. An Agent makes the changes. You then review each file, confirm the commit message and push one new commit to the same PR. The PR title and description stay as they are. Reply to reviewers on GitHub yourself.",
     limit: ({ limit, selected }: { limit: number; selected: number }) =>
       `Up to ${limit} comments per round; ${selected} selected.`,
     note: "Note",
@@ -588,6 +588,7 @@ const workspace = {
     back: "Back to the draft",
     finishDemo: "Open the sample Draft PR",
     sending: "Publishing…",
+    pushing: "Pushing…",
     pushRound: "Push this round",
     submit: "Publish Draft PR",
   },

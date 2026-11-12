@@ -244,7 +244,7 @@ test("files can be left out, and a held-back file can only be left out", async (
   ];
   await assert.rejects(
     en(() => f.workbench.split(f.run.id, { contributions: two([".env"]) })),
-    refused(422, /"\.env" is blocked from review/),
+    refused(422, /"\.env" is held back from review/),
   );
   assert.equal(f.store.data.runs.length, 1);
 

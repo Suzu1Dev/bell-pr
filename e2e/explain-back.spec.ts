@@ -112,7 +112,7 @@ test("the sample passes with its own answers: a correction, a prediction and the
   await reviewAll(page);
   const footer = page.locator(".review-footer");
   await expect(page.locator(".review-progress")).toContainText(workspace.changes.allReviewed);
-  const explain = page.getByRole("button", { name: workspace.footer.explainBack });
+  const explain = footer.getByRole("button", { name: workspace.footer.explainBack });
   await expect(explain).toHaveAttribute("title", workspace.footer.needsCheck);
   await explain.click();
 

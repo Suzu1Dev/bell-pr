@@ -722,7 +722,7 @@ export default {
     duplicatePath: ({ path }: { path: string }) =>
       `"${path}" is in more than one contribution; a file goes to only one.`,
     heldBack: ({ path }: { path: string }) =>
-      `"${path}" is blocked from review, so it cannot be moved; leave it out.`,
+      `"${path}" is held back from review, so it cannot be moved; leave it only in the original.`,
     notReproduced:
       "The copied files did not match the originals, so nothing was split. A Git setting that rewrites files, such as line-ending conversion, can cause this.",
     startedFrom: ({ title }: { title: string }) => `Split from "${title}".`,
@@ -826,7 +826,7 @@ export default {
     roundMessageRequired:
       "Write this follow-up round's commit message and leave no placeholders in it.",
     approvalStale:
-      "The approved version changed or expired; reload, review and approve again before you publish the PR.",
+      "The approved version changed or expired; reload, review and approve again.",
     approveFirst: "Finish the review and approve the PR first.",
     noGithubOrigin:
       "This project has no GitHub source, so it cannot be published.",

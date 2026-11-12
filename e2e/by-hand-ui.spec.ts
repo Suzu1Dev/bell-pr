@@ -588,7 +588,7 @@ test("the task dialog says why BELL won't publish a learn-by-hand run on a banni
   const { page, close } = await open(browser, `#/runs/${runs.writing}/overview`);
   try {
     const mode = discovery.byHand;
-    await page.getByRole("button", { name: workspace.newContribution }).click();
+    await page.locator(".workspace-heading").getByRole("button", { name: workspace.newContribution }).click();
     const dialog = page.getByRole("dialog");
     await dialog.locator("#task-repo").selectOption(banRepoId);
     // A banning project is never a reason to preselect Learn by hand.

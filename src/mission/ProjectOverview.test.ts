@@ -416,7 +416,7 @@ test("Generate 5 more is always open on a real analysis, with no chip and no upg
   assertNoHan(html);
   assert.match(moreButton(html), /Generate 5 more<\/button>$/);
   assert.doesNotMatch(moreButton(html), /disabled|pro-badge/);
-  assert.match(moreReason(html) ?? "", /^Uses this project&#x27;s saved model settings\./);
+  assert.match(moreReason(html) ?? "", /^Uses the saved model settings\./);
   assert.doesNotMatch(html, /pro-badge|mission-upgrade-button|See what Pro adds/);
   const zh = render({ insights: analyzed });
   assert.match(moreButton(zh), /產出 5 個新建議<\/button>$/);

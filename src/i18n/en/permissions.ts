@@ -2,12 +2,12 @@ import { fullAccessDisclosure, sudoDisclosure } from "../../../shared/i18n/discl
 import { product } from "../../../shared/product";
 export default {
   label: "Agent permissions",
-  workspace: "Working directory only (default)",
+  workspace: "Working directory access (default)",
   full: "Full access",
   fullAccessDisclosure,
   fullConfirmTitle: "Use Full access?",
   fullConfirm: "Use Full access",
-  fullCancel: "Keep working directory only",
+  fullCancel: "Keep working directory access",
   summary: "Full access (sandbox and command deny rules lifted)",
   workspaceHelp: "Codex uses its working-directory sandbox. Claude Code and Antigravity keep their OS sandbox and command deny rules unless you separately allowed them without a sandbox. Read-only roles remain restricted.",
   sudoTitle: "Passwordless sudo",

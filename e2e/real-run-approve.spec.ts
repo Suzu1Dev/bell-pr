@@ -161,7 +161,7 @@ test("a seeded real run is approved through the UI and the publish dialog opens 
     // no file question, only what was not tested.
     await page.locator("#workspace-tab-changes").click();
     const check = workspace.check;
-    await page.getByRole("button", { name: workspace.footer.explainBack }).click();
+    await page.locator(".review-footer").getByRole("button", { name: workspace.footer.explainBack }).click();
     const panel = page.locator(".understanding-check");
     await expect(page.locator(".explain-panel")).toHaveCount(0);
     await panel
@@ -252,7 +252,7 @@ test("a passed check counts after the setting is turned off: publishing asks not
 
     // Explain it back while the check is on.
     const check = workspace.check;
-    await page.getByRole("button", { name: workspace.footer.explainBack }).click();
+    await page.locator(".review-footer").getByRole("button", { name: workspace.footer.explainBack }).click();
     const panel = page.locator(".understanding-check");
     await panel
       .getByRole("textbox", { name: check.explainPrompt })

@@ -396,7 +396,7 @@ const m: Translation<typeof en> = {
   followUp: {
     title: "依回饋繼續修正",
     intro:
-      "勾選上方要處理的回饋，必要時補一句說明。一位 Agent 會在原本的工作目錄修改；完成後你逐檔審閱、確認提交訊息，再以新的 commit 推到同一個 PR。PR 標題與說明不會改，回覆 reviewer 請在 GitHub 上自己處理。",
+      "勾選上方要處理的回饋，必要時補一句說明。Agent 修改後，你逐檔審閱、確認提交訊息，再以一個新的 commit 推送到同一個 PR。PR 標題與說明不變。回覆 reviewer 請自己在 GitHub 上處理。",
     limit: ({ limit, selected }) =>
       `一輪最多 ${limit} 則回饋，已選 ${selected} 則。`,
     note: "補充說明",
@@ -461,6 +461,7 @@ const m: Translation<typeof en> = {
     back: "返回編輯草稿",
     finishDemo: "開啟範例 Draft PR",
     sending: "正在發布…",
+    pushing: "正在推送…",
     pushRound: "推送這一輪",
     submit: "發布 Draft PR",
   },

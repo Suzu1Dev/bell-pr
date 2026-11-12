@@ -436,7 +436,7 @@ const m: Translation<typeof en> = {
     followUp: "這個貢獻有一輪修正正在進行，目前無法拆分。",
     unknownPath: ({ path }) => `「${path}」不是這個貢獻有變更的檔案。`,
     duplicatePath: ({ path }) => `「${path}」出現在多個貢獻中；一個檔案只能放進一個貢獻。`,
-    heldBack: ({ path }) => `「${path}」已被擋下、不納入審閱，無法移動；請選擇不移動。`,
+    heldBack: ({ path }) => `「${path}」已被擋下、不納入審閱，無法移動；請讓它只留在原本那份。`,
     notReproduced:
       "複製出來的檔案與原檔不一致，所以沒有拆分。改寫檔案內容的 Git 設定（例如換行轉換）可能造成這種情況。",
     startedFrom: ({ title }) => `拆分自「${title}」。`,
@@ -515,7 +515,7 @@ const m: Translation<typeof en> = {
     reviewAllFirst: "請先審閱每個變更檔案的最新版本、標記為已審閱，並移除被擋下的檔案。",
     prTextRequired: "請先填寫 PR 標題與內容。",
     roundMessageRequired: "請填好這一輪的提交訊息，不要留下待填寫的內容。",
-    approvalStale: "核准版本已更新或失效；請重新載入、審閱並核准，再發布 PR。",
+    approvalStale: "核准版本已更新或失效；請重新載入、審閱並核准。",
     approveFirst: "請先完成審閱並核准 PR。",
     noGithubOrigin: "這個專案沒有 GitHub 來源，無法發布。",
     diffChanged: "變更內容和你核准時不同，請重新審閱與核准。",

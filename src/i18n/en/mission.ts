@@ -238,7 +238,7 @@ const mission = {
     moreLimit: ({ max }: { max: number }) =>
       `This analysis has reached its limit of ${n(max)} recommendations. Pick a direction, or re-analyze the project.`,
     moreHint:
-      "Uses this project's saved model settings. Existing recommendations stay.",
+      "Uses the saved model settings. Existing recommendations stay.",
     generatingStatus:
       "Reading the project and steering clear of the existing directions. You can keep reading the recommendations below.",
     viewAdded: ({ added, requested }: { added: number; requested?: number }) =>

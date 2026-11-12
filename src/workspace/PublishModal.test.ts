@@ -311,6 +311,7 @@ test("a follow-up round previews its commit and pushes to the PR branch instead 
   assert.match(html, /<strong>PR 標題<\/strong><pre>Add retry backoff<\/pre>/);
   assert.match(html, /<pre>## Summary\n\nRetries GET requests\.<\/pre>/);
   assert.match(html, /<button class="button primary">.*推送這一輪<\/button>/);
+  assert.match(render({ run: roundRun, busy: true }, { followUp: round }), /正在推送…/);
 
   const sync = render(
     { run: roundRun },
@@ -385,6 +386,7 @@ test("an open round's publish dialog reads in English with no Chinese left", () 
   assert.match(sync, /<h2 id="modal-title">Push the sync to the PR\.<\/h2>/);
   assertNoHan(sync);
   assert.match(renderEn(element({ busy: true })), /Publishing…/);
+  assert.match(renderEn(element({ run: roundRun, busy: true }, { followUp: round })), /Pushing…/);
 });
 
 test("the server's local-path, workflow and author e-mail checks each need a tick", () => {

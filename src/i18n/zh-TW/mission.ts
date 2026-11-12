@@ -163,7 +163,7 @@ const m: Translation<typeof en> = {
     moreLimit: ({ max }) =>
       `已累積 ${n(max)} 個建議，達到這份分析的上限。可先挑選方向，或重新分析專案。`,
     moreHint:
-      "沿用這個專案已儲存的模型設定。既有建議會保留。",
+      "沿用已儲存的模型設定。既有建議會保留。",
     generatingStatus:
       "正在閱讀專案、避開既有方向，你可以繼續閱讀下方建議。",
     viewAdded: ({ added, requested }) =>
