@@ -203,10 +203,10 @@
 }
 .is-reading .footer-hint,
 .is-focused .topbar,
-.is-focused .workspace-heading {
+.is-reading.is-focused .workspace-heading {
   display: none;
 }
-.is-focused .review-area {
+.is-reading.is-focused .review-area {
   margin: 0;
   border-radius: 0;
 }
@@ -518,6 +518,7 @@
     overflow-x: auto;
   }
   .review-tabs {
+    gap: 18px;
     flex-shrink: 0;
   }
   .review-tabs > button {

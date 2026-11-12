@@ -133,6 +133,14 @@ for (const width of [390, 1024, 1440, 1800]) {
     await expect(explanation).toBeVisible();
     await toggle(workspace.changes.enterFocus).click();
     await expect(page.locator(".app-shell")).toHaveClass(/is-focused/);
+    const heading = page.locator(".workspace-heading");
+    await expect(heading).toBeHidden();
+    await expect(heading).toHaveCSS("display", "none");
+    const review = page.locator(".review-area");
+    await expect(review).toHaveCSS("margin-top", "0px");
+    await expect(review).toHaveCSS("margin-right", "0px");
+    await expect(review).toHaveCSS("margin-bottom", "0px");
+    await expect(review).toHaveCSS("margin-left", "0px");
     await expect(files).toBeHidden();
     await expect(explanation).toBeHidden();
 
