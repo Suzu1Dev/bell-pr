@@ -382,6 +382,12 @@ Full access changes writable roles as described [below](#explicit-full-access).
   full access is on. Reads of other files your user can read are still
   allowed. The profile does not name the system keyring (Secret Service,
   D-Bus, or Keychain).
+- **Web access** (off until you turn it on) sets Codex's web search to
+  `live`; otherwise every turn sets it to `disabled`, because Codex
+  searches a cached index by default. ChatGPT apps (connectors) are off on
+  every turn (`features.apps=false`), full access included: with a ChatGPT
+  sign-in they add a web search tool that stays available with web search
+  disabled (seen with Codex CLI 0.167).
 
 ### Antigravity
 

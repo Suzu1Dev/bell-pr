@@ -195,6 +195,12 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   discovery too (seen with Codex CLI 0.167). Every Codex turn now states
   the setting: `web_search="live"` with web access on, and
   `web_search="disabled"` otherwise.
+- **Codex agents no longer get ChatGPT apps (connectors).** With a ChatGPT
+  sign-in, Codex offers its apps to every turn. They include a web search
+  tool that stays available with web search disabled (seen with Codex CLI
+  0.167), and the run log did not record its queries. Every Codex turn now
+  starts with `features.apps=false`, with web access on or off, as BELL PR
+  already keeps your own MCP servers away from agents.
 
 ## [1.1.0] - 2026-11-04
 

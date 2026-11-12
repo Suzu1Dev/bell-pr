@@ -124,6 +124,8 @@ test("Codex arguments keep the existing sandbox, approval and schema flags", asy
       'approval_policy="never"',
       "-c",
       'web_search="disabled"',
+      "-c",
+      "features.apps=false",
       "--json",
       "--color",
       "never",
@@ -608,6 +610,9 @@ test("web access adds Claude Code's WebSearch/WebFetch and Codex live search for
     );
     assert.ok(!codexOn.args.includes("--search"));
     assert.equal(codexOff.args.filter((arg) => arg.startsWith("web_search=")).length, 1);
+    // ChatGPT apps carry a search tool of their own, so they are off either way.
+    assert.ok(codexOn.args.includes("features.apps=false"));
+    assert.ok(codexOff.args.includes("features.apps=false"));
     assert.deepEqual(await agentCommand(codex, { cwd: "/work/tree", access, web: false }), codexOff);
   }
   // curl and wget stay denied with web on: WebFetch is the sanctioned way to read a page.
