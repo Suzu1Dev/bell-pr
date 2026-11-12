@@ -108,7 +108,7 @@ const answers: Record<string, string | ((input: TeamAgentInput) => string)> = {
           reason: "A flaky server stops breaking the page.",
           concept: "Retry\nTrying a safe request again.",
           tip: "Test a 503 followed by a 200.",
-          example: { scenario: "A shop page loads.", before: "The page showed an error.", after: "The page loads on the second try." },
+          example: { scenario: "A shop page loads.", before: "The page showed an error.", after: "The page loads on the second try.", beforeSteps: [], afterSteps: [] },
           alternatives: "A circuit breaker.",
           lookup: ["retry"],
           selfCheck: { question: "Why only GET?", answer: "A GET can be sent twice safely." },

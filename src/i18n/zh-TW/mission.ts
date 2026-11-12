@@ -99,6 +99,8 @@ const m: Translation<typeof en> = {
     title: "第一次讀這個專案，建議這樣讀",
     lead: "依 Agent 讀過的抽樣檔案排出順序；每一步說明為什麼先看它、看什麼。",
     flow: "模組怎麼串起來",
+    flowOutside: "在這個專案之外",
+    flowPasses: "傳給下一步：",
     unsampled: "未抽樣，內容未讀",
     lookFor: "看什麼",
     context: "這個檔案在分析中的其他說明",

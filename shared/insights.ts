@@ -86,6 +86,16 @@ export interface RecommendationVerification {
   }[];
 }
 
+/** One step of the project's main flow, drawn as a diagram. */
+export interface ProjectFlowStep {
+  /** A short name: a few words. */
+  label: string;
+  /** One of the analysis's module paths, or "" for something outside the repository. */
+  path: string;
+  /** What moves from this step to the next, in a few words; "" on the last step. */
+  passes: string;
+}
+
 export interface ProjectInsights {
   modelExecution?: ModelExecution;
   efficiency?: EfficiencyMetrics;
@@ -103,6 +113,8 @@ export interface ProjectInsights {
   readingPath?: { path: string; why: string; lookFor: string; sampled?: boolean }[];
   /** One main data flow traced through the sampled files; inferences are labelled in prose. */
   howItFitsTogether?: string;
+  /** That flow as steps in order. Optional: analyses saved before the diagram have none. */
+  flow?: ProjectFlowStep[];
   evidence: { path: string; note: string }[];
   recommendations: ContributionRecommendation[];
   verification?: RecommendationVerification;

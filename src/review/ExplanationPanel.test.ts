@@ -49,6 +49,36 @@ test("a demo file with an explanation renders every learning section", () => {
   assert.doesNotMatch(html, /AI 生成/);
 });
 
+test("the example draws both columns' steps and marks the ones that differ; a card without both lists shows only the prose", () => {
+  const file = demoFiles[0];
+  const example = file.explanation!.example!;
+  const html = render(file);
+  const chains = html.match(/<ol class="explain-example-steps">[\s\S]*?<\/ol>/g) ?? [];
+  assert.equal(chains.length, 2);
+  for (const [chain, steps] of [
+    [chains[0], example.beforeSteps!],
+    [chains[1], example.afterSteps!],
+  ] as const) {
+    const changed = steps.filter((step) => step.changed).length;
+    assert.ok(changed > 0 && changed < steps.length, "the sample marks some steps, not all");
+    assert.equal(chain.match(/<li>/g)?.length, steps.length);
+    // A step that differs is marked by its class, an icon and hidden text, not colour alone.
+    assert.equal(chain.match(/explain-example-step-changed/g)?.length, changed);
+    assert.equal(chain.match(/class="lucide lucide-diff" aria-hidden="true"/g)?.length, changed);
+    assert.equal(chain.match(/<span class="visually-hidden">這一步不同： <\/span>/g)?.length, changed);
+    for (const step of steps) assert.ok(chain.includes(step.label), step.label);
+  }
+  // Each chain sits between its column's heading and its prose; no new heading.
+  assert.match(html, /<h4>修改前<\/h4><ol class="explain-example-steps">/);
+  assert.match(html, /修改後<\/h4><ol class="explain-example-steps">/);
+  const { beforeSteps: _before, afterSteps: _after, ...stepless } = example;
+  for (const without of [stepless, { ...example, afterSteps: [] }]) {
+    const plain = render({ ...file, explanation: { ...file.explanation!, example: without } });
+    assert.doesNotMatch(plain, /explain-example-steps|這一步不同/);
+    assert.match(plain, /<h4>修改前<\/h4>/);
+  }
+});
+
 test("test files get a reading hint and extra presets while source files keep the fixed three", () => {
   const testFile = demoFiles.find((file) => file.path === "tests/retry.test.ts")!;
   const html = render(testFile);
