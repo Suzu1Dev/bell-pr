@@ -55,6 +55,8 @@ without JavaScript, all seven commands are visible together.
   `title` tag fails the check, because the text after it would not be read.
   After the kept English names in `check-site.mjs` are removed, any remaining
   Latin letter fails, whether or not the English page contains that string.
+  A language-switch link with `lang="en"` or `hreflang="en"` keeps the
+  English autonym and is not checked.
   A CJK character and a Latin letter or digit need a space between them,
   including in those attributes and inside `code`, `pre` and `kbd`. Inline
   tags in between do not count, a new block does, and full-width punctuation

@@ -41,7 +41,7 @@
           </ul>
         </nav>
         <nav class="lang-switch" aria-label="語言">
-          <a href="../install.html" hreflang="en">英文</a>
+          <a href="../install.html" hreflang="en" lang="en">English</a>
           <span class="sep" aria-hidden="true">/</span>
           <a href="install.html" hreflang="zh-Hant-TW" lang="zh-Hant-TW" aria-current="true">中文</a>
         </nav>
@@ -183,7 +183,7 @@ brew install suzu1dev/bell-pr/bell-pr<!-- /generated:install-commands --></code>
               <li><strong>Git 2.40 以上</strong>，將貢獻移到最新目標分支時需要。</li>
               <li><strong>GitHub CLI</strong>（<code>gh</code>），以 <code>gh <wbr>auth <wbr>login</code> 登入。BELL PR 用它發布 Draft PR 並尋找專案。</li>
               <li><strong>一套 AI 程式設計 CLI</strong>，已安裝並登入：OpenAI Codex CLI；搭配你的 Claude 方案或 Anthropic API 金鑰的 Claude Code；或搭配你的 Google 帳號、Gemini API 金鑰或 Google Cloud 憑證的 Antigravity CLI。用量計入你自己的帳號。</li>
-              <li><strong>在 Linux 上需要 bubblewrap 與 socat</strong>（例如 <code>sudo <wbr>apt-get <wbr>install <wbr>bubblewrap <wbr>socat</code>），讓會修改程式碼的 Claude Code agents 能在作業系統沙箱中執行。</li>
+              <li><strong>在 Linux 上需要 bubblewrap 與 socat</strong>（例如 <code>sudo <wbr>apt-get <wbr>install <wbr>bubblewrap <wbr>socat</code>），讓會修改程式碼的 Claude Code Agent 能在作業系統沙箱中執行。</li>
             </ul>
             <p><code>bell-pr <wbr>doctor</code> 會檢查以上項目，並說明如何補齊缺少的部分。</p>
 
@@ -234,7 +234,7 @@ bell-pr</code></pre>
             </ul>
 
             <h2 id="docker">用 Docker 執行（beta）</h2>
-            <p class="notice">Docker 支援目前為 beta。在 Docker 預設安全設定下，agents 無法啟動其沙箱，因此分析、審查與程式碼變更會卡住。若要讓它們運作，請在 <code>docker <wbr>run</code> 加上 <code>--security-opt <wbr>seccomp=unconfined <wbr>--security-opt <wbr>apparmor=unconfined <wbr>--security-opt <wbr>systempaths=unconfined</code>。這些選項會放寬容器本身的限制，好讓 agent 沙箱能啟動；請只在你能掌控的機器上使用。</p>
+            <p class="notice">Docker 支援目前為 beta。在 Docker 預設安全設定下，Agent 無法啟動其沙箱，因此分析、審查與程式碼變更會卡住。若要讓它們運作，請在 <code>docker <wbr>run</code> 加上 <code>--security-opt <wbr>seccomp=unconfined <wbr>--security-opt <wbr>apparmor=unconfined <wbr>--security-opt <wbr>systempaths=unconfined</code>。這些選項會放寬容器本身的限制，好讓 Agent 沙箱能啟動；請只在你能掌控的機器上使用。</p>
             <p>從取出的原始碼建置映像後執行：</p>
             <pre><code>docker build -t bell-pr .</code></pre>
             <pre><code>docker run -d --name bell-pr \
@@ -247,14 +247,14 @@ bell-pr</code></pre>
   bell-pr</code></pre>
             <ul>
               <li><code>-p <wbr>127.0.0.1:4311:4311</code> 只在本機迴路介面上公開埠號，因此網路上的其他裝置無法連到 BELL PR。容器內 BELL PR 會監聽所有介面，所以絕不要在沒有 <code>127.0.0.1:</code> 的情況下公開埠號。對外公開時，僅剩 API 權杖保護完整存取。請保持埠號私有；遠端存取請使用搭配 <code>BELLPR_PUBLIC_URL</code> 的 <code>tailscale <wbr>serve</code>，或 <code>ssh <wbr>-L</code>。</li>
-              <li><code>bellpr-data</code> 磁碟區保存你的儲存庫、執行紀錄與筆記；<code>bellpr-home</code> 保存容器內工具的登入狀態。</li>
+              <li><code>bellpr-data</code> 磁碟區保存你的 repository、執行紀錄與筆記；<code>bellpr-home</code> 保存容器內工具的登入狀態。</li>
               <li>可用 <code>docker <wbr>exec <wbr>bell-pr <wbr>bell-pr <wbr>open <wbr>--print <wbr>--print-token</code> 再次取得位址。<code>--print-token</code> 會包含 API 權杖；請勿分享該位址。</li>
               <li>映像內含 Git、GitHub CLI 與 Codex CLI。<code>-e <wbr>OPENAI_API_KEY</code> 會把你的 OpenAI 金鑰傳給 Codex CLI；也可以在容器內登入。可用 <code>-e <wbr>GIT_AUTHOR_NAME</code>、<code>-e <wbr>GIT_AUTHOR_EMAIL</code>、<code>-e <wbr>GIT_COMMITTER_NAME</code> 與 <code>-e <wbr>GIT_COMMITTER_EMAIL</code> 設定提交的 Git 身分。</li>
               <li>Claude Code 未預先安裝。若要使用，請執行 <code>docker <wbr>exec <wbr>-it <wbr>bell-pr <wbr>npm <wbr>install <wbr>-g <wbr>@anthropic-ai/claude-code</code>，接著 <code>docker <wbr>exec <wbr>-it <wbr>bell-pr <wbr>claude <wbr>auth <wbr>login</code>。</li>
             </ul>
 
             <h2 id="next">下一步</h2>
-            <p>開啟範例專案查看一份完成的貢獻，再匯入你想貢獻的儲存庫。在你發布 Draft PR 之前，一切都留在你的電腦上。原始碼儲存庫在 <code>docs/security-model.md</code> 說明 agents 在你電腦上可做什麼，在 <code>docs/privacy-and-data.md</code> 說明什麼會離開你的電腦。</p>
+            <p>開啟範例專案查看一份完成的貢獻，再匯入你想貢獻的 repository。在你發布 Draft PR 之前，一切都留在你的電腦上。原始碼 repository 在 <code>docs/security-model.md</code> 說明 Agent 在你電腦上可做什麼，在 <code>docs/privacy-and-data.md</code> 說明什麼會離開你的電腦。</p>
           </div>
         </div>
       </section>

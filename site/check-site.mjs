@@ -21,6 +21,8 @@
  *   meta text below are checked. Text inside code, pre or kbd is skipped.
  *   After the kept English names in this file are removed, any remaining
  *   Latin letter fails, whether or not the English page has that string.
+ *   A language-switch link with lang="en" or hreflang="en" keeps the
+ *   English autonym and is not checked.
  *   A CJK character and a Latin letter or digit also need a space between
  *   them (tags in between do not count; full-width punctuation does not
  *   need a space). In site.js the zh side of `isZh ? zh : en` must not be
@@ -90,13 +92,13 @@ const listedInReadme = (value) => readme.includes(value);
 
 /**
  * Names that stay English on zh-tw pages. Longest first, so "Claude Code"
- * is removed before "Claude", "agents" before "agent", and "BELL PR" before
- * "BELL". A checked string fails when any Latin letter remains after these
- * are removed. "macOS · Linux" passes. "Deploy now" does not.
+ * is removed before "Claude" and "BELL PR" before "BELL". A checked string
+ * fails when any Latin letter remains after these are removed.
+ * "macOS · Linux" passes. "Deploy now" does not.
  *
  * Brand, product and tool names, plus terms the Traditional Chinese pages
- * keep on purpose (issue, pull request, vibe coding, Draft PR, the role
- * names, CLI, API, AI). Not a list of phrases copied from the pages.
+ * keep on purpose: issue, pull request, repository, diff, vibe coding,
+ * Draft PR, Agent (capitalized), the role names, CLI, API and AI.
  */
 const keptInEnglish = [
   "Apache License",
@@ -113,6 +115,7 @@ const keptInEnglish = [
   "Draft PR",
   "Test analyst",
   "bubblewrap",
+  "repository",
   "Teammates",
   "teammates",
   "teammate",
@@ -130,7 +133,6 @@ const keptInEnglish = [
   "Docker",
   "Ubuntu",
   "Debian",
-  "agents",
   "macOS",
   "Linux",
   "Windows",
@@ -141,7 +143,7 @@ const keptInEnglish = [
   "WSL",
   "Apache",
   "Agent",
-  "agent",
+  "diff",
   "PATH",
   "npm",
   "npx",
@@ -186,6 +188,13 @@ function decodeEntities(text) {
  * Visible text nodes, excluding code, pre and kbd. Whitespace is collapsed.
  * `unclosed` names a skip tag still open at the end; text after it was not checked.
  */
+/** A language-switch link written in English (`lang="en"` or `hreflang="en"`). */
+function englishSwitch(raw) {
+  const lang = raw.match(/\slang="([^"]*)"/i)?.[1] ?? "";
+  const hrefLang = raw.match(/\shreflang="([^"]*)"/i)?.[1] ?? "";
+  return /^en\b/i.test(lang) || /^en\b/i.test(hrefLang);
+}
+
 function visibleTextNodes(html) {
   const nodes = [];
   const stack = [];
@@ -205,9 +214,9 @@ function visibleTextNodes(html) {
         if (raw.startsWith("/")) {
           const name = raw.slice(1).trim().split(/\s/)[0].toLowerCase();
           for (let at = stack.length - 1; at >= 0; at -= 1) {
-            if (stack[at] === name) {
+            if (stack[at].tag === name) {
               // A parent close must not hide a skip tag that was never closed.
-              unclosed ??= stack.slice(at + 1).find((tag) => skipTextTags.has(tag));
+              unclosed ??= stack.slice(at + 1).find((frame) => skipTextTags.has(frame.tag))?.tag;
               stack.splice(at);
               break;
             }
@@ -216,17 +225,20 @@ function visibleTextNodes(html) {
         continue;
       }
       const tag = raw.split(/[\s/>]/)[0].toLowerCase();
-      if (!raw.endsWith("/") && !voidTags.has(tag)) stack.push(tag);
+      if (!raw.endsWith("/") && !voidTags.has(tag)) {
+        const inherited = stack.at(-1)?.english ?? false;
+        stack.push({ tag, english: inherited || englishSwitch(raw) });
+      }
       continue;
     }
     const end = html.indexOf("<", index);
     const raw = html.slice(index, end === -1 ? html.length : end);
     index = end === -1 ? html.length : end;
-    if (stack.some((tag) => skipTextTags.has(tag))) continue;
+    if (stack.some((frame) => skipTextTags.has(frame.tag) || frame.english)) continue;
     const text = decodeEntities(raw).replace(/\s+/g, " ").trim();
     if (text) nodes.push(text);
   }
-  return { texts: nodes, unclosed: unclosed ?? stack.find((tag) => skipTextTags.has(tag)) };
+  return { texts: nodes, unclosed: unclosed ?? stack.find((frame) => skipTextTags.has(frame.tag))?.tag };
 }
 
 /** True when `text` is only kept names, separators and digits. */
