@@ -10,7 +10,7 @@
 // stand-in's turn held) read with GETs only. The tests of each server
 // share it and run in order. Axe checks each new view.
 import AxeBuilder from "@axe-core/playwright";
-import { expect, request, test, type Browser, type Page } from "@playwright/test";
+import { expect, request, test, type Browser, type Page, type Response } from "@playwright/test";
 import { e2eApiHeaders } from "./api-token.mjs";
 import { readyNow } from "../shared/by-hand";
 import { changeFingerprint } from "../shared/change-fingerprint";
@@ -18,7 +18,7 @@ import panelStrings from "../src/review/i18n/en";
 import panelStringsZh from "../src/review/i18n/zh-TW";
 import { expectNoOverflow } from "./helpers/overflow";
 import { messages } from "./helpers/messages";
-import { files, prUrl, runId, startRealProject, type RealProject } from "./helpers/real-project";
+import { files, prUrl, repoId, runId, startRealProject, type RealProject } from "./helpers/real-project";
 
 const t = messages.en;
 const zh = messages["zh-TW"];
@@ -372,10 +372,36 @@ test.describe("a Learn-by-hand run in review, marked ready", () => {
       await page.getByRole("tab", { name: t.review.panel.tabs.walkthrough }).click();
       await page.locator(`.file-item[title="${files.format}"]`).click();
       await expect(page.locator(".file-item.selected")).toHaveAttribute("title", files.format);
-      await page.reload();
+      // Logged before reload, then kept only if the read started after it.
+      // The clock runs the 2s–4s timers; the round trip lets a timer's POST land.
+      const seen: Response[] = [];
+      page.on("response", (response) => seen.push(response));
+      await page.clock.install();
+      const navigation = await page.reload({ waitUntil: "commit" });
+      if (!navigation) throw new Error("The reload did not commit.");
+      const reloadedAt = navigation.request().timing().startTime;
+      const readAfterReload = (path: string) => new Promise<void>((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error(`No GET ${path} after reload.`)), 5_000);
+        const matches = (response: Response) =>
+          response.request().method() === "GET" &&
+          new URL(response.url()).pathname === path &&
+          response.request().timing().startTime >= reloadedAt;
+        const finish = () => {
+          if (!seen.some(matches)) return;
+          clearTimeout(timer);
+          page.off("response", finish);
+          resolve();
+        };
+        page.on("response", finish);
+        finish();
+      });
+      const understanding = readAfterReload(`/api/runs/${runId}/understanding`);
+      const insights = readAfterReload(`/api/repos/${repoId}/insights`);
       await expect(page.locator(".explain-panel")).toBeVisible();
-      // The polls and refreshes of a few seconds pass; the network log stays empty.
-      await page.waitForTimeout(3_000);
+      await understanding;
+      await insights;
+      await page.clock.runFor(5_000);
+      await page.evaluate(() => undefined);
       expect(asked).toEqual([]);
       const after = (await (await page.request.get(`/api/runs/${runId}/diff`)).json()) as {
         files: { explanationStatus?: string; walkthroughStatus?: string }[];

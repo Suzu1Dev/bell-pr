@@ -181,8 +181,19 @@ test.afterAll(async () => {
 
 /** No serious or critical axe issue, color contrast included, within `selector`. */
 async function expectAccessible(page: Page, selector: string) {
-  await page.evaluate(() => document.fonts.ready);
-  await page.waitForTimeout(300);
+  // The dialog fades in on its backdrop. Axe reads contrast once that paint, and any other finite animation on the region, has finished.
+  await page.evaluate(async (root) => {
+    await document.fonts.ready;
+    const scope = document.querySelector(root);
+    const animations: Animation[] = [];
+    for (let node: Element | null = scope; node; node = node.parentElement) animations.push(...node.getAnimations());
+    if (scope) animations.push(...scope.getAnimations({ subtree: true }));
+    await Promise.allSettled(
+      animations
+        .filter((animation) => animation.effect?.getComputedTiming().endTime !== Infinity)
+        .map((animation) => animation.finished),
+    );
+  }, selector);
   const results = await new AxeBuilder({ page }).options({ rules: { "color-contrast": { enabled: true } } }).include(selector).analyze();
   const serious = results.violations.filter((violation) => violation.impact === "serious" || violation.impact === "critical");
   expect(serious.map((violation) => `${violation.id}: ${violation.nodes.map((node) => node.target.join(" ")).join(", ")}`)).toEqual([]);
@@ -265,12 +276,16 @@ test("the same failure three times is checked in once per step and failing run, 
     await expect.poll(() => posts.length).toBe(expected);
     if (expected) expect(posts[0]).toEqual({ stepId: "s2", signal: "repeat-failure" });
     // The panel mounts again (another tab, then back; a reload): no second check-in for the same failing run.
+    const testCommand = (response: { url(): string }) => new URL(response.url()).pathname === `/api/runs/${runs.repeat}/by-hand/test-command`;
     await page.locator("#workspace-tab-overview").click();
-    await page.locator("#workspace-tab-changes").click();
+    // Finish this read before arming the reload's waiter, or the tab switch's answer can satisfy it.
+    await Promise.all([page.waitForResponse(testCommand), page.locator("#workspace-tab-changes").click()]);
     await expect(guide).toBeVisible();
+    // Armed before reload: on a fast loopback the read can finish before a listener attached after commit.
+    const settled = page.waitForResponse(testCommand);
     await page.reload();
     await expect(guide).toBeVisible();
-    await page.waitForTimeout(1500);
+    await settled;
     expect(posts).toHaveLength(expected);
   } finally {
     await close();
