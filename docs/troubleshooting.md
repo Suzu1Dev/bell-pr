@@ -24,6 +24,10 @@ versions BELL PR supports (2.1.292 or later, before 2.2); agents still
 start, and the [security model](security-model.md#claude-code) says why
 the version matters.
 
+On Linux, the Passwordless sudo line fails when BELL PR's sudo rule is past
+its expiry time or has none; run the `sudo rm` command it prints. Add
+`--sudoers-path <file>` to inspect another file; the check only reads it.
+
 Contents:
 
 - [I lost the address](#i-lost-the-address)

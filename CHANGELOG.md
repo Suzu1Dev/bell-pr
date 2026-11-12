@@ -146,6 +146,18 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- **The sudo helper is now host-local only and enabled for a limited time.**
+  Each enable asks for the sudo password and a duration from 1 minute to
+  8 hours (1 hour by default). BELL PR removes the rule when the time is up
+  and, at startup, removes a rule past its time or without an end time (such
+  as one installed by 1.0.0 or 1.1.0; if removal needs a password,
+  `bell-pr doctor` prints the `sudo rm` command). While it is on, it cannot
+  be enabled again to move its end time; remove it first. Only the install
+  token, from this computer at `localhost`, `127.0.0.1` or `[::1]` and
+  without proxy headers, may use it; paired devices may not. Changes are
+  recorded in `audit/sudo.jsonl` in the data directory, never with the
+  password. `bell-pr doctor` reports a rule past its time or without one, and
+  `--sudoers-path <file>` picks the file it inspects.
 - **A sync snapshot does not count as another copy of a recovered commit.**
   `refs/bellpr/sync/<run>` is removed with the run's files, so a
   publish-recovery ref is kept when that snapshot is the only other ref
