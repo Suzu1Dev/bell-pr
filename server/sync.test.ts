@@ -592,14 +592,14 @@ test("an agent resolves sync conflicts for review, leftover markers keep blockin
     await f.write("hello.ts", "line one\nline two, mine\nline three\n");
     await f.github.upstreamCommit({ "hello.ts": "line one\nline two, theirs\nline three\n" });
     await f.workbench.syncRun(f.run.id);
-    // Leftover markers keep approval blocked and are named in the report.
+    // Leftover markers keep approval blocked and are named in the run log.
     behaviour = "partial";
     await f.workbench.resolveConflicts(f.run.id);
     assert.equal(f.run.status, "running");
     await until(() => f.run.status === "review");
     assert.match(prompt, /hello\.ts/);
     assert.match(prompt, /latest main/);
-    assert.match(f.run.sync!.report!, /仍有衝突標記：hello\.ts/);
+    assert.match(f.run.logs.at(-1)!.message, /仍有衝突標記：hello\.ts/);
     await f.reviewAll();
     await assert.rejects(f.workbench.approve(f.run.id, { ...f.run.draft }), /衝突標記/);
     // An agent that commits is undone; its resolution waits for review.

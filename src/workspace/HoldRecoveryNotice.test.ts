@@ -137,7 +137,7 @@ test("legacy runs without heldPaths render legacy copy without an empty list, av
   };
   const html = renderEn(element({ run: legacyRun }));
   assertNoHan(html);
-  assert.match(html, /This run stopped earlier because it changed files someone else held\./);
+  assert.match(html, /<p>Put these files back, or check current holds again\.<\/p>/);
   assert.doesNotMatch(html, /hold-stop-list/);
   assert.match(html, />Put these files back<\/button>/);
 

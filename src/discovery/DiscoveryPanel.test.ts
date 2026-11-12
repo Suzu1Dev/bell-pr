@@ -130,7 +130,7 @@ test("an English render of a finished discovery has no Han", () => {
   assert.match(html, /<span>Found 1 opportunity\.<\/span><small>Searched [^<]*2026[^<]*<\/small>/);
   assert.match(html, /<summary>Scope and limits of this search · 1<\/summary>/);
   assert.match(html, /aria-label="Recommended contributions"/);
-  assert.match(html, /YOUR CONTRIBUTION SHORTLIST/);
+  assert.match(html, /<h2>Suggested contributions<\/h2>/);
   assert.match(html, /in the &quot;Stars&quot; order you chose/);
   assert.match(html, /<span class="discovery-count">1 opportunity<\/span>/);
   // The opportunity card
@@ -173,7 +173,7 @@ test("English renders of the other discovery states have no Han", () => {
     modelExecution: undefined,
   });
   assert.match(running, /aria-label="Discovery progress"/);
-  assert.match(running, /RESEARCH IN PROGRESS/);
+  assert.match(running, /<h2 role="status">Checking contribution rules…<\/h2>/);
   assert.match(running, /<strong>Search projects<\/strong>/);
   assert.match(running, /<strong>Check the rules and needs<\/strong>/);
   assert.match(running, /Stop discovery/);
@@ -187,7 +187,6 @@ test("English renders of the other discovery states have no Han", () => {
       opportunities: job.opportunities,
     },
   });
-  assert.match(previous, /PREVIOUS RESULTS/);
   assert.match(previous, /Your previous recommendations are still here\./);
   assert.match(previous, /These results are from [^<]*2026[^<]* and do not reflect/);
 });
@@ -314,7 +313,7 @@ test("the sample project shows its sample results as ordinary sample data", () =
   assertNoHan(html);
   assert.match(
     html,
-    /<div class="discovery-sample-banner" role="note"><strong>Sample results — not live<\/strong><span>These fictional projects show what discovery finds\./,
+    /<div class="discovery-sample-banner" role="note"><strong>Sample results — not live<\/strong><span>These projects are fictional\./,
   );
   assert.match(html, /Nothing here comes from GitHub or an AI, and they cannot be imported\./);
   assert.doesNotMatch(html, /pro-badge|Upgrade|trial/i);
@@ -334,7 +333,7 @@ test("the sample project shows its sample results as ordinary sample data", () =
     html.match(/<button class="button primary" disabled="">.*?Import project and set up task<\/button>/g)?.length,
     sample.opportunities.length - byHand,
   );
-  assert.match(html, /A sample cannot be imported\. Live discovery finds real projects you can import\./);
+  assert.match(html, /<p>A sample cannot be imported\.<\/p>/);
   // The heading's note describes a live search, not one the reader ran.
   assert.match(html, /A live search takes 12 candidates in the order you choose/);
   assert.doesNotMatch(html, /order you chose/);
@@ -415,13 +414,13 @@ test("the language notice follows the previous results on screen, not the search
   const empty = { ...job, message: "No suitable opportunity found.", candidates: [], opportunities: [] };
   // Chinese results kept under an English search that found nothing.
   const chinese = panel({ ...empty, locale: "en", previousResult: earlier("zh-TW") }, live);
-  assert.match(chinese, /PREVIOUS RESULTS/);
+  assert.match(chinese, /Your previous recommendations are still here\./);
   assert.match(chinese, /These results were written in Traditional Chinese\. Search again to get them in English\./);
   // English results kept under a Chinese search, and results saved before
   // their language was recorded, say nothing.
   for (const previousResult of [earlier("en"), earlier()]) {
     const html = panel({ ...empty, locale: "zh-TW", previousResult }, live);
-    assert.match(html, /PREVIOUS RESULTS/);
+    assert.match(html, /Your previous recommendations are still here\./);
     assert.doesNotMatch(html, /discovery-locale-notice/);
   }
   // No results on screen: nothing to describe.

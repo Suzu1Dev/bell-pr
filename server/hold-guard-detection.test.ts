@@ -289,8 +289,8 @@ test("outside-BELL-PR commits on held paths are detected and reported to the hol
     message:
       "Commits on main changed files under your hold since you took it. Check those changes before publishing.",
     details: [
-      `docs/old.md changed on main since your hold (${c2.slice(0, 7)})`,
-      `src/api/users.ts changed on main since your hold (${c1.slice(0, 7)})`,
+      `docs/old.md (${c2.slice(0, 7)})`,
+      `src/api/users.ts (${c1.slice(0, 7)})`,
     ],
   });
   const checksZh = await s.preflight(run.id, s.who.admin, chinese);
@@ -300,8 +300,8 @@ test("outside-BELL-PR commits on held paths are detected and reported to the hol
     kind: "confirm",
     message: "在你佔用期間，main 上有提交改到你佔用的檔案。發佈前請先確認這些變更。",
     details: [
-      `docs/old.md：在你佔用期間，main 上有變更（${c2.slice(0, 7)}）`,
-      `src/api/users.ts：在你佔用期間，main 上有變更（${c1.slice(0, 7)}）`,
+      `docs/old.md（${c2.slice(0, 7)}）`,
+      `src/api/users.ts（${c1.slice(0, 7)}）`,
     ],
   });
 

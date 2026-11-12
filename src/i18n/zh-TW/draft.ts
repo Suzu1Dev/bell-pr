@@ -53,8 +53,8 @@ const m: Translation<typeof en> = {
       noRules: "未附額外寫作規範，請對照來源文件確認草稿段落。",
     },
     checks: {
-      title: "送出前由你確認",
-      intro: "以下是核對提醒，尚未代表完成檢查。",
+      title: "這份建議的核對提醒",
+      intro: "這些項目沒有替你檢查過。",
     },
     preview: "預覽建議草稿",
     apply: {
@@ -103,7 +103,7 @@ const m: Translation<typeof en> = {
       factsRead: ({ date }) => `GitHub 讀取於 ${date}`,
       status: {
         ok: "沒問題",
-        confirm: "需要確認",
+        confirm: "需要你確認",
         block: "阻擋發布",
         unknown: "無法確認",
         off: "已關閉",
@@ -149,7 +149,7 @@ const m: Translation<typeof en> = {
       wordsOk: `說明不是 ${product.name} 建議的文字。它是不是用你自己的話寫出你理解的內容，只有你能判斷。`,
       wordsUnknown: `${product.name} 沒有建議的說明可以比對。請確認它是用你自己的話寫出你理解的內容。`,
       reviewable: ({ band, lines, files }) =>
-        `依 ${product.name} 的預設分級為「${band}」：${fmt.number(files)} 個檔案共 ${fmt.number(lines)} 行變更。`,
+        `「${band}」（${product.name} 預設）：${fmt.number(files)} 個檔案共 ${fmt.number(lines)} 行變更。`,
       disclosureRequired: "專案要求揭露，而說明裡已經寫了。",
       disclosureWaits: "專案要求揭露，寫上之前發布會先等著。",
       disclosureChoice: `${product.name} 讀過的檔案沒有要求揭露；要不要加上由你決定。`,
@@ -197,7 +197,7 @@ const m: Translation<typeof en> = {
       title: "發布前檢查",
       intro: "發布時會對已儲存的草稿執行相同檢查。阻擋項目修正前無法發布；其他項目需要你確認。",
       block: "阻擋發布",
-      confirm: "發布前需確認",
+      confirm: "需要你確認",
       clear: "已儲存的草稿沒有需要處理的檢查項目。",
       textClear: "文字的檢查都沒問題，其餘項目請看下方的維護者檢查清單。",
     },

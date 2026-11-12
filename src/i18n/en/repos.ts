@@ -33,20 +33,18 @@ const repos = {
     deleted: ({ name }: { name: string }) => `Deleted ${name}.`,
   },
   explore: {
-    eyebrow: "REPOSITORY EXPLORER",
     intro:
       "Understand the users and problems first, then choose this contribution's direction.",
     chooseDirection: "Choose a contribution direction",
   },
   import: {
     title: "Import a project",
-    subtitle:
-      "Paste a GitHub link or owner/repository, or the full path of a local Git project.",
+    subtitle: "From GitHub or from this computer.",
     source: "Repository source",
     placeholder: "owner/repository or https://github.com/owner/repository",
     /** `example` is a path under the home directory, such as ~/projects/repository. */
     localPathHint: ({ example }: { example: string }) =>
-      `Local Git projects work too: paste the path, such as ${example}`,
+      `Paste a GitHub link, owner/repository, or the full path of a local Git project, such as ${example}`,
     /**
      * Shown to Windows browsers under localPathHint. Worded as a condition:
      * the server may also run in Docker or on another computer.

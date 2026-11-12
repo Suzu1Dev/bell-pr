@@ -46,8 +46,6 @@ const m: Translation<typeof en> = {
       "",
       "group invite 的選項：",
       "  --admin             受邀的人以小組管理員身分加入",
-      "",
-      `忘了位址？在這台電腦執行 \`${bin} open\`，即可再次印出並開啟。`,
     ].join("\n"),
   unknownCommand: ({ command }) =>
     `沒有「${command}」這個指令。執行 \`${bin} help\` 查看可用指令。`,
@@ -107,7 +105,7 @@ const m: Translation<typeof en> = {
       `${name} 無法在 ${address} 監聽：${reason}`,
     failed: ({ reason }) => `${name} 未能啟動：${reason}`,
     forced: `警告：--force 略過就緒檢查，仍會啟動 ${name}。執行 \`${bin} doctor\` 可查看缺少的項目。範例導覽不需要 AI 服務；真實的 Agent 工作仍然需要。`,
-    notReady: `${name} 沒有啟動。上方清單列出每一項失敗的必要檢查與修正指令。若仍要啟動並走範例導覽，請執行 \`${bin} start --force\`。`,
+    notReady: `${name} 沒有啟動。上方清單列出每一項失敗的必要檢查與修正指令。`,
     sampleTour: `還沒有 AI 服務？先看範例導覽：${bin} start --force`,
     uiMissing: ({ path }) =>
       `網頁介面尚未建置：${path} 中沒有 index.html。請在 ${name} 原始碼資料夾執行 \`npm run build\` 後重新啟動；在此之前只有 API 可用。`,

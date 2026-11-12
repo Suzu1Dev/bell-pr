@@ -868,7 +868,6 @@ export function ProjectOverview({
         >
           <div className="mission-section-heading">
             <div>
-              <span className="mission-kicker">{t.journey.kicker}</span>
               <h2 id="mission-journey-title">
                 <Route size={18} />
                 {t.journey.title}
@@ -897,7 +896,6 @@ export function ProjectOverview({
         >
           <div className="mission-section-heading">
             <div>
-              <span className="mission-kicker">{t.reading.kicker}</span>
               <h2 id="mission-reading-title">
                 <BookOpen size={18} />
                 {t.reading.title}
@@ -1333,7 +1331,6 @@ export function ProjectOverview({
         >
           <div className="mission-section-heading">
             <div>
-              <span className="mission-kicker">{t.ideas.kicker}</span>
               <h2 id="mission-ideas-title">
                 <Lightbulb size={18} />
                 {t.ideas.title}

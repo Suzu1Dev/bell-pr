@@ -56,7 +56,7 @@ const m: Translation<typeof en> = {
     body:
       "改動仍留在工作目錄。你可以還原這些檔案，或等對方釋出、小組管理員收回佔用後重新檢查。",
     legacyBody:
-      "這項工作先前因改到別人佔用的檔案而停止。你可以還原這些檔案，或重新檢查目前的佔用狀態。",
+      "你可以還原這些檔案，或重新檢查目前的佔用狀態。",
     legacyTaskStopped:
       "這個子任務改到別人佔用的檔案，改動未加入這份貢獻。等佔用釋出或收回後即可重試。",
     item: ({ path, holder, title, since }) =>
@@ -123,7 +123,6 @@ const m: Translation<typeof en> = {
     changed: "你在標記可以審查之後又改了程式碼。審查和理解檢查會等你再次標記可以審查。",
   },
   footer: {
-    allReviewed: "每一個檔案都已審閱。",
     passed: "你已用自己的話講過一遍，可以核准了。",
     checkOff: "每一個檔案都已審閱 · 理解檢查已關閉。核准只需要你的審閱勾選。",
     learning: "不只是 review，也是一次 code learning。",
@@ -160,8 +159,7 @@ const m: Translation<typeof en> = {
     waitingForChanges: "等待 agent 產生變更",
     noMatches: "沒有符合的檔案",
     progress: "審查進度",
-    allReviewed: "每一個檔案都已審閱。下一步：用自己的話講一遍。",
-    allReviewedDone: "每一個檔案都已審閱。",
+    allReviewed: "下一步：用自己的話講一遍。",
     reviewHint: "讀過檔案與它的解說後，就勾選「已審閱」。",
     takeCheck: "現在就做檢查",
     openCheck: "打開你的檢查",
@@ -186,8 +184,8 @@ const m: Translation<typeof en> = {
     viewActivity: "查看執行進度",
     resize: "調整解說面板寬度",
     loadingPanel: "正在準備閱讀面板…",
-    emptyTitle: "理解，從改動開始。",
-    emptyText: "選取變更的檔案，就能詢問背後的設計與取捨。",
+    emptyTitle: "選取一個變更的檔案",
+    emptyText: "就能詢問它的設計與取捨。",
   },
   diffRounds: {
     label: "選擇要看的變更",
@@ -200,7 +198,7 @@ const m: Translation<typeof en> = {
     adopted: ({ number }) => `第 ${number} 輪：接手 GitHub 上的變更`,
     all: "全部變更（累計）",
     readOnly: "唯讀變更",
-    notice: "此檢視僅供閱讀。請返回目前變更，再勾選已審閱、提問或核准。",
+    notice: "此檢視唯讀。要勾選已審閱、提問或核准，請返回目前變更。",
     back: "返回目前變更",
     loading: "正在讀取所選的變更…",
     retry: "重新讀取",
@@ -309,7 +307,6 @@ const m: Translation<typeof en> = {
     log: "執行紀錄",
     demoLog: "示範紀錄",
     live: "每 2.5 秒更新",
-    taskLog: "任務紀錄",
     filterLabel: "依角色篩選執行紀錄",
     all: "全部",
     emptyLog: "任務開始後會在此顯示紀錄。",
@@ -340,7 +337,7 @@ const m: Translation<typeof en> = {
     commitLabel: "提交訊息",
     commitLabelRound: "這輪修正的提交訊息",
     commitHelp: `第一行是主旨，空一行後寫說明，最後放 trailers。留空時以 PR 標題作為單行提交訊息。Signed-off-by 等簽署由你本人輸入，${product.name} 與模型不會代填。`,
-    commitHelpRound: `這段訊息會成為 PR 分支上的新 commit，必須填寫，請確認它說明了這輪處理的 review 意見。第一行是主旨，空一行後寫說明，最後放 trailers。Signed-off-by 等簽署由你本人輸入，${product.name} 與模型不會代填。`,
+    commitHelpRound: `必填：寫出這輪處理了哪些 review 意見。第一行是主旨，空一行後寫說明，最後放 trailers。Signed-off-by 等簽署由你本人輸入，${product.name} 與模型不會代填。`,
     branchLabel: "GitHub 分支",
     branchHelp:
       "推送到 GitHub 時使用的分支名稱，留空時使用 {branch}。有些專案規定分支命名，例如不能有斜線或 feat/ 前綴，請依核對清單調整。本機工作分支不會改名。",
@@ -375,7 +372,7 @@ const m: Translation<typeof en> = {
     taskItemsHelp: `只勾你真正完成或確認的項目。${product.name} 和模型不會替你勾；勾選會直接改寫上方說明，記得儲存。`,
     noSection: "未分段",
     samePr: "推送到同一個 PR",
-    samePrHelp: "只加上新的 commit，不會 force push，也不會改 PR 標題與說明。",
+    samePrHelp: "不會 force push。",
     draftPr: "以 Draft PR 送出",
     draftPrHelp:
       "送出後仍可在 GitHub 繼續編輯；專案的自動檢查通常對 Draft PR 也會執行。",
@@ -390,7 +387,7 @@ const m: Translation<typeof en> = {
   },
   feedback: {
     title: "維護者回饋",
-    intro: `按下按鈕才會讀取 PR 上的 review、留言與 CI 結果；${product.name} 只讀不回，回覆請到 GitHub。`,
+    intro: `每按一次按鈕，才讀取一次 PR 上的 review、留言與 CI 結果，不會自動更新。${product.name} 只讀不回，回覆請到 GitHub。`,
     viewPullRequest: "查看 Pull Request",
     fetchAgain: "重新讀取回饋",
     fetch: "讀取回饋",
@@ -414,7 +411,7 @@ const m: Translation<typeof en> = {
     line: ({ line }) => `第 ${line} 行`,
     resolved: "已解決",
     openOnGitHub: "在 GitHub 開啟",
-    notFetched: "尚未讀取。按「讀取回饋」會向 GitHub 查詢一次，不會自動更新。",
+    notFetched: "尚未讀取。",
     cantContinue: "無法繼續了嗎？請自己在 GitHub 關閉這個 Pull Request，並用自己的話留下簡短說明。",
   },
   followUp: {
@@ -479,8 +476,8 @@ const m: Translation<typeof en> = {
     factsLoading: "正在讀取 GitHub 資訊…",
     couldntCheck: ({ reason }) => `無法確認：${reason}`,
     factsMissing: "這個版本還無法讀取 GitHub 資訊",
-    overrideLabel: "為什麼仍要送出？會記錄在這次任務上，20 到 200 個字元",
-    overrideCount: ({ count }) => `${count} 個字元，需 20 到 200 個`,
+    overrideLabel: "為什麼仍要送出？會記錄在這次任務上。",
+    overrideCount: ({ count }) => `${count} / 20–200 個字元`,
     closeLoop: ({ title }) => `先完成上一份：讀取「${title}」的回饋`,
     waitingPr: ({ number }) => `先完成上一份：閱讀 PR #${number} 的審查意見（開啟 GitHub）`,
     confirmNote: `勾選只代表你知道這些項目還沒處理、願意照目前的說明送出。${product.name} 不會因此改動說明或替你勾選任何項目，這些確認也不會寫進 PR。想先修改，請按「返回編輯草稿」。`,

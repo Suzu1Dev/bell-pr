@@ -72,9 +72,9 @@ const m: Translation<typeof en> = {
     skippedSensitiveSource: "已略過疑似包含敏感資訊的來源。",
     sourcesTruncated: "來源超過 30 KB 範圍，已省略完整段落。",
     noEvidence: "這次未找到同時符合條件且具有可核對 issue 證據的機會。",
-    analyzing: "已取得真實 GitHub 來源，正在分析適合的貢獻機會",
+    analyzing: "已取得 GitHub 來源，正在分析適合的貢獻機會",
     analyzingWithWait: ({ wait }) =>
-      `已取得真實 GitHub 來源，正在分析適合的貢獻機會（${wait}）`,
+      `已取得 GitHub 來源，正在分析適合的貢獻機會（${wait}）`,
     unusableAnswer:
       "AI 探索分析未完成或回應無法安全使用，請重試；上一份結果仍保留。",
     found: ({ count }) =>

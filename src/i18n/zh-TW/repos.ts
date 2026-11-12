@@ -30,16 +30,16 @@ const m: Translation<typeof en> = {
     deleted: ({ name }) => `已刪除 ${name}。`,
   },
   explore: {
-    eyebrow: "專案探索",
     intro: "先了解使用者與問題，再決定這次貢獻的方向。",
     chooseDirection: "指定貢獻方向",
   },
   import: {
     title: "匯入專案",
-    subtitle: "貼上 GitHub 連結或 owner/repository，或本機 Git 專案的完整路徑。",
+    subtitle: "從 GitHub 或這台電腦匯入。",
     source: "專案來源",
     placeholder: "owner/repository 或 https://github.com/owner/repository",
-    localPathHint: ({ example }) => `也支援本機 Git 專案：貼上路徑，例如 ${example}`,
+    localPathHint: ({ example }) =>
+      `貼上 GitHub 連結、owner/repository，或本機 Git 專案的完整路徑，例如 ${example}`,
     wslPathHint: `若 ${product.name} 在這台電腦的 WSL2 中執行，請使用 Linux 發行版中的路徑：Windows 的資料夾位於 /mnt/c/ 底下，例如 /mnt/c/projects/repository。`,
     callout:
       "GitHub 專案會下載至本機；後續開發使用獨立 worktree，保留原專案狀態。",

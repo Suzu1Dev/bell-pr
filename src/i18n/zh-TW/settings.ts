@@ -8,7 +8,7 @@ const number = (value: number) => fmt.number(value);
 
 const m: Translation<typeof en> = {
   title: "設定",
-  intro: "語言、AI 服務、Agent 安全、學習、上限與資料。這裡的設定都只保留在這台電腦上。",
+  intro: "這裡的設定都只保留在這台電腦上。",
   nav: { label: "設定分類" },
   sections: {
     general: "一般",
@@ -75,7 +75,7 @@ const m: Translation<typeof en> = {
   provider: {
     title: "AI 服務",
     intro: "Agent 透過這台電腦上的 AI 程式開發 CLI 工作：已安裝並登入的 Codex CLI、Claude Code 或 Antigravity CLI。",
-    needOne: "你至少需要一個 AI 服務。請安裝並登入 Codex CLI、Claude Code 或 Antigravity CLI，指令列在下方。",
+    needOne: "你至少需要一個 AI 服務。請安裝並登入其中一個，指令列在下方。",
     readyWith: ({ providers }) => `已可使用 ${fmt.list(providers)}。`,
     description: {
       codex: "使用你已安裝並登入的 Codex CLI，用量計入你自己的帳戶。",
@@ -204,7 +204,7 @@ const m: Translation<typeof en> = {
   },
   data: {
     title: "資料與隱私",
-    intro: `${product.name} 把所有資料保存在這台電腦上的一個資料目錄。沒有 ${product.name} 雲端，也沒有遙測。`,
+    intro: `${product.name} 把所有資料保存在這台電腦上的一個資料目錄。`,
     dataDir: {
       title: "資料目錄",
       copyLabel: "複製資料目錄的路徑",
@@ -269,8 +269,7 @@ const m: Translation<typeof en> = {
   },
   modelDialog: {
     title: "設定貢獻模型",
-    subtitle:
-      "所有專案共用的 Agent、模型與思考強度，套用到之後建立的任務與專案分析。",
+    subtitle: "所有專案共用，套用到之後建立的任務與專案分析。",
     loading: "正在載入模型設定…",
     reload: "重新載入模型設定",
     close: "關閉",

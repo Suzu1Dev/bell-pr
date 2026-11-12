@@ -61,7 +61,7 @@ const m: Translation<typeof en> = {
   },
   sample: {
     title: "示範結果，非即時資料",
-    body: "這些虛構專案用來示範探索會找到什麼；內容並非來自 GitHub 或 AI，也無法匯入。",
+    body: "這些專案是虛構的；內容並非來自 GitHub 或 AI，也無法匯入。",
   },
   languages: {
     en: "英文",
@@ -75,7 +75,6 @@ const m: Translation<typeof en> = {
   loading: "正在讀取探索紀錄…",
   progress: {
     label: "探索進度",
-    eyebrow: "RESEARCH IN PROGRESS",
     stop: "停止探索",
     phases: {
       searching: {
@@ -109,13 +108,11 @@ const m: Translation<typeof en> = {
   },
   results: {
     label: "推薦貢獻清單",
-    eyebrow: "YOUR CONTRIBUTION SHORTLIST",
-    previousEyebrow: "PREVIOUS RESULTS",
     title: "推薦貢獻項目",
     previousTitle: "上一份推薦，仍在這裡。",
     note: ({ sort }) =>
       `依你選的「${sort}」排序取 12 個候選、驗證後最多 6 個；順序由分析整理，不是 GitHub 全站排名。實作前仍需確認 issue 最新狀態與維護者意願。`,
-    sampleNote: "即時搜尋會依你選的排序取 12 個候選，檢查後最多保留 6 個，結果就像這些示範。",
+    sampleNote: "即時搜尋會依你選的排序取 12 個候選，檢查後最多保留 6 個。",
     previousNote: ({ date }) =>
       date
         ? `這是 ${date} 的結果，未反映本次搜尋。`
@@ -143,7 +140,7 @@ const m: Translation<typeof en> = {
     risks: "投入之前，再確認",
     evidence: ({ count }) => `推薦依據與原文 · ${fmt.number(count)} 則`,
     chooseHint: "會帶入任務設定，可再修改。",
-    sampleHint: "示範專案無法匯入；即時探索會找到可匯入的真實專案。",
+    sampleHint: "示範專案無法匯入。",
     choose: "匯入專案並設定任務",
     importing: "正在匯入專案…",
     learnByHand: "親手學：這一個請自己寫",

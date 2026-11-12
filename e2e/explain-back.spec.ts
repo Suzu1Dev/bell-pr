@@ -111,7 +111,6 @@ test("the sample passes with its own answers: a correction, a prediction and the
   await page.goto("/#/runs/demo-run/changes?locale=en");
   await reviewAll(page);
   const footer = page.locator(".review-footer");
-  await expect(footer).toContainText(workspace.footer.allReviewed);
   await expect(page.locator(".review-progress")).toContainText(workspace.changes.allReviewed);
   const explain = page.getByRole("button", { name: workspace.footer.explainBack });
   await expect(explain).toHaveAttribute("title", workspace.footer.needsCheck);
@@ -205,7 +204,7 @@ test("with the check turned off, the run says so and approval needs the ticks on
     await expect(page.locator("#check-off-help")).toHaveText(workspace.checkOff.tooltipSetting);
     await reviewAll(page);
     await expect(page.locator(".review-footer")).toContainText(workspace.footer.checkOff);
-    await expect(page.locator(".review-progress")).toContainText(workspace.changes.allReviewedDone);
+    await expect(page.locator(".review-progress")).not.toContainText(workspace.changes.allReviewed);
     await page.getByRole("button", { name: workspace.footer.approvePr }).click();
     const dialog = page.getByRole("dialog", { name: workspace.publish.titleDemo });
     await expect(dialog).toContainText(workspace.publish.checkOff);

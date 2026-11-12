@@ -209,7 +209,7 @@ test("once every file is ticked, the footer asks to explain the change back firs
   assert.match(button, /Explain it back/);
   assert.doesNotMatch(button, /disabled=""/);
   assert.match(button, /title="Explain the change back in your own words: a short, closed-book check next to the code"/);
-  assert.match(html, /<span>Every file reviewed\.<\/span>/);
+  assert.doesNotMatch(html, /Every file reviewed/);
   assert.match(html, /Read it, then explain it back/);
   assertNoHan(html);
   // Before every file is ticked, the tooltip names both remaining steps.
@@ -217,7 +217,7 @@ test("once every file is ticked, the footer asks to explain the change back firs
   assert.match(partial, /disabled=""/);
   assert.match(partial, /title="Mark every file as reviewed, then explain the change back in your own words"/);
   assert.match(partial, /Approve and prepare the PR/);
-  assert.match(renderZh(element({ run: ticked, files })), /<span>每一個檔案都已審閱。<\/span>/);
+  assert.doesNotMatch(renderZh(element({ run: ticked, files })), /每一個檔案都已審閱/);
 });
 
 test("a path reviewed in an older round does not count toward approving the current diff", () => {
@@ -357,10 +357,12 @@ test("a learn-by-hand run's approval waits for the person's PR title and descrip
 
 test("a learn-by-hand run's footer hint asks the guide, not the agent", () => {
   const byHand: Run = { ...realRun, learnByHand: true, agents: realRun.agents.filter((agent) => agent.id === "lead") };
-  const html = renderEn(element({ run: byHand, tab: "overview" }));
+  const html = renderEn(element({ run: byHand, tab: "changes" }));
   assert.match(html, /<span class="footer-hint">Select code to ask the guide about it\.<\/span>/);
-  assert.match(renderZh(element({ run: byHand, tab: "overview" })), /<span class="footer-hint">選取程式碼，就能向嚮導提問。<\/span>/);
-  assert.match(renderEn(element({ tab: "overview" })), /<span class="footer-hint">Select code to ask the agent about it\.<\/span>/);
+  assert.match(renderZh(element({ run: byHand, tab: "changes" })), /<span class="footer-hint">選取程式碼，就能向嚮導提問。<\/span>/);
+  assert.match(renderEn(element({ tab: "changes" })), /<span class="footer-hint">Select code to ask the agent about it\.<\/span>/);
+  // A tab that shows no code has nothing to select.
+  assert.doesNotMatch(renderEn(element({ tab: "overview" })), /footer-hint/);
 });
 
 test("a contribution split from another says so and links back to the original", () => {

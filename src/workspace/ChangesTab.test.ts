@@ -137,7 +137,7 @@ test("published files ignore the old unreviewed filter and keep explanations wit
   assert.doesNotMatch(html, /Only unreviewed|review-progress|rv-reviewed|file-reviewed/);
   assert.match(html, /Suggested order/);
   assert.match(html, /explanation-wrap/);
-  assert.match(html, /Click any line and the agent will explain it/);
+  assert.match(html, /rv-diff-footer[^>]*>.*Click a line to ask about it/);
   const sample = renderEn(element({ run: published, demo: true, onlyUnreviewed: true }));
   assert.match(sample, /Only unreviewed|review-progress|rv-reviewed/);
   assert.equal((sample.match(/class="file-item /g) ?? []).length, 1);
@@ -231,7 +231,8 @@ test("a run whose files were cleaned up says so", () => {
     }),
   );
   assert.match(html, /The changed files were cleaned up/);
-  assert.match(html, /Reports and notes are kept\./);
+  // The notice above the tabs says the rest; it is not repeated here.
+  assert.doesNotMatch(html, /Reports and notes are kept\./);
   assertNoHan(html);
 });
 
@@ -274,9 +275,9 @@ test("the Changes header offers the check before every file is ticked", () => {
 test("every file ticked: the hint points at the check, unless it is off or passed", () => {
   const ticked = (fields: Partial<Understanding>) =>
     renderEn(element({ allReviewed: true, reviewedCount: 2, understanding: understanding(fields) }));
-  assert.match(ticked({}), /Every file reviewed\. Next: explain it back\./);
-  assert.match(ticked({ required: false, off: true }), /<small>Every file reviewed\.<\/small>/);
-  assert.match(ticked({ passed: true }), /<small>Every file reviewed\.<\/small>/);
+  assert.match(ticked({}), /<small>Next: explain it back\.<\/small>/);
+  assert.doesNotMatch(ticked({ required: false, off: true }), /Next: explain it back|<small><\/small>/);
+  assert.doesNotMatch(ticked({ passed: true }), /Next: explain it back|<small><\/small>/);
   // A published run asks for neither a new check nor new review marks.
   assert.doesNotMatch(
     renderEn(
@@ -287,7 +288,7 @@ test("every file ticked: the hint points at the check, unless it is off or passe
         understanding: understanding(),
       }),
     ),
-    /review-progress|Every file reviewed/,
+    /review-progress|Next: explain it back/,
   );
   assert.match(
     renderEn(element()),

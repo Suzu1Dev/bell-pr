@@ -32,10 +32,10 @@ const m: Translation<typeof en> = {
     before: "變更前",
     after: "變更後",
     selectedLines: ({ count }) => `已選取 ${count} 行`,
-    idleHint: "點選任何一行，讓 Agent 為你解說",
+    idleHint: "點一行來追問",
     idleHintGuide: "點選任何一行，向嚮導提問",
     shiftKey: "Shift",
-    shiftHint: ({ key }) => `${key} 可多行選取`,
+    shiftHint: ({ key }) => `按住 ${key} 可選多行`,
     clearSelection: "清除選取",
     gap: {
       showBelow: ({ count }) => `顯示上一段變更下方的 ${count} 行`,
@@ -160,16 +160,16 @@ const m: Translation<typeof en> = {
     emptyBody:
       "Lead 整合、Reviewer 與 Test analyst 完成後，報告全文會放在這裡。",
     intro:
-      "這些是獨立靜態審查，不是執行結果；每份報告保留全文，並標示提到目前檔案的段落數。",
+      "這些是獨立的靜態審查：只讀程式碼，沒有執行。每份報告都顯示全文。",
     orderTitle: "Lead 建議的閱讀順序",
     orderIntro:
       "常見的讀法是先看定義與介面、再看呼叫端，測試放最前或最後；Lead 在整合摘要中說明了這次為何這樣排。左側檔案清單可切換「依建議順序」。",
-    staticBadge: "獨立靜態審查，非執行結果",
+    staticBadge: "靜態審查",
     mentions: ({ count }) => `本報告提到此檔 ${count} 處`,
     noMentions: "此報告未直接提到本檔",
     evidenceDemo: "示範報告不是即時 AI 推論，也不代表測試結果。",
     evidenceLive:
-      "報告內容由各角色靜態檢視產生；實測結果以報告中明確列出的指令與輸出為準。",
+      "只有報告中明確列出的指令與輸出才算實測結果。",
   },
   feedback: {
     title: "維護者對此檔的留言",

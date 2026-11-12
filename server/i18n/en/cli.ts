@@ -46,8 +46,6 @@ export default {
       "",
       "Options for group invite:",
       "  --admin             The invited person joins as a group admin",
-      "",
-      `Lost the address? Run \`${bin} open\` on this computer to print and open it again.`,
     ].join("\n"),
   /** A command that does not exist. */
   unknownCommand: ({ command }: { command: string }) =>
@@ -141,7 +139,7 @@ export default {
     /** `--force`: the readiness gate is skipped. */
     forced: `Warning: --force skips the readiness check and starts ${name} anyway. Run \`${bin} doctor\` to see what is missing. The sample tour needs no AI provider; a real agent run still does.`,
     /** A required doctor check failed, so start did not listen. */
-    notReady: `${name} did not start. The checklist above names each failed required check and the command that fixes it. To start anyway and take the sample tour, run \`${bin} start --force\`.`,
+    notReady: `${name} did not start. The checklist above names each failed required check and the command that fixes it.`,
     /** Right under the Not ready headline, before the fix commands. */
     sampleTour: `No AI provider yet? See the sample tour: ${bin} start --force`,
     uiMissing: ({ path }: { path: string }) =>

@@ -5,7 +5,8 @@ import type { Run } from "../types";
  * once every file is ticked, a required check that has not passed turns
  * the primary button into "Explain it back", which opens the check; the
  * status line says where the person stands, and before the ticks are done
- * the tooltip names both remaining steps. Keys of the `footer` messages.
+ * the tooltip names both remaining steps. Keys of the `footer` messages;
+ * only the `passed` and `checkOff` statuses have a line to show.
  */
 export function checkFooter(
   run: Pick<Run, "status" | "publishing">,

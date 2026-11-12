@@ -163,7 +163,7 @@ test("the reports tab renders demo reports with the static-review label and per-
   assert.match(html, /Lead 整合摘要/);
   assert.match(html, /Lens · Reviewer/);
   assert.match(html, /Scout · Test analyst/);
-  assert.equal(html.match(/獨立靜態審查，非執行結果/g)?.length, 3);
+  assert.equal(html.match(/class="explain-report-badge">靜態審查</g)?.length, 3);
   assert.match(html, /本報告提到此檔 \d+ 處/);
   // Markdown is rendered, not shown as raw asterisks.
   assert.match(html, /<strong>正確性<\/strong>/);
@@ -591,7 +591,7 @@ test("an English render of the reports tab has no Han in its own text", () => {
       "Atlas · Team lead",
       "Code review",
       "Test analysis",
-      "Independent static review, not an execution result",
+      "explain-report-badge\">Static review<",
       "Mentions this file in 1 paragraph<",
       "This report doesn&#x27;t mention this file directly",
     ])

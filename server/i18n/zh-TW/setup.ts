@@ -136,7 +136,7 @@ const m: Translation<typeof en> = {
     scopesUnknown: "這種權杖不會回報它的權限，因此不檢查。",
     sandboxReady: "可以使用：會修改檔案的 Claude Code Agent 會在沙箱中執行。",
     sandboxMissing:
-      "無法使用：請安裝 bubblewrap 與 socat，讓 Claude Code Agent 能在沙箱中修改檔案。",
+      "無法使用：缺少 bubblewrap 或 socat，因此 Claude Code Agent 無法修改檔案。",
     sandboxBlocked:
       "無法使用：bubblewrap 已安裝，但在這裡無法建立沙箱，例如在使用預設安全設定的容器中。",
     sandboxUnsupported:

@@ -574,8 +574,6 @@ export default {
       `Asked the agent to resolve the merge conflicts in ${count(files.length, "file", "files")}: ${list(files)}.`,
     agentCommitted:
       "The agent made its own commit or switched branches; that was undone, and its edits stay in the working directory for your review.",
-    markersLeft: ({ files }: { files: string[] }) =>
-      `Conflict markers remain: ${list(files)}.`,
     resolved:
       "The agent resolved the merge conflicts; review these files one by one.",
     stillConflicted: ({ files }: { files: string[] }) =>
@@ -775,13 +773,11 @@ export default {
       `Commits on ${branch} changed files under your hold since you took it. Check those changes before publishing.`,
     heldChangedUpstreamItem: ({
       path,
-      branch,
       commits,
     }: {
       path: string;
-      branch: string;
       commits: readonly string[];
-    }) => `${path} changed on ${branch} since your hold (${commits.join(", ")})`,
+    }) => `${path} (${commits.join(", ")})`,
     holdRecoveryNotAllowed:
       "Held files can only be restored or checked again on a finished run whose pull request has not merged.",
     holdRecoveryBusy:

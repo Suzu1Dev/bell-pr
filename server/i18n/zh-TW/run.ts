@@ -345,7 +345,6 @@ const m: Translation<typeof en> = {
       `要求 Agent 解決 ${files.length} 個檔案的合併衝突：${list(files)}。`,
     agentCommitted:
       "Agent 自行建立了 commit 或切換了分支；已還原，修改保留在工作目錄供你審閱。",
-    markersLeft: ({ files }) => `仍有衝突標記：${list(files)}。`,
     resolved: "Agent 已解決合併衝突，請逐檔審閱這些檔案。",
     stillConflicted: ({ files }) =>
       `Agent 處理後仍有衝突標記：${list(files)}；可以自行修改，或再請 Agent 處理。`,
@@ -474,8 +473,8 @@ const m: Translation<typeof en> = {
       `小組協作已停止，無法確認檔案佔用狀態，所以 Agent 不能修改檔案。請先在主機修復小組協作並重新啟動 ${name}，或改以不帶 --group 的方式啟動 ${name}。`,
     heldChangedUpstream: ({ branch }) =>
       `在你佔用期間，${branch} 上有提交改到你佔用的檔案。發佈前請先確認這些變更。`,
-    heldChangedUpstreamItem: ({ path, branch, commits }) =>
-      `${path}：在你佔用期間，${branch} 上有變更（${commits.join("、")}）`,
+    heldChangedUpstreamItem: ({ path, commits }) =>
+      `${path}（${commits.join("、")}）`,
     holdRecoveryNotAllowed:
       "只有已完成且尚未合併 PR 的工作，才能還原佔用檔案或重新檢查佔用狀態。",
     holdRecoveryBusy:

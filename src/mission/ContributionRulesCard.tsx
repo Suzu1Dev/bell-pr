@@ -197,11 +197,10 @@ export default function ContributionRulesCard({
     <section className="rules-card" aria-labelledby="rules-card-title">
       <div className="rules-card-head">
         <div>
-          <span className="mission-kicker">
-            <Scale size={14} aria-hidden="true" />
-            {t.kicker}
-          </span>
-          <h2 id="rules-card-title">{t.title}</h2>
+          <h2 id="rules-card-title">
+            <Scale size={18} aria-hidden="true" />
+            {t.title}
+          </h2>
           <p>{t.lead}</p>
         </div>
         {!demo && (

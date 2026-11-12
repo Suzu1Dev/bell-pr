@@ -192,7 +192,6 @@ export function ChangesTab({
 }: ChangesTabProps) {
   const workspace = useT("workspace");
   const t = workspace.changes;
-  const notices = workspace.runNotices;
   const fileStatus = useT("common").fileStatus;
   const {
     messages,
@@ -461,13 +460,9 @@ export function ChangesTab({
                 }}
               />
             </div>
-            <small>
-              {!allReviewed
-                ? t.reviewHint
-                : checkOpen && understanding?.required && !understanding.passed
-                  ? t.allReviewed
-                  : t.allReviewedDone}
-            </small>
+            {!allReviewed
+              ? <small>{t.reviewHint}</small>
+              : checkOpen && understanding?.required && !understanding.passed && <small>{t.allReviewed}</small>}
           </div>}
         </aside>
       )}
@@ -610,15 +605,13 @@ export function ChangesTab({
                   ? t.filesRemoved
                   : t.noChanges}
             </h3>
-            <p>
+            {(run.error || !run.workspaceRemovedAt) && <p>
               {run.error ? (
                 <FailureText text={run.error} />
-              ) : run.workspaceRemovedAt ? (
-                notices.workspaceRemoved
               ) : (
                 run.learnByHand ? workspace.byHand.planFirst : t.noChangesHint
               )}
-            </p>
+            </p>}
             <button
               className="button secondary"
               onClick={() => setTab("activity")}

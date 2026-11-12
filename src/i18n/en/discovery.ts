@@ -81,7 +81,7 @@ const discovery = {
   /** The labelled sample results shown in the sample project. */
   sample: {
     title: "Sample results — not live",
-    body: "These fictional projects show what discovery finds. Nothing here comes from GitHub or an AI, and they cannot be imported.",
+    body: "These projects are fictional. Nothing here comes from GitHub or an AI, and they cannot be imported.",
   },
   /** Language names, in the UI language. */
   languages: {
@@ -97,7 +97,6 @@ const discovery = {
   loading: "Loading your discovery history…",
   progress: {
     label: "Discovery progress",
-    eyebrow: "RESEARCH IN PROGRESS",
     stop: "Stop discovery",
     phases: {
       searching: {
@@ -147,15 +146,13 @@ const discovery = {
   },
   results: {
     label: "Recommended contributions",
-    eyebrow: "YOUR CONTRIBUTION SHORTLIST",
-    previousEyebrow: "PREVIOUS RESULTS",
     title: "Suggested contributions",
     previousTitle: "Your previous recommendations are still here.",
     note: ({ sort }: { sort: string }) =>
       `We took 12 candidates in the "${sort}" order you chose and kept at most 6 after checking them. The order comes from the analysis, not from a GitHub-wide ranking. Before you start, check the issue's latest status and whether the maintainers want the change.`,
     /** Above the sample results, which no search produced. */
     sampleNote:
-      "A live search takes 12 candidates in the order you choose and keeps at most 6 after checking them, like these.",
+      "A live search takes 12 candidates in the order you choose and keeps at most 6 after checking them.",
     previousNote: ({ date }: { date?: string }) =>
       date
         ? `These results are from ${date} and do not reflect your latest search.`
@@ -186,8 +183,7 @@ const discovery = {
     evidence: ({ count }: { count: number }) =>
       `Evidence and quoted sources · ${fmt.number(count)}`,
     chooseHint: "The settings are filled in for you and can be edited.",
-    sampleHint:
-      "A sample cannot be imported. Live discovery finds real projects you can import.",
+    sampleHint: "A sample cannot be imported.",
     choose: "Import project and set up task",
     importing: "Importing the project…",
     /** An opportunity whose issue is labelled for newcomers: practice for the person, not work for the agent team. */

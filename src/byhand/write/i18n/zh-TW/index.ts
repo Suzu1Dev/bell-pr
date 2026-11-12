@@ -83,7 +83,7 @@ const m: Translation<typeof en> = {
     checks: { tests: "你最後一次修改後還沒跑過測試。", failing: "讀一下上次測試第一行失敗的訊息。",
       small: "這一步小到一次就能做完嗎？" },
     human: "問問專案的人",
-    humanText: `去問專案的人。筆記請自己寫；${name} 不會替你寫任何一句。`,
+    humanText: `筆記請自己寫；${name} 不會替你寫任何一句。`,
     note: "我想做的事：\n我試了什麼：\n我預期什麼：\n實際發生什麼：\n",
     issue: "這個 issue",
     smaller: "把這一步拆小",

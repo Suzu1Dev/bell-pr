@@ -66,8 +66,8 @@ const draft = {
         "No further writing rules were found; check the draft's sections against the source documents.",
     },
     checks: {
-      title: "Confirm before you publish",
-      intro: "These are reminders to check, not checks that were done.",
+      title: "Reminders from this suggestion",
+      intro: "Nothing here was checked for you.",
     },
     preview: "Preview the suggested draft",
     apply: {
@@ -133,14 +133,14 @@ const draft = {
       factsRead: ({ date }: { date: string }) => `GitHub read ${date}`,
       status: {
         ok: "OK",
-        confirm: "Asks to confirm",
+        confirm: "Needs your confirmation",
         block: "Blocks publishing",
         unknown: "Couldn't check",
         off: "Off",
       },
       rows: {
         rules: "The project's rules",
-        door: "Pull requests open to you",
+        door: "Who may open pull requests",
         issue: "The linked issue",
         pacing: "Your pace here",
         words: "Your own words",
@@ -192,7 +192,7 @@ const draft = {
       wordsOk: `The description isn't ${product.name}'s suggested wording. Only you can tell whether it says what you understood, in your own words.`,
       wordsUnknown: `${product.name} has no suggested description to compare with. Check that it says what you understood, in your own words.`,
       reviewable: ({ band, lines, files }: { band: string; lines: number; files: number }) =>
-        `${band} by ${product.name}'s default bands: ${fmt.number(lines)} changed lines in ${fmt.plural(files) === "one" ? "1 file" : `${fmt.number(files)} files`}.`,
+        `${band} (${product.name} default): ${fmt.number(lines)} changed lines in ${fmt.plural(files) === "one" ? "1 file" : `${fmt.number(files)} files`}.`,
       disclosureRequired:
         "The project asks for a disclosure, and the description has one.",
       disclosureWaits:
@@ -265,7 +265,7 @@ const draft = {
       intro:
         "Publishing runs the same checks on the saved draft. A blocking check stops publishing until you fix it; the others ask you to confirm.",
       block: "Blocks publishing",
-      confirm: "Confirm before publishing",
+      confirm: "Needs your confirmation",
       clear: "No check needs your attention in the saved draft.",
       /** The text checks are clear, and the maintainer checklist holds the rest. */
       textClear:

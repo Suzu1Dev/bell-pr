@@ -27,9 +27,8 @@ const m: Translation<typeof en> = {
   empty: {
     loadingTitle: "正在把程式碼，整理成專案全貌。",
     title: "你的下一個貢獻，從理解開始。",
-    loadingLead:
-      "Agent 會閱讀專案文件與主要模組，整理用途、使用流程，以及有依據的改善建議。",
-    lead: "讓 Agent 閱讀這個 repository，先回答三個問題，再決定值得投入的方向。",
+    loadingLead: "Agent 正在閱讀專案文件與主要模組。",
+    lead: "讓 Agent 閱讀這個專案，回答三個問題。",
     questions: {
       problem: "它解決什麼問題？",
       users: "誰會使用它？",
@@ -91,11 +90,9 @@ const m: Translation<typeof en> = {
     reanalyze: ({ language }) => `改用${language}重新分析`,
   },
   journey: {
-    kicker: "THE USER JOURNEY",
     title: "使用者如何用到這個專案？",
   },
   reading: {
-    kicker: "WHERE TO START READING",
     title: "第一次讀這個專案，建議這樣讀",
     lead: "依 Agent 讀過的抽樣檔案排出順序；每一步說明為什麼先看它、看什麼。",
     flow: "模組怎麼串起來",
@@ -153,7 +150,6 @@ const m: Translation<typeof en> = {
     why: "為什麼引用這段",
   },
   ideas: {
-    kicker: "WHERE YOU CAN HELP",
     title: "值得探索的貢獻方向",
     lead: "先看問題與使用者價值，再決定要不要交給團隊。",
     aiGenerated: "AI 生成",
@@ -280,7 +276,7 @@ const m: Translation<typeof en> = {
     },
     issue: {
       label: "相關 issue 連結",
-      help: "只接受 GitHub issue 頁面網址。填了之後，PR 草稿才可以寫 Fixes／Refs #編號並連回這個 issue；送出前請先在 issue 留言表明要處理。",
+      help: "只接受 GitHub issue 網址。填了之後，PR 草稿才能寫 Fixes／Refs #編號。送出前請先在 issue 留言表明要處理。",
     },
     model: {
       heading: "模型與思考強度",
@@ -291,7 +287,7 @@ const m: Translation<typeof en> = {
         claude:
           "使用你已安裝並登入的 Claude Code CLI（Claude 方案或 Anthropic API 金鑰皆可）。用量計入你自己的帳號，可用模型依你的方案而定。",
         antigravity:
-          "使用你已安裝並登入的 Antigravity CLI（agy；Google 帳號、Gemini API 金鑰或 Google Cloud 憑證皆可）。用量計入你自己的帳號，列出的模型也依帳號而定。它的 Agent 一律可以搜尋網路；專案若附帶 Antigravity 的 hooks、MCP 伺服器、外掛、Agent 或技能，就不會在其中啟動。",
+          "使用你已安裝並登入的 Antigravity CLI（agy；Google 帳號、Gemini API 金鑰或 Google Cloud 憑證皆可）。用量計入你自己的帳號，列出的模型也依帳號而定。專案若附帶 Antigravity 的 hooks、MCP 伺服器、外掛、Agent 或技能，Antigravity 就不會在其中啟動。",
       },
       providerOption: ({ provider, state }) => `${provider}（${state}）`,
       providerStates: {
@@ -357,7 +353,6 @@ const m: Translation<typeof en> = {
     analysisFailed: "專案分析未完成，請重試。",
   },
   rules: {
-    kicker: "THE PROJECT'S OWN RULES",
     title: "貢獻之前",
     lead: `這個專案對貢獻者的要求，原文引自專案自己的檔案，並說明發布時 ${product.name} 會怎麼處理每一條規範。`,
     door: {
@@ -386,13 +381,13 @@ const m: Translation<typeof en> = {
     },
     effect: {
       ban: `${product.name} 的每一份變更都由 agent 撰寫，所以不會在這裡發布。你仍可以在本機練習。`,
-      banAmbiguous: "發布時會請你判斷，這條規範是否涵蓋 AI 協助的貢獻。",
-      disclose: "說明裡提到 AI 有協助之前，發布會先等著。",
+      banAmbiguous: "由你判斷這條規範是否涵蓋 AI 協助的貢獻。",
+      disclose: "說明裡提到 AI 有協助之前。",
       understand: "你的理解檢查涵蓋這一條。如果關閉了理解檢查，發布時會請你確認。",
-      area: "連結的 issue 有新手標籤時，會阻擋發布。",
+      area: "連結的 issue 有新手標籤時。",
       agent: "這是寫給 AI agent 的話。作者是你，所以發布時會請你判斷是否適用。",
-      "own-words": `說明仍是 ${product.name} 的建議文字時，發布會先等著。`,
-      "issue-first": "沒有連結 issue 時，發布前會請你確認。",
+      "own-words": `說明仍是 ${product.name} 的建議文字時。`,
+      "issue-first": "沒有連結 issue 時。",
     },
     found: ({ count, files }) =>
       `從 ${product.name} 讀過的 ${n(files)} 個檔案中，引用了 ${n(count)} 條規範。`,
@@ -420,7 +415,7 @@ const m: Translation<typeof en> = {
   start: {
     title: "開始之前",
     lead: "每個 issue 連結只讀取一次。這裡的內容不會阻止你練習；發布時會再確認一次。",
-    noIssue: `連結你要處理的 issue，${product.name} 會確認它是否仍開著，以及是否已有別人在做。`,
+    noIssue: `填了連結，${product.name} 會確認 issue 是否仍開放中，以及是否已有人在做。`,
     notGitHub:
       "只有 GitHub issue 連結會讀取 issue 資訊，例如 https://github.com/owner/repo/issues/123。",
     oneIssue:
@@ -467,15 +462,15 @@ const m: Translation<typeof en> = {
   startConfirm: {
     title: "團隊開始之前",
     practise: {
-      "issue-closed": `你可以在本機練習；只要連結的 issue 仍是關閉的，${product.name} 就不會發布它。`,
-      door: `你可以在本機練習；只要這個 repository 不接受你開的 Pull Request，${product.name} 就不會發布它。`,
-      ban: `你可以在本機練習；只要專案規範不接受 AI 協助的貢獻，${product.name} 就不會發布它。`,
-      area: `你可以在本機練習；專案把有新手標籤的 issue 留給不靠 AI 工具學習的人，所以 ${product.name} 不會發布它。`,
+      "issue-closed": `只要連結的 issue 仍是關閉的，${product.name} 就不會發布這個任務。`,
+      door: `只要這個 repository 不接受你開的 Pull Request，${product.name} 就不會發布這個任務。`,
+      ban: `只要專案規範不接受 AI 協助的貢獻，${product.name} 就不會發布這個任務。`,
+      area: `專案把有新手標籤的 issue 留給不靠 AI 工具學習的人，所以 ${product.name} 不會發布這個任務。`,
     },
     otherPr: ({ author, number }) =>
-      `你可以在本機練習；只要 @${author} 的 Pull Request #${number} 會關閉同一個 issue，${product.name} 就不會發布它，除非你在發布時寫下理由。`,
+      `只要 @${author} 的 Pull Request #${number} 會關閉同一個 issue，${product.name} 就不會發布這個任務，除非你在發布時寫下理由。`,
     pacing: ({ open, budget }) =>
-      `你可以在本機練習；你在這裡有 ${n(open)} 個開著的 Pull Request，至少是上限 ${n(budget)} 的兩倍，在這之前 ${product.name} 不會發布它。`,
+      `你在這裡有 ${n(open)} 個開放中的 Pull Request，至少是上限 ${n(budget)} 的兩倍；降下來之前，${product.name} 不會發布這個任務。`,
     lesson:
       "有新手標籤的 issue，是新手親手寫修正、認識專案的入口。交給 agent 團隊做，下一位新手就少了這個機會。可以考慮改做標有 help wanted 的 issue。",
     practiseLocally: "開始，在本機練習",

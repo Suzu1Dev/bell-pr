@@ -54,9 +54,8 @@ const mission = {
   empty: {
     loadingTitle: "Turning the code into a project overview.",
     title: "Your next contribution starts with understanding.",
-    loadingLead:
-      "The Agent reads the project's docs and main modules, then sums up its purpose, how people use it, and improvements backed by evidence.",
-    lead: "Let the Agent read this repository and answer three questions first, then decide where your effort is worth it.",
+    loadingLead: "The Agent is reading the project's docs and main modules.",
+    lead: "Let the Agent read this project and answer three questions.",
     questions: {
       problem: "What problem does it solve?",
       users: "Who uses it?",
@@ -154,11 +153,9 @@ const mission = {
     reanalyze: ({ language }: { language: string }) => `Re-analyze in ${language}`,
   },
   journey: {
-    kicker: "THE USER JOURNEY",
     title: "How do people use this project?",
   },
   reading: {
-    kicker: "WHERE TO START READING",
     title: "New to this project? Read it in this order",
     lead: "Ordered from the sampled files the Agent read; each step says why to read it first and what to look for.",
     flow: "How the modules fit together",
@@ -223,7 +220,6 @@ const mission = {
     why: "Why this quote",
   },
   ideas: {
-    kicker: "WHERE YOU CAN HELP",
     title: "Contribution directions worth exploring",
     lead: "Look at the problem and its value to users first, then decide whether to hand it to the team.",
     /** Marks the recommendations as written by AI. */
@@ -387,7 +383,7 @@ const mission = {
     },
     issue: {
       label: "Related issue link",
-      help: "Only GitHub issue page URLs are accepted. With one, the PR draft can write Fixes or Refs #number and link back to the issue. Before you submit, comment on the issue to say you will work on it.",
+      help: "Only GitHub issue URLs are accepted. With one, the PR draft can write Fixes or Refs #number. Before you submit, comment on the issue to say you will work on it.",
     },
     model: {
       heading: "Model and reasoning effort",
@@ -398,7 +394,7 @@ const mission = {
         claude:
           "Uses the Claude Code CLI you installed and signed in to (Claude plan or Anthropic API key). Usage counts against your own account. Available models depend on your plan.",
         antigravity:
-          "Uses the Antigravity CLI (agy) you installed and signed in to (Google account, Gemini API key or Google Cloud credentials). Usage counts against your own account, and the models listed depend on it. Its agents can always search the web, and it does not start in a project that ships Antigravity hooks, MCP servers, plugins, agents or skills.",
+          "Uses the Antigravity CLI (agy) you installed and signed in to (Google account, Gemini API key or Google Cloud credentials). Usage counts against your own account, and the models listed depend on it. Antigravity does not start in a project that ships Antigravity hooks, MCP servers, plugins, agents or skills.",
       } satisfies Record<AgentProvider, string>,
       /** A provider in the list with its state, for example "Codex — not signed in". */
       providerOption: ({ provider, state }: { provider: string; state: string }) =>
@@ -488,7 +484,6 @@ const mission = {
    * project has no rules, only where it looked.
    */
   rules: {
-    kicker: "THE PROJECT'S OWN RULES",
     title: "Before you contribute",
     lead: `What this project asks of contributors, quoted from its own files, and what ${product.name} does about each rule when you publish.`,
     door: {
@@ -520,16 +515,15 @@ const mission = {
     },
     effect: {
       ban: `${product.name}'s agents write every change, so it won't publish one here. You can still practise locally.`,
-      banAmbiguous:
-        "Publishing asks you to decide whether it covers AI-assisted contributions.",
-      disclose: "Publishing waits until the description says that AI helped.",
+      banAmbiguous: "You decide whether it covers AI-assisted contributions.",
+      disclose: "Until the description says that AI helped.",
       understand:
         "Your understanding check covers it. With the check turned off, publishing asks you to confirm.",
-      area: "Publishing is blocked when the linked issue carries a label for newcomers.",
+      area: "When the linked issue is labelled for newcomers.",
       agent:
         "It is addressed to AI agents. You are the author, so publishing asks you to decide whether it applies.",
-      "own-words": `Publishing waits while the description is still ${product.name}'s suggested text.`,
-      "issue-first": "Publishing asks you to confirm when no issue is linked.",
+      "own-words": `While the description is still ${product.name}'s suggested text.`,
+      "issue-first": "When no issue is linked.",
     } satisfies Record<PolicyKind | "banAmbiguous", string>,
     found: ({ count, files }: { count: number; files: number }) =>
       `${amount(count, "rule", "rules")} quoted from the ${amount(files, "file", "files")} ${product.name} read.`,
@@ -565,7 +559,7 @@ const mission = {
   start: {
     title: "Before you start",
     lead: "Read once for this issue link. Nothing here stops you from practising; publishing checks again.",
-    noIssue: `Link the issue you will work on, and ${product.name} checks whether it is still open and whether someone else is already on it.`,
+    noIssue: `With a link, ${product.name} checks whether the issue is still open and whether someone else is already on it.`,
     notGitHub:
       "Issue facts are read for GitHub issue links, such as https://github.com/owner/repo/issues/123.",
     oneIssue:
@@ -620,15 +614,15 @@ const mission = {
   startConfirm: {
     title: "Before the team starts",
     practise: {
-      "issue-closed": `You can practise this locally; ${product.name} won't publish it while the linked issue is closed.`,
-      door: `You can practise this locally; ${product.name} won't publish it while this repository doesn't take pull requests from you.`,
-      ban: `You can practise this locally; ${product.name} won't publish it while the project's rules don't accept AI-assisted contributions.`,
-      area: `You can practise this locally; ${product.name} won't publish it while the project keeps issues labelled for newcomers for people learning without AI tools.`,
+      "issue-closed": `${product.name} won't publish this while the linked issue is closed.`,
+      door: `${product.name} won't publish this while this repository doesn't take pull requests from you.`,
+      ban: `${product.name} won't publish this while the project's rules don't accept AI-assisted contributions.`,
+      area: `${product.name} won't publish this: the project keeps issues labelled for newcomers for people learning without AI tools.`,
     },
     otherPr: ({ author, number }: { author: string; number: number }) =>
-      `You can practise this locally; ${product.name} won't publish it while @${author}'s pull request #${number} would close the same issue, unless you give your reason when you publish.`,
+      `${product.name} won't publish this while @${author}'s pull request #${number} would close the same issue, unless you give your reason when you publish.`,
     pacing: ({ open, budget }: { open: number; budget: number }) =>
-      `You can practise this locally; ${product.name} won't publish it while you have ${n(open)} open pull requests here, at least twice your budget of ${n(budget)}.`,
+      `${product.name} won't publish this while you have ${n(open)} open pull requests here, at least twice your budget of ${n(budget)}.`,
     lesson:
       "Issues labelled for newcomers are how people learn a project by writing the fix themselves. When an agent team takes one, the next newcomer loses that chance. Consider a help-wanted issue instead.",
     practiseLocally: "Start and practise locally",

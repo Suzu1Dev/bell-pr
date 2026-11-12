@@ -158,7 +158,7 @@ export default {
       "This kind of token does not report its permissions, so they are not checked.",
     sandboxReady: "Available: Claude Code agents that edit files run in the sandbox.",
     sandboxMissing:
-      "Not available: install bubblewrap and socat so Claude Code agents can edit files in a sandbox.",
+      "Not available: bubblewrap or socat is missing, so Claude Code agents cannot edit files.",
     sandboxBlocked:
       "Not available: bubblewrap is installed but cannot start a sandbox here, as in a container with default security settings.",
     sandboxUnsupported:

@@ -12,8 +12,7 @@ const number = (value: number) => fmt.number(value);
 
 const settings = {
   title: "Settings",
-  intro:
-    "Language, AI provider, agent safety, learning, limits and data. Everything you set here stays on this computer.",
+  intro: "Everything you set here stays on this computer.",
   nav: { label: "Settings sections" },
   sections: {
     general: "General",
@@ -89,7 +88,7 @@ const settings = {
     intro:
       "Agents work through an AI coding CLI on this computer: the Codex CLI, Claude Code or the Antigravity CLI, installed and signed in.",
     needOne:
-      "You need at least one provider. Install and sign in to the Codex CLI, Claude Code or the Antigravity CLI; the commands are below.",
+      "You need at least one provider. Install and sign in to one; the commands are below.",
     readyWith: ({ providers }: { providers: string[] }) =>
       `Ready to work with ${fmt.list(providers)}.`,
     description: {
@@ -243,7 +242,7 @@ const settings = {
   },
   data: {
     title: "Data & privacy",
-    intro: `${product.name} keeps everything in one data directory on this computer. There is no ${product.name} cloud and no telemetry.`,
+    intro: `${product.name} keeps everything in one data directory on this computer.`,
     dataDir: {
       title: "Data directory",
       copyLabel: "Copy the data directory's path",
@@ -315,8 +314,7 @@ const settings = {
   },
   modelDialog: {
     title: "Set contribution models",
-    subtitle:
-      "The agent, model and reasoning effort that every project shares, used by the tasks and project analyses you create from now on.",
+    subtitle: "For new tasks and project analyses in every project.",
     loading: "Loading model settings…",
     reload: "Reload model settings",
     close: "Close",

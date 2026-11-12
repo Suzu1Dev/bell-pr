@@ -468,8 +468,8 @@ test("a respect check says why maintainers care and where it comes from", () => 
     /<div class="publish-block" role="alert"><span>Blocks publishing: Someone else&#x27;s open pull request would close this issue\.<small class="publish-why">Two pull requests for one issue split the maintainers&#x27; review time\.<\/small><small>#41 by @someone<\/small><\/span>/,
   );
   // Only this block can be lifted, with a reason of 20 to 200 characters.
-  assert.match(html, /Why publish anyway\? Saved on this run, 20 to 200 characters<textarea class="text-input" maxLength="200">/);
-  assert.match(html, /0 of 20 to 200 characters/);
+  assert.match(html, /Why publish anyway\? Saved on this run\.<textarea class="text-input" maxLength="200">/);
+  assert.match(html, /0 \/ 20–200 characters/);
   assert.match(html, /<input type="checkbox"\/><span>The issue may not be free to work on\.<small class="publish-why">/);
   assertNoHan(html);
 });
@@ -681,14 +681,14 @@ test("file-hold checks, including upstream changes under your hold, group under 
       kind: "confirm",
       message:
         "Commits on main changed files under your hold since you took it. Check those changes before publishing.",
-      details: ["src/api/users.ts changed on main since your hold (abc1234, def5678)"],
+      details: ["src/api/users.ts (abc1234, def5678)"],
     },
   ];
   const enHtml = renderEn(checksElement({ checks: confirmOnly }));
   assertNoHan(enHtml);
   assert.match(enHtml, /File holds/);
   assert.match(enHtml, /Commits on main changed files under your hold since you took it\./);
-  assert.match(enHtml, /src\/api\/users\.ts changed on main since your hold \(abc1234, def5678\)/);
+  assert.match(enHtml, /src\/api\/users\.ts \(abc1234, def5678\)/);
   assert.match(enHtml, /type="checkbox"/);
 
   const zhHtml = renderZh(checksElement({ checks: confirmOnly }));

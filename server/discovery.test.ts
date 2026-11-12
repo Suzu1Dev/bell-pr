@@ -1128,7 +1128,7 @@ test("discovery passes the Codex baseline timeout and a longer, announced wait f
     // 240 s × 2.5 (Claude) × 1.5 (xhigh) = 900 s.
     assert.deepEqual(timeouts, [900_000]);
     assert.deepEqual(messages, [
-      "已取得真實 GitHub 來源，正在分析適合的貢獻機會（最多等待 15 分鐘）",
+      "已取得 GitHub 來源，正在分析適合的貢獻機會（最多等待 15 分鐘）",
     ]);
     timeOut = true;
     await claude.service.start({

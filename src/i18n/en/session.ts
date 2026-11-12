@@ -35,7 +35,7 @@ const messages = {
   "limitationsAction": "Ask the agent to address these items",
   "limitationsIntro": "The PR draft’s Limitations section lists unfinished or unverified work. Please address what you can (code fixes, tests, checks), explain what remains and ask for what you need. Put completed verification in Validation, keep only remaining gaps and constraints in Limitations, and correct outdated claims in both sections:\n\n",
   "blocks": {
-    "running": "The agent is working in this checkout. Wait until it finishes.",
+    "running": "The next turn can start when this one finishes.",
     "publishing": "The PR is being submitted. Wait until it finishes.",
     "published": "This PR was submitted. Use the review follow-up action in the PR draft tab for later feedback.",
     "ended": "This run has ended and cannot start another collaboration turn.",

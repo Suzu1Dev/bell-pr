@@ -151,9 +151,9 @@ export default {
     noEvidence:
       "No opportunity this time both matched your criteria and had issue evidence that can be checked.",
     analyzing:
-      "Found real GitHub sources; analyzing which contribution opportunities fit",
+      "Found GitHub sources; analyzing which contribution opportunities fit",
     analyzingWithWait: ({ wait }: { wait: string }) =>
-      `Found real GitHub sources; analyzing which contribution opportunities fit (${wait})`,
+      `Found GitHub sources; analyzing which contribution opportunities fit (${wait})`,
     unusableAnswer:
       "The AI discovery analysis did not finish, or its response cannot be used safely. Try again; the previous result is kept.",
     found: ({ count }: { count: number }) =>

@@ -4,7 +4,7 @@ import type en from "../en/onboarding";
 
 const m: Translation<typeof en> = {
   title: `歡迎使用 ${product.name}`,
-  intro: "幾個步驟就能準備就緒：語言、這台電腦上的工具，以及 Agent 使用的 AI 服務。",
+  intro: "幾個步驟就能準備就緒。",
   progress: "設定步驟",
   stepOf: ({ step, total }) => `第 ${step} 步，共 ${total} 步`,
   steps: {

@@ -65,8 +65,7 @@ const efficiency = {
   /** A role's call count when only some calls reported their usage. */
   partialCalls: ({ calls, measured }: { calls: number; measured: number }) =>
     `${fmt.number(calls)} (${fmt.number(measured)} reported)`,
-  byRoleNote:
-    "Like the totals above, this lists only the tokens and calls the CLI reported. Teammates is the total of all members.",
+  byRoleNote: "Teammates is the total of all members.",
   noMeasurement:
     "No measurements yet. Reported usage and time appear after a run.",
   noMeasurementSample: "No measurements yet. The sample did not call AI.",

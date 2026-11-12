@@ -38,13 +38,14 @@ test("an unpublished run shows its base, its conflicts with the agent action, an
       to: "a".repeat(40),
       snapshot: "c".repeat(40),
       conflicts: ["src/hello.ts"],
-      report: "仍有衝突標記：src/hello.ts。",
+      report: "已合併兩邊的修改。",
     },
   });
   assert.match(html, /<code>main<\/code> 的 <code>aaaaaaa<\/code>/);
   assert.match(html, /上次同步：<code>bbbbbbb<\/code>/);
   assert.match(html, /src\/hello\.ts/);
   assert.match(html, /仍有衝突標記/);
+  assert.match(html, /已合併兩邊的修改。/);
   assert.equal(button(html, "請 Agent 解決衝突"), "enabled");
   assert.match(html, /復原同步/);
   // The server refuses another sync until these conflicts are resolved.

@@ -78,7 +78,7 @@ const workspace = {
     body:
       "The edits are still in the working directory. Put the files back, or check again after the holder releases the hold or a group admin revokes it.",
     legacyBody:
-      "This run stopped earlier because it changed files someone else held. Put these files back, or check current holds again.",
+      "Put these files back, or check current holds again.",
     legacyTaskStopped:
       "This subtask touched files someone else held, so its edits weren't added. Retry once the hold is released or revoked.",
     item: ({
@@ -173,7 +173,6 @@ const workspace = {
     changed: "You changed the code after marking it ready. The review and the check wait until you mark it ready again.",
   },
   footer: {
-    allReviewed: "Every file reviewed.",
     passed: "You explained it back. Ready to approve.",
     checkOff:
       "Every file reviewed · Understanding check off. Approval needs your reviewed ticks only.",
@@ -218,8 +217,7 @@ const workspace = {
     waitingForChanges: "Waiting for the agents' changes",
     noMatches: "No matching files",
     progress: "Review progress",
-    allReviewed: "Every file reviewed. Next: explain it back.",
-    allReviewedDone: "Every file reviewed.",
+    allReviewed: "Next: explain it back.",
     reviewHint: "Once you have read a file and its explanation, mark it as reviewed.",
     /** Opens the check before every file is ticked; the ticks stay required. */
     takeCheck: "Take the check now",
@@ -248,8 +246,8 @@ const workspace = {
     viewActivity: "View activity",
     resize: "Resize the explanation panel",
     loadingPanel: "Preparing the reading panel…",
-    emptyTitle: "Understanding starts with the changes.",
-    emptyText: "Select a changed file to ask about its design and trade-offs.",
+    emptyTitle: "Select a changed file",
+    emptyText: "Then ask about its design and trade-offs.",
   },
   diffRounds: {
     label: "Changes to view",
@@ -262,7 +260,7 @@ const workspace = {
     adopted: ({ number }: { number: number }) => `Round ${number}: changes taken over from GitHub`,
     all: "All changes (cumulative)",
     readOnly: "Read-only changes",
-    notice: "This view is read-only. Return to the current changes to mark files as reviewed, ask questions or approve.",
+    notice: "Read-only view. To mark files as reviewed, ask questions or approve, go back to the current changes.",
     back: "Back to current changes",
     loading: "Loading the selected changes…",
     retry: "Try loading again",
@@ -391,7 +389,6 @@ const workspace = {
     log: "Run log",
     demoLog: "Sample log",
     live: "Updates every 2.5 s",
-    taskLog: "Task log",
     filterLabel: "Filter the run log by role",
     all: "All",
     emptyLog: "The log appears here once the task starts.",
@@ -425,7 +422,7 @@ const workspace = {
     commitLabel: "Commit message",
     commitLabelRound: "This round's commit message",
     commitHelp: `The first line is the subject, then a blank line and the body, with trailers last. Left empty, the PR title becomes a one-line commit message. Add sign-offs such as Signed-off-by yourself; ${product.name} and the model never fill them in.`,
-    commitHelpRound: `This message becomes the new commit on the PR branch, so it is required: make sure it says which review comments this round addresses. The first line is the subject, then a blank line and the body, with trailers last. Add sign-offs such as Signed-off-by yourself; ${product.name} and the model never fill them in.`,
+    commitHelpRound: `Required: say which review comments this round addresses. The first line is the subject, then a blank line and the body, with trailers last. Add sign-offs such as Signed-off-by yourself; ${product.name} and the model never fill them in.`,
     branchLabel: "GitHub branch",
     /** `{branch}` marks where the run's own branch name is shown. */
     branchHelp:
@@ -465,8 +462,7 @@ const workspace = {
     taskItemsHelp: `Only tick what you really finished or checked. ${product.name} and the model never tick them for you; ticking rewrites the description above, so remember to save.`,
     noSection: "No section",
     samePr: "Push to the same PR",
-    samePrHelp:
-      "Only adds a new commit: nothing is force-pushed, and the PR title and description stay.",
+    samePrHelp: "Nothing is force-pushed.",
     draftPr: "Submit as a Draft PR",
     draftPrHelp:
       "You can keep editing on GitHub afterwards; the project's automated checks usually run on Draft PRs too.",
@@ -483,7 +479,7 @@ const workspace = {
   },
   feedback: {
     title: "Maintainer feedback",
-    intro: `Reviews, comments and CI results on the PR are read only when you press the button. ${product.name} only reads them; reply on GitHub.`,
+    intro: `Reviews, comments and CI results on the PR are read once each time you press the button and never update on their own. ${product.name} only reads them; reply on GitHub.`,
     viewPullRequest: "View pull request",
     fetchAgain: "Read feedback again",
     fetch: "Read feedback",
@@ -534,8 +530,7 @@ const workspace = {
     line: ({ line }: { line: number }) => `Line ${line}`,
     resolved: "Resolved",
     openOnGitHub: "Open on GitHub",
-    notFetched:
-      "Not read yet. “Read feedback” asks GitHub once and never updates on its own.",
+    notFetched: "Not read yet.",
     cantContinue:
       "Can't continue? Close the pull request yourself on GitHub, with a short note in your own words.",
   },
@@ -621,8 +616,8 @@ const workspace = {
     factsLoading: "Reading the GitHub facts…",
     couldntCheck: ({ reason }: { reason: string }) => `Couldn't check: ${reason}`,
     factsMissing: "this build cannot read the GitHub facts yet",
-    overrideLabel: "Why publish anyway? Saved on this run, 20 to 200 characters",
-    overrideCount: ({ count }: { count: number }) => `${count} of 20 to 200 characters`,
+    overrideLabel: "Why publish anyway? Saved on this run.",
+    overrideCount: ({ count }: { count: number }) => `${count} / 20–200 characters`,
     closeLoop: ({ title }: { title: string }) => `Close the loop first: read the feedback on “${title}”`,
     /** A pull request a maintainer has waited on, which BELL has no run for: it opens on GitHub. */
     waitingPr: ({ number }: { number: string }) =>

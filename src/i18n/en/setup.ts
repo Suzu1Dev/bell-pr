@@ -82,7 +82,6 @@ export default {
     gh: "This needs the GitHub CLI, installed and signed in.",
     "git-identity":
       "This needs your Git name and e-mail address, which every commit carries.",
-    unavailable: "Unavailable until this is fixed.",
     detail: ({ check, detail }: { check: string; detail: string }) =>
       `${check}: ${detail}`,
   },

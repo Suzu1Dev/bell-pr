@@ -39,7 +39,7 @@ test("the sample shows issue #42 without a link, green chips and the maintainer'
 test("without a GitHub issue link nothing is read, and the field says what would be", () => {
   const empty = renderEn(view());
   assertNoHan(empty);
-  assert.match(empty, /Link the issue you will work on, and BELL PR checks whether it is still open and whether someone else is already on it\./);
+  assert.match(empty, /With a link, BELL PR checks whether the issue is still open and whether someone else is already on it\./);
   assert.deepEqual(chips(empty), []);
   assert.match(renderEn(view({ issueUrl: "#42" })), /Issue facts are read for GitHub issue links/);
   // Several links are not one link: the field says it takes one, and where the others go.

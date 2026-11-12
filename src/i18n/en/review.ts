@@ -74,7 +74,7 @@ const review = {
       plural(count) === "one"
         ? `${count} line selected`
         : `${count} lines selected`,
-    idleHint: "Click any line and the agent will explain it",
+    idleHint: "Click a line to ask about it",
     /** A Learn-by-hand run: the guide answers a question about the selected lines. */
     idleHintGuide: "Click any line to ask the guide about it",
     /** The name on the Shift key cap. */
@@ -261,11 +261,11 @@ const review = {
     emptyBody:
       "Once the Lead's integration, the Reviewer and the Test analyst have finished, their full reports appear here.",
     intro:
-      "These are independent static reviews, not execution results. Each report is shown in full, with the number of paragraphs that mention the current file.",
+      "Independent static reviews: the code was read, not run. Each report is shown in full.",
     orderTitle: "Reading order suggested by the Lead",
     orderIntro:
       "A common approach is to read definitions and interfaces first, then their callers, with tests first or last. The Lead's integration summary explains why this order was chosen. The file list on the left can switch to this suggested order.",
-    staticBadge: "Independent static review, not an execution result",
+    staticBadge: "Static review",
     mentions: ({ count }: { count: number }) =>
       plural(count) === "one"
         ? `Mentions this file in ${count} paragraph`
@@ -274,7 +274,7 @@ const review = {
     evidenceDemo:
       "Sample reports aren't live AI output and don't represent test results.",
     evidenceLive:
-      "Each role wrote its report by reading the code, not running it. Only the commands and output a report lists explicitly count as test results.",
+      "Only the commands and output a report lists explicitly count as test results.",
   },
   /** Maintainer comments on the current file from the published PR. */
   feedback: {

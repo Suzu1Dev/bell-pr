@@ -149,7 +149,6 @@ export function AboutDialog({
     <Modal
       wide
       title={t.title}
-      subtitle={t.subtitle}
       onClose={onClose}
       mark={<Logo variant="mark" size={28} title="" />}
     >

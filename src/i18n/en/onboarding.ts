@@ -3,8 +3,7 @@ import { product } from "../../../shared/product";
 
 export default {
   title: `Welcome to ${product.name}`,
-  intro:
-    "A few steps get you ready: your language, the tools on this computer and the AI provider your agents use.",
+  intro: "A few steps get you ready.",
   progress: "Setup steps",
   stepOf: ({ step, total }: { step: number; total: number }) =>
     `Step ${step} of ${total}`,

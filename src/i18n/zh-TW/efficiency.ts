@@ -49,7 +49,7 @@ const m: Translation<typeof en> = {
   },
   partialCalls: ({ calls, measured }) =>
     `${fmt.number(calls)}（回報 ${fmt.number(measured)}）`,
-  byRoleNote: "同樣只列 CLI 回報的 tokens 與呼叫次數；Teammates 為所有成員合計。",
+  byRoleNote: "Teammates 為所有成員合計。",
   noMeasurement: "尚無實測；執行後會顯示已回報的用量與時間。",
   noMeasurementSample: "尚無實測；示範內容未呼叫 AI。",
 };

@@ -83,7 +83,7 @@ test("the import dialog reads in English with no Chinese left", () => {
   assert.match(html, /<h2 id="modal-title">Import a project<\/h2>/);
   assert.match(html, /<label class="field-label" for="repo-source">Repository source<\/label>/);
   assert.match(html, /placeholder="owner\/repository or https:\/\/github\.com\/owner\/repository"/);
-  assert.match(html, /Local Git projects work too: paste the path, such as ~\/projects\/repository<\/p>/);
+  assert.match(html, /Paste a GitHub link, owner\/repository, or the full path of a local Git project, such as ~\/projects\/repository<\/p>/);
   assert.match(html, />Not now<\/button>/);
   assert.doesNotMatch(html, /lucide-github|Cloning/);
   assertNoHan(html);
@@ -124,7 +124,7 @@ test("one path example for every computer, and the WSL2 hint for Windows browser
   );
   assertNoHan(windows);
   const zh = renderZh(createElement(ImportRepoModal, { ...props, platform: "Win32" }));
-  assert.match(zh, /也支援本機 Git 專案：貼上路徑，例如 ~\/projects\/repository/);
+  assert.match(zh, /貼上 GitHub 連結、owner\/repository，或本機 Git 專案的完整路徑，例如 ~\/projects\/repository/);
   assert.match(zh, /若 BELL PR 在這台電腦的 WSL2 中執行，請使用 Linux 發行版中的路徑/);
 });
 

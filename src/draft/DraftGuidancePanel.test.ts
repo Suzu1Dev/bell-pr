@@ -443,9 +443,9 @@ test("the preflight lists the secret block first, then the path, workflow and e-
     items.map(([kind, label]) => [kind, label]),
     [
       ["block", "Blocks publishing"],
-      ["confirm", "Confirm before publishing"],
-      ["confirm", "Confirm before publishing"],
-      ["confirm", "Confirm before publishing"],
+      ["confirm", "Needs your confirmation"],
+      ["confirm", "Needs your confirmation"],
+      ["confirm", "Needs your confirmation"],
     ],
   );
   for (const check of [preflight[0], ...preflight.slice(1)])
