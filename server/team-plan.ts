@@ -5,6 +5,8 @@
  * Learn-by-hand run's confirmed plan starts the person's own turn instead.
  */
 import { maxPlanRevisions } from "../shared/team.js";
+import { planOverlaps, planScopes } from "./group-local.js";
+import { assertNotHeld, heldNotice } from "./hold-guard.js";
 import { sm } from "./i18n/index.js";
 import { redact } from "./process.js";
 import { enterPhase, logRunQueued } from "./run-events.js";
@@ -35,16 +37,57 @@ export async function sendTeamMessage(
   });
 }
 
-export async function approvePlan(ctx: WorkbenchContext, id: string) {
+/**
+ * The titles of the other contributions whose files meet `run`'s plan,
+ * once the person confirmed them: `digest` is the one GET
+ * /api/runs/:id/overlaps returned with them. Without it, or for overlaps
+ * or a plan that changed since, it is a 409.
+ */
+async function confirmedOverlaps(ctx: WorkbenchContext, run: Run, digest?: string) {
+  const { overlaps, digest: current } = await planOverlaps(ctx, run);
+  const titles = overlaps.map((overlap) => overlap.title);
+  if (titles.length && digest !== current)
+    throw new AppError(
+      (m) => (digest ? m.run.local.overlapChanged : m.run.local.planOverlap({ titles })),
+      409,
+    );
+  return titles;
+}
+
+/**
+ * Refuses a plan that covers files someone else in the group holds
+ * (hold-guard.ts, S2): 409 `heldByOther`, or 503 `holdsUnknown` when group
+ * work stopped. Without group work, nothing is checked.
+ */
+function assertPlanNotHeld(ctx: WorkbenchContext, run: Run) {
+  const held = assertNotHeld(ctx.holds, run, planScopes(run), "plan");
+  if (held.length) ctx.log(run, "user", heldNotice(held), { kind: "notice" });
+}
+
+/**
+ * Approves an agent team's plan, or confirms a Learn-by-hand run's plan.
+ * When other contributions of the project change files the plan covers,
+ * the person approves with the digest of the overlaps they saw.
+ */
+export async function approvePlan(
+  ctx: WorkbenchContext,
+  id: string,
+  options: { overlapDigest?: string } = {},
+) {
   return ctx.lock(id, async () => {
     const run = ctx.run(id);
-    if (run.learnByHand) return confirmByHandPlan(ctx, run);
-    if (run.status !== "awaiting_plan" || !run.team?.tasks.length)
-      throw new AppError((m) => m.run.queue.noPlanToApprove, 409);
+    if (run.learnByHand) return confirmByHandPlan(ctx, run, options.overlapDigest);
+    const waiting = () => run.status === "awaiting_plan" && !!run.team?.tasks.length;
+    if (!waiting()) throw new AppError((m) => m.run.queue.noPlanToApprove, 409);
+    assertPlanNotHeld(ctx, run);
+    const titles = await confirmedOverlaps(ctx, run, options.overlapDigest);
+    // A Stop does not take the run lock, so it may have come during the check.
+    if (!waiting() || !run.team) throw new AppError((m) => m.run.queue.noPlanToApprove, 409);
     run.team.approvedAt = now();
     run.team.phase = "developing";
     run.status = "queued";
     ctx.log(run, "user", sm().run.queue.planApproved);
+    if (titles.length) ctx.log(run, "user", sm().run.local.approvedOverlap({ titles }), { kind: "notice" });
     await ctx.store.save();
     logRunQueued(run, "plan_approved");
     ctx.enqueue(id);
@@ -56,14 +99,22 @@ export async function approvePlan(ctx: WorkbenchContext, id: string) {
  * "This is my plan" in a Learn-by-hand run (DESIGN v1.2 F3): it needs at
  * least one step the person wrote, and starts their turn to write the
  * change. Nothing is queued: no agent writes, and the guide's outline is
- * never executed (`team.tasks` stays as it is). The caller holds the run
- * lock.
+ * never executed (`team.tasks` stays as it is). The steps' files are
+ * checked against the person's other contributions like an agent plan.
+ * The caller holds the run lock.
  */
-async function confirmByHandPlan(ctx: WorkbenchContext, run: Run) {
+async function confirmByHandPlan(ctx: WorkbenchContext, run: Run, overlapDigest?: string) {
+  if (run.status !== "awaiting_plan" || !run.team)
+    throw new AppError((m) => m.run.queue.noPlanToApprove, 409);
+  if (!run.byHand?.plan?.steps.length)
+    throw new AppError((m) => m.byHand.flow.stepFirst, 409);
+  assertPlanNotHeld(ctx, run);
+  const titles = await confirmedOverlaps(ctx, run, overlapDigest);
+  // A Stop does not take the run lock, so it may have come during the check.
   const team = run.team;
+  const plan = run.byHand?.plan;
   if (run.status !== "awaiting_plan" || !team)
     throw new AppError((m) => m.run.queue.noPlanToApprove, 409);
-  const plan = run.byHand?.plan;
   if (!plan?.steps.length)
     throw new AppError((m) => m.byHand.flow.stepFirst, 409);
   const at = now();
@@ -72,6 +123,7 @@ async function confirmByHandPlan(ctx: WorkbenchContext, run: Run) {
   enterPhase(run, team, "developing");
   run.status = "review";
   ctx.log(run, "user", sm().byHand.flow.yourTurn);
+  if (titles.length) ctx.log(run, "user", sm().run.local.approvedOverlap({ titles }), { kind: "notice" });
   await ctx.store.save();
   return run;
 }

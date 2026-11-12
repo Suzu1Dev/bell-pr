@@ -8,6 +8,7 @@ import {
   type SetStateAction,
 } from "react";
 import { api, send } from "../../api";
+import { participantHeaders } from "../../collab/participant";
 import { getDemo } from "../../demo";
 import { useLocale, useT } from "../../i18n";
 import type { Run } from "../../types";
@@ -270,6 +271,7 @@ export function useDraftEditor({
       try {
         const { checks } = await api<{ checks: DraftCheck[] }>(
           `/runs/${id}/preflight`,
+          { headers: participantHeaders() },
         );
         if (runIdRef.current === id)
           setServerChecks({ runId: id, fingerprint, checks });

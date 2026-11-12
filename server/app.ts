@@ -10,6 +10,7 @@ import { DiscoveryService } from "./discovery.js";
 import type { AgentSlots } from "./agent-slots.js";
 import { localhostGuard, parseAllowedOrigins } from "./http-guard.js";
 import type { ApiErrorBody } from "../shared/errors.js";
+import type { SuiteLinks } from "../shared/suite.js";
 import { formatters, htmlLang, parseLocale } from "../shared/i18n/locale.js";
 import { defaultStaticDir } from "./config.js";
 import { currentLocale, sm, withLocale } from "./i18n/index.js";
@@ -34,12 +35,15 @@ import { registerUnderstandingRoutes } from "./routes/understanding.js";
 import { registerContributionRoutes } from "./routes/contribution.js";
 import { registerByHandRoutes } from "./routes/by-hand.js";
 import { registerSessionRoutes } from "./routes/session.js";
+import { registerSuiteRoutes } from "./routes/suite.js";
 import { registerSudoRoutes } from "./routes/sudo.js";
 import type { PasswordlessSudo } from "./sudo.js";
 import { readApiToken } from "./api-token.js";
 import { DeviceTokens } from "./device-tokens.js";
 import { Pairing } from "./pairing.js";
 import { registerPairingRoutes } from "./routes/pairing.js";
+import type { CollabHost } from "./collab-host.js";
+import { registerCollabRoutes } from "./routes/collab.js";
 
 /** Masks secrets in string values, which may quote command output. */
 function redactValues<T extends Record<string, unknown>>(values?: T) {
@@ -122,6 +126,10 @@ export interface AppOptions {
    * and device tokens next to it under the data directory.
    */
   apiTokenFile?: string;
+  /** Group work's host (collab-host.ts), when BELL PR was started with --group. */
+  collab?: CollabHost;
+  /** The other BELL products' origins (BELLPR_SUITE_LINKS); none by default. */
+  suiteLinks?: SuiteLinks;
 }
 
 export function createApp(workbench: Workbench, options: AppOptions = {}) {
@@ -220,12 +228,19 @@ export function createApp(workbench: Workbench, options: AppOptions = {}) {
   registerContributionRoutes(app, deps);
   registerByHandRoutes(app, deps);
   registerSessionRoutes(app, deps);
+  registerSuiteRoutes(app, deps);
   if (tokenFile && devices)
     registerPairingRoutes(app, tokenFile, {
       devices,
       pairing: new Pairing(path.dirname(tokenFile), devices),
       publicUrl: options.publicUrl,
     });
+  if (options.collab) {
+    app.locals.collab = options.collab;
+    registerCollabRoutes(app, options.collab, { store: workbench.store, devices, tokenFile });
+    // Agent turns, teammates and plans respect the group's holds too.
+    workbench.guardHolds(options.collab);
+  }
   if ((options.platform ?? process.platform) === "linux") registerSudoRoutes(app, deps);
   app.use("/api", (_req, res) => {
     res.status(404).json({ error: sm().common.notFound });

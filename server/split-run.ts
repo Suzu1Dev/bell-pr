@@ -17,7 +17,7 @@ import { mkdir } from "node:fs/promises";
 import path from "node:path";
 import { activeFollowUp } from "../shared/followups.js";
 import { planTaskPaths } from "../shared/reviewability.js";
-import type { SplitRef, SplitRequest } from "../shared/split.js";
+import { groupAfterLimit, type SplitRef, type SplitRequest } from "../shared/split.js";
 import { assertWorkspacePresent } from "./cleanup.js";
 import { assertRefName, readDiff } from "./git.js";
 import { shuttingDown, sm } from "./i18n/index.js";
@@ -203,6 +203,8 @@ function contributionRun(
     ...(source.modelExecution ? { modelExecution: structuredClone(source.modelExecution) } : {}),
     ...(facts ? { contributionFacts: facts } : {}),
     ...(source.unsandboxed ? { unsandboxed: true as const } : {}),
+    // A part is still the work of the people who started the contribution.
+    ...(source.owners ? { owners: [...source.owners] } : {}),
     ...(explanations ? { explanations } : {}),
     ...(walkthroughs ? { walkthroughs } : {}),
     ...(notes ? { notes } : {}),
@@ -222,6 +224,71 @@ function contributionRun(
   };
   ctx.log(run, "lead", text.split.startedFrom({ title: source.title }), { kind: "notice" });
   return run;
+}
+
+/**
+ * Records, on each part, the parts it builds on (`group.after`): a task
+ * with files in this part depends, directly or through other tasks, on a
+ * task with files in that part. A part's own copy of the plan keeps only
+ * its own tasks, so this is where those dependencies stay known. When the
+ * source is itself a part, each new part also builds on what the source
+ * built on, and the parts that built on the source build on every new part.
+ */
+function recordPartOrder(
+  runs: Run[],
+  source: Run,
+  input: SplitRequest,
+  created: Run[],
+  files: ReadonlyMap<string, DiffFile>,
+) {
+  const tasks = source.team?.tasks ?? [];
+  const changed = [...files.keys()];
+  const partOfPath = new Map(
+    input.contributions.flatMap(({ paths }, part) => paths.map((filePath) => [filePath, part] as const)),
+  );
+  const partsOf = new Map(
+    tasks.map((task) => [
+      task.id,
+      new Set(planTaskPaths(changed, task).flatMap((filePath) => partOfPath.get(filePath) ?? [])),
+    ]),
+  );
+  const byId = new Map(tasks.map((task) => [task.id, task]));
+  const inherited = source.group?.after ?? [];
+  created.forEach((run, part) => {
+    const after = new Set<number>();
+    for (const task of tasks) {
+      if (!partsOf.get(task.id)?.has(part)) continue;
+      // The plan's dependencies have no cycles (parseTeamPlan), so this ends.
+      const pending = [...task.dependsOn];
+      const seen = new Set<string>();
+      for (let id = pending.pop(); id !== undefined; id = pending.pop()) {
+        if (seen.has(id)) continue;
+        seen.add(id);
+        for (const other of partsOf.get(id) ?? []) if (other !== part) after.add(other);
+        pending.push(...(byId.get(id)?.dependsOn ?? []));
+      }
+    }
+    const ids = [...inherited, ...[...after].sort((a, b) => a - b).map((other) => created[other].id)];
+    if (ids.length) run.group = { after: ids };
+  });
+  const made = created.map((run) => run.id);
+  for (const other of runs) {
+    const after = other.group?.after;
+    if (!after?.includes(source.id)) continue;
+    other.group = { ...other.group, after: [...new Set(after.flatMap((id) => (id === source.id ? made : [id])))] };
+  }
+}
+
+/**
+ * The most parts a new part, or a run built on `source`, would build on
+ * after splitting `source` into `count` (recordPartOrder).
+ */
+function widestOrder(runs: readonly Run[], source: Run, count: number) {
+  const others = count - 1;
+  return Math.max(
+    (source.group?.after?.length ?? 0) + others,
+    ...runs.map((run) => (run.group?.after?.includes(source.id) ? run.group.after.length + others : 0)),
+  );
 }
 
 /**
@@ -250,6 +317,8 @@ export async function splitRun(
     await assertConflictsResolved(source);
     const files = assertRequest(input, await ctx.diff(id));
     const repo = ctx.repo(source.repoId);
+    const tooMany = () => new AppError((m) => m.run.split.tooManyEdges({ limit: groupAfterLimit }), 422);
+    if (widestOrder(ctx.store.data.runs, source, input.contributions.length) > groupAfterLimit) throw tooMany();
 
     const created: Run[] = [];
     try {
@@ -266,6 +335,14 @@ export async function splitRun(
       throw error;
     }
 
+    // Checked again with no await before the rewrite: another split may have widened a shared dependent meanwhile.
+    if (widestOrder(ctx.store.data.runs, source, created.length) > groupAfterLimit) {
+      await ctx.lock(`repository:${repo.id}`, async () => {
+        for (const run of created) await discardCheckout(repo, run.branch, run.worktreePath);
+      });
+      throw tooMany();
+    }
+    recordPartOrder(ctx.store.data.runs, source, input, created, files);
     const refs: SplitRef[] = created.map((run) => ({ runId: run.id, title: run.title }));
     source.splitInto = refs;
     ctx.log(source, "lead", sm().run.split.wasSplit({ count: created.length }), { kind: "notice" });

@@ -7,6 +7,344 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- **Group work for the people who share one BELL PR, from the command
+  line and the API.** `bell-pr start --group` (or `BELLPR_GROUP=1`) turns
+  it on. The person at the host sets the group up with
+  `bell-pr group setup` and invites each person by name with a one-time
+  code (`bell-pr group invite <name> [--admin]`); `bell-pr group status`
+  says whether group work is not set up, ready or stopped. A person joins
+  with the code through `POST /api/collab/join` and gets a participant
+  token, sent in `x-bell-participant` next to the app token; an admin can
+  remove a person and, when asked, unpair the device they joined from.
+  Admin and member only decide who may invite and remove people, add
+  repositories and revoke a hold (next entry). Without the switch nothing changes, except that a
+  participant token is masked (under Changed). `docs/group-work.md`
+  describes it.
+- **The group's repositories, holds on files and folders, and a live feed,
+  through the API.** A group admin adds a repository this BELL PR has
+  (`POST /api/collab/projects`), and the group gets its own bare copy of
+  its default branch in `collab/` in the data directory. Each person says
+  what they are working on by taking a hold: a title and up to 50 files or
+  folders (`POST /api/collab/projects/<id>/work`). A folder holds
+  everything inside it, and letter case is ignored. BELL PR refuses a hold
+  that meets one already held and names who holds what; `check` asks the
+  same question without taking anything. The holder releases a hold, an
+  admin revokes one, and removing a person ends what they hold.
+  `GET /api/collab/projects/<id>/feed` answers with the repository's
+  board, the people of the group and what is held now, and waits up to 25
+  seconds for the next change. A hold does not stop a tool, an editor or a
+  push outside BELL PR from writing to a held path; what BELL PR checks of
+  its own writes is in the entry "BELL PR checks its own writes against
+  other people's holds" below.
+  The group's record keeps every ended hold and nothing cleans it up: once
+  it is full (8 MiB) new holds are refused until the host resets group
+  storage, which `docs/troubleshooting.md` describes. The paths that
+  cannot be held and every limit are in `docs/group-work.md`.
+- **With group work on, the data-directory lock is the strict one.** It is
+  never replaced because of its age. After a crash that leaves a lock
+  whose holder cannot be confirmed (another container or machine, an older
+  build, an unreadable file), the next start is refused until a person
+  removes the lock file. `bell-pr start --group` never reuses a BELL PR
+  that runs without group work: it says to stop that one first and exits
+  with 1.
+- **The Group page: who holds what, in the app.** With group work on, the
+  sidebar has a **Group** item (`#/group`). The page shows one repository
+  of the group: its people and who is looking at the board now, and each
+  hold with its holder, title, paths and time, kept current from the feed
+  without a reload. Under **Start work** you type a title and paths, and
+  the page says before you take the hold whether another one is in the way
+  and whose; the answer updates by itself when the board changes. You
+  release your own holds, and an admin revokes someone else's after one
+  question. The person at the host starts group work and adds a repository
+  there, an admin invites with a one-time code, and a paired device joins
+  by typing it. A chip says whether the board is live, updated every 10
+  seconds or reconnecting. Under **Must finish first** you tick the tasks
+  that must be finished before yours starts, and your own hold has
+  **Finish & release** (the task is done, so work that waits for it can
+  start) and **Release only**. Using the same identity on another device
+  and removing a person stay API-only. Without the switch the page says
+  how to turn group work on, and the sidebar has no Group item.
+  `docs/group-work.md` describes it.
+- **BELL PR checks its own writes against other people's holds.** In a
+  repository of the group, BELL PR publishes no change (first pull request
+  or follow-up round) that touches a path someone else holds: the publish
+  dialog lists the files and who holds them. A plan that covers such a
+  path cannot be approved, Codex and Claude Code turns get other people's
+  held paths read-only in the sandbox, and a teammate's change over one is
+  not integrated. A turn that still changed such a file stops the run,
+  with the change left in the checkout: the run page lists the files with
+  **Put these files back** (**Put this file back** for one file; to the
+  run's base, after one question; other changed files stay) and **Check
+  again**, also
+  `POST /api/runs/<id>/holds/restore` and `/holds/recheck`. A run keeps
+  who started it (`owners`) and the files that stopped it (`heldPaths`).
+  Sync and the first publish report commits on the target branch that
+  changed files under your own hold. Work can wait for other work
+  (`dependsOn`, releasing with `"done": true`, and
+  `GET /api/collab/projects/<id>/tasks`). An editor, a terminal tool or a
+  push outside BELL PR is not checked, and nothing is locked in a checkout
+  or on GitHub. While group work has stopped, nothing is published and no
+  turn that may change files starts in a repository of the group. Without
+  the switch nothing is checked. `docs/group-work.md` has the details.
+- **A coordination core for several people on one project, its integration
+  not reachable yet.** `server/coordination.ts` grants claims on files all
+  or nothing, waits for task dependencies, and moves a dedicated branch one
+  checked change at a time, as `docs/multiuser-collaboration.md` describes.
+  Only group work opens it: to add the people and the repositories of a
+  group, and to claim, release and revoke for its holds. Nothing in the
+  app, the CLI or any listener reaches its dependencies or its
+  integration, and the core itself checks no write against a claim: the
+  checks against holds are group work's (the entry above).
+- **An admin can reopen a failed coordination task, in the core only.** The
+  task keeps its claims, their reasons and fences, and records who reopened
+  it and when. Members cannot reopen a task, and an integrated task never
+  reopens. Nothing in the app, the CLI or any listener reaches it yet.
+- **An interrupted integration the branch cannot settle when the
+  coordinator opens closes only its own project, in the core only.** Other
+  projects keep working; the closed one refuses every change, keeps its
+  claims and fences, and shows the interrupted integration to anyone who
+  reads it. An admin settles it once the branch is back at its base or its
+  change; settling never moves the branch, and each project keeps its
+  latest 10 settlements: who, when and what. While the coordinator runs, a
+  failed write or an integration it cannot account for still stops every
+  project until it opens again. Nothing in the app, the CLI or any
+  listener reaches it yet.
+- **Coordination never reads a commit-graph file, in the core only.** Git
+  takes the parents and trees of the commits it walks to from that file,
+  so one edited by someone with write access to the repository's directory
+  could hide a file outside the claim, a merge or a non-fast-forward
+  from the checks. Every coordination Git command now turns it off, even
+  where the repository's config turns it on. Other files in that
+  directory, such as object files, packs and alternates, are still trusted,
+  and nothing in the app, the CLI or any listener runs those commands yet.
+- **BELL Suite link (contract v1).** `BELLPR_SUITE_LINKS` tells this BELL PR
+  where BELL Explain and BELL Personal are, on the same computer or tailnet,
+  and a switcher between the BELL products shows once a link is set.
+  `GET /api/suite/manifest` and `GET /api/suite/today` describe BELL PR and
+  the runs that wait for you or for BELL PR: two counts and, for each run
+  listed, its id and route, title, state with a fixed phrase, and time.
+  Nothing else about a run is sent. Both stay behind the access token like
+  the rest of the API, and no existing protection changes. No other BELL
+  product can read the feed yet, because BELL PR has no read-only
+  credential to give one. [BELL Suite link](docs/bell-suite.md) has the
+  details.
+
+### Changed
+
+- **The data-directory lock is written whole.** Where the file system
+  supports hard links, a start writes its lock aside and links it into
+  place, so no other start reads it half written. A stale lock is removed
+  only after a start claims it, so two starts that find the same stale
+  lock cannot remove the lock either of them then writes. A claim left by
+  a start that stopped is cleared by the next start once its process is
+  gone, and one that names no start, outside coordination, once it is 30
+  seconds old;
+  a claim that stays, like a lock that cannot be read, is named in the
+  refusal. Without hard links, a start gives up a lock it wrote in place
+  when another start had claimed it empty, so both cannot run; a leftover
+  claim there can refuse a start until it is removed. A lock taken
+  for coordination is never replaced until its holder is shown to have
+  stopped; group work takes one. Tests now hold an integration after its
+  last lock check, and put holders and starts in real separate PID
+  namespaces where bubblewrap can make them: no start of this version
+  takes such a lock, running, paused or expired. A lock a person removes
+  or replaces while its holder runs is still outside that rule: an
+  integration already past its last lock check still moves the branch.
+- **A participant token is masked like other tokens, in every BELL PR.**
+  Text shaped exactly like one (`bpc_` and 43 letters, digits, `-` or `_`)
+  is masked in logs, Agent answers and drafts; a changed file that holds
+  it is held back from review, and a draft that holds it cannot be
+  published. This applies with or without group work. A longer or shorter
+  name that starts with `bpc_` is left as it is.
+
+### Fixed
+
+- **Other requests no longer wait while the server starts Git.** Before each
+  Git command, the server read the repository's driver settings with a
+  synchronous `git config`, so no other request was served until it
+  finished. A keep-alive connection whose idle timeout passed during that
+  wait was closed with the next request already on it, and a client that
+  reuses connections without retrying, such as Playwright's request
+  context, got `ECONNRESET`. The read now runs without blocking the server.
+- **Every subtask after a failed one is now blocked.** When a subtask
+  failed, a subtask that depended on it through another one could still show
+  as waiting on dependencies if the plan listed it first. Every pending or
+  ready subtask that depends on a failed or blocked one, directly or through
+  others, is now blocked in the same step, whatever the plan's order, and
+  that step starts no subtask. Subtasks that a restart of BELL PR stopped
+  now block the subtasks after them in the same way. A dependency on a task
+  the plan does not list, which only an edited data file can hold, no longer
+  causes an internal error and never counts as finished: its subtask keeps
+  waiting unless another dependency blocks it, and the run stops with "Task
+  dependencies or file assignments stop the team from continuing".
+- **The task board no longer shows failed subtasks as done.** Done now holds
+  only integrated subtasks; a failed one stays in To do with its status. A
+  subtask's dependencies used to read "Waits for" with their IDs, finished
+  ones included; each is now listed by title with its current status, and a
+  task the plan does not list shows as unknown. In a run that failed or was
+  cancelled, a subtask whose dependencies are integrated shows "Ready after
+  retry" instead of "Ready to claim", since nothing starts it until you
+  retry. Long titles and descriptions, even with no space to break at, now
+  wrap inside their card.
+- **Codex's web search tool is now off while web access is off.** BELL PR
+  passed Codex a search setting only with web access on. Codex searches a
+  cached index by default, and live in a full access sandbox, so its agents
+  could search the web with the switch off, in project analysis and
+  discovery too (seen with Codex CLI 0.167). Every Codex turn now states
+  the setting: `web_search="live"` with web access on, and
+  `web_search="disabled"` otherwise.
+- **Codex agents no longer get ChatGPT apps (connectors).** With a ChatGPT
+  sign-in, Codex offers its apps to every turn. They include a web search
+  tool that stays available with web search disabled (seen with Codex CLI
+  0.167), and the run log did not record its queries. Every Codex turn now
+  starts with `features.apps=false`, with web access on or off, as BELL PR
+  already keeps your own MCP servers away from agents.
+
+## [1.1.0] - 2026-11-04
+
+The first release on npm's `latest` tag since 1.0.0. It also contains two
+versions that never reached `latest`; CHANGELOG.md, in the package and the
+repository, lists them in full:
+
+- **1.1.0-beta.1**, a prerelease on the `next` tag, added Antigravity
+  (Google's Antigravity CLI, `agy`) as a third AI provider, next to the
+  Codex CLI and Claude Code. Its known limitations are repeated below.
+- **1.0.1**, prepared but never published, added installation with a
+  user-local shell script, a Homebrew formula, Bun or mise, and a warning
+  when the installed Claude Code is outside the supported versions. It
+  fixed Codex commands on Linux when `~/.ssh` holds files. It also stopped
+  your Claude Code hooks from running in BELL PR's agent turns, and kept
+  Codex from reading credential files that are symbolic links in `~/.aws`
+  or the GitHub CLI config directory.
+
+### Added
+
+- **A warning when two of your contributions to one project change the
+  same files.** Before a plan is approved, BELL PR compares the files it
+  covers with your other unfinished contributions to that project: their
+  plans while still to be carried out, what their checkouts changed, and
+  what their pull requests change until that change is in this run's base
+  commit or you read the pull request as merged or closed. Parts of one
+  split never count against each other. The plan board then says which
+  contributions change files this plan covers, and marks each task that
+  touches those files with "Also changed in" and the other contribution's
+  title. Approving needs the tick "I know these overlap; approve anyway".
+  A plan that would start on its own waits for your approval instead, and
+  so does a retried plan that was never approved. "This is my plan" in
+  Learn by hand asks for a similar tick, "I know these overlap; confirm
+  my plan anyway". The check reads only BELL PR's own records and
+  checkouts on this computer and sends nothing.
+- **The parts of a split keep their order.** Each part records the parts
+  its tasks build on; splitting a part again passes this on, and deleting
+  parts points what built on them back at their source. A split that would
+  make a part build on more than 64 others is refused.
+- **Two publish confirms under "Your other contributions here"**: one when
+  another of your contributions to the project changes some of the same
+  files, and one when a part of a split builds on parts that are not
+  merged yet.
+- **Let the agent set this up.** On a Full access run in review or
+  approved, the "Setup this machine needs from you" checklist hands the
+  commands you tick, at most 10 per turn, to one Collaborate turn. A dialog
+  shows them word for word first, and nothing starts until you confirm.
+  The turn runs without the sandbox and with your account. The agent is
+  told to run only the ticked commands that match the project's
+  documentation, changing them at most by adding non-interactive flags,
+  running sudo as `sudo -n` and refreshing the package index, and not to
+  change code or tests. It is told to rerun the checks the commands
+  blocked and to report each item as installed, already present, failed
+  or needs you; an item it does not report shows no result, and a turn
+  that is stopped or fails reports none. A file the turn changes, such as
+  a lockfile an install step rewrites, loses its review mark, and a change
+  to the files or to the PR draft's Validation and Limitations returns an
+  approved contribution to review. BELL PR refuses to hand over the
+  command shapes it knows run fetched code: a downloader (curl, wget,
+  aria2c, axel, fetch) that pipes, chains or substitutes, and a pipe into a
+  shell or another interpreter. Any other command reaches the dialog as
+  written, so read it before you tick it. sudo works only when it needs no
+  password, and stopping the turn does not undo installs.
+
+### Changed
+
+- **Antigravity's models are listed once each, with their thinking levels
+  as reasoning efforts**, as Claude Code's and Codex's are. The Antigravity
+  CLI lists every level as a model of its own (Gemini 4 Argon Low, Medium
+  and High), so the model picker showed each model up to three times. agy
+  still receives the model IDs it listed. A model saved with its level, as
+  1.1.0-beta.1 saved it, reads as that model and effort.
+
+### Fixed
+
+- A plan scope that names a directory of the base commit without its
+  trailing slash (`src`) is read as that directory (`src/`), so the plan
+  covers the files inside.
+- On a Full access run, Antigravity's writing roles were told that curl,
+  wget, the GitHub CLI and pushing are denied, though Full access lifts
+  those denials; the note now names only what stays denied.
+
+### Known limitations
+
+These are 1.1.0-beta.1's limitations of Antigravity, which still apply:
+
+- The Antigravity CLI cannot skip a project's customizations, so BELL PR
+  does not start it in a project with Antigravity hooks, MCP servers,
+  plugins, agents or skills. It still reads the project's `AGENTS.md` and
+  `GEMINI.md`.
+- Its web search cannot be turned off: with Antigravity, every agent can
+  search the web, project analysis and discovery included.
+- On Ubuntu 24.04 and later its sandbox cannot start
+  (`kernel.apparmor_restrict_unprivileged_userns`), so writing roles are
+  refused there unless unsandboxed agents are allowed.
+- It saves every conversation under `~/.gemini/antigravity-cli/`.
+- After you chose Antigravity, a 1.0.x version reports the model settings,
+  the analyses Antigravity made and the discovery results as unreadable;
+  [Upgrading](docs/upgrading.md#going-back-to-an-older-version) says how to
+  recover. 1.1.0-beta.1 reports an Antigravity model chosen in 1.1.0 as
+  unknown until you choose it again.
+
+## [1.1.0-beta.1] - 2026-11-04
+
+A prerelease on npm's `next` tag, to try the Antigravity provider before
+it is released. The tag v1.1.0-beta.0 was never published: its release
+stalled, and this version also gives the Antigravity sign-in check the
+time `agy models` needs.
+
+### Added
+
+- **Antigravity as a third AI provider.** Agents can run through Google's
+  Antigravity CLI (`agy`, checked with 1.5.0), which serves Gemini models,
+  signed in with a Google account, a Gemini API key or Google Cloud
+  credentials. The doctor, the setup checklist, onboarding, the settings and
+  the model picker list it next to the Codex CLI and Claude Code; `agy models`
+  gives the model list and is the sign-in check. Each turn gets permission
+  rules for its role: read-only roles may not write, run commands or read
+  the home directory off the way to their checkout, and no role may read
+  credential files, the Antigravity CLI's own files or BELL PR's data
+  outside its checkout, use MCP tools or the browser, or read pages unless
+  web access is on. Writing roles run their commands in the Antigravity
+  CLI's terminal sandbox, or without it only when you allowed unsandboxed
+  agents. Four error codes have their own troubleshooting sections:
+  `antigravity_missing`, `antigravity_unauthenticated`,
+  `antigravity_sandbox_unavailable` and `antigravity_workspace_config`.
+
+### Known limitations
+
+- The Antigravity CLI cannot skip a project's customizations, so BELL PR
+  does not start it in a project with Antigravity hooks, MCP servers,
+  plugins, agents or skills. It still reads the project's `AGENTS.md` and
+  `GEMINI.md`.
+- Its web search cannot be turned off: with Antigravity, every agent can
+  search the web, project analysis and discovery included.
+- On Ubuntu 24.04 and later its sandbox cannot start
+  (`kernel.apparmor_restrict_unprivileged_userns`), so writing roles are
+  refused there unless unsandboxed agents are allowed.
+- It saves every conversation under `~/.gemini/antigravity-cli/`.
+- After you chose Antigravity, a 1.0.x version reports the model settings,
+  the analyses Antigravity made and the discovery results as unreadable;
+  [Upgrading](docs/upgrading.md#going-back-to-an-older-version) says how to
+  recover.
+
 ## [1.0.1] - 2026-10-31
 
 ### Added

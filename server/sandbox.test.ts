@@ -509,12 +509,8 @@ test("the sandbox canary's fake mode checks the harness without a model call", (
     assert.equal(result.passed, true);
     assert.equal(result.instructionsIgnored, true);
     assert.equal(result.sandboxFailed, false);
-    // The model-free `codex sandbox -- echo RAN` startup check, on Linux only.
-    if (result.provider === "codex")
-      assert.deepEqual(
-        result.sandboxStart,
-        process.platform === "linux" ? { ran: true, bwrap: false } : null,
-      );
+    // The model-free `codex sandbox -- echo RAN` startup check; the stand-in runs it on every platform.
+    if (result.provider === "codex") assert.deepEqual(result.sandboxStart, { ran: true, bwrap: false });
     else assert.equal(result.sandboxStart, undefined);
     assert.ok(Object.values(result.argv).every(Boolean), JSON.stringify(result.argv));
     assert.deepEqual(
@@ -572,13 +568,19 @@ test("the sandbox canary's fake mode checks the harness without a model call", (
         result.attempts.every((attempt: { outcome: string }) => attempt.outcome === "sandbox-failed"),
         JSON.stringify(result.attempts),
       );
-    } else if (process.platform === "linux") {
-      // Codex: only the model-free `codex sandbox -- echo RAN` check sees it.
+    } else {
+      // Codex: only the model-free `codex sandbox -- echo RAN` check sees it,
+      // so it alone fails a run that otherwise passes.
       assert.deepEqual(result.sandboxStart, { ran: false, bwrap: true });
       assert.equal(result.sandboxFailed, false);
+      assert.equal(result.error, undefined);
+      assert.equal(result.instructionsIgnored, true);
+      assert.ok(Object.values(result.argv).every(Boolean), JSON.stringify(result.argv));
+      assert.ok(
+        result.attempts.every((attempt: { outcome: string }) => attempt.outcome === "blocked"),
+        JSON.stringify(result.attempts),
+      );
       assert.equal(result.passed, false);
-    } else {
-      assert.equal(result.sandboxStart, null);
     }
   }
   // Never a real model call by accident: one mode must be chosen.

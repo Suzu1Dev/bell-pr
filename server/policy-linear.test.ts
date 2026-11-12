@@ -113,28 +113,41 @@ const bodies = [
   fill("Can I use AI to understand the code? ", 60_000),
 ];
 
+/**
+ * Fails when `read` grows like a rescan. It reads `text`, and the same shape at a quarter of the
+ * length (its first and last eighths), the fastest of five runs each: a linear read takes about 4
+ * times as long on the whole text and a rescanning one 16, while a slow or busy machine slows both
+ * alike. Runs under 5 ms count as 5 ms, so timer noise on a fast read doesn't count.
+ */
+const assertLinear = (label: string, text: string, read: (text: string) => unknown) => {
+  const eighth = Math.floor(text.length / 8);
+  const [quarter, whole] = [text.slice(0, eighth) + text.slice(-eighth), text].map((input) =>
+    Math.max(timed(() => read(input), 5), 5),
+  );
+  assert.ok(
+    whole < 10 * quarter,
+    `${label} on ${JSON.stringify(text.slice(0, 30))}…: ${quarter.toFixed(1)} ms at a quarter of the length, ${whole.toFixed(1)} ms in full`,
+  );
+};
+
 test("the quote readers stay linear on padded and repeated text", () => {
   for (const text of [...named.map(([, text]) => text), ...bodies, `research${fill("-")}`, fill("research ")])
     for (const [label, read] of [
-      ["refusesAiHelp", () => refusesAiHelp(text)],
-      ["banReach", () => banReach(text)],
-      ["areaReach", () => areaReach(text)],
-      ["carveOutKinds", () => carveOutKinds(text)],
-    ] as const) {
-      const ms = timed(read);
-      assert.ok(ms < 500, `${label} on ${JSON.stringify(text.slice(0, 30))}…: ${ms.toFixed(0)} ms`);
-    }
+      ["refusesAiHelp", refusesAiHelp],
+      ["banReach", banReach],
+      ["areaReach", areaReach],
+      ["carveOutKinds", carveOutKinds],
+    ] as const)
+      assertLinear(label, text, read);
 });
 
 test("the PR-text checks stay linear on a padded or repeated body", () => {
   for (const text of bodies)
     for (const [label, read] of [
-      ["hasAiDisclosure", () => hasAiDisclosure(text, text, { helpVerbs: true })],
-      ["assistanceDenial", () => assistanceDenial(text, text)],
-    ] as const) {
-      const ms = timed(read);
-      assert.ok(ms < 500, `${label} on ${JSON.stringify(text.slice(0, 30))}…: ${ms.toFixed(0)} ms`);
-    }
+      ["hasAiDisclosure", (body: string) => hasAiDisclosure(body, body, { helpVerbs: true })],
+      ["assistanceDenial", (body: string) => assistanceDenial(body, body)],
+    ] as const)
+      assertLinear(label, text, read);
 });
 
 test("a rules read over a padded CONTRIBUTING takes under a second, every quote verbatim and stable for the lock", async (t) => {

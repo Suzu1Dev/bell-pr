@@ -14,7 +14,7 @@ const m: Translation<typeof en> = {
   },
   team: {
     eyebrow: "為協作而生",
-    title: "一個目標，一支 Agent team。",
+    title: "AI 團隊如何分工",
     intro: "從拆解問題到交叉審查，讓專業分工融入你的開發流程。",
     assign: "指派新任務",
     roles: {
@@ -44,7 +44,7 @@ const m: Translation<typeof en> = {
       },
     },
     noteTitle: "Agent 負責開發，你保有最後決定權。",
-    noteText: `使用本機 ${providerLabels.codex} 或 ${providerLabels.claude} CLI 登入狀態。每個任務有獨立分支，完成後進入審查，不會自動建立 PR。`,
+    noteText: `使用本機 ${providerLabels.codex}、${providerLabels.claude} 或 ${providerLabels.antigravity} CLI 登入狀態。每個任務有獨立分支，完成後進入審查，不會自動建立 PR。`,
   },
 };
 

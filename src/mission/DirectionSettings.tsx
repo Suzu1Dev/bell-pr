@@ -2,7 +2,6 @@ import { safeLink, WebLink } from "../review/MarkdownContent";
 import { lazy, Suspense, useEffect, useId, useState } from "react";
 import {
   Bug,
-  Cpu,
   FileText,
   Gauge,
   Globe,
@@ -19,7 +18,7 @@ import type {
   ContributionDirection,
   ContributionSettings,
 } from "../../shared/insights";
-import { codexEnabled } from "../../shared/codex-switch";
+import { activeProvider, codexEnabled } from "../../shared/codex-switch";
 import {
   agentProviders,
   providerLabels,
@@ -180,8 +179,7 @@ export function DirectionSettings({
     report?.platform ??
     (typeof process === "undefined" ? undefined : process.platform);
   const linux = platform === "linux";
-  const provider =
-    !codexEnabled && value.provider !== "claude" ? "claude" : (value.provider ?? "codex");
+  const provider = activeProvider(value.provider);
   const providerLabel = providerLabels[provider];
   useEffect(() => {
     const controller = new AbortController();
@@ -236,6 +234,56 @@ export function DirectionSettings({
     >
       {!modelsOnly && (
         <>
+          <div className="mission-settings-fields">
+            <div className="mission-form-field">
+              <label htmlFor={`${id}-acceptance`}>
+                {t.acceptance.label} <span>{t.optional}</span>
+              </label>
+              <textarea
+                id={`${id}-acceptance`}
+                maxLength={4000}
+                value={value.acceptance}
+                onChange={(event) => update("acceptance", event.target.value)}
+                rows={3}
+                placeholder={t.acceptance.placeholder}
+                aria-describedby={`${id}-acceptance-help`}
+              />
+              <p id={`${id}-acceptance-help`} className="mission-field-note">
+                {t.acceptance.help}
+              </p>
+            </div>
+            <div className="mission-form-field">
+              <label htmlFor={`${id}-issue`}>
+                {t.issue.label} <span>{t.optional}</span>
+              </label>
+              <input
+                id={`${id}-issue`}
+                type="text"
+                inputMode="url"
+                maxLength={400}
+                value={value.issueUrl ?? ""}
+                onChange={(event) => update("issueUrl", event.target.value)}
+                placeholder="https://github.com/owner/repo/issues/123"
+                aria-describedby={`${id}-issue-help`}
+              />
+              <p id={`${id}-issue-help`} className="mission-field-note">
+                {t.issue.help}
+              </p>
+              {repoId && (
+                <Suspense fallback={null}>
+                  <BeforeYouStart
+                    repoId={repoId}
+                    issueUrl={value.issueUrl}
+                    demo={demo}
+                    onFacts={onStartCheck}
+                    byHand={byHand}
+                  />
+                </Suspense>
+              )}
+            </div>
+          </div>
+          <details className="mission-form-details" open={!compact}>
+            <summary>{t.requirements}</summary>
           <fieldset className="mission-fieldset">
             <legend>
               <span className="mission-legend-icon">
@@ -291,7 +339,7 @@ export function DirectionSettings({
                 placeholder={t.outcome.placeholder}
               />
             </div>
-            <div className="mission-form-columns">
+            <div>
               <div className="mission-form-field">
                 <label htmlFor={`${id}-constraints`}>
                   {t.constraints.label} <span>{t.optional}</span>
@@ -309,67 +357,26 @@ export function DirectionSettings({
                   {t.constraints.help}
                 </p>
               </div>
-              <div className="mission-form-field">
-                <label htmlFor={`${id}-acceptance`}>
-                  {t.acceptance.label} <span>{t.optional}</span>
-                </label>
-                <textarea
-                  id={`${id}-acceptance`}
-                  maxLength={4000}
-                  value={value.acceptance}
-                  onChange={(event) => update("acceptance", event.target.value)}
-                  rows={3}
-                  placeholder={t.acceptance.placeholder}
-                  aria-describedby={`${id}-acceptance-help`}
-                />
-                <p id={`${id}-acceptance-help`} className="mission-field-note">
-                  {t.acceptance.help}
-                </p>
-              </div>
-            </div>
-            <div className="mission-form-field">
-              <label htmlFor={`${id}-issue`}>
-                {t.issue.label} <span>{t.optional}</span>
-              </label>
-              <input
-                id={`${id}-issue`}
-                type="text"
-                inputMode="url"
-                maxLength={400}
-                value={value.issueUrl ?? ""}
-                onChange={(event) => update("issueUrl", event.target.value)}
-                placeholder="https://github.com/owner/repo/issues/123"
-                aria-describedby={`${id}-issue-help`}
-              />
-              <p id={`${id}-issue-help`} className="mission-field-note">
-                {t.issue.help}
-              </p>
-              {repoId && (
-                <Suspense fallback={null}>
-                  <BeforeYouStart
-                    repoId={repoId}
-                    issueUrl={value.issueUrl}
-                    demo={demo}
-                    onFacts={onStartCheck}
-                    byHand={byHand}
-                  />
-                </Suspense>
-              )}
             </div>
           </div>
+          </details>
 
         </>
       )}
+      {provider === "antigravity" && !modelsOnly && (
+        <p className="mission-field-note" role="note">{t.model.antigravityWeb}</p>
+      )}
+      <details className="mission-form-details" open={!compact || modelsOnly || !selectedReadiness.ready || access === "full" || !!modelError}>
+        <summary id={`${id}-model-heading`}>
+          <strong>{modelsOnly ? t.model.heading : t.execution}</strong>
+          <span>{[providerLabel, value.model || defaultModel?.name || t.model.modelDefault({}), access === "full" ? permissions.full : permissions.workspace, !byHand && !modelsOnly ? t.team.summary({ count: value.maxTeammates }) : ""].filter(Boolean).join(" · ")}</span>
+        </summary>
       <div
         className="mission-model-settings"
         role="group"
         aria-labelledby={`${id}-model-heading`}
       >
         <div className="mission-model-header">
-          <h3 id={`${id}-model-heading`} className="mission-model-heading">
-            <Cpu size={16} aria-hidden="true" />
-            {t.model.heading}
-          </h3>
           <p className="mission-field-note">{t.model.note}</p>
         </div>
         <div className="mission-form-field">
@@ -471,7 +478,7 @@ export function DirectionSettings({
                 loadingModels ||
                 (!availableEfforts.length && !value.reasoningEffort)
               }
-              aria-describedby={`${id}-reasoning-default ${id}-reasoning-help`}
+              aria-describedby={`${id}-reasoning-help`}
               onChange={(event) =>
                 update(
                   "reasoningEffort",
@@ -497,9 +504,6 @@ export function DirectionSettings({
                 </option>
               ))}
             </select>
-            <p id={`${id}-reasoning-default`} className="mission-field-note">
-              {t.model.defaultEffortNote}
-            </p>
             <p id={`${id}-reasoning-help`} className="mission-field-note">
               {unknownEffort && !loadingModels
                 ? t.model.unknownEffort
@@ -517,9 +521,9 @@ export function DirectionSettings({
           <span className="mission-plan-copy">
             <strong>
               <Globe size={16} />
-              {t.model.webAccess}
+              {provider === "antigravity" ? t.model.webPages : t.model.webAccess}
             </strong>
-            <small id={`${id}-web-help`}>{t.model.webAccessHelp}</small>
+            <small id={`${id}-web-help`}>{provider === "antigravity" ? t.model.antigravityWeb : t.model.webAccessHelp}</small>
           </span>
         </label>
         <div className="mission-form-field">
@@ -642,6 +646,7 @@ export function DirectionSettings({
           </div>
         </>
       )}
+      </details>
     </div>
   );
 }

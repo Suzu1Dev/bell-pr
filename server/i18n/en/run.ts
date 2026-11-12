@@ -1,5 +1,6 @@
 import { formatters } from "../../../shared/i18n/locale.js";
 import { product } from "../../../shared/product.js";
+import type { RunStatus } from "../../../shared/types.js";
 
 const fmt = formatters("en");
 /** A number with its noun in the matching form: "1 file", "3 files". */
@@ -7,6 +8,17 @@ const count = (n: number, one: string, other: string) =>
   `${fmt.number(n)} ${fmt.plural(n) === "one" ? one : other}`;
 /** File names and similar items, separated as the locale separates a plain list. */
 const list = (items: readonly string[]) => fmt.list(items, { type: "unit" });
+/** Where another contribution is, as the overlap confirms name it. */
+const runStates: Record<RunStatus, string> = {
+  queued: "queued",
+  running: "in progress",
+  awaiting_plan: "waiting for plan approval",
+  review: "in review",
+  approved: "approved, not published",
+  published: "published, not seen merged",
+  failed: "failed",
+  cancelled: "cancelled",
+};
 const followUpAgentCommitted =
   "The agent made its own commit or switched branches; the branch is back on the pushed PR, and the edits stay in the working directory for your review.";
 
@@ -45,6 +57,10 @@ export default {
       "Claude Code is not signed in. Run claude auth login in a terminal first.",
     codexMissing: "Codex CLI is not installed. Install it, then run codex login.",
     codexSignedOut: "Codex is not signed in. Run codex login in a terminal first.",
+    antigravityMissing:
+      "The Antigravity CLI (agy) is not installed. Install it, then run agy once in a terminal to sign in.",
+    antigravitySignedOut:
+      "The Antigravity CLI is not signed in. Run agy in a terminal and sign in first.",
     full: ({ max }: { max: number }) =>
       `Up to ${max} runs can be queued or in progress at once; wait for one to finish.`,
     teamStopped:
@@ -156,12 +172,17 @@ export default {
     retryIntegration:
       "Retry: every subtask is complete, so only integration and the independent review run again.",
     retryPending: "Retry: continuing with the subtasks that have not started.",
+    /** Plan scopes written without the "/" of a directory, read as the directories they are in the base commit. */
+    scopeDirectories: ({ scopes }: { scopes: string[] }) =>
+      `Read ${list(scopes)} as ${scopes.length === 1 ? "a directory" : "directories"}, as in the base commit, so the plan covers the files inside.`,
   },
   /** Agent CLI events, retries and time limits shown while an agent works. */
   agentCli: {
     /** The outcome of a shell command Claude Code ran, kept with the task's checks. */
     commandSucceeded: "succeeded",
     commandFailed: "failed",
+    /** An Antigravity command whose output did not start with its exit code. */
+    commandUnreported: "finished, exit code not reported",
     /**
      * A success that does not show the commands in the line succeeded, as in
      * `npm test | tail` (tail's status) or `npm test || true`; outcome is
@@ -173,6 +194,12 @@ export default {
     codexError: "Codex reported an error.",
     claudeTurnFailed: ({ subtype }: { subtype: string }) =>
       `The Claude Code turn failed (${subtype}).`,
+    /** status is agy's own id, such as ERROR or CANCELED. */
+    antigravityTurnFailed: ({ status }: { status: string }) =>
+      `The Antigravity turn failed (${status}).`,
+    /** agy ends a print-mode turn without an answer once it refused an action. */
+    antigravityEndedOnDenial:
+      "Antigravity refused an action this turn may not take and then ended the turn without an answer.",
     /** Each detail is left out when the CLI did not report it. */
     apiRetry: ({
       attempt,
@@ -554,7 +581,7 @@ export default {
       "Stopped resolving the conflicts; the edited files are kept, and you can finish yourself or ask the agent again.",
     /** `reason` is an error message without its final period. */
     failed: ({ reason }: { reason: string }) =>
-      `${reason}; the edited files are kept, and you can finish yourself or ask the agent again.`,
+      `${reason.replace(/[.\u3002]+$/u, "")}; the edited files are kept, and you can finish yourself or ask the agent again.`,
     incompleteReason: "Resolving the conflicts did not finish",
     incomplete: "Resolving the conflicts did not finish.",
     conflictsOpen: ({ files }: { files: string[] }) =>
@@ -562,6 +589,21 @@ export default {
     mergeFailed: "Could not compute the merge result.",
     answerIncomplete:
       "The agent's answer about the conflict resolution is incomplete",
+    heldChangedUpstream: ({
+      branch,
+      items,
+    }: {
+      branch: string;
+      items: readonly string[];
+    }) =>
+      `Commits on ${branch} changed files under your hold since you took it: ${items.join("; ")}.`,
+    heldChangedUpstreamItem: ({
+      path,
+      commits,
+    }: {
+      path: string;
+      commits: readonly string[];
+    }) => `${path} (${commits.join(", ")})`,
   },
   /** Follow-up rounds on a published PR, and its branch on GitHub. */
   followUp: {
@@ -602,7 +644,7 @@ export default {
     incompleteReason: "This round did not finish",
     /** `reason` is one of the reasons above or an error message. */
     keptEdits: ({ reason }: { reason: string }) =>
-      `${reason}; some edits are kept in the working directory, and you can review them, write a commit message and push, or discard the round.`,
+      `${reason.replace(/[.\u3002]+$/u, "")}; some edits are kept in the working directory, and you can review them, write a commit message and push, or discard the round.`,
     nothingToDiscard: "There is no follow-up round to discard.",
     alreadyPushed:
       `This round is already on the PR; press Push again so ${product.name} records it as done.`,
@@ -684,9 +726,78 @@ export default {
       "The copied files did not match the originals, so nothing was split. A Git setting that rewrites files, such as line-ending conversion, can cause this.",
     startedFrom: ({ title }: { title: string }) => `Split from "${title}".`,
     wasSplit: ({ count }: { count: number }) => `Split into ${count} contributions.`,
+    tooManyEdges: ({ limit }: { limit: number }) =>
+      `This split would make a contribution build on more than ${limit} others. Split it into fewer contributions.`,
+  },
+  /** The person's other contributions of the same project (server/group-local.ts). */
+  local: {
+    /** One overlapping contribution: its title, where it is, and the paths it shares. */
+    overlapWith: ({ title, status, paths }: { title: string; status: RunStatus; paths: string[] }) =>
+      `"${title}" (${runStates[status]}): ${list(paths)}`,
+    planOverlap: ({ titles }: { titles: string[] }) =>
+      `Your other contributions to this project change files this plan covers: ${list(titles.map((title) => `"${title}"`))}. Look at the overlap on the plan and confirm it, then approve again.`,
+    autoOverlap:
+      "This plan covers files your other contributions to this project change, so it waits for your approval instead of starting on its own.",
+    overlapChanged:
+      "Your other contributions or this plan changed since you confirmed the overlap. Look at the overlap on the plan again and confirm it, then approve again.",
+    approvedOverlap: ({ titles }: { titles: string[] }) =>
+      `Approved although ${list(titles.map((title) => `"${title}"`))} ${titles.length === 1 ? "changes" : "change"} some of the same files.`,
+    publishOverlap:
+      "Your other contributions to this project change some of the same files, so whichever is merged second may need its conflicts resolved. Publish them in the order you want them merged, or combine them.",
+    splitOrder:
+      "This part of a split builds on other parts that are not merged yet. Publish those first, or this pull request may fail its checks until they are merged.",
+    buildsOn: ({ title, prUrl }: { title: string; prUrl?: string }) =>
+      prUrl ? `"${title}": published at ${prUrl}, not seen merged` : `"${title}": not published yet`,
+    /** The publish dialog's block when the change meets someone else's hold (server/hold-guard.ts). */
+    heldByOther:
+      "Someone else in the group holds files this change touches. Ask them to release the hold, ask a group admin to revoke it, or remove these files from the change before publishing.",
+    /** One changed file and the hold it meets, in the dialog and in the publish refusal. */
+    heldByOtherItem: ({ path, holder, title, since }: { path: string; holder: string; title: string; since: string }) =>
+      `${path} — held by ${holder} for “${title}” (since ${since})`,
+    holdsUnknown: ({ name }: { name: string }) =>
+      `Can't check file holds because group work has stopped. Fix group work on the host and restart ${name} before publishing.`,
+    /** An agent's write turn changed files someone else holds. */
+    turnHeldByOther: ({ items }: { items: readonly string[] }) =>
+      `The agent changed files someone else holds, so the run stopped. The changes are still in the checkout. ${items.join("; ")}. Ask them to release the hold, ask a group admin to revoke it, or undo the changes to these files, then try again.`,
+    /** A teammate's changes meet someone else's hold, so they were not brought into the contribution. */
+    taskHeldByOther: ({ items }: { items: readonly string[] }) =>
+      `A teammate changed files someone else holds, so those changes were not added to the contribution. ${items.join("; ")}. Ask them to release the hold, or ask a group admin to revoke it, then try again.`,
+    planHeldByOther: ({ items }: { items: readonly string[] }) =>
+      `This plan covers files someone else holds, so it can't be approved. ${items.join("; ")}. Send the plan back with feedback, or wait until the hold is released.`,
+    autoHeld:
+      "This plan covers files someone else in the group holds, so it waits for your approval instead of starting on its own.",
+    agentsHoldsUnknown: ({ name }: { name: string }) =>
+      `Can't check file holds because group work has stopped, so the agents can't change files. Fix group work on the host and restart ${name}, or start ${name} without --group.`,
+    heldChangedUpstream: ({ branch }: { branch: string }) =>
+      `Commits on ${branch} changed files under your hold since you took it. Check those changes before publishing.`,
+    heldChangedUpstreamItem: ({
+      path,
+      branch,
+      commits,
+    }: {
+      path: string;
+      branch: string;
+      commits: readonly string[];
+    }) => `${path} changed on ${branch} since your hold (${commits.join(", ")})`,
+    holdRecoveryNotAllowed:
+      "Held files can only be restored or checked again on a finished run whose pull request has not merged.",
+    holdRecoveryBusy:
+      "Work is still running on this contribution. Wait for it to finish before restoring or checking held files.",
+    holdRecoveryCheckoutMissing:
+      "This run's working directory or base commit is unavailable.",
+    heldPathsRestored: ({ files }: { files: readonly string[] }) =>
+      files.length
+        ? `Put back ${count(files.length, "held file", "held files")} to the run's base: ${list([...files])}.`
+        : "No held files differed from the run's base.",
+    heldPathsRechecked:
+      "Checked file holds again: no changed files are held by someone else.",
   },
   /** The human review gate and publishing: draft, file reviews, approval and push. */
   publish: {
+    heldByOther: ({ items }: { items: readonly string[] }) =>
+      `Someone else holds files this change touches, so nothing was published. ${items.join("; ")}. Ask them to release the hold, or ask a group admin to revoke it.`,
+    holdsUnknown: ({ name }: { name: string }) =>
+      `Can't check file holds because group work has stopped, so nothing was published. Fix group work on the host and restart ${name}, or start ${name} without --group.`,
     recoveryStale: "The unfinished publish changed. Reload before recovering it.",
     recoveryNotAllowed: "Only an unfinished publish with no recorded push target or pull request can be recovered here.",
     recoveryBusy: "Work is still running for this contribution. Wait for it to finish before recovering the publish.",

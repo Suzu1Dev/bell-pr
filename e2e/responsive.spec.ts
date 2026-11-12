@@ -355,6 +355,32 @@ test.describe("at 320 px with the sample badge", () => {
       });
 });
 
+// With another BELL product linked, the product switcher's button joins
+// the top bar where the sidebar is a drawer. Below 390 px the sample badge
+// leaves it no room, so it shows from 390 px up.
+test.describe("with the product switcher beside the sample badge", () => {
+  let server: LaunchedServer | undefined;
+  test.beforeAll(async () => {
+    server = await startServer({ env: { BELLPR_SUITE_LINKS: "explain=http://localhost:5173" } });
+  });
+  test.afterAll(async () => {
+    await server?.stop();
+  });
+
+  for (const locale of locales)
+    for (const route of routes.filter((entry) => sampleRoutes.test(entry.name)))
+      for (const viewport of [{ width: 320, height: 640 }, ...viewports.slice(0, 2)])
+        test(`${route.name} in ${locale} fits at ${viewport.width} px`, async ({ browser }) => {
+          await expectFits(browser, server!, locale, route.hash, viewport, true, {
+            async drive(page) {
+              const trigger = page.locator(".breadcrumb .suite-trigger");
+              await expect(trigger).toHaveCount(1);
+              await expect(trigger).toBeVisible({ visible: viewport.width >= 390 });
+            },
+          });
+        });
+});
+
 // The v1.1 views that take steps to reach (e2e/helpers/views.ts), on a
 // common and the narrowest phone.
 const phones = [

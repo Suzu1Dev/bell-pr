@@ -195,8 +195,10 @@ full user rights, and those runs are marked. The
 In the default Working directory mode, agents are also told not to change the
 machine: no `sudo` and no global or user-level installs. When a check needs a
 tool the machine lacks, the run's overview lists it with a suggested command,
-for you to check against the project's documentation and run yourself; BELL PR
-never runs it from that checklist. Explicit **Full access** lets writable
+for you to check against the project's documentation and run yourself. BELL PR
+never runs a command from that checklist on its own; on a Full access run you
+can tick commands and confirm, and one Collaborate turn runs them without its
+sandbox, with your account, and reports each item. Explicit **Full access** lets writable
 agents run outside their sandbox, install tools and use available sudo
 privileges:
 
@@ -233,7 +235,7 @@ access “safe by itself”; keep it on a private network.
 ### Which platforms does it run on?
 
 macOS, Linux, and Windows through WSL2. It needs Node.js 22 or later, Git,
-the GitHub CLI and the Codex CLI or Claude Code. There is also a Docker
+the GitHub CLI and the Codex CLI, Claude Code or the Antigravity CLI. There is also a Docker
 image, in beta: [Docker](docker.md).
 
 ### Does it work with GitLab or Bitbucket?
@@ -250,6 +252,39 @@ data directory (a Learn by hand run shows its folder in its own panel).
 Edit the files in your own editor (do not commit; BELL PR does that when
 you publish), then choose **Refresh the diff**. Changed files get new
 explanations and need another review.
+
+### How do I know what a subtask is waiting for?
+
+Each subtask on the task board names the subtasks it depends on, with their
+current status. **Waiting on dependencies** means at least one of them is not
+integrated yet. **Ready to claim** means all of them are; while the run is
+going, a teammate takes it once no subtask in progress has the same owner or
+overlapping files and the team has a free place. **Ready after retry** means
+the same, but the run has failed or was cancelled, so nothing starts it until
+you choose **Retry failed subtasks**. **Blocked** means a subtask it depends
+on, directly or through others, failed or is blocked itself. Only a subtask
+that has not started is blocked this way, and after a failure the team starts
+no further subtask. A blocked subtask stays in To do and does not start until
+you retry. A dependency shown as unknown names a task the plan does not
+list and never counts as integrated: its subtask keeps waiting, or is blocked
+if it also depends on a failed or blocked subtask. Once nothing else can
+start, the run stops with "Task dependencies or file assignments stop the
+team from continuing". BELL PR rejects such a plan from the Lead, so only an
+edited data file can hold one.
+
+### What happens to a team run when BELL PR restarts?
+
+A restart stops the agents. When BELL PR starts again, the run and each
+subtask that was in progress are marked failed, with a note that the service
+restarted; their isolated working directories are kept. Subtasks that have
+not started and depend on them, directly or through others, are marked
+**Blocked**, as when a subtask fails during the run, and integrated subtasks
+stay integrated. A subtask whose dependencies are all integrated shows
+**Ready after retry**. **Retry failed subtasks** on the task board schedules
+the unfinished subtasks again: the failed and blocked ones start from a fresh
+snapshot, and integrated work is kept. Each one still starts only when its
+dependencies, its files and the team's free places allow, so a retry does not
+promise that all of them run.
 
 ### Can I split a contribution that holds several fixes?
 
@@ -269,9 +304,28 @@ check, reports or logs, so you explain and approve each part on its own. The
 original run keeps every file and stays as it was, but a banner asks you to
 publish the parts instead. A part you delete leaves that banner, and once
 every part is deleted you can split the original again. BELL PR cannot
-check that a part works on its own, so run each part's tests. The split is
-not offered for the sample run, a Learn by hand run, a published run, or a
-run whose working copy is gone.
+check that a part works on its own, so run each part's tests. When a task
+in one part depends on a task in another, publishing that part before the
+other is merged asks you to confirm, so you can publish them in order. The
+split is not offered for the sample run, a Learn by hand run, a published
+run, or a run whose working copy is gone.
+
+### What happens when two of my contributions change the same files?
+
+BELL PR tells you before you approve the plan (also a Learn by hand plan)
+and before you publish. Your other contributions to the same project count
+while they are in progress, in review or approved, and once they have a pull
+request until its change to a file is in this run's base commit or you read
+it as merged or closed. The plan lists each overlapping contribution
+with the files it shares, and approving needs your tick, which counts only
+for the overlap it was given on; a run started without plan approval waits
+for it. The publish dialog asks you to confirm the overlap for the files you
+changed (`group-own-overlap`), because whichever is merged second may need
+its conflicts resolved. BELL PR only reads its own records and working
+copies for this, and nothing is saved or sent (a temporary copy of a working
+copy's Git index is deleted right after it is read). The parts of one split
+never count against each other or the original, and an original that was
+split counts only for the files none of its parts holds.
 
 ### Can several people use one BELL PR?
 
@@ -320,6 +374,6 @@ everything. See [Privacy and your data](privacy-and-data.md#deleting-data).
 ### Does BELL PR change my Git or CLI configuration?
 
 No. BELL PR never changes the global configuration of Git, the GitHub CLI,
-the Codex CLI or Claude Code. It runs them with its own options for each
+the Codex CLI, Claude Code or the Antigravity CLI. It runs them with its own options for each
 command. The fix commands it suggests (for example `git config --global
 user.email …`) are for you to run.

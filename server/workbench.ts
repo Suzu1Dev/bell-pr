@@ -68,6 +68,10 @@ import { byHandFacade, type ByHandFacade } from "./by-hand.js";
 import type { GuardOverride } from "../shared/contribution.js";
 import type { SplitRequest } from "../shared/split.js";
 import type { WorkbenchContext } from "./workbench-context.js";
+import { planOverlaps } from "./group-local.js";
+import type { CollabHost } from "./collab-host.js";
+import { runHolds, type HoldsAsker } from "./hold-guard.js";
+import * as holdRecovery from "./hold-recovery.js";
 
 export type { WorkbenchContext };
 
@@ -399,6 +403,15 @@ export class Workbench {
     return createRun(this.context, sources, repoId, prompt, title, settings, mode);
   }
 
+  /**
+   * Gives agent turns, teammates and plans the group's holds
+   * (hold-guard.ts, S2). createApp calls it when BELL PR runs with --group;
+   * without it, none of them is checked.
+   */
+  guardHolds(host: CollabHost) {
+    this.context.holds = runHolds(host);
+  }
+
   /** Appends to the run's own log through the context (see appendRunLog). */
   private log(
     run: Run,
@@ -413,8 +426,13 @@ export class Workbench {
     return teamPlan.sendTeamMessage(this.context, id, input);
   }
 
-  async approvePlan(id: string) {
-    return teamPlan.approvePlan(this.context, id);
+  async approvePlan(id: string, options: { overlapDigest?: string } = {}) {
+    return teamPlan.approvePlan(this.context, id, options);
+  }
+
+  /** The person's other contributions whose files meet this run's plan (group-local.ts). */
+  async planOverlaps(id: string) {
+    return planOverlaps(this.context, this.run(id));
   }
 
   /** Sends a plan back to the lead with the person's feedback (team-plan.ts). */
@@ -426,8 +444,23 @@ export class Workbench {
     return retryTeam(this.context, id, message);
   }
 
+  /** Restores conflicting or recorded held paths in the run's checkout back to its base (hold-recovery.ts). */
+  async restoreHeldPaths(id: string, asker?: HoldsAsker) {
+    return holdRecovery.restoreHeldPaths(this.context, id, asker);
+  }
+
+  /** Re-evaluates the run's changed paths against current holds without modifying checkout files (hold-recovery.ts). */
+  async recheckHeldPaths(id: string, asker?: HoldsAsker) {
+    return holdRecovery.recheckHeldPaths(this.context, id, asker);
+  }
+
   async startSession(id: string, content: string) {
-    return sessions.startSession(this.context, id, content);
+    return sessions.startSession(this.context, id, { content });
+  }
+
+  /** Hands the ticked setup commands of a Full access run to one collaboration turn (session-runs.ts). */
+  async startSetupSession(id: string, commands: string[]) {
+    return sessions.startSession(this.context, id, { setupCommands: commands });
   }
 
   async cancelSession(id: string) {
@@ -603,9 +636,9 @@ export class Workbench {
   }
 
   /** Moves a run onto the latest commit of its target branch (see sync-runs.ts). */
-  async syncRun(id: string) {
+  async syncRun(id: string, asker?: HoldsAsker) {
     cleanup.assertWorkspacePresent(this.run(id), { update: true });
-    return syncing.syncRun(this.context, id);
+    return syncing.syncRun(this.context, id, asker);
   }
 
   async undoSync(id: string) {
@@ -634,7 +667,8 @@ export class Workbench {
    * Publishes the first commit and PR, or pushes an open round
    * (publish.ts). `overrides` lift a block with the person's reason
    * (only `issue-has-pr`), recorded on the run; `rulesDigest` binds the
-   * quoted confirm's tick to the words read.
+   * quoted confirm's tick to the words read; `holds` is the group's
+   * write guard, given only with --group (hold-guard.ts).
    */
   async publish(
     id: string,
@@ -642,6 +676,7 @@ export class Workbench {
     acknowledged: string[] = [],
     overrides: Pick<GuardOverride, "id" | "reason">[] = [],
     rulesDigest?: string,
+    holds?: publishing.HoldCheck | publishing.PublishHolds,
   ) {
     const round = activeFollowUp(this.run(id).followUps);
     return logged(
@@ -655,6 +690,7 @@ export class Workbench {
           acknowledged,
           overrides,
           rulesDigest,
+          holds,
         ),
     );
   }

@@ -1,5 +1,6 @@
 import type { AgentProvider } from "./models.js";
 import type { SetupNeed } from "./setup-needs.js";
+import type { RunStatus } from "./types.js";
 
 export type TeamTaskStatus =
   "pending" | "ready" | "running" | "complete" | "failed" | "blocked";
@@ -34,6 +35,8 @@ export interface TeamTask {
   status: TeamTaskStatus;
   report?: string;
   error?: string;
+  /** Paths of other people's holds that stopped the task; what a retry tells the teammate instead of `error`. */
+  heldPaths?: string[];
   worktreePath?: string;
   /** Git directory of that checkout, recorded when the worktree was created. */
   gitDir?: string;
@@ -120,4 +123,19 @@ export interface PremiseCheck {
   verdict: PremiseVerdict;
   statement: string;
   evidence: string;
+}
+
+/**
+ * Another unfinished contribution of the same project whose files meet a
+ * plan's scopes or a change's files (GET /api/runs/:id/overlaps and the
+ * `group-own-overlap` confirm). Computed when asked, never stored.
+ */
+export interface LocalOverlap {
+  runId: string;
+  title: string;
+  status: RunStatus;
+  /** That run's paths or scopes that meet them, sorted. */
+  paths: string[];
+  /** The plan tasks whose scopes meet those paths; absent for a change's files. */
+  taskIds?: string[];
 }

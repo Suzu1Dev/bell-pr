@@ -1,4 +1,4 @@
-import { spawn as nodeSpawn, spawnSync, type ChildProcess } from "node:child_process";
+import { execFile, spawn as nodeSpawn, type ChildProcess } from "node:child_process";
 
 /** The spawn both `command` and the Codex catalog use. Tests replace `spawn`. */
 export const processSpawn: { spawn: typeof nodeSpawn } = { spawn: nodeSpawn };
@@ -6,7 +6,8 @@ import { existsSync } from "node:fs";
 import { lstat, readdir, readFile, realpath } from "node:fs/promises";
 import path from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
-import type { AgentProvider } from "../shared/models.js";
+import { promisify } from "node:util";
+import { agentProviders, providerExecutables, type AgentProvider } from "../shared/models.js";
 import { physicalPath } from "../shared/physical-path.js";
 import { log } from "./log.js";
 import { redact } from "./secrets.js";
@@ -145,8 +146,24 @@ const claudeEnvironment = [
 ];
 
 /**
+ * The ways the Antigravity CLI signs in besides its own saved Google sign-in:
+ * a Gemini API key (with `"modelProvider": "gemini"` in its settings), an
+ * endpoint that replaces the Gemini API, and Application Default
+ * Credentials with their optional quota project and location.
+ */
+const antigravityEnvironment = [
+  "GEMINI_API_KEY",
+  "GOOGLE_GEMINI_BASE_URL",
+  "AGY_ADC_AUTH",
+  "GOOGLE_APPLICATION_CREDENTIALS",
+  "CLOUDSDK_CONFIG",
+  "GOOGLE_CLOUD_QUOTA_PROJECT",
+  "GOOGLE_CLOUD_LOCATION",
+];
+
+/**
  * Usage-data opt-outs the person set, passed through unchanged so their
- * choice reaches the agents: the cross-tool DO_NOT_TRACK for both CLIs, and
+ * choice reaches the agents: the cross-tool DO_NOT_TRACK for every CLI, and
  * the variables Claude Code documents for its telemetry, error reports, bug
  * reports, feedback surveys and all non-essential traffic. BELL PR never
  * sets them itself.
@@ -164,16 +181,18 @@ const claudeOptOutEnvironment = [
  * The environment an agent CLI runs with: nothing from the server's own
  * environment except what that CLI needs and the usage-data opt-outs the
  * person set. Claude Code receives every authentication method it supports;
- * BELL never restricts or reads them. Codex gets only its own keys and
- * Claude Code only its own. Without a provider the result holds both sets,
- * for callers that have not said which CLI they start.
+ * BELL never restricts or reads them. Each CLI gets only its own keys.
+ * Without a provider the result holds every set, for callers that have not
+ * said which CLI they start.
  */
 export function agentEnvironment(provider?: AgentProvider): NodeJS.ProcessEnv {
+  const starts = (cli: AgentProvider) => provider === undefined || provider === cli;
   const keys = [
     ...baseEnvironment,
     ...optOutEnvironment,
-    ...(provider === "claude" ? [] : codexEnvironment),
-    ...(provider === "codex" ? [] : [...claudeEnvironment, ...claudeOptOutEnvironment]),
+    ...(starts("codex") ? codexEnvironment : []),
+    ...(starts("claude") ? [...claudeEnvironment, ...claudeOptOutEnvironment] : []),
+    ...(starts("antigravity") ? antigravityEnvironment : []),
   ];
   const env: NodeJS.ProcessEnv = {};
   for (const key of keys) {
@@ -187,7 +206,7 @@ export function agentEnvironment(provider?: AgentProvider): NodeJS.ProcessEnv {
 }
 
 /**
- * Environment for one Claude Code or Codex child. With no explicit env,
+ * Environment for one agent CLI child. With no explicit env,
  * this is agentEnvironment. With an explicit env, every variable is kept
  * except `GH_TOKEN` and `GITHUB_TOKEN`, which are removed here, at spawn,
  * whether or not the sandbox is on. Does not mutate `explicit`.
@@ -203,12 +222,10 @@ export function agentChildEnvironment(
   return child;
 }
 
-/** `claude` or `codex`, including a path and a Windows `.exe` / `.cmd` name. */
+/** `claude`, `codex` or `agy`, including a path and a Windows `.exe` / `.cmd` name. */
 export function agentProviderOf(executable: string): AgentProvider | undefined {
   const base = executable.split(/[/\\]/).pop()?.toLowerCase().replace(/\.(?:exe|cmd)$/i, "");
-  if (base === "claude") return "claude";
-  if (base === "codex") return "codex";
-  return undefined;
+  return agentProviders.find((provider) => providerExecutables[provider] === base);
 }
 
 interface CommandOptions {
@@ -253,8 +270,8 @@ const stderrTailLength = 4000;
  * used. A failure rejects with an AppError: a process that could not start
  * keeps the spawn error as `cause`, and one that exited with a code outside
  * `allowedCodes` carries `details.stderr` (the redacted end of its raw
- * stderr) and `details.exitCode`. Known failures of git, gh, codex and
- * claude get a setup code and fixes (cli-errors.ts).
+ * stderr) and `details.exitCode`. Known failures of git, gh, codex,
+ * claude and agy get a setup code and fixes (cli-errors.ts).
  *
  * Claude and Codex get agentChildEnvironment, so `GH_TOKEN` and
  * `GITHUB_TOKEN` are removed before the process is spawned. `git` gets
@@ -528,16 +545,22 @@ export const gitSafetyArgs = [
 const driverKey =
   /^(?:filter\.[^.]+\.(?:clean|smudge|process)|diff\.(?:external|.+\.(?:textconv|command))|merge\.[^.]+\.driver|alias\.[^.]+|gpg\.(?:.+\.)?program)$/i;
 
+const execFileAsync = promisify(execFile);
+
 /**
  * `-c` blanks for drivers this repository defines, so a `filter` named by
  * `.gitattributes` has no command left to run. Shell aliases are blanked
  * only when the value starts with `!`.
+ *
+ * Read without blocking the event loop: every server Git command waits for
+ * it, and a server stalled while Git starts lets keep-alive timers close
+ * sockets that already carry the next request (ECONNRESET for the client).
  */
-function repoDriverOverrides(cwd: string, gitDir?: string): string[] {
+async function repoDriverOverrides(cwd: string, gitDir?: string): Promise<string[]> {
   if (!existsSync(cwd)) return [];
   let stdout = "";
   try {
-    const result = spawnSync(
+    const result = await execFileAsync(
       "git",
       [
         ...(gitDir ? ["--git-dir", gitDir, "--work-tree", cwd] : []),
@@ -561,7 +584,7 @@ function repoDriverOverrides(cwd: string, gitDir?: string): string[] {
         env: gitChildEnv(undefined, false),
       },
     );
-    if (result.status !== 0 || !result.stdout) return [];
+    if (!result.stdout) return [];
     stdout = result.stdout;
   } catch {
     return [];
@@ -807,6 +830,13 @@ const gitNetworkEnvKeys = [
 ];
 
 /**
+ * The only graft file a caller may give Git: none. Git reads a
+ * repository's info/grafts unless GIT_GRAFT_FILE names another file;
+ * Git for Windows opens /dev/null as NUL, as for gitSafetyArgs.
+ */
+export const noGraftFile = "/dev/null";
+
+/**
  * Environment for a server Git process. Not the server's full environment.
  * `GH_TOKEN` and `GITHUB_TOKEN` are included only for `gitNetwork`, whose
  * credential helper is `gh auth git-credential`. `GIT_ASKPASS` and
@@ -830,6 +860,8 @@ export function gitChildEnv(
     if (value) env[key] = value;
   }
   if (source.GIT_INDEX_FILE) env.GIT_INDEX_FILE = source.GIT_INDEX_FILE;
+  // Grafts off when the caller asks; any other graft file stays out.
+  if (explicit?.GIT_GRAFT_FILE === noGraftFile) env.GIT_GRAFT_FILE = noGraftFile;
   if (network) {
     env.GCM_INTERACTIVE = "never";
     for (const key of gitNetworkEnvKeys) {
@@ -930,7 +962,7 @@ export async function serverGitArgs(cwd: string, args: string[]): Promise<string
   const gitDir = await commandGitDir(cwd, args);
   return [
     ...(await gitInvocationPrefix(cwd, args)),
-    ...repoDriverOverrides(cwd, gitDir),
+    ...(await repoDriverOverrides(cwd, gitDir)),
     ...withDiffSafety(args),
   ];
 }

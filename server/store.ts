@@ -19,13 +19,16 @@ import {
 } from "./types.js";
 import { activeFollowUp } from "../shared/followups.js";
 import { withStoredReach } from "../shared/project-policy.js";
-import { splitLimits } from "../shared/split.js";
+import { maxRunOwners } from "../shared/collab.js";
+import { groupAfterLimit, splitLimits } from "../shared/split.js";
 import { sessionMessageLimit, sessionContentLimit } from "../shared/session.js";
+import { setupTurnLimit } from "../shared/setup-needs.js";
 import { sm } from "./i18n/index.js";
 import { writeDurable } from "./fs-atomic.js";
 import { initLog, log } from "./log.js";
 import { lenientRead } from "./persisted-schema.js";
 import { bindStoredGitDirs } from "./process.js";
+import { claimReadyTasks } from "./team.js";
 
 /** What loading state.json had to repair at this start; GET /api/status shows it. */
 export interface StoreRecovery {
@@ -434,6 +437,11 @@ const setupNeedsSchema = z
   .array(loose({ need: text.max(120), command: text.max(300), reason: text.max(600) }))
   .max(10);
 
+/** Files under the person's hold that commits on the target branch changed (BaseSync, FollowUpRound, RunCore). */
+const heldChangesSchema = z
+  .array(loose({ path: text, commits: list.max(20) }))
+  .max(150);
+
 const pacingSchema = loose({
   openPrs: count.optional(),
   mergedPrs: count.optional(),
@@ -486,7 +494,14 @@ const sessionSchema = loose({
     checks: later(z.array(loose({ command: text, outcome: text }))),
     notRun: later(z.array(loose({ check: text.max(300), reason: text.max(600) })).max(10)),
     setup: later(setupNeedsSchema),
+    // A setup turn's results; the outcome is plain text, so a later build's value still loads.
+    setupResults: later(
+      z
+        .array(loose({ need: text.max(120), command: text.max(300), outcome: text.max(20), detail: text.max(800) }))
+        .max(setupTurnLimit),
+    ),
     failed: later(z.boolean()),
+    heldPaths: later(list),
     draftUpdate: later(loose({ before: text, after: text })),
   })).max(sessionMessageLimit),
   running: later(z.boolean()),
@@ -563,6 +578,7 @@ export const runReadSchema = loose({
           status: text,
           setup: later(setupNeedsSchema),
           gitDir: later(text),
+          heldPaths: later(list),
         }),
       ),
       messages: z.array(loose({})),
@@ -587,11 +603,20 @@ export const runReadSchema = loose({
           restatements: later(
             z.array(loose({ url: text, text: text.max(300) })).max(20),
           ),
+          heldChanges: later(heldChangesSchema),
           setup: later(setupNeedsSchema),
         }),
       )
       .optional(),
-    sync: loose({ from: text, to: text, snapshot: text, conflicts: list }).optional(),
+    sync: loose({
+      from: text,
+      to: text,
+      snapshot: text,
+      conflicts: list,
+      heldChanges: later(heldChangesSchema),
+    }).optional(),
+    heldChanges: later(heldChangesSchema),
+    heldPaths: later(list),
     prUrl: text.optional(),
     error: text.optional(),
     publishing: z.boolean().optional(),
@@ -645,6 +670,10 @@ export const runReadSchema = loose({
     // Splitting a contribution, optional in the same way.
     splitFrom: later(splitRefSchema),
     splitInto: later(z.array(splitRefSchema).max(splitLimits.maxContributions)),
+    // Group mode Phase 0 (server/group-local.ts), optional in the same way.
+    group: later(loose({ after: later(z.array(text).max(groupAfterLimit)) })),
+    // The write guard's S2 (server/hold-guard.ts), optional in the same way.
+    owners: later(z.array(text.max(64)).max(maxRunOwners)),
 });
 
 const runSchema = lenientRead(runReadSchema);
@@ -850,6 +879,8 @@ export class Store {
               task.status = "failed";
               task.error = recovery.task;
             }
+          // Block their dependents, as when a task fails during the run.
+          claimReadyTasks(run.team.tasks, 0);
         }
       }
     }

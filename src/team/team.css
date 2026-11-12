@@ -357,11 +357,13 @@
   line-height: 1.7;
   margin: 13px 0 9px;
   color: var(--color-accent-600);
+  overflow-wrap: anywhere;
 }
 .team-task > p {
   font-size: var(--text-xs);
   line-height: 1.9;
   color: var(--color-text-muted);
+  overflow-wrap: anywhere;
 }
 .team-task-owner {
   display: flex;
@@ -395,6 +397,22 @@
   font-size: var(--text-2xs);
   color: var(--color-text-muted);
   margin-top: 8px;
+}
+.team-task-deps ul {
+  list-style: none;
+  padding: 0;
+  margin: 4px 0 0;
+}
+.team-task-deps li {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 2px 8px;
+  margin-top: 4px;
+}
+.team-task-deps li > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 .team-lane-empty {
   font-size: var(--text-xs);
@@ -714,7 +732,49 @@
   border-width: 0 0 1px;
   border-radius: 0;
 }
-/* Setup the machine lacks for checks agents could not run: the person installs it. */
+/* Other contributions of the project that change files the plan covers. */
+.overlap-notice {
+  margin-top: var(--space-3);
+  padding: 11px 14px;
+  border: 1px solid var(--color-warning-border);
+  border-radius: var(--radius-md);
+  background: var(--color-warning-bg);
+  font-size: var(--text-xs);
+  line-height: 1.75;
+  color: var(--color-text-secondary);
+  overflow-wrap: anywhere;
+}
+.overlap-notice h3 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: var(--text-sm);
+}
+.overlap-notice h3 svg,
+.team-task-overlap svg {
+  color: var(--color-warning);
+}
+.overlap-notice ul {
+  margin: 6px 0 0;
+  padding: 0 0 0 18px;
+}
+.overlap-notice p {
+  margin: 6px 0 0;
+}
+.overlap-notice label {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 8px;
+  font-weight: 550;
+  cursor: pointer;
+}
+.overlap-notice input {
+  margin-top: 4px;
+}
+/* Setup the machine lacks for checks agents could not run: the person installs it,
+   or on a Full access run hands it to an agent and sees what it reported. */
 .setup-needs {
   margin: 0 var(--space-7) var(--space-5);
   padding: var(--space-4) var(--space-5);
@@ -760,6 +820,89 @@
 .setup-needs li small {
   color: var(--color-text-muted);
   font-size: var(--text-2xs);
+}
+.setup-handoff {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  margin: 0 0 var(--space-3);
+}
+.setup-handoff .field-help {
+  flex: 1 1 260px;
+  margin: 0;
+}
+.setup-needs li .setup-outcome {
+  margin: 6px 0 0;
+  color: var(--color-text-secondary);
+  font-weight: 550;
+}
+.setup-needs li .setup-outcome[data-outcome="installed"],
+.setup-needs li .setup-outcome[data-outcome="present"] {
+  color: var(--color-success);
+}
+.setup-needs li .setup-outcome[data-outcome="failed"],
+.setup-needs li .setup-outcome[data-outcome="needsYou"] {
+  color: var(--color-warning);
+}
+.setup-handoff-choices {
+  display: grid;
+  gap: var(--space-2);
+  margin: var(--space-3) 0;
+  padding: 0;
+  border: 0;
+}
+.setup-handoff-choices legend {
+  margin-bottom: var(--space-2);
+  font-weight: 550;
+}
+.setup-handoff-choices label {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  font-size: var(--text-xs);
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+.setup-handoff-choices input {
+  margin-top: 4px;
+}
+.setup-handoff-choices small {
+  display: block;
+  color: var(--color-text-muted);
+}
+.setup-handoff-choices .setup-sudo-tag {
+  display: inline;
+  margin-left: var(--space-2);
+  color: var(--color-warning);
+  font-weight: 550;
+}
+.setup-handoff-facts {
+  margin: var(--space-2) 0;
+  padding-left: 18px;
+  font-size: var(--text-xs);
+  line-height: 1.7;
+  color: var(--color-text-secondary);
+}
+.setup-results h4 {
+  margin: 0 0 6px;
+  font-size: var(--text-sm);
+}
+.setup-results ul {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-xs);
+  overflow-wrap: anywhere;
+}
+.setup-results .setup-result-outcome {
+  font-weight: 550;
+}
+.setup-results li p {
+  margin: 2px 0 0;
+  color: var(--color-text-secondary);
 }
 @media (max-width: 1250px) {
   .team-board-content {
@@ -840,3 +983,7 @@
     font-size: var(--text-md);
   }
 }
+
+.team-task-details > summary, .activity-details > summary { cursor: pointer; font-weight: 600; }
+.activity-details { margin: 24px 28px; }
+.team-task-details { margin-block: 12px; }

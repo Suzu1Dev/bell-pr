@@ -4,8 +4,8 @@ BELL PR runs on macOS and Linux with Node.js 22 or later. Windows uses WSL2;
 native Windows is not supported. Choose one installation method below.
 
 For real work, you also need Git, a configured Git identity, the GitHub CLI
-signed in with `gh auth login`, and either Codex CLI or Claude Code signed in
-as the same user that runs BELL PR. On Linux, Claude Code's sandbox also needs
+signed in with `gh auth login`, and one of Codex CLI, Claude Code or the
+Antigravity CLI signed in as the same user that runs BELL PR. On Linux, Claude Code's sandbox also needs
 `bubblewrap` and `socat`. See the full [requirements](getting-started.md#before-you-start).
 The Windows helper installs these tools, but sign-in stays manual.
 
@@ -99,16 +99,16 @@ your AI CLI are still required for real work.
 With mise already installed:
 
 ```sh
-MISE_NPM_PACKAGE_MANAGER=npm mise use -g node@24 npm:bell-pr@1.0.1
+MISE_NPM_PACKAGE_MANAGER=npm mise use -g node@24 npm:bell-pr@1.1.0
 mise exec -- bell-pr
 ```
 
-This selects Node.js 24 and pins BELL PR to the version in the command, in
-your global mise tool configuration. The explicit version avoids latest-release cooldown selection;
-the npm choice uses npm's normal installation checks instead of the default
-backend's additional new-package and download-count gates. The environment
-variable applies only to this command, without permanently changing mise's
-package-manager setting.
+In your global mise tool configuration, this selects Node.js 24 and pins
+BELL PR to the version in the command. The explicit version avoids
+latest-release cooldown selection; the npm choice uses npm's normal
+installation checks instead of the default backend's additional new-package
+and download-count gates. The environment variable applies only to this
+command, without permanently changing mise's package-manager setting.
 
 For upgrades, repeat `MISE_NPM_PACKAGE_MANAGER=npm mise use -g node@24` with
 `npm:bell-pr@<version>`, replacing `<version>` with the release you want.

@@ -2127,3 +2127,6 @@
   max-height: 520px;
   overflow: auto;
 }
+
+.explain-card-example > summary { cursor: pointer; font-weight: 600; color: var(--color-text-primary); }
+.explain-card-example[open] > summary { margin-bottom: 12px; }

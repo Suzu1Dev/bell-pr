@@ -121,10 +121,13 @@ const team = {
   /** The running lane while the plan waits for approval. */
   laneEmptyAwaiting: "Subtasks start once you approve the plan.",
   task: {
+    details: "Assignment and files",
     worktree: "Isolated worktree",
     worktreeRemoved: "Isolated worktree cleaned up",
     filesPending: "Being planned",
-    dependsOn: ({ tasks }: { tasks: string }) => `Waits for ${tasks}`,
+    dependsOn: "Depends on",
+    dependencyUnknown: "Unknown",
+    readyAfterRetry: "Ready after retry",
     integrated: ({ files }: { files: string }) => `Integrated: ${files}`,
     /** The toggle of a long task description, folded to its first lines. */
     showAll: "Show the whole description",
@@ -193,6 +196,45 @@ const team = {
     round: ({ number }: { number: number }) => `Follow-up round ${number}`,
     /** …or a teammate, by its name and the id the task board shows. */
     agent: ({ name, id }: { name: string; id: string }) => `${name} (${id})`,
+    /** Handing the list to an agent on a Full access run (src/team/SetupHandOff.tsx). */
+    handOffAction: "Let the agent set this up",
+    handOffNote:
+      "This run has Full access, so an agent can install the items you choose, without the sandbox and with your account, then rerun the checks they blocked. You confirm the exact commands first.",
+    handOffUnsafe: `${product.name} never hands this command to an agent: it downloads something and runs or chains it, or pipes into a shell or another interpreter. Check it and run it yourself.`,
+    allHandled:
+      "The agent reports every item it can take as installed or already present. The Collaborate tab has the details; anything left here is yours to run.",
+    outcomeLine: ({ outcome, time }: { outcome: string; time: string }) => `Agent reports: ${outcome} (${time})`,
+    unreportedLine: ({ time }: { time: string }) => `The setup turn at ${time} ended without a result for this item.`,
+    resultsTitle: "Setup results (the agent's report)",
+    agentAccount: "The agent's account:",
+    outcomes: {
+      installed: "installed",
+      present: "already present",
+      failed: "failed",
+      needsYou: "needs you",
+      unreported: "no result",
+    },
+    dialog: {
+      title: "Let the agent set up this machine?",
+      intro:
+        "Earlier agents suggested these commands while reading the project, so check them. The agent runs only the ones you tick and only when they match the project's documentation. It may add non-interactive flags such as -y, run sudo as sudo -n and refresh the package index, but never swaps in another command. It then verifies each item, reruns the checks they blocked and reports each one.",
+      choose: "Commands to hand over",
+      sudoTag: "uses sudo",
+      limit: ({ limit }: { limit: number }) =>
+        `At most ${limit} items per turn; the rest stay on the list for the next turn.`,
+      sudoPasswordless: ({ user }: { user: string }) =>
+        `sudo runs without a password for ${user} here, so the agent can run these sudo commands as root, unless a sudo rule limits which commands may run that way.`,
+      sudoPassword: ({ user }: { user: string }) =>
+        `sudo asks ${user} for a password here, and the agent never enters one, so an item that needs sudo comes back to you, unless a sudo rule lets that command run without a password; then the agent runs it as root. Run them yourself, or turn on Passwordless sudo in the model settings; that lets every process under your account run any command as root.`,
+      sudoMissing: "sudo is not installed here, so items that need it come back to you.",
+      sudoUnknown: `${product.name} could not tell whether sudo needs a password here. The agent runs sudo only as sudo -n, so a password prompt stops that item and it comes back to you.`,
+      runs: "The agent runs without the sandbox, with your account. Usage counts against your own account.",
+      review:
+        "The agent is told not to change code. A file it does change, such as a lockfile an install step rewrites, loses its review mark, and a change to the files or to the PR draft's Validation and Limitations returns an approved contribution to review.",
+      stop: "Follow and stop it on the Collaborate tab. Stopping does not undo what was installed, and an install already started through sudo may finish anyway.",
+      confirm: ({ count }: { count: number }) => `Start the agent (${count})`,
+      starting: "Starting the agent…",
+    },
   },
   /** The disclosure holding the protocol note. */
   /** A Learn-by-hand run's log names its one agent role so (DESIGN v1.2 §12). */

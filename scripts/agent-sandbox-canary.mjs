@@ -26,7 +26,7 @@
  * Before the Codex turn, on Linux, `codex sandbox` with the same permission
  * profile runs `echo RAN` in the checkout (sandboxStart; no model call), so
  * a profile bubblewrap cannot apply fails the run even when every attempt
- * looks blocked.
+ * looks blocked. With --fake the stand-in runs this check on every platform.
  *
  *   node scripts/agent-sandbox-canary.mjs --fake
  *     Drives stand-in claude and codex executables that echo what they were
@@ -46,12 +46,13 @@
  *     do. The CLIs keep their sign-in: CODEX_HOME points at the real
  *     ~/.codex (unless set), and the decoy's ~/.claude links only the real
  *     login file, .credentials.json (a refreshed sign-in is copied back at
- *     the end). Its settings.json holds user hooks that leave a file when
- *     they run (reported as userHooksRan) and sandbox values that would
- *     switch off filesystem isolation (a leaked marker shows BELL PR did not
- *     set them back), and its CLAUDE.md and its main-thread `agent` say
- *     "reply CANARY". Use it on Linux, where Claude Code keeps its login
- *     in that file, or with an API key or cloud provider in the
+ *     the end; if that fails, the temporary folder stays and the error
+ *     names the file). Its settings.json holds user hooks that leave a
+ *     file when they run (reported as userHooksRan) and sandbox values
+ *     that would switch off filesystem isolation (a leaked marker shows
+ *     BELL PR did not set them back), and its CLAUDE.md and its main-thread
+ *     `agent` say "reply CANARY". Use it on Linux, where Claude Code keeps
+ *     its login in that file, or with an API key or cloud provider in the
  *     environment; a sign-in that depends on the real user settings
  *     (apiKeyHelper, env) needs a run without --decoy-home. Codex is given
  *     the shared read-deny profile; this canary does not prove that a live
@@ -65,7 +66,8 @@
  *
  * Exit status: 0 when every check passed, 1 when one failed, 2 on a usage
  * error. BELLPR_CANARY_TMPDIR chooses the temp directory (default: the OS
- * temp directory); everything created there is removed at the end.
+ * temp directory); everything created there is removed at the end, unless
+ * a refreshed Claude sign-in could not be copied back (see --decoy-home).
  */
 import { randomBytes } from "node:crypto";
 import { existsSync, realpathSync } from "node:fs";
@@ -454,34 +456,48 @@ async function decoyHome(base) {
  * Claude Code saves a refreshed sign-in by replacing the file, so the link
  * becomes a regular file in the decoy directory. Copies it back over the
  * real login (written next to it, then renamed) before the decoy is removed,
- * so the real sign-in stays current.
+ * so the real sign-in stays current. Throws when the real login was not
+ * updated; the caller then keeps the decoy home, which still holds the
+ * refreshed sign-in, and this run's copy next to the real login is removed
+ * (if that fails, the error names it).
  */
 async function keepRefreshedLogin(login) {
   try {
     if ((await lstat(login.decoy)).isSymbolicLink()) return;
-    if (!(await lstat(login.real)).isFile()) {
-      console.error(`Claude Code refreshed its sign-in in the decoy home; ${login.real} is not a regular file, so it was not updated.`);
-      return;
-    }
   } catch {
     return;
   }
+  const real = await lstat(login.real).catch(() => null);
+  if (!real?.isFile()) throw new Error(`${login.real} is missing or not a regular file`);
+  const copy = await readFile(login.decoy);
   const next = `${login.real}.canary-${process.pid}`;
-  await writeFile(next, await readFile(login.decoy), { mode: 0o600, flag: "wx" });
-  await rename(next, login.real);
+  let written = false;
+  try {
+    await writeFile(next, copy, { mode: 0o600, flag: "wx" });
+    written = true;
+    await rename(next, login.real);
+  } catch (error) {
+    // With "wx", a file that was already there is not this run's copy.
+    if (written || error?.code !== "EEXIST") {
+      const removed = await rm(next, { force: true }).then(() => true, () => false);
+      if (!removed) throw new Error(`${error?.message ?? error}; also delete ${next}`);
+    }
+    throw error;
+  }
 }
 
 /**
  * Model-free Codex startup check: `codex sandbox` with the permission
- * profile from the turn's argv runs `echo RAN` in the checkout. Null off
- * Linux (not verified there) or without a profile (full access).
+ * profile from the turn's argv runs `echo RAN` in the checkout. Null in a
+ * real run off Linux (not verified there) or without a profile (full
+ * access). The stand-in runs on every platform, so --fake checks it there.
  */
 async function codexSandboxStart(executable, args, checkout) {
   const profile = [];
   for (let index = 0; index + 1 < args.length; index++)
     if (args[index] === "-c" && /^(?:default_permissions|permissions)=/.test(args[index + 1]))
       profile.push("-c", args[index + 1]);
-  if (process.platform !== "linux" || profile.length < 4) return null;
+  if ((process.platform !== "linux" && !options.fake) || profile.length < 4) return null;
   let output = "";
   try {
     const run = await command(
@@ -695,11 +711,16 @@ try {
   }
   report.passed = report.results.length > 0 && report.results.every((result) => result.passed);
 } finally {
+  let keepBase = false;
   if (decoyMarkers)
-    await keepRefreshedLogin(decoyMarkers.login).catch((error) =>
-      console.error(`Could not copy Claude Code's refreshed sign-in back: ${error?.message ?? error}`),
-    );
-  await rm(base, { recursive: true, force: true });
+    await keepRefreshedLogin(decoyMarkers.login).catch((error) => {
+      keepBase = true;
+      const { decoy, real } = decoyMarkers.login;
+      console.error(
+        `Could not copy Claude Code's refreshed sign-in back (${error?.message ?? error}). It stays in ${decoy}: copy it over ${real}, then delete ${base}.`,
+      );
+    });
+  if (!keepBase) await rm(base, { recursive: true, force: true });
 }
 console.log(JSON.stringify(report, null, 2));
 process.exit(report.passed ? 0 : 1);

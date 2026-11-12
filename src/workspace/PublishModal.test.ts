@@ -431,12 +431,15 @@ test("the checks are grouped by topic, in the dialog's order", () => {
       check("issue-state"),
       check("brevity"),
       check("ai-disclosure", "block"),
+      check("split-order"),
+      check("group-own-overlap"),
     ]).map((group) => [group.topic, group.checks.map((item) => item.id)]),
     [
       ["unknown", ["facts-unknown"]],
       ["rules", ["ai-disclosure"]],
       ["issue", ["issue-state"]],
       ["pacing", ["pacing"]],
+      ["others", ["split-order", "group-own-overlap"]],
       ["words", ["brevity"]],
       ["safety", ["secret"]],
     ],
@@ -649,4 +652,45 @@ test("the warning about the person's own words on AI use joins their words, not 
       ["words", ["disclosure-accuracy", "own-words"]],
     ],
   );
+});
+
+test("file-hold checks, including upstream changes under your hold, group under File holds", () => {
+  const check = (id: DraftCheck["id"], kind: DraftCheck["kind"] = "confirm"): DraftCheck => ({
+    id,
+    kind,
+    message: `msg-${id}`,
+    details: [`detail-${id}`],
+  });
+  assert.deepEqual(
+    groupChecks([
+      check("group-own-overlap"),
+      check("held-by-other", "block"),
+      check("holds-unknown", "block"),
+      check("held-changed-upstream", "confirm"),
+      check("brevity"),
+    ]).map((group) => [group.topic, group.checks.map((item) => item.id)]),
+    [
+      ["others", ["group-own-overlap"]],
+      ["holds", ["held-by-other", "holds-unknown", "held-changed-upstream"]],
+      ["words", ["brevity"]],
+    ],
+  );
+  const confirmOnly: DraftCheck[] = [
+    {
+      id: "held-changed-upstream",
+      kind: "confirm",
+      message:
+        "Commits on main changed files under your hold since you took it. Check those changes before publishing.",
+      details: ["src/api/users.ts changed on main since your hold (abc1234, def5678)"],
+    },
+  ];
+  const enHtml = renderEn(checksElement({ checks: confirmOnly }));
+  assertNoHan(enHtml);
+  assert.match(enHtml, /File holds/);
+  assert.match(enHtml, /Commits on main changed files under your hold since you took it\./);
+  assert.match(enHtml, /src\/api\/users\.ts changed on main since your hold \(abc1234, def5678\)/);
+  assert.match(enHtml, /type="checkbox"/);
+
+  const zhHtml = renderZh(checksElement({ checks: confirmOnly }));
+  assert.match(zhHtml, /檔案佔用/);
 });

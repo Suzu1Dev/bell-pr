@@ -98,6 +98,9 @@
   padding: 0;
   list-style: none;
 }
+.session-message .setup-results {
+  margin: 0;
+}
 .session-message .setup-needs {
   margin: 0;
 }

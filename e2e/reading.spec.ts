@@ -257,6 +257,8 @@ test.describe("reading a real run in review", () => {
         t.team.setupNeeds.reportedBy({ names: t.team.setupNeeds.agent({ name: "Member 1", id: "member-1" }) }),
       );
       await expect(setup.locator("code")).toHaveText("curl -fsSL https://deno.land/install.sh | sh");
+      // This run has no Full access, so the list stays the person's to run.
+      await expect(setup.getByRole("button", { name: t.team.setupNeeds.handOffAction })).toHaveCount(0);
       // A run made before premise checks offers one; the verdict then leads the brief.
       const brief = page.locator("#overview-contribution");
       await brief.getByRole("button", { name: t.mission.brief.premiseCheck }).click();

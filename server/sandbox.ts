@@ -1,18 +1,21 @@
 /**
- * The OS sandbox for Claude Code agents that edit files and run commands.
+ * The OS sandbox for Claude Code and Antigravity agents that edit files and
+ * run commands.
  *
  * Claude Code's own sandbox runs every Bash command inside bubblewrap on
- * Linux (with socat for its network proxy) or sandbox-exec on macOS. A
- * write-role Claude agent runs only inside it, unless the person allowed
- * unsandboxed agents; such a run is marked `run.unsandboxed`. Read-only
- * roles have no Bash, and Codex brings its own sandbox, so neither needs it.
+ * Linux (with socat for its network proxy) or sandbox-exec on macOS; the
+ * Antigravity CLI's terminal sandbox uses user namespaces on Linux and
+ * sandbox-exec on macOS. A write-role agent of either runs only inside it,
+ * unless the person allowed unsandboxed agents; such a run is marked
+ * `run.unsandboxed`. Read-only roles run no commands, and Codex brings its
+ * own sandbox, so neither needs it.
  */
 import { execFile } from "node:child_process";
-import { constants, lstatSync, readdirSync, readFileSync, realpathSync } from "node:fs";
-import { access } from "node:fs/promises";
+import { constants, existsSync, lstatSync, readdirSync, readFileSync, realpathSync } from "node:fs";
+import { access, readFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { sharedCredentialDenials } from "../shared/credential-denials.js";
+import { expandHome, sharedCredentialDenials } from "../shared/credential-denials.js";
 import type { AgentProvider } from "../shared/models.js";
 import { product } from "../shared/product.js";
 import { AppError } from "./types.js";
@@ -116,6 +119,51 @@ export function forgetClaudeSandboxDetection(): void {
   detections.clear();
 }
 
+let kernelSettingsRoot = "/proc/sys";
+
+/** Tests read the kernel settings from another folder; no argument restores /proc/sys. */
+export function setKernelSettingsRootForTests(directory?: string): void {
+  kernelSettingsRoot = directory ?? "/proc/sys";
+}
+
+/** A kernel setting under /proc/sys, trimmed; undefined when it cannot be read. */
+async function kernelSetting(name: string) {
+  try {
+    return (await readFile(path.join(kernelSettingsRoot, name), "utf8")).trim();
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Whether the Antigravity CLI's terminal sandbox can start here, judged the
+ * way agy 1.5.0 judges it: on Linux it needs unprivileged user namespaces,
+ * which `kernel.apparmor_restrict_unprivileged_userns = 1` (the Ubuntu
+ * default since 24.04) withholds from it ("Terminal sandbox unavailable:
+ * AppArmor restricts unprivileged user namespaces" in its log), as do
+ * `kernel.unprivileged_userns_clone = 0` and `user.max_user_namespaces = 0`;
+ * on macOS it needs sandbox-exec. agy does not refuse a turn without its
+ * sandbox: `--sandbox` then does nothing and commands wait for an approval
+ * that print mode cannot give. Reasons: `restricted:apparmor`,
+ * `restricted:userns`, `missing:sandbox-exec` or `platform:<name>`.
+ */
+export async function detectAntigravitySandbox(): Promise<SandboxDetection> {
+  const platform = process.platform;
+  if (platform === "darwin")
+    return (await onPath("sandbox-exec", process.env.PATH ?? ""))
+      ? { available: true }
+      : { available: false, reason: "missing:sandbox-exec" };
+  if (platform !== "linux") return { available: false, reason: `platform:${platform}` };
+  if ((await kernelSetting("kernel/apparmor_restrict_unprivileged_userns")) === "1")
+    return { available: false, reason: "restricted:apparmor" };
+  if (
+    (await kernelSetting("kernel/unprivileged_userns_clone")) === "0" ||
+    (await kernelSetting("user/max_user_namespaces")) === "0"
+  )
+    return { available: false, reason: "restricted:userns" };
+  return { available: true };
+}
+
 let allowUnsandboxedSource: (() => boolean | undefined) | undefined;
 
 /**
@@ -131,8 +179,9 @@ export function setAllowUnsandboxedAgentsSource(
 }
 
 /**
- * True when the person allowed Claude Code write agents to run without the
- * OS sandbox: from the source above, else BELLPR_ALLOW_UNSANDBOXED_AGENTS=1.
+ * True when the person allowed Claude Code and Antigravity write agents to
+ * run without the OS sandbox: from the source above, else
+ * BELLPR_ALLOW_UNSANDBOXED_AGENTS=1.
  */
 export function allowUnsandboxedAgents(): boolean {
   try {
@@ -145,19 +194,20 @@ export function allowUnsandboxedAgents(): boolean {
 }
 
 /**
- * Decides how one agent turn runs. A write-role Claude agent gets the
- * sandbox when it is available; without it the turn runs unsandboxed only
- * when the person allowed that, and is refused otherwise with 503
- * `claude_sandbox_unavailable` and the ways to fix it. Every other turn is
- * unaffected.
+ * Decides how one agent turn runs. A write-role Claude or Antigravity agent
+ * gets its sandbox when it is available; without it the turn runs
+ * unsandboxed only when the person allowed that, and is refused otherwise
+ * with 503 `claude_sandbox_unavailable` or `antigravity_sandbox_unavailable`
+ * and the ways to fix it. Every other turn is unaffected.
  */
 export async function enforceAgentSandbox(
   provider: AgentProvider | undefined,
   access: AgentAccess,
 ): Promise<{ sandbox: boolean; unsandboxed: boolean }> {
-  if (provider !== "claude" || access !== "write")
+  if ((provider !== "claude" && provider !== "antigravity") || access !== "write")
     return { sandbox: false, unsandboxed: false };
-  const detection = await detectClaudeSandbox();
+  const detection =
+    provider === "claude" ? await detectClaudeSandbox() : await detectAntigravitySandbox();
   if (detection.available) return { sandbox: true, unsandboxed: false };
   if (allowUnsandboxedAgents()) return { sandbox: false, unsandboxed: true };
   const messages = sm().security.sandbox;
@@ -165,6 +215,17 @@ export async function enforceAgentSandbox(
     label: messages.allowFix,
     command: `BELLPR_ALLOW_UNSANDBOXED_AGENTS=1 ${product.binNames[0]}`,
   };
+  if (provider === "antigravity")
+    throw new AppError(
+      detection.reason?.startsWith("restricted:")
+        ? messages.antigravityRestricted
+        : messages.antigravityUnavailable,
+      503,
+      {
+        code: "antigravity_sandbox_unavailable",
+        fixes: [{ label: messages.claudeFix, command: "claude auth login" }, allowFix],
+      },
+    );
   // Installed but blocked, as in a container: installing it again or
   // switching to Codex, whose sandbox is blocked the same way, cannot help.
   if (detection.reason === "unusable:bwrap")
@@ -240,15 +301,16 @@ function dataDirectoryOf(cwd: string) {
 }
 
 /**
- * A Read rule for an absolute path, in permission-rule syntax (`//` starts
- * an absolute path), followed by an optional glob such as `/**`. Glob
+ * A Read rule (or another tool's) for an absolute path, in permission-rule
+ * syntax (`//` starts an absolute path), followed by an optional glob such
+ * as `/**`. Glob
  * characters in the path itself are escaped; a path Claude Code could not
  * parse inside a rule is left out rather than risk the whole settings value
  * being rejected.
  */
-function absoluteRule(directory: string, glob = ""): string | undefined {
+function absoluteRule(directory: string, glob = "", tool = "Read"): string | undefined {
   if (/[()\\\n\r\0]/.test(directory)) return undefined;
-  return `Read(/${directory.replace(/[*?[\]!#]/g, (char) => `\\${char}`)}${glob})`;
+  return `${tool}(/${directory.replace(/[*?[\]!#]/g, (char) => `\\${char}`)}${glob})`;
 }
 
 function entries(directory: string) {
@@ -276,23 +338,16 @@ function owningClone(cwd: string) {
 }
 
 /**
- * Read denials for one data directory. A checkout outside it is denied all
- * of it. A checkout inside it may read its own path only: every other entry
- * on the way down is denied, except the repository its Git metadata lives
- * in (Git inside the sandbox reads it). Files that may appear later, such
- * as the insights cache, are denied whether they exist yet or not.
+ * What one data directory denies an agent working in `cwd`. A checkout
+ * outside it is denied all of it (`whole`). A checkout inside it may read
+ * its own path only: every other entry on the way down is denied
+ * (`targets`), except the repository its Git metadata lives in (Git inside
+ * the sandbox reads it).
  */
-function dataDirectoryRules(dataDirectory: string, cwd: string): string[] {
+function dataDirectoryDenials(dataDirectory: string, cwd: string) {
   const root = resolved(dataDirectory);
-  const rules: (string | undefined)[] = [];
-  const deny = (target: string) =>
-    rules.push(absoluteRule(target), absoluteRule(target, "/**"));
-  if (root === cwd || !inside(cwd, root)) {
-    rules.push(absoluteRule(root, "/**"));
-    return rules.filter((rule): rule is string => !!rule);
-  }
-  for (const pattern of ["insights/**", "*.json", "*.lock", "*-index-*"])
-    rules.push(absoluteRule(root, `/${pattern}`));
+  if (root === cwd || !inside(cwd, root)) return { root, whole: true, targets: [] };
+  const targets: string[] = [];
   const clone = owningClone(cwd);
   let directory = root;
   for (const part of path.relative(root, cwd).split(path.sep)) {
@@ -303,14 +358,30 @@ function dataDirectoryRules(dataDirectory: string, cwd: string): string[] {
       if (directory === root && entry === "repositories" && clone) {
         for (const repository of entries(target)) {
           const candidate = path.join(target, repository);
-          if (resolved(candidate) !== clone) deny(candidate);
+          if (resolved(candidate) !== clone) targets.push(candidate);
         }
         continue;
       }
-      deny(target);
+      targets.push(target);
     }
     directory = path.join(directory, part);
   }
+  return { root, whole: false, targets };
+}
+
+/**
+ * Read denials for one data directory (see dataDirectoryDenials). Files
+ * that may appear later, such as the insights cache, are denied whether
+ * they exist yet or not.
+ */
+function dataDirectoryRules(dataDirectory: string, cwd: string): string[] {
+  const { root, whole, targets } = dataDirectoryDenials(dataDirectory, cwd);
+  if (whole) return [absoluteRule(root, "/**")].filter((rule): rule is string => !!rule);
+  const rules: (string | undefined)[] = [];
+  for (const pattern of ["insights/**", "*.json", "*.lock", "*-index-*"])
+    rules.push(absoluteRule(root, `/${pattern}`));
+  for (const target of targets)
+    rules.push(absoluteRule(target), absoluteRule(target, "/**"));
   return [...new Set(rules.filter((rule): rule is string => !!rule))];
 }
 
@@ -390,6 +461,167 @@ export function agentSandboxReadPaths(cwd: string) {
   return { denyRead: [...new Set(denyRead)], allowRead: [...new Set(allowRead)] };
 }
 
+/** An Antigravity permission rule such as `read_file(/home/me/.ssh)`; undefined for a target it cannot carry. */
+function antigravityRule(action: string, target: string): string | undefined {
+  return /[()\n\r\0]/.test(target) ? undefined : `${action}(${target})`;
+}
+
+/**
+ * The Antigravity CLI's and Google Cloud's own files that no Antigravity
+ * turn may read or write: your customizations (hooks, MCP servers,
+ * plugins), its settings and saved conversations, the Gemini CLI's sign-in
+ * next to them, plugin secrets, and the gcloud configuration and
+ * Application Default Credentials that BELL passes on for signing in. Its
+ * `brain` folder, where the agent keeps the artifacts of a conversation,
+ * stays open.
+ */
+function antigravityPrivatePaths(home: string): string[] {
+  const credentials = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+  return [
+    path.join(home, ".gemini", "config"),
+    path.join(home, ".gemini", "settings.json"),
+    path.join(home, ".gemini", "oauth_creds.json"),
+    path.join(home, ".gemini", "antigravity-cli", "settings.json"),
+    path.join(home, ".gemini", "antigravity-cli", "conversations"),
+    path.join(home, ".config", "antigravity"),
+    process.env.CLOUDSDK_CONFIG || path.join(home, ".config", "gcloud"),
+    ...(credentials ? [credentials] : []),
+  ].map((target) => path.resolve(target));
+}
+
+/**
+ * Every entry of the home directory, and of each folder below it on the way
+ * to `cwd`, that is not on that way; every entry of it when `cwd` lies
+ * outside it. A read-only Antigravity turn gets these, since agy lets its
+ * read tool open files outside the workspace (1.5.0 read one in another
+ * project under a folder it trusted).
+ */
+function homeDenials(home: string, cwd: string): string[] {
+  const root = resolved(home);
+  if (root === cwd) return [];
+  if (!inside(cwd, root)) return entries(root).map((entry) => path.join(root, entry));
+  const targets: string[] = [];
+  let directory = root;
+  for (const part of path.relative(root, cwd).split(path.sep)) {
+    for (const entry of entries(directory))
+      if (entry !== part) targets.push(path.join(directory, entry));
+    directory = path.join(directory, part);
+  }
+  return targets;
+}
+
+/**
+ * The read denials of agentReadDenials as Antigravity `read_file` rules,
+ * which deny a path and everything under it (agy 1.5.0 refused a file in a
+ * denied directory, also through a symbolic link in the checkout) and also
+ * deny writing it, plus the Antigravity CLI's own files
+ * (antigravityPrivatePaths). Globs are not part of the rule syntax, so `~`
+ * entries are expanded, `X/**` becomes the directory X, and the data
+ * directory's files that may appear later are denied by name: its insights
+ * cache directory. A file that appears at its top level during a turn is not
+ * covered, as it is for Claude Code. `outsideCheckout` also denies the home
+ * directory off the way to the checkout (homeDenials).
+ */
+export function antigravityReadDenials(
+  cwd: string,
+  options: { outsideCheckout?: boolean } = {},
+): string[] {
+  const here = resolved(cwd);
+  const home = process.env.HOME || os.homedir();
+  const targets = sharedCredentialDenials().map((entry) =>
+    path.resolve(expandHome(entry.replace(/\/(?:\*\*)?$/, ""), home)),
+  );
+  targets.push(...antigravityPrivatePaths(home));
+  for (const directory of dataDirectoriesFor(here)) {
+    const { root, whole, targets: denied } = dataDirectoryDenials(directory, here);
+    targets.push(...(whole ? [root] : [path.join(root, "insights"), ...denied]));
+  }
+  if (options.outsideCheckout) targets.push(...homeDenials(home, here));
+  return [...new Set(targets)].flatMap((target) => antigravityRule("read_file", target) ?? []);
+}
+
+/**
+ * The Git paths of agentGitWriteDenials as Antigravity `write_file` rules,
+ * which cover a path and everything under it, so the `/**` forms are left
+ * out.
+ */
+export function antigravityGitWriteDenials(cwd: string): string[] {
+  return agentGitWriteDenials(cwd)
+    .filter((target) => !target.endsWith("/**"))
+    .flatMap((target) => antigravityRule("write_file", target) ?? []);
+}
+
+/**
+ * The `read_file` allow rule for the Git directory of the clone a worktree
+ * checkout belongs to: agy's sandbox mounts nothing outside the workspace
+ * that no rule allows, and Git inside it needs that directory. Undefined
+ * for a checkout with its own `.git` directory.
+ */
+export function antigravityCloneGitRead(cwd: string): string | undefined {
+  const clone = owningClone(cwd);
+  return clone && antigravityRule("read_file", path.join(clone, ".git"));
+}
+
+/**
+ * The customization folders the Antigravity CLI looks for in a workspace,
+ * and what it loads from them that runs or instructs outside BELL's
+ * control: hooks (shell commands it runs outside any sandbox), MCP servers
+ * it starts, plugins bundling both, custom agents with their own MCP
+ * servers, and skills. agy 1.5.0 has no setting that skips them and loads
+ * them in print mode in a folder it was never asked to trust (BELL's own
+ * check with a SessionStart hook).
+ */
+const antigravityCustomizationRoots = [".agents", ".agent", "_agents", "_agent"];
+const antigravityCustomizations = [
+  "hooks.json",
+  "mcp_config.json",
+  "plugins",
+  "plugins.json",
+  "agents",
+  "skills",
+  "skills.json",
+];
+
+/**
+ * The customizations agy would load from `cwd`: it walks from the working
+ * directory up to the repository root (the folder holding `.git`), so each
+ * folder on that way is checked, and only `cwd` itself when no folder above
+ * it is a repository. Paths are relative to `cwd`.
+ */
+export function antigravityWorkspaceConfig(cwd: string): string[] {
+  const start = path.resolve(cwd);
+  const folders: string[] = [];
+  for (let directory = start; ; ) {
+    folders.push(directory);
+    if (existsSync(path.join(directory, ".git"))) break;
+    const parent = path.dirname(directory);
+    if (parent === directory) {
+      folders.splice(1);
+      break;
+    }
+    directory = parent;
+  }
+  return folders.flatMap((folder) =>
+    antigravityCustomizationRoots.flatMap((root) =>
+      antigravityCustomizations
+        .map((item) => path.join(folder, root, item))
+        .filter((target) => existsSync(target))
+        .map((target) => path.relative(start, target)),
+    ),
+  );
+}
+
+/** 422 `antigravity_workspace_config` before an Antigravity turn in a folder that would load customizations. */
+export function assertNoAntigravityWorkspaceConfig(cwd: string): void {
+  const found = antigravityWorkspaceConfig(cwd);
+  if (found.length)
+    throw new AppError(
+      (m) => m.security.sandbox.antigravityWorkspaceConfig({ paths: found.slice(0, 5) }),
+      422,
+      { code: "antigravity_workspace_config", params: { paths: found.slice(0, 5).join(", ") } },
+    );
+}
+
 /**
  * Paths a sandboxed agent must not write. Claude Code's
  * `sandbox.filesystem.denyWrite` takes absolute paths and does not block
@@ -433,4 +665,103 @@ export function agentGitWriteDenials(cwd: string): string[] {
     /* No worktrees recorded. */
   }
   return [...new Set(rules)];
+}
+
+/** The most held paths one turn's sandbox is given; the rest wait for the check after the turn. */
+export const maxHeldWriteTargets = 200;
+
+/**
+ * Where in the checkout `cwd` an agent write turn must not write because
+ * other people in the group hold it (docs/design/collab-write-guard.md,
+ * S3): absolute paths, as the checkout spells them, for the sandbox to make
+ * read-only. Holds fold ASCII case and the file system on Linux does not,
+ * so each held path is looked up one folder at a time and every spelling
+ * found there counts. A held file that does not exist yet is named too,
+ * when its folder exists: the sandbox then refuses to create it. Left out,
+ * so that the turn still starts and only the check after it applies:
+ *
+ * - a held path whose folder does not exist (Codex 0.167 would make the
+ *   first missing folder read-only, other people's files in it included);
+ * - a path with a symbolic link on the way or at its end (bubblewrap
+ *   refuses to start: "cannot enforce sandbox read-only path … because it
+ *   crosses writable symlink");
+ * - anything in `.git`, which is already read-only, and paths with `..`;
+ * - a path below another one in the list, and paths past
+ *   maxHeldWriteTargets.
+ *
+ * Not covered either: renaming a folder above a held path. That needs write
+ * access only to the folder that contains it, which stays writable for the
+ * files of other people in it, and the next command's fresh sandbox no
+ * longer guards the file at its new place; the check after the turn stops
+ * the turn, since the held path changed.
+ *
+ * Each sandbox may leave out more (codexSandboxConfig: glob characters;
+ * heldSandboxWriteDenials: paths that do not exist; heldEditDenials:
+ * parentheses, backslashes and line breaks).
+ *
+ * Verified with codex-cli 0.167.0 (`codex sandbox`) on Linux with
+ * bubblewrap 0.11.1: a read-only file cannot be written, deleted or
+ * renamed over, a read-only folder takes no new file, and its neighbours
+ * stay writable.
+ */
+export function heldWriteTargets(cwd: string, scopes: readonly string[]): string[] {
+  const fold = (value: string) => value.replace(/[A-Z]/g, (letter) => letter.toLowerCase());
+  const found = new Set<string>();
+  for (const scope of scopes) {
+    const parts = scope.split("/").filter((part) => part && part !== ".");
+    if (!parts.length || parts.includes("..") || fold(parts[0]) === ".git") continue;
+    let folders = [cwd];
+    parts.forEach((part, index) => {
+      const last = index === parts.length - 1;
+      const next: string[] = [];
+      for (const folder of folders) {
+        let names;
+        try {
+          names = readdirSync(folder, { withFileTypes: true });
+        } catch {
+          continue;
+        }
+        const matches = names.filter((entry) => fold(entry.name) === fold(part));
+        if (!matches.length && last) found.add(path.join(folder, part));
+        for (const entry of matches) {
+          if (entry.isSymbolicLink()) continue;
+          const target = path.join(folder, entry.name);
+          if (last) found.add(target);
+          else if (entry.isDirectory()) next.push(target);
+        }
+      }
+      folders = next;
+    });
+  }
+  const sorted = [...found].sort();
+  return sorted
+    .filter((target) => !sorted.some((other) => inside(target, other)))
+    .slice(0, maxHeldWriteTargets);
+}
+
+/**
+ * The Claude Code Edit rules for heldWriteTargets: each path and everything
+ * under it. Edit rules cover every tool that edits files (Edit, Write,
+ * NotebookEdit); the sandbox's denyWrite covers Bash. They apply with or
+ * without the sandbox. A path absoluteRule cannot write as a rule gets
+ * none and is left to the check after the turn.
+ */
+export function heldEditDenials(targets: readonly string[]): string[] {
+  return targets.flatMap((target) =>
+    [absoluteRule(target, "", "Edit"), absoluteRule(target, "/**", "Edit")].filter(
+      (rule): rule is string => !!rule,
+    ),
+  );
+}
+
+/**
+ * heldWriteTargets as Claude Code's sandbox takes them for Bash. A path with
+ * glob characters would be read as a pattern, and a path that does not
+ * exist yet was not verified with its bubblewrap (on the Linux host where
+ * this was written, Claude Code 2.1.321 could not start its sandbox at all,
+ * with or without these paths), so both are left out: the Edit rules and
+ * the check after the turn still cover them.
+ */
+export function heldSandboxWriteDenials(targets: readonly string[]): string[] {
+  return targets.filter((target) => !/[*?[\]{}]/.test(target) && existsSync(target));
 }

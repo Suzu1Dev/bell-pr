@@ -1,8 +1,6 @@
 import { useRef, useState, type Dispatch, type FormEvent, type SetStateAction } from "react";
 import {
-  Bot,
   Check,
-  ChevronRight,
   Loader2,
   Play,
   Plus,
@@ -190,6 +188,33 @@ export function NewTaskModal({
           </button>
         </div>
         {demo && <p className="task-demo-note">{t.demoNote}</p>}
+        <label className="field-label" htmlFor="task-prompt">
+          {t.goal}
+        </label>
+        <textarea
+          id="task-prompt"
+          className="text-input task-prompt"
+          placeholder={t.goalPlaceholder}
+          value={prompt}
+          onChange={(e) => setPrompt(e.target.value)}
+          required
+          minLength={10}
+        />
+        <details className="task-name-details">
+          <summary>{t.taskName} · {taskTitle || common.optional}</summary>
+          <label className="field-label" htmlFor="task-title">
+            {t.taskName} <span>{common.optional}</span>
+          </label>
+          <input
+            id="task-title"
+            className="text-input"
+            placeholder={t.taskPlaceholder}
+            value={taskTitle}
+            onChange={(e) => setTaskTitle(e.target.value)}
+          />
+        </details>
+        <ModeChoice mode={mode} onModeChange={setModeChoice} rulesCase={rulesCase} fitted={fitted}
+          onFittedChange={setFitChoice} sample={demo} disabled={busy} />
         {settingsLoading && (
           <p className="field-help" role="status">
             {t.loadingSettings}
@@ -230,42 +255,6 @@ export function NewTaskModal({
           <Check size={14} />
           {t.saveDefault}
         </button>
-        <label className="field-label" htmlFor="task-title">
-          {t.taskName} <span>{common.optional}</span>
-        </label>
-        <input
-          id="task-title"
-          className="text-input"
-          placeholder={t.taskPlaceholder}
-          value={taskTitle}
-          onChange={(e) => setTaskTitle(e.target.value)}
-        />
-        <label className="field-label" htmlFor="task-prompt">
-          {t.goal}
-        </label>
-        <textarea
-          id="task-prompt"
-          className="text-input task-prompt"
-          placeholder={t.goalPlaceholder}
-          value={prompt}
-          onChange={(e) => setPrompt(e.target.value)}
-          required
-          minLength={10}
-        />
-        <ModeChoice mode={mode} onModeChange={setModeChoice} rulesCase={rulesCase} fitted={fitted}
-          onFittedChange={setFitChoice} sample={demo} disabled={busy} />
-        {mode === "agents" && (
-          <div className="task-team-preview">
-            <Bot size={16} />
-            <span>{t.lead}</span>
-            <ChevronRight size={12} />
-            <span>
-              {t.teammates({ count: contributionSettings.maxTeammates })}
-            </span>
-            <ChevronRight size={12} />
-            <span>{t.reviewers}</span>
-          </div>
-        )}
         <p className="field-help">
           {(mode === "hand" ? modeText.usage : t.usage)({
             provider: providerLabels[contributionSettings.provider ?? "codex"],

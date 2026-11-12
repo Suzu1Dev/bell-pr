@@ -55,6 +55,7 @@ import type {
 } from "../shared/contribution.js";
 import { explainPrCreateFailure, refreshRunFacts } from "./contribution-facts.js";
 import { outgoingPublishText } from "../shared/publish-payload.js";
+import { localPublishChecks } from "./group-local.js";
 
 const now = () => new Date().toISOString();
 
@@ -135,7 +136,8 @@ function changesOf(run: Run, files: DiffFile[], repo?: Repository) {
  * (the project's rules, the stored GitHub facts, reviewability, pacing).
  * The publish dialog shows the same list (GET /api/runs/:id/preflight),
  * which never calls GitHub: it uses the facts stored on the run unless
- * `extra.facts` passes fresher ones.
+ * `extra.facts` passes fresher ones. With `extra.runs`, the person's other
+ * contributions of the project are checked too (server/group-local.ts).
  */
 export async function publishChecks(
   run: Run,
@@ -146,6 +148,7 @@ export async function publishChecks(
     repo?: Repository;
     facts?: ContributionFacts;
     overrides?: GuardOverride[];
+    runs?: readonly Run[];
   } = {},
 ): Promise<DraftCheck[]> {
   const confirmed = await confirmedEmails(dataDirectory);
@@ -184,6 +187,10 @@ export async function publishChecks(
     },
     locale,
   );
+  if (extra.repo && extra.runs)
+    checks.push(
+      ...(await localPublishChecks({ runs: extra.runs, repo: extra.repo, directory: dataDirectory }, run, files)),
+    );
   // The quoted confirm carries a digest of its words, which publish() wants back with its tick.
   return checks.map((check) => (check.id === "by-hand-rules" ? { ...check, digest: checkDigest(check) } : check));
 }
@@ -605,11 +612,31 @@ export async function recoverPublish(
 }
 
 /**
+ * Refuses a change that meets a file someone else in the group holds
+ * (hold-guard.ts). Given only when BELL PR runs with --group.
+ */
+export type HoldCheck = (
+  run: Run,
+  files: readonly DiffFile[],
+  acknowledged: readonly string[],
+) => void;
+
+export interface PublishHolds {
+  publishing: HoldCheck;
+  confirms?: (
+    run: Run,
+    repo: Repository | undefined,
+    runs: readonly Run[],
+  ) => Promise<DraftCheck[]>;
+}
+
+/**
  * `acknowledged` lists the preflight items the person confirmed in the
  * publish dialog. They are recomputed here from the saved draft, so a stale
  * or partial list is rejected before anything is pushed. The quoted
  * confirm's tick counts only with `rulesDigest`, the digest of the words
  * the dialog showed, when it matches the words the server shows now.
+ * `holds` is the group's write guard, when BELL PR runs with --group.
  */
 export async function publish(
   ctx: WorkbenchContext,
@@ -618,7 +645,10 @@ export async function publish(
   acknowledged: string[] = [],
   overrides: Pick<GuardOverride, "id" | "reason">[] = [],
   rulesDigest?: string,
+  holds?: HoldCheck | PublishHolds,
 ) {
+  const holdCheck = typeof holds === "function" ? holds : holds?.publishing;
+  const holdConfirms = typeof holds === "function" ? undefined : holds?.confirms;
   return ctx.lock(id, async () => {
     const run = ctx.run(id);
     if (
@@ -654,6 +684,8 @@ export async function publish(
     // The current setting applies, also to runs approved while it was off
     // and to runs approved by builds before the check existed.
     assertUnderstood(run, files, repo);
+    // Before the follow-up branch, so a follow-up round is held to it too.
+    holdCheck?.(run, files, acknowledged);
     const round = activeFollowUp(run.followUps);
     if (round) return publishFollowUp(ctx, run, round, files);
     if (run.prUrl)
@@ -731,8 +763,10 @@ export async function publish(
       files,
       ctx.store.directory,
       currentLocale(),
-      { repo, overrides: guardOverrides },
+      { repo, overrides: guardOverrides, runs: ctx.store.data.runs },
     );
+    if (holdConfirms)
+      checks.push(...(await holdConfirms(run, repo, ctx.store.data.runs)));
     const blocking = checks.find((check) => check.kind === "block");
     if (blocking)
       throw new AppError(

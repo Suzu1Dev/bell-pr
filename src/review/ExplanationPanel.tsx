@@ -443,7 +443,6 @@ export function ExplanationPanel({
         </span>
         <div>
           <h2>{t.panel.title}</h2>
-          <p>{t.panel.subtitle}</p>
         </div>
         <span className={`explain-mode ${demo ? "explain-mode-demo" : ""}`}>
           {demo ? t.panel.demoBadge : t.panel.liveBadge}
@@ -565,16 +564,24 @@ export function ExplanationPanel({
                     {t.explain.testFileHint}
                   </p>
                 )}
-                <section className="explain-card explain-card-example">
+                <section className="explain-card explain-card-summary">
                   <h3>
-                    <MessageCircle size={15} />
-                    {t.explain.cards.example}
+                    <span className="explain-card-number">01</span>
+                    {t.explain.cards.summary}
                   </h3>
+                  <MarkdownContent>{explanation.summary}</MarkdownContent>
+                </section>
+                <section className="explain-card">
+                  <h3>
+                    <span className="explain-card-number">02</span>
+                    {t.explain.cards.reason}
+                  </h3>
+                  <MarkdownContent>{explanation.reason}</MarkdownContent>
+                </section>
+                <details className="explain-card explain-card-example" open={!explanation.example}>
+                  <summary><MessageCircle size={15} /> {t.explain.cards.example}</summary>
                   {explanation.example ? (
                     <>
-                      <p className="explain-example-intro">
-                        {t.explain.exampleIntro}
-                      </p>
                       <div className="explain-example-scenario">
                         <span className="explain-example-label">
                           {t.explain.exampleScenario}
@@ -632,21 +639,7 @@ export function ExplanationPanel({
                       <p>{t.explain.examplePendingBody}</p>
                     </div>
                   )}
-                </section>
-                <section className="explain-card explain-card-summary">
-                  <h3>
-                    <span className="explain-card-number">01</span>
-                    {t.explain.cards.summary}
-                  </h3>
-                  <MarkdownContent>{explanation.summary}</MarkdownContent>
-                </section>
-                <section className="explain-card">
-                  <h3>
-                    <span className="explain-card-number">02</span>
-                    {t.explain.cards.reason}
-                  </h3>
-                  <MarkdownContent>{explanation.reason}</MarkdownContent>
-                </section>
+                </details>
                 <section className="explain-card explain-card-concept">
                   <h3>
                     <Lightbulb size={15} />

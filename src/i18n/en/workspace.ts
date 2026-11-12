@@ -37,11 +37,11 @@ const workspace = {
     draft: "PR draft",
     commits: "Commit history",
   },
-  /** The badge of a run whose Claude Code agent ran without the OS sandbox. */
+  /** The badge of a run whose Claude Code or Antigravity agent ran without the OS sandbox. */
   unsandboxed: {
     label: "Ran without sandbox",
     tooltip:
-      "You allowed Claude agents to run without the operating system's sandbox, so an agent of this run could read or change files outside its working folder. Check its changes with extra care. The safety settings turn this off for new runs.",
+      "You allowed agents to run without the operating system's sandbox, so an agent of this run could read or change files outside its working folder. Check its changes with extra care. The safety settings turn this off for new runs.",
   },
   /**
    * The badge of a run approved without the understanding check, or one
@@ -70,8 +70,76 @@ const workspace = {
     workspaceRemoved:
       "Files for this run were cleaned up to free disk space. Reports and notes are kept.",
   },
+  holdStop: {
+    heading: ({ count }: { count: number }) =>
+      plural(count) === "one"
+        ? "Stopped because a file is held"
+        : "Stopped because files are held",
+    body:
+      "The last turn changed files someone else holds; edits stay in the working directory. Put these files back, or check again once released or revoked.",
+    legacyBody:
+      "This run stopped earlier because it changed files someone else held. Put these files back, or check current holds again.",
+    legacyTaskStopped:
+      "This subtask touched files someone else held, so its edits weren't added. Retry once the hold is released or revoked.",
+    item: ({
+      path,
+      holder,
+      title,
+      since,
+    }: {
+      path: string;
+      holder: string;
+      title: string;
+      since: string;
+    }) => `${path}: held by ${holder} for “${title}” (since ${since})`,
+    itemMeta: ({
+      holder,
+      title,
+      since,
+    }: {
+      holder: string;
+      title: string;
+      since: string;
+    }) => `Held by ${holder} for “${title}” · since ${since}`,
+    itemPathOnly: ({ path }: { path: string }) => `${path} (held by another member)`,
+    restoreAction: ({ count = 2 }: { count?: number } = {}) =>
+      plural(count) === "one" ? "Put this file back" : "Put these files back",
+    restoringAction: "Putting back…",
+    recheckAction: "Check again",
+    recheckingAction: "Checking…",
+    restoreConfirmTitle: "Put held files back?",
+    restoreConfirmBody: ({ count }: { count: number }) =>
+      plural(count) === "one"
+        ? `Put ${count} held file back to this run's base version? Edits to that file will be removed, while any other changed files stay as they are.`
+        : `Put ${count} held files back to this run's base version? Edits to those files will be removed, while any other changed files stay as they are.`,
+    restoreConfirmAction: "Put these files back",
+    restoreCancelAction: "Cancel",
+    restoreFailed:
+      "Couldn't finish putting these files back. Reload to see what changed, then try again or restore them by hand.",
+    restoreStale:
+      "The working directory changed, so nothing was restored. Refresh the file list and try again.",
+    recheckFailed: ({ name }: { name: string }) =>
+      `Couldn't check file holds right now. Try again in a moment, or fix group work on the host and restart ${name} if it has stopped.`,
+  },
   sampleReview: "Sample review",
   humanReview: "Human review",
+  /** Other contributions of the same project whose files meet the plan's scopes. */
+  overlap: {
+    label: "Overlap with your other contributions",
+    heading: ({ count }: { count: number }) =>
+      count === 1
+        ? "Another contribution of yours to this project changes files this plan covers"
+        : `${count} other contributions of yours to this project change files this plan covers`,
+    item: ({ title, status }: { title: string; status: string }) => `“${title}” (${status}):`,
+    hint: "Whichever is merged second may need its conflicts resolved. Send the plan back to keep away from these files, or approve it anyway.",
+    confirm: "I know these overlap; approve anyway",
+    /** A Learn-by-hand plan: the person changes their own steps. */
+    hintByHand: "Whichever is merged second may need its conflicts resolved. Change your steps to keep away from these files, or confirm your plan anyway.",
+    confirmByHand: "I know these overlap; confirm my plan anyway",
+    chip: ({ titles }: { titles: string }) => `Also changed in ${titles}`,
+    /** One title in the chip's list. */
+    quoted: ({ title }: { title: string }) => `“${title}”`,
+  },
   /** The lead's check of the request's assumption, made by reading the code. */
   premise: {
     label: "Premise check",
@@ -222,7 +290,9 @@ const workspace = {
       `Could not load the check: ${message}`,
     retry: "Try again",
     plan: ({ questions, lines }: { questions: number; lines: number }) =>
-      `${plural(questions) === "one" ? `${questions} file question` : `${questions} file questions`} for ${plural(lines) === "one" ? `${lines} changed line` : `${lines} changed lines`}. ${product.name} defaults: none up to 15 lines, 1 up to 100, 2 up to 400, 3 above.`,
+      `${lines} changed lines · ${questions} file ${plural(questions) === "one" ? "question" : "questions"}`,
+    planHelp: "How questions are selected",
+    planRules: "Default: no file questions up to 15 changed lines, 1 up to 100, 2 up to 400, and 3 above 400. Explaining the change and recording untested behavior are still required.",
     fill: "Fill with the sample answer",
     explainTitle: "1. Explain",
     explainPrompt:
@@ -327,21 +397,10 @@ const workspace = {
     emptyLog: "The log appears here once the task starts.",
     emptyFilter: "This role has no log entries yet.",
   },
-  /** Defaults of the contribution brief built from a run's settings. */
-  brief: {
-    motivation:
-      "The value of this contribution still has to be confirmed by the task's needs and its acceptance results.",
-    before:
-      "The problem in the task description exists today; the team confirms how far it reaches while planning.",
-    beforeByHand:
-      "The problem in the task description exists today; you and the guide find how far it reaches while you plan.",
-    after:
-      "Improve the current behavior as the task asks; not yet verified to be achieved.",
-    risk: "Before submitting, check compatibility, regression tests and user-facing behavior.",
-  },
   draft: {
+    publishOptions: "Commit message and branch",
     loadingGuide: "Loading the draft guidelines…",
-    heading: "Good changes deserve a good description.",
+    heading: "PR title and description",
     subheading:
       "Polish the draft so maintainers can understand your contribution easily.",
     label: "DRAFT PR",
@@ -381,7 +440,12 @@ const workspace = {
     save: "Save draft",
   },
   checklist: {
-    title: "One last look before you submit.",
+    open: "View publishing checklist",
+    understandingAction: "Explain the change",
+    completed: "Completed checks",
+    reviewAction: "Review changes",
+    editAction: "Edit draft",
+    title: "Before you publish",
     text: "A clear PR is the start of a good collaboration.",
     allReviewed: "All files reviewed",
     files: ({ reviewed, total }: { reviewed: number; total: number }) =>
@@ -398,7 +462,7 @@ const workspace = {
     noDescription: "No description yet",
     placeholdersStay: "TODOs and blanks to fill in never reach GitHub",
     taskItems: "Checkboxes in the description",
-    taskItemsHelp: `Only tick what you really finished or checked. ${product.name} and the model never tick them for you; ticking rewrites the description on the left, so remember to save.`,
+    taskItemsHelp: `Only tick what you really finished or checked. ${product.name} and the model never tick them for you; ticking rewrites the description above, so remember to save.`,
     noSection: "No section",
     samePr: "Push to the same PR",
     samePrHelp:
@@ -544,6 +608,8 @@ const workspace = {
       rules: "The project's rules",
       issue: "The issue",
       pacing: "Your pace here",
+      others: "Your other contributions here",
+      holds: "File holds",
       words: "Your words and reviewability",
       safety: "Safety",
     },
@@ -635,6 +701,25 @@ const workspace = {
     syncedPr:
       "Merged the latest target branch into the PR. Review it, then push one merge commit.",
     synced: "Synced to the latest target branch. Review the files it changed again.",
+    syncHeldChanges: ({ count }: { count: number }) =>
+      plural(count) === "one"
+        ? `${count} file under your hold changed on the target branch. Check the Target branch panel.`
+        : `${count} files under your hold changed on the target branch. Check the Target branch panel.`,
+    heldFilesRestored: ({ count, keptOtherChanges = true }: { count: number; keptOtherChanges?: boolean }) =>
+      keptOtherChanges
+        ? plural(count) === "one"
+          ? `${count} file restored. Other changes were kept.`
+          : `${count} files restored. Other changes were kept.`
+        : plural(count) === "one"
+          ? `${count} file restored.`
+          : `${count} files restored.`,
+    holdCleared: "No holds remain on these files. You can continue.",
+    holdStillActiveBy: ({ who, paths, pathCount }: { who: string; paths: string; pathCount: number }) =>
+      plural(pathCount) === "one"
+        ? `${who} still holds ${paths}. Wait for them to release it, ask a group admin to revoke it, or put this file back.`
+        : `${who} still holds ${paths}. Wait for them to release them, ask a group admin to revoke them, or put these files back.`,
+    holdStillActiveMulti: ({ count, holders, paths }: { count: number; holders: string; paths: string }) =>
+      `${count} files are still held by ${holders} (${paths}). Wait for release, ask a group admin to revoke the holds, or put these files back.`,
     resolvingConflicts:
       "An agent is resolving the conflicts. Review each file when it finishes.",
     undoSyncConfirm:

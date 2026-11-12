@@ -10,7 +10,7 @@ computer, and where those protections end, is described in
 
 | Version | Security fixes |
 | --- | --- |
-| The latest release (while there is no stable release, the newest pre-release) | Yes |
+| The latest release | Yes |
 | Earlier releases | No: update to the latest release |
 
 Security fixes ship as new releases, with a note in

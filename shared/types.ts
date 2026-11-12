@@ -10,7 +10,7 @@ import type { FileConversation } from "./chat.js";
 import type { PrFeedback } from "./pr-feedback.js";
 import type { Locale } from "./i18n/locale.js";
 import type { FollowUpRound } from "./followups.js";
-import type { BaseSync } from "./sync.js";
+import type { BaseSync, HeldUpstreamChange } from "./sync.js";
 import type {
   FeedbackTag,
   FileAttempt,
@@ -148,6 +148,19 @@ export interface RunCore {
   followUps?: FollowUpRound[];
   /** The last move of an unpublished run onto a newer target-branch commit. */
   sync?: BaseSync;
+  /**
+   * Files under the person's hold that commits on the target branch changed
+   * since the hold was taken, recorded by a sync that needed no merge so the
+   * Target branch panel still shows them.
+   */
+  heldChanges?: HeldUpstreamChange[];
+  /**
+   * Paths of the run's checkout that met someone else's hold when a write
+   * turn stopped (group work, S2). Paths only, never holder names or titles.
+   * Cleared when those files are put back, when a recheck finds them free, or
+   * when a later write turn finishes without a hold conflict.
+   */
+  heldPaths?: string[];
   contributionSettings?: ContributionSettings;
   team?: AgentTeam;
   /** Follow-up Q&A per diff path; absent on runs saved before it was persisted. */
@@ -217,4 +230,38 @@ export interface RunCore {
    * with it, so the run can be split again.
    */
   splitInto?: SplitRef[];
+  /**
+   * How this contribution relates to the person's other ones (group mode,
+   * Phase 0). Absent on every run that has nothing to record.
+   */
+  group?: RunGroup;
+  /**
+   * The group's participant ids that started this run (group work, the
+   * write guard's S2): everyone who counted as "you" for the request that
+   * created it. Agent turns, teammates and plans of the run may change
+   * files these people hold, and no one else's. Set only when group work
+   * was set up; absent on every other run, which respects every hold.
+   */
+  owners?: string[];
+}
+
+export interface RunGroup {
+  /**
+   * The ids of the parts of the same split this part builds on: a task of
+   * this part depends on a task with files in that part. Publishing before
+   * those are merged needs a confirmation (`split-order`). Set only by a
+   * split; a deleted part leaves the list.
+   */
+  after?: string[];
+}
+
+/** POST /api/runs/:id/holds/restore */
+export interface HoldRestoreResponse {
+  run: RunCore;
+  restored: string[];
+}
+
+/** POST /api/runs/:id/holds/recheck */
+export interface HoldRecheckResponse {
+  run: RunCore;
 }

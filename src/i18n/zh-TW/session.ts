@@ -4,9 +4,9 @@ import type en from "../en/session";
 const messages: Translation<typeof en> = {
   "tab": "協作",
   "attention": "有待處理",
-  "busy": "Agent 正在修改程式碼，完成後再操作。",
+  "busy": "Agent 正在這個工作目錄中作業，完成後再操作。",
   "label": "和 Agent 協作",
-  "empty": "說明你希望 Agent 做什麼，例如修正失敗的檢查或補上測試。Agent 會在這個工作尚未送出的工作目錄中修改程式碼並執行檢查；每一輪結束後，這裡會列出改動的檔案、實際執行的指令與它提出的問題。",
+  "empty": "說明下一步要修改什麼。AI 會在這份尚未送出的工作目錄修改程式碼並執行檢查，完成後請確認結果。",
   "progress": "Agent 目前的進度",
   "working": "Agent 正在工作",
   "stop": "停止",
@@ -38,7 +38,7 @@ const messages: Translation<typeof en> = {
   "limitationsAction": "請 Agent 處理這些未完成的項目",
   "limitationsIntro": "PR 草稿的 Limitations 寫到以下項目尚未完成或沒有驗證，請在可以做到的範圍內補做（修正程式碼、補測試、執行檢查），做不到的請說明原因並問我需要什麼。請將已執行的驗證寫入 Validation，Limitations 只保留尚未覆蓋的項目與實際限制，並修正兩段中過時的說明：\n\n",
   "blocks": {
-    "running": "Agent 正在修改程式碼，完成後再操作。",
+    "running": "Agent 正在這個工作目錄中作業，完成後再操作。",
     "publishing": "正在送出 PR，完成後才能和 Agent 協作。",
     "published": "PR 已送出；之後的 review 回饋請在「PR 草稿」分頁用「依 review 修正」處理。",
     "ended": "這個工作已結束，不能再和 Agent 協作。",

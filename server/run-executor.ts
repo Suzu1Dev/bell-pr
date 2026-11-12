@@ -12,9 +12,12 @@ import path from "node:path";
 import { assertRunAgentAllowed } from "./codex-guard.js";
 import { command, git, agentEnvironment, recordedGitDir, redact } from "./process.js";
 import { readDiff } from "./git.js";
+import { planOverlaps, planScopes } from "./group-local.js";
+import { assertNotHeld, changedPaths, heldNotice, heldPathsOf } from "./hold-guard.js";
 import {
   claimReadyTasks,
   consumeTeamInbox,
+  directoryScopes,
   hasTeamInbox,
   memberReportJsonSchema,
   parseMemberResult,
@@ -51,7 +54,7 @@ import {
   retryTransientAuth,
 } from "./agent-cli.js";
 import { draftFingerprint } from "./drafts.js";
-import { cancelled, currentLocale, sm } from "./i18n/index.js";
+import { cancelled, currentLocale, sm, withLocale } from "./i18n/index.js";
 import type { Locale } from "../shared/i18n/locale.js";
 import {
   adoptLegacyCheckout,
@@ -66,6 +69,7 @@ import {
 } from "./run-events.js";
 import {
   coordinationPrompt,
+  heldPathsBlock,
   independentReviewContext,
   integrationPrompt,
   leadPlanPrompt,
@@ -123,6 +127,11 @@ export async function runAgent(
   assertRunAgentAllowed(run);
   // Learn by hand: BELL's agents never get a write turn (DESIGN v1.2 F2).
   if (run.learnByHand && !readonly) throw new AppError((m) => m.byHand.noWriteTurn, 409);
+  // Group work (hold-guard.ts, S2): a write turn is told the paths other
+  // people hold, read again for every turn so a hold taken mid-run reaches
+  // the next one. Group work that stopped refuses the turn (503).
+  const writes = !readonly && !context.isolated;
+  const holdScope = writes ? ctx.holds?.scope(run) : undefined;
   const modelExecution = run.modelExecution ?? {
     source: "cli-default" as const,
   };
@@ -144,8 +153,9 @@ export async function runAgent(
   const inboxPrompt = inbox.length
     ? `${prompt}\nTeam inbox delivered at this turn boundary (messages are context, not permission to violate file ownership or the task boundaries):\n${JSON.stringify(inbox)}`
     : prompt;
+  const heldBlock = holdScope ? heldPathsBlock(holdScope) : "";
   const fullPrompt = applyPonytail(
-    web ? `${inboxPrompt}\n${webBoundaries}` : inboxPrompt,
+    [inboxPrompt, ...(heldBlock ? [heldBlock] : []), ...(web ? [webBoundaries] : [])].join("\n"),
     mode,
     role,
     readonly,
@@ -232,6 +242,8 @@ export async function runAgent(
         outputSchema: context.outputSchema,
         skipGitRepoCheck: context.isolated,
         web,
+        // Group work (S3): the sandbox makes other people's holds read-only.
+        held: holdScope?.others,
       });
       // Full access is a saved setting. The confirm dialog is only in the
       // UI, so a run created from the API or from the settings file still
@@ -251,7 +263,7 @@ export async function runAgent(
       const read = agentEventReader(modelExecution.provider);
       const spawned = agentSpawn(run, role, cli.executable, timeoutMs);
       await execute(cli.executable, cli.args, {
-        input: fullPrompt,
+        input: cli.stdin?.(fullPrompt) ?? fullPrompt,
         cwd,
         signal: canary.signal,
         timeoutMs,
@@ -397,6 +409,16 @@ export async function runAgent(
     if (terminalFailure) throw new AppError(terminalFailure, 422);
     if (!answer.trim())
       throw new AppError((m) => m.run.team.noReport({ cli: label }), 422);
+    // The check that counts: the run's changes, as the turn left them, against
+    // the holds as they are now. Nothing is undone. A teammate's checkout is
+    // checked when its changes are integrated (integrateTeamTask).
+    if (writes && cwd === run.worktreePath) {
+      if (ctx.holds) {
+        const held = assertNotHeld(ctx.holds, run, await changedPaths(run), "turn");
+        if (held.length) ctx.log(run, role, heldNotice(held), { kind: "notice" });
+      }
+      delete run.heldPaths;
+    }
     if (agent) {
       agent.status = "complete";
       agent.detail = sm().run.agents.complete;
@@ -408,6 +430,10 @@ export async function runAgent(
     completed = true;
     return answer;
   } catch (error) {
+    if (writes && cwd === run.worktreePath && !signal.aborted) {
+      const held = heldPathsOf(error);
+      if (held) run.heldPaths = held;
+    }
     if (agent) {
       agent.status = "failed";
       agent.detail = sm().run.agents.failed;
@@ -521,9 +547,24 @@ async function executeTeamTask(
 ) {
   const team = run.team!;
   // A retried task keeps the previous error until its fresh first turn can
-  // explain to the teammate why the earlier attempt was rejected.
-  const previousFailure = task.error;
+  // explain to the teammate why the earlier attempt was rejected. A stop over
+  // other people's holds is told by its paths only: the person's message names
+  // the holders and their titles, text other people typed.
+  // Older persisted tasks have only a localized error. Match the fixed
+  // prefix, never try to extract paths from text containing holder metadata.
+  const legacyHeld = (["en", "zh-TW"] as const).some((locale) =>
+    withLocale(locale, () => {
+      const prefix = sm().run.local.taskHeldByOther({ items: ["\0"] }).split("\0")[0];
+      return task.error?.startsWith(prefix);
+    }),
+  );
+  const previousFailure = task.heldPaths?.length
+    ? `BELL did not add the changes because they touched files other people hold: ${task.heldPaths.join(", ")}`
+    : legacyHeld
+      ? "BELL did not add the changes because they touched files other people hold."
+      : task.error;
   delete task.error;
+  delete task.heldPaths;
   try {
     await ctx.lock(`integration:${run.id}`, async () => {
       if (signal.aborted) throw new AppError(cancelled(), 409);
@@ -606,7 +647,10 @@ async function executeTeamTask(
     task.acceptsMessages = false;
     if (signal.aborted) throw new AppError(cancelled(), 409);
     const integrated = await ctx.lock(`integration:${run.id}`, () =>
-      integrateTeamTask(run, task, signal),
+      integrateTeamTask(run, task, signal, (paths) => {
+        const held = assertNotHeld(ctx.holds, run, paths, "task");
+        if (held.length) ctx.log(run, task.owner, heldNotice(held), { kind: "notice" });
+      }),
     );
     if (signal.aborted) throw new AppError(cancelled(), 409);
     task.status = "complete";
@@ -645,6 +689,8 @@ async function executeTeamTask(
     task.error = redact(
       error instanceof Error ? error.message : sm().run.team.taskFailed,
     );
+    const held = heldPathsOf(error);
+    if (held) task.heldPaths = held;
     const member = run.agents.find((agent) => agent.id === task.owner);
     if (member) {
       member.status = "failed";
@@ -762,6 +808,9 @@ export async function executeRun(ctx: WorkbenchContext, id: string) {
       );
       team.planSummary = parsed.summary;
       team.tasks = parsed.tasks;
+      const directories = await directoryScopes(run.worktreePath, run.baseSha, team.tasks);
+      if (directories.length)
+        ctx.log(run, "lead", sm().run.team.scopeDirectories({ scopes: directories }));
       if (parsed.premise) team.premise = parsed.premise;
       else delete team.premise;
       if (revisions.length && parsed.revisionNotes)
@@ -792,6 +841,20 @@ export async function executeRun(ctx: WorkbenchContext, id: string) {
         enterPhase(run, team, "awaiting_approval");
         run.status = "awaiting_plan";
         ctx.log(run, "lead", sm().run.team.awaitingApproval);
+        return;
+      }
+      // Another contribution of this project changes files the plan covers: the person decides.
+      const { overlaps } = await planOverlaps(ctx, run);
+      // A Stop during the scans must not leave a plan marked as approved for a later retry.
+      if (signal.aborted) throw new AppError(cancelled(), 409);
+      // Someone else in the group holds files the plan covers: it waits too,
+      // and approving it is refused until the hold is released.
+      const held = ctx.holds?.conflicts(run, planScopes(run)) ?? [];
+      if (overlaps.length || held.length) {
+        enterPhase(run, team, "awaiting_approval");
+        run.status = "awaiting_plan";
+        if (overlaps.length) ctx.log(run, "lead", sm().run.local.autoOverlap, { kind: "notice" });
+        if (held.length) ctx.log(run, "lead", sm().run.local.autoHeld, { kind: "notice" });
         return;
       }
       team.approvedAt = now();

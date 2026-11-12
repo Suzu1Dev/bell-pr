@@ -48,7 +48,8 @@ problem.
 ### With no AI provider
 
 `bell-pr start` does not listen until every required check passes. With
-neither the Codex CLI nor Claude Code installed and signed in, it exits
+none of the Codex CLI, Claude Code and the Antigravity CLI installed and
+signed in, it exits
 and prints **Not ready**, then this line, before the commands that fix
 each check:
 
@@ -211,7 +212,10 @@ same.
 
 ## 3. Choose a direction
 
-**Choose a contribution direction**, or start from a recommendation. Pick
+Choose **New contribution**, or start from a recommendation. Enter the task
+goal and completion criteria first. **Additional requirements** holds the
+beneficiaries, outcome and boundaries; **AI and team settings** shows the
+current configuration and expands for changes. Pick
 one main direction (fix a bug, add a feature, improve performance, user
 experience, add tests, improve docs or maintenance) and describe:
 
@@ -261,6 +265,31 @@ Start the run with **Generate the team plan** (with plan approval) or
 - With plan approval on, you read the plan first. **Approve the plan and
   start development**, or **Send back with feedback** for a new plan (up
   to 3 times).
+- When your other contributions to the same project change files the plan
+  covers, the plan lists each of them with its status and the files it
+  shares, and each task that touches those files says **Also changed in**
+  and names them. This counts contributions in progress, in review or
+  approved (their plan while it is still to be carried out, and what their
+  working copy changed), and ones with a pull request for what it changes,
+  until their change to a file is in this run's base commit, also after a
+  squash merge. A pull request you read as merged or closed (**Read
+  feedback**) no longer counts, nor does a contribution whose working copy
+  was removed before it was published. The parts of one split never count
+  against each other or the original, and an original that was split counts
+  only for the files none of its parts holds.
+  Whichever of two overlapping changes is merged second may need its
+  conflicts resolved, so approving needs the tick **I know these overlap;
+  approve anyway**. The tick counts only for what it was given on: when the
+  overlap or the plan changes before you approve, you confirm again. A run
+  started without plan approval waits for your approval instead, also after
+  **Stop** and a retry. A Learn by hand plan's files are checked the same
+  way at **This is my plan**. BELL PR only reads its own records and
+  working copies for this, without changing them; nothing is saved or
+  sent, and the temporary copy of a working copy's Git index it reads
+  through is deleted right after.
+- A file scope the Lead writes without a trailing `/` that is a directory
+  in the base commit, such as `src`, is read as `src/`, so it covers the
+  files inside; the activity log says so.
 - **Teammates** work at the same time, each in its own Git worktree, and
   share findings through the team inbox. You can message the Lead, one
   task or everyone.
@@ -279,10 +308,20 @@ Start the run with **Generate the team plan** (with plan approval) or
   teammate reports it, and **Overview & motivation** lists it under "Setup
   this machine needs from you" with a suggested command and who reported
   it. Check the command against the project's documentation before you run
-  it; the setup checklist never runs it. Explicit **Full access** in the model
+  it; the checklist itself never runs a command. Explicit **Full access** in the model
   settings lets writable agents install required tools and use available sudo
   privileges outside the checkout. Read the [access settings](security-model.md#explicit-full-access)
-  before enabling it; read-only roles keep their restrictions.
+  before enabling it; read-only roles keep their restrictions. On a Full
+  access run in review or approved, **Let the agent set this up** opens the commands for
+  you to tick and confirm, at most 10 per turn, then hands them to one
+  Collaborate turn, which runs without the sandbox and with your account.
+  The agent is told to run only the ticked commands that match the
+  project's documentation, adding at most non-interactive flags, `sudo -n`
+  and a package-index refresh. It verifies them, reruns the checks they
+  blocked and reports each item as installed, already present, failed or
+  needs you; an item it does not report shows as no result, and a turn
+  that is stopped or fails reports none. sudo works only when it needs no
+  password, and stopping the turn does not undo installs.
 - **Run details** folds the model and the AI usage: its line names the
   agent, the model, the calls and the input and output tokens, marks
   partial reports and says when usage was not reported, never 0.
@@ -301,7 +340,10 @@ layout from before you entered it.
 Before publishing an agent contribution, the **Collaborate** tab lets you ask
 an agent to finish missing checks, add tests or fix failures in the run's working
 copy. The draft's Limitations shortcut fills the message box for you to review
-and send. Each message starts a fresh agent call with recent conversation and
+and send. The setup checklist's **Let the agent set this up** (Full access runs
+only) starts its turn once you confirm the commands; the agent is told not to
+change code in that turn, and when the turn finishes, its per-item results
+appear in the conversation and on the checklist. Each message starts a fresh agent call with recent conversation and
 the existing reports as context; it uses your own CLI account.
 
 The conversation lists changed files, commands BELL actually observed, checks
@@ -390,7 +432,8 @@ against the code.
 **Overview & motivation** leads with this contribution's brief: the premise
 check, the problem and the motivation, before and after, and how to
 validate it, in Markdown as written. The project's analysis follows as its
-background, and the directions come last. On a finished run you can check
+background in an expandable section, together with other contribution
+directions. The review action stays next to the current brief. On a finished run you can check
 the premise again (or for the first time, on a run made before premise
 checks); a changed verdict has the walkthroughs written again, and the
 explanations you have not answered from yet.
@@ -525,13 +568,24 @@ or approved that is not published, is not a Learn-by-hand run and still has
 its working copy; it is not offered on the sample run. Conflicts a sync left
 must be resolved before the split, as before approval. BELL PR cannot check
 that a part works on its own, because one part's tests may need another
-part, so run each part's tests.
+part, so run each part's tests. When a plan task of one part depends on a
+task with files in another part, the part remembers that it builds on the
+other. Publishing it while the other is not merged asks you to confirm
+(`split-order`): publish that part first. A part counts as merged when you
+read its pull request as merged or when its change is in this part's base
+commit. Deleting a part removes it from the parts that build on it, and
+splitting a part again passes what it builds on to its new parts; deleting
+those new parts makes the parts that built on them build on that part again.
 
 **The maintainer checklist** shows, row by row, the project's rules,
 whether pull requests are open to you, the linked issue, your pace in this
 repository, your own words, reviewability, disclosing AI help and the
-understanding check, each with its source and one sentence on why
-maintainers care.
+understanding check, together with file review and draft-saving status.
+Unfinished, blocked and unknown items stay visible. Completed checks are
+collapsed, with separate counts for passed and turned-off checks. Sources and
+explanations can be expanded. **View publishing checklist** jumps there from
+the editor. Commit messages and branch names are under **Commit message and
+branch**.
 
 Before you can approve, BELL PR checks what will be sent. Blocks common token formats and private keys before publishing.
 Placeholders such as `TODO:` or an empty `Fixes #` block it;
@@ -622,6 +676,9 @@ finish, it leaves the contribution unchanged.
   short note in your own words.
 
 ## Keep learning
+
+Learning notes are grouped by contribution. Sample notes can be expanded
+separately. The AI team role reference is available from **User guide**.
 
 - **Learning notes** in the sidebar collects the explanations and your
   notes from every contribution, with a search, so you can come back to a

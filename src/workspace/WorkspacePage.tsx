@@ -31,7 +31,8 @@ import type { useProjectInsights } from "../mission/useProjectInsights";
 import type { ContributionRecommendation } from "../../shared/insights";
 import type { Tab } from "../app/AppShell";
 import type { DraftEditor } from "../app/hooks/useDraftEditor";
-import type { RunActions } from "../app/hooks/useRunActions";
+import { runPath, type RunActions } from "../app/hooks/useRunActions";
+import { api, send } from "../api";
 import type { RunRounds } from "../app/hooks/useRunRounds";
 import type { Walkthroughs } from "../app/hooks/useWalkthroughs";
 import { useRunRecords } from "../app/hooks/useRunRecords";
@@ -46,9 +47,10 @@ import { checkFooter } from "./checkFooter";
 import { DraftTab } from "./DraftTab";
 import { OverviewTab } from "./OverviewTab";
 import { RunNotices, showsCheckOff, UnderstandingOffBadge, UnsandboxedBadge } from "./RunNotices";
+import { HoldRecoveryNotice } from "./HoldRecoveryNotice";
 import "./workspace.css";
 import { limitationsRequest } from "../session/limitations";
-import { sessionAwaitsAnswer, showSessionTab } from "../session/state";
+import { sessionAwaitsAnswer, sessionTurnBlock, setupHandOffShown, showSessionTab } from "../session/state";
 import "../session/session.css";
 
 const SessionPanel = lazy(() =>
@@ -345,6 +347,7 @@ export function WorkspacePage({
         </div>
       </section>
       <RunNotices run={run} queued={queued} />
+      <HoldRecoveryNotice run={run} busy={demo || busy || active || reviewRerunning} actions={actions} />
       <SplitNotices run={run} onOpen={actions.chooseRun} />
       <section className="workflow-strip" aria-label={t.progress}>
         {[
@@ -510,6 +513,22 @@ export function WorkspacePage({
                   : undefined
               }
               checkingPremise={premise.checkingPremise}
+              onSetupTurn={
+                // The Collaborate tab it opens needs both.
+                setupHandOffShown(run, demo) && onSessionRun && onSessionDraftChange
+                  ? async (commands) => {
+                      const { run: updated } = await api<{ run: Run }>(
+                        `${runPath(run.id)}/session/setup`,
+                        send("POST", { commands }),
+                      );
+                      onSessionRun(updated);
+                      setTab("session");
+                    }
+                  : undefined
+              }
+              setupTurnBlock={
+                premise.checkingPremise ? sessionMessages.blocks.active : sessionTurnBlock(run, sessionMessages.blocks)
+              }
             />
           )}
           {historical && (
@@ -626,7 +645,7 @@ export function WorkspacePage({
             <span className="footer-spark">
               <Sparkles size={15} />
             </span>
-            <span>{published ? t.footer.publishedChanges : t.footer[footer.status]}</span>
+            {(published || footer.status !== "learning") && <span>{published ? t.footer.publishedChanges : t.footer[footer.status]}</span>}
             {prTextMissing && !byHand.writing && !reviewing && run.status !== "published" ? (
               <button type="button" className="mission-text-button" onClick={() => setTab("draft")}>{t.byHand.writePr}</button>
             ) : <span className="footer-hint">{run.learnByHand ? t.footer.hintByHand : t.footer.hint}</span>}

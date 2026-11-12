@@ -1,4 +1,4 @@
-import type { SetupNeed } from "./setup-needs.js";
+import type { SetupNeed, SetupResult } from "./setup-needs.js";
 
 /**
  * One entry of the working session: the person and an agent talking about
@@ -20,8 +20,16 @@ export interface SessionMessage {
   notRun?: { check: string; reason: string }[];
   /** What the machine lacked for checks this turn could not run. */
   setup?: SetupNeed[];
+  /** A setup turn's result for each item the person handed over, in handed order; absent on other turns. */
+  setupResults?: SetupResult[];
   /** True for an agent turn that ended in an error or was stopped. */
   failed?: boolean;
+  /**
+   * Set when BELL stopped this turn because it changed files other people
+   * hold: those paths. Agents are told only these, never who holds them or
+   * why; `content` keeps the whole message for the person.
+   */
+  heldPaths?: string[];
   /**
    * Set when this turn rewrote the PR draft's validation/limitations sections (the person's
    * own PR text, so both versions are kept to show and undo by hand).
