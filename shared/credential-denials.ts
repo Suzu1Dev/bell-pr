@@ -240,7 +240,7 @@ export function sharedCredentialDenials(
 ): string[] {
   const env = options.env ?? process.env;
   const home = options.home || env.HOME || os.homedir();
-  let store: string[] = [];
+  let store: string[];
   try {
     store = credentialStoreFiles(configuredHelpers(env, home), home);
   } catch {
