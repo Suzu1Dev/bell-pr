@@ -175,8 +175,8 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   said once, long notices are split into one fact per sentence, and
   strings that were never shown are removed. One word now names one thing
   in both languages: for example "publish" (發布) for sending the PR,
-  "working directory" (工作目錄) for where a run works, and "Agent" with
-  a capital letter. Several buttons and tabs were renamed: "Activity",
+  "working directory" (工作目錄) for where a run works, "repository" in
+  Chinese text too (no longer 儲存庫), and "Agent" with a capital letter. Several buttons and tabs were renamed: "Activity",
   "Overview", "Explain it back now", "Approve and preview the PR",
   "Publish Draft PR", "Check again" and "Code changes" among them. Saved
   runs and stored messages keep the wording they were saved with.

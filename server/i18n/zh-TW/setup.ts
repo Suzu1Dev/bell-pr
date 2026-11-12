@@ -60,7 +60,7 @@ const m: Translation<typeof en> = {
     antigravityUnauthenticated:
       "Antigravity CLI 尚未登入，或登入已失效。請在終端機執行 agy 登入後再試一次。",
     cloneTimeout:
-      "複製儲存庫超過 10 分鐘，已經停止。請自行複製儲存庫，再匯入你那份複本的路徑。",
+      "複製 repository 超過 10 分鐘，已經停止。請自行複製 repository，再匯入你那份複本的路徑。",
   },
   fixes: {
     installGit: "安裝 Git",
@@ -68,7 +68,7 @@ const m: Translation<typeof en> = {
     installGh: "安裝 GitHub CLI",
     signInGh: "登入 GitHub",
     addWorkflowScope: "允許推送工作流程的修改",
-    addRepoScope: "允許推送到儲存庫",
+    addRepoScope: "允許推送到 repository",
     installCodex: "安裝 Codex CLI",
     signInCodex: "登入 Codex",
     installClaude: "安裝 Claude Code",
@@ -78,7 +78,7 @@ const m: Translation<typeof en> = {
     setGitName: "設定你的名字",
     setGitEmail: "設定你的電子郵件地址",
     setNoreplyEmail: "使用你專屬的 GitHub no-reply 地址",
-    cloneLocally: "自行複製儲存庫",
+    cloneLocally: "自行複製 repository",
     installNode: "安裝 Node.js 22 以上版本",
     dataDir: "改用你有寫入權限的資料目錄啟動",
   },
@@ -130,7 +130,7 @@ const m: Translation<typeof en> = {
     githubOffline: "已登入，但無法連上 GitHub。請檢查網路連線。",
     githubRejected: "GitHub 拒絕了已儲存的登入。請重新登入。",
     scopesMissingRepo:
-      "這個登入無法推送到儲存庫：需要 repo 或 public_repo 權限。",
+      "這個登入無法推送到 repository：需要 repo 或 public_repo 權限。",
     scopesMissingWorkflow:
       "沒有 workflow 權限時，無法推送修改 GitHub Actions 工作流程的 Pull Request。",
     scopesUnknown: "這種 token 不會回報它的權限，因此不檢查。",

@@ -32,7 +32,7 @@ const m: Translation<typeof en> = {
   project: {
     unknown: ({ project }) => `沒有 ${project} 這個專案。`,
     exists: ({ project }) => `專案 ${project} 已存在。`,
-    invalidBaseline: "整合分支必須是某個 bare Git 儲存庫中已存在的分支。",
+    invalidBaseline: "整合分支必須是某個 bare Git repository 中已存在的分支。",
     branchTaken: "已有另一個專案整合到這個分支。",
   },
   task: {
@@ -49,7 +49,7 @@ const m: Translation<typeof en> = {
   },
   claim: {
     invalidScope: ({ scope }) =>
-      `範圍「${scope}」無法可靠地和其他路徑比對，因此不能 claim。請使用儲存庫內、只含可列印 ASCII 字元的路徑。`,
+      `範圍「${scope}」無法可靠地和其他路徑比對，因此不能 claim。請使用 repository 內、只含可列印 ASCII 字元的路徑。`,
     tooManyScopes: "一個 claim 最多 200 個範圍。",
     conflict: "這些範圍內有檔案已被其他有效的 claim 持有，因此沒有取得也沒有變更任何東西。",
     unknown: "這個專案沒有這個 claim。",
@@ -62,7 +62,7 @@ const m: Translation<typeof en> = {
   integration: {
     invalidCommit: "請提供基底與變更的完整 commit id。",
     empty: "這個變更在基底之上沒有任何 commit。",
-    unknownCommit: "整合儲存庫裡沒有這個 commit。",
+    unknownCommit: "整合 repository 裡沒有這個 commit。",
     notFastForward: "這個變更不是建立在預期的基底上。",
     mergeCommit: "這個變更含有 merge commit；請整合線性的 commit 序列。",
     tooManyCommits: "這個變更超過 200 個 commit；請分成較小的部分整合。",
