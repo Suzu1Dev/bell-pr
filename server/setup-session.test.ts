@@ -213,7 +213,7 @@ test("a setup turn is refused without Full access, in Learn by hand, outside rev
   });
   try {
     await withLocale("en", async () => {
-      await assert.rejects(f.workbench.startSetupSession(f.run.id, [unsafe.command]), refused(422, /downloads something/));
+      await assert.rejects(f.workbench.startSetupSession(f.run.id, [unsafe.command]), refused(422, /downloads and runs or chains/));
       await assert.rejects(f.workbench.startSetupSession(f.run.id, ["sudo apt-get install -y other"]), refused(409, /no longer on this run's list/));
       f.run.modelExecution = { source: "cli-default" };
       await assert.rejects(f.workbench.startSetupSession(f.run.id, [safe.command]), refused(409, /Full access/));

@@ -20,7 +20,7 @@ const runStates: Record<RunStatus, string> = {
   cancelled: "cancelled",
 };
 const followUpAgentCommitted =
-  "The Agent made its own commit or switched branches; the branch is back on the pushed PR, and the edits stay in the working directory for your review.";
+  "The Agent committed or switched branches; the branch is back on the pushed PR, with its edits in the working directory for review.";
 
 /** Run pipeline messages: run logs, agent details and run errors. */
 export default {
@@ -284,7 +284,7 @@ export default {
     timeoutLimit: ({ minutes }: { minutes: number }) =>
       `waits up to ${count(minutes, "minute", "minutes")}`,
     timedOut: ({ executable, minutes }: { executable: string; minutes: number }) =>
-      `${executable} timed out after ${count(minutes, "minute", "minutes")}. A higher reasoning effort or a large project needs more time: lower the effort, choose a faster model, or raise BELLPR_AGENT_TIMEOUT_SCALE.`,
+      `${executable} timed out after ${count(minutes, "minute", "minutes")}. Lower the reasoning effort, use a faster model or raise BELLPR_AGENT_TIMEOUT_SCALE; large projects need more time.`,
   },
   /** Git, gh and agent CLI processes. */
   command: {
@@ -367,7 +367,7 @@ export default {
     tooLarge:
       "The changes are larger than 100 KB, so no code walkthrough is made automatically.",
     overLimit: ({ limit }: { limit: number }) =>
-      `This change touches more than ${limit} code files, and code walkthroughs are made automatically for the first ${limit} only; ask about the others in the Ask tab.`,
+      `Only the first ${limit} code files get an automatic walkthrough; ask about the rest in the Ask tab.`,
     incomplete: "The Agent's code walkthrough was incomplete.",
     tooEarly: "Wait for development to finish before generating code walkthroughs.",
     stopped: "The code walkthrough stopped; you can retry it.",
@@ -502,7 +502,7 @@ export default {
     stale:
       "The code changes were updated; generate a new PR draft suggestion that matches them.",
     applied:
-      "The PR draft suggestion is now in the editor. It is the model's text. Put it in your own words before you publish, and work through the checklist and checkboxes.",
+      "The model's suggestion is in the editor. Before you publish, put it in your own words and work through the checklist and checkboxes.",
     ready:
       "The PR draft suggestion is ready and your current draft is kept; review and apply it in the PR draft area.",
     stopped:
@@ -513,11 +513,11 @@ export default {
   /** Syncing a run onto the latest target branch and resolving its conflicts. */
   sync: {
     partlyPublished:
-      "An earlier publish already made a commit that may be on GitHub, so this run can no longer be synced or have a sync undone; start a new run from the latest version.",
+      "An earlier publish's commit may be on GitHub, so this run can't sync or undo a sync. Start a new run from the latest version.",
     unmarkedRun: ({ files }: { files: string[] }) =>
-      `These files conflict in a way conflict markers cannot show: ${list(files)}. One side deleted the file and the other changed it, or both changed a binary file. ${product.name} does not pick a side, so the run is unchanged. Undo this run's changes to these files or its deletions of them, sync, then make the changes again.`,
+      `Conflict markers can't show these conflicts: ${list(files)}. One side deleted a file the other changed, or both changed a binary file. ${product.name} won't pick a side, so the run is unchanged. Undo this run's changes to or deletions of these files, sync, then redo them.`,
     unmarkedPr: ({ files, branch }: { files: string[]; branch: string }) =>
-      `These files conflict in a way conflict markers cannot show: ${list(files)}. One side deleted the file and the other changed it, or both changed a binary file. ${product.name} does not pick a side, so the PR is unchanged. Merge ${branch} into the PR branch with git on your machine and push; ${product.name} takes over those commits afterwards.`,
+      `Conflict markers can't show these conflicts: ${list(files)}. One side deleted a file the other changed, or both changed a binary file. ${product.name} won't pick a side, so the PR is unchanged. Merge ${branch} into the PR branch locally and push; ${product.name} then takes over those commits.`,
     notAllowed:
       "Only runs in review, approved or waiting for plan approval can sync to the latest target branch.",
     busy: "Agents, a review or explanations are still working on this run; wait for them to finish before you sync.",
@@ -551,7 +551,7 @@ export default {
     prUpToDate: ({ branch }: { branch: string }) =>
       `Checked: the PR already contains the latest ${branch}.`,
     nothingToMerge: ({ branch }: { branch: string }) =>
-      `${branch} already contains every change of this PR, so merging would change nothing and no sync was made; the PR is unchanged, and you may want to close it.`,
+      `${branch} already has every change in this PR, so nothing was synced. You may want to close the PR.`,
     prSynced: ({
       branch,
       commit,
@@ -640,7 +640,7 @@ export default {
       round: number;
       agentCommitted: boolean;
     }) =>
-      `Follow-up round ${round} is done; review the files this round changed one by one and check the commit message before you push.${agentCommitted ? ` ${followUpAgentCommitted}` : ""}`,
+      `Follow-up round ${round} is done. Review each changed file and the commit message before you push.${agentCommitted ? ` ${followUpAgentCommitted}` : ""}`,
     stoppedReason: "This round was stopped",
     incompleteReason: "This round did not finish",
     /** `reason` is one of the reasons above or an error message. */
@@ -657,15 +657,15 @@ export default {
     answerIncomplete: "The Agent's answer about the round is incomplete",
     pushUnknown: "Cannot confirm whether this round was pushed to the PR.",
     remoteMoved: ({ branch }: { branch: string }) =>
-      `The PR branch ${branch} on GitHub has commits from outside ${product.name} (for example a suggestion applied on GitHub, a maintainer's push or an updated branch). ${product.name} does not overwrite them and cannot continue the round; handle it on GitHub or discard the round.`,
+      `The PR branch ${branch} on GitHub has commits from outside ${product.name} (such as an applied suggestion, a maintainer's push or Update branch). ${product.name} won't overwrite them and can't continue the round; handle them on GitHub or discard the round.`,
     remoteMissing: ({ branch }: { branch: string }) =>
       `The PR branch ${branch} is not on GitHub, so the round cannot be pushed.`,
     historyRewritten: ({ branch }: { branch: string }) =>
-      `The PR branch ${branch} on GitHub rewrote history that ${product.name} pushed (for example with a force push), so ${product.name} cannot continue; handle it on GitHub.`,
+      `The PR branch ${branch} on GitHub rewrote history ${product.name} pushed (for example by force push). ${product.name} cannot continue; handle it on GitHub.`,
     adoptedReport: ({ commits }: { commits: number }) =>
       `Took over ${count(commits, "commit", "commits")} made on GitHub outside ${product.name}; their changes are reviewed with the next round.`,
     adopted: ({ branch, commits }: { branch: string; commits: number }) =>
-      `Took over ${count(commits, "commit", "commits")} on the PR branch ${branch} on GitHub (for example an applied suggestion or Update branch); their changes are reviewed with the next round.`,
+      `Took over ${count(commits, "commit", "commits")} on the GitHub PR branch ${branch}, such as an applied suggestion or Update branch; the next round reviews them.`,
   },
   /** What a run says after the service restarted in the middle of its work. */
   recovery: {
@@ -685,8 +685,8 @@ export default {
     conflicts:
       "The service restarted, so resolving the conflicts stopped; the edited files are kept, and you can finish yourself or ask the Agent again.",
     round:
-      "The service restarted, so this follow-up round stopped; you can review the edits kept in the working directory, write a commit message and push, or discard the round.",
-    run: "The service restarted, so the run stopped. Its working directory is kept and you can read the diff; for a team run, retry the failed subtasks on the task board, and integrated subtasks do not run again.",
+      "The service restarted, so this round stopped. Review the edits kept in the working directory, write a commit message and push, or discard the round.",
+    run: "The service restarted, so the run stopped. Its working directory and diff are kept. Team runs can retry failed subtasks on the task board; integrated ones don't rerun.",
     task: "The service restarted, so the task stopped; its own working directory is kept, and a retry starts again from a fresh snapshot.",
   },
   /** The projects BELL works on and its own clones of them. */
@@ -697,13 +697,13 @@ export default {
     bare: "Choose a repository that has a working directory.",
     /** A local path that names no folder; `path` is absolute, with ~/ expanded. */
     pathMissing: ({ path }: { path: string }) =>
-      `There is no folder at ${path} on the computer ${product.name} runs on. Check the path; ~/ is the home directory of the user ${product.name} runs as.`,
+      `No folder at ${path} on ${product.name}'s computer. Check the path; ~/ is the home of the user it runs as.`,
     /** A local folder that Git does not see as part of a working tree. */
     notGitRepository: ({ path }: { path: string }) =>
       `${path} is not inside a Git repository. Enter the folder of a Git checkout, the one that holds its .git folder.`,
     /** A local-only project: BELL cloned it at import, and it has no GitHub source. */
     localNotUpdated:
-      `This project has no GitHub source, so ${product.name} has nothing to update its copy from. To work on newer code, update your own checkout, then remove the project here and import it again.`,
+      `This project has no GitHub source, so ${product.name} cannot update its copy. Update your own checkout, then remove and re-import the project.`,
     /** A checkout an earlier build imported in place: the person's own. */
     checkoutNotUpdated:
       `This is your own local repository, and ${product.name} never changes it; run git pull in a terminal yourself, then analyse the project again.`,
@@ -740,18 +740,18 @@ export default {
     autoOverlap:
       "This plan covers files your other contributions to this project change, so it waits for your approval instead of starting on its own.",
     overlapChanged:
-      "Your other contributions or this plan changed since you confirmed the overlap. Look at the overlap on the plan again and confirm it, then approve again.",
+      "Your other contributions or this plan changed since you confirmed the overlap. Confirm it on the plan again, then approve.",
     approvedOverlap: ({ titles }: { titles: string[] }) =>
       `Approved although ${list(titles.map((title) => `"${title}"`))} ${titles.length === 1 ? "changes" : "change"} some of the same files.`,
     publishOverlap:
-      "Your other contributions to this project change some of the same files, so whichever is merged second may need its conflicts resolved. Publish them in the order you want them merged, or combine them.",
+      "Your other contributions here change some of the same files; whichever merges second may need conflicts resolved. Publish in your preferred merge order, or combine them.",
     splitOrder:
-      "This part of a split builds on other parts that are not merged yet. Publish those first, or this pull request may fail its checks until they are merged.",
+      "This split part builds on unmerged parts. Publish those first, or this pull request may fail checks until they merge.",
     buildsOn: ({ title, prUrl }: { title: string; prUrl?: string }) =>
       prUrl ? `"${title}": published at ${prUrl}, not seen merged` : `"${title}": not published yet`,
     /** The publish dialog's block when the change meets someone else's hold (server/hold-guard.ts). */
     heldByOther:
-      "Someone else in the group holds files this change touches. Ask them to release the hold, ask a group admin to revoke it, or remove these files from the change before publishing.",
+      "Someone else holds files this change touches. Ask them to release the hold or a group admin to revoke it, or drop those files from the change.",
     /** One changed file and the hold it meets, in the dialog and in the publish refusal. */
     heldByOtherItem: ({ path, holder, title, since }: { path: string; holder: string; title: string; since: string }) =>
       `${path} — held by ${holder} for “${title}” (since ${since})`,
@@ -764,11 +764,11 @@ export default {
     taskHeldByOther: ({ items }: { items: readonly string[] }) =>
       `A teammate changed files someone else holds, so those changes were not added to the contribution. ${items.join("; ")}. Ask them to release the hold, or ask a group admin to revoke it, then try again.`,
     planHeldByOther: ({ items }: { items: readonly string[] }) =>
-      `This plan covers files someone else holds, so it can't be approved. ${items.join("; ")}. Send the plan back with feedback, or wait until the hold is released.`,
+      `Can't approve: someone else holds files this plan covers. ${items.join("; ")}. Send the plan back with feedback, or wait for the release.`,
     autoHeld:
       "This plan covers files someone else in the group holds, so it waits for your approval instead of starting on its own.",
     agentsHoldsUnknown: ({ name }: { name: string }) =>
-      `Can't check file holds because group work has stopped, so the Agents can't change files. Fix group work on the host and restart ${name}, or start ${name} without --group.`,
+      `Group work stopped, so file holds can't be checked and Agents can't change files. Fix it on the host and restart ${name}, or start ${name} without --group.`,
     heldChangedUpstream: ({ branch }: { branch: string }) =>
       `Commits on ${branch} changed files under your hold since you took it. Check those changes before publishing.`,
     heldChangedUpstreamItem: ({
@@ -822,9 +822,9 @@ export default {
   /** The human review gate and publishing: draft, file reviews, approval and push. */
   publish: {
     heldByOther: ({ items }: { items: readonly string[] }) =>
-      `Someone else holds files this change touches, so nothing was published. ${items.join("; ")}. Ask them to release the hold, or ask a group admin to revoke it.`,
+      `Not published: someone else holds files this change touches. ${items.join("; ")}. Ask them to release the hold or a group admin to revoke it.`,
     holdsUnknown: ({ name }: { name: string }) =>
-      `Can't check file holds because group work has stopped, so nothing was published. Fix group work on the host and restart ${name}, or start ${name} without --group.`,
+      `Not published: group work stopped, so file holds can't be checked. Fix it on the host and restart ${name}, or start ${name} without --group.`,
     recoveryStale: "The unfinished publish changed. Reload before recovering it.",
     recoveryNotAllowed: "Only an unfinished publish with no recorded push target or pull request can be recovered here.",
     recoveryBusy: "Work is still running on this run. Wait for it to finish before recovering the publish.",
@@ -843,7 +843,7 @@ export default {
     branchIsTarget: ({ branch }: { branch: string }) =>
       `The GitHub branch cannot be the target branch ${branch}: that would push straight to it instead of opening a PR. Use a new branch name.`,
     branchLocked: ({ branch }: { branch: string }) =>
-      `An earlier publish already pushed to the GitHub branch ${branch}. After a push the branch cannot change, so that no second PR is opened; restore the branch name or start a new run.`,
+      `An earlier publish pushed to the GitHub branch ${branch}. Changing it now would open a second PR: restore the branch name or start a new run.`,
     fileChanged:
       "This file's diff changed; reload and review the latest version before you mark it reviewed.",
     draftChanged:
@@ -863,7 +863,7 @@ export default {
     notAllReviewed:
       "Review the latest version of every changed file and mark it as reviewed, and remove the blocked files first.",
     understandingRequired:
-      "Explain the change back before you approve or publish: finish the understanding check for the latest version of the changes. You can turn the check off in Settings → Learning; runs approved without it are marked.",
+      "Explain the change back before you approve or publish: finish the understanding check for the latest changes. Settings → Learning turns it off; runs approved without it are marked.",
     prAlreadySent:
       "This PR was already published; to push new changes, start a follow-up round from the maintainer feedback.",
     branchIsTargetReapprove: ({ branch }: { branch: string }) =>
@@ -879,12 +879,12 @@ export default {
     targetMoved:
       "The target branch has new commits; first press “Sync to the latest target branch” on the PR draft tab, review, then publish.",
     targetMovedAfterCommit:
-      "The target branch has new commits. An earlier publish already made a commit that may be on GitHub, so this run can no longer be synced or have a sync undone; start a new run from the latest version.",
+      "The target branch has new commits, but an earlier publish's commit may be on GitHub, so this run can't sync. Start a new run from the latest version.",
     branchChanged: "The run's branch changed, so publishing stopped.",
     priorCommitDiffers:
-      "An earlier publish made a different commit. Return to the PR draft tab. If “Recover unfinished publish” is available, recover, review and approve again. Otherwise inspect the earlier branch or start a new run.",
+      "An earlier publish made a different commit. Use “Recover unfinished publish” on the PR draft tab if shown; otherwise inspect the earlier branch or start a new run.",
     priorMessageDiffers:
-      "The commit of an earlier publish has a different commit message, which cannot change after a push. Return to the PR draft tab. If “Recover unfinished publish” is available, recover, review and approve again. Otherwise restore the message or start a new run.",
+      "An earlier publish's commit has a different message, which can't change after a push. Use “Recover unfinished publish” on the PR draft tab if shown; otherwise restore the message or start a new run.",
     notAFork:
       "Your repository with this name is not a fork of the target project; sort out the GitHub fork first.",
     noPrUrl:
@@ -894,7 +894,7 @@ export default {
     failedAfterPush: ({ error }: { error: string }) =>
       `${error} If the push went through, the branch stays on GitHub; check the remote before you retry.`,
     roundReverts: ({ files }: { files: string[] }) =>
-      `This follow-up round puts pushed files back to their original version or deletes them: ${list(files)}. ${product.name} cannot show such changes for file-by-file review, so they are not pushed; restore these files or discard the round.`,
+      `This round reverts or deletes pushed files: ${list(files)}. File-by-file review can't show such changes, so they are not pushed. Restore these files or discard the round.`,
     roundMessageMissing: "Write this follow-up round's commit message.",
     roundMessagePlaceholders:
       "The commit message still has placeholders; complete it before pushing.",

@@ -343,7 +343,7 @@ export async function readDiff(
       throw new AppError((m) => m.run.diff.unsupportedName, 422);
     let blocked = sensitivePath(stat.path) ? held.sensitive : undefined;
     let patch = "";
-    let status: DiffFile["status"] = "modified";
+    let status: DiffFile["status"];
     let fileMode = "";
     if (stat.untracked) {
       status = "added";

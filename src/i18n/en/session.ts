@@ -33,7 +33,7 @@ const messages = {
   "copyFailed": "Could not copy the command.",
   "limitationsNotice": "The PR draft’s Limitations section lists unfinished or unverified work.",
   "limitationsAction": "Ask the Agent to address these items",
-  "limitationsIntro": "The PR draft’s Limitations section lists unfinished or unverified work. Please address what you can (code fixes, tests, checks), explain what remains and ask for what you need. Put completed verification in Validation, keep only remaining gaps and constraints in Limitations, and correct outdated claims in both sections:\n\n",
+  "limitationsIntro": "Work through the PR draft’s Limitations below: fix what you can, explain the rest and ask for what you need. Move completed checks to Validation, keep only remaining gaps and constraints in Limitations, and fix outdated claims in both:\n\n",
   "blocks": {
     "running": "The next turn can start when this one finishes.",
     "publishing": "The PR is being published. Wait until it finishes.",

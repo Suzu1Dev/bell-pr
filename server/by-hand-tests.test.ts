@@ -726,6 +726,133 @@ test("long runs of carriage returns or digits in the output keep BELL responsive
   assert.ok(gap < 1_500, `BELL's event loop stood still for ${gap} ms`);
 });
 
+test("once the run is no longer busy, a reload reads the result the save just wrote", async (t) => {
+  const f = await fixture(t);
+  await f.confirm(`node -e "console.log('3 passing')"`);
+  // Hold the save that records the result. Busy must still be set then, and
+  // state.json must not have the result until that save finishes.
+  let releaseSave = () => {};
+  let markEntered = () => {};
+  const entered = new Promise<void>((resolve) => {
+    markEntered = resolve;
+  });
+  const gate = new Promise<void>((resolve) => {
+    releaseSave = resolve;
+  });
+  t.after(() => releaseSave());
+  const save = f.store.save.bind(f.store);
+  let idleWrite: Promise<void> | undefined;
+  f.store.save = async () => {
+    const recording = (f.run.byHand?.tests?.length ?? 0) > 0;
+    if (recording && f.run.byHand?.busy?.kind === "tests") {
+      markEntered();
+      await gate;
+    }
+    const pending = save();
+    if (recording && f.run.byHand?.busy?.kind !== "tests") idleWrite = pending;
+    return pending;
+  };
+  const done = f.runOnce();
+  let reachedSave = false;
+  const endedFirst = done.then(
+    () => {
+      if (!reachedSave) assert.fail("the run finished before its result was saved");
+    },
+    (error: unknown) => {
+      if (!reachedSave) throw error;
+    },
+  );
+  const onDisk = () =>
+    (
+      JSON.parse(readFileSync(path.join(f.store.directory, "state.json"), "utf8")) as {
+        runs: { id: string; byHand?: { busy?: unknown; tests?: unknown[] } }[];
+      }
+    ).runs.find((run) => run.id === f.run.id);
+  try {
+    await Promise.race([
+      entered.then(() => {
+        reachedSave = true;
+      }),
+      endedFirst,
+    ]);
+    // Read the file directly. Loading it through Store clears a stale busy mark and writes that back.
+    assert.equal(onDisk()?.byHand?.tests, undefined);
+    assert.equal(f.run.byHand?.busy?.kind, "tests");
+  } finally {
+    releaseSave();
+  }
+  const result = await done;
+  if (idleWrite) await idleWrite;
+  const saved = onDisk();
+  assert.deepEqual(saved?.byHand?.tests?.at(-1), JSON.parse(JSON.stringify(result)));
+  assert.equal(saved?.byHand?.busy, undefined);
+});
+
+test("the by-hand result save keeps the run lock until the stored state is complete", async (t) => {
+  const f = await fixture(t);
+  await f.confirm(`node -e "console.log('3 passing')"`);
+  // Pause the save that writes the result, before it replaces state.json.
+  let releaseWrite = () => {};
+  let markWriting = () => {};
+  const writing = new Promise<void>((resolve) => {
+    markWriting = resolve;
+  });
+  const gate = new Promise<void>((resolve) => {
+    releaseWrite = resolve;
+  });
+  t.after(() => releaseWrite());
+  const save = f.store.save.bind(f.store);
+  let held = false;
+  f.store.save = async () => {
+    if (!held && (f.run.byHand?.tests?.length ?? 0) > 0) {
+      held = true;
+      markWriting();
+      await gate;
+    }
+    return save();
+  };
+  await en(() => f.byHand.runTests(f.run.id, {}));
+  // The 30s wait in finished() never names a missing lock. The job ending
+  // without this save means the write did not run inside workbench.lock.
+  const saveOrEnd = async () => {
+    for (;;) {
+      if (held) return;
+      const live = await en(() => f.byHand.liveTests(f.run.id));
+      if (!live.running) return;
+      await new Promise((resolve) => setImmediate(resolve));
+    }
+  };
+  await Promise.race([writing, saveOrEnd()]);
+  if (!held) assert.fail("save ran outside workbench.lock");
+  const statePath = path.join(f.store.directory, "state.json");
+  let entered = false;
+  const read = f.workbench.lock(f.run.id, async () => {
+    entered = true;
+    try {
+      const parsed = JSON.parse(readFileSync(statePath, "utf8")) as {
+        runs?: { id: string; byHand?: { busy?: unknown; tests?: TestRun[] } }[];
+      };
+      return parsed.runs?.find((run) => run.id === f.run.id);
+    } catch {
+      return undefined;
+    }
+  });
+  try {
+    // lock() chains tasks on a promise. A free lock runs the read on a
+    // microtask, which is before this setImmediate.
+    await new Promise((resolve) => setImmediate(resolve));
+    if (entered) assert.fail("save ran outside workbench.lock");
+  } finally {
+    releaseWrite();
+  }
+  const seen = await read;
+  const result = f.run.byHand?.tests?.at(-1);
+  assert.ok(result);
+  assert.ok(seen, "the locked read did not see a complete state");
+  assert.deepEqual(seen.byHand?.tests?.at(-1), JSON.parse(JSON.stringify(result)));
+  assert.equal(seen.byHand?.busy, undefined);
+});
+
 test("a new run starts at once when the last one shows its result and the run is no longer busy", async (t) => {
   const f = await fixture(t);
   await f.confirm(`node -e "process.exit(1)"`);

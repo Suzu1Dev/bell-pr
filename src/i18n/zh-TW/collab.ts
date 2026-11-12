@@ -66,7 +66,7 @@ const m: Translation<typeof en> = {
   keep: "保留",
   nothingHeld: ({ time }) => `截至 ${time}，沒有任何路徑被佔用。`,
   honesty:
-    `${product.name} 會拒絕重疊的佔用（包含重疊的 #Lstart-Lend 行號區間或設為防護的相依檔案）、不會發布改到他人佔用範圍的變更，並在 Agent 改到被佔用的區間或相依防護檔案時停止該任務；變更仍留在工作目錄裡。它無法攔截編輯器、終端機工具或直接 git push。`,
+    `${product.name} 會拒絕重疊佔用（含 #Lstart-Lend 行號區間與相依防護）、不發布改到他人佔用範圍的變更，Agent 一改到就停止任務（變更留在工作目錄）。它攔不住編輯器、終端機工具或直接 git push。`,
   join: {
     title: "加入這個小組",
     body: "請向管理員索取邀請碼，或直接使用你的團隊帳號登入。",

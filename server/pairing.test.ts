@@ -215,7 +215,7 @@ test("device tokens verify, record use at most once a minute, and die with a rot
   // The use is written on a queue. Wait until that write lands, not a fixed 50 ms.
   const settled = async (expected: string) => {
     const deadline = Date.now() + 2_000;
-    let value = "";
+    let value: string;
     do {
       value = await writes();
       if (value === expected) return value;

@@ -140,7 +140,7 @@ export default {
       min: string;
       below: string;
     }) =>
-      `Claude Code ${version} is outside the versions ${product.name} supports (${min} or later, before ${below}). Agents still start, but ${product.name} has not checked that this release applies its sandbox and hook settings.`,
+      `Claude Code ${version} is unsupported (${product.name} supports ${min} or later, before ${below}). Agents still start, but ${product.name}'s sandbox and hook settings are untested on it.`,
     identityMissing:
       "Not set: Git does not know your name and e-mail address, so nothing can be committed or published.",
     identityAutodetected: ({ email }: { email: string }) =>
@@ -168,7 +168,7 @@ export default {
     antigravitySandboxReady:
       "Available: Antigravity Agents that edit files run their commands in its terminal sandbox.",
     antigravitySandboxRestricted:
-      "Not available: this Linux system does not let the Antigravity CLI create user namespaces (kernel.apparmor_restrict_unprivileged_userns), so Antigravity Agents cannot edit files. docs/troubleshooting.md explains the options.",
+      "Not available: this Linux system blocks user namespaces for the Antigravity CLI (kernel.apparmor_restrict_unprivileged_userns), so Antigravity Agents cannot edit files. See docs/troubleshooting.md.",
     antigravitySandboxUnsupported:
       "Not available on this platform, so Antigravity Agents cannot edit files.",
     antigravitySandboxAllowed:

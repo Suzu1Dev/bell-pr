@@ -17,7 +17,7 @@ const runStates: Record<RunStatus, string> = {
   cancelled: "已取消",
 };
 const followUpAgentCommitted =
-  "Agent 自行建立了 commit 或切換了分支；已還原到已推送的 PR，修改保留在工作目錄供你審閱。";
+  "Agent 自行建立 commit 或切換分支，已還原到推送的 PR；修改留在工作目錄待審閱。";
 
 const m: Translation<typeof en> = {
   unsandboxedNotice:
@@ -168,7 +168,7 @@ const m: Translation<typeof en> = {
       `Claude Code 正在等另一個行程更新完登入狀態，${seconds} 秒後重試（第 ${attempt}/${total} 次）。`,
     timeoutLimit: ({ minutes }) => `最多等待 ${minutes} 分鐘`,
     timedOut: ({ executable, minutes }) =>
-      `${executable} 執行逾時（已等待 ${minutes} 分鐘）。較高的思考強度或大型專案需要更久；可降低思考強度、改用較快的模型，或提高 BELLPR_AGENT_TIMEOUT_SCALE。`,
+      `${executable} 執行逾時（${minutes} 分鐘）。請調低思考強度、換較快的模型或提高 BELLPR_AGENT_TIMEOUT_SCALE；大型專案需要更久。`,
   },
   command: {
     timedOut: ({ executable }) => `${executable} 執行逾時。`,
@@ -226,7 +226,7 @@ const m: Translation<typeof en> = {
     noFunctions: "這類檔案沒有函式可以拆解。",
     tooLarge: "差異超過 100 KB，不自動產生程式碼解說。",
     overLimit: ({ limit }) =>
-      `這次修改超過 ${limit} 個程式檔，只為前 ${limit} 個自動產生程式碼解說；其他檔案可以在「追問 Agent」詢問。`,
+      `只有前 ${limit} 個程式檔會自動產生程式碼解說；其餘請在「追問 Agent」詢問。`,
     incomplete: "Agent 回傳的程式碼解說格式不完整。",
     tooEarly: "請等待開發完成後再產生程式碼解說。",
     stopped: "程式碼解說已停止，可以重試。",
@@ -300,7 +300,7 @@ const m: Translation<typeof en> = {
     cancelled: "PR 草稿產生已取消。",
     stale: "程式碼變更已更新；請重新產生符合目前變更的 PR 草稿建議。",
     applied:
-      "已把 PR 草稿建議放進編輯區。這是模型寫的原文。發布前請改成自己的話，並處理核對清單與勾選項目。",
+      "模型的建議已放進編輯區。發布前請改成自己的話，並處理核對清單與勾選項目。",
     ready: "PR 草稿建議已準備完成，現有草稿保留；可在 PR 草稿區檢視並套用。",
     stopped:
       "PR 草稿建議產生已停止；現有草稿與已完成變更仍保留，可重新產生。",
@@ -309,11 +309,11 @@ const m: Translation<typeof en> = {
   },
   sync: {
     partlyPublished:
-      "先前的發布已建立 commit，可能已推送到 GitHub，因此不能再同步或復原同步；請從最新版本建立新任務。",
+      "先前發布的 commit 可能已在 GitHub，無法再同步或復原同步；請從最新版本建立新任務。",
     unmarkedRun: ({ files }) =>
-      `這些檔案的衝突無法用衝突標記表示：${list(files)}。原因是一邊刪除、另一邊修改，或兩邊都改了二進位檔。${product.name} 不會替你選邊，所以任務沒有變動。請先還原這次對這些檔案的修改或刪除，同步後再重做。`,
+      `衝突標記無法表示這些檔案的衝突：${list(files)}。一邊刪、一邊改，或兩邊都改了二進位檔。${product.name} 不選邊，任務未變動。請還原任務對它們的修改或刪除，同步後再重做。`,
     unmarkedPr: ({ files, branch }) =>
-      `這些檔案的衝突無法用衝突標記表示：${list(files)}。原因是一邊刪除、另一邊修改，或兩邊都改了二進位檔。${product.name} 不會替你選邊，所以 PR 沒有變動。請在本機用 git 把 ${branch} 合併進 PR 分支並推送，${product.name} 之後會接續這些 commit。`,
+      `衝突標記無法表示這些檔案的衝突：${list(files)}。一邊刪、一邊改，或兩邊都改了二進位檔。${product.name} 不選邊，PR 未變動。請在本機把 ${branch} 合併進 PR 分支並推送，${product.name} 之後會接續這些 commit。`,
     notAllowed:
       "只有審閱中、已核准或等待計畫核准的任務可以同步到最新目標分支。",
     busy: "這個任務還有 Agent、審查或解說在進行；請等它完成再同步。",
@@ -332,7 +332,7 @@ const m: Translation<typeof en> = {
       "工作目錄和已推送的 PR 內容不一致；請先還原工作目錄裡的修改再同步。",
     prUpToDate: ({ branch }) => `已確認 PR 已包含 ${branch} 的最新版本。`,
     nothingToMerge: ({ branch }) =>
-      `${branch} 已經包含這個 PR 的全部修改，合併後沒有差異，所以沒有同步；PR 沒有變動，可以考慮關閉它。`,
+      `${branch} 已經包含這個 PR 的全部修改，所以沒有同步；可以考慮關閉這個 PR。`,
     prSynced: ({ branch, commit, conflicts }) =>
       conflicts.length
         ? `已把 ${branch} 最新版本（${commit}）合併進 PR，${conflicts.length} 個檔案有衝突需要解決：${list(conflicts)}。`
@@ -377,7 +377,7 @@ const m: Translation<typeof en> = {
     noChanges:
       "Agent 沒有修改任何檔案；請看下方的說明，必要時調整選取的回饋或補充說明再試一次。",
     done: ({ round, agentCommitted }) =>
-      `第 ${round} 輪修正完成，請逐檔審閱這一輪改到的檔案，確認提交訊息後再推送。${agentCommitted ? followUpAgentCommitted : ""}`,
+      `第 ${round} 輪修正完成。請逐檔審閱變更並確認提交訊息，再推送。${agentCommitted ? followUpAgentCommitted : ""}`,
     stoppedReason: "這一輪已停止",
     incompleteReason: "這一輪未完成",
     keptEdits: ({ reason }) =>
@@ -389,15 +389,15 @@ const m: Translation<typeof en> = {
     answerIncomplete: "Agent 回傳的修正結果格式不完整",
     pushUnknown: "無法確認這一輪是否已推送到 PR。",
     remoteMoved: ({ branch }) =>
-      `GitHub 上的 PR 分支 ${branch} 已有 ${product.name} 以外的 commit（例如在 GitHub 上套用建議、維護者推送或更新分支），${product.name} 不會覆蓋，也無法接續修正；請在 GitHub 上處理，或放棄這一輪。`,
+      `GitHub 上的 PR 分支 ${branch} 有 ${product.name} 以外的 commit（例如套用建議、維護者推送或 Update branch）。${product.name} 不會覆蓋它們，也無法接續這一輪；請在 GitHub 上處理，或放棄這一輪。`,
     remoteMissing: ({ branch }) =>
       `GitHub 上找不到 PR 分支 ${branch}，無法推送修正。`,
     historyRewritten: ({ branch }) =>
-      `GitHub 上的 PR 分支 ${branch} 改寫了 ${product.name} 推送過的歷史（例如 force push），${product.name} 無法接續；請在 GitHub 上處理。`,
+      `GitHub 上的 PR 分支 ${branch} 改寫了 ${product.name} 推送的歷史（例如 force push），無法接續；請在 GitHub 處理。`,
     adoptedReport: ({ commits }) =>
       `接續了 GitHub 上 ${product.name} 以外的 ${commits} 個 commit；這些變更會在下一輪一起審閱。`,
     adopted: ({ branch, commits }) =>
-      `已接續 GitHub 上 PR 分支 ${branch} 的 ${commits} 個 commit（例如在 GitHub 上套用建議或 Update branch）；這些變更會在下一輪一起審閱。`,
+      `已接續 GitHub 上 PR 分支 ${branch} 的 ${commits} 個 commit（例如套用建議或 Update branch），會在下一輪一起審閱。`,
   },
   recovery: {
     unreadableState: ({ path, reason }) =>
@@ -410,8 +410,8 @@ const m: Translation<typeof en> = {
     conflicts:
       "服務重新啟動，解衝突已停止；已改的檔案保留，可以自行完成，或再請 Agent 處理。",
     round:
-      "服務重新啟動，這一輪已停止；工作目錄保留的修改可以審閱、寫好提交訊息後推送，或放棄這一輪。",
-    run: "服務重新啟動，任務已停止。工作目錄仍保留，可檢視差異；團隊任務可在任務板重試失敗的子任務，已整合的子任務不會重跑。",
+      "服務重新啟動，這一輪已停止。請審閱工作目錄保留的修改、寫提交訊息後推送，或放棄這一輪。",
+    run: "服務重新啟動，任務已停止。工作目錄與差異保留。團隊任務可在任務板重試失敗的子任務，已整合的不重跑。",
     task: "服務重新啟動，子任務已停止；獨立工作目錄保留，重試時會以新快照重新開始。",
   },
   repos: {
@@ -419,11 +419,11 @@ const m: Translation<typeof en> = {
     importSource: "請輸入 GitHub HTTPS URL 或本機 Repository 的絕對路徑。",
     bare: "請選擇有工作目錄的 Repository。",
     pathMissing: ({ path }) =>
-      `${product.name} 執行的電腦上沒有 ${path} 這個資料夾。請檢查路徑；~/ 代表執行 ${product.name} 的使用者的家目錄。`,
+      `${product.name} 所在電腦上沒有 ${path} 資料夾。請檢查路徑；~/ 是執行 ${product.name} 的使用者家目錄。`,
     notGitRepository: ({ path }) =>
       `${path} 不在任何 Git repository 中。請輸入 Git 專案的資料夾，也就是含有 .git 資料夾的那一個。`,
     localNotUpdated:
-      `這個專案沒有 GitHub 來源，${product.name} 無從更新它的副本。若要使用較新的程式碼，請先更新你自己的 repository，再在這裡移除專案並重新匯入。`,
+      `這個專案沒有 GitHub 來源，${product.name} 無法更新副本。請先更新你自己的 repository，再移除專案並重新匯入。`,
     checkoutNotUpdated:
       `這是你本機的 repository，${product.name} 不會更動它；請在終端機自行 git pull 後再重新分析。`,
     cloneChanged: `${product.name} 的專案副本有未預期的修改，已停止更新；請檢查後再試。`,
@@ -448,17 +448,17 @@ const m: Translation<typeof en> = {
     planOverlap: ({ titles }) =>
       `你在這個專案的其他貢獻也改了這個計畫涵蓋的檔案：${list(titles.map((title) => `「${title}」`))}。請先在計畫上查看並確認重疊，再核准一次。`,
     autoOverlap: "這個計畫涵蓋的檔案也被你在這個專案的其他貢獻修改，所以改為等待你核准，不會自動開始。",
-    overlapChanged: "你確認重疊之後，你的其他貢獻或這個計畫有了變化。請在計畫上重新查看並確認重疊，再核准一次。",
+    overlapChanged: "確認重疊後，你的其他貢獻或這個計畫有變化。請在計畫上重新確認，再核准。",
     approvedOverlap: ({ titles }) =>
       `已核准；${list(titles.map((title) => `「${title}」`))}也改了其中部分檔案。`,
     publishOverlap:
-      "你在這個專案的其他貢獻也改了部分相同的檔案，較晚合併的那一個可能需要解決衝突。請依你希望的合併順序發布，或把它們合併成一個。",
+      "你在此專案的其他貢獻改到部分相同檔案，較晚合併的可能要解衝突。請依想要的合併順序發布，或合併成一個。",
     splitOrder:
-      "這個拆分出來的部分建立在同一次拆分中尚未合併的其他部分上。請先發布那些部分，否則這個 PR 在它們合併前可能無法通過檢查。",
+      "這部分拆分依賴尚未合併的其他部分。請先發布它們，否則這個 PR 在它們合併前可能通不過檢查。",
     buildsOn: ({ title, prUrl }) =>
       prUrl ? `「${title}」：已發布於 ${prUrl}，尚未看到合併` : `「${title}」：尚未發布`,
     heldByOther:
-      "小組裡有人佔用了這次變更動到的檔案。請對方釋出、請小組管理員撤銷佔用，或先把這些檔案移出這次變更再發布。",
+      "別人佔用了這次變更動到的檔案。請對方釋出或請小組管理員撤銷，或把這些檔案移出變更。",
     heldByOtherItem: ({ path, holder, title, since }) => `${path}：由 ${holder} 為「${title}」佔用（${since} 起）`,
     holdsUnknown: ({ name }) =>
       `小組協作已停止，無法確認檔案佔用狀態。發布前請先在主機修復小組協作並重新啟動 ${name}。`,
@@ -467,10 +467,10 @@ const m: Translation<typeof en> = {
     taskHeldByOther: ({ items }) =>
       `隊友改到別人佔用的檔案，所以這些改動沒有加入這份貢獻。${items.join("；")}。請對方釋出，或請小組管理員撤銷佔用，再試一次。`,
     planHeldByOther: ({ items }) =>
-      `這個計畫涵蓋別人佔用的檔案，所以無法核准。${items.join("；")}。請附上意見退回計畫，或等對方釋出。`,
+      `計畫涵蓋別人佔用的檔案，無法核准。${items.join("；")}。請附上意見退回，或等對方釋出。`,
     autoHeld: "這個計畫涵蓋小組裡別人佔用的檔案，所以改為等待你核准，不會自動開始。",
     agentsHoldsUnknown: ({ name }) =>
-      `小組協作已停止，無法確認檔案佔用狀態，所以 Agent 不能修改檔案。請先在主機修復小組協作並重新啟動 ${name}，或改以不帶 --group 的方式啟動 ${name}。`,
+      `小組協作已停止，無法確認檔案佔用，Agent 不能修改檔案。請在主機修復小組協作後重新啟動 ${name}，或不帶 --group 啟動 ${name}。`,
     heldChangedUpstream: ({ branch }) =>
       `在你佔用期間，${branch} 上有 commit 改到你佔用的檔案。發布前請先確認這些變更。`,
     heldChangedUpstreamItem: ({ path, commits }) =>
@@ -497,9 +497,9 @@ const m: Translation<typeof en> = {
   },
   publish: {
     heldByOther: ({ items }) =>
-      `這次變更動到別人佔用的檔案，所以沒有發布。${items.join("；")}。請對方釋出，或請小組管理員撤銷這項佔用。`,
+      `變更動到別人佔用的檔案，未發布。${items.join("；")}。請對方釋出，或請小組管理員撤銷佔用。`,
     holdsUnknown: ({ name }) =>
-      `小組協作已停止，無法確認檔案佔用狀態，所以沒有發布。請先在主機修復小組協作並重新啟動 ${name}，或改以不帶 --group 的方式啟動 ${name}。`,
+      `小組協作已停止，無法確認檔案佔用，所以未發布。請在主機修復小組協作後重新啟動 ${name}，或不帶 --group 啟動 ${name}。`,
     recoveryStale: "未完成的發布紀錄已變更；請重新載入後再恢復。",
     recoveryNotAllowed: "只能恢復尚未記錄推送目標或 PR 的未完成發布。",
     recoveryBusy: "這個任務仍有作業進行中；請等完成後再恢復發布。",
@@ -518,7 +518,7 @@ const m: Translation<typeof en> = {
     branchIsTarget: ({ branch }) =>
       `GitHub 分支不能是目標分支 ${branch}，否則會直接推送到目標分支而不是建立 PR；請用新的分支名稱。`,
     branchLocked: ({ branch }) =>
-      `先前發布已推送到 GitHub 分支 ${branch}，推送後不能改分支，以免重複建立 PR。請還原分支名稱，或建立新任務。`,
+      `先前發布已推送到 GitHub 分支 ${branch}，現在改名會另開 PR。請還原分支名稱，或建立新任務。`,
     fileChanged: "檔案差異已更新；請重新載入並審閱最新內容，再標記為已審閱。",
     draftChanged: "PR 草稿已更新；請重新載入並確認最新標題與內容，再重新核准。",
     reviewAllFirst: "請先審閱每個變更檔案的最新版本、標記為已審閱，並移除被擋下的檔案。",
@@ -530,7 +530,7 @@ const m: Translation<typeof en> = {
     diffChanged: "變更內容和你核准時不同，請重新審閱與核准。",
     notAllReviewed: "請先審閱每個變更檔案的最新版本、標記為已審閱，並移除被擋下的檔案。",
     understandingRequired:
-      "核准或發布前，請先用自己的話講一遍：完成最新版本變更的理解檢查。你可以在「設定 → 學習」關閉這項檢查；未經檢查就核准的任務會被標記。",
+      "核准或發布前，請先用自己的話講一遍：完成最新變更的理解檢查。可在「設定 → 學習」關閉；未經檢查就核准的任務會標記。",
     prAlreadySent:
       "這個 PR 已經發布；要推送新的修改，請從維護者回饋開始一輪修正。",
     branchIsTargetReapprove: ({ branch }) =>
@@ -543,12 +543,12 @@ const m: Translation<typeof en> = {
     targetMoved:
       "目標分支已有新 commit；請先在 PR 草稿頁按「同步到最新目標分支」，審閱後再發布。",
     targetMovedAfterCommit:
-      "目標分支已有新 commit；先前的發布已建立 commit，可能已推送到 GitHub，因此不能再同步或復原同步；請從最新版本建立新任務。",
+      "目標分支已有新 commit，但先前發布的 commit 可能已在 GitHub，無法再同步；請從最新版本建立新任務。",
     branchChanged: "任務分支已改變，已停止發布。",
     priorCommitDiffers:
-      "先前發布已建立不同的 commit。請返回 PR 草稿頁；若顯示「恢復未完成的發布」，請先恢復再重新審閱與核准。若無此選項，請檢查先前分支或建立新任務。",
+      "先前發布已建立不同的 commit。若 PR 草稿頁顯示「恢復未完成的發布」，請按下；否則請檢查先前分支或建立新任務。",
     priorMessageDiffers:
-      "先前發布的 commit 已帶有不同的提交訊息，推送後無法更改。請返回 PR 草稿頁；若顯示「恢復未完成的發布」，請先恢復再重新審閱與核准。若無此選項，請還原提交訊息或建立新任務。",
+      "先前發布的 commit 提交訊息不同，推送後無法更改。若 PR 草稿頁顯示「恢復未完成的發布」，請按下；否則請還原訊息或建立新任務。",
     notAFork: "同名 Repository 不是目標專案的 fork，請先處理 GitHub fork。",
     noPrUrl: "GitHub 未回傳 PR URL，請先到 GitHub 確認，避免重複發布。",
     prCreated: "已建立 GitHub Draft PR。",
@@ -556,7 +556,7 @@ const m: Translation<typeof en> = {
     failedAfterPush: ({ error }) =>
       `${error} 若推送已完成，分支會保留在 GitHub；重試前請確認遠端狀態。`,
     roundReverts: ({ files }) =>
-      `這一輪把已推送的檔案改回原始版本或刪除：${list(files)}。這類修改無法在 ${product.name} 逐檔審閱，因此不會推送；請還原這些檔案或放棄這一輪。`,
+      `這一輪把已推送的檔案改回原版或刪除：${list(files)}。這類修改無法逐檔審閱，不推送；請還原這些檔案或放棄這一輪。`,
     roundMessageMissing: "請填寫這一輪的提交訊息。",
     roundMessagePlaceholders: "提交訊息還有待填寫的內容，請改好再推送。",
     roundNoPushTarget: "找不到這個 PR 的推送位置，無法推送修正。",

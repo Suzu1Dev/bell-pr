@@ -196,13 +196,13 @@ export default {
       "This search reads only GitHub's first 12 results and found no public project that matches. Try fewer keywords, a lower stars threshold or another difficulty.",
     /** What discovery sampled, in the GitHub search order the person chose. */
     samplingScope: ({ sort }: { sort: DiscoverySort }) =>
-      `Sampled: at most 6 projects (${
+      `Sampled: up to 6 projects (${
         {
           relevance: "GitHub's best matches first",
           updated: "most recently updated first",
           stars: "most stars first",
         }[sort]
-      }), up to 3 open issues each, the last 3 comments per issue. Labels do not guarantee the actual difficulty or that the work is still available. Read: only the README, CONTRIBUTING and PR template that GitHub's community profile finds in the root, .github or docs. Not read: account-wide defaults, folders of several templates, external links.`,
+      }), up to 3 open issues each, the last 3 comments per issue. Labels don't prove difficulty or that work is unclaimed. Read: README, CONTRIBUTING and PR template found by GitHub's community profile in the root, .github or docs. Not read: account-wide defaults, multi-template folders, external links.`,
     screening: ({ repository }: { repository: string }) =>
       `Checking the issues, contribution documents and maintainer replies of ${repository}.`,
     repositoryUnconfirmed: ({ repository }: { repository: string }) =>
@@ -252,7 +252,7 @@ export default {
     candidateBytesLimit:
       "The sources reached the 30 KB limit for each project; some content was not read.",
     requestLimit:
-      "Discovery reached its limit of 36 requests or 90 seconds. The results so far are kept; the sources of the remaining candidates were not fully read.",
+      "Discovery hit its limit of 36 requests or 90 seconds. Results so far are kept; remaining candidates' sources were not fully read.",
     noCandidates:
       "No candidate passed the public status and source checks, so there is no project to analyze this time. Try again later or adjust the criteria.",
   },
@@ -279,7 +279,7 @@ export default {
     readFailed: ({ label }: { label: string }) =>
       `${label} could not be read; its rules were not checked.`,
     searchScope:
-      "Rules were searched locally in the base commit: the common contribution guides, READMEs, maintainer documents and PR templates in the root, .github, docs and documentation folders; AGENTS.md and CLAUDE.md in the root; the .github/workflows files that check pull requests automatically. Links in those documents were not followed.",
+      "Rules searched locally in the base commit: common contribution guides, READMEs, maintainer documents and PR templates in the root, .github, docs and documentation; AGENTS.md and CLAUDE.md in the root; .github/workflows files that check pull requests. Links were not followed.",
     automationLimit: ({ max, remaining }: { max: number; remaining: number }) =>
       fmt.plural(remaining) === "one"
         ? `At most ${max} pull request check workflows are included; 1 more workflow was not checked.`
@@ -293,7 +293,7 @@ export default {
     noRemote:
       "No verifiable github.com project URL is available, so maintainer discussions and account-wide default rules on GitHub were not checked.",
     metadataFailed:
-      "Maintainer discussions and account-wide information could not be read from GitHub, possibly because of permissions, the connection or API limits; this does not mean there are no further rules.",
+      "Couldn't read maintainer discussions or account-wide information from GitHub (perhaps permissions, the connection or API limits). More rules may still apply.",
     defaultsTruncated:
       "The file list of the account-wide .github repository was truncated; its default rules were not fully checked.",
     defaultsNotPublic:
@@ -303,7 +303,7 @@ export default {
     defaultsFailed:
       "The default rules in the account-wide .github repository could not be read; whether any of them apply was not checked.",
     maintainerSample:
-      "Maintainer preferences come from the 3 most recently updated merged PRs, with up to 5 comments and 5 reviews each. A merged PR is not an endorsed rule; check whether each preference applies.",
+      "Maintainer preferences: the 3 most recently updated merged PRs, up to 5 comments and 5 reviews each. A merged PR isn't an endorsed rule; check that each applies.",
     maintainerComment: ({
       number,
       association,
@@ -343,7 +343,7 @@ export default {
       line: string;
       title: boolean;
     }) =>
-      `${title ? "The subject is the PR title. " : ""}${label} asks for an AI trailer (“${quote}”), so the message ends with ${line}, which names the Agent that wrote this change.`,
+      `${title ? "The subject is the PR title. " : ""}${label} asks for an AI trailer (“${quote}”), so the message ends with ${line}, naming the Agent.`,
     ruleQuoteMismatch:
       "A rule quoted in the PR draft does not match its source. Generate it again.",
     templateNotUsed:
@@ -360,7 +360,7 @@ export default {
       `The PR draft put to-dos or unfilled template fields into the description that is sent to GitHub (${fmt.plural(count) === "one" ? "line" : "lines"} ${lines}). Generate it again.`,
     /** Put above the summary when the Linux defaults stand in for rules not found. */
     provisionalLinuxPolicy:
-      "Looking up the project's sources was limited or incomplete, so the Linux contribution writing principles are used for now. Check the project's own rules before you publish.",
+      "Source lookup was limited or incomplete, so Linux contribution writing principles stand in. Check the project's rules before you publish.",
     noSafeDiff: "There is no safe code diff to write a PR from yet.",
     diffTooLarge:
       "The diff is over the 100 KB limit for PR drafts. Split the change and try again.",

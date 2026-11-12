@@ -280,7 +280,7 @@ test("the server listens on 127.0.0.1 unless --host says otherwise, and warns th
     const address = running.server.address() as AddressInfo;
     assert.equal(address.address, "127.0.0.1");
     assert.equal(resolveConfig({}, {}).host, "127.0.0.1");
-    assert.equal(lines.some((line) => line.includes("explicit setting")), false);
+    assert.equal(lines.some((line) => line.includes("not only on 127.0.0.1")), false);
     const token = readApiToken(dataPaths(directory).apiToken);
     assert.match(token ?? "", tokenPattern);
     assert.equal(lines.some((line) => token !== undefined && line.includes(token)), false);

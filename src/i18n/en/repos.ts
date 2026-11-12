@@ -25,7 +25,7 @@ const repos = {
     delete: "Delete project",
     deleteLabel: ({ name }: { name: string }) => `Delete project: ${name}`,
     deleteConfirm: ({ name }: { name: string }) =>
-      `Delete ${name} from ${product.name}? Its contributions, their notes and the project analysis are deleted too. A copy ${product.name} downloaded is removed; a folder you imported from this computer stays where it is.`,
+      `Delete ${name} from ${product.name}? Its contributions, notes and analysis go too. A downloaded copy is removed; an imported local folder stays.`,
     deleteYes: "Delete",
     deleteNo: "Keep it",
     deleting: "Deleting…",
@@ -48,7 +48,7 @@ const repos = {
      * Shown to Windows browsers under localPathHint. Worded as a condition:
      * the server may also run in Docker or on another computer.
      */
-    wslPathHint: `If ${product.name} runs inside WSL2 on this computer, use the path in your Linux distribution: a Windows folder is under /mnt/c/, for example /mnt/c/projects/repository.`,
+    wslPathHint: `If ${product.name} runs in WSL2 on this computer, use the Linux path, such as /mnt/c/projects/repository for a Windows folder.`,
     callout:
       "GitHub projects are downloaded to this computer. Development then happens in separate working directories (Git worktrees), and the original stays as it is.",
     later: "Not now",

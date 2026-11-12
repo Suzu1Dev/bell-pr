@@ -1,7 +1,8 @@
 /**
  * Freeing disk space and deleting data: a run's working files (its Git
- * worktree, its teammates' checkouts, its branch in BELL's own clone and
- * its sync ref), whole runs, projects and all data, plus the retention
+ * worktree, its teammates' checkouts, its branch in BELL's own clone,
+ * its sync ref and a publish-recovery ref whose commit is already
+ * reachable elsewhere), whole runs, projects and all data, plus the retention
  * period that frees finished runs' files on its own.
  *
  * Nothing outside the data directory is deleted. In a repository the
@@ -13,6 +14,7 @@ import { lstat, readdir, rm, truncate } from "node:fs/promises";
 import type { Stats } from "node:fs";
 import path from "node:path";
 import { git } from "./process.js";
+import { prHasCommit, remoteBranchHead } from "./pr-branch.js";
 import { AppError, withRunLocale, type Repository, type Run } from "./types.js";
 import { activeFollowUp } from "../shared/followups.js";
 import { dropSplitLinks } from "../shared/split.js";
@@ -183,10 +185,122 @@ const findRepository = (ctx: WorkbenchContext, id: string) =>
   ctx.store.data.repos.find((repo) => repo.id === id);
 
 /**
+ * Deletes `refs/bellpr/publish-recovery/<run>/<commit>` when that commit is
+ * already reachable from the remote branch, the PR head, or another ref.
+ * A missing ref is not an error. A commit that may be the only copy is kept.
+ */
+export async function releasePublishRecovery(
+  ctx: WorkbenchContext,
+  run: Run,
+  repositoryPath?: string,
+) {
+  const cwd =
+    (repositoryPath && (await exists(repositoryPath)) && repositoryPath) ||
+    (run.worktreePath && (await exists(run.worktreePath)) && run.worktreePath) ||
+    undefined;
+  if (!cwd) return;
+  const prefix = `refs/bellpr/publish-recovery/${run.id}/`;
+  let listed: string;
+  try {
+    listed = (
+      await git(cwd, ["for-each-ref", "--format=%(refname) %(objectname)", prefix])
+    ).stdout;
+  } catch (error) {
+    log.info(
+      `Keeping ${prefix}: could not list publish-recovery refs (${error instanceof Error ? error.message : "unknown error"})`,
+    );
+    return;
+  }
+  for (const line of listed.split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    const space = trimmed.indexOf(" ");
+    const ref = trimmed.slice(0, space);
+    const commit = trimmed.slice(space + 1);
+    let reachable: boolean;
+    try {
+      reachable = await recoveryCommitReachable(ctx, run, cwd, ref, commit);
+    } catch (error) {
+      log.info(
+        `Keeping ${ref}: could not check whether ${commit} is reachable (${error instanceof Error ? error.message : "unknown error"})`,
+      );
+      continue;
+    }
+    if (!reachable) {
+      log.info(
+        `Keeping ${ref}: ${commit} is not reachable from the remote branch, the PR head, or any other ref`,
+      );
+      continue;
+    }
+    // The old value keeps a ref that was replaced while reachability was checked.
+    // A missing ref exits 1, which is the same result as deleting it once.
+    try {
+      await git(cwd, ["update-ref", "-d", ref, commit], { allowedCodes: [0, 1] });
+    } catch (error) {
+      log.info(
+        `Keeping ${ref}: could not delete it (${error instanceof Error ? error.message : "unknown error"})`,
+      );
+    }
+  }
+}
+
+/** True when something other than `ref` can still reach `commit`. */
+async function recoveryCommitReachable(
+  ctx: WorkbenchContext,
+  run: Run,
+  cwd: string,
+  ref: string,
+  commit: string,
+) {
+  const holders = (
+    await git(cwd, [
+      "for-each-ref",
+      "--format=%(refname)",
+      "--contains",
+      commit,
+    ])
+  ).stdout
+    .split("\n")
+    .map((name) => name.trim())
+    // A sync snapshot is deleted with the workspace, so it is not another copy.
+    .filter(
+      (name) => name && name !== ref && !name.startsWith("refs/bellpr/sync/"),
+    );
+  if (holders.length) return true;
+  const branch = run.publishedBranch ?? run.branch;
+  const here = { ...run, worktreePath: cwd };
+  if (run.headRepository && branch) {
+    try {
+      const remoteHead = await remoteBranchHead(here);
+      if (
+        remoteHead &&
+        (
+          await git(
+            cwd,
+            ["merge-base", "--is-ancestor", commit, remoteHead],
+            { allowedCodes: [0, 1] },
+          )
+        ).code === 0
+      )
+        return true;
+    } catch {
+      // A failed remote read is not proof the commit is safe to drop.
+    }
+  }
+  if (!run.prUrl) return false;
+  try {
+    return await prHasCommit(ctx, here, commit);
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Removes the run's working files; the caller holds the run lock and has
  * checked that the run is not active. Under the repository lock:
  * `git worktree remove --force`, the teammates' checkouts, `git worktree
- * prune`, the refs/bellpr/sync/<run> ref, and the run's branch when the
+ * prune`, the refs/bellpr/sync/<run> ref, publish-recovery refs whose
+ * commit is already reachable elsewhere, and the run's branch when the
  * repository is BELL's own clone under <data>/repositories. Returns the
  * bytes freed.
  */
@@ -231,6 +345,9 @@ async function removeWorkspace(
       run.branch !== run.baseBranch
     )
       await quietly(["branch", "-D", "--", run.branch]);
+    // After the branch delete, so a branch this cleanup removes does not
+    // count as another copy of the commit.
+    if (repository) await releasePublishRecovery(ctx, run, repository);
   };
   await (repo ? ctx.lock(`repository:${repo.id}`, work) : work());
   return bytes;
@@ -238,7 +355,8 @@ async function removeWorkspace(
 
 /**
  * Frees a finished run's disk space: its Git worktree, its teammates'
- * checkouts, its branch in BELL's own clone and its sync ref. The run, its
+ * checkouts, its branch in BELL's own clone, its sync ref and a
+ * publish-recovery ref whose commit is already reachable elsewhere. The run, its
  * reports, notes and explanations stay; the diff then answers 410
  * `workspace_removed`. Refused (409) while the run is still working or has
  * a follow-up round open, and when its worktree lies outside the data
@@ -296,9 +414,15 @@ export async function removeRun(ctx: WorkbenchContext, id: string) {
   await ctx.lock(id, async () => {
     if (runActive(ctx, run))
       throw new AppError((m) => m.storage.workspace.busy, 409);
+    const repo = findRepository(ctx, run.repoId);
     // A worktree outside the data directory is left where it is.
     if (!run.workspaceRemovedAt && (await ownsWorkspace(ctx, run)))
-      await removeWorkspace(ctx, run, findRepository(ctx, run.repoId));
+      await removeWorkspace(ctx, run, repo);
+    else if (repo)
+      await ctx.lock(`repository:${repo.id}`, () =>
+        releasePublishRecovery(ctx, run, repo.path),
+      );
+    else await releasePublishRecovery(ctx, run);
     // A part that built on a deleted part builds on what that part was split from, if it is still
     // there and is not one of its own originals, which hold its files too. Decided before any link
     // is dropped: dropping them removes the splitFrom links an ancestry is read through.

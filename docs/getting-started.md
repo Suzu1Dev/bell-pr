@@ -385,7 +385,8 @@ When the team is done, the run waits for your review in **Code changes**:
   example of the behavior before and after, what changed and why, the
   concepts involved, what to check, another way it could have been done and
   a question to test yourself. When the example is a sequence, its before
-  and after are also drawn as steps, with the steps that differ marked.
+  and after are also drawn as steps, with the steps that differ marked, and
+  the example opens by itself.
 - **Ask**: click a line (Shift for several) and ask the agent about it.
   Answers are saved with the run.
 - **Reviews**: the Lead's summary and the Reviewer's and Test analyst's
@@ -640,7 +641,10 @@ and PRs, including closed PRs. If those checks succeed and find none, it
 keeps your files and draft, backs up the old commit locally and returns the
 contribution to review. Review and approve again before publishing. Recovery
 does not publish anything; if a branch or PR exists, or the checks cannot
-finish, it leaves the contribution unchanged.
+finish, it leaves the contribution unchanged. After a later publish succeeds,
+or when the run is removed, that backup is deleted only if the commit is
+already reachable from the remote branch, the pull request, or another ref.
+If it may be the only copy, it stays.
 
 ## 8. After publishing
 

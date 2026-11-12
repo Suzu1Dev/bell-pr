@@ -220,7 +220,7 @@ test("maintainer statements require verified repository URLs and roles; merged P
     );
     assert.ok(
       context.warnings.some((warning) =>
-        warning.includes("已合併不等於規範認可"),
+        warning.includes("已合併不代表認可"),
       ),
     );
     assert.ok(
@@ -310,7 +310,7 @@ test("in English, source labels and warnings carry no Han", async () => {
     );
     assert.ok(
       context.warnings.some((warning) =>
-        warning.startsWith("Rules were searched locally"),
+        warning.startsWith("Rules searched locally"),
       ),
     );
     assert.ok(
@@ -320,7 +320,7 @@ test("in English, source labels and warnings carry no Han", async () => {
     );
     assert.ok(
       context.warnings.some((warning) =>
-        warning.includes("A merged PR is not an endorsed rule"),
+        warning.includes("A merged PR isn't an endorsed rule"),
       ),
     );
     for (const text of [
@@ -439,7 +439,7 @@ test("missing public defaults are distinct from failed or incomplete metadata lo
     });
     assert.ok(
       unknown.warnings.some((warning) =>
-        warning.includes("不能據此判定沒有額外規範"),
+        warning.includes("仍可能有其他規範"),
       ),
     );
     assert.ok(unknown.sources.some((source) => source.path === "README.md"));

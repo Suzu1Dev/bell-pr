@@ -268,7 +268,7 @@ test("a file Ada holds stops Ben's publish with 409 heldByOther, and nothing is 
   // The dialog shows a block, item by item.
   const check = heldOf(await s.preflight(s.devices.ben));
   assert.equal(check?.kind, "block");
-  assert.match(check.message, /^Someone else in the group holds files this change touches\./);
+  assert.match(check.message, /^Someone else holds files this change touches\./);
   assert.equal(check.details.length, 1);
   assert.match(check.details[0], /^src\/api\/users\.ts — held by Ada for “Users API” \(since .+\)$/);
 
@@ -279,7 +279,7 @@ test("a file Ada holds stops Ben's publish with 409 heldByOther, and nothing is 
   ]);
   assert.match(
     reply.json.error,
-    /^Someone else holds files this change touches, so nothing was published\. src\/api\/users\.ts — held by Ada for “Users API” \(since .+\)\. Ask them to release the hold, or ask a group admin to revoke it\.$/,
+    /^Not published: someone else holds files this change touches\. src\/api\/users\.ts — held by Ada for “Users API” \(since .+\)\. Ask them to release the hold or a group admin to revoke it\.$/,
   );
   assert.equal(await s.head(), before);
   assert.equal(s.current().status, "approved");
@@ -491,7 +491,7 @@ test("while group work is stopped, a repository in the group does not publish: 5
   assert.match(check.message, /^Can't check file holds because group work has stopped\./);
   const reply = await s.publish(s.devices.ben);
   assert.equal(outcome(reply), "503 holdsUnknown");
-  assert.match(reply.json.error, /so nothing was published\. .*or start BELL PR without --group\.$/);
+  assert.match(reply.json.error, /^Not published: group work stopped.*or start BELL PR without --group\.$/);
   assert.equal(s.current().status, "approved");
   assert.equal(await s.pushes(), 0);
 });
@@ -502,12 +502,12 @@ test("the refusal and the dialog's block speak the request's language", async (t
   await s.ready(s.write("src/api/users.ts", "export const users = ['ben'];\n"));
   const zh = { "x-bell-locale": "zh-TW" };
   const check = heldOf(await s.preflight({ ...s.devices.ben, ...zh }));
-  assert.match(check?.message ?? "", /^小組裡有人佔用了這次變更動到的檔案。/);
+  assert.match(check?.message ?? "", /^別人佔用了這次變更動到的檔案。/);
   assert.match(check?.details[0] ?? "", /^src\/api\/users\.ts：由 Ada 為「Users API」佔用（.+ 起）$/);
   const reply = await s.publish(s.devices.ben, {}, zh);
   assert.equal(outcome(reply), "409 heldByOther");
   assert.match(
     reply.json.error,
-    /^這次變更動到別人佔用的檔案，所以沒有發布。src\/api\/users\.ts：由 Ada 為「Users API」佔用（.+ 起）。請對方釋出，或請小組管理員撤銷這項佔用。$/,
+    /^變更動到別人佔用的檔案，未發布。src\/api\/users\.ts：由 Ada 為「Users API」佔用（.+ 起）。請對方釋出，或請小組管理員撤銷佔用。$/,
   );
 });

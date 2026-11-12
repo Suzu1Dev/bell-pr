@@ -275,7 +275,7 @@ test("a plan over Ada's hold does not start on its own, cannot be approved while
   ]);
   assert.match(
     refused.json.error,
-    /^This plan covers files someone else holds, so it can't be approved\. src\/api — held by Ada for “Users API” \(since .+\)\. Send the plan back with feedback, or wait until the hold is released\.$/,
+    /^Can't approve: someone else holds files this plan covers\. src\/api — held by Ada for “Users API” \(since .+\)\. Send the plan back with feedback, or wait for the release\.$/,
   );
   assert.equal(s.run(id).status, "awaiting_plan");
   assert.equal(s.run(id).team?.approvedAt, undefined);
@@ -456,7 +456,7 @@ test("while group work is stopped, a write turn does not start: 503 holdsUnknown
   assert.equal(stopped.failed, true);
   assert.equal(
     stopped.content,
-    "Can't check file holds because group work has stopped, so the Agents can't change files. Fix group work on the host and restart BELL PR, or start BELL PR without --group.",
+    "Group work stopped, so file holds can't be checked and Agents can't change files. Fix it on the host and restart BELL PR, or start BELL PR without --group.",
   );
   assert.equal(s.turns.some((turn) => turn.role === "session"), false);
 });

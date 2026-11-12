@@ -18,7 +18,7 @@ const m: Translation<typeof en> = {
     blankLine: "空白行",
     listLabel: "差異的各行",
     keyboardHint: ({ button }) =>
-      `用方向鍵在各行之間移動，按住 Shift 再按方向鍵可選取多行；按 Enter 前往選取範圍的「${button}」，按 Esc 清除選取。`,
+      `方向鍵在各行間移動，Shift 加方向鍵選取多行；Enter 前往選取範圍的「${button}」，Esc 清除選取。`,
     hunkLabel: ({ oldLine, newLine }) =>
       `從舊版第 ${oldLine} 行、新版第 ${newLine} 行起的變更`,
     hunkLabelIn: ({ oldLine, newLine, context }) =>
@@ -155,7 +155,7 @@ const m: Translation<typeof en> = {
     rerun: "重新執行審查",
     rerunBusy: "正在重新審查…",
     rerunNote:
-      "依工作目錄目前的差異重新執行 Reviewer 與 Test analyst（唯讀，會使用 CLI 用量）。報告只是建議，不會改變已審閱與核准狀態。",
+      "依目前的差異重新執行 Reviewer 與 Test analyst（唯讀，計入 CLI 用量）。報告只是建議，不影響審閱與核准。",
     emptyTitle: "這個貢獻還沒有審查報告",
     emptyBody:
       "Lead 整合、Reviewer 與 Test analyst 完成後，報告全文會放在這裡。",
@@ -163,7 +163,7 @@ const m: Translation<typeof en> = {
       "這些是獨立的靜態審查：只讀程式碼，沒有執行。每份報告都顯示全文。",
     orderTitle: "Lead 建議的閱讀順序",
     orderIntro:
-      "常見的讀法是先看定義與介面、再看呼叫端，測試放最前或最後；Lead 在整合摘要中說明了這次為何這樣排。左側檔案清單可切換「依建議順序」。",
+      "常見讀法：先定義與介面，再呼叫端，測試放最前或最後。整合摘要裡有 Lead 的排序理由。左側檔案清單可切換「依建議順序」。",
     staticBadge: "靜態審查",
     mentions: ({ count }) => `本報告提到此檔 ${count} 處`,
     noMentions: "此報告未直接提到本檔",
@@ -298,9 +298,9 @@ const m: Translation<typeof en> = {
     loadingDetail: "讀取這個 commit 的變更…",
     omitted: ({ count }) => `另外 ${count} 個檔案超過顯示上限，請到 GitHub 查看完整差異。`,
     unpublished:
-      `還沒發布 PR，所以修改仍未提交。${product.name} 會在發布時建立第一個 commit。之後每一輪修正、每次同步目標分支，都會在這裡多一個 commit。`,
+      `還沒發布 PR，變更尚未提交。發布時 ${product.name} 才提交；之後每一輪修正、每次同步各加一個 commit。`,
     unpublishedDemo:
-      "示範資料還沒有發布 PR，所以還沒有 commit。下面是示範 PR 在初次發布、一輪修正與同步目標分支之後的歷程。",
+      "示範沒有 PR，也就沒有 commit。下方是初次發布、一輪修正與同步目標分支後的歷程。",
     publishedDemo: "示範 PR 的 commit：初次發布、一輪修正與同步目標分支。沒有送出任何內容到 GitHub。",
     loading: "讀取 commit 歷程…",
     intro: ({ count }) => `PR 分支上的 ${count} 個 commit，依時間順序；標籤說明它在 ${product.name} 裡的來源。`,
