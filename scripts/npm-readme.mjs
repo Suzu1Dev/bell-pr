@@ -53,7 +53,9 @@
  *     (`npm:bell-pr@1.0.0` while the release is 1.0.1), code included:
  *     the packed READMEs keep a hand-written pin. A pin inside a generated
  *     region is skipped; the mise install command is rendered from
- *     publishedInstallVersion and can lead package.json;
+ *     publishedInstallVersion and can lead package.json.
+ *     render-generated-regions --check fails when that version is a lower
+ *     semver than package.json or the Homebrew formula;
  *   - README.md or README.zh-TW.md, rewritten as --pre would, still has a
  *     relative path, or, rewritten with the current or a stand-in
  *     `homepageUrl`, links to a path that site/ does not serve.
