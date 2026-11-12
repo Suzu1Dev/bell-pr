@@ -35,6 +35,8 @@ export interface TeamTask {
   status: TeamTaskStatus;
   report?: string;
   error?: string;
+  /** Paths of other people's holds that stopped the task; what a retry tells the teammate instead of `error`. */
+  heldPaths?: string[];
   worktreePath?: string;
   /** Git directory of that checkout, recorded when the worktree was created. */
   gitDir?: string;

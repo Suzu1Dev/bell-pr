@@ -12,6 +12,7 @@ import path from "node:path";
 import { assertRunAgentAllowed } from "./codex-guard.js";
 import { git, redact } from "./process.js";
 import { readDiff } from "./git.js";
+import { heldPathsOf } from "./hold-guard.js";
 import { AppError, withRunLocale, type Run } from "./types.js";
 import type { TeamCheck } from "../shared/team.js";
 import {
@@ -335,7 +336,9 @@ async function runFollowUp(
         : controller.signal.aborted
           ? "cancelled"
           : "failed";
-      round.error = dirty ? sm().run.followUp.keptEdits({ reason }) : reason;
+      // A held stop already says the edits stay; they cannot be pushed until the hold goes.
+      const held = !controller.signal.aborted && heldPathsOf(error);
+      round.error = dirty && !held ? sm().run.followUp.keptEdits({ reason }) : reason;
       if (dirty) await ctx.diff(run.id).catch(() => undefined);
       else await restoreParentMessage(run, round).catch(() => undefined);
       run.status = dirty ? "review" : "published";
@@ -390,6 +393,7 @@ export async function discardFollowUp(ctx: WorkbenchContext, id: string) {
       run.status = "published";
       delete run.approvedFingerprint;
       delete run.error;
+      delete run.heldPaths;
       // Reading the pushed message back needs the checkout, so the round's goes.
       const { commitMessage: _round, ...draft } = run.draft;
       run.draft = draft;
@@ -425,6 +429,7 @@ export async function discardFollowUp(ctx: WorkbenchContext, id: string) {
     run.status = "published";
     delete run.approvedFingerprint;
     delete run.error;
+    delete run.heldPaths;
     const files = await ctx.diff(id);
     // The checkout is the pushed head again, whose files were all reviewed
     // before it was pushed, except files changed by commits taken over from

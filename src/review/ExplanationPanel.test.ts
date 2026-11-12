@@ -446,8 +446,7 @@ test("an English render of the explanation tab has no Han in its own text", () =
     for (const text of [
       'aria-label="Code learning assistant"',
       "Understand every change",
-      "What changed, and why",
-      'aria-label="Learning panel"',
+        'aria-label="Learning panel"',
       "Explanation</button>",
       "Reviews</button>",
       "Ask</button>",

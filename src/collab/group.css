@@ -1,0 +1,132 @@
+/* Group work (#/group). The frame, cards, fields, buttons, path chips, the
+   two-column grid, the answer boxes and the dialog are existing classes. */
+/* Start work is first in the DOM, so it is above the board when narrow. In
+   two columns it takes the right-hand one. */
+@media (min-width: 1251px) {
+  .group-page .team-board-content > :first-child {
+    grid-area: 1 / 2;
+  }
+}
+/* People, then Invite. */
+.group-people {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+/* A ring means "viewing now"; the label says it too. */
+.group-people .here {
+  border: 2px solid var(--color-brand-500);
+}
+/* The label, on hover and on focus: under the strip and never wider than
+   it, so a long name wraps and never leaves the page. */
+.group-people .profile-avatar:is(:hover, :focus)::after {
+  content: attr(aria-label);
+  position: absolute;
+  inset: 100% auto auto 0;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-inverse);
+  color: var(--color-text-inverse);
+  overflow-wrap: anywhere;
+}
+/* Held now: one row per hold, oldest first. Rows never change places. */
+.group-holds {
+  padding: 0;
+  overflow: hidden;
+  list-style: none;
+}
+.group-hold {
+  display: grid;
+  grid-template-columns: 32px 8.5rem minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  border-left: 3px solid transparent;
+  overflow-wrap: anywhere;
+}
+.group-hold + .group-hold {
+  border-top: 1px solid var(--color-border-subtle);
+}
+/* Yours: an accent edge, next to the word "You". */
+.group-hold.mine {
+  border-left-color: var(--color-accent-500);
+}
+/* A new row fades from a tint in 1.5 s. The reduced-motion rule in
+   styles.css removes every animation, this one included. */
+.group-hold.changed {
+  animation: group-mark 1.5s ease-in;
+}
+@keyframes group-mark {
+  from {
+    background: var(--color-accent-100);
+  }
+}
+/* "since 13:40" under the holder's name; "No longer held" in a row that stays. */
+.group-hold small {
+  display: block;
+  color: var(--color-text-muted);
+}
+.group-hold :is(.mission-evidence-paths, .run-list-confirm) {
+  margin: var(--space-2) 0 0;
+}
+/* A state shown as one card (join, first set-up, stopped, off) stays readable. */
+.group-page > .settings-card {
+  max-width: 30rem;
+}
+/* A card that opens with a field: the card's own padding is enough above it. */
+.group-page .settings-card > .field-label:first-child {
+  margin-top: 0;
+}
+/* The invite code in the dialog, in large type. */
+.group-page .modal code {
+  font-size: var(--text-2xl);
+  text-align: center;
+}
+.group-dependencies {
+  min-width: 0;
+  margin: var(--space-4) 0;
+  padding: 0;
+  border: 0;
+}
+.group-dependencies > .field-help:first-of-type {
+  margin-top: 0;
+}
+.group-selected,
+.group-release {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+.group-selected {
+  justify-content: space-between;
+  margin-top: var(--space-2);
+}
+.group-release {
+  justify-content: flex-end;
+  max-width: 20rem;
+}
+.group-release .button {
+  min-height: 44px;
+}
+@media (max-width: 760px) {
+  .group-hold {
+    grid-template-columns: 32px minmax(0, 1fr) auto;
+  }
+  .group-what {
+    grid-area: 2 / 1 / auto / -1;
+  }
+  .group-release {
+    grid-column: 1 / -1;
+    max-width: none;
+  }
+  .group-release .button {
+    flex: 1 1 9rem;
+  }
+  /* Touch targets. */
+  .group-page :is(.button, .icon-button, .text-input, select, .group-people > *, .draft-task-items label) {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}

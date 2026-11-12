@@ -94,37 +94,6 @@ export function HomePage({
         <Logo variant="wordmark" size={44} className="home-logo" />
         <h1 tabIndex={-1}>{t.tagline}</h1>
       </header>
-      <section className="home-section" aria-labelledby="home-start-heading">
-        <h2 id="home-start-heading">{t.start.heading}</h2>
-        <div className="home-choices">
-          {choices.map(({ id, icon: Icon, title, text, onClick }) => (
-            <button
-              key={id}
-              type="button"
-              className={`home-choice home-choice-${id}`}
-              onClick={onClick}
-            >
-              <Icon size={22} aria-hidden="true" />
-              <span className="home-choice-text">
-                <strong className="home-choice-title">{title}</strong>
-                <span>{text}</span>
-              </span>
-            </button>
-          ))}
-        </div>
-      </section>
-      {!presenting && (
-        <section className="home-section" aria-labelledby="home-setup-heading">
-          <h2 id="home-setup-heading">{t.setup.heading}</h2>
-          <SetupChecklist
-            {...doctor}
-            variant="summary"
-            detailsHref="#/settings/environment"
-            maskUser={maskUser}
-            maskPath={maskPath}
-          />
-        </section>
-      )}
       {recent.length > 0 && (
         <section className="home-section" aria-labelledby="home-continue-heading">
           <h2 id="home-continue-heading">{t.continue.heading}</h2>
@@ -157,6 +126,38 @@ export function HomePage({
           </ul>
         </section>
       )}
+      <section className="home-section" aria-labelledby="home-start-heading">
+        <h2 id="home-start-heading">{t.start.heading}</h2>
+        <div className="home-choices">
+          {choices.map(({ id, icon: Icon, title, text, onClick }) => (
+            <button
+              key={id}
+              type="button"
+              className={`home-choice home-choice-${id}`}
+              onClick={onClick}
+            >
+              <Icon size={22} aria-hidden="true" />
+              <span className="home-choice-text">
+                <strong className="home-choice-title">{title}</strong>
+                <span>{text}</span>
+              </span>
+            </button>
+          ))}
+        </div>
+      </section>
+      {!presenting && (
+        <section className="home-section" aria-labelledby="home-setup-heading">
+          <h2 id="home-setup-heading">{t.setup.heading}</h2>
+          <SetupChecklist
+            {...doctor}
+            variant="summary"
+            detailsHref="#/settings/environment"
+            maskUser={maskUser}
+            maskPath={maskPath}
+          />
+        </section>
+      )}
+
     </section>
   );
 }

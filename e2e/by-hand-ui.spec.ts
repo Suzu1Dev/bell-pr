@@ -23,6 +23,7 @@ import byHandText from "../src/byhand/write/i18n/en";
 import byHandZh from "../src/byhand/write/i18n/zh-TW";
 import { getSampleDiscoveryJob } from "../src/demo/discovery";
 import discovery from "../src/i18n/en/discovery";
+import modals from "../src/i18n/en/modals";
 import workspace from "../src/i18n/en/workspace";
 import { findOverflow } from "./helpers/overflow";
 import { startReadyServer } from "./helpers/ready-server";
@@ -592,7 +593,7 @@ test("the task dialog says why BELL won't publish a learn-by-hand run on a banni
     await dialog.locator("#task-repo").selectOption(banRepoId);
     // A banning project is never a reason to preselect Learn by hand.
     await expect(dialog.getByRole("radio", { name: mode.agents })).toBeChecked();
-    await expect(page.getByRole("dialog", { name: "Hand your idea to your agent team." })).toBeVisible();
+    await expect(page.getByRole("dialog", { name: modals.newTask.title })).toBeVisible();
     await dialog.getByText(mode.hand).click();
     // The person writes it: the dialog no longer hands it to the agent team.
     await expect(page.getByRole("dialog", { name: mode.start })).toBeVisible();

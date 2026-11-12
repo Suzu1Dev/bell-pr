@@ -5,7 +5,7 @@ const fmt = formatters("zh-TW");
 
 const m: Translation<typeof en> = {
   eyebrow: "LEARN BY CONTRIBUTING",
-  title: "讓看懂的程式碼，成為你的經驗。",
+  title: "學習筆記",
   intro: "每個任務審查時產生的解說都會留在這裡，可以跨任務回顧同一個觀念。",
   aiNote:
     "這些解說由審查各項變更的 AI agent 產生，可能有誤；採用前請對照程式碼確認。",

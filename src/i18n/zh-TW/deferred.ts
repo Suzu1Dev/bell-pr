@@ -6,6 +6,7 @@
 import type { Translation } from "../../../shared/i18n/locale";
 import type en from "../en/deferred";
 import about from "./about";
+import collab from "./collab";
 import discovery from "./discovery";
 import efficiency from "./efficiency";
 import learning from "./learning";
@@ -25,6 +26,7 @@ const messages: Translation<typeof en> = {
   about,
   legal,
   team,
+  collab,
 };
 
 export default messages;

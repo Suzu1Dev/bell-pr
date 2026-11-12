@@ -6,10 +6,20 @@ person at the host, and teammates who reach it from
 that BELL PR is set up as one group, and each person joins the group under
 a name, as a member or an admin.
 
-This is the first part of group work. Today it is switched on, set up, and
-people are invited from the command line and the API. The Group page comes
-later: nothing in the app shows the group yet, and no page changes when
-group work is on. Group work **does not protect anything at write time**;
+Today it is switched on, set up, and people are invited from the command
+line and the API. Once people have joined, an admin adds repositories to
+the group, and each person says which files and folders they are working on
+by taking a [hold](#holds). BELL PR refuses a hold that meets one already
+held, and one whose work
+[waits for other work](#work-that-waits-for-other-work) that is not done
+yet. Everyone who follows that repository's
+[live feed](#the-live-feed) hears of each change. The app shows it on
+[the Group page](#the-group-page), where people also set up, invite, join
+and take holds. BELL PR also
+[publishes no change that touches someone else's hold](#publishing-over-someone-elses-hold),
+and [its agents are held to the same holds](#bell-prs-agents-and-someone-elses-hold).
+A hold still **does not stop a tool outside BELL PR, an editor or a push**
+from writing inside it or outside it.
 [What is promised and what is not](#what-is-promised-and-what-is-not) lists
 what you can rely on today.
 
@@ -73,6 +83,108 @@ directory has to be on a local file system
 why), and one that supports hard links: a strict lock is written aside and
 linked into place.
 
+## The Group page
+
+With group work on, the sidebar of the app has a **Group** item, and the
+page is at `#/group`. Without the switch the sidebar has no such item, and
+that address says that group work is off and shows the line that turns it
+on.
+
+**What it shows.** One repository of the group at a time. At the top are
+its name (a picker when the group has more than one, or when an admin can
+add another) and a circle for each person, with the first two characters
+of their name (three circles and a count when there are more than four
+people); a ring marks the people who are looking at this board now.
+**Held now** has one row for each [hold](#holds), oldest first: who holds
+it and since when, its title and its paths. Your own rows say **You** and
+have **Finish & release** and **Release only**
+([Release and revoke](#release-and-revoke)). An admin has **Revoke** on
+the other rows, and the page asks once before it revokes. A hold that ends while the pointer or the
+keyboard focus is in the list keeps its row, marked "No longer held",
+until both have left, so that no button moves under them. When
+[group work has stopped](#when-group-work-stops), the page says so and
+shows no board.
+
+**Set up.** In a browser that uses the install token (the one
+`bell-pr open` opens on the host), the page shows **Start group work
+here**. Type your name and press **Start group work**: the page sets the
+group up, as `bell-pr group setup` does, and you join as an admin. In a
+group that is set up already, it only adds you as one more admin. Then
+choose the group's first repository under **Add a repository**, among the
+ones this BELL PR has ([the group's repositories](#the-groups-repositories)
+says what adding does); an admin adds further ones from the picker at the
+top. While the group has no repository, the page says so and asks again
+every 10 seconds, so the first repository shows without a reload. Once a
+board is on the page, a repository that someone else adds shows in the
+picker after the page is loaded again. A paired device cannot set the
+group up, and its page says where that is done.
+
+**Invite.** The **Invite** button is there for an admin, and for anyone
+who has joined in a browser that uses the install token. Type the person's
+name, tick **Admin** when they are to be one, and press **Create code**.
+The code is shown once, with the time it stops working and a button that
+copies it. [Invite people](#invite-people) has the rules.
+
+**Join.** On a paired device that has not joined, the page shows **Join
+this group**: type the code and press **Join**. A refusal (a wrong or used
+code, too many wrong ones, a full group) shows under the field in the
+server's words. The browser keeps the participant token in its storage
+for this address, so the page knows you the next time. A person who has
+been removed is asked to join again.
+
+**What the form's answer means.** Under **Start work**, type a title and
+the paths, one per line. A moment after the last key the page asks
+[`check`](#check-first), and it asks again whenever the board changes, so
+the box under the paths updates by itself:
+
+- "Nothing in the way, in what BELL checked": at the time shown, no hold
+  met the paths typed. That is an answer and not a hold: someone can take
+  a path a moment later. **Take hold** then takes the hold, or it is
+  refused whole and the box says who holds what, after "Not taken" when
+  the refusal reaches the page before the board with that hold does.
+- "**Ada** holds `src/api` — Fix pagination, since 13:40": that hold is in
+  the way. A hold of your own is in the way too ("You hold …"). **Take
+  hold** is off until the paths change or the hold ends.
+- "Cannot be held: …" names the typed paths that
+  [cannot be held](#paths-that-cannot-be-held). **Take hold** is off.
+- No box: no path is typed, or the page has no answer for the paths and
+  the board it shows now, as right after a key or a change of the board,
+  and while it is reconnecting. **Take hold** is off then, and while the
+  title is empty. A refusal of another kind (`slowDown`, for example)
+  shows as the server's sentence, and a check that got no answer says that
+  BELL PR cannot be reached.
+
+**Work that waits.** Under **Must finish first**, tick the tasks of this
+repository that must be finished before yours starts, up to 50: the list
+has the tasks held now and the finished ones. While one of them is not
+finished, **Take hold** is refused and the page shows the server's
+sentence; untick it, or wait until its holder presses **Finish &
+release**. A hold taken after other tasks says "Started after …" on its
+row. **Finish & release** on your own row says the task is done, so work
+that waits for it can start; **Release only** frees the paths and leaves
+the task not done for good
+([Work that waits for other work](#work-that-waits-for-other-work)).
+
+**The chip's three words.** The chip next to the repository says how the
+board on the page is kept current, and "as of" says when it was last
+confirmed:
+
+- **Live**: a request of the page waits on the
+  [live feed](#the-live-feed), and the board changes as soon as the host
+  answers.
+- **Updating every 10 s**: the host had no place for one more waiting
+  request (`tooManyWaiters`). The page asks every 10 seconds instead, and
+  tries a waiting request again after a minute.
+- **Reconnecting**: the last request failed, or had no answer after 40
+  seconds. The page keeps the board it has, with its "as of" time, tries
+  again after 1, 2 and 5 seconds and then every 15, and the form gives no
+  answer until a request succeeds. A page that has no board yet says
+  "Reconnecting" in its place.
+
+**What stays API-only.**
+[Using the same identity on another device](#use-the-same-identity-on-another-device)
+and [removing a person](#remove-a-person) are not on the page.
+
 ## Set it up
 
 On the computer that runs BELL PR:
@@ -116,7 +228,7 @@ Give the code to that person over a channel you trust.
 
 ## Join
 
-There is no page for joining yet. Joining is one API request from the
+Joining is one API request from the
 device that joins, with the app token that device already uses (on the
 host, the install token in `<data dir>/api-token`):
 
@@ -164,6 +276,12 @@ A group admin sends `POST /api/collab/people/<id>/remove` with the body
   their participant token, and a code they made for themself, stop
   working. A code made at the host with the install token is the host's,
   whoever typed the command, and keeps working.
+- Whatever the person holds ends, in every repository of the group: each
+  [hold](#holds) is revoked in the admin's name. `revoked` in the answer
+  counts them. Their requests waiting on a [live feed](#the-live-feed) end
+  at once. A hold they were taking at that moment does not stay: it is
+  revoked with the others, or refused with 403 `notJoined`. Sending the
+  removal again is harmless: it ends whatever that person still holds.
 - Removing does not unpair anything by itself: a removed person on a
   paired device can still use everything else in that BELL PR. With
   `"unpair": true`, the paired device the person first joined from is
@@ -177,9 +295,461 @@ A group admin sends `POST /api/collab/people/<id>/remove` with the body
   `bell-pr devices revoke <id>`.
 - An admin cannot remove themself (409), and a removal cannot be undone.
   Invite the person again; they join as a new person with a new id.
-- A person's id is in the answer to their join and in `collab.json` on the
-  host. No request lists the people of a group yet.
-- `revoked` in the answer is always 0 today.
+- A person's id is in the answer to their join, in `collab.json` on the
+  host and, once the group has a repository, in `people` of its board
+  (the [live feed](#the-live-feed)).
+
+## The group's repositories
+
+Holds are taken in a repository of the group. An admin adds one that this
+BELL PR already has (imported on the Repositories page).
+`GET /api/collab/projects` lists the group's repositories (`projects`).
+For an admin the answer also names the repositories of this BELL PR that
+can still be added (`addable`, each with its `repoId`) and how full the
+group's record is (`storage`; see [Limits](#limits)).
+
+```sh
+curl -X POST http://127.0.0.1:4311/api/collab/projects \
+  -H "Authorization: Bearer <app token>" \
+  -H "x-bell-participant: <participant token>" \
+  -H "Content-Type: application/json" \
+  -d '{"repoId":"<repoId>"}'
+```
+
+Adding a repository makes the group its own bare copy of it, in
+`<data dir>/collab/<project id>.git`: the default branch of BELL PR's clone
+as it is at that moment, with that branch's commits and files, and no other
+branch and no tag. The answer (201) is `{ "project": { "id", "name" } }`;
+every later request names the repository by that `id` (`p-…`).
+
+- The copy is made once and never refreshed. Nothing reads it after the
+  repository is added: a hold is a record of paths, and a path that is not
+  in the repository yet can be held.
+- A copy that fails, or takes more than 3 minutes, is answered
+  `cloneFailed` (500, or 504 when it took too long). Git's own words go to
+  the log on the host only, the folder is deleted again, and the
+  repository is not in the group. Two cases leave something behind: BELL
+  PR stopped by force in the middle of a copy can leave a half-made folder
+  under `collab/` in the data directory (disk space only; the repository
+  can be added again), and when the copy was made but the group's own file
+  could not be written, the repository's entry stays in the group's record
+  and counts towards the 100.
+- A repository cannot be taken out of the group again, and it keeps the
+  name it had when it was added (its first 200 characters). Deleting it
+  from BELL PR (**Delete repository**, or **Delete all data**) leaves it
+  in the group under that name, with its holds and its bare copy.
+
+What cannot be added:
+
+- a repository this BELL PR does not have (400 `unknownRepository`); import
+  it first;
+- a repository that is already the group's, or is being copied right now
+  (409 `alreadyAdded`);
+- a repository whose default branch is not in BELL PR's clone, or whose
+  default branch has a name the group's record does not take (more than
+  200 characters, a first character that is not a letter or a digit, or
+  any character but letters, digits, `.`, `_`, `/` and `-`): it is not in
+  `addable`, and adding it is answered `cloneFailed`;
+- a repository beyond the 100 a group can have (409 `full`).
+
+## Holds
+
+A hold says that one person is working on these files and folders of a
+repository, for one task. Everyone in the group can take one, in any of the
+group's repositories.
+
+### Take a hold
+
+```sh
+curl -X POST http://127.0.0.1:4311/api/collab/projects/<project id>/work \
+  -H "Authorization: Bearer <app token>" \
+  -H "x-bell-participant: <participant token>" \
+  -H "Content-Type: application/json" \
+  -d '{"title":"Fix pagination","scopes":["src/api","docs/api.md"]}'
+```
+
+- `title` says what the work is: 1 to 120 characters. A control character
+  in it becomes a space, and so does a character that embeds, overrides or
+  isolates the direction of text (U+202A to U+202E, U+2066 to U+2069). A
+  direction mark (U+200E, U+200F, U+061C) stays as it is.
+- `scopes` are the paths: 1 to 50 files or folders, each relative to the
+  top of the repository, with `/` between its parts, at most 300
+  characters. A leading `./` and one trailing `/` are dropped.
+  [Paths that cannot be held](#paths-that-cannot-be-held) lists what is
+  refused.
+- `dependsOn` is optional: the tasks of this repository that must be done
+  before this work starts, at most 50 task ids (each the `taskId` of an
+  earlier hold). More than 50 is refused with 400 `tooManyDependencies`. [Work that waits for other work](#work-that-waits-for-other-work)
+  says when it is refused.
+
+The answer (201) is
+`{ "hold": { claimId, taskId, title, holder, scopes, fence, since, dependsOn? }, "changing": [{ runId, title, status, owners, paths }] }`.
+Keep `claimId` and `fence`: releasing the hold needs both. Each hold makes
+its own task, and `taskId` names it. `dependsOn` is there only when the
+work named tasks: each as `{ taskId, title }`. `changing` lists other
+people's unfinished runs of this repository whose changed files, active
+plans or unmerged pull requests already meet the held paths (`owners`
+names the active group members who own the run, or `[]` when none of them
+started it); taking the hold still goes ahead. BELL PR also records the
+default branch's current commit in `collab.json` when the hold is taken,
+so commits that land on the target branch while you hold those paths can
+be [reported at sync and publish](#changes-on-the-target-branch-under-your-hold).
+
+**A folder holds everything inside it.** A hold of `src/api` meets a hold
+of `src/api/users.ts`, of `src/api` and of `src`. **Letter case is
+ignored** (for the letters A to Z): `SRC/API/Users.ts` meets `src/api`.
+
+A hold has no time limit. It stays, across restarts of BELL PR, until it is
+released or revoked, or the person who holds it is removed.
+
+### When a path is already held
+
+BELL PR refuses a hold that meets one already held: 409 `conflict`, with
+`conflicts` naming, for each held path in the way, the path, the holder's
+name, the title and since when. A hold is taken whole or refused whole:
+when one path is in the way, nothing is held. A person's own hold is in the
+way too. To hold more paths, release the hold and take a new one with all
+of them; between the two, anyone else can take them.
+
+When two people ask for paths that meet at the same moment, one gets the
+hold and the other is refused. A task made for the refused one can stay in
+the group's record ([Limits](#limits)); no board shows it.
+
+### Check first
+
+`POST /api/collab/projects/<project id>/check` with `{ "scopes": […] }`
+asks the same question and takes nothing. The answer (200) is
+`{ asOf, invalid, meets, changing }`: `meets` lists each held path in the
+way with its `claimId`, `taskId`, title and the holder's name, `invalid`
+lists the asked paths that cannot be held, and `changing` lists other
+people's unfinished runs whose files, active plans or unmerged pull
+requests already meet the valid asked paths. The answer is true at
+`asOf`; someone can take a path a moment later.
+
+### Release and revoke
+
+- **Release.** The person who holds it sends
+  `POST /api/collab/projects/<project id>/holds/<claimId>/release` with
+  `{ "fence": <fence> }`. Someone else's hold is answered 403 `notHolder`,
+  a fence that is not this hold's 409 `staleFence`, and a hold that has
+  already ended 409 `ended`. With `"done": true` as well, the release also
+  says that the hold's task is done, so work that
+  [waits for it](#work-that-waits-for-other-work) can start. A refused
+  release marks nothing done.
+- **Revoke.** An admin ends anyone's hold with
+  `POST /api/collab/projects/<project id>/holds/<claimId>/revoke` and the
+  body `{}`. A member is answered 403 `adminOnly`.
+
+A hold that ended is no longer on the board, and neither is its task: the
+board shows only what is held now. Its paths are free for a new hold.
+
+### Work that waits for other work
+
+A `work` request can name, in `dependsOn`, tasks of the same repository
+that must be done before its work starts. A task is done once the person
+who held it released it with `"done": true`. A hold released without it,
+or revoked, leaves its task not done for good: a task is never held again,
+and nothing else marks it done. Releasing a hold to take a wider one makes
+a new task too. Work that waits for such a task has to name the new one.
+
+- An id that is not a task of this repository (a task of another
+  repository, an id nobody made, or one longer than the 64 characters of
+  a task id) is refused with 400 `dependencyUnknown`, and `unknown` lists
+  those ids.
+- A task that is not done yet is refused with 409 `dependencyPending`, and
+  `pending` lists each one with its `taskId`, its `title` and `held`:
+  whether someone holds it now.
+- Both are asked after the paths' shape and before a `conflict`. When
+  either refuses, nothing is made or held, and the request still counts
+  toward the `work` limit.
+- An id named twice counts once.
+- Such work and a release with `"done": true` take turns in a repository.
+  Work sent while that release is under way is asked once the release has
+  answered, so it finds the task done, or, when the release failed, not
+  done. Work that names no task, and a release without `done`, do not
+  wait.
+
+Once every task it names is done, the same request is taken. Nothing tells
+the person who waits, but the [live feed](#the-live-feed) changes when the
+hold they wait for ends.
+
+Tasks cannot wait for each other in a cycle. Each hold makes a new task,
+it can name only tasks made before it, and what a task waits for never
+changes. Done is what the task's holder said, nothing more: BELL PR does
+not check that the work was merged, pushed or integrated. A hold that was
+taken stays held when something it waited for changes.
+
+### Publishing over someone else's hold
+
+BELL PR publishes no change that touches a path someone else in the group
+holds: neither a run's first pull request nor a follow-up round. It asks
+right before anything is committed or pushed, about every file the change
+adds, changes or deletes (a moved file counts at both of its paths), with
+the rules between two holds: a folder holds everything inside it, and
+letter case is ignored. The publish dialog shows the files as a block,
+each with the holder, the hold's title and since when.
+`POST /api/runs/<id>/publish` is answered 409 with `reason: "heldByOther"`
+and `held`, a list of `{ path, claimId, holder, title, since }`. The block
+cannot be ticked or overridden. Once the holder releases the hold, or an
+admin revokes it, the same change publishes.
+
+Only repositories of the group are checked, and only someone else's hold
+stops a change. Who you are:
+
+- With the `x-bell-participant` header, the person whose token it is. An
+  unknown token, or one of someone removed, is answered 403 `notJoined`.
+- Without it (the app sends it once this browser has joined), everyone in
+  the group who joined from the device that asks. The install token counts as one device:
+  everyone who joined at the host.
+
+While group work [has stopped](#when-group-work-stops), BELL PR cannot
+tell who holds what, so nothing in a repository of the group is
+published: the dialog shows a block, and the publish request is answered
+503 with `reason: "holdsUnknown"`. A repository outside the group
+publishes as before, as long as `collab.json` still says which
+repositories are in the group. Fix group work and restart BELL PR, or
+start it without `--group`: then nothing is checked.
+
+### BELL PR's agents and someone else's hold
+
+A run belongs to the people who started it, worked out as for publishing:
+the person of the `x-bell-participant` token, or else everyone in the
+group who joined from the device that started it. BELL PR keeps them with
+the run (at most 100), so they stay its owners after a restart. A run nobody in the
+group started (a device where nobody joined) has no owners, and then
+every hold counts as someone else's. In a repository of the group, an
+unknown token, or one of someone removed, is answered 403 `notJoined` and
+no run is started. In a repository outside the group such a token refuses
+nothing and the run starts without owners, as long as `collab.json` still
+says which repositories are in the group.
+
+In a repository of the group, a run's agents are held to the holds of
+everyone else:
+
+- **The agents are told.** Every turn that may change files gets the
+  paths other people hold, and the paths its own people hold, read again
+  for each turn. Only the paths: not who holds them or why.
+- **Held paths are read-only in the agent's sandbox.** A Codex or Claude
+  Code turn that may change files gets the paths other people hold as
+  read-only, read again for each turn, so writing, deleting or renaming
+  them fails as the agent tries. That covers each spelling of the path
+  the checkout has (holds ignore ASCII letter case) and a held file that
+  does not exist yet, when its folder does. Claude Code's edit tools are
+  refused those paths with or without its sandbox; its shell commands only
+  inside the sandbox, and only for paths that already exist. Left to the
+  check after the turn: a held path that goes through a symbolic link or
+  whose folder does not exist yet, a spelling the checkout does not have
+  yet, a renamed folder above a held path (the held file can be changed
+  at its new place), Claude Code's edit tools on a path with a
+  parenthesis, a backslash or a line break in it, Codex with full access,
+  and Antigravity.
+- **A plan over someone else's hold waits.** A plan that would start on
+  its own waits for approval instead, with a notice that it covers files
+  someone else holds. Approving a plan that covers such a file is
+  answered 409 with `reason: "heldByOther"` and `held`, as for
+  publishing. Send the plan back with feedback, or approve it once the
+  hold is released.
+- **A teammate's change is checked before it is added.** When a
+  teammate's task is integrated, its changed files are compared with the
+  holds right after the check that they stay inside the task. A change
+  over someone else's hold is not added: the run stops with the files,
+  and the teammate's own checkout keeps the change.
+- **A turn in the run's checkout is checked after it ends.** After a
+  turn from the **Collaborate** tab, a follow-up round or a turn that
+  resolves sync conflicts, every file the run changed since its base (new
+  files too, and a moved file at both of its paths) is compared with the
+  holds of that moment. A turn that fails for another reason is not
+  checked then: what it changed is checked after the next turn that
+  completes, and at publish.
+  A change over someone else's hold stops the turn with the files.
+  Nothing is undone: the changes stay in the checkout for review, a
+  follow-up round keeps them without a commit message, and BELL PR saves
+  the conflicting paths on the run as `heldPaths` (paths only, never
+  holder names or hold titles; exposed on `GET /api/runs/<id>` and
+  cleared once a later write turn finishes without conflict, a follow-up
+  round is discarded, or an unpublished sync is undone without remaining
+  conflicts). The person sees who holds each file; the run's later turns,
+  a retried teammate task, and the PR draft written from the run, are
+  told only the paths.
+- **Recovering a stopped checkout.** The page of a run that stopped this
+  way lists the files with two actions, **Put these files back** (**Put
+  this file back** for one file; after one question) and **Check again**.
+  They are two API routes:
+  - `POST /api/runs/<id>/holds/restore` with `{}` puts the files of the
+    run's recorded `heldPaths` (changed, added, deleted or moved) back to
+    the run's review base (`baseSha`, or `parentCommit` of an open
+    follow-up round), leaving every other changed file untouched,
+    clearing the hold-stop state, and returning `{ run, restored }`. A
+    changed file that came under someone else's hold only after the stop
+    is not put back with them: the answer is then 409 `heldByOther`,
+    `heldPaths` becomes those files, the run's log says what was put
+    back, and the run page lists the new files to be confirmed. A run saved before `heldPaths` existed gets every changed
+    file put back that meets someone else's active hold. When reviewable
+    changes remain on a completed solo or team run that a hold stopped as
+    `failed`, its status returns to `review`. A checkout BELL PR cannot
+    show as a diff (more than 150 changed files, for one) is answered 422
+    after the files were put back, and the stop stays until the diff can
+    be read and **Check again** is pressed.
+  - `POST /api/runs/<id>/holds/recheck` with `{}` re-checks the
+    checkout's changed files against the current holds without modifying
+    any file: it answers 409 `heldByOther` (updating `heldPaths`) while a
+    conflict remains, and 200 `{ run }` once the hold is released or
+    revoked, clearing the hold-stop state and returning a run that a
+    hold stopped as `failed` to `review` when reviewable changes remain.
+
+Turns that only read or review, and turns that work outside the run's
+checkout, are not checked. While group work
+[has stopped](#when-group-work-stops), turns that may change files, plan
+approvals, `holds/restore` and `holds/recheck` in a repository of the
+group are answered 503 with
+`reason: "holdsUnknown"`, and a plan that would start on its own fails;
+turns that only read go on. Without `--group`, and in a repository
+outside the group, nothing is checked.
+
+### Changes on the target branch under your hold
+
+Edits pushed straight to GitHub outside BELL PR, or merged from another
+pull request while you hold a path, are reported to the holder when BELL PR
+sees them on the run's target branch (`<hold base>..<target>`):
+
+- **At sync.** `POST /api/runs/<id>/sync` (for both unpublished runs and
+  published pull requests) checks first-parent commits on the target branch
+  since each of your active holds was taken. When any of those commits
+  touched a path under your hold, the response includes `heldChanges`
+  (`[{ path, commits }]`, with 7-character commit hashes), the **Target
+  branch** panel lists the files and commits, and a notice is added to the
+  run's log. Undoing an unpublished sync clears its recorded `heldChanges`.
+- **Before first publish.** `GET /api/runs/<id>/preflight` and
+  `POST /api/runs/<id>/publish` add a `confirm` check
+  `held-changed-upstream` under **File holds** whenever commits on the
+  target branch changed files under your hold since you took it, even if
+  your own run did not touch that file. Publishing requires confirming that
+  item in `acknowledged`.
+
+Only your own active holds are checked (resolved by `x-bell-participant` or
+by device, as for publishing), and only file paths and short commit hashes
+are shown — never commit subjects or other people's holds. BELL PR reads
+the newest 500 first-parent commits on the target branch since each hold;
+an older change is not reported. While group work
+[has stopped](#when-group-work-stops) a sync still runs and reports no
+changes under your holds; the check before the first publish runs again
+once group work is back.
+
+### What a hold does not do
+
+A hold is a record the group can see, the reason a second hold that meets
+it is refused, the reason BELL PR does not
+[publish a change over it](#publishing-over-someone-elses-hold), and a
+[limit for BELL PR's agents](#bell-prs-agents-and-someone-elses-hold). It
+**does not stop every write as it happens**: an agent's sandbox refuses
+most writes to held paths, any other change an agent makes is found when
+its turn ends (after a turn that failed: when the next one completes, or
+at publish), an editor or a tool outside BELL PR is not checked, and
+nothing is locked in a checkout or on GitHub. A push made outside BELL PR
+is not checked at all. A hold says nothing about a path nobody named, and
+nothing about two changes in different files that do not work together.
+
+## The live feed
+
+`GET /api/collab/projects/<project id>/feed` answers with one repository's
+board: the people of the group, what is held (oldest first) and the ids of
+the people looking at that board now (`present`). Each answer carries
+`epoch`, `version` and `seen`. A caller that sends them back with
+`wait=<seconds>` (0 to 25) is answered as soon as the board or `present`
+changes, and with 204 when nothing changed in that time, so asking again
+in a loop follows the board as it changes. A person counts as present
+while a request of theirs waits and for 40 seconds after their last one;
+presence is best effort. One person can have 2 requests waiting, over all
+repositories, and the group 64; one more is answered 429 `tooManyWaiters`,
+while a request with `wait=0` is still answered. BELL PR also keeps at
+most 8 feed answers of one person that have not left it yet, because
+their connections do not take them: until one leaves or its connection
+closes, every further feed request of that person is answered 429
+`tooManyWaiters`, with `wait=0` too. A caller that reads each answer
+before it asks again never meets that limit. After
+BELL PR restarts the `epoch` is another one, and the next answer has the
+whole board again.
+
+## Paths that cannot be held
+
+A hold names files and folders inside the repository. These are refused
+with 400 `invalidScope`, and `invalid` in the answer lists them as they
+were sent:
+
+- the whole repository: an empty path, `.` or `/`;
+- an absolute path, and a path with `..`, `.` or nothing between two `/`;
+- a backslash, a control character, any character outside printable ASCII
+  (an accented or a Chinese letter, for example), and any of
+  `: * ? " < > | { }`;
+- a part that begins or ends with a space, ends with a dot, or has `~`
+  before a digit (a Windows short name such as `PROGRA~1`);
+- `.git` as a part, in any letter case;
+- the files BELL PR holds back from review, in any letter case: `.env` and
+  `.env.*` (but not `.env.example`, `.env.sample` or `.env.template`),
+  `.npmrc`, `.pypirc`, `id_rsa`, `id_ed25519`, `credentials` and
+  `credentials.*`, `.DS_Store`, a path that ends in `.pem`, `.p12`, `.pfx`
+  or `.key`, and anything in `node_modules`, `.bellpr`, `.ssh`, `.aws` or
+  `.codex`;
+- a part named exactly `prototype`, `constructor` or `__proto__`. A file
+  under such a folder cannot be named by itself; hold a folder above it;
+- a path of more than 300 characters. Such a path is not repeated in
+  `invalid`;
+- a path that is a symbolic link, or goes through one or into a
+  submodule, on the repository's default branch in BELL PR's copy on the
+  host, in any letter case. Git records a change at the file's real path,
+  and a submodule as one entry, so such a hold would protect nothing. Hold
+  the real path, or the submodule as a whole.
+
+The other rules are about spelling only. They exist so that two spellings
+of one file always meet, on every file system a person in the group may
+use.
+
+## Limits
+
+| What | Limit | Past it |
+| --- | --- | --- |
+| Paths in one hold, or in one `check` | 50 | 400 `tooManyScopes` |
+| Length of a path | 300 characters | 400 `invalidScope` |
+| Title of a task | 120 characters | 400 |
+| Tasks one `work` request names in `dependsOn` | 50 | 400 `tooManyDependencies` |
+| `work` requests of one person | 30 in 10 minutes, taken or refused | 429 `slowDown`; `retryAfter` is the seconds to wait |
+| `check` requests of one person | 120 in a minute | 429 `slowDown`, the same way |
+| Feed requests waiting | 2 for one person, 64 for the group, over all repositories | 429 `tooManyWaiters` |
+| Feed answers one person's connections have not taken yet | 8 | 429 `tooManyWaiters`, until one is read or its connection closes |
+| Holds one person has at a time, in all repositories | 100, with 2000 paths | 409 `full` |
+| Holds in one repository at a time | 1000, with 20 000 paths | 409 `full` |
+| Tasks in one repository, ended ones included | 10 000 | 409 `full` |
+| Holds in one repository, ended ones included | 100 000 | 409 `full` |
+| Repositories in the group | 100 | 409 `full` |
+| People in the group, removed ones included | 1000 | 409 `full` |
+| The group's record, `coordination.json` | 8 MiB | 409 `full` |
+
+The two request limits are counted in memory, so a restart of BELL PR
+starts them again. A request the limit refused is not counted.
+
+**The record keeps every hold that has ended**, with its paths, and every
+task. Releasing or revoking deletes nothing, and no clean-up is built. An
+admin reads how full the record is in `storage` of
+`GET /api/collab/projects`: `used` and `max`, in bytes.
+
+On a built BELL PR, a hold of one path took about 0.6 KB of the record once
+it had ended: about 0.2 KB for its task and 0.4 KB for the hold. Each
+further path adds a little more than its own length. A small group that
+takes a few holds each working day uses well under 1 MB a year: three a
+day come to about 0.5 MB, and ten a day to about 1.6 MB. The record has
+room for more than 10 000 such holds. The limits above slow a person down;
+they do not keep someone in the group from filling the record on purpose.
+
+When the record is full, every new hold, task, person and repository is
+refused with 409 `full` ("The group's record is full. Ask the host to
+reset group storage."), for everyone, and still after a restart. Holds can
+still be released and revoked: BELL PR keeps room for that, about 3 KB for
+each hold held now and 0.1 KB for each task, which is why `full` comes
+before `used` reaches `max`. The way out today is to start the group
+again:
+[Group storage is full](troubleshooting.md#group-storage-is-full). The
+other limits answered `full` use the same sentence; where the limit is on
+what is held at a time, releasing a hold makes room again.
 
 ## The API in short
 
@@ -194,17 +764,41 @@ token, or a paired device's). The routes exist only with the switch.
 | `POST /api/collab/invites` with `{ self: true }` | anyone who joined | 201 `{ code, expiresAt }` |
 | `POST /api/collab/join` with `{ code }` | anyone with the app token | 201 `{ groupId, id, name, admin?, token }`; 400 `invalidCode`; 429 `joinLocked`; 409 `full` |
 | `POST /api/collab/people/<id>/remove` with `{ unpair?: true }` | an admin | 200 `{ revoked, unpaired }`; 409 `self`; 404 `unknownPerson` |
+| `GET /api/collab/projects` | anyone who joined | 200 `{ projects: [{ id, name }], addable?, storage? }`; `addable` (`[{ repoId, name }]`) and `storage` (`{ used, max }`) for an admin only |
+| `POST /api/collab/projects` with `{ repoId }` | an admin | 201 `{ project: { id, name } }`; 403 `adminOnly`; 400 `unknownRepository`; 409 `alreadyAdded`, `full`; 500 or 504 `cloneFailed` |
+| `GET /api/collab/projects/<project id>/feed?epoch=&version=&seen=&wait=` | anyone who joined | 200 `{ epoch, version, seen, asOf, board?, present }`; 204 when nothing changed; 404 `unknownProject`; 429 `tooManyWaiters` |
+| `GET /api/collab/projects/<project id>/tasks` | anyone who joined | 200 `{ tasks: [{ taskId, title, status }] }`, the tasks held now (`held`) and the finished ones (`done`), to name in `dependsOn`; 404 `unknownProject` |
+| `POST /api/collab/projects/<project id>/check` with `{ scopes }` | anyone who joined | 200 `{ asOf, invalid, meets, changing }`; 400 `tooManyScopes`, `invalidScope`; 404 `unknownProject`; 429 `slowDown` |
+| `POST /api/collab/projects/<project id>/work` with `{ title, scopes, dependsOn? }` | anyone who joined | 201 `{ hold, changing }`; 400 `invalidScope`, `tooManyScopes`, `tooManyDependencies`, `dependencyUnknown`; 404 `unknownProject`; 409 `conflict`, `dependencyPending`, `full`; 429 `slowDown` |
+| `POST /api/collab/projects/<project id>/holds/<claimId>/release` with `{ fence, done? }` | the person who holds it | 200 `{ ok: true }`; 403 `notHolder`; 404 `unknownProject`, `unknownClaim`; 409 `staleFence`, `ended`; 500 `doneNotSaved` |
+| `POST /api/collab/projects/<project id>/holds/<claimId>/revoke` with `{}` | an admin | 200 `{ ok: true }`; 403 `adminOnly`; 404 `unknownProject`, `unknownClaim`; 409 `ended` |
 
 - `state` is `notSetUp`, `ready` or `stopped`. `GET /api/status` carries
   the same `collab: { state, reason? }`.
-- While group work is not ready, inviting, joining and removing answer 503
-  with `reason` `notSetUp` or `stopped`. The one request whose write stops
-  group work can answer 503 with the reason itself, `notSingleWriter` or
-  `unavailable`.
+- While group work is not ready, every request but `GET /api/collab` and
+  the set-up answers 503 with `reason` `notSetUp` or `stopped`. The one
+  request whose write stops group work can answer 503 with the reason
+  itself, `notSingleWriter` or `unavailable`.
 - Where a request needs a participant, a missing, unknown or removed
   participant token is answered 403 with `reason: "notJoined"`, never 401
   (`GET /api/collab` answers 200 without `me`). A 401 still means what it
   meant before: the app token is missing or wrong.
+- A refusal is `{ reason, error }`: `reason` is the word in the table and
+  `error` a sentence in the language of the request's `x-bell-locale`
+  header (English or Traditional Chinese). Five refusals say more:
+  `conflict` carries `conflicts`, `invalidScope` carries `invalid`,
+  `dependencyUnknown` carries `unknown`, `dependencyPending` carries
+  `pending`, and `slowDown` carries `retryAfter`, in seconds.
+- A body of the wrong shape (a missing or unknown field, a wrong type, a
+  title that is too long) is answered 400 with `error` only.
+- With the switch, `GET /api/runs/<id>/preflight`,
+  `POST /api/runs/<id>/publish`, `POST /api/runs/<id>/sync`,
+  `POST /api/runs/<id>/holds/restore` and
+  `POST /api/runs/<id>/holds/recheck` also check holds:
+  [Publishing over someone else's hold](#publishing-over-someone-elses-hold),
+  [BELL PR's agents and someone else's hold](#bell-prs-agents-and-someone-elses-hold)
+  and
+  [Changes on the target branch under your hold](#changes-on-the-target-branch-under-your-hold).
 
 ## When group work stops
 
@@ -213,12 +807,27 @@ is missing or damaged, a write to `coordination.json` failed, or the lock
 is no longer this process's. A stopped group stays stopped until the cause
 is fixed and BELL PR is restarted. BELL PR never creates either file again
 by itself and never repairs one: nothing is assumed about a group whose
-record is gone. The rest of BELL PR keeps working.
+record is gone. The rest of BELL PR keeps working, except that nothing in
+a repository of the group is
+[published](#publishing-over-someone-elses-hold), and no agent turn that
+may change files and no plan approval
+[runs there](#bell-prs-agents-and-someone-elses-hold). BELL PR notices a stop
+at the next request that reads or writes the group's record or asks for
+its state, and at the latest when a request waiting on a
+[live feed](#the-live-feed) has waited its time. At that moment every
+request waiting on a live feed is answered 204, and a repository being
+copied for the group is given up.
 
 A failed write to `collab.json` after set-up does not stop group work: the
 request fails and the file keeps what it held. When that happens in a
 join, the invite code is spent and the person is not in the group (no
 token was given out), but they count toward the 1000. Invite them again.
+When it happens while a repository is added, the answer is `cloneFailed`,
+the copy is deleted and the repository is not in the group, but it counts
+toward the 100. Add it again. When it happens in a release with
+`"done": true`, the answer is 500 `doneNotSaved`: the hold has ended but
+its task is not done, and it cannot be marked done any more. Work that
+waits for it has to name another task.
 
 `bell-pr group status` prints the reason, and the server log has it in a
 "Group work stopped" line;
@@ -227,17 +836,30 @@ what each one means and what to do.
 
 ## The files it writes
 
-Both are in the data directory, only with group work, from
-`bell-pr group setup` on:
+All are in the data directory, only with group work: the two files from
+`bell-pr group setup` on, the folder from the first repository added.
 
 | File | What it holds |
 | --- | --- |
-| `coordination.json` | Each person's id, role (admin or member), the time they were added and the SHA-256 of their participant token; never the token |
-| `collab.json` | The group's id and set-up time, and for each person: name, the time they joined, whether they are an admin, the time they were removed, and, when they joined from a paired device, that device's id |
+| `coordination.json` | Each person's id, role (admin or member), the time they were added and the SHA-256 of their participant token; never the token. Each repository of the group, with the folder of its bare copy and the commit it was copied at. Each task, with who made it and when, and every hold, ended ones included: its paths, who holds it, when it was taken and when and by whom it ended |
+| `collab.json` | The group's id and set-up time, and for each person: name, the time they joined, whether they are an admin, the time they were removed, and, when they joined from a paired device, that device's id. For each repository: its name, its id in this BELL PR and the time it was added. For each task: its title, the tasks its work waited for, and when its holder said it is done; and (`holds`) for each active hold, the default-branch commit recorded when it was taken (removed when the hold ends) |
+| `collab/<project id>.git` | The group's bare copy of a repository: the commits and files of its default branch, as they were when it was added |
 
 The lock file `bellpr.lock` also carries `"strict": true`. Back the two
-files up and restore them together: one without the other stops group
-work. Deleting the data directory deletes the group.
+files and the folder up and restore them together: one of the two files
+without the other stops group work. Deleting the data directory deletes the
+group. **Delete all data** in Settings does not: it leaves the two files
+and the folder as they are.
+
+Do not start a build of BELL PR from before the group had repositories
+with `--group` on this data directory. The first time such a build saves
+`collab.json` (a join or a removal), it writes the file without the
+repositories' names and the tasks' titles, and the group's repositories
+are gone from the group. A build from before tasks could wait for other
+work drops, the first time it saves `collab.json`, what each task waited
+for and when it was done: from then on a done task is not done, work that
+waits for it is refused, and the holds already taken stay held but no
+longer list `dependsOn`.
 
 ## What is promised and what is not
 
@@ -249,6 +871,17 @@ Promised:
 - A problem with group work never unpairs a device. Only a removal that
   asks for it (`"unpair": true`) does.
 - Invite codes work once and are short-lived.
+- Two holds that are held at the same time in one repository never meet:
+  BELL PR refuses the second. A hold is taken whole or refused whole.
+- Work that names tasks in `dependsOn` is held only once each of them is
+  done. Otherwise nothing is made or held.
+- BELL PR publishes no change, first round or follow-up, that touches a
+  path someone else in the group holds at that moment, and while group
+  work has stopped it publishes nothing in a repository of the group.
+- In a repository of the group, BELL PR approves no plan that covers a
+  path someone else holds, adds no teammate's change over such a path, and
+  stops a turn whose changes in the run's checkout touch one. While group
+  work has stopped, no agent turn there changes files.
 - No participant token and no invite code is put in a URL or written to a
   log.
 - Group work adds no listener, no dependency, no account, no cloud call and
@@ -256,15 +889,27 @@ Promised:
 
 Not promised:
 
-- **Writing is not protected.** Group work records who is in the group. It
-  does not yet record who works on which files, and it stops nobody: an
-  agent, an editor or a push can change any file.
+- **A hold stops only some writes as they happen.** An editor, a tool or
+  a push outside BELL PR can still change any file, held or not. A BELL PR
+  agent is told the held paths and its sandbox makes most of them
+  read-only, but a change it makes anyway is found only when its turn ends
+  or its task is integrated, and nothing is undone then. Each check uses
+  the holds of that moment: a hold taken later says nothing about what was
+  already changed or published.
+- **A hold covers only the paths and the tasks it names.** Two people who
+  hold different files can still make changes that do not work together,
+  and work waits only for the tasks it names. A task is done when its
+  holder says so: BELL PR does not check the work.
+- **Who is looking at a board (`present`) is best effort.** It is kept in
+  memory, and a person stays listed for up to 40 seconds after they left.
+- **Nothing is cleaned up.** The record keeps every ended hold
+  ([Limits](#limits)), and BELL PR never deletes a bare copy.
 - **People cannot be deleted or renamed, and a token cannot be changed.**
   Remove the person and invite them again.
+- **A repository cannot be taken out of the group or renamed there.**
 - **Roles are not a security boundary.** Everyone in the group uses a
   paired device (or sits at the host), and a paired device can use
   everything in that BELL PR: start agents, read every project, publish.
-  Admin and member only decide who may invite and remove people.
+  Admin and member only decide who may invite and remove people, add
+  repositories to the group and revoke someone else's hold.
 - **One host.** If the BELL PR on the host is down, the group is down.
-- **No Group page yet.** Until it ships, the command line and the API are
-  the only way to use group work.
