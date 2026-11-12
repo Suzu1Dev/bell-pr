@@ -90,7 +90,7 @@ BELL PR prints its address when it starts. Read it from the log:
 docker logs bell-pr
 ```
 
-or ask the running server for its address again, with your container's name
+or ask the running service for its address again, with your container's name
 in place of `bell-pr`:
 
 ```sh
@@ -151,7 +151,7 @@ bwrap --ro-bind / / --dev /dev --proc /proc --unshare-all --die-with-parent true
 | `--security-opt seccomp=unconfined` | Fails: `bwrap: Failed to make / slave: Permission denied` |
 | `--security-opt apparmor=unconfined` | Fails: `bwrap: No permissions to create a new namespace` |
 | both of the above | Fails: `bwrap: Can't mount proc on /proc: Operation not permitted` |
-| both of the above and `--security-opt systempaths=unconfined` | Works: the agent writes inside its workspace (under `/data`, where BELL PR keeps checkouts), a write to `/home/node` fails with "Read-only file system", and network access fails |
+| both of the above and `--security-opt systempaths=unconfined` | Works: the agent writes inside its workspace (under `/data`, where BELL PR keeps working directories), a write to `/home/node` fails with "Read-only file system", and network access fails |
 
 The direct `bwrap` probe (what Claude Code's sandbox needs) gives the same
 results.

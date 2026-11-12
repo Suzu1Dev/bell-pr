@@ -6,7 +6,7 @@
 
 BELL PR 是讓你透過開源貢獻學習的本機工作台。它使用你的 Codex CLI、Claude Code 或 Antigravity CLI 分析專案，在獨立的 Git worktree 中完成修改。你透過白話解說審閱程式碼、用自己的話說明改動，再核准符合專案規範的 Draft Pull Request。
 
-以 [Apache-2.0](LICENSE) 授權，免費開源，不需 BELL PR 帳號，也沒有付費版；AI 用量計入你自己的服務商帳戶。介面與解說支援英文和繁體中文；除非目標專案另有要求，PR 使用英文。
+以 [Apache-2.0](LICENSE) 授權，免費開源，不需 BELL PR 帳號，也沒有付費版；AI 用量計入你自己的服務商帳號。介面與解說支援英文和繁體中文；除非目標專案另有要求，PR 使用英文。
 
 ![「程式碼變更」頁籤：diff 旁邊是變更的白話解說](docs/images/zh-TW/run-changes-1280.png)
 
@@ -33,7 +33,7 @@ BELL PR 是讓你透過開源貢獻學習的本機工作台。它使用你的 Co
   | Claude Code | `npm install -g @anthropic-ai/claude-code` | `claude auth login` |
   | Antigravity CLI | `curl -fsSL https://antigravity.google/cli/install.sh \| bash` | 執行 `agy` |
 
-  BELL PR 使用你已安裝並登入的 CLI。Claude Code 可使用 Claude 方案或 Anthropic API 金鑰；用量計入你自己的帳戶。
+  BELL PR 使用你已安裝並登入的 CLI。Claude Code 可使用 Claude 方案或 Anthropic API 金鑰；用量計入你自己的帳號。
 - **Linux 使用 Claude Code 時**另需 `bubblewrap` 與 `socat`（Debian/Ubuntu：`sudo apt-get install bubblewrap socat`）。
 
 ## 快速開始
@@ -44,7 +44,7 @@ npx bell-pr
 
 BELL PR 會檢查環境，再於瀏覽器開啟 `http://127.0.0.1:4311`。依歡迎畫面選擇語言與 AI 服務，接著匯入專案或探索貢獻方向。必要檢查未通過時，啟動會停止並列出修正指令。
 
-### 用範例專案試試看
+### 用示範專案試試看
 
 只要已安裝 Node.js，就能在設定 GitHub 或 AI 服務前體驗審閱流程：
 
@@ -52,7 +52,7 @@ BELL PR 會檢查環境，再於瀏覽器開啟 `http://127.0.0.1:4311`。依歡
 npx bell-pr start --force
 ```
 
-從首頁「試用範例專案」或側欄「範例」開啟。範例包含計畫、diff、解說、理解檢查與 PR 草稿，不呼叫 AI，也不會送到 GitHub。真實的 Agent 工作仍需已登入的 AI 服務。
+從首頁「試試示範專案」或側欄「示範」開啟。示範專案包含計畫、diff、解說、理解檢查與 PR 草稿，不呼叫 AI，也不會送到 GitHub。真實的 Agent 工作仍需已登入的 AI 服務。
 
 若要保留安裝：
 
@@ -65,19 +65,19 @@ Homebrew、Bun、mise 與 Windows 安裝腳本等方式，請見[安裝指南](d
 
 ## 貢獻流程
 
-1. **理解專案。** 匯入 Repository，或從 GitHub 探索專案。BELL PR 說明專案結構、引用貢獻規範，並提出有程式碼依據的貢獻方向。
+1. **理解專案。** 匯入專案，或從 GitHub 探索專案。BELL PR 說明專案結構、引用貢獻規範，並提出有程式碼依據的貢獻方向。
 2. **規劃與實作。** 描述改動並核准 Lead 的計畫。兩到四位隊友各自在獨立的 Git worktree 工作，再由 Reviewer 與 Test analyst 檢查整合結果。選擇「親手學」時，由你寫程式，Agent 提供引導與審查。
 3. **審閱與學習。** 對照 diff 與解說、詢問不熟悉的程式碼，逐檔標記已審閱。Agent 貢獻可透過「協作」要求修正或補測試；改動後的檔案需要重新審閱。
-4. **說明與發佈。** 理解檢查請你說明改動、回答審閱問題，並交代沒測試的部分。對照參考答案後，再核准 PR 草稿。發佈會推送分支（必要時使用你的 fork），並透過 GitHub CLI 開啟 **Draft PR**。
+4. **說明與發布。** 理解檢查請你說明改動、回答審閱問題，並交代沒測試的部分。對照參考答案後，再核准 PR 草稿。發布會推送分支（必要時使用你的 fork），並透過 GitHub CLI 開啟 **Draft PR**。
 5. **跟進與複習。** 讀取維護者回饋與 CI 結果、審閱後續修正，並同步目標分支。在學習頁回顧筆記與題目，也能將學習紀錄匯出為 Markdown。
 
-理解檢查預設開啟。在「設定 → 學習」關閉時，工作會留下標記；逐檔審閱、親自核准與專案規範仍然必要。BELL PR 的發佈流程不會 force push。
+理解檢查預設開啟。在「設定 → 學習」關閉時，工作會留下標記；逐檔審閱、親自核准與專案規範仍然必要。BELL PR 的發布流程不會 force push。
 
-發佈前會檢查專案的 AI 政策、issue 狀態、其他人的 PR、你尚待回覆的審查，以及改動中的敏感內容。部分結果會阻擋發佈，其他結果需要你說明或確認。規則與限制請見[負責任地貢獻](docs/contributing-responsibly.md)；完整操作流程請見[入門指南](docs/getting-started.md)。
+發布前會檢查專案的 AI 政策、issue 狀態、其他人的 PR、你尚待回覆的審查，以及改動中的敏感內容。部分結果會阻擋發布，其他結果需要你說明或確認。規則與限制請見[負責任地貢獻](docs/contributing-responsibly.md)；完整操作流程請見[入門指南](docs/getting-started.md)。
 
 ## 隱私與安全
 
-- **本機儲存，外部 AI。** BELL PR 沒有雲端服務或遙測。Agent 讀取的程式碼與提問會送到你選擇的 AI 服務商；GitHub 操作使用你的帳戶。各 CLI 另有自己的資料政策。
+- **本機儲存，外部 AI。** BELL PR 沒有雲端服務或遙測。Agent 讀取的程式碼與提問會送到你選擇的 AI 服務商；GitHub 操作使用你的帳號。各 CLI 另有自己的資料政策。
 - **沙箱的限制。** Agent 預設使用各 CLI 的沙箱。請只匯入你願意在這台電腦上執行的專案。你的 Claude Code 設定[可能放寬沙箱](https://code.claude.com/docs/en/sandboxing#configure-sandboxing)，系統 keyring 中的 GitHub 憑證也不受其檔案限制保護；請使用權限最小的 token。[GitHub 的文件說明](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens#personal-access-tokens-classic)，只有 classic personal access token 能寫入不屬於你、也不屬於你所屬組織的公開 Repository。如果用 fine-grained token 發布失敗，請改用 classic token。
 - **擴大權限需自行開啟。**「完整權限」或允許無沙箱執行，會讓可寫入的 Agent 取得你的使用者權限。Linux 的免密碼 sudo 會讓該使用者的所有程序取得 root 權限。這些選項只適合在用完即丟的 VM 或容器中使用。
 - **網路存取。** Agent 網路存取預設關閉；Antigravity 的網路搜尋無法關閉，是例外。專案若附帶 Antigravity 的 hooks、MCP 伺服器、外掛、Agent 或技能，BELL PR 會拒絕在其中啟動 Antigravity。
@@ -100,7 +100,7 @@ npm ci
 BELLPR_DATA_DIR=~/.bellpr-dev npm run dev
 ```
 
-網頁介面位於 `http://127.0.0.1:4310`，API 使用連接埠 4311，資料會放在獨立目錄。真實 Agent 工作需要[系統需求](#系統需求)中的工具。瀏覽器驗證、未登入 AI 時的範例啟動，以及建置後的執行方式，請見[開發指南](docs/development.md#run-from-source)。
+網頁介面位於 `http://127.0.0.1:4310`，API 使用連接埠 4311，資料會放在獨立目錄。真實 Agent 工作需要[系統需求](#系統需求)中的工具。瀏覽器驗證、未登入 AI 時的示範專案啟動，以及建置後的執行方式，請見[開發指南](docs/development.md#run-from-source)。
 
 | 位置 | 用途 |
 | --- | --- |

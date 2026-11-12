@@ -8,7 +8,7 @@ bell-pr doctor
 ```
 
 The same check is in the app under **Settings → Environment**, with a
-**Re-check** button. `bell-pr doctor --json` prints the report as JSON, for
+**Check again** button. `bell-pr doctor --json` prints the report as JSON, for
 scripts and support requests. The command exits with 0 when every required
 check passes (Node.js, Git, an AI provider and the data directory) and with
 1 otherwise. Add `--data-dir <dir>` if your BELL PR uses a data directory
@@ -40,7 +40,7 @@ Contents:
 ## An earlier publish made a different commit
 
 If a publish failed and you have not changed the code or commit message,
-retry **Submit Draft PR** after resolving the error. BELL PR reuses the saved
+retry **Publish Draft PR** after resolving the error. BELL PR reuses the saved
 commit; recovery is needed when that commit no longer matches your changes.
 
 A failed publish can leave a local commit. If you later change the files or
@@ -258,7 +258,7 @@ the agent starts (HTTP 503). Pick one:
   Docker's default security settings. Start the container with the three
   `--security-opt` options in [Running BELL PR in Docker](docker.md#agent-sandbox-in-docker).
 - **Use Codex** for this work: sign in to the Codex CLI and choose it as
-  the agent in the model settings. Its sandbox is separate.
+  the AI provider under **Settings → AI provider**. Its sandbox is separate.
 - **Allow unsandboxed Claude Code agents** under **Settings → Agent
   safety**, or start BELL PR with `BELLPR_ALLOW_UNSANDBOXED_AGENTS=1`. The
   agents then run with your full user rights: they can read and change
@@ -317,14 +317,14 @@ log. BELL PR reads the same settings. Pick one:
   Ubuntu turned on for the whole system:
   `sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0` (until
   the next restart; a file in `/etc/sysctl.d/` keeps it). Then press
-  **Re-check** in **Settings → Environment**.
+  **Check again** in **Settings → Environment**.
 - **Allow unsandboxed agents** under **Settings → Agent safety**, or start
   BELL PR with `BELLPR_ALLOW_UNSANDBOXED_AGENTS=1`. Antigravity's commands
   then run with your full user rights, as described for
   `claude_sandbox_unavailable` above, and every such run carries a "Ran
   without sandbox" badge.
 
-Choosing Claude Code or Codex in the model settings may not help: their
+Choosing Claude Code or Codex under **Settings → AI provider** may not help: their
 sandboxes can need the same Ubuntu setting. Claude Code documents that
 [Ubuntu's AppArmor restriction can keep its sandbox from starting](https://code.claude.com/docs/en/sandboxing#apparmor-restriction-stops-bubblewrap).
 [Codex's sandboxing documentation](https://learn.chatgpt.com/docs/sandboxing#prerequisites) says that on Ubuntu 24.04 Codex may still
@@ -342,12 +342,12 @@ the sandbox as not available.
 The project contains Antigravity customizations: a `hooks.json`,
 `mcp_config.json`, `plugins`, `plugins.json`, `agents`, `skills` or
 `skills.json` in an `.agents`, `.agent`, `_agents` or `_agent` folder,
-in the working folder or a folder above it up to the repository root. The
+in the working directory or a folder above it up to the repository root. The
 Antigravity CLI has no setting that skips them: it would load them for
 every agent, run their hooks and start their MCP servers outside any
 sandbox, also in a folder it was never asked to trust. So BELL PR does not
 start Antigravity there (HTTP 422); the error names what it found. Choose
-Claude Code or Codex in the model settings for this project. An agent that
+Claude Code or Codex under **Settings → AI provider** to work on this project. An agent that
 creates such a file during a run stops the run's next Antigravity turn the
 same way. See the [security model](security-model.md#antigravity) for
 what else the Antigravity CLI loads.
@@ -420,7 +420,7 @@ understanding check. It is on by default, and the server holds approval
 and publishing until it is done for the latest version of the changes. It
 is a check you grade yourself; no AI model grades your answers.
 
-- Open the check from the Changes tab once every file is marked Reviewed:
+- Open the check from the Code changes tab once every file is marked Reviewed:
   explain the change in a few sentences, answer the questions about the
   riskiest files and what you did not test, compare each answer with the
   reference, grade it, and correct what you missed.
@@ -440,10 +440,10 @@ is a check you grade yourself; no AI model grades your answers.
 
 Before a pull request reaches the maintainers, BELL PR checks it against
 the project's own rules, the linked issue and your pace in that
-repository. The Draft tab's maintainer checklist shows these checks while
+repository. The **Before you publish** checklist on the PR draft tab shows these checks while
 you work, and the publish dialog lists them again under **Before it
 reaches the maintainers**, grouped by topic. When the dialog opens, BELL
-PR reads the GitHub facts once, and **Submit Draft PR** reads them again
+PR reads the GitHub facts once, and **Publish Draft PR** reads them again
 live, so a publish never relies on old facts. The understanding-check
 switch in **Settings → Learning** never turns one of them off.
 
@@ -491,14 +491,14 @@ you read the quote and decide whether it applies.
 "The project asks contributors to disclose AI assistance, and the
 description does not say so yet." Write the disclosure in your own words
 where the project's rule asks for it, or turn on the AI-assistance line on
-the Draft tab, then save the draft. BELL PR never adds a disclosure that
+the PR draft tab, then save the draft. BELL PR never adds a disclosure that
 you did not choose; it only waits for one that the project requires.
 
 ### `own-words`
 
 "The project asks for descriptions in the contributor's own words, and
 this one is still BELL PR's suggested text." Rewrite the description
-before you publish; **Use my explanation** on the Draft tab puts your
+before you publish; **Use my explanation** on the PR draft tab puts your
 explanation from the understanding check at its start, as a beginning. On
 a project without such a rule, a description that is still the suggested
 wording only asks you to confirm.
@@ -535,7 +535,7 @@ Practise on it locally, or pick a help-wanted issue instead.
 `#[ignore]`, `t.Skip(` and similar) or removes an `assert` or `expect(`
 line in a test file that no assertion in the same hunk replaces (a loose
 one, such as `toBeDefined()` or `assert True`, replaces only another
-loose one). In **How reviewable is this change?** on the Draft
+loose one). In **How reviewable is this change?** on the PR draft
 tab, give each flagged item a one-line reason of at least 3 words and save
 the reasons; the block clears when every item has one. The reasons are
 offered for the description's Testing section, so the maintainers can
@@ -563,10 +563,10 @@ there, then publish again.
 - **"Not ready: fix the required check…"**: `bell-pr doctor` failed a
   required check, so `bell-pr start` exited before it listened. The message
   is the doctor's checklist: each failed check and the command that fixes
-  it, then how to start anyway. `bell-pr start --force` starts and prints a
-  warning. The sample tour needs no AI provider; a real agent run still
-  waits until Codex CLI, Claude Code or the Antigravity CLI is installed
-  and signed in.
+  it, under a line that points to the sample tour. `bell-pr start --force`
+  starts and prints a warning. The sample tour needs no AI provider; a
+  real agent run still waits until Codex CLI, Claude Code or the
+  Antigravity CLI is installed and signed in.
 - **"BELL PR needs Node.js 22 or later"**: install the current Node.js LTS
   from [nodejs.org](https://nodejs.org/en) (or `nvm install 22`).
 - **"Port 4311 is already in use by another program"**: start on a free
@@ -658,7 +658,7 @@ Only for a BELL PR started with `--group` ([Group work](group-work.md)).
 Group requests answer 503 with `reason: "stopped"` (set-up answers 409), and
 `GET /api/collab` and `GET /api/status` carry the reason. The one request
 whose write stopped group work can answer 503 with the reason itself,
-`notSingleWriter` or `unavailable`. The server log has a "Group work
+`notSingleWriter` or `unavailable`. The log on the host has a "Group work
 stopped" line with the cause. When the lock file itself is gone,
 `bell-pr group status` finds no running BELL PR and cannot print the
 reason: read it in the log or in `GET /api/collab`. The rest of BELL PR
@@ -762,7 +762,7 @@ was changed by the refused request.
 Worktree identity checks resolve symbolic links in the data directory, including
 macOS temporary paths under `/var/folders`. Using the same directory through its
 physical path or a symbolic link keeps the recorded Git directory; a different
-checkout with a copied `.git` pointer is still refused.
+working directory with a copied `.git` pointer is still refused.
 
 - **A run is queued**: only as many contributions execute at once as
   **Settings → Performance → Runs at a time** allows

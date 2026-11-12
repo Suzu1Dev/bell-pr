@@ -60,7 +60,7 @@ npx bell-pr
 
 BELL PR checks your environment, then opens `http://127.0.0.1:4311` in your
 browser. In Welcome, choose your language and AI provider, then import a
-repository or explore contribution ideas. If a required check fails,
+project or explore contribution ideas. If a required check fails,
 startup stops and prints the commands to fix it.
 
 ### Try the sample project
@@ -89,7 +89,7 @@ are in [Installation](docs/installation.md).
 
 ## Contribution workflow
 
-1. **Understand the project.** Import a repository or discover one on GitHub.
+1. **Understand the project.** Import a project or discover one on GitHub.
    BELL PR explains its structure, quotes its contribution rules and suggests
    contribution ideas with references to the code.
 2. **Plan and build.** Describe the change and approve the Lead's plan.
