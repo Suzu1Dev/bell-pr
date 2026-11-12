@@ -25,6 +25,12 @@ export interface SessionMessage {
   /** True for an agent turn that ended in an error or was stopped. */
   failed?: boolean;
   /**
+   * Set when BELL stopped this turn because it changed files other people
+   * hold: those paths. Agents are told only these, never who holds them or
+   * why; `content` keeps the whole message for the person.
+   */
+  heldPaths?: string[];
+  /**
    * Set when this turn rewrote the PR draft's validation/limitations sections (the person's
    * own PR text, so both versions are kept to show and undo by hand).
    */

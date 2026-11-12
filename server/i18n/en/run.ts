@@ -581,7 +581,7 @@ export default {
       "Stopped resolving the conflicts; the edited files are kept, and you can finish yourself or ask the agent again.",
     /** `reason` is an error message without its final period. */
     failed: ({ reason }: { reason: string }) =>
-      `${reason}; the edited files are kept, and you can finish yourself or ask the agent again.`,
+      `${reason.replace(/[.\u3002]+$/u, "")}; the edited files are kept, and you can finish yourself or ask the agent again.`,
     incompleteReason: "Resolving the conflicts did not finish",
     incomplete: "Resolving the conflicts did not finish.",
     conflictsOpen: ({ files }: { files: string[] }) =>
@@ -589,6 +589,21 @@ export default {
     mergeFailed: "Could not compute the merge result.",
     answerIncomplete:
       "The agent's answer about the conflict resolution is incomplete",
+    heldChangedUpstream: ({
+      branch,
+      items,
+    }: {
+      branch: string;
+      items: readonly string[];
+    }) =>
+      `Commits on ${branch} changed files under your hold since you took it: ${items.join("; ")}.`,
+    heldChangedUpstreamItem: ({
+      path,
+      commits,
+    }: {
+      path: string;
+      commits: readonly string[];
+    }) => `${path} (${commits.join(", ")})`,
   },
   /** Follow-up rounds on a published PR, and its branch on GitHub. */
   followUp: {
@@ -629,7 +644,7 @@ export default {
     incompleteReason: "This round did not finish",
     /** `reason` is one of the reasons above or an error message. */
     keptEdits: ({ reason }: { reason: string }) =>
-      `${reason}; some edits are kept in the working directory, and you can review them, write a commit message and push, or discard the round.`,
+      `${reason.replace(/[.\u3002]+$/u, "")}; some edits are kept in the working directory, and you can review them, write a commit message and push, or discard the round.`,
     nothingToDiscard: "There is no follow-up round to discard.",
     alreadyPushed:
       `This round is already on the PR; press Push again so ${product.name} records it as done.`,
@@ -733,9 +748,56 @@ export default {
       "This part of a split builds on other parts that are not merged yet. Publish those first, or this pull request may fail its checks until they are merged.",
     buildsOn: ({ title, prUrl }: { title: string; prUrl?: string }) =>
       prUrl ? `"${title}": published at ${prUrl}, not seen merged` : `"${title}": not published yet`,
+    /** The publish dialog's block when the change meets someone else's hold (server/hold-guard.ts). */
+    heldByOther:
+      "Someone else in the group holds files this change touches. Ask them to release the hold, ask a group admin to revoke it, or remove these files from the change before publishing.",
+    /** One changed file and the hold it meets, in the dialog and in the publish refusal. */
+    heldByOtherItem: ({ path, holder, title, since }: { path: string; holder: string; title: string; since: string }) =>
+      `${path} — held by ${holder} for “${title}” (since ${since})`,
+    holdsUnknown: ({ name }: { name: string }) =>
+      `Can't check file holds because group work has stopped. Fix group work on the host and restart ${name} before publishing.`,
+    /** An agent's write turn changed files someone else holds. */
+    turnHeldByOther: ({ items }: { items: readonly string[] }) =>
+      `The agent changed files someone else holds, so the run stopped. The changes are still in the checkout. ${items.join("; ")}. Ask them to release the hold, ask a group admin to revoke it, or undo the changes to these files, then try again.`,
+    /** A teammate's changes meet someone else's hold, so they were not brought into the contribution. */
+    taskHeldByOther: ({ items }: { items: readonly string[] }) =>
+      `A teammate changed files someone else holds, so those changes were not added to the contribution. ${items.join("; ")}. Ask them to release the hold, or ask a group admin to revoke it, then try again.`,
+    planHeldByOther: ({ items }: { items: readonly string[] }) =>
+      `This plan covers files someone else holds, so it can't be approved. ${items.join("; ")}. Send the plan back with feedback, or wait until the hold is released.`,
+    autoHeld:
+      "This plan covers files someone else in the group holds, so it waits for your approval instead of starting on its own.",
+    agentsHoldsUnknown: ({ name }: { name: string }) =>
+      `Can't check file holds because group work has stopped, so the agents can't change files. Fix group work on the host and restart ${name}, or start ${name} without --group.`,
+    heldChangedUpstream: ({ branch }: { branch: string }) =>
+      `Commits on ${branch} changed files under your hold since you took it. Check those changes before publishing.`,
+    heldChangedUpstreamItem: ({
+      path,
+      branch,
+      commits,
+    }: {
+      path: string;
+      branch: string;
+      commits: readonly string[];
+    }) => `${path} changed on ${branch} since your hold (${commits.join(", ")})`,
+    holdRecoveryNotAllowed:
+      "Held files can only be restored or checked again on a finished run whose pull request has not merged.",
+    holdRecoveryBusy:
+      "Work is still running on this contribution. Wait for it to finish before restoring or checking held files.",
+    holdRecoveryCheckoutMissing:
+      "This run's working directory or base commit is unavailable.",
+    heldPathsRestored: ({ files }: { files: readonly string[] }) =>
+      files.length
+        ? `Put back ${count(files.length, "held file", "held files")} to the run's base: ${list([...files])}.`
+        : "No held files differed from the run's base.",
+    heldPathsRechecked:
+      "Checked file holds again: no changed files are held by someone else.",
   },
   /** The human review gate and publishing: draft, file reviews, approval and push. */
   publish: {
+    heldByOther: ({ items }: { items: readonly string[] }) =>
+      `Someone else holds files this change touches, so nothing was published. ${items.join("; ")}. Ask them to release the hold, or ask a group admin to revoke it.`,
+    holdsUnknown: ({ name }: { name: string }) =>
+      `Can't check file holds because group work has stopped, so nothing was published. Fix group work on the host and restart ${name}, or start ${name} without --group.`,
     recoveryStale: "The unfinished publish changed. Reload before recovering it.",
     recoveryNotAllowed: "Only an unfinished publish with no recorded push target or pull request can be recovered here.",
     recoveryBusy: "Work is still running for this contribution. Wait for it to finish before recovering the publish.",

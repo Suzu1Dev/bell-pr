@@ -1,7 +1,8 @@
 /**
  * One repository's board, put together from the coordinator's view of the
  * project (its claims) and the side file (names and titles): who holds
- * what. Reading only.
+ * what. Reading only, apart from `dropHoldEntries`, which edits a
+ * `saveSide` draft.
  */
 import type { CollabBoard, CollabHold } from "../shared/collab.js";
 import { sideEntry, type CollabSide } from "./collab-host.js";
@@ -11,19 +12,42 @@ import { pathsMeet } from "./scope-paths.js";
 /** The side file's key of a task. */
 export const taskKey = (projectId: string, taskId: string) => `${projectId}/${taskId}`;
 
+/** Drops recorded hold base commits from the side file; omits `holds` once empty. */
+export function dropHoldEntries(draft: CollabSide, keys: readonly string[]) {
+  if (!draft.holds || !keys.length) return;
+  for (const key of keys) {
+    if (Object.hasOwn(draft.holds, key)) delete draft.holds[key];
+  }
+  if (!Object.keys(draft.holds).length) delete draft.holds;
+}
+
 /** A person's name as the side file has it, else their id. */
 export const nameOf = (side: CollabSide, id: string) => sideEntry(side.people, id)?.name ?? id;
 
-/** A held claim as the board shows it; its task's id stands in for a title that was never saved. */
+/** A task's side-file entry: its title, what it waited for, and whether it is done. */
+export const taskOf = (side: CollabSide, projectId: string, taskId: string) =>
+  sideEntry(side.tasks, taskKey(projectId, taskId));
+
+/** A task as other work names it; its id stands in for a title that was never saved. */
+export const dependencyOf = (side: CollabSide, projectId: string, taskId: string) => ({
+  taskId,
+  title: taskOf(side, projectId, taskId)?.title ?? taskId,
+});
+
+/** A held claim as the board shows it. */
 export function holdOf(side: CollabSide, projectId: string, claim: ClaimView): CollabHold {
+  const task = taskOf(side, projectId, claim.taskId);
   return {
     claimId: claim.id,
     taskId: claim.taskId,
-    title: sideEntry(side.tasks, taskKey(projectId, claim.taskId))?.title ?? claim.taskId,
+    title: task?.title ?? claim.taskId,
     holder: claim.holder,
     scopes: claim.scopes,
     fence: claim.fence,
     since: claim.createdAt,
+    ...(task?.dependsOn?.length
+      ? { dependsOn: task.dependsOn.map((id) => dependencyOf(side, projectId, id)) }
+      : {}),
   };
 }
 

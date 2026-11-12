@@ -17,9 +17,11 @@ import { FolderGit2, Info, TriangleAlert, UserPlus } from "lucide-react";
 import type {
   CollabCheckResponse,
   CollabConflict,
+  CollabDependency,
   CollabHold,
   CollabInfo,
   CollabInviteResponse,
+  CollabTasksResponse,
 } from "../../shared/collab";
 import type { Formatters } from "../../shared/i18n/locale";
 import { product } from "../../shared/product";
@@ -362,6 +364,7 @@ function HeldNow({ store, state, project, held, me }: BoardProps) {
   const [asked, setAsked] = useState("");
   const [ending, setEnding] = useState("");
   const [failed, setFailed] = useState<{ id: string; message: string }>();
+  const [released, setReleased] = useState("");
 
   useEffect(() => {
     const focused = list.current?.contains(document.activeElement) ?? false;
@@ -385,15 +388,19 @@ function HeldNow({ store, state, project, held, me }: BoardProps) {
     if (!stay) setRows((shown) => shown.filter((row) => !row.gone));
   };
 
-  const end = async (hold: CollabHold, mine: boolean) => {
+  const end = async (hold: CollabHold, mine: boolean, done = false) => {
     if (ending === hold.claimId) return;
     setEnding(hold.claimId);
     setFailed(undefined);
     try {
       await store.call(
         `/projects/${encodeURIComponent(project)}/holds/${encodeURIComponent(hold.claimId)}/${mine ? "release" : "revoke"}`,
-        send("POST", mine ? { fence: hold.fence } : {}),
+        send("POST", mine ? { fence: hold.fence, ...(done ? { done: true } : {}) } : {}),
       );
+      if (mine) {
+        const words = { title: hold.title, paths: format.list(hold.scopes, { type: "unit" }) };
+        setReleased(done ? t.spoken.finishedAndReleased(words) : t.spoken.releasedUnfinished(words));
+      }
       setAsked("");
       // The row's button goes with the hold.
       list.current?.focus();
@@ -411,6 +418,9 @@ function HeldNow({ store, state, project, held, me }: BoardProps) {
       <div className="section-heading">
         <h2 id="held-h">{t.heldNow}</h2>
       </div>
+      <p className="visually-hidden" aria-live="polite">
+        {released}
+      </p>
       {rows.length ? (
         <ul
           ref={list}
@@ -449,6 +459,16 @@ function HeldNow({ store, state, project, held, me }: BoardProps) {
                       <code key={index}>{scope}</code>
                     ))}
                   </div>
+                  {hold.dependsOn?.length ? (
+                    <p className="field-help">
+                      {t.dependsOn.cardNote({
+                        titles: format.list(
+                          hold.dependsOn.map((task) => task.title),
+                          { type: "conjunction" },
+                        ),
+                      })}
+                    </p>
+                  ) : null}
                   {asked === id && !gone && (
                     <div
                       className="run-list-confirm"
@@ -490,15 +510,26 @@ function HeldNow({ store, state, project, held, me }: BoardProps) {
                 {gone ? (
                   <small>{t.gone}</small>
                 ) : mine ? (
-                  <button
-                    type="button"
-                    className="button secondary"
-                    aria-disabled={ending === id}
-                    aria-label={t.releaseHold({ title: hold.title })}
-                    onClick={() => void end(hold, true)}
-                  >
-                    {t.release}
-                  </button>
+                  <div className="group-release">
+                    <button
+                      type="button"
+                      className="button primary"
+                      aria-disabled={ending === id}
+                      aria-label={t.release.finishAria({ title: hold.title })}
+                      onClick={() => void end(hold, true, true)}
+                    >
+                      {t.release.finish}
+                    </button>
+                    <button
+                      type="button"
+                      className="button secondary"
+                      aria-disabled={ending === id}
+                      aria-label={t.release.unfinishedAria({ title: hold.title })}
+                      onClick={() => void end(hold, true)}
+                    >
+                      {t.release.unfinished}
+                    </button>
+                  </div>
                 ) : (
                   me.admin &&
                   asked !== id && (
@@ -525,9 +556,20 @@ function HeldNow({ store, state, project, held, me }: BoardProps) {
           {t.nothingHeld({ time: format.time(state.asOf ?? "", seconds) })}
         </p>
       )}
+      {rows.some(({ hold, gone }) => !gone && hold.holder === me.id) && (
+        <p className="field-help">{t.release.finishHint}</p>
+      )}
       <p className="field-help">{t.honesty}</p>
     </section>
   );
+}
+
+/** Selected tasks stay visible when their unfinished hold leaves the task list. */
+export function taskChoices(tasks: CollabDependency[], selected: CollabDependency[]) {
+  return [
+    ...tasks,
+    ...selected.filter((chosen) => !tasks.some((task) => task.taskId === chosen.taskId)),
+  ];
 }
 
 /** The board of one repository: Start work, which asks before it takes, and Held now. */
@@ -537,10 +579,12 @@ function Board(props: BoardProps) {
   const format = useFormat();
   const [title, setTitle] = useState("");
   const [paths, setPaths] = useState("");
+  const [tasks, setTasks] = useState<CollabDependency[]>([]);
+  const [prerequisites, setPrerequisites] = useState<CollabDependency[]>([]);
   /** The last answer, with the paths and the board it is about: it shows for those only. */
   const [answered, setAnswered] = useState<{ asked: string; held: CollabHold[]; answer: Answer }>();
   const [busy, setBusy] = useState(false);
-  const [refusal, setRefusal] = useState("");
+  const [refusal, setRefusal] = useState<{ text: string; dependencyPending: boolean }>();
   const titleField = useRef<HTMLInputElement>(null);
   const scopes = paths
     .split("\n")
@@ -551,6 +595,25 @@ function Board(props: BoardProps) {
   const answer =
     answered?.asked === asked && answered.held === held ? answered.answer : undefined;
   const check = `/projects/${encodeURIComponent(project)}`;
+  const choices = taskChoices(tasks, prerequisites);
+
+  useEffect(() => {
+    const request = new AbortController();
+    void store
+      .call<CollabTasksResponse>(`${check}/tasks`, { signal: request.signal })
+      .then((answer) => {
+        if (!request.signal.aborted) setTasks(answer.tasks);
+      })
+      .catch((error: unknown) => {
+        if (!request.signal.aborted)
+          setRefusal({ text: sentenceOf(error), dependencyPending: false });
+      });
+    return () => request.abort();
+  }, [store, check, held]);
+
+  useEffect(() => {
+    setRefusal((last) => (last?.dependencyPending ? undefined : last));
+  }, [held]);
 
   // Asked 400 ms after the last key, and again whenever the board changes.
   useEffect(() => {
@@ -567,7 +630,7 @@ function Board(props: BoardProps) {
         });
         // An answer for paths or a board that are no longer the ones on the page is dropped.
         if (request.signal.aborted) return;
-        setRefusal("");
+        setRefusal(undefined);
         setAnswered({
           asked,
           held,
@@ -593,7 +656,7 @@ function Board(props: BoardProps) {
         if (request.signal.aborted) return;
         // No answer, so no box; the sentence says why.
         setAnswered(undefined);
-        setRefusal(sentenceOf(error));
+        setRefusal({ text: sentenceOf(error), dependencyPending: false });
       }
     }, 400);
     return () => {
@@ -606,12 +669,22 @@ function Board(props: BoardProps) {
     event.preventDefault();
     if (busy) return;
     setBusy(true);
-    setRefusal("");
+    setRefusal(undefined);
     try {
-      await store.call(`${check}/work`, send("POST", { title: title.trim(), scopes }));
+      await store.call(
+        `${check}/work`,
+        send("POST", {
+          title: title.trim(),
+          scopes,
+          ...(prerequisites.length
+            ? { dependsOn: prerequisites.map((task) => task.taskId) }
+            : {}),
+        }),
+      );
       // The row arrives with the feed.
       setTitle("");
       setPaths("");
+      setPrerequisites([]);
       setAnswered(undefined);
       titleField.current?.focus();
     } catch (error) {
@@ -648,7 +721,11 @@ function Board(props: BoardProps) {
         setAnswered((last) =>
           last && (last.asked !== asked || last.held !== held) ? last : notTaken,
         );
-      } else setRefusal(sentenceOf(error));
+      } else
+        setRefusal({
+          text: sentenceOf(error),
+          dependencyPending: reasonOf(error) === "dependencyPending",
+        });
     } finally {
       setBusy(false);
     }
@@ -719,10 +796,61 @@ function Board(props: BoardProps) {
             <p className="field-help" id="hold-help">
               {t.pathsHelp}
             </p>
+            <fieldset className="group-dependencies" aria-describedby="depends-help depends-limit">
+              <legend className="field-label">{t.dependsOn.label}</legend>
+              <p className="field-help" id="depends-help">
+                {t.dependsOn.help}
+              </p>
+              {choices.length ? (
+                <div className="draft-task-items">
+                  {choices.map((task) => {
+                    const checked = prerequisites.some((chosen) => chosen.taskId === task.taskId);
+                    return (
+                      <label key={task.taskId}>
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          disabled={!checked && prerequisites.length >= 50}
+                          onChange={({ target }) =>
+                            setPrerequisites((current) =>
+                              target.checked
+                                ? [...current, { taskId: task.taskId, title: task.title }]
+                                : current.filter((chosen) => chosen.taskId !== task.taskId),
+                            )
+                          }
+                        />
+                        <span>{task.title}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="field-help">{t.dependsOn.empty}</p>
+              )}
+              {prerequisites.length > 0 && (
+                <div className="group-selected">
+                  <span>{t.dependsOn.selectedCount({ count: prerequisites.length })}</span>
+                  <button
+                    type="button"
+                    className="button secondary"
+                    onClick={() => {
+                      setPrerequisites([]);
+                      // The button goes with the selection: the focus must not go with it.
+                      focusSoon("#hold-paths");
+                    }}
+                  >
+                    {t.dependsOn.clear}
+                  </button>
+                </div>
+              )}
+              <p className="field-help" id="depends-limit">
+                {t.dependsOn.limitNote}
+              </p>
+            </fieldset>
             <HoldAnswer answer={answer} />
             {refusal && (
               <p className="inline-error" role="alert">
-                {refusal}
+                {refusal.text}
               </p>
             )}
             <button
