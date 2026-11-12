@@ -89,6 +89,10 @@ test("a first start with no provider CLI opens Welcome and shows how to install 
       "href",
       "https://code.claude.com/docs/en/overview",
     );
+    await expect(page.getByRole("link", { name: "Antigravity documentation" })).toHaveAttribute(
+      "href",
+      "https://antigravity.google/docs",
+    );
     await fits(page, 1280);
     await fits(page, 375);
     for (const width of widths) await commandsOnOneLine(page, width);
@@ -104,6 +108,10 @@ test("a first start with no provider CLI opens Welcome and shows how to install 
     await expect(page.getByRole("link", { name: "Claude Code 文件" })).toHaveAttribute(
       "href",
       "https://code.claude.com/docs/en/overview",
+    );
+    await expect(page.getByRole("link", { name: "Antigravity 文件" })).toHaveAttribute(
+      "href",
+      "https://antigravity.google/docs",
     );
     await fits(page, 1280);
     await fits(page, 375);
