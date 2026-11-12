@@ -16,7 +16,17 @@
  *   Security Policy can apply, and every page declares one;
  * - every image in assets/screenshots/ is a byte-identical copy of the one
  *   in docs/images/en/;
- * - the site's files total at most 5 MB.
+ * - the site's files total at most 5 MB;
+ * - on each zh-tw page, visible text and the translatable attributes and
+ *   meta text below are checked. Text inside code, pre or kbd is skipped.
+ *   After the kept English names in this file are removed, any remaining
+ *   Latin letter fails, whether or not the English page has that string.
+ *   A language-switch link with lang="en" or hreflang="en" keeps the
+ *   English autonym and is not checked.
+ *   A CJK character and a Latin letter or digit also need a space between
+ *   them (tags in between do not count; full-width punctuation does not
+ *   need a space). In site.js the zh side of `isZh ? zh : en` must not be
+ *   English.
  *
  * Browser checks (--browser), with the pages served from a static server on
  * 127.0.0.1, at 1440 x 900, 390 x 844 and 320 x 740:
@@ -44,8 +54,10 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { publishedInstallVersion } from "../scripts/published-version.mjs";
 
-const siteDir = path.dirname(fileURLToPath(import.meta.url));
-const repoDir = path.dirname(siteDir);
+const scriptDir = path.dirname(fileURLToPath(import.meta.url));
+/** CHECK_SITE_DIR points the static checks at a copy of site/, for tests. */
+const siteDir = process.env.CHECK_SITE_DIR ? path.resolve(process.env.CHECK_SITE_DIR) : scriptDir;
+const repoDir = path.dirname(scriptDir);
 const readme = fs.readFileSync(path.join(siteDir, "README.md"), "utf8");
 /** The site's size budget. */
 const maxSiteBytes = 5 * 1024 * 1024;
@@ -77,6 +89,309 @@ function generatedRanges(html) {
 
 const ids = (html) => new Set([...html.matchAll(/\sid="([^"]+)"/g)].map((match) => match[1]));
 const listedInReadme = (value) => readme.includes(value);
+
+/**
+ * Names that stay English on zh-tw pages. Longest first, so "Claude Code"
+ * is removed before "Claude" and "BELL PR" before "BELL". A checked string
+ * fails when any Latin letter remains after these are removed.
+ * "macOS · Linux" passes. "Deploy now" does not.
+ *
+ * Brand, product and tool names, plus terms the Traditional Chinese pages
+ * keep on purpose: issue, pull request, repository, diff, vibe coding,
+ * Draft PR, Agent (capitalized), the role names, CLI, API and AI.
+ */
+const keptInEnglish = [
+  "Apache License",
+  "Claude Code",
+  "Antigravity",
+  "PowerShell",
+  "Homebrew",
+  "Node.js",
+  "Google Cloud",
+  "vibe coding",
+  "git worktree",
+  "pull request",
+  "Pull request",
+  "Draft PR",
+  "Test analyst",
+  "bubblewrap",
+  "repository",
+  "Teammates",
+  "teammates",
+  "teammate",
+  "BELL PR",
+  "bell-pr",
+  "worktree",
+  "GitHub",
+  "OpenAI",
+  "Anthropic",
+  "Reviewer",
+  "Gemini",
+  "Google",
+  "Claude",
+  "Codex",
+  "Docker",
+  "Ubuntu",
+  "Debian",
+  "macOS",
+  "Linux",
+  "Windows",
+  "issue",
+  "Shell",
+  "WSL2",
+  "Draft",
+  "WSL",
+  "Apache",
+  "Agent",
+  "diff",
+  "PATH",
+  "npm",
+  "npx",
+  "mise",
+  "Markdown",
+  "socat",
+  "sudo",
+  "beta",
+  "Bun",
+  "bun",
+  "curl",
+  "brew",
+  "ps1",
+  "Git",
+  "BELL",
+  "Lead",
+  "CLI",
+  "API",
+  "Inc.",
+  "LLC",
+  "PBC",
+  "PR",
+  "AI",
+].sort((a, b) => b.length - a.length);
+
+const skipTextTags = new Set(["script", "style", "code", "pre", "kbd", "title"]);
+const voidTags = new Set(["area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "source", "track", "wbr"]);
+
+function decodeEntities(text) {
+  return text
+    .replace(/&#x([0-9a-f]+);/gi, (_, hex) => String.fromCodePoint(Number.parseInt(hex, 16)))
+    .replace(/&#(\d+);/g, (_, digits) => String.fromCodePoint(Number(digits)))
+    .replace(/&nbsp;/g, " ")
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;|&#39;/g, "'")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&amp;/g, "&");
+}
+
+/**
+ * Visible text nodes, excluding code, pre and kbd. Whitespace is collapsed.
+ * `unclosed` names a skip tag still open at the end; text after it was not checked.
+ */
+/** A language-switch link written in English (`lang="en"` or `hreflang="en"`). */
+function englishSwitch(raw) {
+  const lang = raw.match(/\slang="([^"]*)"/i)?.[1] ?? "";
+  const hrefLang = raw.match(/\shreflang="([^"]*)"/i)?.[1] ?? "";
+  return /^en\b/i.test(lang) || /^en\b/i.test(hrefLang);
+}
+
+function visibleTextNodes(html) {
+  const nodes = [];
+  const stack = [];
+  let unclosed;
+  let index = 0;
+  while (index < html.length) {
+    if (html.startsWith("<!--", index)) {
+      const end = html.indexOf("-->", index);
+      index = end === -1 ? html.length : end + 3;
+      continue;
+    }
+    if (html[index] === "<") {
+      const end = html.indexOf(">", index);
+      const raw = html.slice(index + 1, end === -1 ? html.length : end);
+      index = end === -1 ? html.length : end + 1;
+      if (raw.startsWith("/") || raw.startsWith("!") || raw.startsWith("?")) {
+        if (raw.startsWith("/")) {
+          const name = raw.slice(1).trim().split(/\s/)[0].toLowerCase();
+          for (let at = stack.length - 1; at >= 0; at -= 1) {
+            if (stack[at].tag === name) {
+              // A parent close must not hide a skip tag that was never closed.
+              unclosed ??= stack.slice(at + 1).find((frame) => skipTextTags.has(frame.tag))?.tag;
+              stack.splice(at);
+              break;
+            }
+          }
+        }
+        continue;
+      }
+      const tag = raw.split(/[\s/>]/)[0].toLowerCase();
+      if (!raw.endsWith("/") && !voidTags.has(tag)) {
+        const inherited = stack.at(-1)?.english ?? false;
+        stack.push({ tag, english: inherited || englishSwitch(raw) });
+      }
+      continue;
+    }
+    const end = html.indexOf("<", index);
+    const raw = html.slice(index, end === -1 ? html.length : end);
+    index = end === -1 ? html.length : end;
+    if (stack.some((frame) => skipTextTags.has(frame.tag) || frame.english)) continue;
+    const text = decodeEntities(raw).replace(/\s+/g, " ").trim();
+    if (text) nodes.push(text);
+  }
+  return { texts: nodes, unclosed: unclosed ?? stack.find((frame) => skipTextTags.has(frame.tag))?.tag };
+}
+
+/** True when `text` is only kept names, separators and digits. */
+function onlyKeptNames(text) {
+  let rest = text;
+  for (const name of keptInEnglish) rest = rest.split(name).join(" ");
+  return !/[A-Za-z]/.test(rest);
+}
+
+const metaNames = new Set(["description", "og:title", "og:description", "twitter:title", "twitter:description"]);
+
+/** Visible text, plus alt, title, aria-label, placeholder, label, the document title and description metas. */
+function translatableStrings(html) {
+  const { texts, unclosed } = visibleTextNodes(html);
+  const found = texts.map((text) => ["text", text]);
+  const title = /<title>([^<]*)<\/title>/i.exec(html);
+  if (title) {
+    const text = decodeEntities(title[1]).replace(/\s+/g, " ").trim();
+    if (text) found.push(["title", text]);
+  }
+  const attr = (raw, name) => {
+    const match = raw.match(new RegExp(`(?:^|\\s)${name}\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s"'>]+))`, "i"));
+    return match?.slice(1).find((part) => part !== undefined);
+  };
+  for (const match of html.matchAll(/<(?:meta|[a-z0-9]+)\b([^>]*)>/gi)) {
+    const raw = match[1];
+    for (const name of ["alt", "title", "aria-label", "placeholder", "label"]) {
+      const text = attr(raw, name);
+      if (text === undefined) continue;
+      const normalized = decodeEntities(text).replace(/\s+/g, " ").trim();
+      if (normalized) found.push([name, normalized]);
+    }
+    const meta = attr(raw, "name") || attr(raw, "property");
+    const content = attr(raw, "content");
+    if (meta && content && metaNames.has(meta)) {
+      const normalized = decodeEntities(content).replace(/\s+/g, " ").trim();
+      if (normalized) found.push([meta, normalized]);
+    }
+  }
+  return { found, unclosed };
+}
+
+const isCjk = (ch) => /\p{Script=Han}/u.test(ch);
+const isLatinOrDigit = (ch) => /[A-Za-z0-9]/u.test(ch);
+/** A new block starts a new run of text, so a heading is not glued to the next paragraph. */
+const blockTags = new Set([
+  "address", "article", "aside", "blockquote", "body", "br", "dd", "details", "div", "dl", "dt",
+  "figcaption", "figure", "footer", "h1", "h2", "h3", "h4", "h5", "h6", "header", "hr", "li",
+  "main", "nav", "ol", "p", "section", "summary", "table", "tbody", "td", "tfoot", "th", "thead", "tr", "ul",
+]);
+
+/**
+ * Visible characters in order. Inline tags are ignored, so a boundary can sit
+ * on either side of them. A block tag inserts a space. script and style are
+ * omitted. code, pre and kbd stay, because the space rule is about what a
+ * reader sees.
+ */
+function visibleFlow(html) {
+  let flow = "";
+  const stack = [];
+  const skip = new Set(["script", "style"]);
+  let index = 0;
+  while (index < html.length) {
+    if (html.startsWith("<!--", index)) {
+      const end = html.indexOf("-->", index);
+      index = end === -1 ? html.length : end + 3;
+      continue;
+    }
+    if (html[index] === "<") {
+      const end = html.indexOf(">", index);
+      const raw = html.slice(index + 1, end === -1 ? html.length : end);
+      index = end === -1 ? html.length : end + 1;
+      if (raw.startsWith("/") || raw.startsWith("!") || raw.startsWith("?")) {
+        if (raw.startsWith("/")) {
+          const name = raw.slice(1).trim().split(/\s/)[0].toLowerCase();
+          for (let at = stack.length - 1; at >= 0; at -= 1) {
+            if (stack[at] === name) {
+              stack.splice(at);
+              break;
+            }
+          }
+        }
+        continue;
+      }
+      const tag = raw.split(/[\s/>]/)[0].toLowerCase();
+      if (blockTags.has(tag)) flow += " ";
+      if (!raw.endsWith("/") && !voidTags.has(tag)) stack.push(tag);
+      continue;
+    }
+    const end = html.indexOf("<", index);
+    const raw = html.slice(index, end === -1 ? html.length : end);
+    index = end === -1 ? html.length : end;
+    if (stack.some((tag) => skip.has(tag))) continue;
+    flow += decodeEntities(raw);
+  }
+  return flow;
+}
+
+/** CJK and a Latin letter or digit with nothing between them (inline tags do not count). */
+function cjkLatinGaps(flow) {
+  const gaps = [];
+  const seen = new Set();
+  const chars = [...flow];
+  for (let i = 0; i < chars.length - 1; i += 1) {
+    const left = chars[i];
+    const right = chars[i + 1];
+    if (!((isCjk(left) && isLatinOrDigit(right)) || (isLatinOrDigit(left) && isCjk(right)))) continue;
+    const snippet = chars.slice(Math.max(0, i - 12), i + 14).join("").replace(/\s+/g, " ");
+    if (seen.has(snippet)) continue;
+    seen.add(snippet);
+    gaps.push(snippet);
+  }
+  return gaps;
+}
+
+/** English left on a zh-tw page: Latin letters that are not kept names, and a missing space at a CJK/Latin boundary. */
+function checkZhTw(problems) {
+  for (const file of pages()) {
+    if (!file.startsWith("zh-tw/") || !file.endsWith(".html")) continue;
+    const english = file.slice("zh-tw/".length);
+    if (!fs.existsSync(path.join(siteDir, english))) problems.push(`${file}: no English page at ${english}`);
+    const html = fs.readFileSync(path.join(siteDir, file), "utf8");
+    const zh = translatableStrings(html);
+    if (zh.unclosed) problems.push(`${file}: <${zh.unclosed}> is never closed, so the text after it was not checked`);
+    const seen = new Set();
+    for (const [kind, text] of zh.found) {
+      if (seen.has(text) || onlyKeptNames(text)) continue;
+      seen.add(text);
+      problems.push(`${file}: untranslated ${kind} "${text}"`);
+    }
+    const gaps = new Set(cjkLatinGaps(visibleFlow(html)));
+    for (const [kind, text] of zh.found) {
+      if (kind === "text") continue;
+      for (const gap of cjkLatinGaps(text)) gaps.add(gap);
+    }
+    for (const gap of gaps) problems.push(`${file}: missing space "${gap}"`);
+  }
+}
+
+/** User-facing copy in site.js is `isZh ? zh : en`. The two sides must both exist and differ. */
+function checkSiteJs(problems) {
+  const js = fs.readFileSync(path.join(siteDir, "site.js"), "utf8");
+  const pattern = /isZh\s*\?\s*(?:"((?:\\.|[^"\\])*)"|'((?:\\.|[^'\\])*)')\s*:\s*(?:"((?:\\.|[^"\\])*)"|'((?:\\.|[^'\\])*)')/g;
+  const pairs = [...js.matchAll(pattern)];
+  if (pairs.length === 0) problems.push("site.js: no isZh ? zh : en string");
+  for (const match of pairs) {
+    const zh = match[1] ?? match[2];
+    const en = match[3] ?? match[4];
+    if (zh === en) problems.push(`site.js: zh and en are the same "${zh}"`);
+    else if (!onlyKeptNames(zh)) problems.push(`site.js: zh is still English "${zh}"`);
+  }
+  if (/textContent\s*=\s*["'][^"']+["']/.test(js)) problems.push("site.js: textContent is set from a string with no zh branch");
+}
 
 /** Every file under site/, relative to it. */
 function siteFiles(dir = siteDir) {
@@ -166,6 +481,9 @@ function checkStatic() {
     .filter((name) => !/\.(mp4|webm)$/i.test(name))
     .reduce((total, name) => total + fs.statSync(path.join(siteDir, name)).size, 0);
   if (bytes > maxSiteBytes) problems.push(`site/: ${bytes} bytes, over the ${maxSiteBytes}-byte budget`);
+
+  checkZhTw(problems);
+  checkSiteJs(problems);
 
   // Stylesheets may load fonts and images through url().
   for (const css of fs.readdirSync(siteDir).filter((name) => name.endsWith(".css"))) {

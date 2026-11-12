@@ -162,6 +162,10 @@ pre {
   background: var(--muted);
   color: var(--text);
 }
+/* A hyphen or slash would otherwise break a command. wbr still breaks. */
+html[lang="zh-Hant-TW"] :not(pre):not(.command) > code {
+  white-space: nowrap;
+}
 
 .skip-link {
   position: absolute;
