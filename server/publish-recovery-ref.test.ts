@@ -391,3 +391,45 @@ test("a sync snapshot does not count as another copy of an unpushed recovery com
     await f.cleanup();
   }
 });
+
+test("another run's sync snapshot does not count as another copy of an unpushed recovery commit", async () => {
+  const f = await fixture();
+  try {
+    await assert.rejects(
+      f.workbench.publish(f.run.id, f.run.approvedFingerprint!, [
+        "facts-unknown",
+      ]),
+    );
+    const commit = f.run.publishCommit;
+    assert.ok(commit);
+    const ref = `refs/bellpr/publish-recovery/${f.run.id}/${commit}`;
+    await f.workbench.recoverPublish(f.run.id, commit);
+    await git(f.repository, ["update-ref", `refs/heads/${f.run.branch}`, f.baseSha]);
+    const tree = (
+      await git(f.repository, ["rev-parse", `${commit}^{tree}`])
+    ).stdout.trim();
+    const snapshot = (
+      await git(f.repository, ["commit-tree", tree, "-p", commit], {
+        input: "BELL: checkout before syncing with the target branch\n",
+      })
+    ).stdout.trim();
+    await git(f.repository, ["update-ref", "refs/bellpr/sync/other-run", snapshot]);
+    const fingerprint = "e".repeat(64);
+    f.run.approvedFingerprint = fingerprint;
+    f.run.status = "published";
+    f.run.prUrl = prUrl;
+    f.run.headRepository = "test-owner/example";
+    f.run.publishedBranch = f.run.branch;
+    await f.workbench.publish(f.run.id, fingerprint, ["facts-unknown"]);
+    assert.equal(await recoveryRefs(f.repository), `${ref} ${commit}`);
+    f.run.worktreePath = path.join(
+      f.workbench.store.directory,
+      "worktrees",
+      f.run.id,
+    );
+    await f.workbench.removeWorkspace(f.run.id);
+    assert.equal(await recoveryRefs(f.repository), `${ref} ${commit}`);
+  } finally {
+    await f.cleanup();
+  }
+});
