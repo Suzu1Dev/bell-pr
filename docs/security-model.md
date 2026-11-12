@@ -578,7 +578,9 @@ The sudo panel and the doctor warning for that file show:
   global `url.*.insteadOf` rewrite does not change which project it is. An
   origin whose URL contains userinfo is not used as a GitHub source: the
   project is imported as a local one, and that address is not stored or
-  logged. Otherwise the clone keeps no remote and runs start from its own
+  logged. The project list and the project page say to replace OWNER and
+  REPO, update that remote in the checkout, remove the local project, and
+  import the folder again. Otherwise the clone keeps no remote and runs start from its own
   branches.
   A project that an earlier version imported in place
   moves to such a clone when its next run starts, once none of its runs

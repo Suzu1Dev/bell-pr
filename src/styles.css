@@ -1432,6 +1432,71 @@ button {
   line-height: 1.8;
   color: var(--color-accent-600);
 }
+.origin-ignored {
+  min-width: 0;
+  max-width: 100%;
+}
+.origin-ignored .copy-command {
+  min-width: 0;
+  max-width: 100%;
+}
+.origin-notice-slot {
+  container-type: inline-size;
+  container-name: origin-notice;
+}
+@media (min-width: 761px) {
+  .repository-card:has(.origin-ignored) {
+    container-type: inline-size;
+    container-name: origin-notice;
+  }
+  .origin-ignored {
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+  .origin-ignored > p {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  .origin-ignored .copy-command {
+    flex: 1 1 auto;
+    max-width: 100%;
+  }
+  .origin-ignored .copy-command-row {
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .origin-ignored .copy-command-row code {
+    flex: 1 1 auto;
+    min-width: max-content;
+    max-width: 100%;
+    white-space: normal;
+    overflow-wrap: break-word;
+    overflow-x: visible;
+  }
+  @container origin-notice (max-width: 36rem) {
+    .origin-ignored {
+      flex-direction: column;
+      align-items: stretch;
+      width: 100%;
+    }
+    .origin-ignored .copy-command,
+    .origin-ignored .copy-command-row {
+      width: 100%;
+      min-width: 0;
+      max-width: 100%;
+    }
+    .origin-ignored .copy-command-row code {
+      flex: 1 1 100%;
+      min-width: 0;
+      max-width: 100%;
+    }
+  }
+}
+@media (max-width: 760px) {
+  .origin-ignored {
+    flex-direction: column;
+  }
+}
 .draft-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 268px;

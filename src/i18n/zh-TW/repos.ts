@@ -4,6 +4,11 @@ import { product } from "../../../shared/product";
 import type en from "../en/repos";
 
 const m: Translation<typeof en> = {
+  originIgnored:
+    "origin 網址含有帳號或權杖，因此以本機專案匯入。請把 OWNER 與 REPO 換成你的專案，在工作目錄更新 remote，並改用 credential helper。移除此本機專案後，再匯入該資料夾。",
+  originIgnoredCommand: "git remote set-url origin https://github.com/OWNER/REPO",
+  originIgnoredReplace: "請替換 OWNER 與 REPO。",
+  originIgnoredReplaceLabel: ({ command }) => `複製指令。請替換 OWNER 與 REPO：${command}`,
   list: {
     title: "專案",
     intro: "開啟已匯入的專案，或加入新專案。",
