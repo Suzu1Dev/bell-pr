@@ -372,20 +372,29 @@ test.describe("a Learn-by-hand run in review, marked ready", () => {
       await page.getByRole("tab", { name: t.review.panel.tabs.walkthrough }).click();
       await page.locator(`.file-item[title="${files.format}"]`).click();
       await expect(page.locator(".file-item.selected")).toHaveAttribute("title", files.format);
-      // Installed before the reload and run across the 2s–4s timers. The
-      // round trip after that is so a timer's POST is already in the log.
+      // Logged before reload, then kept only if the read started after it.
+      // The clock runs the 2s–4s timers; the round trip lets a timer's POST land.
+      const seen: Response[] = [];
+      page.on("response", (response) => seen.push(response));
       await page.clock.install();
       const navigation = await page.reload({ waitUntil: "commit" });
       if (!navigation) throw new Error("The reload did not commit.");
       const reloadedAt = navigation.request().timing().startTime;
-      const getAfterReload = (path: string) => (response: Response) =>
-        response.request().method() === "GET" &&
-        new URL(response.url()).pathname === path &&
-        response.request().timing().startTime >= reloadedAt;
-      const readAfterReload = (path: string) =>
-        page.waitForResponse(getAfterReload(path), { timeout: 5_000 }).catch((error: unknown) => {
-          throw new Error(`No GET ${path} after reload.`, { cause: error });
-        });
+      const readAfterReload = (path: string) => new Promise<void>((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error(`No GET ${path} after reload.`)), 5_000);
+        const matches = (response: Response) =>
+          response.request().method() === "GET" &&
+          new URL(response.url()).pathname === path &&
+          response.request().timing().startTime >= reloadedAt;
+        const finish = () => {
+          if (!seen.some(matches)) return;
+          clearTimeout(timer);
+          page.off("response", finish);
+          resolve();
+        };
+        page.on("response", finish);
+        finish();
+      });
       const understanding = readAfterReload(`/api/runs/${runId}/understanding`);
       const insights = readAfterReload(`/api/repos/${repoId}/insights`);
       await expect(page.locator(".explain-panel")).toBeVisible();
