@@ -987,6 +987,7 @@ function buildReport(
             status: "fail" as const,
             reason: "claude-only",
             detail: `${m.claudeOnlyRelease}\n${m.installClaudeCode}`,
+            ...fixes(providerFixes("claude", facts)),
           }
         : {
           status: "fail",

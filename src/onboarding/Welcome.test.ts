@@ -128,6 +128,9 @@ test("the provider step picks the only ready provider and lets the person choose
   const blocked = renderEn(welcome("provider", { doctor: doctor(onlyCodex) }));
   assert.match(blocked, /1\.0\.0 supports Claude Code only; Codex support is disabled\./);
   assert.match(blocked, /Install Claude Code\./);
+  assert.match(blocked, /See the <a[^>]*>Claude Code documentation<\/a> for other ways to install it\./);
+  assert.doesNotMatch(blocked, /See the Codex CLI/);
+  assert.doesNotMatch(blocked, /Antigravity documentation/);
   assert.doesNotMatch(blocked, /No AI provider is ready yet/);
   providerReady.detail = "1.0.0 只支援 Claude Code；Codex 已停用。\n請安裝 Claude Code。";
   const blockedZh = renderZh(welcome("provider", { doctor: doctor(onlyCodex) }));
@@ -186,6 +189,8 @@ test("with no provider ready, Welcome shows how to install one", () => {
   assert.match(html, /See the <a[^>]*>Codex CLI<\/a> for other ways to install it\./);
   assert.match(html, /href="https:\/\/code\.claude\.com\/docs\/en\/overview"/);
   assert.match(html, /See the <a[^>]*>Claude Code documentation<\/a> for other ways to install it\./);
+  assert.match(html, /href="https:\/\/antigravity.google\/docs"/);
+  assert.match(html, /See the <a[^>]*>Antigravity documentation<\/a> for other ways to install it\./);
   const zh = renderZh(welcome("provider", { doctor: doctor(missing) }));
   assert.match(zh, /歡迎使用 BELL PR/);
   assert.match(
@@ -196,6 +201,30 @@ test("with no provider ready, Welcome shows how to install one", () => {
   assert.match(zh, /href="https:\/\/github.com\/openai\/codex"/);
   assert.match(zh, /其他安裝方式請見 <a[^>]*>Claude Code 文件<\/a>/);
   assert.match(zh, /href="https:\/\/code\.claude\.com\/docs\/en\/overview"/);
+  assert.match(zh, /其他安裝方式請見 <a[^>]*>Antigravity 文件<\/a>/);
+  assert.match(zh, /href="https:\/\/antigravity.google\/docs"/);
+});
+
+test("a provider that is not ready shows only that provider's install link", () => {
+  const chosen = {
+    ...none,
+    checks: none.checks.map((check) =>
+      check.id === "provider-ready"
+        ? {
+            ...check,
+            status: "fail" as const,
+            reason: "chosen-not-ready",
+            params: { provider: "claude" },
+            fixes: [{ label: "Sign in to Claude Code", command: "claude auth login" }],
+          }
+        : check,
+    ),
+  };
+  const html = renderEn(welcome("provider", { doctor: doctor(chosen) }));
+  assert.match(html, /claude auth login/);
+  assert.match(html, /Claude Code documentation/);
+  assert.doesNotMatch(html, /See the Codex CLI/);
+  assert.doesNotMatch(html, /Antigravity documentation/);
 });
 
 test("the last step offers the tour, an import and discovery, which waits for the GitHub CLI", () => {
