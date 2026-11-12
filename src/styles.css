@@ -67,7 +67,13 @@ a {
 }
 /* Diff rows sit in a scroll container that would clip an outer ring. Same
    specificity as the rule above, so it has to come after it. */
-:root .rv-line:focus-visible {
+:root .rv-line:focus-visible,
+:root .review-toolbar:focus-visible,
+:root .file-tree:focus-visible,
+:root .mission-idea-list:focus-visible,
+:root .mission-section-nav ul:focus-visible,
+:root .publish-body-preview pre:focus-visible {
+  outline-offset: 0;
   box-shadow: var(--focus-ring-inset);
 }
 a {
@@ -2455,10 +2461,39 @@ button {
 .draft-task-items span {
   overflow-wrap: anywhere;
 }
+.publish-outgoing > div:first-child pre {
+  max-width: 100%;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
 .publish-body-preview {
   margin-top: 16px;
   border: 1px solid var(--color-border-subtle);
   border-radius: 8px;
+}
+.publish-body-preview pre {
+  margin: 0;
+  padding: 12px 14px;
+  max-width: 100%;
+  overflow: auto;
+  border: 0;
+  background: var(--color-surface-sunken);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  line-height: 1.7;
+  white-space: pre;
+  /* A fade on the side that still has more to scroll. The covers move with
+     the text and hide the fade at each end; nothing sits on top of the text
+     or the focus ring. */
+  background-image:
+    linear-gradient(to right, var(--color-surface-sunken) 45%, transparent),
+    linear-gradient(to left, var(--color-surface-sunken) 45%, transparent),
+    linear-gradient(to right, color-mix(in srgb, var(--color-text) 28%, transparent), transparent),
+    linear-gradient(to left, color-mix(in srgb, var(--color-text) 28%, transparent), transparent);
+  background-repeat: no-repeat;
+  background-size: 28px 100%, 28px 100%, 14px 100%, 14px 100%;
+  background-position: 0 0, 100% 0, 0 0, 100% 0;
+  background-attachment: local, local, scroll, scroll;
 }
 .publish-body-preview summary {
   padding: 10px 14px;
@@ -3116,6 +3151,7 @@ button {
     font-size: var(--text-2xs);
   }
   .modal-actions {
+    flex-wrap: wrap;
     gap: 7px;
   }
   .modal-actions .button {

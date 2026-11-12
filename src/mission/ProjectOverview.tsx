@@ -275,7 +275,7 @@ function SectionNav({ sections }: { sections: OverviewSection[] }) {
   }, [sectionKey]);
   return (
     <nav className="mission-section-nav" aria-label={t.label}>
-      <ul ref={list}>
+      <ul ref={list} tabIndex={0}>
         {sections.map((section) => (
           <li key={section}>
             <a

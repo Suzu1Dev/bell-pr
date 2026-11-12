@@ -154,7 +154,7 @@ export function DiffView({
     start: number;
     end: number;
   } | null>(null);
-  // The list of lines is one tab stop; the arrow keys move inside it.
+  // The list of lines is one tab stop; up and down move inside it.
   const roving = useRovingList(codeLines.length, { pageSize: linesPerPage });
   const askButton = useRef<HTMLButtonElement>(null);
   const focusAskButton = useRef(false);
@@ -329,6 +329,12 @@ export function DiffView({
       if (!selection) return;
       event.preventDefault();
       setSelection(null);
+    } else if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+      // Up and down stay on the lines. Left and right move the code sideways.
+      const box = codeScroll.current;
+      if (!box || box.scrollWidth <= box.clientWidth + 1) return;
+      event.preventDefault();
+      box.scrollLeft += (event.key === "ArrowRight" ? 1 : -1) * (box.clientWidth / 4);
     } else {
       const next = roving.handleKeyDown(event);
       if (next !== undefined && event.shiftKey) {

@@ -242,6 +242,14 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   provider". When Ubuntu's restriction on user namespaces stops the
   Antigravity sandbox, the error no longer offers signing in to Claude
   Code as a fix, because Claude Code's sandbox can need the same setting.
+- **Sideways overflow on the overview and in the publish dialog.** The
+  contribution directions stay a sideways row you can scroll (arrow keys,
+  previous and next), and that row no longer pushes its section wider than
+  the page. The run's tabs, the section links and the file list scroll
+  from the keyboard: each is named and shows a focus ring. The diff stays
+  one tab stop; the left and right arrow keys scroll its lines sideways.
+  The publish description keeps its long lines, scrolls them with the
+  arrow keys, and shows a fade on the side that still has more to scroll.
 - **Other requests no longer wait while the server starts Git.** Before each
   Git command, the server read the repository's driver settings with a
   synchronous `git config`, so no other request was served until it
