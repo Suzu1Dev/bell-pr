@@ -427,6 +427,23 @@ test("every demo file has a selfCheck question and alternatives in both locales"
     }
 });
 
+test("the sample draws its flow through its own modules and each example as steps that differ", () => {
+  for (const locale of locales) {
+    const { insights, files } = getDemo(locale);
+    const modules = new Set(insights.modules.map((module) => module.path));
+    const flow = insights.flow ?? [];
+    assert.ok(flow.length >= 2 && flow.length <= 6, locale);
+    for (const step of flow)
+      assert.ok(step.path === "" || modules.has(step.path), `${locale} ${step.path}`);
+    assert.equal(flow.at(-1)?.passes, "", locale);
+    for (const file of files) {
+      const { beforeSteps = [], afterSteps = [] } = file.explanation?.example ?? {};
+      assert.ok(beforeSteps.length >= 2 && afterSteps.length >= 2, `${locale} ${file.path}`);
+      assert.ok(afterSteps.some((step) => step.changed), `${locale} ${file.path}`);
+    }
+  }
+});
+
 test("the sample CONTRIBUTING.md yields exactly the issue-first, understand and disclose rules", () => {
   for (const locale of locales) {
     const demo = getDemo(locale);

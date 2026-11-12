@@ -33,8 +33,17 @@ const messages: Translation<typeof en> = {
   explanationStatus: ({ status }) => `解說狀態：${status}`,
   explanationStatusWithError: ({ status, error }) =>
     `解說狀態：${status}（${error}）`,
-  example: ({ scenario, before, after }) =>
-    `**白話文舉例**\n\n- 情境：${scenario}\n- 修改前：${before}\n- 修改後：${after}`,
+  example: ({ scenario, before, after, beforeSteps = [], afterSteps = [] }) => {
+    const chain = (steps: typeof beforeSteps) =>
+      steps
+        .map((step) => (step.changed ? `${step.label}（不同）` : step.label))
+        .join(" → ");
+    const steps =
+      beforeSteps.length && afterSteps.length
+        ? `\n- 修改前的步驟：${chain(beforeSteps)}\n- 修改後的步驟：${chain(afterSteps)}`
+        : "";
+    return `**白話文舉例**\n\n- 情境：${scenario}\n- 修改前：${before}\n- 修改後：${after}${steps}`;
+  },
   fields: {
     summary: "改了什麼",
     reason: "為什麼改",

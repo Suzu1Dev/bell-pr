@@ -47,12 +47,25 @@ const messages = {
     scenario,
     before,
     after,
+    beforeSteps = [],
+    afterSteps = [],
   }: {
     scenario: string;
     before: string;
     after: string;
-  }) =>
-    `**In everyday terms**\n\n- Scenario: ${scenario}\n- Before: ${before}\n- After: ${after}`,
+    beforeSteps?: { label: string; changed: boolean }[];
+    afterSteps?: { label: string; changed: boolean }[];
+  }) => {
+    const chain = (steps: typeof beforeSteps) =>
+      steps
+        .map((step) => (step.changed ? `${step.label} (differs)` : step.label))
+        .join(" → ");
+    const steps =
+      beforeSteps.length && afterSteps.length
+        ? `\n- Before, step by step: ${chain(beforeSteps)}\n- After, step by step: ${chain(afterSteps)}`
+        : "";
+    return `**In everyday terms**\n\n- Scenario: ${scenario}\n- Before: ${before}\n- After: ${after}${steps}`;
+  },
   /** Labels of the explanation card fields, in the order they are exported. */
   fields: {
     summary: "What changed",
