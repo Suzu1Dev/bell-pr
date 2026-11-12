@@ -52,7 +52,10 @@ Recovery checks the project and your signed-in account's fork for matching
 branches, and checks the project for matching PRs in any state. If no branch
 or PR exists, it backs up the old commit locally, keeps your files and draft,
 and returns the contribution to review. Review and approve it again, then
-submit the Draft PR as usual.
+submit the Draft PR as usual. After a later publish succeeds, or when the
+run is removed, that backup is deleted only if the commit is already
+reachable from the remote branch, the pull request, or another ref. If it
+may be the only copy, it stays.
 
 If GitHub cannot be checked, fix the connection or sign-in and try recovery
 again. If a branch or PR already exists, recovery leaves everything unchanged;

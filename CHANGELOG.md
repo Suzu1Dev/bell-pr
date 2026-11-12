@@ -146,6 +146,16 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- **A sync snapshot does not count as another copy of a recovered commit.**
+  `refs/bellpr/sync/<run>` is removed with the run's files, so a
+  publish-recovery ref is kept when that snapshot is the only other ref
+  that can reach the commit.
+- **A publish-recovery ref is deleted only when its commit is already
+  reachable.** After a later publish succeeds, or when a run is removed,
+  `refs/bellpr/publish-recovery/<run>/<commit>` is deleted if that commit
+  can be reached from the remote branch, the pull request, or another ref.
+  If it may be the only copy, it stays, and the log says why. Deleting a
+  ref that is already gone is not an error.
 - **The data-directory lock is written whole.** Where the file system
   supports hard links, a start writes its lock aside and links it into
   place, so no other start reads it half written. A stale lock is removed
