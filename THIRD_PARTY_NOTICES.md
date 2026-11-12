@@ -19,7 +19,7 @@ The browser code in `dist/assets` contains code from these packages.
 | devlop | 1.1.0 | MIT | [3](#license-text-3) |
 | escape-string-regexp | 5.0.0 | MIT | [4](#license-text-4) |
 | longest-streak | 3.1.0 | MIT | [5](#license-text-5) |
-| lucide-react | 1.59.0 | ISC | [6](#license-text-6) |
+| lucide-react | 1.70.0 | ISC | [6](#license-text-6) |
 | markdown-table | 3.0.4 | MIT | [2](#license-text-2) |
 | mdast-util-find-and-replace | 3.0.3 | MIT | [2](#license-text-2) |
 | mdast-util-from-markdown | 2.1.0 | MIT | [2](#license-text-2) |
@@ -398,7 +398,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 <a id="license-text-6"></a>
 
-### 6. Used by lucide-react 1.59.0
+### 6. Used by lucide-react 1.70.0
 
 ```text
 ISC License
