@@ -482,6 +482,61 @@ const splitRefSchema = loose({
   title: text.max(splitLimits.titleChars),
 });
 
+const teamRecordsSchema = loose({
+  fileReviews: later(
+    z.record(
+      text,
+      z
+        .array(
+          loose({
+            reviewerId: text,
+            reviewerName: text.max(80),
+            fingerprint: text,
+            reviewedAt: text,
+          }),
+        )
+        .max(32),
+    ),
+  ),
+  rationales: later(
+    z
+      .array(
+        loose({
+          id: text,
+          filePath: text,
+          lineStart: count.optional(),
+          lineEnd: count.optional(),
+          authorId: text,
+          authorName: text.max(80),
+          text: text.max(2000),
+          fingerprint: text.optional(),
+          createdAt: text,
+          updatedAt: text.optional(),
+        }),
+      )
+      .max(200),
+  ),
+  todos: later(
+    z
+      .array(
+        loose({
+          id: text,
+          filePath: text.optional(),
+          text: text.max(1000),
+          authorId: text,
+          authorName: text.max(80),
+          assigneeId: text.optional(),
+          assigneeName: text.max(80).optional(),
+          done: z.boolean(),
+          doneBy: text.max(80).optional(),
+          doneAt: text.optional(),
+          createdAt: text,
+        }),
+      )
+      .max(200),
+  ),
+});
+
 /** Read schema of a run in state.json (lenientRead wraps it below). */
 const sessionSchema = loose({
   messages: z.array(loose({
@@ -674,6 +729,8 @@ export const runReadSchema = loose({
     group: later(loose({ after: later(z.array(text).max(groupAfterLimit)) })),
     // The write guard's S2 (server/hold-guard.ts), optional in the same way.
     owners: later(z.array(text.max(64)).max(maxRunOwners)),
+    // Team reviews, rationales & handoff TODOs (server/team-records.ts).
+    teamRecords: later(teamRecordsSchema),
 });
 
 const runSchema = lenientRead(runReadSchema);

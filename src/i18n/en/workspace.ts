@@ -773,6 +773,56 @@ const workspace = {
       reason: string;
     }) => `${title}: ${url}\nQuote: ${quote}\nRelevance: ${reason}`,
   },
+  teamCollab: {
+    viewingRun: ({ names }: { names: string }) => `Teammates viewing this run: ${names}`,
+    viewingFile: ({ names }: { names: string }) => `Viewing this file now: ${names}`,
+    viewingLines: ({ name, start, end }: { name: string; start: number; end: number }) =>
+      start === end ? `${name} (L${start})` : `${name} (L${start}–L${end})`,
+    fileHeld: ({ holder, title }: { holder: string; title: string }) =>
+      `Held by ${holder} for “${title}” — conflicting edits and publish are blocked.`,
+    rangeHeld: ({
+      holder,
+      start,
+      end,
+      title,
+    }: {
+      holder: string;
+      start: number;
+      end: number;
+      title: string;
+    }) =>
+      `Lines ${start}–${end} are held by ${holder} for “${title}”. Non-overlapping lines in this file remain open for concurrent work.`,
+    rangeOverlap: ({
+      holder,
+      start,
+      end,
+    }: {
+      holder: string;
+      start: number;
+      end: number;
+    }) => `Your selected lines overlap ${holder}'s hold on lines ${start}–${end}.`,
+    dependencyGuard: ({
+      holder,
+      otherPath,
+      title,
+    }: {
+      holder: string;
+      otherPath: string;
+      title: string;
+    }) =>
+      `Dependency guard: ${otherPath} is held by ${holder} (“${title}”). Agent edits and holds here are blocked until released.`,
+    dependencyWarn: ({
+      holder,
+      otherPath,
+      title,
+    }: {
+      holder: string;
+      otherPath: string;
+      title: string;
+    }) =>
+      `Dependency warning: ${otherPath} is currently held by ${holder} (“${title}”). Coordinate before publishing.`,
+    openGroup: "Open Group board",
+  },
 };
 
 export default workspace;

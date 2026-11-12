@@ -285,6 +285,8 @@ async function start(args: string[], ctx: Context): Promise<number | undefined> 
     dev: { type: "boolean" },
     force: { type: "boolean" },
     group: { type: "boolean" },
+    "trust-vpn": { type: "boolean" },
+    "tailscale-auth": { type: "boolean" },
   });
   loadEnvFile(values["env-file"]);
   const config = resolveConfig(
@@ -295,6 +297,8 @@ async function start(args: string[], ctx: Context): Promise<number | undefined> 
       dev: values.dev,
       open: values["no-open"] ? false : undefined,
       group: values.group,
+      trustVpn: values["trust-vpn"],
+      tailscaleAuth: values["tailscale-auth"],
     },
     ctx.env,
   );

@@ -14,6 +14,7 @@
  * and 64 in all. One timer runs, and only while a request waits.
  */
 import { randomBytes } from "node:crypto";
+import type { CollabMemberActivity } from "../shared/collab.js";
 import { refuse } from "./collab-refusal.js";
 import type { Actor } from "./coordination.js";
 
@@ -39,10 +40,18 @@ interface Feed {
   version: number;
   /** The ids of the people present as JSON, as last counted. */
   present: string;
+  /** Live member activities for this project as JSON, as last counted. */
+  activities: string;
   seen: number;
   /** When each person last asked or stopped waiting, by participant id. */
   asked: Map<string, number>;
   waiters: Set<Waiter>;
+}
+
+interface StoredActivity {
+  at: number;
+  entry: CollabMemberActivity;
+  projectIds?: readonly string[];
 }
 
 export interface FeedQuestion {
@@ -58,6 +67,7 @@ export interface FeedQuestion {
 export class CollabHub {
   readonly epoch = randomBytes(8).toString("hex");
   private readonly feeds = new Map<string, Feed>();
+  private readonly activityByActor = new Map<string, StoredActivity>();
   private parked = 0;
   private timer: NodeJS.Timeout | undefined;
 
@@ -84,6 +94,7 @@ export class CollabHub {
         stale: true,
         version: 0,
         present: "[]",
+        activities: "[]",
         seen: 0,
         asked: new Map(),
         waiters: new Set(),
@@ -137,12 +148,39 @@ export class CollabHub {
 
   /** A removed person: their waiting requests end, and they are present nowhere. */
   forget(participantId: string) {
+    this.activityByActor.delete(participantId);
     for (const feed of this.feeds.values()) {
       for (const waiter of [...feed.waiters])
         if (waiter.actor.id === participantId && this.leave(waiter)) waiter.answer();
       feed.asked.delete(participantId);
     }
     this.arm();
+  }
+
+  /** Records what a participant is currently viewing or working on and wakes listeners. */
+  reportActivity(entry: CollabMemberActivity, projectIds?: readonly string[]) {
+    const now = Date.now();
+    this.activityByActor.set(entry.id, { at: now, entry, projectIds });
+    for (const feed of this.feeds.values()) {
+      if (!projectIds || projectIds.includes(feed.projectId)) feed.asked.set(entry.id, now);
+      if (this.count(feed, now)) this.wake(feed, false, now);
+    }
+    this.arm();
+  }
+
+  /** Live activities across the group (or filtered by `repoId`), pruning expired entries. */
+  activities(repoId?: string): CollabMemberActivity[] {
+    const now = Date.now();
+    const out: CollabMemberActivity[] = [];
+    for (const [id, item] of this.activityByActor) {
+      if (now - item.at >= presenceTtl) {
+        this.activityByActor.delete(id);
+        continue;
+      }
+      if (repoId && item.entry.repoId && item.entry.repoId !== repoId) continue;
+      out.push(item.entry);
+    }
+    return out.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
   }
 
   /** Answers every waiting request (204), so stopping never waits for one. */
@@ -165,7 +203,7 @@ export class CollabHub {
     return true;
   }
 
-  /** Counts who is present; true when they differ from the ones before. */
+  /** Counts who is present and their live activity; true when either differs from before. */
   private count(feed: Feed, now: number) {
     const ids = new Set<string>();
     for (const waiter of feed.waiters) ids.add(waiter.actor.id);
@@ -173,9 +211,23 @@ export class CollabHub {
       if (now - at < presenceTtl) ids.add(id);
       else feed.asked.delete(id);
     }
+    const activeEntries: CollabMemberActivity[] = [];
+    for (const [id, item] of this.activityByActor) {
+      if (now - item.at >= presenceTtl) {
+        this.activityByActor.delete(id);
+        continue;
+      }
+      if (!item.projectIds || item.projectIds.includes(feed.projectId)) {
+        ids.add(id);
+        activeEntries.push(item.entry);
+      }
+    }
+    activeEntries.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
     const present = JSON.stringify([...ids].sort());
-    if (present === feed.present) return false;
+    const activities = JSON.stringify(activeEntries);
+    if (present === feed.present && activities === feed.activities) return false;
     feed.present = present;
+    feed.activities = activities;
     feed.seen += 1;
     return true;
   }
@@ -189,7 +241,8 @@ export class CollabHub {
       asOf: new Date(now).toISOString(),
     });
     const board = withBoard ? `,"board":${feed.board}` : "";
-    return `${head.slice(0, -1)}${board},"present":${feed.present}}`;
+    const activities = feed.activities !== "[]" ? `,"activities":${feed.activities}` : "";
+    return `${head.slice(0, -1)}${board},"present":${feed.present}${activities}}`;
   }
 
   /** One string for every request waiting on the project. */
@@ -223,6 +276,7 @@ export class CollabHub {
       if (!feed.waiters.size) continue;
       for (const waiter of feed.waiters) next = Math.min(next, waiter.until);
       for (const at of feed.asked.values()) next = Math.min(next, at + presenceTtl);
+      for (const item of this.activityByActor.values()) next = Math.min(next, item.at + presenceTtl);
     }
     if (next === Infinity) return;
     this.timer = setTimeout(() => this.tick(), Math.max(0, next - Date.now()));

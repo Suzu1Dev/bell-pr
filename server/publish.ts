@@ -44,8 +44,9 @@ import { assertReady } from "./by-hand.js";
 import { assertGitIdentity, githubTokenScopes } from "./doctor.js";
 import { setupError } from "./cli-errors.js";
 import type { WorkbenchContext } from "./workbench.js";
-import { currentLocale, shuttingDown, sm } from "./i18n/index.js";
+import { currentLocale, shuttingDown, sm, withLocale } from "./i18n/index.js";
 import { secretInPatch } from "./secrets.js";
+import { applyReviewerSignOff, type TeamActorIdentity } from "./team-records.js";
 import { assertUnderstood, understandingRequired } from "./understanding.js";
 import { reviewabilitySnapshot } from "../shared/reviewability.js";
 import { byHandPreflight } from "../shared/by-hand.js";
@@ -191,6 +192,23 @@ export async function publishChecks(
     checks.push(
       ...(await localPublishChecks({ runs: extra.runs, repo: extra.repo, directory: dataDirectory }, run, files)),
     );
+  const openTodos = (run.teamRecords?.todos ?? []).filter((todo) => !todo.done);
+  if (openTodos.length) {
+    const mLocal = withLocale(locale, () => sm().run.local);
+    checks.push({
+      id: "team-open-todos",
+      kind: "confirm",
+      message: mLocal.teamOpenTodos({ count: openTodos.length }),
+      details: openTodos.map((todo) =>
+        mLocal.teamOpenTodoItem({
+          text: todo.text,
+          filePath: todo.filePath,
+          assignee: todo.assigneeName,
+          author: todo.authorName,
+        }),
+      ),
+    });
+  }
   // The quoted confirm carries a digest of its words, which publish() wants back with its tick.
   return checks.map((check) => (check.id === "by-hand-rules" ? { ...check, digest: checkDigest(check) } : check));
 }
@@ -282,6 +300,7 @@ export async function review(
   filePath: string,
   reviewed: boolean,
   displayedFingerprint: string,
+  reviewer?: TeamActorIdentity,
 ) {
   return ctx.lock(id, async () => {
     const run = ctx.run(id);
@@ -294,6 +313,7 @@ export async function review(
     if (file.blocked) throw new AppError(file.blocked, 422);
     if (reviewed) run.reviewedFingerprints[filePath] = file.fingerprint;
     else delete run.reviewedFingerprints[filePath];
+    if (reviewer) applyReviewerSignOff(run, filePath, reviewed, file.fingerprint, reviewer);
     run.reviewedFiles = Object.keys(run.reviewedFingerprints);
     run.status = "review";
     delete run.approvedFingerprint;
@@ -627,6 +647,7 @@ export interface PublishHolds {
     run: Run,
     repo: Repository | undefined,
     runs: readonly Run[],
+    files?: readonly DiffFile[],
   ) => Promise<DraftCheck[]>;
 }
 
@@ -766,7 +787,7 @@ export async function publish(
       { repo, overrides: guardOverrides, runs: ctx.store.data.runs },
     );
     if (holdConfirms)
-      checks.push(...(await holdConfirms(run, repo, ctx.store.data.runs)));
+      checks.push(...(await holdConfirms(run, repo, ctx.store.data.runs, files)));
     const blocking = checks.find((check) => check.kind === "block");
     if (blocking)
       throw new AppError(

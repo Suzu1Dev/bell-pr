@@ -38,6 +38,20 @@ export default {
     "The hold has ended, but its task could not be marked done, and now it never can be. Work that waits for it has to name another task. The log on the host has the details.",
   notHolder: "Only the person who holds these paths can release them.",
   staleFence: "This hold has changed since the board was read. Reload the board, then try again.",
+  invalidCredentials: "Wrong username or password, or this account is disabled.",
+  usernameTaken: "Someone in this group already uses this username.",
+  invalidAccountInput:
+    "Enter a username of 2 to 32 letters, digits, dots, underscores or hyphens, and a password of 8 to 128 characters.",
+  tailscaleUnavailable:
+    `Tailscale identity is not available on this connection. Open ${name} through Tailscale Serve with --tailscale-auth enabled, or sign in with a username and password.`,
+  tailscaleUnlinked: ({ login }: { login: string }) =>
+    `No group account is linked to Tailscale user ${login} yet. Enter an invite code once to link your account, or ask a group admin to bind it.`,
+  lastAdmin: "At least one active group admin must remain.",
+  dependencyBlocked:
+    "Someone holds a file marked as a blocking dependency of your path, so nothing was held.",
+  unknownDependency: "This repository has no file dependency rule with this id.",
+  atHostName: "Host",
+  soloAuthorName: "Developer",
   refused: "Group work refused this request.",
   failed: "Group work could not do this. The log on the host has the details.",
 };

@@ -1,8 +1,7 @@
 /**
- * The Group page (#/group): who is here, what is held in one repository and
- * whether the paths you want are free. The board comes from the store
- * (./store.ts). A refusal is the server's own sentence, shown as text where
- * the action was taken.
+ * The Group page (#/group): who is here, what is held in one repository,
+ * live teammate progress, cross-file dependency guards, team handoff TODOs,
+ * and member/account management.
  */
 import {
   useEffect,
@@ -13,14 +12,30 @@ import {
   type InputHTMLAttributes,
   type ReactNode,
 } from "react";
-import { FolderGit2, Info, TriangleAlert, UserPlus } from "lucide-react";
+import {
+  Activity,
+  CheckSquare,
+  FolderGit2,
+  GitFork,
+  Info,
+  KeyRound,
+  Shield,
+  TriangleAlert,
+  UserPlus,
+  Users,
+} from "lucide-react";
 import type {
   CollabCheckResponse,
   CollabConflict,
   CollabDependency,
+  CollabDependencyHit,
+  CollabDependencyMode,
+  CollabDetectedImport,
+  CollabFileDependency,
   CollabHold,
   CollabInfo,
   CollabInviteResponse,
+  CollabMemberRecord,
   CollabTasksResponse,
 } from "../../shared/collab";
 import type { Formatters } from "../../shared/i18n/locale";
@@ -47,6 +62,11 @@ const initials = (name: string) => Array.from(name).slice(0, 2).join("").toUpper
 /** Moves the focus once the next render is on screen. */
 function focusSoon(selector: string) {
   requestAnimationFrame(() => document.querySelector<HTMLElement>(selector)?.focus());
+}
+
+function runHref(runId: string, filePath?: string) {
+  const base = `#/runs/${encodeURIComponent(runId)}/${filePath ? "changes" : "overview"}`;
+  return filePath ? `${base}?file=${encodeURIComponent(filePath)}` : base;
 }
 
 /**
@@ -80,6 +100,8 @@ export interface Answer {
   invalid: string[];
   /** The holds in the way, each with its held paths. */
   holds: { name: string; mine: boolean; title: string; paths: string[]; since?: string }[];
+  /** Cross-file dependency hits (`block` guards or `warn` reminders). */
+  dependencyHits?: CollabDependencyHit[];
 }
 
 type InTheWay = Answer["holds"][number];
@@ -108,7 +130,7 @@ interface Line {
   values: string[];
 }
 
-/** The answer's sentences: what cannot be held, then one for each hold in the way. */
+/** The answer's sentences: what cannot be held, then holds and dependency hits in the way. */
 function linesOf(answer: Answer, t: Messages["collab"], format: Formatters): Line[] {
   const listed = (paths: string[]) =>
     format.list(
@@ -124,6 +146,18 @@ function linesOf(answer: Answer, t: Messages["collab"], format: Formatters): Lin
     }),
     values: [hold.mine ? t.me : hold.name, hold.title, ...hold.paths],
   }));
+  for (const hit of answer.dependencyHits ?? []) {
+    const template = hit.mode === "block" ? t.dependencyBlock : t.dependencyWarn;
+    lines.push({
+      text: template({
+        holder: slot(0),
+        title: slot(1),
+        askedPath: slot(2),
+        heldPath: slot(3),
+      }),
+      values: [hit.holder, hit.title, hit.askedPath, hit.heldPath],
+    });
+  }
   if (answer.invalid.length)
     lines.unshift({
       text: t.cannotHold({ paths: listed(answer.invalid) }),
@@ -158,9 +192,13 @@ function heard(answer: Answer | undefined, t: Messages["collab"], format: Format
   return lines.map((text) => t.spoken.sentence({ text })).join(" ");
 }
 
-/** Whether Take hold is off: no title, no answer, or something in the way. */
+/** Whether Take hold is off: no title, no answer, or a hold / blocked dependency in the way. */
 export const cannotTake = (title: string, answer?: Answer) =>
-  !title.trim() || !answer || answer.holds.length > 0 || answer.invalid.length > 0;
+  !title.trim() ||
+  !answer ||
+  answer.holds.length > 0 ||
+  answer.invalid.length > 0 ||
+  Boolean(answer.dependencyHits?.some((hit) => hit.mode === "block"));
 
 /** At most one box: who is in the way, in words, or that nothing is. */
 export function HoldAnswer({ answer }: { answer?: Answer }) {
@@ -197,7 +235,7 @@ export function HoldAnswer({ answer }: { answer?: Answer }) {
   );
 }
 
-/** A state shown as one card with one field and one button: joining, and the first set-up at the host. */
+/** A state shown as one card with one field and one button: first set-up at the host. */
 function FieldCard({
   words,
   label,
@@ -207,7 +245,6 @@ function FieldCard({
 }: {
   words: { title: string; body: string; submit: string };
   label: ReactNode;
-  /** The server's sentence from before the card was shown. */
   refused?: string;
   action: (value: string) => Promise<unknown>;
 } & InputHTMLAttributes<HTMLInputElement>) {
@@ -219,7 +256,6 @@ function FieldCard({
       className="settings-card"
       onSubmit={(event) => {
         event.preventDefault();
-        // The card goes with a start or a join: the page's heading takes the focus.
         void request.run(() => action(value.trim()).then(() => focusSoon(".group-page h1")));
       }}
     >
@@ -256,6 +292,192 @@ function FieldCard({
   );
 }
 
+/** Unjoined card: invite code (+ optional reusable account), team username/password login, or Tailscale. */
+function JoinAuthCard({
+  store,
+  info,
+  refused,
+}: {
+  store: Store;
+  info: CollabInfo;
+  refused?: string;
+}) {
+  const t = useT("collab");
+  const [tab, setTab] = useState<"invite" | "login" | "tailscale">(
+    info.tailscaleAvailable ? "tailscale" : "invite",
+  );
+  const [code, setCode] = useState("");
+  const [withAccount, setWithAccount] = useState(false);
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const request = useRequest();
+  const error = request.error || refused;
+
+  const submit = (event: FormEvent) => {
+    event.preventDefault();
+    void request.run(async () => {
+      if (tab === "login") {
+        await store.login(username.trim(), password);
+      } else if (tab === "tailscale") {
+        await store.loginTailscale(code.trim() || undefined);
+      } else {
+        await store.join(
+          code.trim(),
+          withAccount && username.trim()
+            ? { username: username.trim(), password }
+            : undefined,
+        );
+      }
+      focusSoon(".group-page h1");
+    });
+  };
+
+  const canSubmit =
+    tab === "login"
+      ? Boolean(username.trim() && password.length >= 8)
+      : tab === "tailscale"
+        ? true
+        : Boolean(code.trim() && (!withAccount || (username.trim() && password.length >= 8)));
+
+  return (
+    <form className="settings-card" onSubmit={submit}>
+      <div className="view-toggle group-auth-tabs" role="group" aria-label={t.auth.tabsLabel}>
+        <button
+          type="button"
+          className={tab === "invite" ? "selected" : ""}
+          aria-pressed={tab === "invite"}
+          onClick={() => {
+            setTab("invite");
+            request.setError("");
+          }}
+        >
+          {t.auth.inviteTab}
+        </button>
+        <button
+          type="button"
+          className={tab === "login" ? "selected" : ""}
+          aria-pressed={tab === "login"}
+          onClick={() => {
+            setTab("login");
+            request.setError("");
+          }}
+        >
+          {t.auth.loginTab}
+        </button>
+        <button
+          type="button"
+          className={tab === "tailscale" ? "selected" : ""}
+          aria-pressed={tab === "tailscale"}
+          onClick={() => {
+            setTab("tailscale");
+            request.setError("");
+          }}
+        >
+          {t.auth.tailscaleTab}
+        </button>
+      </div>
+      <div className="section-heading">
+        <div>
+          <h2>
+            {tab === "login"
+              ? t.auth.loginTitle
+              : tab === "tailscale"
+                ? t.auth.tailscaleTitle
+                : t.join.title}
+          </h2>
+          <p>
+            {tab === "login"
+              ? t.auth.loginBody
+              : tab === "tailscale"
+                ? t.auth.tailscaleBody
+                : t.join.body}
+          </p>
+        </div>
+      </div>
+      {tab === "tailscale" && info.tailscaleLogin && (
+        <p className="field-help" role="status">
+          {t.auth.tailscaleDetected({ login: info.tailscaleLogin })}
+        </p>
+      )}
+      {(tab === "invite" || tab === "tailscale") && (
+        <>
+          <label className="field-label" htmlFor="join-code">
+            {tab === "invite" ? t.join.code : t.auth.inviteOptional}
+          </label>
+          <input
+            className="text-input"
+            id="join-code"
+            value={code}
+            maxLength={32}
+            autoComplete="off"
+            autoCapitalize="characters"
+            spellCheck={false}
+            onChange={(event) => setCode(event.target.value)}
+          />
+        </>
+      )}
+      {tab === "invite" && (
+        <div className="draft-task-items">
+          <label>
+            <input
+              type="checkbox"
+              checked={withAccount}
+              onChange={(event) => setWithAccount(event.target.checked)}
+            />
+            <span>{t.auth.optionalAccount}</span>
+          </label>
+        </div>
+      )}
+      {(tab === "login" || (tab === "invite" && withAccount)) && (
+        <>
+          <label className="field-label" htmlFor="group-username">
+            {t.auth.username}
+          </label>
+          <input
+            className="text-input"
+            id="group-username"
+            value={username}
+            maxLength={32}
+            placeholder={t.auth.usernamePlaceholder}
+            autoComplete="username"
+            autoCapitalize="off"
+            onChange={(event) => setUsername(event.target.value)}
+          />
+          <label className="field-label" htmlFor="group-password">
+            {t.auth.password}
+          </label>
+          <input
+            className="text-input"
+            id="group-password"
+            type="password"
+            value={password}
+            maxLength={128}
+            placeholder={t.auth.passwordPlaceholder}
+            autoComplete={tab === "login" ? "current-password" : "new-password"}
+            onChange={(event) => setPassword(event.target.value)}
+          />
+        </>
+      )}
+      {error && (
+        <p className="inline-error" role="alert" id="card-error">
+          {error}
+        </p>
+      )}
+      <button
+        className="button primary full-width"
+        aria-disabled={request.busy}
+        disabled={!canSubmit}
+      >
+        {tab === "login"
+          ? t.auth.loginSubmit
+          : tab === "tailscale"
+            ? t.auth.tailscaleSubmit
+            : t.join.submit}
+      </button>
+    </form>
+  );
+}
+
 /** Name and role, then the code, which is shown once. */
 function InviteDialog({ store, onClose }: { store: Store; onClose: () => void }) {
   const t = useT("collab");
@@ -278,7 +500,6 @@ function InviteDialog({ store, onClose }: { store: Store; onClose: () => void })
     );
   };
   return (
-    // A key for each step: the dialog moves the focus to the step's first control.
     <Modal
       key={invite ? "code" : "name"}
       title={invite ? words.codeFor({ name: name.trim() }) : words.title}
@@ -345,6 +566,297 @@ function InviteDialog({ store, onClose }: { store: Store; onClose: () => void })
   );
 }
 
+/** Member self-service dialog to set or update their own username/password. */
+function AccountDialog({ store, me, onClose }: { store: Store; me: Me; onClose: () => void }) {
+  const t = useT("collab");
+  const actions = useT("common").actions;
+  const [username, setUsername] = useState(me.username ?? "");
+  const [password, setPassword] = useState("");
+  const [saved, setSaved] = useState(false);
+  const request = useRequest();
+
+  const save = (event: FormEvent) => {
+    event.preventDefault();
+    setSaved(false);
+    void request.run(async () => {
+      await store.call(
+        `/people/${encodeURIComponent(me.id)}`,
+        send("PATCH", {
+          ...(username.trim() ? { username: username.trim() } : {}),
+          ...(password ? { password } : {}),
+        }),
+      );
+      setPassword("");
+      setSaved(true);
+    });
+  };
+
+  return (
+    <Modal
+      title={t.accountDialog.title}
+      subtitle={t.accountDialog.subtitle}
+      mark={<KeyRound size={22} />}
+      onClose={onClose}
+    >
+      <form onSubmit={save}>
+        <label className="field-label" htmlFor="my-account-username">
+          {t.auth.username}
+        </label>
+        <input
+          className="text-input"
+          id="my-account-username"
+          value={username}
+          maxLength={32}
+          placeholder={t.auth.usernamePlaceholder}
+          autoComplete="username"
+          autoCapitalize="off"
+          onChange={(event) => setUsername(event.target.value)}
+        />
+        <label className="field-label" htmlFor="my-account-password">
+          {t.auth.password}
+        </label>
+        <input
+          className="text-input"
+          id="my-account-password"
+          type="password"
+          value={password}
+          maxLength={128}
+          placeholder={t.auth.passwordPlaceholder}
+          autoComplete="new-password"
+          onChange={(event) => setPassword(event.target.value)}
+        />
+        {saved && (
+          <p className="field-help" role="status">
+            {t.accountDialog.saved}
+          </p>
+        )}
+        {request.error && (
+          <p className="inline-error" role="alert">
+            {request.error}
+          </p>
+        )}
+        <div className="modal-actions">
+          <button type="button" className="button secondary" onClick={onClose}>
+            {actions.close}
+          </button>
+          <button
+            className="button primary"
+            aria-disabled={request.busy}
+            disabled={!username.trim() && password.length < 8}
+          >
+            {t.accountDialog.save}
+          </button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
+/** Admin dialog to create accounts, assign admin roles, link Tailscale or disable/remove members. */
+function AdminMembersDialog({ store, me, onClose }: { store: Store; me: Me; onClose: () => void }) {
+  const t = useT("collab");
+  const actions = useT("common").actions;
+  const words = t.adminDialog;
+  const [members, setMembers] = useState<CollabMemberRecord[]>([]);
+  const [name, setName] = useState("");
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [tailscaleLogin, setTailscaleLogin] = useState("");
+  const [admin, setAdmin] = useState(false);
+  const request = useRequest();
+
+  const load = async () => {
+    const res = await store.call<{ people: CollabMemberRecord[] }>("/people");
+    setMembers(res.people.filter((item) => !item.removed));
+  };
+
+  useEffect(() => {
+    void request.run(load);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const createMember = (event: FormEvent) => {
+    event.preventDefault();
+    void request.run(async () => {
+      await store.call(
+        "/people",
+        send("POST", {
+          name: name.trim(),
+          username: username.trim(),
+          password,
+          ...(admin ? { admin: true } : {}),
+          ...(tailscaleLogin.trim() ? { tailscaleLogin: tailscaleLogin.trim() } : {}),
+        }),
+      );
+      setName("");
+      setUsername("");
+      setPassword("");
+      setTailscaleLogin("");
+      setAdmin(false);
+      await load();
+      store.reload();
+    });
+  };
+
+  const updateMember = (id: string, patch: Record<string, unknown>) =>
+    void request.run(async () => {
+      await store.call(`/people/${encodeURIComponent(id)}`, send("PATCH", patch));
+      await load();
+      store.reload();
+    });
+
+  const removeMember = (id: string) =>
+    void request.run(async () => {
+      await store.call(`/people/${encodeURIComponent(id)}/remove`, send("POST", {}));
+      await load();
+      store.reload();
+    });
+
+  return (
+    <Modal
+      title={words.title}
+      subtitle={words.subtitle}
+      mark={<Users size={22} />}
+      onClose={onClose}
+    >
+      <form className="group-admin-create" onSubmit={createMember}>
+        <h3>{words.createHeading}</h3>
+        <div className="group-admin-grid">
+          <div>
+            <label className="field-label" htmlFor="admin-member-name">
+              {words.displayName}
+            </label>
+            <input
+              className="text-input"
+              id="admin-member-name"
+              value={name}
+              maxLength={40}
+              onChange={(event) => setName(event.target.value)}
+            />
+          </div>
+          <div>
+            <label className="field-label" htmlFor="admin-member-username">
+              {t.auth.username}
+            </label>
+            <input
+              className="text-input"
+              id="admin-member-username"
+              value={username}
+              maxLength={32}
+              placeholder={t.auth.usernamePlaceholder}
+              autoCapitalize="off"
+              onChange={(event) => setUsername(event.target.value)}
+            />
+          </div>
+          <div>
+            <label className="field-label" htmlFor="admin-member-password">
+              {t.auth.password}
+            </label>
+            <input
+              className="text-input"
+              id="admin-member-password"
+              type="password"
+              value={password}
+              maxLength={128}
+              placeholder={t.auth.passwordPlaceholder}
+              onChange={(event) => setPassword(event.target.value)}
+            />
+          </div>
+          <div>
+            <label className="field-label" htmlFor="admin-member-ts">
+              {words.tailscaleLabel}
+            </label>
+            <input
+              className="text-input"
+              id="admin-member-ts"
+              value={tailscaleLogin}
+              maxLength={120}
+              placeholder={words.tailscalePlaceholder}
+              autoCapitalize="off"
+              onChange={(event) => setTailscaleLogin(event.target.value)}
+            />
+          </div>
+        </div>
+        <div className="draft-task-items">
+          <label>
+            <input
+              type="checkbox"
+              checked={admin}
+              onChange={(event) => setAdmin(event.target.checked)}
+            />
+            <span>{words.roleAdmin}</span>
+          </label>
+        </div>
+        <button
+          className="button primary"
+          aria-disabled={request.busy}
+          disabled={!name.trim() || !username.trim() || password.length < 8}
+        >
+          {words.createSubmit}
+        </button>
+      </form>
+      <div className="group-admin-members">
+        <h3>{words.membersHeading}</h3>
+        {request.error && (
+          <p className="inline-error" role="alert">
+            {request.error}
+          </p>
+        )}
+        <ul className="group-sublist">
+          {members.map((member) => (
+            <li key={member.id} className="group-subrow">
+              <div>
+                <strong>
+                  {member.id === me.id ? t.you({ name: member.name }) : member.name}
+                </strong>
+                <div className="mission-evidence-paths">
+                  <code>{member.admin ? words.roleAdmin : words.roleMember}</code>
+                  {member.username && <code>@{member.username}</code>}
+                  {member.tailscaleLogin && <code>{member.tailscaleLogin}</code>}
+                  {member.disabled && <code>{words.disabledBadge}</code>}
+                </div>
+              </div>
+              {member.id !== me.id && (
+                <div className="group-release">
+                  <button
+                    type="button"
+                    className="button secondary"
+                    aria-disabled={request.busy}
+                    onClick={() => updateMember(member.id, { admin: !member.admin })}
+                  >
+                    {member.admin ? words.makeMember : words.makeAdmin}
+                  </button>
+                  <button
+                    type="button"
+                    className="button secondary"
+                    aria-disabled={request.busy}
+                    onClick={() => updateMember(member.id, { disabled: !member.disabled })}
+                  >
+                    {member.disabled ? words.enable : words.disable}
+                  </button>
+                  <button
+                    type="button"
+                    className="button danger"
+                    aria-disabled={request.busy}
+                    onClick={() => removeMember(member.id)}
+                  >
+                    {words.remove}
+                  </button>
+                </div>
+              )}
+            </li>
+          ))}
+        </ul>
+      </div>
+      <div className="modal-actions">
+        <button type="button" className="button secondary" onClick={onClose}>
+          {actions.close}
+        </button>
+      </div>
+    </Modal>
+  );
+}
+
 interface BoardProps {
   store: Store;
   state: GroupState;
@@ -360,7 +872,6 @@ function HeldNow({ store, state, project, held, me }: BoardProps) {
   const format = useFormat();
   const list = useRef<HTMLUListElement>(null);
   const [rows, setRows] = useState(() => held.map((hold) => ({ hold, gone: false })));
-  /** The hold an admin is asked about before it is revoked. */
   const [asked, setAsked] = useState("");
   const [ending, setEnding] = useState("");
   const [failed, setFailed] = useState<{ id: string; message: string }>();
@@ -368,7 +879,6 @@ function HeldNow({ store, state, project, held, me }: BoardProps) {
 
   useEffect(() => {
     const focused = list.current?.contains(document.activeElement) ?? false;
-    // Nothing moves under the pointer or the focus: an ended hold keeps its row until both have left.
     const stay = focused || (list.current?.matches(":hover") ?? false);
     setRows((shown) => [
       ...shown.flatMap((old) => {
@@ -379,11 +889,9 @@ function HeldNow({ store, state, project, held, me }: BoardProps) {
         .filter((hold) => !shown.some((old) => old.hold.claimId === hold.claimId))
         .map((hold) => ({ hold, gone: false })),
     ]);
-    // The focused button went away with its hold: the list takes the focus.
     if (focused) focusSoon(".group-holds:not(:focus-within)");
   }, [held]);
 
-  /** Once the pointer and the focus have both left the list, the ended holds go. */
   const settle = (stay: boolean) => {
     if (!stay) setRows((shown) => shown.filter((row) => !row.gone));
   };
@@ -402,10 +910,8 @@ function HeldNow({ store, state, project, held, me }: BoardProps) {
         setReleased(done ? t.spoken.finishedAndReleased(words) : t.spoken.releasedUnfinished(words));
       }
       setAsked("");
-      // The row's button goes with the hold.
       list.current?.focus();
     } catch (error) {
-      // The hold in hand is not the current one: the board is asked for again.
       if (reasonOf(error) === "staleFence") store.reload();
       setFailed({ id: hold.claimId, message: sentenceOf(error) });
     } finally {
@@ -564,6 +1070,363 @@ function HeldNow({ store, state, project, held, me }: BoardProps) {
   );
 }
 
+/** Live member progress & workspace presence (Requirement 2). */
+function LiveProgressSection({ state, me }: { state: GroupState; me: Me }) {
+  const collab = useT("collab");
+  const t = collab.liveProgress;
+  const runStatus = useT("common").runStatus;
+  const format = useFormat();
+  const activities = state.activities ?? [];
+  return (
+    <section aria-labelledby="live-progress-h">
+      <div className="section-heading">
+        <div>
+          <h2 id="live-progress-h">
+            <Activity size={16} aria-hidden="true" /> {t.title}
+          </h2>
+          <p>{t.subtitle}</p>
+        </div>
+      </div>
+      {activities.length ? (
+        <ul className="settings-card group-sublist" aria-labelledby="live-progress-h">
+          {activities.map((item) => {
+            const isMe = item.id === me.id;
+            const fileLabel = item.filePath
+              ? item.lineStart !== undefined
+                ? t.inspectingLines({
+                    path: item.filePath,
+                    start: item.lineStart,
+                    end: item.lineEnd ?? item.lineStart,
+                  })
+                : t.inspectingFile({ path: item.filePath })
+              : undefined;
+            return (
+              <li key={item.id} className="group-subrow">
+                <div className="group-subrow-main">
+                  <span className="profile-avatar" aria-hidden="true">
+                    {initials(item.name)}
+                  </span>
+                  <div>
+                    <strong>{isMe ? `${item.name} (${collab.me})` : item.name}</strong>
+                    <small>{format.time(item.updatedAt, seconds)}</small>
+                  </div>
+                  <div>
+                    {item.runTitle && <strong>{item.runTitle}</strong>}
+                    <div className="mission-evidence-paths">
+                      {item.view && <code>{t.views[item.view]}</code>}
+                      {item.runStatus && <code>{runStatus[item.runStatus]}</code>}
+                      {fileLabel && <code>{fileLabel}</code>}
+                    </div>
+                  </div>
+                </div>
+                {item.runId && (
+                  <a className="button secondary" href={runHref(item.runId, item.filePath)}>
+                    {t.openRun}
+                  </a>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      ) : (
+        <p className="settings-card">{t.empty}</p>
+      )}
+    </section>
+  );
+}
+
+/** Cross-file dependency rules & static import scanner (Requirement 1c). */
+function DependencyGuardsSection({ store, state, project, me }: BoardProps) {
+  const t = useT("collab").depPanel;
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const [mode, setMode] = useState<CollabDependencyMode>("block");
+  const [note, setNote] = useState("");
+  const [scanned, setScanned] = useState<CollabDetectedImport[]>();
+  const [scanning, setScanning] = useState(false);
+  const request = useRequest();
+  const base = `/projects/${encodeURIComponent(project)}/dependencies`;
+  const rules = state.dependencies ?? [];
+
+  const createRule = (
+    ruleFrom: string,
+    ruleTo: string,
+    ruleMode: CollabDependencyMode,
+    ruleNote?: string,
+  ) =>
+    void request.run(async () => {
+      await store.call(
+        base,
+        send("POST", {
+          from: ruleFrom.trim(),
+          to: ruleTo.trim(),
+          mode: ruleMode,
+          ...(ruleNote?.trim() ? { note: ruleNote.trim() } : {}),
+        }),
+      );
+      if (ruleFrom === from) {
+        setFrom("");
+        setTo("");
+        setNote("");
+      }
+    });
+
+  const removeRule = (depId: string) =>
+    void request.run(async () => {
+      await store.call(`${base}/${encodeURIComponent(depId)}`, { method: "DELETE" });
+    });
+
+  const scanImports = async () => {
+    if (scanning) return;
+    setScanning(true);
+    request.setError("");
+    try {
+      const answer = await store.call<{
+        dependencies: CollabFileDependency[];
+        detectedImports?: CollabDetectedImport[];
+      }>(`${base}?scan=1`);
+      const covered = new Set(rules.map((r) => `${r.from.toLowerCase()}->${r.to.toLowerCase()}`));
+      setScanned(
+        (answer.detectedImports ?? []).filter(
+          (edge) => !covered.has(`${edge.from.toLowerCase()}->${edge.to.toLowerCase()}`),
+        ),
+      );
+    } catch (cause) {
+      request.setError(sentenceOf(cause));
+    } finally {
+      setScanning(false);
+    }
+  };
+
+  return (
+    <section aria-labelledby="dep-guards-h">
+      <div className="section-heading">
+        <div>
+          <h2 id="dep-guards-h">
+            <GitFork size={16} aria-hidden="true" /> {t.title}
+          </h2>
+          <p>{t.subtitle}</p>
+        </div>
+        <button
+          type="button"
+          className="button secondary"
+          aria-disabled={scanning}
+          onClick={() => void scanImports()}
+        >
+          {scanning ? t.scanning : t.scan}
+        </button>
+      </div>
+      <div className="settings-card">
+        {rules.length ? (
+          <ul className="group-sublist" aria-labelledby="dep-guards-h">
+            {rules.map((rule) => (
+              <li key={rule.id} className="group-subrow">
+                <div>
+                  <div className="mission-evidence-paths">
+                    <code>
+                      <Shield size={12} aria-hidden="true" />{" "}
+                      {rule.mode === "block" ? t.badgeBlock : t.badgeWarn}
+                    </code>
+                    <code>{rule.from}</code>
+                    <span>{t.arrow}</span>
+                    <code>{rule.to}</code>
+                  </div>
+                  {rule.note && <small>{rule.note}</small>}
+                </div>
+                {(me.admin || rule.createdBy === me.id) && (
+                  <button
+                    type="button"
+                    className="button secondary"
+                    aria-disabled={request.busy}
+                    onClick={() => removeRule(rule.id)}
+                  >
+                    {t.remove}
+                  </button>
+                )}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="field-help">{t.empty}</p>
+        )}
+
+        {scanned !== undefined && (
+          <div className="group-scanned-imports">
+            <h3>{t.scannedTitle({ count: scanned.length })}</h3>
+            {scanned.length ? (
+              <ul className="group-sublist">
+                {scanned.slice(0, 20).map((edge) => {
+                  const key = `${edge.from}->${edge.to}`;
+                  return (
+                    <li key={key} className="group-subrow">
+                      <div className="mission-evidence-paths">
+                        <code>{t.badgeAuto}</code>
+                        <code>{edge.from}</code>
+                        <span>{t.arrow}</span>
+                        <code>{edge.to}</code>
+                      </div>
+                      <div className="group-release">
+                        <button
+                          type="button"
+                          className="button primary"
+                          aria-disabled={request.busy}
+                          onClick={() => {
+                            createRule(edge.from, edge.to, "block");
+                            setScanned((prev) =>
+                              prev?.filter((item) => !(item.from === edge.from && item.to === edge.to)),
+                            );
+                          }}
+                        >
+                          {t.promoteBlock}
+                        </button>
+                        <button
+                          type="button"
+                          className="button secondary"
+                          aria-disabled={request.busy}
+                          onClick={() => {
+                            createRule(edge.from, edge.to, "warn");
+                            setScanned((prev) =>
+                              prev?.filter((item) => !(item.from === edge.from && item.to === edge.to)),
+                            );
+                          }}
+                        >
+                          {t.promoteWarn}
+                        </button>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : (
+              <p className="field-help">{t.scannedEmpty}</p>
+            )}
+          </div>
+        )}
+
+        <form
+          className="group-dep-form"
+          onSubmit={(event) => {
+            event.preventDefault();
+            createRule(from, to, mode, note);
+          }}
+        >
+          <div className="group-admin-grid">
+            <div>
+              <label className="field-label" htmlFor="dep-from">
+                {t.fromLabel}
+              </label>
+              <input
+                className="text-input"
+                id="dep-from"
+                value={from}
+                maxLength={240}
+                placeholder={t.fromPlaceholder}
+                spellCheck={false}
+                autoCapitalize="off"
+                onChange={(event) => setFrom(event.target.value)}
+              />
+            </div>
+            <div>
+              <label className="field-label" htmlFor="dep-to">
+                {t.toLabel}
+              </label>
+              <input
+                className="text-input"
+                id="dep-to"
+                value={to}
+                maxLength={240}
+                placeholder={t.toPlaceholder}
+                spellCheck={false}
+                autoCapitalize="off"
+                onChange={(event) => setTo(event.target.value)}
+              />
+            </div>
+            <div>
+              <label className="field-label" htmlFor="dep-mode">
+                {t.modeLabel}
+              </label>
+              <select
+                className="text-input"
+                id="dep-mode"
+                value={mode}
+                onChange={(event) => setMode(event.target.value as CollabDependencyMode)}
+              >
+                <option value="block">{t.modeBlock}</option>
+                <option value="warn">{t.modeWarn}</option>
+              </select>
+            </div>
+            <div>
+              <label className="field-label" htmlFor="dep-note">
+                {t.noteLabel}
+              </label>
+              <input
+                className="text-input"
+                id="dep-note"
+                value={note}
+                maxLength={200}
+                placeholder={t.notePlaceholder}
+                onChange={(event) => setNote(event.target.value)}
+              />
+            </div>
+          </div>
+          {request.error && (
+            <p className="inline-error" role="alert">
+              {request.error}
+            </p>
+          )}
+          <button
+            className="button secondary"
+            aria-disabled={request.busy}
+            disabled={!from.trim() || !to.trim()}
+          >
+            {t.addSubmit}
+          </button>
+        </form>
+      </div>
+    </section>
+  );
+}
+
+/** Open coordination / handoff TODOs across active runs in this repository (Requirement 3c). */
+function TeamTodosSection({ state }: { state: GroupState }) {
+  const t = useT("collab").todoPanel;
+  const todos = state.openTodos ?? [];
+  return (
+    <section aria-labelledby="team-todos-h">
+      <div className="section-heading">
+        <div>
+          <h2 id="team-todos-h">
+            <CheckSquare size={16} aria-hidden="true" /> {t.title}
+          </h2>
+          <p>{t.subtitle}</p>
+        </div>
+      </div>
+      {todos.length ? (
+        <ul className="settings-card group-sublist" aria-labelledby="team-todos-h">
+          {todos.map((todo) => (
+            <li key={`${todo.runId}:${todo.id}`} className="group-subrow">
+              <div>
+                <strong>{todo.text}</strong>
+                <div className="mission-evidence-paths">
+                  <code>{todo.runTitle}</code>
+                  {todo.filePath && <code>{todo.filePath}</code>}
+                  {todo.assigneeName && <code>{t.assignedTo({ name: todo.assigneeName })}</code>}
+                  <code>{t.byAuthor({ name: todo.authorName })}</code>
+                </div>
+              </div>
+              <a className="button secondary" href={runHref(todo.runId, todo.filePath)}>
+                {t.openRun}
+              </a>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="settings-card">{t.empty}</p>
+      )}
+    </section>
+  );
+}
+
 /** Selected tasks stay visible when their unfinished hold leaves the task list. */
 export function taskChoices(tasks: CollabDependency[], selected: CollabDependency[]) {
   return [
@@ -572,7 +1435,7 @@ export function taskChoices(tasks: CollabDependency[], selected: CollabDependenc
   ];
 }
 
-/** The board of one repository: Start work, which asks before it takes, and Held now. */
+/** The board of one repository: Start work, Held now, Live progress, Dependency guards and Team TODOs. */
 function Board(props: BoardProps) {
   const { store, state, project, held, me } = props;
   const t = useT("collab");
@@ -581,8 +1444,12 @@ function Board(props: BoardProps) {
   const [paths, setPaths] = useState("");
   const [tasks, setTasks] = useState<CollabDependency[]>([]);
   const [prerequisites, setPrerequisites] = useState<CollabDependency[]>([]);
-  /** The last answer, with the paths and the board it is about: it shows for those only. */
-  const [answered, setAnswered] = useState<{ asked: string; held: CollabHold[]; answer: Answer }>();
+  const [answered, setAnswered] = useState<{
+    asked: string;
+    held: CollabHold[];
+    deps: CollabFileDependency[] | undefined;
+    answer: Answer;
+  }>();
   const [busy, setBusy] = useState(false);
   const [refusal, setRefusal] = useState<{ text: string; dependencyPending: boolean }>();
   const titleField = useRef<HTMLInputElement>(null);
@@ -593,7 +1460,11 @@ function Board(props: BoardProps) {
   const asked = scopes.join("\n");
   const offline = state.link === "reconnecting";
   const answer =
-    answered?.asked === asked && answered.held === held ? answered.answer : undefined;
+    answered?.asked === asked &&
+    answered.held === held &&
+    answered.deps === state.dependencies
+      ? answered.answer
+      : undefined;
   const check = `/projects/${encodeURIComponent(project)}`;
   const choices = taskChoices(tasks, prerequisites);
 
@@ -615,7 +1486,7 @@ function Board(props: BoardProps) {
     setRefusal((last) => (last?.dependencyPending ? undefined : last));
   }, [held]);
 
-  // Asked 400 ms after the last key, and again whenever the board changes.
+  // Asked 400 ms after the last key, and again whenever holds or dependency rules change.
   useEffect(() => {
     if (!asked || offline) {
       setAnswered(undefined);
@@ -624,16 +1495,19 @@ function Board(props: BoardProps) {
     const request = new AbortController();
     const timer = setTimeout(async () => {
       try {
-        const { asOf, invalid, meets } = await store.call<CollabCheckResponse>(`${check}/check`, {
-          ...send("POST", { scopes: asked.split("\n") }),
-          signal: request.signal,
-        });
-        // An answer for paths or a board that are no longer the ones on the page is dropped.
+        const { asOf, invalid, meets, dependencyHits } = await store.call<CollabCheckResponse>(
+          `${check}/check`,
+          {
+            ...send("POST", { scopes: asked.split("\n"), scanImports: true }),
+            signal: request.signal,
+          },
+        );
         if (request.signal.aborted) return;
         setRefusal(undefined);
         setAnswered({
           asked,
           held,
+          deps: state.dependencies,
           answer: {
             asOf,
             invalid,
@@ -650,11 +1524,11 @@ function Board(props: BoardProps) {
                 };
               }),
             ),
+            ...(dependencyHits?.length ? { dependencyHits } : {}),
           },
         });
       } catch (error) {
         if (request.signal.aborted) return;
-        // No answer, so no box; the sentence says why.
         setAnswered(undefined);
         setRefusal({ text: sentenceOf(error), dependencyPending: false });
       }
@@ -663,7 +1537,7 @@ function Board(props: BoardProps) {
       clearTimeout(timer);
       request.abort();
     };
-  }, [store, check, asked, held, offline, me.id]);
+  }, [store, check, asked, held, state.dependencies, offline, me.id]);
 
   const take = async (event: FormEvent) => {
     event.preventDefault();
@@ -681,7 +1555,6 @@ function Board(props: BoardProps) {
             : {}),
         }),
       );
-      // The row arrives with the feed.
       setTitle("");
       setPaths("");
       setPrerequisites([]);
@@ -692,18 +1565,22 @@ function Board(props: BoardProps) {
         error instanceof ApiError && reasonOf(error) === "conflict"
           ? (error.details.conflicts as CollabConflict[] | undefined)
           : undefined;
-      if (conflicts?.length) {
-        // The button goes off with the hold in the way: the paths take the focus.
+      const blockedDeps =
+        error instanceof ApiError && reasonOf(error) === "dependencyBlocked"
+          ? (error.details.dependencyHits as CollabDependencyHit[] | undefined)
+          : undefined;
+      if (conflicts?.length || blockedDeps?.length) {
         focusSoon("#hold-paths");
         const notTaken: NonNullable<typeof answered> = {
           asked,
           held,
+          deps: state.dependencies,
           answer: {
             asOf: Date.now(),
             notTaken: true,
             invalid: [],
             holds: byHold(
-              conflicts.map(({ scope, holder, title, since }) => ({
+              (conflicts ?? []).map(({ scope, holder, title, since }) => ({
                 key: JSON.stringify([holder, title, since]),
                 scope,
                 name: holder,
@@ -715,9 +1592,9 @@ function Board(props: BoardProps) {
                 since,
               })),
             ),
+            ...(blockedDeps?.length ? { dependencyHits: blockedDeps } : {}),
           },
         };
-        // An answer that came meanwhile, for other paths or a newer board, stays.
         setAnswered((last) =>
           last && (last.asked !== asked || last.held !== held) ? last : notTaken,
         );
@@ -731,7 +1608,6 @@ function Board(props: BoardProps) {
     }
   };
 
-  // One sentence for each batch of changes on the board, and one when the connection changes.
   const [said, setSaid] = useState("");
   const [link, setLink] = useState(state.link);
   if (link !== state.link) {
@@ -835,7 +1711,6 @@ function Board(props: BoardProps) {
                     className="button secondary"
                     onClick={() => {
                       setPrerequisites([]);
-                      // The button goes with the selection: the focus must not go with it.
                       focusSoon("#hold-paths");
                     }}
                   >
@@ -859,7 +1734,12 @@ function Board(props: BoardProps) {
             </button>
           </form>
         </section>
-        <HeldNow {...props} />
+        <div className="group-board-main">
+          <HeldNow {...props} />
+          <LiveProgressSection state={state} me={me} />
+          <DependencyGuardsSection {...props} />
+          <TeamTodosSection state={state} />
+        </div>
       </div>
     </>
   );
@@ -877,16 +1757,16 @@ export function GroupPage({ status }: { status: Status | null }) {
     return store.close;
   }, [store, on]);
   const [inviting, setInviting] = useState(false);
+  const [managingMembers, setManagingMembers] = useState(false);
+  const [editingAccount, setEditingAccount] = useState(false);
   const adding = useRequest();
   const addable = useRef<HTMLSelectElement>(null);
-  /** Adds a repository. Its card goes, or the picker changes: the page's heading takes the focus. */
   const add = (repoId: string) =>
     void adding.run(() => store.add(repoId).then(() => focusSoon(".group-page h1")));
 
   const { info, projects, held } = state;
   const me = on && info?.state === "ready" ? info.me : undefined;
   const project = me && projects?.find((item) => item.id === state.project);
-  // A failed add's sentence goes with the card or the board it was said beside.
   const forget = adding.setError;
   useEffect(() => forget(""), [forget, project?.id, me?.id]);
   const canInvite = me && (me.admin || info?.host);
@@ -936,16 +1816,7 @@ export function GroupPage({ status }: { status: Status | null }) {
     ) : info.state === "notSetUp" ? (
       <p className="settings-card">{t.setUpAtHost}</p>
     ) : (
-      <FieldCard
-        id="join-code"
-        words={t.join}
-        label={t.join.code}
-        refused={state.refused}
-        maxLength={32}
-        autoCapitalize="characters"
-        spellCheck={false}
-        action={store.join}
-      />
+      <JoinAuthCard store={store} info={info} refused={state.refused} />
     );
   } else if (me && projects?.length === 0) {
     card = state.addable?.length ? (
@@ -990,7 +1861,6 @@ export function GroupPage({ status }: { status: Status | null }) {
       <p className="settings-card">{me.admin ? t.nothingToAdd : t.noRepository}</p>
     );
   } else if (!held && state.link === "reconnecting") {
-    // No answer yet, and the last request failed: the page says that it is trying.
     card = (
       <p className="settings-card" role="status">
         {t.reconnecting}
@@ -1039,7 +1909,6 @@ export function GroupPage({ status }: { status: Status | null }) {
                   project.name
                 )}
               </span>
-              {/* The picker stays while the board of the repository just chosen is on its way. */}
               {held && (
                 <>
                   <i />
@@ -1053,7 +1922,7 @@ export function GroupPage({ status }: { status: Status | null }) {
             </div>
           )}
         </div>
-        {(project || canInvite) && (
+        {(project || me) && (
           <div className="group-people" role="group" aria-label={t.people}>
             {circles.map((person) => (
               <span
@@ -1075,6 +1944,26 @@ export function GroupPage({ status }: { status: Status | null }) {
               >
                 +{people.length - circles.length}
               </span>
+            )}
+            {me && (
+              <button
+                type="button"
+                className="button secondary"
+                onClick={() => setEditingAccount(true)}
+              >
+                <KeyRound size={15} aria-hidden="true" />
+                {t.myAccount}
+              </button>
+            )}
+            {me?.admin && (
+              <button
+                type="button"
+                className="button secondary"
+                onClick={() => setManagingMembers(true)}
+              >
+                <Users size={15} aria-hidden="true" />
+                {t.manageMembers}
+              </button>
             )}
             {canInvite && (
               <button type="button" className="button secondary" onClick={() => setInviting(true)}>
@@ -1108,6 +1997,12 @@ export function GroupPage({ status }: { status: Status | null }) {
         card
       )}
       {inviting && canInvite && <InviteDialog store={store} onClose={() => setInviting(false)} />}
+      {editingAccount && me && (
+        <AccountDialog store={store} me={me} onClose={() => setEditingAccount(false)} />
+      )}
+      {managingMembers && me?.admin && (
+        <AdminMembersDialog store={store} me={me} onClose={() => setManagingMembers(false)} />
+      )}
     </section>
   );
 }

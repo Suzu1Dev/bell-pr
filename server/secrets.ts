@@ -83,9 +83,10 @@ export const secretPatterns: readonly SecretPattern[] = [
     blocks: true,
   },
   {
-    // Participant tokens (coordination.ts): bpc_ and exactly 43 base64url
-    // characters, so an identifier such as bpc_frame_buffer_config stays.
-    pattern: /\bbpc_[A-Za-z0-9_-]{43}(?![A-Za-z0-9_-])/g,
+    // Participant and account session tokens (coordination.ts, collab-auth.ts):
+    // bpc_ or bpa_ and exactly 43 base64url characters, so an identifier such
+    // as bpc_frame_buffer_config stays.
+    pattern: /\bbp[ca]_[A-Za-z0-9_-]{43}(?![A-Za-z0-9_-])/g,
     replacement: "[REDACTED]",
     blocks: true,
   },

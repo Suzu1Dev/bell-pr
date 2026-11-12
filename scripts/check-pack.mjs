@@ -49,7 +49,11 @@
 // page (group work, part 3) with Node.js 22.22.1: all JS 489.7 kB in 54
 // files, 491.7 kB on CI's Node.js 24. The page added 9.2 kB: its own chunk
 // (6.6 kB) and its en and zh-TW texts, so the all-JS budget rose from
-// 490 kB to 500 kB.
+// 490 kB to 500 kB. Measured with Team Collaboration v2 (VPN/Tailscale
+// sign-in, team accounts & admin management, line-range holds, cross-file
+// dependency guards, live member presence, and the review Team tab with
+// en and zh-TW texts): all JS 507.4 kB in 54 files on Node.js 24, all CSS
+// <= 45.0 kB, so the all-JS budget rose from 500 kB to 515 kB.
 //
 // Exit status: 0 when every check passes, 1 when one fails, 2 on a usage or
 // setup error.
@@ -73,7 +77,7 @@ const budgets = {
   entries: 150,
   woff2: 12,
   largestJsGzip: 116 * kB,
-  totalJsGzip: 500 * kB,
+  totalJsGzip: 515 * kB,
   totalCssGzip: 45 * kB,
 };
 const required = [

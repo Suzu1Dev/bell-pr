@@ -22,11 +22,15 @@ import type {
   CollabAddProjectResponse,
   CollabCheckResponse,
   CollabConflict,
+  CollabFileDependency,
+  CollabHold,
+  CollabMemberActivity,
   CollabOkResponse,
   CollabProjectsResponse,
   CollabTasksResponse,
   CollabWorkResponse,
 } from "../../shared/collab.js";
+import { runStatuses } from "../../shared/types.js";
 import {
   boardOf,
   dependencyOf,
@@ -43,11 +47,12 @@ import { PersonLimit } from "../collab-limits.js";
 import { CollabProjects } from "../collab-projects.js";
 import { adminOnly, notJoined, reasonOf, refuse } from "../collab-refusal.js";
 import type { Actor } from "../coordination.js";
+import { matchFileDependencies, scanRepositoryImports } from "../file-deps.js";
 import { changingRuns } from "../group-local.js";
 import { knownBranchTip } from "../hold-guard.js";
 import { log } from "../log.js";
 import { git } from "../process.js";
-import { claimableScope } from "../scope-paths.js";
+import { baseScopePath, claimableScope, pathsMeet } from "../scope-paths.js";
 import { redact } from "../secrets.js";
 import type { Store } from "../store.js";
 import type { Repository } from "../types.js";
@@ -80,7 +85,27 @@ const feedSchema = z.object({
   seen: z.coerce.number().int().min(0).optional(),
   wait: z.coerce.number().int().min(0).max(25).default(0),
 });
-const checkSchema = z.strictObject({ scopes });
+const checkSchema = z.strictObject({
+  scopes,
+  scanImports: z.boolean().optional(),
+});
+const dependencyBodySchema = z.strictObject({
+  from: z.string().max(maxPathLength),
+  to: z.string().max(maxPathLength),
+  mode: z.enum(["warn", "block"]),
+  note: line.pipe(z.string().max(200)).optional(),
+});
+const activityBodySchema = z.strictObject({
+  repoId: z.string().max(64).optional(),
+  view: z.enum(["group", "workspace", "changes", "review", "draft", "publish"]).optional(),
+  runId: z.string().max(80).optional(),
+  runTitle: line.pipe(z.string().max(180)).optional(),
+  runStatus: z.enum(runStatuses).optional(),
+  filePath: z.string().max(maxPathLength).optional(),
+  lineStart: z.number().int().min(1).max(1_000_000).optional(),
+  lineEnd: z.number().int().min(1).max(1_000_000).optional(),
+});
+const maxFileDependencies = 200;
 const workSchema = z.strictObject({
   title: line.pipe(z.string().min(1).max(maxTitle)),
   scopes,
@@ -112,9 +137,10 @@ async function linkedScopes(repo: Repository | undefined, scopes: string[]) {
   const fold = (path: string) => path.replace(/[A-Z]/g, (letter) => letter.toLowerCase());
   const prefixes = (scope: string) =>
     scope.split("/").map((_, n, parts) => parts.slice(0, n + 1).join("/"));
-  const asked = new Set(scopes.flatMap(prefixes).map(fold));
-  const parents = new Set(scopes.flatMap((scope) => prefixes(scope).slice(0, -1)).map(fold));
-  // Git's modes for a symbolic link and a submodule, by folded path.
+  const baseScopes = scopes.map((scope) => baseScopePath(scope));
+  const asked = new Set(baseScopes.flatMap(prefixes).map(fold));
+  const parents = new Set(baseScopes.flatMap((scope) => prefixes(scope).slice(0, -1)).map(fold));
+  // Git's modes for a symbolic link, submodule and folder, by folded path.
   const modes = new Map<string, string>();
   // One folder level at a time, since ls-tree matches paths in their exact
   // case: the root, then each folder in Git's spelling that an asked path
@@ -157,19 +183,23 @@ async function linkedScopes(repo: Repository | undefined, scopes: string[]) {
         const folded = fold(recorded);
         if (!asked.has(folded)) continue;
         // A link wins over a folder spelled in another case: either opens.
-        if (mode === "120000" || (mode === "160000" && !modes.has(folded))) modes.set(folded, mode);
+        if (mode === "120000" || ((mode === "160000" || mode === "040000") && !modes.has(folded)))
+          modes.set(folded, mode);
         if (mode === "040000" && parents.has(folded)) next.push(recorded);
       }
     }
     folders = next;
   }
   for (const scope of scopes) {
-    const through = prefixes(scope).some((prefix, n, all) => {
+    const base = baseScopePath(scope);
+    const through = prefixes(base).some((prefix, n, all) => {
       const mode = modes.get(fold(prefix));
       // A submodule itself is held as Git records it.
       return mode === "120000" || (mode === "160000" && n < all.length - 1);
     });
-    if (through) linked.add(scope);
+    // Line-range holds (#Lstart-Lend) apply only to files, never directories.
+    const folderRange = scope.includes("#L") && modes.get(fold(base)) === "040000";
+    if (through || folderRange) linked.add(scope);
   }
   return linked;
 }
@@ -227,7 +257,11 @@ export function registerCollabBoardRoutes(
 ) {
   const projects = new CollabProjects(host, store);
   const hub = new CollabHub((projectId, actor) =>
-    JSON.stringify(boardOf(host.coordinator().project(actor, projectId), host.side())),
+    JSON.stringify(
+      boardOf(host.coordinator().project(actor, projectId), host.side(), {
+        runs: store.data.runs,
+      }),
+    ),
   );
   const works = new PersonLimit(workLimit.max, workLimit.windowMs);
   const checks = new PersonLimit(checkLimit.max, checkLimit.windowMs);
@@ -285,7 +319,7 @@ export function registerCollabBoardRoutes(
       (run) => {
         const active = (run.owners ?? []).filter((id) => {
           const person = sideEntry(side.people, id);
-          return person && !person.removedAt;
+          return person && !person.removedAt && !person.disabledAt;
         });
         if (active.includes(actor.id)) return "self";
         return active.map((id) => nameOf(side, id));
@@ -366,6 +400,37 @@ export function registerCollabBoardRoutes(
     const changing = await changingFor(repo, actor, held, tip);
     const side = host.side();
     const view = host.coordinator().project(actor, projectId);
+    const manualDeps: CollabFileDependency[] = Object.entries(
+      sideEntry(side.fileDeps, projectId) ?? {},
+    ).map(([id, dep]) => ({
+      id,
+      from: dep.from,
+      to: dep.to,
+      mode: dep.mode,
+      createdBy: dep.createdBy,
+      createdByName: nameOf(side, dep.createdBy),
+      createdAt: dep.createdAt,
+      ...(dep.note ? { note: dep.note } : {}),
+    }));
+    const detectedImports =
+      body.scanImports && repo && held.length ? await scanRepositoryImports(repo.path) : [];
+    const dependencyHits = held.length
+      ? matchFileDependencies({
+          askedScopes: held,
+          heldClaims: view.claims
+            .filter((claim) => claim.status === "held")
+            .map((claim) => ({
+              claimId: claim.id,
+              holderId: claim.holder,
+              holderName: nameOf(side, claim.holder),
+              title: taskOf(side, projectId, claim.taskId)?.title ?? claim.taskId,
+              scopes: claim.scopes,
+            })),
+          excludeHolderIds: new Set([actor.id]),
+          manualDeps,
+          detectedImports,
+        })
+      : [];
     const answer: CollabCheckResponse = {
       asOf: new Date().toISOString(),
       invalid,
@@ -380,6 +445,7 @@ export function registerCollabBoardRoutes(
         };
       }),
       changing,
+      ...(dependencyHits.length ? { dependencyHits } : {}),
     };
     res.json(answer);
   });
@@ -443,6 +509,48 @@ export function registerCollabBoardRoutes(
         // Asked first, so a refusal makes nothing.
         refuseWaiting();
         refuseMeeting();
+        {
+          const side = host.side();
+          const view = coordinator.project(actor, projectId);
+          const blockDeps: CollabFileDependency[] = Object.entries(
+            sideEntry(side.fileDeps, projectId) ?? {},
+          )
+            .filter(([, dep]) => dep.mode === "block")
+            .map(([id, dep]) => ({
+              id,
+              from: dep.from,
+              to: dep.to,
+              mode: dep.mode,
+              createdBy: dep.createdBy,
+              createdByName: nameOf(side, dep.createdBy),
+              createdAt: dep.createdAt,
+              ...(dep.note ? { note: dep.note } : {}),
+            }));
+          if (blockDeps.length) {
+            const dependencyHits = matchFileDependencies({
+              askedScopes: held,
+              heldClaims: view.claims
+                .filter((claim) => claim.status === "held")
+                .map((claim) => ({
+                  claimId: claim.id,
+                  holderId: claim.holder,
+                  holderName: nameOf(side, claim.holder),
+                  title: taskOf(side, projectId, claim.taskId)?.title ?? claim.taskId,
+                  scopes: claim.scopes,
+                })),
+              excludeHolderIds: new Set([actor.id]),
+              manualDeps: blockDeps,
+              detectedImports: [],
+            });
+            if (dependencyHits.length)
+              throw refuse(
+                409,
+                "dependencyBlocked",
+                (m) => m.collab.dependencyBlocked,
+                { dependencyHits },
+              );
+          }
+        }
         const taskId = collabId("t");
         const key = taskKey(projectId, taskId);
         await coordinator.defineTask(actor, projectId, { id: taskId });
@@ -553,6 +661,188 @@ export function registerCollabBoardRoutes(
       res.json(answer);
     },
   );
+
+  app.get<{ project: string }>(
+    "/api/collab/projects/:project/dependencies",
+    participant,
+    async (req, res) => {
+      const projectId = req.params.project;
+      projectOf(projectId);
+      const side = host.side();
+      const dependencies: CollabFileDependency[] = Object.entries(
+        sideEntry(side.fileDeps, projectId) ?? {},
+      )
+        .map(([id, dep]) => ({
+          id,
+          from: dep.from,
+          to: dep.to,
+          mode: dep.mode,
+          createdBy: dep.createdBy,
+          createdByName: nameOf(side, dep.createdBy),
+          createdAt: dep.createdAt,
+          ...(dep.note ? { note: dep.note } : {}),
+        }))
+        .sort((a, b) => (a.createdAt < b.createdAt ? -1 : a.createdAt > b.createdAt ? 1 : 0));
+      const scan = req.query.scan === "1" || req.query.scan === "true";
+      const repo = scan ? repoOf(projectId) : undefined;
+      const detectedImports = repo ? await scanRepositoryImports(repo.path) : undefined;
+      res.json({
+        dependencies,
+        ...(detectedImports ? { detectedImports } : {}),
+      });
+    },
+  );
+
+  app.post<{ project: string }>(
+    "/api/collab/projects/:project/dependencies",
+    participant,
+    async (req, res) => {
+      const actor = res.locals.actor as Actor;
+      pace(works, actor);
+      const body = dependencyBodySchema.parse(req.body);
+      const projectId = req.params.project;
+      const { held, invalid } = await scopesOf(projectId, [body.from, body.to]);
+      if (invalid.length || held.length !== 2) throw invalidScope(invalid);
+      const [from, to] = held;
+      if (pathsMeet(from, to)) throw invalidScope([body.from, body.to]);
+      const dependency = await host.run(async () => {
+        const current = sideEntry(host.side().fileDeps, projectId) ?? {};
+        const duplicate = Object.entries(current).find(
+          ([, dep]) =>
+            (dep.from.toLowerCase() === from.toLowerCase() &&
+              dep.to.toLowerCase() === to.toLowerCase()) ||
+            (dep.from.toLowerCase() === to.toLowerCase() &&
+              dep.to.toLowerCase() === from.toLowerCase()),
+        );
+        if (!duplicate && Object.keys(current).length >= maxFileDependencies)
+          throw refuse(400, "tooManyDependencies", (m) =>
+            m.collab.tooManyDependencies({ max: maxFileDependencies }),
+          );
+        const id = duplicate ? duplicate[0] : collabId("d");
+        const createdAt = new Date().toISOString();
+        const note = body.note?.trim() || undefined;
+        await host.saveSide((draft) => {
+          const map = ((draft.fileDeps ??= {})[projectId] ??= {});
+          map[id] = {
+            from,
+            to,
+            mode: body.mode,
+            createdBy: actor.id,
+            createdAt,
+            ...(note ? { note } : {}),
+          };
+        });
+        const side = host.side();
+        return {
+          id,
+          from,
+          to,
+          mode: body.mode,
+          createdBy: actor.id,
+          createdByName: nameOf(side, actor.id),
+          createdAt,
+          ...(note ? { note } : {}),
+        } satisfies CollabFileDependency;
+      }, projectId);
+      res.status(201).json({ dependency });
+    },
+  );
+
+  app.delete<{ project: string; depId: string }>(
+    "/api/collab/projects/:project/dependencies/:depId",
+    participant,
+    async (req, res) => {
+      const actor = res.locals.actor as Actor;
+      const { project: projectId, depId } = req.params;
+      projectOf(projectId);
+      await host.run(async () => {
+        const existing = sideEntry(sideEntry(host.side().fileDeps, projectId), depId);
+        if (!existing) throw refuse(404, "unknownDependency", (m) => m.collab.unknownDependency);
+        if (actor.role !== "admin" && existing.createdBy !== actor.id) throw adminOnly();
+        await host.saveSide((draft) => {
+          const map = sideEntry(draft.fileDeps, projectId);
+          if (!map) return;
+          delete map[depId];
+          if (!Object.keys(map).length && draft.fileDeps) {
+            delete draft.fileDeps[projectId];
+            if (!Object.keys(draft.fileDeps).length) delete draft.fileDeps;
+          }
+        });
+      }, projectId);
+      res.json({ ok: true });
+    },
+  );
+
+  app.post("/api/collab/activity", participant, (req, res) => {
+    const actor = res.locals.actor as Actor;
+    const body = activityBodySchema.parse(req.body);
+    const side = host.side();
+    const filePath = body.filePath ? baseScopePath(claimableScope(body.filePath) ?? "") || undefined : undefined;
+    const lineStart = body.lineStart;
+    const lineEnd =
+      lineStart !== undefined
+        ? Math.max(lineStart, body.lineEnd ?? lineStart)
+        : undefined;
+    const entry: CollabMemberActivity = {
+      id: actor.id,
+      name: nameOf(side, actor.id),
+      updatedAt: new Date().toISOString(),
+      ...(body.repoId ? { repoId: body.repoId } : {}),
+      ...(body.view ? { view: body.view } : {}),
+      ...(body.runId ? { runId: body.runId } : {}),
+      ...(body.runTitle ? { runTitle: body.runTitle } : {}),
+      ...(body.runStatus ? { runStatus: body.runStatus } : {}),
+      ...(filePath ? { filePath } : {}),
+      ...(lineStart !== undefined ? { lineStart } : {}),
+      ...(lineEnd !== undefined ? { lineEnd } : {}),
+    };
+    const projectIds = body.repoId
+      ? Object.entries(side.projects ?? {})
+          .filter(([, p]) => p.repoId === body.repoId)
+          .map(([id]) => id)
+      : undefined;
+    hub.reportActivity(entry, projectIds?.length ? projectIds : undefined);
+    res.json({ ok: true });
+  });
+
+  app.get("/api/collab/activity", participant, (req, res) => {
+    const actor = res.locals.actor as Actor;
+    const repoId = typeof req.query.repoId === "string" ? req.query.repoId.slice(0, 64) : undefined;
+    const activities = hub.activities(repoId);
+    const holds: (CollabHold & { holderName: string })[] = [];
+    const dependencies: CollabFileDependency[] = [];
+    if (repoId) {
+      const side = host.side();
+      const coordinator = host.coordinator();
+      for (const [projectId, project] of Object.entries(side.projects ?? {})) {
+        if (project.repoId !== repoId) continue;
+        for (const claim of coordinator.project(actor, projectId).claims) {
+          if (claim.status !== "held") continue;
+          holds.push({
+            ...holdOf(side, projectId, claim),
+            holderName: nameOf(side, claim.holder),
+          });
+        }
+        for (const [id, dep] of Object.entries(sideEntry(side.fileDeps, projectId) ?? {})) {
+          dependencies.push({
+            id,
+            from: dep.from,
+            to: dep.to,
+            mode: dep.mode,
+            createdBy: dep.createdBy,
+            createdByName: nameOf(side, dep.createdBy),
+            createdAt: dep.createdAt,
+            ...(dep.note ? { note: dep.note } : {}),
+          });
+        }
+      }
+    }
+    res.json({
+      asOf: new Date().toISOString(),
+      activities,
+      ...(repoId ? { holds, dependencies } : {}),
+    });
+  });
 
   return hub;
 }

@@ -4,10 +4,16 @@
  * what. Reading only, apart from `dropHoldEntries`, which edits a
  * `saveSide` draft.
  */
-import type { CollabBoard, CollabHold } from "../shared/collab.js";
+import type {
+  CollabBoard,
+  CollabBoardTodo,
+  CollabFileDependency,
+  CollabHold,
+} from "../shared/collab.js";
 import { sideEntry, type CollabSide } from "./collab-host.js";
 import type { ClaimView, ProjectView } from "./coordination.js";
 import { pathsMeet } from "./scope-paths.js";
+import type { Run } from "./types.js";
 
 /** The side file's key of a task. */
 export const taskKey = (projectId: string, taskId: string) => `${projectId}/${taskId}`;
@@ -68,7 +74,11 @@ export function inTheWay(view: ProjectView, scopes: string[]) {
   return found;
 }
 
-export function boardOf(view: ProjectView, side: CollabSide): CollabBoard {
+export function boardOf(
+  view: ProjectView,
+  side: CollabSide,
+  extra?: { runs?: readonly Run[] },
+): CollabBoard {
   const project = sideEntry(side.projects, view.id);
   const held = view.claims.filter((claim) => claim.status === "held");
   const holders = new Set(held.map((claim) => claim.holder));
@@ -80,7 +90,46 @@ export function boardOf(view: ProjectView, side: CollabSide): CollabBoard {
       name: person.name ?? id,
       ...(person.admin ? { admin: true } : {}),
       ...(person.removedAt ? { removed: true } : {}),
+      ...(person.disabledAt ? { disabled: true } : {}),
+      ...(person.username ? { username: person.username } : {}),
     });
+  }
+  const dependencies: CollabFileDependency[] = Object.entries(
+    sideEntry(side.fileDeps, view.id) ?? {},
+  )
+    .map(([id, dep]) => ({
+      id,
+      from: dep.from,
+      to: dep.to,
+      mode: dep.mode,
+      createdBy: dep.createdBy,
+      createdByName: nameOf(side, dep.createdBy),
+      createdAt: dep.createdAt,
+      ...(dep.note ? { note: dep.note } : {}),
+    }))
+    .sort((a, b) => (a.createdAt < b.createdAt ? -1 : a.createdAt > b.createdAt ? 1 : 0));
+  const openTodos: CollabBoardTodo[] = [];
+  if (extra?.runs && project?.repoId) {
+    for (const run of extra.runs) {
+      if (run.repoId !== project.repoId || !run.teamRecords?.todos?.length) continue;
+      for (const todo of run.teamRecords.todos) {
+        if (todo.done) continue;
+        openTodos.push({
+          id: todo.id,
+          runId: run.id,
+          runTitle: run.title,
+          ...(todo.filePath ? { filePath: todo.filePath } : {}),
+          text: todo.text,
+          ...(todo.authorId ? { authorId: todo.authorId } : {}),
+          authorName: todo.authorName,
+          ...(todo.assigneeId ? { assigneeId: todo.assigneeId } : {}),
+          ...(todo.assigneeName ? { assigneeName: todo.assigneeName } : {}),
+          done: false,
+          createdAt: todo.createdAt,
+        });
+      }
+    }
+    openTodos.sort((a, b) => (b.createdAt < a.createdAt ? -1 : b.createdAt > a.createdAt ? 1 : 0));
   }
   return {
     project: {
@@ -90,5 +139,7 @@ export function boardOf(view: ProjectView, side: CollabSide): CollabBoard {
     },
     people,
     held: held.map((claim) => holdOf(side, view.id, claim)),
+    ...(dependencies.length ? { dependencies } : {}),
+    ...(openTodos.length ? { openTodos: openTodos.slice(0, 100) } : {}),
   };
 }

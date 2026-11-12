@@ -31,7 +31,9 @@
   overflow-wrap: anywhere;
 }
 /* Held now: one row per hold, oldest first. Rows never change places. */
-.group-holds {
+.group-holds,
+.group-sublist {
+  margin: 0;
   padding: 0;
   overflow: hidden;
   list-style: none;
@@ -45,7 +47,8 @@
   border-left: 3px solid transparent;
   overflow-wrap: anywhere;
 }
-.group-hold + .group-hold {
+.group-hold + .group-hold,
+.group-subrow + .group-subrow {
   border-top: 1px solid var(--color-border-subtle);
 }
 /* Yours: an accent edge, next to the word "You". */
@@ -93,14 +96,19 @@
   margin-top: 0;
 }
 .group-selected,
-.group-release {
+.group-release,
+.group-subrow,
+.group-subrow-main {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: var(--space-2);
 }
-.group-selected {
+.group-selected,
+.group-subrow {
   justify-content: space-between;
+}
+.group-selected {
   margin-top: var(--space-2);
 }
 .group-release {
@@ -109,6 +117,14 @@
 }
 .group-release .button {
   min-height: 44px;
+}
+.group-board-main {
+  display: grid;
+  gap: var(--space-5);
+  align-content: start;
+}
+.group-subrow {
+  padding: var(--space-3) var(--space-4);
 }
 @media (max-width: 760px) {
   .group-hold {

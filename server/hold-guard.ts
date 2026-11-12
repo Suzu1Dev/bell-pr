@@ -29,7 +29,7 @@ import type { HoldCheck } from "./publish.js";
 import { assertGitConfigSafe, git } from "./process.js";
 import { participantOf } from "./routes/collab.js";
 import type { ClaimView } from "./coordination.js";
-import { comparablePath, pathsMeet } from "./scope-paths.js";
+import { baseScopePath, comparablePath, pathsMeet } from "./scope-paths.js";
 import { AppError, type DiffFile, type Repository, type Run } from "./types.js";
 
 /**
@@ -44,6 +44,10 @@ export const heldByOtherKind: DraftCheck["kind"] = "block";
 /** A changed file and the hold of someone else it meets. */
 export interface HeldConflict {
   path: string;
+  /** Line-range hold scope (`path#Lstart-Lend`) when the conflict is on a locked region. */
+  scope?: string;
+  /** Peer path when blocked by an active cross-file dependency guard (`mode: "block"`). */
+  viaDependency?: string;
   claimId: string;
   /** The holder's name as the group knows it, else their id. */
   holder: string;
@@ -75,7 +79,7 @@ function yours(host: CollabHost, asker: HoldsAsker): ReadonlySet<string> {
   }
   return new Set(
     Object.entries(host.side().people ?? {})
-      .filter(([, person]) => !person.removedAt && person.deviceId === asker.deviceId)
+      .filter(([, person]) => !person.removedAt && !person.disabledAt && person.deviceId === asker.deviceId)
       .map(([id]) => id),
   );
 }
@@ -111,18 +115,54 @@ function conflictsOf(
 ): HeldConflict[] {
   const side = host.side();
   const held: HeldConflict[] = [];
+  const seen = new Set<string>();
   for (const { projectId, claim } of claims) {
     if (you.has(claim.holder)) continue;
-    for (const path of paths)
+    const deps = Object.values(sideEntry(side.fileDeps, projectId) ?? {}).filter(
+      (dep) => dep.mode === "block",
+    );
+    for (const rawPath of paths) {
+      const basePath = baseScopePath(rawPath);
+      const key = `${claim.id}\0${basePath.toLowerCase()}`;
+      if (seen.has(key)) continue;
       // A path that cannot be compared reliably is taken to meet the hold.
-      if (!comparablePath(path) || claim.scopes.some((scope) => pathsMeet(scope, path)))
+      const uncomparable = !comparablePath(rawPath);
+      const matchedScope = uncomparable
+        ? undefined
+        : claim.scopes.find((scope) => pathsMeet(scope, rawPath));
+      if (uncomparable || matchedScope !== undefined) {
+        seen.add(key);
         held.push({
-          path,
+          path: basePath,
+          ...(matchedScope?.includes("#L") ? { scope: matchedScope } : {}),
           claimId: claim.id,
           holder: nameOf(side, claim.holder),
           title: taskOf(side, projectId, claim.taskId)?.title ?? claim.taskId,
           since: claim.createdAt,
         });
+        continue;
+      }
+      for (const dep of deps) {
+        const hitFrom =
+          pathsMeet(dep.from, rawPath) && claim.scopes.some((scope) => pathsMeet(scope, dep.to));
+        const hitTo =
+          !hitFrom &&
+          pathsMeet(dep.to, rawPath) &&
+          claim.scopes.some((scope) => pathsMeet(scope, dep.from));
+        if (hitFrom || hitTo) {
+          seen.add(key);
+          held.push({
+            path: basePath,
+            viaDependency: hitFrom ? dep.to : dep.from,
+            claimId: claim.id,
+            holder: nameOf(side, claim.holder),
+            title: taskOf(side, projectId, claim.taskId)?.title ?? claim.taskId,
+            since: claim.createdAt,
+          });
+          break;
+        }
+      }
+    }
   }
   return held;
 }
@@ -138,7 +178,13 @@ function heldItems(held: readonly HeldConflict[]) {
   const format = formatters(currentLocale());
   const m = sm().run.local;
   return held.map((conflict) =>
-    m.heldByOtherItem({ ...conflict, since: format.dateTime(conflict.since) }),
+    m.heldByOtherItem({
+      ...conflict,
+      path:
+        conflict.scope ??
+        (conflict.viaDependency ? `${conflict.path} (⇄ ${conflict.viaDependency})` : conflict.path),
+      since: format.dateTime(conflict.since),
+    }),
   );
 }
 
@@ -150,7 +196,7 @@ function activeOwners(host: CollabHost, run: Pick<Run, "owners">): ReadonlySet<s
   return new Set(
     (run.owners ?? []).filter((id) => {
       const person = sideEntry(people, id);
-      return person && !person.removedAt;
+      return person && !person.removedAt && !person.disabledAt;
     }),
   );
 }
@@ -298,7 +344,7 @@ export function holdGuard(host: CollabHost, asker: HoldsAsker) {
     heldByOthers(
       host,
       run.repoId,
-      files.map((file) => file.path),
+      diffScopes(files),
       asker,
     );
   /** For publish(), first publishes and follow-ups alike: 409 `heldByOther`, 503 `holdsUnknown`. */
@@ -332,25 +378,74 @@ export function holdGuard(host: CollabHost, asker: HoldsAsker) {
     if (!held.length) return [];
     return [{ id: "held-by-other", kind: heldByOtherKind, message: m.heldByOther, details: heldItems(held) }];
   };
-  /** S4: upstream commits on the target branch that touched the holder's own held paths. */
+  /** S4 + cross-file warn dependencies: upstream commits on own holds and held dependent files. */
   const confirms = async (
     run: Run,
     repo: Repository | undefined,
     runs: readonly Run[],
+    files?: readonly DiffFile[],
   ): Promise<DraftCheck[]> => {
-    if (activeFollowUp(run.followUps)) return [];
-    const target = (await knownBranchTip(repo, runs, run.baseBranch)) ?? run.baseSha;
-    const changes = await heldUpstreamChanges(host, repo, run, target, asker);
-    if (!changes.length) return [];
+    const out: DraftCheck[] = [];
     const m = sm().run.local;
-    return [
-      {
-        id: "held-changed-upstream",
-        kind: "confirm",
-        message: m.heldChangedUpstream({ branch: run.baseBranch }),
-        details: changes.map((change) => m.heldChangedUpstreamItem(change)),
-      },
-    ];
+    if (!activeFollowUp(run.followUps)) {
+      const target = (await knownBranchTip(repo, runs, run.baseBranch)) ?? run.baseSha;
+      const changes = await heldUpstreamChanges(host, repo, run, target, asker);
+      if (changes.length)
+        out.push({
+          id: "held-changed-upstream",
+          kind: "confirm",
+          message: m.heldChangedUpstream({ branch: run.baseBranch }),
+          details: changes.map((change) => m.heldChangedUpstreamItem(change)),
+        });
+    }
+    if (files?.length) {
+      const claims = groupClaims(host, run.repoId);
+      if (Array.isArray(claims)) {
+        const you = yours(host, asker);
+        const side = host.side();
+        const scopes = diffScopes(files);
+        const warnDetails: string[] = [];
+        const seen = new Set<string>();
+        for (const { projectId, claim } of claims) {
+          if (you.has(claim.holder)) continue;
+          const deps = Object.values(sideEntry(side.fileDeps, projectId) ?? {}).filter(
+            (dep) => dep.mode === "warn",
+          );
+          for (const dep of deps) {
+            for (const rawPath of scopes) {
+              const hitFrom =
+                pathsMeet(dep.from, rawPath) && claim.scopes.some((s) => pathsMeet(s, dep.to));
+              const hitTo =
+                !hitFrom &&
+                pathsMeet(dep.to, rawPath) &&
+                claim.scopes.some((s) => pathsMeet(s, dep.from));
+              if (!hitFrom && !hitTo) continue;
+              const basePath = baseScopePath(rawPath);
+              const peer = hitFrom ? dep.to : dep.from;
+              const key = `${claim.id}\0${basePath.toLowerCase()}\0${peer.toLowerCase()}`;
+              if (seen.has(key)) continue;
+              seen.add(key);
+              warnDetails.push(
+                m.dependencyWarningItem({
+                  path: basePath,
+                  peer,
+                  holder: nameOf(side, claim.holder),
+                  title: taskOf(side, projectId, claim.taskId)?.title ?? claim.taskId,
+                }),
+              );
+            }
+          }
+        }
+        if (warnDetails.length)
+          out.push({
+            id: "collab-dependency-warn",
+            kind: "confirm",
+            message: m.dependencyWarning,
+            details: warnDetails,
+          });
+      }
+    }
+    return out;
   };
   return { publishing, preflight, confirms };
 }
@@ -418,11 +513,24 @@ export function runHolds(host: CollabHost): RunHolds {
       const claims = claimsOf(run);
       if (!claims) return undefined;
       const you = activeOwners(host, run);
+      const side = host.side();
+      const depGuarded: string[] = [];
+      for (const { projectId, claim } of claims) {
+        if (you.has(claim.holder)) continue;
+        for (const dep of Object.values(sideEntry(side.fileDeps, projectId) ?? {})) {
+          if (dep.mode !== "block") continue;
+          if (claim.scopes.some((s) => pathsMeet(s, dep.to))) depGuarded.push(dep.from);
+          if (claim.scopes.some((s) => pathsMeet(s, dep.from))) depGuarded.push(dep.to);
+        }
+      }
       const scopes = (mine: boolean) =>
         [
-          ...new Set(
-            claims.filter(({ claim }) => you.has(claim.holder) === mine).flatMap(({ claim }) => claim.scopes),
-          ),
+          ...new Set([
+            ...claims
+              .filter(({ claim }) => you.has(claim.holder) === mine)
+              .flatMap(({ claim }) => claim.scopes),
+            ...(mine ? [] : depGuarded),
+          ]),
         ].sort();
       return { others: scopes(false), yours: scopes(true) };
     },
@@ -533,4 +641,142 @@ export async function changedPaths(run: Pick<Run, "worktreePath" | "baseSha" | "
   ]);
   const untracked = await git(run.worktreePath, ["ls-files", "--others", "--exclude-standard", "-z"]);
   return [...new Set([...names(changed.stdout), ...names(untracked.stdout)])];
+}
+
+const hunkHeaderPattern = /^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@/;
+
+/**
+ * 1-based line ranges in the base file touched by a unified diff patch.
+ * Context lines (' ') are skipped so two people holding non-overlapping
+ * `#L<start>-L<end>` regions of the same file can edit concurrently.
+ */
+export function changedLineRanges(patch: string): { start: number; end: number }[] {
+  const ranges: { start: number; end: number }[] = [];
+  let oldLine = 0;
+  let inHunk = false;
+  let runStart = 0;
+  let runEnd = 0;
+  const flush = () => {
+    if (!runStart) return;
+    const prev = ranges[ranges.length - 1];
+    if (prev && runStart <= prev.end + 1) prev.end = Math.max(prev.end, runEnd);
+    else ranges.push({ start: runStart, end: runEnd });
+    runStart = 0;
+    runEnd = 0;
+  };
+  for (const line of patch.split("\n")) {
+    const header = hunkHeaderPattern.exec(line);
+    if (header) {
+      flush();
+      const oldStart = Number(header[1]);
+      const oldCount = header[2] === undefined ? 1 : Number(header[2]);
+      oldLine = oldCount === 0 ? oldStart + 1 : oldStart;
+      inHunk = true;
+      continue;
+    }
+    if (!inHunk) continue;
+    if (line.startsWith(" ")) {
+      flush();
+      oldLine += 1;
+    } else if (line.startsWith("-")) {
+      const at = Math.max(1, oldLine);
+      if (!runStart) runStart = at;
+      runEnd = Math.max(runEnd, at);
+      oldLine += 1;
+    } else if (line.startsWith("+")) {
+      if (!runStart) {
+        const at = Math.max(1, oldLine);
+        runStart = at;
+        runEnd = at;
+      }
+    } else if (!line.startsWith("\\")) {
+      flush();
+      inHunk = false;
+    }
+  }
+  flush();
+  return ranges;
+}
+
+/** Emits `path#L<start>-L<end>` per modified hunk on modified text files, else `path`. */
+export function diffScopes(files: readonly DiffFile[]): string[] {
+  const scopes: string[] = [];
+  for (const file of files) {
+    if (file.status === "modified" && !file.blocked && file.patch) {
+      const ranges = changedLineRanges(file.patch);
+      if (ranges.length) {
+        for (const range of ranges) scopes.push(`${file.path}#L${range.start}-L${range.end}`);
+        continue;
+      }
+    }
+    scopes.push(file.path);
+  }
+  return scopes;
+}
+
+/**
+ * Changed scopes in a run's checkout against its review base, with `#Lstart-Lend`
+ * granularity on modified tracked text files so concurrent intra-file holds do
+ * not block non-overlapping Agent edits.
+ */
+export async function changedScopes(run: Pick<Run, "worktreePath" | "baseSha" | "followUps">) {
+  const base = reviewBaseSha(run);
+  if (!base || !run.worktreePath) return [];
+  await assertGitConfigSafe(run.worktreePath);
+  const names = (output: string) => output.split("\0").filter(Boolean);
+  const tracked = names(
+    (
+      await git(run.worktreePath, [
+        "diff",
+        "--no-ext-diff",
+        "--no-textconv",
+        "--no-renames",
+        "--name-only",
+        "-z",
+        base,
+        "--",
+      ])
+    ).stdout,
+  );
+  const untracked = names(
+    (await git(run.worktreePath, ["ls-files", "--others", "--exclude-standard", "-z"])).stdout,
+  );
+  const scopes: string[] = [];
+  for (const filePath of tracked) {
+    const patch = (
+      await git(
+        run.worktreePath,
+        [
+          "--literal-pathspecs",
+          "diff",
+          "--no-ext-diff",
+          "--no-textconv",
+          "--no-renames",
+          "--unified=0",
+          base,
+          "--",
+          filePath,
+        ],
+        { maxBytes: 600_000 },
+      ).catch(() => ({ stdout: "" }))
+    ).stdout;
+    if (
+      patch &&
+      !patch.includes("\nnew file mode ") &&
+      !patch.includes("\ndeleted file mode ") &&
+      !patch.includes("Binary files ") &&
+      !patch.includes("GIT binary patch")
+    ) {
+      const ranges = changedLineRanges(patch);
+      if (ranges.length) {
+        for (const range of ranges) scopes.push(`${filePath}#L${range.start}-L${range.end}`);
+        continue;
+      }
+    }
+    scopes.push(filePath);
+  }
+  for (const filePath of untracked) {
+    if (!tracked.includes(filePath)) scopes.push(filePath);
+  }
+  return scopes;
 }

@@ -8,6 +8,7 @@ export function ApiTokenEmptyState() {
     <div className="empty-state" role="status">
       <p>{message}</p>
       <p>{t.pair.explainer}</p>
+      <p>{t.pair.remoteHint}</p>
       <a className="button primary" href="/pair">{t.pair.open}</a>
     </div>
   );

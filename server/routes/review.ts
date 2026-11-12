@@ -7,9 +7,13 @@ import {
 import { runDraftSchema } from "../drafts.js";
 import { learningExport } from "../learning-export.js";
 import { publishChecks, resumesPublish } from "../publish.js";
-import { currentLocale } from "../i18n/index.js";
+import { currentLocale, sm } from "../i18n/index.js";
 import { participantHeader } from "../coordination-routes.js";
+import { notJoined } from "../collab-refusal.js";
+import type { CollabHub } from "../collab-hub.js";
 import { holdGuard } from "../hold-guard.js";
+import { participantOf } from "./collab.js";
+import type { TeamActorIdentity } from "../team-records.js";
 import type { RouteDeps } from "./types.js";
 
 // The commit message is passed to git verbatim, so newline is the only control character allowed.
@@ -33,6 +37,73 @@ export function registerReviewRoutes(
           deviceId: res.locals.deviceId,
         })
       : undefined;
+
+  const optionalReviewer = (req: Request, res: Response): TeamActorIdentity | undefined => {
+    if (!options.collab || options.collab.status().state !== "ready") return undefined;
+    const token = req.get(participantHeader);
+    if (token !== undefined) {
+      const found = participantOf(options.collab, token);
+      return found
+        ? {
+            id: found.actor.id,
+            name: found.person.name ?? found.actor.id,
+            admin: found.actor.role === "admin",
+          }
+        : undefined;
+    }
+    const matches = Object.entries(options.collab.side().people ?? {}).filter(
+      ([, p]) => !p.removedAt && !p.disabledAt && p.deviceId === res.locals.deviceId,
+    );
+    if (matches.length === 1) {
+      const [id, person] = matches[0];
+      return { id, name: person.name ?? id, admin: Boolean(person.admin) };
+    }
+    return undefined;
+  };
+
+  const requireTeamActor = (
+    req: Request,
+    res: Response,
+    fallbackName?: string,
+  ): TeamActorIdentity => {
+    if (options.collab && options.collab.status().state === "ready") {
+      const token = req.get(participantHeader);
+      if (token !== undefined) {
+        const found = participantOf(options.collab, token);
+        if (!found) throw notJoined();
+        return {
+          id: found.actor.id,
+          name: found.person.name ?? found.actor.id,
+          admin: found.actor.role === "admin",
+        };
+      }
+      const matches = Object.entries(options.collab.side().people ?? {}).filter(
+        ([, p]) => !p.removedAt && !p.disabledAt && p.deviceId === res.locals.deviceId,
+      );
+      if (matches.length >= 1) {
+        const [id, person] = matches[0];
+        return { id, name: person.name ?? id, admin: Boolean(person.admin) };
+      }
+      if (res.locals.deviceId === undefined) {
+        return { id: "host", name: fallbackName?.trim() || sm().collab.atHostName, admin: true };
+      }
+      throw notJoined();
+    }
+    return {
+      id: "local",
+      name: fallbackName?.trim() || sm().collab.soloAuthorName,
+      admin: true,
+    };
+  };
+
+  const notifyCollabTodoChange = (req: Request, repoId: string) => {
+    if (!options.collab || options.collab.status().state !== "ready") return;
+    const hub = req.app.locals.collabHub as CollabHub | undefined;
+    if (!hub) return;
+    for (const [projectId, project] of Object.entries(options.collab.side().projects ?? {})) {
+      if (project.repoId === repoId) hub.changed(projectId);
+    }
+  };
   app.get("/api/runs/:id/export.md", (req, res) => {
     const run = workbench.run(req.params.id);
     const repo = workbench.store.data.repos.find(
@@ -115,7 +186,7 @@ export function registerReviewRoutes(
       const holdChecks = guard.preflight(run, files);
       checks.push(...holdChecks);
       if (!holdChecks.some((check) => check.id === "holds-unknown"))
-        checks.push(...(await guard.confirms(run, repo, workbench.store.data.runs)));
+        checks.push(...(await guard.confirms(run, repo, workbench.store.data.runs, files)));
     }
     // After an attempt that pushed but recorded no PR, GitHub's open count
     // may include the PR that attempt opened. publish() records that PR
@@ -153,8 +224,101 @@ export function registerReviewRoutes(
         filePath,
         reviewed,
         fingerprint,
+        optionalReviewer(req, res),
       ),
     });
+  });
+  app.post("/api/runs/:id/team-review", async (req, res) => {
+    const { filePath, reviewed, fingerprint, reviewerName } = z
+      .strictObject({
+        filePath: z.string().min(1).max(1024),
+        reviewed: z.boolean(),
+        fingerprint: z.string().regex(/^[a-f0-9]{64}$/),
+        reviewerName: z.string().max(80).optional(),
+      })
+      .parse(req.body);
+    const reviewer = requireTeamActor(req, res, reviewerName);
+    res.json({
+      run: await workbench.teamFileReview(req.params.id, {
+        filePath,
+        reviewed,
+        fingerprint,
+        reviewer,
+      }),
+    });
+  });
+  app.post("/api/runs/:id/team-rationales", async (req, res) => {
+    const body = z
+      .strictObject({
+        filePath: z.string().min(1).max(1024),
+        lineStart: z.number().int().min(1).max(1_000_000).optional(),
+        lineEnd: z.number().int().min(1).max(1_000_000).optional(),
+        text: z.string().trim().min(1).max(2000),
+        authorName: z.string().max(80).optional(),
+      })
+      .parse(req.body);
+    const author = requireTeamActor(req, res, body.authorName);
+    const run = await workbench.addTeamRationale(req.params.id, {
+      filePath: body.filePath,
+      lineStart: body.lineStart,
+      lineEnd: body.lineEnd,
+      text: body.text,
+      author,
+    });
+    res.status(201).json({ run });
+  });
+  app.delete("/api/runs/:id/team-rationales/:noteId", async (req, res) => {
+    const actor = requireTeamActor(req, res);
+    const run = await workbench.removeTeamRationale(req.params.id, req.params.noteId, actor);
+    res.json({ run });
+  });
+  app.post("/api/runs/:id/team-todos", async (req, res) => {
+    const body = z
+      .strictObject({
+        filePath: z.string().min(1).max(1024).optional(),
+        text: z.string().trim().min(1).max(1000),
+        assigneeId: z.string().max(80).optional(),
+        assigneeName: z.string().max(80).optional(),
+        authorName: z.string().max(80).optional(),
+      })
+      .parse(req.body);
+    const author = requireTeamActor(req, res, body.authorName);
+    const run = await workbench.addTeamTodo(req.params.id, {
+      filePath: body.filePath,
+      text: body.text,
+      assigneeId: body.assigneeId,
+      assigneeName: body.assigneeName,
+      author,
+    });
+    notifyCollabTodoChange(req, run.repoId);
+    res.status(201).json({ run });
+  });
+  app.patch("/api/runs/:id/team-todos/:todoId", async (req, res) => {
+    const body = z
+      .strictObject({
+        done: z.boolean().optional(),
+        text: z.string().trim().min(1).max(1000).optional(),
+        assigneeId: z.union([z.string().max(80), z.null()]).optional(),
+        assigneeName: z.union([z.string().max(80), z.null()]).optional(),
+        authorName: z.string().max(80).optional(),
+      })
+      .parse(req.body);
+    const actor = requireTeamActor(req, res, body.authorName);
+    const run = await workbench.updateTeamTodo(req.params.id, req.params.todoId, {
+      done: body.done,
+      text: body.text,
+      assigneeId: body.assigneeId,
+      assigneeName: body.assigneeName,
+      actor,
+    });
+    notifyCollabTodoChange(req, run.repoId);
+    res.json({ run });
+  });
+  app.delete("/api/runs/:id/team-todos/:todoId", async (req, res) => {
+    const actor = requireTeamActor(req, res);
+    const run = await workbench.removeTeamTodo(req.params.id, req.params.todoId, actor);
+    notifyCollabTodoChange(req, run.repoId);
+    res.json({ run });
   });
   app.post("/api/runs/:id/approve", async (req, res) => {
     const { draft } = z

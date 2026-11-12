@@ -50,6 +50,7 @@ import * as syncing from "./sync-runs.js";
 import * as followUps from "./followup-runs.js";
 import * as walkthroughs from "./walkthrough-runs.js";
 import * as premises from "./premise-runs.js";
+import * as teamRecords from "./team-records.js";
 import { commitDetail, listCommits } from "./commits.js";
 import { readDiffView } from "./diff-views.js";
 import { splitRun } from "./split-run.js";
@@ -568,6 +569,7 @@ export class Workbench {
     filePath: string,
     reviewed: boolean,
     displayedFingerprint: string,
+    reviewer?: teamRecords.TeamActorIdentity,
   ) {
     return publishing.review(
       this.context,
@@ -575,7 +577,76 @@ export class Workbench {
       filePath,
       reviewed,
       displayedFingerprint,
+      reviewer,
     );
+  }
+
+  async teamFileReview(
+    id: string,
+    input: {
+      filePath: string;
+      reviewed: boolean;
+      fingerprint: string;
+      reviewer: teamRecords.TeamActorIdentity;
+    },
+  ) {
+    return teamRecords.recordTeamFileReview(this.context, id, input);
+  }
+
+  async addTeamRationale(
+    id: string,
+    input: {
+      filePath: string;
+      lineStart?: number;
+      lineEnd?: number;
+      text: string;
+      author: teamRecords.TeamActorIdentity;
+    },
+  ) {
+    return teamRecords.addTeamRationale(this.context, id, input);
+  }
+
+  async removeTeamRationale(
+    id: string,
+    noteId: string,
+    actor: teamRecords.TeamActorIdentity,
+  ) {
+    return teamRecords.removeTeamRationale(this.context, id, noteId, actor);
+  }
+
+  async addTeamTodo(
+    id: string,
+    input: {
+      filePath?: string;
+      text: string;
+      assigneeId?: string;
+      assigneeName?: string;
+      author: teamRecords.TeamActorIdentity;
+    },
+  ) {
+    return teamRecords.addTeamTodo(this.context, id, input);
+  }
+
+  async updateTeamTodo(
+    id: string,
+    todoId: string,
+    input: {
+      done?: boolean;
+      text?: string;
+      assigneeId?: string | null;
+      assigneeName?: string | null;
+      actor: teamRecords.TeamActorIdentity;
+    },
+  ) {
+    return teamRecords.updateTeamTodo(this.context, id, todoId, input);
+  }
+
+  async removeTeamTodo(
+    id: string,
+    todoId: string,
+    actor: teamRecords.TeamActorIdentity,
+  ) {
+    return teamRecords.removeTeamTodo(this.context, id, todoId, actor);
   }
 
   async approve(id: string, displayedDraft: Run["draft"]) {

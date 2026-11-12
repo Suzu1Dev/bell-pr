@@ -783,14 +783,14 @@ export function useRunActions({
       return;
     }
     try {
-      const { run: updated } = await api<{ run: Run }>(
-        `/runs/${run.id}/review`,
-        send("POST", {
+      const { run: updated } = await api<{ run: Run }>(`/runs/${run.id}/review`, {
+        ...send("POST", {
           filePath: file.path,
           reviewed,
           fingerprint: file.fingerprint,
         }),
-      );
+        headers: participantHeaders(),
+      });
       if (runIdRef.current === updated.id) setRun(updated);
     } catch (error) {
       notify((error as Error).message, "error");

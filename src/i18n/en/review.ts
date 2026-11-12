@@ -172,6 +172,7 @@ const review = {
       walkthrough: "Walkthrough",
       reports: "Reviews",
       chat: "Ask",
+      team: "Team",
     },
     /** `path` is shown as code; `purpose` is the project analysis's words. */
     module: ({ path, purpose }: { path: string; purpose: string }) =>
@@ -469,6 +470,41 @@ const review = {
       plural(count) === "one"
         ? `The PR branch's 1 commit; the label says where it came from in ${product.name}.`
         : `The PR branch's ${count} commits, oldest first; each label says where the commit came from in ${product.name}.`,
+  },
+  /** Team collaboration records on changed files: reviewer sign-offs, rationales and handoff TODOs. */
+  team: {
+    reviewsTitle: "Reviewed by teammates",
+    reviewsIntro:
+      "Track who has reviewed this Agent-modified file at its current diff version.",
+    reviewsEmpty: "No teammate sign-off recorded for this file yet.",
+    signOff: "Mark reviewed by me",
+    clearSignOff: "Clear my review mark",
+    reviewedAt: ({ name, time }: { name: string; time: string }) => `${name} · ${time}`,
+    chipCount: ({ count }: { count: number }) =>
+      plural(count) === "one" ? "1 team review" : `${count} team reviews`,
+    rationalesTitle: "Change rationale & thoughts",
+    rationalesIntro:
+      "Leave context for teammates explaining why this file or line range was changed this way.",
+    rationalesEmpty: "No developer rationale notes on this file yet.",
+    rationalePlaceholder: "Explain why this approach was chosen, assumptions or subtle edge cases…",
+    lineRangeOptional: "Lines (optional, e.g. 12-30)",
+    useSelectedLines: ({ start, end }: { start: number; end: number }) =>
+      start === end ? `Use selected line ${start}` : `Use selected lines ${start}–${end}`,
+    locateLines: ({ start, end }: { start: number; end: number }) =>
+      start === end ? `Line ${start}` : `Lines ${start}–${end}`,
+    addRationale: "Post note",
+    removeItem: "Delete",
+    todosTitle: "Handoff & coordination TODOs",
+    todosIntro:
+      "Tag remaining tasks or items to coordinate with teammates. Open items require confirmation before publishing.",
+    todosEmpty: "No handoff TODOs tagged yet.",
+    todoPlaceholder: "What still needs follow-up or coordination?",
+    assigneePlaceholder: "Assignee name (optional)",
+    scopeThisFile: "Attach to this file",
+    addTodo: "Add TODO",
+    assignedTo: ({ name }: { name: string }) => `For ${name}`,
+    completedBy: ({ name }: { name: string }) => `Done by ${name}`,
+    otherFileBadge: ({ path }: { path: string }) => path,
   },
 };
 

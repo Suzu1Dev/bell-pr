@@ -34,7 +34,14 @@ export const reasonOf = (error: unknown) =>
     : undefined;
 
 /** The detail fields a refusal may carry to the person. */
-const forwarded = ["conflicts", "retryAfter", "invalid", "unknown", "pending"] as const;
+const forwarded = [
+  "conflicts",
+  "retryAfter",
+  "invalid",
+  "unknown",
+  "pending",
+  "dependencyHits",
+] as const;
 
 /** Group work's sentence for a refusal it did not word: by its reason, else a general one. */
 function sentence(status: number, reason: string | undefined) {

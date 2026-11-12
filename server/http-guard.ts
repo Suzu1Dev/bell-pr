@@ -14,11 +14,33 @@ function loopbackHost(hostname: string) {
 }
 
 /**
- * Parses BELLPR_ALLOWED_ORIGINS. Each entry is one origin; a non-loopback
- * origin must use HTTPS, since API traffic would otherwise cross the
- * network in clear text.
+ * Private VPN (RFC 1918 / RFC 4193 ULA) and Tailscale CGNAT (`100.64.0.0/10`)
+ * or Tailscale IPv6 (`fd7a:115c:a1e0::/48`) host addresses. Trusted over HTTP
+ * only when the operator explicitly opts in (`trustVpn`).
  */
-export function parseAllowedOrigins(value = ""): string[] {
+export function privateOrTailnetHost(hostname: string): boolean {
+  const bare = hostname.replace(/^\[(.*)\]$/, "$1").toLowerCase();
+  const ipv4 = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(bare);
+  if (ipv4) {
+    const octets = ipv4.slice(1).map(Number);
+    if (octets.some((n) => n > 255)) return false;
+    const [a, b] = octets;
+    return (
+      a === 10 ||
+      (a === 172 && b >= 16 && b <= 31) ||
+      (a === 192 && b === 168) ||
+      (a === 100 && b >= 64 && b <= 127)
+    );
+  }
+  return /^f[cd][0-9a-f]{0,2}:/i.test(bare);
+}
+
+/**
+ * Parses BELLPR_ALLOWED_ORIGINS. Each entry is one origin; a non-loopback
+ * origin must use HTTPS unless `allowPrivateHttp` is enabled for a private VPN
+ * or Tailscale address.
+ */
+export function parseAllowedOrigins(value = "", { allowPrivateHttp = false } = {}): string[] {
   if (!value.trim()) return [];
   return value.split(",").map((entry) => {
     const value = entry.trim();
@@ -34,7 +56,9 @@ export function parseAllowedOrigins(value = ""): string[] {
         url.hostname.includes("*") ||
         value.endsWith(":") ||
         url.port === "0" ||
-        (url.protocol === "http:" && !loopbackHost(url.hostname))
+        (url.protocol === "http:" &&
+          !loopbackHost(url.hostname) &&
+          !(allowPrivateHttp && privateOrTailnetHost(url.hostname)))
       )
         throw new Error("Invalid origin");
       return url.origin;
@@ -53,6 +77,13 @@ export interface GuardOptions {
    * one throws.
    */
   allowedOrigins: string[];
+  /**
+   * Allow direct connections over private VPN / Tailscale IP addresses on
+   * `ports` (`--trust-vpn` / `BELLPR_TRUST_VPN=1`).
+   */
+  trustVpn?: boolean;
+  /** Enable pre-token access to `/api/collab/auth/*` team sign-in endpoints. */
+  collabAuth?: boolean;
   /**
    * When `apiToken` or `readApiToken` is set, every `/api` request except
    * GET and HEAD `/api/health` and POST `/api/pair` must send this token or
@@ -81,11 +112,12 @@ export function localhostGuard(opts: GuardOptions): RequestHandler {
     ]),
   );
   const localOrigins = new Set([...localHosts].map((host) => `http://${host}`));
+  const portSet = new Set(opts.ports.map(String));
   // Each entry is exactly one origin: an empty entry or a comma-separated
   // list in one entry throws like a malformed origin.
   const allowedOrigins = new Set(
     opts.allowedOrigins.map((entry) => {
-      const origins = parseAllowedOrigins(entry);
+      const origins = parseAllowedOrigins(entry, { allowPrivateHttp: Boolean(opts.trustVpn) });
       if (origins.length !== 1) throw new Error(invalidOrigins());
       return origins[0];
     }),
@@ -94,6 +126,15 @@ export function localhostGuard(opts: GuardOptions): RequestHandler {
     ...localHosts,
     ...[...allowedOrigins].map((origin) => new URL(origin).host),
   ]);
+  const trustedVpnHost = (hostHeader: string) => {
+    if (!opts.trustVpn || !hostHeader) return false;
+    try {
+      const parsed = new URL(`http://${hostHeader}`);
+      return portSet.has(parsed.port) && privateOrTailnetHost(parsed.hostname);
+    } catch {
+      return false;
+    }
+  };
   return (req, res, next) => {
     res.setHeader("X-Content-Type-Options", "nosniff");
     res.setHeader("Referrer-Policy", "no-referrer");
@@ -112,7 +153,8 @@ export function localhostGuard(opts: GuardOptions): RequestHandler {
       req.get("sec-fetch-mode") === "navigate" &&
       req.get("sec-fetch-dest") === "document";
     const host = (req.headers.host ?? "").toLowerCase();
-    if (!allowedHosts.has(host)) {
+    const vpnHostAllowed = trustedVpnHost(host);
+    if (!allowedHosts.has(host) && !vpnHostAllowed) {
       res.status(403).json({ error: sm().common.hostNotAllowed });
       return;
     }
@@ -121,7 +163,8 @@ export function localhostGuard(opts: GuardOptions): RequestHandler {
       (origin &&
         !(
           (localHosts.has(host) && localOrigins.has(origin)) ||
-          (allowedOrigins.has(origin) && new URL(origin).host === host)
+          (allowedOrigins.has(origin) && new URL(origin).host === host) ||
+          (vpnHostAllowed && (origin === `http://${host}` || origin === `https://${host}`))
         )) ||
       (req.get("sec-fetch-site") === "cross-site" && !pageNavigation)
     ) {
@@ -135,7 +178,13 @@ export function localhostGuard(opts: GuardOptions): RequestHandler {
       res.status(415).json({ error: sm().common.jsonRequired });
       return;
     }
-    if (api && enforced(opts) && !publicHealth(req) && !publicPairing(req)) {
+    if (
+      api &&
+      enforced(opts) &&
+      !publicHealth(req) &&
+      !publicPairing(req) &&
+      !(opts.collabAuth && publicCollabAuth(req))
+    ) {
       const expected = opts.readApiToken?.() ?? opts.apiToken;
       if (
         !expected ||
@@ -164,6 +213,16 @@ function publicHealth(req: Request) {
 /** Redeeming a pairing code: the device has no token yet. */
 function publicPairing(req: Request) {
   return req.method === "POST" && /^\/api\/pair$/i.test(req.path);
+}
+
+/** Signing in with a team account or Tailscale identity before pairing a device. */
+function publicCollabAuth(req: Request) {
+  if ((req.method === "GET" || req.method === "HEAD") && /^\/api\/collab\/auth\/status$/i.test(req.path))
+    return true;
+  return (
+    req.method === "POST" &&
+    /^\/api\/collab\/auth\/(?:login|register|tailscale)$/i.test(req.path)
+  );
 }
 
 function hasTokenHeader(req: Request) {

@@ -24,8 +24,10 @@ import {
   ShieldCheck,
   Split,
   Sparkles,
+  Users,
 } from "lucide-react";
-import { useT, withMessages } from "../i18n";
+import { useFormat, useT, withMessages } from "../i18n";
+import { useTeamCollaboration } from "../collab/useTeamCollaboration";
 import type { DiffFile, Repo, Run } from "../types";
 import type { useProjectInsights } from "../mission/useProjectInsights";
 import type { ContributionRecommendation } from "../../shared/insights";
@@ -203,6 +205,18 @@ export function WorkspacePage({
   updatingRepo,
 }: WorkspacePageProps) {
   const t = useT("workspace");
+  const format = useFormat();
+  const team = useTeamCollaboration({
+    run,
+    setRun: actions.setRun,
+    tab,
+    selectedPath,
+    demo,
+    notify: actions.notify,
+  });
+  const otherViewers = team.activities.filter(
+    (item) => item.runId === run.id && (!team.me || item.id !== team.me.id),
+  );
   const roundKey = diffRoundKey(run);
   const [diffSelection, setDiffSelection] = useState({ key: roundKey, round: "current" });
   const hasHistory = !demo && !!run.prUrl && !!run.publishCommit;
@@ -347,6 +361,21 @@ export function WorkspacePage({
         </div>
       </section>
       <RunNotices run={run} queued={queued} />
+      {otherViewers.length > 0 && (
+        <div className="run-notices">
+          <p className="run-notice" role="status">
+            <Users size={15} aria-hidden="true" />
+            <span>
+              {t.teamCollab.viewingRun({
+                names: format.list(
+                  otherViewers.map((v) => v.name),
+                  { type: "conjunction" },
+                ),
+              })}
+            </span>
+          </p>
+        </div>
+      )}
       <HoldRecoveryNotice run={run} busy={demo || busy || active || reviewRerunning} actions={actions} />
       <SplitNotices run={run} onOpen={actions.chooseRun} />
       <section className="workflow-strip" aria-label={t.progress}>
@@ -581,6 +610,7 @@ export function WorkspacePage({
               actions={actions}
               understanding={understanding}
               byHand={byHand}
+              team={team}
             />
           )}
           {tab === "activity" && (

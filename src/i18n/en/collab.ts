@@ -9,6 +9,13 @@ interface Held {
   time?: string;
 }
 
+interface DependencyLine {
+  holder: string;
+  askedPath: string;
+  heldPath: string;
+  title: string;
+}
+
 const collab = {
   eyebrow: "GROUP WORK",
   title: "Who holds which paths?",
@@ -26,18 +33,25 @@ const collab = {
   viewing: ({ name }: { name: string }) => `${name} · viewing now`,
   you: ({ name }: { name: string }) => `${name} (you)`,
   invite: "Invite",
+  manageMembers: "Members",
+  myAccount: "Account",
   startWork: "Start work",
   holdTitle: "Title",
   shownOnBoard: "shown on the board",
   paths: "Paths",
   onePerLine: "one per line",
   takeHold: "Take hold",
-  pathsHelp: "Holding a folder holds everything inside it. Letter case is ignored.",
+  pathsHelp:
+    "Holding a folder holds everything inside it. Add #L10-L45 to hold only that line range so teammates can edit other parts of the same file concurrently. Letter case is ignored.",
   free: `No one holds these paths, as far as ${product.name} checked`,
   holds: ({ name, paths, title, time }: Held) =>
     `${name} holds ${paths} — ${title}${time ? `, since ${time}` : ""}`,
   youHold: ({ name, paths, title, time }: Held) =>
     `${name} hold ${paths} — ${title}${time ? `, since ${time}` : ""}`,
+  dependencyBlock: ({ holder, askedPath, heldPath, title }: DependencyLine) =>
+    `Dependency guard: ${askedPath} depends on ${heldPath}, held by ${holder} — ${title}`,
+  dependencyWarn: ({ holder, askedPath, heldPath, title }: DependencyLine) =>
+    `Dependency warning: ${askedPath} depends on ${heldPath}, held by ${holder} — ${title}`,
   /** Opens the answer after a refused hold; `then` is its first sentence. */
   notTaken: ({ then }: { then: string }) => `Not taken. ${then}`,
   cannotHold: ({ paths }: { paths: string }) => `Cannot be held: ${paths}`,
@@ -67,12 +81,106 @@ const collab = {
   keep: "Keep it",
   nothingHeld: ({ time }: { time: string }) => `Nothing is held, as of ${time}.`,
   honesty:
-    `${product.name} refuses a hold that overlaps another, publishes no change to paths someone else holds, and stops a run whose Agent changed a held path; that change stays in the working directory. It cannot stop an editor, a terminal tool or a direct git push.`,
+    `${product.name} refuses a hold that overlaps another (including overlapping #Lstart-Lend ranges or blocked file dependencies), publishes no change to paths someone else holds, and stops a run whose Agent changed a held range or blocked dependency; that change stays in the working directory. It cannot stop an editor, a terminal tool or a direct git push.`,
   join: {
     title: "Join this group",
-    body: "Ask an admin of this group for an invite code. A code works once, for 10 minutes.",
+    body: "Ask an admin of this group for an invite code, or sign in with your team account.",
     code: "Invite code",
     submit: "Join",
+  },
+  auth: {
+    tabsLabel: "Join or sign in",
+    inviteTab: "Invite code",
+    loginTab: "Team account",
+    tailscaleTab: "Tailscale",
+    loginTitle: "Sign in to team collaboration",
+    loginBody: "Use your team username and password to access holds, live progress and review records.",
+    tailscaleTitle: "Sign in with Tailscale",
+    tailscaleBody: "Authenticate with the Tailscale identity verified by the host's local proxy.",
+    tailscaleDetected: ({ login }: { login: string }) => `Detected Tailscale identity: ${login}`,
+    optionalAccount: "Create a reusable username & password (optional)",
+    username: "Username",
+    usernamePlaceholder: "3–32 lowercase letters, numbers, ., _ or -",
+    password: "Password",
+    passwordPlaceholder: "At least 8 characters",
+    inviteOptional: "Invite code (first-time link only)",
+    loginSubmit: "Sign in",
+    tailscaleSubmit: "Sign in with Tailscale",
+  },
+  liveProgress: {
+    title: "Live team activity",
+    subtitle: "What teammates are working on and inspecting right now.",
+    empty: "No active workspace sessions reported in the last few minutes.",
+    views: {
+      group: "Group board",
+      workspace: "Workspace",
+      changes: "Code changes",
+      review: "Review",
+      draft: "PR draft",
+      publish: "Publish preview",
+    },
+    inspectingFile: ({ path }: { path: string }) => `Viewing ${path}`,
+    inspectingLines: ({ path, start, end }: { path: string; start: number; end: number }) =>
+      start === end ? `Viewing ${path} · L${start}` : `Viewing ${path} · L${start}–L${end}`,
+    openRun: "Open run",
+  },
+  depPanel: {
+    title: "Cross-file dependency guards",
+    subtitle: "Mark files that depend on each other so concurrent edits warn or block before conflicts happen.",
+    empty: "No manual dependency rules yet. Add one below or scan static imports.",
+    fromLabel: "Dependent file or folder",
+    fromPlaceholder: "e.g. src/routes/users.ts",
+    toLabel: "Target dependency",
+    toPlaceholder: "e.g. shared/user-schema.ts",
+    modeLabel: "Protection",
+    modeBlock: "Guard (block conflicting holds & Agent edits)",
+    modeWarn: "Warning (remind & confirm before publish)",
+    badgeBlock: "Guard",
+    badgeWarn: "Warn",
+    badgeAuto: "Auto import",
+    noteLabel: "Reason (optional)",
+    notePlaceholder: "e.g. Shares request contract",
+    addSubmit: "Add dependency rule",
+    remove: "Remove",
+    scan: "Scan imports",
+    scanning: "Scanning…",
+    scannedTitle: ({ count }: { count: number }) => `Detected relative imports (${count})`,
+    scannedEmpty: "No relative imports detected or all are already covered by rules.",
+    promoteBlock: "Guard",
+    promoteWarn: "Warn",
+    arrow: "depends on",
+  },
+  todoPanel: {
+    title: "Team handoff TODOs",
+    subtitle: "Open items teammates tagged on runs for follow-up or coordination.",
+    empty: "No open handoff TODOs across active runs in this repository.",
+    assignedTo: ({ name }: { name: string }) => `For ${name}`,
+    byAuthor: ({ name }: { name: string }) => `by ${name}`,
+    openRun: "Open in workspace",
+  },
+  accountDialog: {
+    title: "My team account",
+    subtitle: "Set or update a username and password so you can sign in from any browser over VPN or Tailscale.",
+    saved: "Account updated.",
+    save: "Save account",
+  },
+  adminDialog: {
+    title: "Manage team members",
+    subtitle: "Create accounts, assign admin roles, link Tailscale logins or disable access.",
+    createHeading: "Create member account",
+    displayName: "Display name",
+    roleAdmin: "Admin",
+    roleMember: "Member",
+    tailscaleLabel: "Tailscale login (optional)",
+    tailscalePlaceholder: "e.g. user@example.com",
+    createSubmit: "Create member",
+    membersHeading: "Members",
+    disabledBadge: "Disabled",
+    makeAdmin: "Make admin",
+    makeMember: "Make member",
+    disable: "Disable",
+    enable: "Enable",
+    remove: "Remove",
   },
   host: {
     title: "Start group work here",
@@ -97,13 +205,13 @@ const collab = {
     title: "Invite someone",
     name: "Name",
     admin: "Admin",
-    adminHelp: "Can invite people, add repositories and revoke holds.",
+    adminHelp: "Can invite people, manage accounts, add repositories and revoke holds.",
     create: "Create code",
     codeFor: ({ name }: { name: string }) => `Invite code for ${name}`,
     member: ({ name, time }: { name: string; time: string }) =>
-      `${name} types it on the Group page of this ${product.name} and joins as a member. It works once and stops working at ${time}.`,
+      `${name} types it on the Group or Pair page of this ${product.name} and joins as a member. It works once and stops working at ${time}.`,
     asAdmin: ({ name, time }: { name: string; time: string }) =>
-      `${name} types it on the Group page of this ${product.name} and joins as an admin. It works once and stops working at ${time}.`,
+      `${name} types it on the Group or Pair page of this ${product.name} and joins as an admin. It works once and stops working at ${time}.`,
     done: "Done",
     copy: "Copy the invite code",
   },

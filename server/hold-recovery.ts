@@ -17,6 +17,7 @@ import { activeFollowUp, reviewBaseSha } from "../shared/followups.js";
 import { assertWorkspacePresent } from "./cleanup.js";
 import { safeRelativePath } from "./git.js";
 import {
+  changedScopes,
   heldByOtherError,
   heldByOtherKind,
   heldNotice,
@@ -26,7 +27,7 @@ import {
 import { shuttingDown, sm } from "./i18n/index.js";
 import { assertGitConfigSafe, git } from "./process.js";
 import { logged } from "./run-events.js";
-import { comparablePath, pathsMeet } from "./scope-paths.js";
+import { baseScopePath, comparablePath, pathsMeet } from "./scope-paths.js";
 import { AppError, type DiffFile, type Run } from "./types.js";
 import { walkthroughKeyPrefix } from "./walkthroughs.js";
 import type { WorkbenchContext } from "./workbench-context.js";
@@ -382,8 +383,11 @@ export async function recheckHeldPaths(
     await awaitSettledTurnCleanup(ctx, id, asker);
     return ctx.lock(id, async () => {
       const { run, base } = await assertHoldRecoveryReady(ctx, id, asker);
-      const paths = await allCheckoutChanges(run.worktreePath, base);
-      const held = ctx.holds?.conflicts(run, paths) ?? [];
+      const allPaths = await allCheckoutChanges(run.worktreePath, base);
+      const fineScopes = await changedScopes(run);
+      const covered = new Set(fineScopes.map((scope) => baseScopePath(scope)));
+      const scopes = [...fineScopes, ...allPaths.filter((p) => !covered.has(p))];
+      const held = ctx.holds?.conflicts(run, scopes) ?? [];
       if (held.length && heldByOtherKind === "block") {
         run.heldPaths = [...new Set(held.map(({ path: heldPath }) => heldPath))];
         await ctx.store.save();

@@ -4,7 +4,7 @@
  * does, and says who is asking within the group with a participant token
  * (`bpc_…`) in the `x-bell-participant` header.
  */
-import type { RunStatus } from "./types.js";
+import type { RunStatus, TeamTodoItem } from "./types.js";
 
 /** Where group work stands on this instance. Never persisted. */
 export type CollabState = "notSetUp" | "ready" | "stopped";
@@ -19,13 +19,25 @@ export interface CollabStatus {
   reason?: string;
 }
 
+/** GET /api/collab/auth/status → 200 (public when group work is enabled). */
+export interface CollabAuthStatus {
+  enabled: boolean;
+  state: CollabState;
+  hasAccounts?: boolean;
+  tailscaleAvailable?: boolean;
+  tailscaleLogin?: string;
+  tailscaleName?: string;
+}
+
 /** GET /api/collab → 200. */
 export interface CollabInfo extends CollabStatus {
   groupId?: string;
   /** The request came with the install token: the person at the host. */
   host: boolean;
+  tailscaleAvailable?: boolean;
+  tailscaleLogin?: string;
   /** Who the participant token belongs to; absent when missing, unknown or removed. */
-  me?: { id: string; name: string; admin?: true };
+  me?: { id: string; name: string; admin?: true; username?: string; tailscaleLogin?: string };
 }
 
 /** POST /api/collab/setup → 201. */
@@ -47,7 +59,80 @@ export interface CollabJoinResponse {
   id: string;
   name: string;
   admin?: true;
+  username?: string;
+  tailscaleLogin?: string;
   token: string;
+  /** Returned when joining/signing in from an unpaired remote browser over VPN/Tailscale. */
+  deviceId?: string;
+  deviceToken?: string;
+}
+
+/** A member record shown in the Admin management view (GET /api/collab/people). */
+export interface CollabMemberRecord {
+  id: string;
+  name: string;
+  admin?: true;
+  username?: string;
+  tailscaleLogin?: string;
+  joinedAt?: string;
+  disabled?: true;
+  removed?: true;
+  heldCount: number;
+}
+
+/** Cross-file dependency rule between two paths in a repository (1c). */
+export type CollabDependencyMode = "warn" | "block";
+
+export interface CollabFileDependency {
+  id: string;
+  /** Dependent file or folder path (changes here rely on `to`). */
+  from: string;
+  /** Prerequisite / upstream file or folder path. */
+  to: string;
+  mode: CollabDependencyMode;
+  note?: string;
+  createdBy: string;
+  createdByName?: string;
+  createdAt: string;
+}
+
+export interface CollabDetectedImport {
+  from: string;
+  to: string;
+}
+
+/** A cross-file dependency hit when checking or taking a hold. */
+export interface CollabDependencyHit {
+  askedPath: string;
+  heldPath: string;
+  holder: string;
+  title: string;
+  claimId: string;
+  mode: CollabDependencyMode;
+  autoDetected?: true;
+  note?: string;
+}
+
+/** Live member presence & progress activity (2). */
+export interface CollabMemberActivity {
+  id: string;
+  name: string;
+  projectId?: string;
+  repoId?: string;
+  view?: "group" | "workspace" | "changes" | "review" | "draft" | "publish";
+  runId?: string;
+  runTitle?: string;
+  runStatus?: RunStatus;
+  filePath?: string;
+  lineStart?: number;
+  lineEnd?: number;
+  updatedAt: string;
+}
+
+/** Open coordination TODO surfaced on the repository's group board (3c). */
+export interface CollabBoardTodo extends TeamTodoItem {
+  runId: string;
+  runTitle: string;
 }
 
 /** POST /api/collab/people/:id/remove → 200. */
@@ -109,9 +194,20 @@ export interface CollabDependency {
 export interface CollabBoard {
   project: { id: string; name: string; repoId?: string };
   /** The group's people; a removed person only while they still hold something. */
-  people: { id: string; name: string; admin?: true; removed?: true }[];
+  people: {
+    id: string;
+    name: string;
+    admin?: true;
+    removed?: true;
+    disabled?: true;
+    username?: string;
+  }[];
   /** Oldest first. */
   held: CollabHold[];
+  /** Cross-file dependency rules defined on this project; omitted when empty. */
+  dependencies?: CollabFileDependency[];
+  /** Open team coordination TODOs across unfinished runs of this repository; omitted when empty. */
+  openTodos?: CollabBoardTodo[];
 }
 
 /** GET /api/collab/projects/:project/tasks → 200. */
@@ -129,7 +225,7 @@ export interface CollabFeedResponse {
   epoch: string;
   /** Rises when the board changes. */
   version: number;
-  /** Rises when `present` changes. */
+  /** Rises when `present` or `activities` changes. */
   seen: number;
   /** ISO 8601: the host's clock when this was answered. */
   asOf: string;
@@ -137,6 +233,8 @@ export interface CollabFeedResponse {
   board?: CollabBoard;
   /** The ids of the people looking at this board now. */
   present: string[];
+  /** Live member status and viewing focus across the workspace; omitted when none. */
+  activities?: CollabMemberActivity[];
 }
 
 /** POST /api/collab/projects/:project/check. */
@@ -175,6 +273,8 @@ export interface CollabCheckResponse {
   meets: CollabMeeting[];
   /** Other people's unfinished runs whose files or plans already meet the asked paths. */
   changing: CollabChanging[];
+  /** Cross-file dependencies whose counterpart is held by someone else; omitted when empty. */
+  dependencyHits?: CollabDependencyHit[];
 }
 
 /** POST /api/collab/projects/:project/work. */
@@ -235,4 +335,6 @@ export interface CollabRefusal {
    * is never done now.
    */
   pending?: (CollabDependency & { held: boolean })[];
+  /** With 409 `dependencyBlocked`: cross-file guard rules whose counterpart is currently held. */
+  dependencyHits?: CollabDependencyHit[];
 }

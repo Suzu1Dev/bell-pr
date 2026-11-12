@@ -790,6 +790,34 @@ export default {
         : "No held files differed from the run's base.",
     heldPathsRechecked:
       "Checked file holds again: no changed files are held by someone else.",
+    dependencyWarning:
+      "Files this change touches depend on files currently held by someone else in the group. Coordinate before publishing.",
+    dependencyWarningItem: ({
+      path,
+      peer,
+      holder,
+      title,
+    }: {
+      path: string;
+      peer: string;
+      holder: string;
+      title: string;
+    }) => `${path} ⇄ ${peer} — held by ${holder} for “${title}”`,
+    teamRecordLimit: "This run has reached its limit of 200 team notes or coordination items.",
+    teamOpenTodos: ({ count: total }: { count: number }) =>
+      `There ${total === 1 ? "is" : "are"} ${count(total, "open team coordination item", "open team coordination items")} on this contribution. Finish ${total === 1 ? "it" : "them"} or confirm publishing anyway.`,
+    teamOpenTodoItem: ({
+      text,
+      filePath,
+      assignee,
+      author,
+    }: {
+      text: string;
+      filePath?: string;
+      assignee?: string;
+      author: string;
+    }) =>
+      `${filePath ? `[${filePath}] ` : ""}${text} (${assignee ? `for ${assignee}, ` : ""}by ${author})`,
   },
   /** The human review gate and publishing: draft, file reviews, approval and push. */
   publish: {

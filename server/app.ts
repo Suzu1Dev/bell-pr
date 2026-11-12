@@ -128,6 +128,10 @@ export interface AppOptions {
   apiTokenFile?: string;
   /** Group work's host (collab-host.ts), when BELL PR was started with --group. */
   collab?: CollabHost;
+  /** Trust private VPN / Tailscale HTTP hosts (`--trust-vpn`). */
+  trustVpn?: boolean;
+  /** Trust verified loopback Tailscale identity headers (`--tailscale-auth`). */
+  tailscaleAuth?: boolean;
   /** The other BELL products' origins (BELLPR_SUITE_LINKS); none by default. */
   suiteLinks?: SuiteLinks;
 }
@@ -173,7 +177,7 @@ export function createApp(workbench: Workbench, options: AppOptions = {}) {
   });
   const configuredOrigins =
     typeof allowedOrigins === "string"
-      ? parseAllowedOrigins(allowedOrigins)
+      ? parseAllowedOrigins(allowedOrigins, { allowPrivateHttp: Boolean(options.trustVpn) })
       : allowedOrigins;
   const tokenFile = options.apiTokenFile;
   const tokenReader = tokenFile
@@ -193,6 +197,8 @@ export function createApp(workbench: Workbench, options: AppOptions = {}) {
             : configuredOrigins,
         ),
       ],
+      ...(options.trustVpn ? { trustVpn: true } : {}),
+      ...(options.collab ? { collabAuth: true } : {}),
       ...(options.apiToken !== undefined ? { apiToken: options.apiToken } : {}),
       ...(tokenReader ? { readApiToken: tokenReader } : {}),
       ...(devices ? { deviceToken: (presented, installToken) => devices.verify(presented, installToken) } : {}),
@@ -237,7 +243,12 @@ export function createApp(workbench: Workbench, options: AppOptions = {}) {
     });
   if (options.collab) {
     app.locals.collab = options.collab;
-    registerCollabRoutes(app, options.collab, { store: workbench.store, devices, tokenFile });
+    registerCollabRoutes(app, options.collab, {
+      store: workbench.store,
+      devices,
+      tokenFile,
+      tailscaleAuth: options.tailscaleAuth,
+    });
     // Agent turns, teammates and plans respect the group's holds too.
     workbench.guardHolds(options.collab);
   }

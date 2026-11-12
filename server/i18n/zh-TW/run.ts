@@ -485,6 +485,15 @@ const m: Translation<typeof en> = {
         ? `已將 ${files.length} 個佔用檔案還原到任務基準：${list([...files])}。`
         : "沒有佔用檔案與任務基準不同。",
     heldPathsRechecked: "已重新檢查檔案佔用：目前改到的檔案都沒有被其他人佔用。",
+    dependencyWarning:
+      "這次變更改到的檔案與小組裡其他人正在佔用的檔案有相依關係。發布前請先與對方確認協調。",
+    dependencyWarningItem: ({ path, peer, holder, title }) =>
+      `${path} ⇄ ${peer}：由 ${holder} 為「${title}」佔用`,
+    teamRecordLimit: "這個任務的團隊變更說明或待辦協調項目已達 200 則上限。",
+    teamOpenTodos: ({ count }) =>
+      `這份貢獻還有 ${count} 項尚未完成的團隊協調待辦事項。請先完成，或確認仍要直接發布。`,
+    teamOpenTodoItem: ({ text, filePath, assignee, author }) =>
+      `${filePath ? `[${filePath}] ` : ""}${text}（${assignee ? `交辦 ${assignee}，` : ""}由 ${author} 標註）`,
   },
   publish: {
     heldByOther: ({ items }) =>

@@ -37,9 +37,42 @@ const sideSchema = z.strictObject({
         joinedAt: stamp,
         admin: z.literal(true).optional(),
         removedAt: stamp,
+        disabledAt: stamp,
         /** The paired device they joined from, when it was one. */
         deviceId: z.string().max(64).optional(),
+        /** Optional team login handle (lowercase ASCII) and scrypt password hash. */
+        username: z.string().max(40).optional(),
+        passwordHash: z.string().max(200).optional(),
+        /** Optional Tailscale user login (`user@domain`) for automatic tailnet identity mapping. */
+        tailscaleLogin: z.string().max(120).optional(),
       }),
+    )
+    .optional(),
+  /** Account session tokens (`bpa_…`, stored as SHA-256 hex digest → participant id). */
+  sessions: z
+    .record(
+      z.string().max(64),
+      z.strictObject({
+        participantId: z.string().max(64).optional(),
+        createdAt: stamp,
+      }),
+    )
+    .optional(),
+  /** Cross-file dependency rules by project id (1c). */
+  fileDeps: z
+    .record(
+      z.string().max(64),
+      z.record(
+        z.string().max(64),
+        z.strictObject({
+          from: z.string().max(300),
+          to: z.string().max(300),
+          mode: z.enum(["warn", "block"]),
+          note: z.string().max(240).optional(),
+          createdBy: z.string().max(64),
+          createdAt: z.string().max(40),
+        }),
+      ),
     )
     .optional(),
   /** The group's repositories, by project id. The name stays when BELL PR forgets the repository. */
@@ -109,8 +142,8 @@ export function sideEntry<T>(record: Record<string, T> | undefined, id: string):
   return record && Object.hasOwn(record, id) ? record[id] : undefined;
 }
 
-/** A generated id the coordinator accepts: a person (`m-`), a project (`p-`) or a task (`t-`). */
-export const collabId = (prefix: "m" | "p" | "t") => `${prefix}-${randomBytes(5).toString("hex")}`;
+/** A generated id the coordinator or side-file accepts: a person (`m-`), a project (`p-`), a task (`t-`) or a dependency rule (`d-`). */
+export const collabId = (prefix: "m" | "p" | "t" | "d") => `${prefix}-${randomBytes(5).toString("hex")}`;
 
 /** The side file: undefined when there is none, "damaged" when it cannot be used. */
 async function readSide(file: string): Promise<CollabSide | "damaged" | undefined> {

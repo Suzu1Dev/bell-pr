@@ -27,6 +27,7 @@ const messages: Translation<typeof en> = {
     forecast: "你的預測",
     feedbackTags: "你標記的維護者回饋",
     overrides: "你略過的檢查與理由",
+    teamCollab: "團隊審閱與協調紀錄",
   },
   noPullRequest: "尚未發布 PR。",
   noExplanations: "尚未產生解說。",
@@ -89,6 +90,14 @@ const messages: Translation<typeof en> = {
   surprised: "出乎意料",
   lesson: ({ lesson }) => `下次的心得：${lesson}`,
   override: ({ check, reason, at }) => `- ${check}（${at}）：${reason}`,
+  teamReviewsHeading: "### 已審閱檔案",
+  teamReviewLine: ({ path, reviewers }) => `- \`${path}\`：${reviewers}`,
+  teamRationalesHeading: "### 變更原因與想法",
+  teamRationaleLine: ({ scope, author, at, text }) =>
+    `- \`${scope}\`（${author}，${at}）：${text}`,
+  teamTodosHeading: "### 待辦與協調事項",
+  teamTodoLine: ({ done, filePath, text, assignee, author }) =>
+    `- [${done ? "x" : " "}] ${filePath ? `\`${filePath}\`：` : ""}${text}（${assignee ? `交辦 ${assignee}，` : ""}由 ${author} 標註）`,
   confidences: { sure: "確定", think: "大概", guess: "用猜的" },
   grades: { got: "答對", partly: "部分對", missed: "沒答到" },
   roadChoices: { keep: "維持這個做法", switch: "偏好另一種", depends: "看情況" },

@@ -7,15 +7,18 @@
 import type {
   CollabAddProjectResponse,
   CollabBoard,
+  CollabBoardTodo,
   CollabFeedResponse,
+  CollabFileDependency,
   CollabHold,
   CollabInfo,
   CollabInviteResponse,
   CollabJoinResponse,
+  CollabMemberActivity,
   CollabProject,
   CollabProjectsResponse,
 } from "../../shared/collab";
-import { api, ApiError, send } from "../api";
+import { api, ApiError, deviceInfoStorageKey, deviceTokenStorageKey, send } from "../api";
 import { keepParticipantToken, participantToken } from "./participant";
 
 export interface GroupState {
@@ -32,6 +35,12 @@ export interface GroupState {
   people: CollabBoard["people"];
   /** Oldest first, as the server gave them; undefined until a board arrived. */
   held?: CollabHold[];
+  /** Cross-file dependency rules of the chosen repository. */
+  dependencies?: CollabFileDependency[];
+  /** Open coordination TODOs across active runs of the chosen repository. */
+  openTodos?: CollabBoardTodo[];
+  /** Live member activity across the group. */
+  activities?: CollabMemberActivity[];
   /** The ids of the people looking at this board now. */
   present: string[];
   /** What the last board brought and took away; empty for the first board of a repository or of an epoch. */
@@ -74,6 +83,21 @@ function keep<T>(previous: T[], next: T[], idOf: (item: T) => string): T[] {
     : kept;
 }
 
+function saveAuthResult(result: CollabJoinResponse) {
+  keepParticipantToken(result.token);
+  if (result.deviceToken) {
+    try {
+      localStorage.setItem(
+        deviceInfoStorageKey,
+        JSON.stringify({ id: result.deviceId ?? result.id, name: result.name }),
+      );
+      localStorage.setItem(deviceTokenStorageKey, result.deviceToken);
+    } catch {
+      // Storage may be unavailable in private browsing or tests.
+    }
+  }
+}
+
 export function createGroupStore() {
   let state: GroupState = { people: [], present: [], added: [], ended: [], link: "live" };
   const listeners = new Set<() => void>();
@@ -91,7 +115,18 @@ export function createGroupStore() {
   /** The board in hand goes, with its place in the feed: nothing stale is shown. */
   function drop(patch: Partial<GroupState>) {
     cursor = undefined;
-    set({ people: [], held: undefined, present: [], added: [], ended: [], asOf: undefined, ...patch });
+    set({
+      people: [],
+      held: undefined,
+      dependencies: undefined,
+      openTodos: undefined,
+      activities: undefined,
+      present: [],
+      added: [],
+      ended: [],
+      asOf: undefined,
+      ...patch,
+    });
   }
 
   /**
@@ -123,6 +158,9 @@ export function createGroupStore() {
     const patch: Partial<GroupState> = {
       asOf: answer.asOf,
       present: keep(state.present, answer.present, (id) => id),
+      ...(answer.activities !== undefined || state.activities !== undefined
+        ? { activities: keep(state.activities ?? [], answer.activities ?? [], (item) => item.id) }
+        : {}),
     };
     if (!answer.board) return patch;
     const held = keep(state.held ?? [], answer.board.held, (hold) => hold.claimId);
@@ -132,6 +170,24 @@ export function createGroupStore() {
       ...patch,
       people: keep(state.people, answer.board.people, (person) => person.id),
       held,
+      ...(answer.board.dependencies !== undefined || state.dependencies !== undefined
+        ? {
+            dependencies: keep(
+              state.dependencies ?? [],
+              answer.board.dependencies ?? [],
+              (dep) => dep.id,
+            ),
+          }
+        : {}),
+      ...(answer.board.openTodos !== undefined || state.openTodos !== undefined
+        ? {
+            openTodos: keep(
+              state.openTodos ?? [],
+              answer.board.openTodos ?? [],
+              (todo) => todo.id,
+            ),
+          }
+        : {}),
       added: before ? held.filter(missing(before)) : [],
       ended: before ? before.filter(missing(held)) : [],
     };
@@ -242,13 +298,21 @@ export function createGroupStore() {
     void follow(loop.signal);
   }
 
-  async function join(code: string) {
-    const { token } = await api<CollabJoinResponse>("/collab/join", send("POST", { code }));
-    keepParticipantToken(token);
+  function resetAfterAuth(result: CollabJoinResponse) {
+    saveAuthResult(result);
     // The card goes at once, so a second press cannot send the used code again. Maybe as
     // another person: the repositories, and which ones can be added, are asked for again.
     set({ info: undefined, refused: undefined, projects: undefined, addable: undefined, link: "live" });
     restart();
+  }
+
+  async function join(code: string, credentials?: { username?: string; password?: string }) {
+    const body =
+      credentials?.username && credentials.password
+        ? { code, username: credentials.username, password: credentials.password }
+        : { code };
+    const result = await api<CollabJoinResponse>("/collab/join", send("POST", body));
+    resetAfterAuth(result);
   }
 
   return {
@@ -276,6 +340,20 @@ export function createGroupStore() {
       restart();
     },
     join,
+    async login(username: string, password: string) {
+      const result = await api<CollabJoinResponse>(
+        "/collab/auth/login",
+        send("POST", { username, password }),
+      );
+      resetAfterAuth(result);
+    },
+    async loginTailscale(code?: string) {
+      const result = await api<CollabJoinResponse>(
+        "/collab/auth/tailscale",
+        send("POST", code ? { code } : {}),
+      );
+      resetAfterAuth(result);
+    },
     /** At the host: sets group work up when it is not, then joins as its admin. */
     async start(name: string) {
       if (state.info?.state === "notSetUp") {

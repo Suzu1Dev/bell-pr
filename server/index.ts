@@ -806,6 +806,8 @@ export async function startServer(
       readApiToken: () => readApiToken(paths.apiToken),
       apiTokenFile: paths.apiToken,
       ...(collab ? { collab } : {}),
+      ...(config.trustVpn ? { trustVpn: true } : {}),
+      ...(config.tailscaleAuth ? { tailscaleAuth: true } : {}),
       suiteLinks: config.suiteLinks,
     });
     handler = app;
@@ -814,7 +816,7 @@ export async function startServer(
     // Wildcard bind without PUBLIC_URL: remote Host headers are not allowed, so
     // every non-local request is 403. Say so once on stderr; keep the generic
     // exposed-host line for other non-loopback binds (those already require PUBLIC_URL).
-    if (isWildcardHost(config.host) && !config.publicUrl) {
+    if (isWildcardHost(config.host) && !config.publicUrl && !config.trustVpn) {
       const warning = messages.wildcardHostNeedsPublicUrl({ host: config.host });
       warn(warning);
       log.warn(warning);

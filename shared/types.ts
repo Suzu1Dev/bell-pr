@@ -26,15 +26,17 @@ import type { CoachDebrief } from "./coach.js";
 import type { ByHandRecord } from "./by-hand.js";
 import type { SplitRef } from "./split.js";
 
-export type RunStatus =
-  | "queued"
-  | "running"
-  | "awaiting_plan"
-  | "review"
-  | "approved"
-  | "published"
-  | "failed"
-  | "cancelled";
+export const runStatuses = [
+  "queued",
+  "running",
+  "awaiting_plan",
+  "review",
+  "approved",
+  "published",
+  "failed",
+  "cancelled",
+] as const;
+export type RunStatus = (typeof runStatuses)[number];
 
 /** An imported repository. The client calls it `Repo`. */
 export interface Repository {
@@ -243,6 +245,52 @@ export interface RunCore {
    * was set up; absent on every other run, which respects every hold.
    */
   owners?: string[];
+  /**
+   * Team collaboration records on this run: per-file reviewer attribution,
+   * developer rationale comments and coordination/handoff TODOs. Absent until
+   * a team record is saved.
+   */
+  teamRecords?: RunTeamRecords;
+}
+
+export interface TeamFileReview {
+  reviewerId: string;
+  reviewerName: string;
+  fingerprint: string;
+  reviewedAt: string;
+}
+
+export interface TeamRationaleNote {
+  id: string;
+  filePath: string;
+  lineStart?: number;
+  lineEnd?: number;
+  authorId?: string;
+  authorName: string;
+  text: string;
+  fingerprint?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface TeamTodoItem {
+  id: string;
+  text: string;
+  filePath?: string;
+  authorId?: string;
+  authorName: string;
+  assigneeId?: string;
+  assigneeName?: string;
+  done: boolean;
+  doneBy?: string;
+  doneAt?: string;
+  createdAt: string;
+}
+
+export interface RunTeamRecords {
+  fileReviews?: Record<string, TeamFileReview[]>;
+  rationales?: TeamRationaleNote[];
+  todos?: TeamTodoItem[];
 }
 
 export interface RunGroup {

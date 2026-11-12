@@ -450,7 +450,7 @@ export function synchronizeReview(
     | "status"
     | "draft"
     | "approvedFingerprint"
-  >,
+  > & { teamRecords?: Run["teamRecords"] },
   files: DiffFile[],
 ) {
   const current = new Map(files.map((file) => [file.path, file.fingerprint]));
@@ -459,6 +459,20 @@ export function synchronizeReview(
   )) {
     if (current.get(filePath) !== fingerprint)
       delete run.reviewedFingerprints[filePath];
+  }
+  if (run.teamRecords?.fileReviews) {
+    for (const [filePath, list] of Object.entries(run.teamRecords.fileReviews)) {
+      const fp = current.get(filePath);
+      const kept = fp ? list.filter((entry) => entry.fingerprint === fp) : [];
+      if (kept.length) run.teamRecords.fileReviews[filePath] = kept;
+      else delete run.teamRecords.fileReviews[filePath];
+    }
+    if (!Object.keys(run.teamRecords.fileReviews).length) {
+      delete run.teamRecords.fileReviews;
+      if (!run.teamRecords.rationales?.length && !run.teamRecords.todos?.length) {
+        delete run.teamRecords;
+      }
+    }
   }
   run.reviewedFiles = Object.keys(run.reviewedFingerprints);
   if (

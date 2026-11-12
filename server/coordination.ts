@@ -50,8 +50,10 @@ import {
   claimableScope,
   comparablePath,
   foldPath,
+  pathsMeet,
   scopeParents,
   scopesHolding,
+  splitScope,
 } from "./scope-paths.js";
 import { AppError } from "./types.js";
 import { isWriterLock, type WriterLock } from "./writer-lock.js";
@@ -351,18 +353,29 @@ function unionScopes(held: string[], added: string[]) {
 
 /**
  * The claims among `claims` whose scopes meet one of `scopes`, in their
- * order. Held claims never meet each other, so of every scope linked to
- * a scope of the other side (scopeParents), the claim's side names one.
+ * order. Directory and whole-file overlaps are found via `scopeParents`;
+ * same-file line-range overlaps are checked per folded path so multiple
+ * disjoint range claims on one file are all matched when an asked range
+ * spans across them.
  */
 function meetingClaims(claims: Claim[], scopes: string[]): Claim[] {
   const all = [...scopes];
   const owners: (Claim | undefined)[] = scopes.map(() => undefined);
+  const askedByPath = new Map<string, string[]>();
+  for (const scope of scopes) {
+    const key = foldPath(splitScope(scope).path);
+    const list = askedByPath.get(key) ?? [];
+    list.push(scope);
+    askedByPath.set(key, list);
+  }
+  const meeting = new Set<Claim>();
   for (const claim of claims)
     for (const scope of claim.scopes) {
       all.push(scope);
       owners.push(claim);
+      const sameFile = askedByPath.get(foldPath(splitScope(scope).path));
+      if (sameFile?.some((asked) => pathsMeet(asked, scope))) meeting.add(claim);
     }
-  const meeting = new Set<Claim>();
   scopeParents(all).forEach((parent, index) => {
     if (parent < 0) return;
     const [above, below] = [owners[parent], owners[index]];
@@ -1048,6 +1061,48 @@ export class Coordinator {
     const actor: Actor = Object.freeze({ id: found.id, role: found.role });
     issuedActors.add(actor);
     return actor;
+  }
+
+  /**
+   * Issues an Actor for a known participant id verified by the host's own
+   * account session layer (`collab-auth.ts`). Throws 401 when unknown.
+   */
+  actorForHost(participantId: string): Actor {
+    this.#assertUsable();
+    const found = this.#state.participants.find((participant) => participant.id === participantId);
+    if (!found) throw unauthenticated();
+    const actor: Actor = Object.freeze({ id: found.id, role: found.role });
+    issuedActors.add(actor);
+    return actor;
+  }
+
+  /**
+   * Changes a participant's role (`member` or `admin`). Only an admin may call
+   * this, and the last remaining admin cannot be demoted.
+   */
+  async setParticipantRole(actor: Actor, participantId: string, role: Role, activeAdminIds?: ReadonlySet<string>) {
+    const idValue = validId(participantId);
+    if (role !== "member" && role !== "admin")
+      throw refuse(400, "invalidId", (m) => m.coordination.invalidId({ id: printable(role) }));
+    await this.#mutate((draft) => {
+      const who = this.#who(actor, draft);
+      if (who.role !== "admin")
+        throw refuse(403, "adminOnly", (m) => m.coordination.participant.adminOnly);
+      const target = draft.participants.find((participant) => participant.id === idValue);
+      if (!target)
+        throw refuse(404, "unknownParticipant", (m) => m.coordination.participant.unauthenticated);
+      if (target.role === "admin" && role === "member") {
+        const remainingAdmins = draft.participants.filter(
+          (participant) =>
+            participant.id !== idValue &&
+            participant.role === "admin" &&
+            (!activeAdminIds || activeAdminIds.has(participant.id)),
+        );
+        if (!remainingAdmins.length)
+          throw refuse(409, "lastAdmin", (m) => m.coordination.participant.adminOnly);
+      }
+      target.role = role;
+    });
   }
 
   /**

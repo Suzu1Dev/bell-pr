@@ -572,6 +572,23 @@ const m: Translation<typeof en> = {
     opportunitySource: ({ title, url, quote, reason }) =>
       `${title}: ${url}\n引用：${quote}\n關聯：${reason}`,
   },
+  teamCollab: {
+    viewingRun: ({ names }) => `正在查看此任務的組員：${names}`,
+    viewingFile: ({ names }) => `正在查看此檔案：${names}`,
+    viewingLines: ({ name, start, end }) =>
+      start === end ? `${name}（第 ${start} 行）` : `${name}（第 ${start}–${end} 行）`,
+    fileHeld: ({ holder, title }) =>
+      `此檔案正由 ${holder} 為「${title}」佔用中，衝突修改與發布將被攔截。`,
+    rangeHeld: ({ holder, start, end, title }) =>
+      `第 ${start}–${end} 行正由 ${holder} 為「${title}」修改中；同一檔案的其他不重疊行號仍可同時協作開發。`,
+    rangeOverlap: ({ holder, start, end }) =>
+      `你選取的行號與 ${holder} 佔用的第 ${start}–${end} 行重疊。`,
+    dependencyGuard: ({ holder, otherPath, title }) =>
+      `跨檔案相依防護：相依檔案 ${otherPath} 正由 ${holder} 佔用（「${title}」），釋出前將攔截衝突修改。`,
+    dependencyWarn: ({ holder, otherPath, title }) =>
+      `跨檔案相依提醒：相依檔案 ${otherPath} 正由 ${holder} 佔用（「${title}」），發布前請先與對方協調。`,
+    openGroup: "開啟小組看板",
+  },
 };
 
 export default m;

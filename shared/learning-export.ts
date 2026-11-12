@@ -58,6 +58,7 @@ function compose(run: RunCore, repo: Repository | undefined, locale: Locale, byH
     section(m.sections.forecast, forecastSection(m, run)),
     section(m.sections.feedbackTags, feedbackTagsSection(m, run)),
     section(m.sections.overrides, overridesSection(m, run)),
+    section(m.sections.teamCollab, teamCollabSection(m, run, locale)),
     section(
       m.sections.pullRequest,
       run.prUrl ? `[${run.prUrl}](${run.prUrl})` : m.noPullRequest,
@@ -287,4 +288,71 @@ function overridesSection(m: Messages, run: RunCore) {
       }),
     )
     .join("\n");
+}
+
+function teamCollabSection(m: Messages, run: RunCore, locale: Locale) {
+  const tr = run.teamRecords;
+  if (!tr) return "";
+  const fmt = formatters(locale);
+  const blocks: string[] = [];
+  const reviewEntries = Object.entries(tr.fileReviews ?? {}).filter(([, list]) => list.length);
+  if (reviewEntries.length) {
+    blocks.push(
+      [
+        m.teamReviewsHeading,
+        reviewEntries
+          .map(([path, list]) =>
+            m.teamReviewLine({
+              path,
+              reviewers: fmt.list(
+                list.map((entry) => `${entry.reviewerName} (${entry.reviewedAt})`),
+                { type: "unit" },
+              ),
+            }),
+          )
+          .join("\n"),
+      ].join("\n\n"),
+    );
+  }
+  const rationales = (tr.rationales ?? []).filter((note) => note.text.trim());
+  if (rationales.length) {
+    blocks.push(
+      [
+        m.teamRationalesHeading,
+        rationales
+          .map((note) =>
+            m.teamRationaleLine({
+              scope:
+                note.lineStart !== undefined
+                  ? `${note.filePath}#L${note.lineStart}-${note.lineEnd ?? note.lineStart}`
+                  : note.filePath,
+              author: note.authorName,
+              at: note.createdAt,
+              text: note.text.trim(),
+            }),
+          )
+          .join("\n"),
+      ].join("\n\n"),
+    );
+  }
+  const todos = (tr.todos ?? []).filter((todo) => todo.text.trim());
+  if (todos.length) {
+    blocks.push(
+      [
+        m.teamTodosHeading,
+        todos
+          .map((todo) =>
+            m.teamTodoLine({
+              done: todo.done,
+              filePath: todo.filePath,
+              text: todo.text.trim(),
+              assignee: todo.assigneeName,
+              author: todo.authorName,
+            }),
+          )
+          .join("\n"),
+      ].join("\n\n"),
+    );
+  }
+  return blocks.join("\n\n");
 }

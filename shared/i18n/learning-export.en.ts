@@ -31,6 +31,7 @@ const messages = {
     forecast: "Your forecast",
     feedbackTags: "Maintainer feedback you tagged",
     overrides: "Checks you overrode, with your reasons",
+    teamCollab: "Team review and coordination records",
   },
   noPullRequest: "No pull request has been opened yet.",
   noExplanations: "No explanations have been generated yet.",
@@ -134,6 +135,36 @@ const messages = {
   lesson: ({ lesson }: { lesson: string }) => `Lesson: ${lesson}`,
   override: ({ check, reason, at }: { check: string; reason: string; at: string }) =>
     `- ${check} (${at}): ${reason}`,
+  teamReviewsHeading: "### Reviewed files",
+  teamReviewLine: ({ path, reviewers }: { path: string; reviewers: string }) =>
+    `- \`${path}\`: ${reviewers}`,
+  teamRationalesHeading: "### Change rationales",
+  teamRationaleLine: ({
+    scope,
+    author,
+    at,
+    text,
+  }: {
+    scope: string;
+    author: string;
+    at: string;
+    text: string;
+  }) => `- \`${scope}\` (${author}, ${at}): ${text}`,
+  teamTodosHeading: "### Coordination TODOs",
+  teamTodoLine: ({
+    done,
+    filePath,
+    text,
+    assignee,
+    author,
+  }: {
+    done: boolean;
+    filePath?: string;
+    text: string;
+    assignee?: string;
+    author: string;
+  }) =>
+    `- [${done ? "x" : " "}] ${filePath ? `\`${filePath}\`: ` : ""}${text} (${assignee ? `for ${assignee}, ` : ""}by ${author})`,
   confidences: { sure: "Sure", think: "Think so", guess: "Guessing" } as Record<string, string>,
   grades: { got: "Got it", partly: "Partly", missed: "Missed" } as Record<string, string>,
   roadChoices: {

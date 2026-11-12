@@ -28,10 +28,16 @@ import {
   Search,
   Sparkles,
   SquarePen,
+  TriangleAlert,
+  Users,
   X,
 } from "lucide-react";
 import { api } from "../api";
-import { useT } from "../i18n";
+import { useFormat, useT } from "../i18n";
+import {
+  computeFileHoldNotice,
+  type TeamCollaboration,
+} from "../collab/useTeamCollaboration";
 import type { DiffFile, Repo, Run } from "../types";
 import { applyReviewOrder, parseReviewOrder } from "../../shared/review-order";
 import { DiffView } from "../review/DiffView";
@@ -130,6 +136,8 @@ interface ChangesTabProps {
   understanding?: Understanding;
   /** A Learn-by-hand run's state and requests (useByHand). */
   byHand?: ByHand;
+  /** Live team activity, holds, dependency rules and team review/rationale/todo actions. */
+  team?: TeamCollaboration;
 }
 
 /**
@@ -189,8 +197,10 @@ export function ChangesTab({
   actions,
   understanding,
   byHand,
+  team,
 }: ChangesTabProps) {
   const workspace = useT("workspace");
+  const format = useFormat();
   const t = workspace.changes;
   const fileStatus = useT("common").fileStatus;
   const {
@@ -570,6 +580,93 @@ export function ChangesTab({
             </div>
           </div>
         </div>
+        {file && team && (() => {
+          const fileViewers = team.activities.filter(
+            (item) =>
+              item.runId === run.id &&
+              item.filePath === file.path &&
+              (!team.me || item.id !== team.me.id),
+          );
+          const { directHolds, dependencyHolds } = computeFileHoldNotice(
+            file.path,
+            team.holds,
+            team.dependencies,
+            team.me?.id,
+            team.selectedRange,
+          );
+          if (!fileViewers.length && !directHolds.length && !dependencyHolds.length) return null;
+          return (
+            <div className="run-notices">
+              {fileViewers.length > 0 && (
+                <p className="run-notice" role="status">
+                  <Users size={14} aria-hidden="true" />
+                  <span>
+                    {workspace.teamCollab.viewingFile({
+                      names: format.list(
+                        fileViewers.map((v) =>
+                          v.lineStart !== undefined
+                            ? workspace.teamCollab.viewingLines({
+                                name: v.name,
+                                start: v.lineStart,
+                                end: v.lineEnd ?? v.lineStart,
+                              })
+                            : v.name,
+                        ),
+                        { type: "conjunction" },
+                      ),
+                    })}
+                  </span>
+                </p>
+              )}
+              {directHolds.map((hold) => (
+                <p key={`${hold.claimId}:${hold.scope}`} className="run-notice" role="status">
+                  <TriangleAlert size={14} aria-hidden="true" />
+                  <span>
+                    {hold.lineStart !== undefined && hold.lineEnd !== undefined
+                      ? `${workspace.teamCollab.rangeHeld({
+                          holder: hold.holderName,
+                          start: hold.lineStart,
+                          end: hold.lineEnd,
+                          title: hold.title,
+                        })}${
+                          hold.overlapsSelection && team.selectedRange
+                            ? ` ${workspace.teamCollab.rangeOverlap({
+                                holder: hold.holderName,
+                                start: hold.lineStart,
+                                end: hold.lineEnd,
+                              })}`
+                            : ""
+                        }`
+                      : workspace.teamCollab.fileHeld({
+                          holder: hold.holderName,
+                          title: hold.title,
+                        })}
+                  </span>
+                  <a className="run-notice-link" href="#/group">
+                    {workspace.teamCollab.openGroup}
+                  </a>
+                </p>
+              ))}
+              {dependencyHolds.map((dep, idx) => (
+                <p key={`${dep.otherPath}:${idx}`} className="run-notice" role="status">
+                  <TriangleAlert size={14} aria-hidden="true" />
+                  <span>
+                    {(dep.mode === "block"
+                      ? workspace.teamCollab.dependencyGuard
+                      : workspace.teamCollab.dependencyWarn)({
+                      holder: dep.holderName,
+                      otherPath: dep.otherPath,
+                      title: dep.title,
+                    })}
+                  </span>
+                  <a className="run-notice-link" href="#/group">
+                    {workspace.teamCollab.openGroup}
+                  </a>
+                </p>
+              ))}
+            </div>
+          );
+        })()}
         {file ? (
           <DiffView
             key={`${run.id}:${file.path}:${reviewBaseSha(run) ?? ""}`}
@@ -588,6 +685,10 @@ export function ChangesTab({
             }
             highlight={shownHighlight}
             guide={!!run.learnByHand && !demo}
+            teamReviews={(run.teamRecords?.fileReviews?.[file.path] ?? []).filter(
+              (entry) => !file.fingerprint || entry.fingerprint === file.fingerprint,
+            )}
+            onSelectLines={team?.reportSelection}
           />
         ) : writing && run.worktreePath ? (
           <ErrorBoundary resetKey={`${run.id}:turn`}>
@@ -768,6 +869,10 @@ export function ChangesTab({
                     initialTab={panelTab === "chat" ? "explain" : panelTab}
                     onTabChange={setPanelTab}
                     byHandReview={byHandReview}
+                    teamRecords={run.teamRecords}
+                    teamMe={team?.me}
+                    selectedRange={team?.selectedRange}
+                    teamActions={team}
                   />
                 </Suspense>
               </ErrorBoundary>

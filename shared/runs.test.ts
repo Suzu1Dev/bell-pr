@@ -128,6 +128,7 @@ test("every detail field is left out", () => {
       "reviewability",
       "session",
       "sync",
+      "teamRecords",
       "understanding",
       "walkthroughs",
     ],

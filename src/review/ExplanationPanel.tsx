@@ -21,8 +21,10 @@ import {
   RotateCcw,
   Shuffle,
   Sparkles,
+  Users,
   Workflow,
 } from "lucide-react";
+import type { TeamCollaboration } from "../collab/useTeamCollaboration";
 import type { ExampleStep, LearnerNote } from "../../shared/explanations";
 import { parseLocale, type Locale } from "../../shared/i18n/locale";
 import type { PrFeedbackItem } from "../../shared/pr-feedback";
@@ -113,10 +115,21 @@ export interface ExplanationPanelProps {
    * walkthrough of the file that nobody asked for yet.
    */
   byHandReview?: ByHandReader;
+  /** Team review sign-offs, rationales and handoff TODOs on this run. */
+  teamRecords?: Run["teamRecords"];
+  /** Current signed-in group member, if any. */
+  teamMe?: { id: string; name: string; admin?: boolean };
+  /** Currently selected diff lines for quick rationale line-range prefill. */
+  selectedRange?: { start: number; end: number };
+  /** Mutation callbacks for team sign-offs, rationales and handoff TODOs. */
+  teamActions?: Pick<
+    TeamCollaboration,
+    "signOffFile" | "addRationale" | "removeRationale" | "addTodo" | "toggleTodo" | "removeTodo"
+  >;
 }
 
 /** The learning panel's tabs. */
-export type PanelTab = "explain" | "walkthrough" | "reports" | "chat";
+export type PanelTab = "explain" | "walkthrough" | "reports" | "chat" | "team";
 
 /**
  * Says where agent-written text comes from: AI output that may be wrong, or
@@ -294,6 +307,341 @@ export function ReviewReports({
   );
 }
 
+function parseLineRangeText(raw: string): { lineStart?: number; lineEnd?: number } {
+  const match = /^\s*L?(\d+)(?:\s*[-–]\s*L?(\d+))?\s*$/i.exec(raw);
+  if (!match) return {};
+  const a = Number(match[1]);
+  const b = match[2] ? Number(match[2]) : a;
+  if (!Number.isFinite(a) || a < 1) return {};
+  return { lineStart: Math.min(a, b), lineEnd: Math.max(a, b) };
+}
+
+export function TeamCollaborationTab({
+  file,
+  teamRecords,
+  teamMe,
+  selectedRange,
+  teamActions,
+  onHighlight,
+}: {
+  file: DiffFile;
+  teamRecords?: Run["teamRecords"];
+  teamMe?: { id: string; name: string; admin?: boolean };
+  selectedRange?: { start: number; end: number };
+  teamActions?: ExplanationPanelProps["teamActions"];
+  onHighlight?: (range: LineRange | undefined) => void;
+}) {
+  const t = useT("review").team;
+  const fmt = useFormat();
+  const [rationaleText, setRationaleText] = useState("");
+  const [lineRangeInput, setLineRangeInput] = useState("");
+  const [todoText, setTodoText] = useState("");
+  const [assignee, setAssignee] = useState("");
+  const [scopeFile, setScopeFile] = useState(true);
+  const [busy, setBusy] = useState(false);
+
+  const fileReviews = (teamRecords?.fileReviews?.[file.path] ?? []).filter(
+    (entry) => !file.fingerprint || entry.fingerprint === file.fingerprint,
+  );
+  const myId = teamMe?.id ?? "local";
+  const mySignedOff = fileReviews.some((entry) => entry.reviewerId === myId);
+  const rationales = (teamRecords?.rationales ?? []).filter((n) => n.filePath === file.path);
+  const todos = teamRecords?.todos ?? [];
+  const sortedTodos = [
+    ...todos.filter((item) => item.filePath === file.path),
+    ...todos.filter((item) => item.filePath !== file.path),
+  ];
+
+  const runAction = async (fn: () => Promise<void>) => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      await fn();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="explain-team-tab">
+      <section className="explain-card">
+        <h3>
+          <Eye size={15} />
+          {t.reviewsTitle}
+        </h3>
+        <p className="explain-note-intro">{t.reviewsIntro}</p>
+        {fileReviews.length ? (
+          <ul className="explain-order-list">
+            {fileReviews.map((entry) => (
+              <li key={entry.reviewerId}>
+                <strong>
+                  {t.reviewedAt({
+                    name: entry.reviewerName,
+                    time: fmt.dateTime(entry.reviewedAt),
+                  })}
+                </strong>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="explain-empty-note">{t.reviewsEmpty}</p>
+        )}
+        {teamActions && file.fingerprint && !file.blocked && (
+          <div className="explain-note-actions">
+            <button
+              type="button"
+              className="explain-note-save"
+              disabled={busy}
+              onClick={() => void runAction(() => teamActions.signOffFile(file, !mySignedOff))}
+            >
+              {mySignedOff ? t.clearSignOff : t.signOff}
+            </button>
+          </div>
+        )}
+      </section>
+
+      <section className="explain-card">
+        <h3>
+          <PenLine size={15} />
+          {t.rationalesTitle}
+        </h3>
+        <p className="explain-note-intro">{t.rationalesIntro}</p>
+        {rationales.length ? (
+          <ul className="explain-order-list">
+            {rationales.map((item) => {
+              const canDelete = Boolean(
+                teamActions && (teamMe?.admin || !teamMe || item.authorId === myId),
+              );
+              return (
+                <li key={item.id}>
+                  <div>
+                    <strong>{item.authorName}</strong>{" "}
+                    <small>{fmt.dateTime(item.createdAt)}</small>
+                    {item.lineStart !== undefined && (
+                      <>
+                        {" · "}
+                        {onHighlight ? (
+                          <button
+                            type="button"
+                            className="explain-answer-toggle"
+                            onClick={() =>
+                              onHighlight({
+                                startLine: item.lineStart!,
+                                endLine: item.lineEnd ?? item.lineStart!,
+                              })
+                            }
+                          >
+                            {t.locateLines({
+                              start: item.lineStart,
+                              end: item.lineEnd ?? item.lineStart,
+                            })}
+                          </button>
+                        ) : (
+                          <code>
+                            {t.locateLines({
+                              start: item.lineStart,
+                              end: item.lineEnd ?? item.lineStart,
+                            })}
+                          </code>
+                        )}
+                      </>
+                    )}
+                    {canDelete && (
+                      <>
+                        {" · "}
+                        <button
+                          type="button"
+                          className="explain-answer-toggle"
+                          disabled={busy}
+                          onClick={() =>
+                            void runAction(() => teamActions!.removeRationale(item.id))
+                          }
+                        >
+                          {t.removeItem}
+                        </button>
+                      </>
+                    )}
+                  </div>
+                  <MarkdownContent>{item.text}</MarkdownContent>
+                </li>
+              );
+            })}
+          </ul>
+        ) : (
+          <p className="explain-empty-note">{t.rationalesEmpty}</p>
+        )}
+        {teamActions && !file.blocked && (
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              if (!rationaleText.trim()) return;
+              const parsed = parseLineRangeText(lineRangeInput);
+              void runAction(async () => {
+                await teamActions.addRationale({
+                  filePath: file.path,
+                  text: rationaleText.trim(),
+                  ...parsed,
+                });
+                setRationaleText("");
+                setLineRangeInput("");
+              });
+            }}
+          >
+            {selectedRange && (
+              <button
+                type="button"
+                className="explain-answer-toggle"
+                onClick={() =>
+                  setLineRangeInput(
+                    selectedRange.start === selectedRange.end
+                      ? `${selectedRange.start}`
+                      : `${selectedRange.start}-${selectedRange.end}`,
+                  )
+                }
+              >
+                {t.useSelectedLines(selectedRange)}
+              </button>
+            )}
+            <input
+              className="explain-note-input"
+              value={lineRangeInput}
+              maxLength={32}
+              placeholder={t.lineRangeOptional}
+              aria-label={t.lineRangeOptional}
+              onChange={(event) => setLineRangeInput(event.target.value)}
+            />
+            <textarea
+              className="explain-note-input"
+              rows={3}
+              maxLength={2000}
+              placeholder={t.rationalePlaceholder}
+              aria-label={t.rationalesTitle}
+              value={rationaleText}
+              onChange={(event) => setRationaleText(event.target.value)}
+            />
+            <div className="explain-note-actions">
+              <span />
+              <button
+                type="submit"
+                className="explain-note-save"
+                disabled={!rationaleText.trim() || busy}
+              >
+                {t.addRationale}
+              </button>
+            </div>
+          </form>
+        )}
+      </section>
+
+      <section className="explain-card">
+        <h3>
+          <Users size={15} />
+          {t.todosTitle}
+        </h3>
+        <p className="explain-note-intro">{t.todosIntro}</p>
+        {sortedTodos.length ? (
+          <ul className="explain-order-list">
+            {sortedTodos.map((todo) => {
+              const canDelete = Boolean(
+                teamActions && (teamMe?.admin || !teamMe || todo.authorId === myId),
+              );
+              return (
+                <li key={todo.id}>
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={todo.done}
+                      disabled={!teamActions || busy}
+                      onChange={(event) =>
+                        teamActions &&
+                        void runAction(() => teamActions.toggleTodo(todo.id, event.target.checked))
+                      }
+                    />{" "}
+                    <span>{todo.text}</span>
+                  </label>
+                  <div>
+                    {todo.filePath && todo.filePath !== file.path && (
+                      <code>{t.otherFileBadge({ path: todo.filePath })}</code>
+                    )}{" "}
+                    {todo.assigneeName && <code>{t.assignedTo({ name: todo.assigneeName })}</code>}{" "}
+                    {todo.done && todo.doneBy && (
+                      <small>{t.completedBy({ name: todo.doneBy })}</small>
+                    )}{" "}
+                    {canDelete && (
+                      <button
+                        type="button"
+                        className="explain-answer-toggle"
+                        disabled={busy}
+                        onClick={() => void runAction(() => teamActions!.removeTodo(todo.id))}
+                      >
+                        {t.removeItem}
+                      </button>
+                    )}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        ) : (
+          <p className="explain-empty-note">{t.todosEmpty}</p>
+        )}
+        {teamActions && (
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              if (!todoText.trim()) return;
+              void runAction(async () => {
+                await teamActions.addTodo({
+                  ...(scopeFile ? { filePath: file.path } : {}),
+                  text: todoText.trim(),
+                  ...(assignee.trim() ? { assigneeName: assignee.trim() } : {}),
+                });
+                setTodoText("");
+                setAssignee("");
+              });
+            }}
+          >
+            <textarea
+              className="explain-note-input"
+              rows={2}
+              maxLength={1000}
+              placeholder={t.todoPlaceholder}
+              aria-label={t.todosTitle}
+              value={todoText}
+              onChange={(event) => setTodoText(event.target.value)}
+            />
+            <input
+              className="explain-note-input"
+              value={assignee}
+              maxLength={80}
+              placeholder={t.assigneePlaceholder}
+              aria-label={t.assigneePlaceholder}
+              onChange={(event) => setAssignee(event.target.value)}
+            />
+            <div className="explain-note-actions">
+              <label>
+                <input
+                  type="checkbox"
+                  checked={scopeFile}
+                  onChange={(event) => setScopeFile(event.target.checked)}
+                />{" "}
+                {t.scopeThisFile}
+              </label>
+              <button
+                type="submit"
+                className="explain-note-save"
+                disabled={!todoText.trim() || busy}
+              >
+                {t.addTodo}
+              </button>
+            </div>
+          </form>
+        )}
+      </section>
+    </div>
+  );
+}
+
 export function ExplanationPanel({
   file,
   messages,
@@ -323,6 +671,10 @@ export function ExplanationPanel({
   initialTab = "explain",
   onTabChange,
   byHandReview,
+  teamRecords,
+  teamMe,
+  selectedRange,
+  teamActions,
 }: ExplanationPanelProps) {
   const t = useT("review");
   const panel = usePanelStrings(); // A Learn-by-hand run's Ask tab names the guide, who answers it (DESIGN v1.2 F8).
@@ -347,11 +699,11 @@ export function ExplanationPanel({
   useEffect(() => {
     setQuestion("");
     setShowAnswer(false);
-    // Reports are run-level and walkthroughs are read file after file, so those tabs stay.
+    // Reports, team records and walkthroughs are read file after file, so those tabs stay.
     setTab((current) =>
       chatRequestId
         ? "chat"
-        : current === "reports" || current === "walkthrough"
+        : current === "reports" || current === "walkthrough" || current === "team"
           ? current
           : "explain",
     );
@@ -538,6 +890,29 @@ export function ExplanationPanel({
             <span className="explain-message-count">{questionCount}</span>
           )}
         </button>
+        {(teamActions || teamRecords || initialTab === "team") && (
+          <button
+            type="button"
+            role="tab"
+            id={`${panelId}-team`}
+            tabIndex={tab === "team" ? 0 : -1}
+            aria-selected={tab === "team"}
+            aria-controls={`${panelId}-content`}
+            className={tab === "team" ? "explain-tab-active" : ""}
+            onClick={() => setTab("team")}
+          >
+            <Users size={14} />
+            {t.panel.tabs.team}
+            {(() => {
+              const openCount =
+                (teamRecords?.todos ?? []).filter((item) => !item.done).length +
+                (teamRecords?.rationales ?? []).filter((item) => item.filePath === file.path).length;
+              return openCount > 0 ? (
+                <span className="explain-message-count">{openCount}</span>
+              ) : null;
+            })()}
+          </button>
+        )}
       </div>
       <div className="explain-context">
         <FileCode2 size={13} />
@@ -902,6 +1277,15 @@ export function ExplanationPanel({
             reviewBusy={reviewBusy}
             byHand={!!byHandReview}
             failed={byHandReview?.run && reviewFailure(byHandReview.run)}
+          />
+        ) : tab === "team" ? (
+          <TeamCollaborationTab
+            file={file}
+            teamRecords={teamRecords}
+            teamMe={teamMe}
+            selectedRange={selectedRange}
+            teamActions={teamActions}
+            onHighlight={onHighlight}
           />
         ) : (
           <div

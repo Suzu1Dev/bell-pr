@@ -13,7 +13,7 @@ import { assertRunAgentAllowed } from "./codex-guard.js";
 import { command, git, agentEnvironment, recordedGitDir, redact } from "./process.js";
 import { readDiff } from "./git.js";
 import { planOverlaps, planScopes } from "./group-local.js";
-import { assertNotHeld, changedPaths, heldNotice, heldPathsOf } from "./hold-guard.js";
+import { assertNotHeld, changedScopes, heldNotice, heldPathsOf } from "./hold-guard.js";
 import {
   claimReadyTasks,
   consumeTeamInbox,
@@ -414,7 +414,7 @@ export async function runAgent(
     // checked when its changes are integrated (integrateTeamTask).
     if (writes && cwd === run.worktreePath) {
       if (ctx.holds) {
-        const held = assertNotHeld(ctx.holds, run, await changedPaths(run), "turn");
+        const held = assertNotHeld(ctx.holds, run, await changedScopes(run), "turn");
         if (held.length) ctx.log(run, role, heldNotice(held), { kind: "notice" });
       }
       delete run.heldPaths;

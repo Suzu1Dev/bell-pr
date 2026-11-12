@@ -38,6 +38,19 @@ const m: Translation<typeof en> = {
     "這項佔用已經結束，但它的任務無法標記為完成，之後也不能再標記。相依它的工作需要改為相依其他任務。詳細原因在主機的記錄裡。",
   notHolder: "只有佔用這些路徑的人可以釋出它們。",
   staleFence: "這項佔用在看板讀取之後有了變更。請重新載入看板再試。",
+  invalidCredentials: "帳號或密碼不正確，或這個帳號已被停用。",
+  usernameTaken: "這個小組裡已經有人使用這個帳號名稱。",
+  invalidAccountInput:
+    "請輸入 2 至 32 個英數字、點號、底線或連字號組成的帳號名稱，以及 8 至 128 個字元的密碼。",
+  tailscaleUnavailable:
+    "這個連線未提供已驗證的 Tailscale 身分。請透過啟用 --tailscale-auth 的 Tailscale Serve 連線，或改用帳號密碼登入。",
+  tailscaleUnlinked: ({ login }) =>
+    `尚未有小組帳號綁定 Tailscale 使用者 ${login}。請輸入一次邀請碼完成綁定，或請小組管理員設定綁定。`,
+  lastAdmin: "小組至少需要保留一位啟用中的管理員。",
+  dependencyBlocked: "已經有人佔用了與你路徑標記為阻擋相依的檔案，所以這次沒有佔用任何路徑。",
+  unknownDependency: "這個 repository 沒有這個 id 的檔案相依規則。",
+  atHostName: "主機管理員",
+  soloAuthorName: "開發者",
   refused: "小組協作拒絕了這個請求。",
   failed: "小組協作無法完成這個動作，詳細原因在主機的記錄裡。",
 };

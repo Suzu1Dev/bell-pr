@@ -11,7 +11,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseActiveRunLimit, parseAgentProcessLimit } from "./agent-slots.js";
 import { parseAgentTimeoutScale } from "./agent-timeouts.js";
-import { parseAllowedOrigins } from "./http-guard.js";
+import { parseAllowedOrigins, privateOrTailnetHost } from "./http-guard.js";
 import { sm } from "./i18n/index.js";
 import { parseSuiteLinks } from "./suite-contract.js";
 import type { SuiteLinks } from "../shared/suite.js";
@@ -30,6 +30,10 @@ export interface StartFlags {
   open?: boolean;
   /** --group: host group work for the people who share this instance. */
   group?: boolean;
+  /** --trust-vpn: allow private VPN and Tailscale HTTP addresses. */
+  trustVpn?: boolean;
+  /** --tailscale-auth: trust verified local Tailscale identity headers. */
+  tailscaleAuth?: boolean;
 }
 
 /** How much agent work runs at once and how long turns may take. */
@@ -66,6 +70,10 @@ export interface Config {
   limits: Limits;
   /** --group or BELLPR_GROUP=1: this instance hosts group work (collab-host.ts). */
   collab?: true;
+  /** --trust-vpn or BELLPR_TRUST_VPN=1: trust private VPN / Tailscale HTTP hosts. */
+  trustVpn?: true;
+  /** --tailscale-auth or BELLPR_TAILSCALE_AUTH=1: trust loopback Tailscale identity headers. */
+  tailscaleAuth?: true;
   /**
    * ./.bellpr in the working directory when it holds data from an older
    * version and is not the data directory in use. Only a hint is printed.
@@ -213,7 +221,7 @@ export function baseUrl(config: Pick<Config, "publicUrl" | "host" | "port">) {
   return config.publicUrl ?? `http://${browserHost(config.host)}:${config.port}`;
 }
 
-function parsePublicUrl(value: string): string {
+function parsePublicUrl(value: string, allowPrivateHttp = false): string {
   const invalid = () =>
     new ConfigError(sm().cli.config.publicUrlInvalid({ value }));
   let url: URL;
@@ -222,6 +230,7 @@ function parsePublicUrl(value: string): string {
   } catch {
     throw invalid();
   }
+  const bareHost = url.hostname.replace(/^\[(.*)\]$/, "$1");
   if (
     !["http:", "https:"].includes(url.protocol) ||
     url.username ||
@@ -230,14 +239,15 @@ function parsePublicUrl(value: string): string {
     url.search ||
     url.hash ||
     // The API would cross a network in the clear: plain http only for
-    // this computer.
+    // this computer or an explicitly trusted VPN / Tailscale network.
     (url.protocol === "http:" &&
-      !isLoopbackHost(url.hostname.replace(/^\[(.*)\]$/, "$1")))
+      !isLoopbackHost(bareHost) &&
+      !(allowPrivateHttp && privateOrTailnetHost(bareHost)))
   )
     throw invalid();
   // The guard checks the origin the same way as BELLPR_ALLOWED_ORIGINS.
   try {
-    parseAllowedOrigins(url.origin);
+    parseAllowedOrigins(url.origin, { allowPrivateHttp });
   } catch {
     throw invalid();
   }
@@ -274,15 +284,19 @@ export function resolveConfig(
       ? parsePort("BELLPR_FRONTEND_PORT", env.BELLPR_FRONTEND_PORT!)
       : defaultFrontendPort
     : undefined;
+  const trustVpn = flags.trustVpn === true || envFlag(env.BELLPR_TRUST_VPN);
+  const tailscaleAuth = flags.tailscaleAuth === true || envFlag(env.BELLPR_TAILSCALE_AUTH);
   const publicUrl = setting(env.BELLPR_PUBLIC_URL)
-    ? parsePublicUrl(setting(env.BELLPR_PUBLIC_URL)!)
+    ? parsePublicUrl(setting(env.BELLPR_PUBLIC_URL)!, trustVpn)
     : undefined;
   // The request guard accepts this computer's addresses and the public URL
   // only: on another address without one, every request would be refused,
-  // the printed address included.
-  if (!publicUrl && !isLoopbackHost(host) && !isWildcardHost(host))
+  // the printed address included (unless --trust-vpn covers a VPN/Tailscale IP).
+  if (!publicUrl && !isLoopbackHost(host) && !isWildcardHost(host) && !(trustVpn && privateOrTailnetHost(host)))
     throw new ConfigError(sm().cli.config.publicUrlRequired({ host }));
-  const configured = parsed(() => parseAllowedOrigins(env.BELLPR_ALLOWED_ORIGINS ?? ""));
+  const configured = parsed(() =>
+    parseAllowedOrigins(env.BELLPR_ALLOWED_ORIGINS ?? "", { allowPrivateHttp: trustVpn }),
+  );
   // Only append an origin that is set: an empty entry throws.
   const allowedOrigins = [
     ...new Set(
@@ -334,6 +348,8 @@ export function resolveConfig(
       !envFlag(env.CI),
     limits,
     ...(flags.group === true || envFlag(env.BELLPR_GROUP) ? { collab: true as const } : {}),
+    ...(trustVpn ? { trustVpn: true as const } : {}),
+    ...(tailscaleAuth ? { tailscaleAuth: true as const } : {}),
     ...(legacyDataDir ? { legacyDataDir } : {}),
   };
 }

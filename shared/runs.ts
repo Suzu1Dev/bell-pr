@@ -32,6 +32,7 @@ export const runDetailFields = [
   "guardOverrides",
   "reviewability",
   "byHand",
+  "teamRecords",
 ] as const;
 export type RunDetailField = (typeof runDetailFields)[number];
 

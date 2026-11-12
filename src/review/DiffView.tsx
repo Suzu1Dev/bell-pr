@@ -64,6 +64,10 @@ export interface DiffViewProps {
   highlight?: { startLine: number; endLine: number };
   /** A Learn-by-hand run: the guide answers a selection, so its button and the hint name the guide. */
   guide?: boolean;
+  /** Teammates who signed off on this file's current diff fingerprint. */
+  teamReviews?: readonly { reviewerId: string; reviewerName: string }[];
+  /** Reports the selected line range in the diff for live presence and rationale notes. */
+  onSelectLines?: (range?: { start: number; end: number }) => void;
 }
 
 // Memoized: every arrow key in the list re-renders the diff, and a line's
@@ -110,6 +114,8 @@ export function DiffView({
   onLoadBase,
   highlight,
   guide = false,
+  teamReviews,
+  onSelectLines,
 }: DiffViewProps) {
   const t = useT("review");
   const askLabel = guide ? t.diff.askGuide : t.diff.askSelection;
@@ -278,6 +284,18 @@ export function DiffView({
       )
     : [];
   const selectedIds = new Set(selectedLines.map((line) => line.id));
+  const onSelectRef = useRef(onSelectLines);
+  onSelectRef.current = onSelectLines;
+  useEffect(() => {
+    if (!onSelectRef.current) return;
+    const nums = selectedLines
+      .map((line) => line.newLine ?? line.oldLine)
+      .filter((n): n is number => n !== null);
+    onSelectRef.current(
+      nums.length ? { start: Math.min(...nums), end: Math.max(...nums) } : undefined,
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selection]);
   const paths = file.path.split("/");
   const name = paths.pop();
   // The header has room for the full name when no short badge is defined.
@@ -563,6 +581,14 @@ export function DiffView({
           )}
           <span className="rv-additions">+{file.additions}</span>
           <span className="rv-deletions">−{file.deletions}</span>
+          {teamReviews && teamReviews.length > 0 && (
+            <span
+              className="rv-note-hint"
+              title={teamReviews.map((entry) => entry.reviewerName).join(", ")}
+            >
+              {t.team.chipCount({ count: teamReviews.length })}
+            </span>
+          )}
           {showReview && hasNote === false && !reviewed && !file.blocked && (
             <span className="rv-note-hint">{t.diff.noteHint}</span>
           )}

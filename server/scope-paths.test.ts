@@ -1,6 +1,14 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { pathsMeet, scopeHolds, scopeParents, scopesHolding } from "./scope-paths.js";
+import {
+  baseScopePath,
+  claimableScope,
+  pathsMeet,
+  scopeHolds,
+  scopeParents,
+  scopesHolding,
+  splitScope,
+} from "./scope-paths.js";
 
 /** Scopes from a few names that sort around "/" and differ only in case. */
 function scopes(seed: number, count: number) {
@@ -39,4 +47,24 @@ test("scopesHolding answers as scopeHolds does for every file", () => {
     for (const file of files)
       assert.equal(holds(file), list.some((scope) => scopeHolds(scope, file)), `${list} | ${file}`);
   }
+});
+
+test("line-range scopes canonicalize and allow non-overlapping edits on the same file", () => {
+  assert.equal(claimableScope("src/app.ts#L10-L45"), "src/app.ts#L10-L45");
+  assert.equal(claimableScope("src/app.ts#l12-30"), "src/app.ts#L12-L30");
+  assert.equal(claimableScope("src/app.ts#L8"), "src/app.ts#L8-L8");
+  assert.equal(claimableScope("src/app.ts#L30-L10"), undefined);
+  assert.equal(claimableScope("src/app.ts#L0-L5"), undefined);
+  assert.deepEqual(splitScope("src/app.ts#L10-L45"), { path: "src/app.ts", start: 10, end: 45 });
+  assert.equal(baseScopePath("src/app.ts#L10-L45"), "src/app.ts");
+
+  // Non-overlapping ranges on the same file do not meet.
+  assert.equal(pathsMeet("src/app.ts#L1-L20", "src/app.ts#L21-L50"), false);
+  // Overlapping ranges on the same file (case-insensitive) do meet.
+  assert.equal(pathsMeet("src/app.ts#L1-L25", "SRC/APP.TS#L25-L50"), true);
+  // Whole-file or parent-folder hold meets any range inside it.
+  assert.equal(pathsMeet("src/app.ts", "src/app.ts#L10-L20"), true);
+  assert.equal(pathsMeet("src", "src/app.ts#L10-L20"), true);
+  assert.equal(scopeHolds("src/app.ts#L10-L20", "src/app.ts#L15-L18"), true);
+  assert.equal(scopeHolds("src/app.ts#L10-L20", "src/app.ts#L25-L30"), false);
 });

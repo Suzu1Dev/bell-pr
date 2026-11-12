@@ -377,7 +377,9 @@ export interface DraftCheck {
     // on the target branch changed files under the person's own hold.
     | "held-by-other"
     | "holds-unknown"
-    | "held-changed-upstream";
+    | "held-changed-upstream"
+    | "collab-dependency-warn"
+    | "team-open-todos";
   /** block stops approval and publishing; confirm needs the person's acknowledgement before publishing. */
   kind: "block" | "confirm";
   message: string;
