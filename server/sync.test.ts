@@ -79,7 +79,7 @@ test("BELL's clone of a GitHub repository updates to the latest default branch; 
       (error: AppError) =>
         error.statusCode === 409 &&
         /has no GitHub source/.test(error.message) &&
-        /import it again/.test(error.message),
+        /re-import the project/.test(error.message),
     );
     // A checkout an earlier build imported in place is the person's own.
     const legacy = { ...localRepo, id: "legacy-checkout", path: local, url: "https://github.com/octo/legacy" };
@@ -367,7 +367,7 @@ test("a sync whose conflicts cannot be marked, or after a publish that stopped h
     await assert.rejects(
       f.workbench.syncRun(f.run.id),
       (error: AppError) =>
-        error.statusCode === 409 && /無法用衝突標記表示/.test(error.message) && /other\.ts/.test(error.message),
+        error.statusCode === 409 && /衝突標記無法表示/.test(error.message) && /other\.ts/.test(error.message),
     );
     assert.equal(f.run.baseSha, oldBase);
     assert.equal(f.run.sync, undefined);
@@ -379,7 +379,7 @@ test("a sync whose conflicts cannot be marked, or after a publish that stopped h
     );
     // A commit left by a publish that failed after making it may be on GitHub already.
     f.run.publishCommit = oldBase;
-    await assert.rejects(f.workbench.syncRun(f.run.id), /先前的發布已建立 commit/);
+    await assert.rejects(f.workbench.syncRun(f.run.id), /先前發布的 commit 可能已在 GitHub/);
   } finally {
     await f.cleanup();
   }
@@ -812,7 +812,7 @@ test("a PR sync takes in files the target branch added, also after the agent com
     // The target deleting a file this PR changed cannot be marked: nothing moves.
     const pushed = f.run.publishCommit!;
     await f.github.upstreamCommit({ "hello.ts": null });
-    await assert.rejects(f.workbench.syncRun(f.run.id), /無法用衝突標記表示.*hello\.ts/);
+    await assert.rejects(f.workbench.syncRun(f.run.id), /衝突標記無法表示.*hello\.ts/);
     assert.equal(f.run.status, "published");
     assert.equal(f.run.followUps!.at(-1), round);
     assert.equal((await git(f.run.worktreePath, ["rev-parse", "HEAD"])).stdout.trim(), pushed);
@@ -881,7 +881,7 @@ test("commits pushed to the PR branch on GitHub are taken over before a round; r
     await git(f.repo.path, ["--git-dir", f.github.bare, "update-ref", "refs/heads/fix/sync0001", mainHead]);
     await assert.rejects(
       f.workbench.startFollowUp(f.run.id, { feedbackUrls: [feedbackUrl] }),
-      /改寫了 BELL PR 推送過的歷史/,
+      /改寫了 BELL PR 推送的歷史/,
     );
     assert.equal(f.run.status, "published");
   } finally {

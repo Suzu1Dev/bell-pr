@@ -464,7 +464,7 @@ test("a fitted run gets only the help its lock names: R3, R4 and plan questions 
   // "My change" after R2 would be R3: no rung is left, and the exits stay.
   await assert.rejects(
     f.ask({ kind: "ask", entry: "change", stepId: "s1", question: "Is this right?" }),
-    refused(409, /^The guide has no more hints for this step in this run: the project's text it is fitted to doesn't name help with planning\. Try an exit instead/),
+    refused(409, /^No more hints for this step in this run: the project's text the guide is fitted to doesn't name help with planning\. Try an exit/),
   );
   assert.equal(f.calls.length, 4);
   assert.deepEqual([...new Set(f.run.byHand?.events?.map((event) => event.kind))], ["answer", "explain", "test"]);

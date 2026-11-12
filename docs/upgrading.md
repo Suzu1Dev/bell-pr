@@ -53,7 +53,7 @@ BELL PR starts in a folder that still has old data in `./.bellpr`, it says
 so and moves nothing:
 
 ```text
-Found BELL PR data in ./.bellpr. BELL PR now uses /home/you/.bellpr and moved nothing. To keep using the old folder, start it with: bell-pr start --data-dir ./.bellpr
+BELL PR now uses /home/you/.bellpr. Older data in ./.bellpr was not moved; to keep using it, run: bell-pr start --data-dir ./.bellpr
 ```
 
 To keep working with that data, start BELL PR with it, from that folder:

@@ -25,7 +25,7 @@ const m: Translation<typeof en> = {
   tooManyWaiters: "目前開著小組看板的頁面太多。請關掉其中一個再試。",
   slowDown: ({ seconds }) => `短時間內的請求太多，請在 ${seconds} 秒後再試。`,
   invalidScope: ({ max }) =>
-    `請至少指定一個 repository 裡的檔案或資料夾，每個路徑最多 ${max} 個字元。有些路徑無法佔用，例如 repository 以外的路徑或含有特殊字元的路徑。`,
+    `請指定至少一個 repository 內的檔案或資料夾，路徑各最多 ${max} 個字元。有些路徑無法佔用，例如 repository 外或含特殊字元的。`,
   tooManyScopes: ({ max }) => `一次佔用最多 ${max} 個路徑。`,
   conflict: "已經有人佔用了和你重疊的路徑，所以這次沒有佔用任何路徑。",
   dependencyUnknown: "這個任務相依的任務不在這個 repository 裡，所以這次沒有佔用任何路徑。",
@@ -35,7 +35,7 @@ const m: Translation<typeof en> = {
   unknownClaim: "這個 repository 沒有這個 id 的佔用。",
   ended: "這項佔用已經結束。",
   doneNotSaved:
-    "這項佔用已經結束，但它的任務無法標記為完成，之後也不能再標記。相依它的工作需要改為相依其他任務。詳細原因在主機的記錄裡。",
+    "佔用已結束，但任務再也無法標記為完成。相依它的工作須改為相依其他任務。詳情見主機的記錄。",
   notHolder: "只有佔用這些路徑的人可以釋出它們。",
   staleFence: "這項佔用在看板讀取之後有了變更。請重新載入看板再試。",
   refused: "小組協作拒絕了這個請求。",

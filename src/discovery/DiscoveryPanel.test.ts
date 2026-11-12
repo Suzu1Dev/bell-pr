@@ -131,7 +131,7 @@ test("an English render of a finished discovery has no Han", () => {
   assert.match(html, /<summary>Scope and limits of this search · 1<\/summary>/);
   assert.match(html, /aria-label="Recommended contributions"/);
   assert.match(html, /<h2>Suggested contributions<\/h2>/);
-  assert.match(html, /12 candidates in &quot;Stars&quot; order, at most 6 kept after checking\./);
+  assert.match(html, /12 candidates by &quot;Stars&quot;, at most 6 kept after checks;/);
   assert.match(html, /<span class="discovery-count">1 opportunity<\/span>/);
   // The opportunity card
   assert.match(html, /<span class="discovery-difficulty">Beginner<\/span>/);
@@ -202,7 +202,7 @@ test("a learn-by-hand opportunity is tagged, has no agent-team choice, and keeps
     /<span class="discovery-learn-tag"><svg[^>]*lucide-hand[\s\S]*?<\/svg>Learn by hand: write this one yourself<\/span><h3>Return focus when the dialog closes<\/h3>/,
   );
   assert.doesNotMatch(html, /Import project and set up task/);
-  assert.match(html, /The issue is labelled for newcomers\. Writing the fix yourself is how you learn the project/);
+  assert.match(html, /Newcomer issue: writing the fix yourself teaches you the project/);
   // The person can start writing it, with the guide (DESIGN v1.2 F1).
   assert.match(html, /<button type="button" class="button primary"><svg[^>]*lucide-hand[\s\S]*?<\/svg>Start learning by hand<\/button>/);
   // The issue it cites opens on GitHub; the overview and the sources stay.
@@ -258,7 +258,7 @@ test("saved settings missing from the catalog are labelled in English", () => {
 test("the zh-TW render keeps the original copy and formats numbers", () => {
   const html = renderZh(createElement(DiscoveryPanel, props(job, live)));
   assert.match(html, /尋找可貢獻的 <em>專案<\/em>/);
-  assert.match(html, /依「星數」排序取 12 個候選/);
+  assert.match(html, /依「星數」取 12 個候選/);
   assert.match(html, /<span class="discovery-count">1 個項目<\/span>/);
   assert.match(html, /<span class="discovery-difficulty">初學者<\/span>/);
   assert.match(html, /12,345/);

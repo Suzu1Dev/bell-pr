@@ -102,8 +102,8 @@ test("the new-task dialog asks for the repository, the goal and the team setting
   assert.match(html, /任務名稱 <span>選填<\/span>/);
   assert.match(html, /這次想完成什麼？/);
   assert.match(html, /3 位隊友/);
-  assert.match(html, /任務會使用本機已登入的 Codex CLI 執行/);
-  assert.doesNotMatch(html, /示範設定可以自由調整/);
+  assert.match(html, /使用本機已登入的 Codex CLI，用量計入該帳號/);
+  assert.doesNotMatch(html, /設定可任意試/);
 });
 
 test("the start button names what happens next and waits for a long enough goal", () => {
@@ -123,12 +123,12 @@ test("the start button names what happens next and waits for a long enough goal"
     },
   });
   assert.match(direct, />開始任務<\/button>/);
-  assert.match(direct, /任務會使用本機已登入的 Claude Code CLI 執行/);
+  assert.match(direct, /使用本機已登入的 Claude Code CLI，用量計入該帳號/);
 });
 
 test("the demo repository plays the sample team again instead of starting agents", () => {
   const html = render({ taskRepoId: "demo-repo" });
-  assert.match(html, /示範設定可以自由調整；不會啟動真實 AI。示範團隊會從頭重新播放它的工作。/);
+  assert.match(html, /設定可任意試，不會啟動真實 Agent，示範團隊會重播任務。/);
   assert.match(html, />播放示範團隊<\/button>/);
 });
 
@@ -149,13 +149,13 @@ test("the new-task dialog reads in English with no Chinese left", () => {
   assert.match(html, /<option value="demo-repo">openfetch-sample\/open-fetch \(demo\)<\/option>/);
   assert.match(html, /Task name <span>Optional<\/span>/);
   assert.match(html, /3 teammates/);
-  assert.match(html, /The task runs with the Codex CLI signed in on this computer/);
+  assert.match(html, /Uses the Codex CLI signed in on this computer/);
   assert.match(html, />Generate the team plan<\/button>/);
   assert.match(html, />Cancel<\/button>/);
   assertNoHan(html);
 
   const demo = renderEn(element({ taskRepoId: "demo-repo" }));
-  assert.match(demo, /Demo settings can be changed freely; no real Agent starts\./);
+  assert.match(demo, /Try any setting: no real Agent starts, and the sample team replays its run\./);
   assert.match(demo, />Play the sample team<\/button>/);
   assertNoHan(demo);
 

@@ -130,7 +130,7 @@ test("without sudo in the commands, the dialog does not ask about sudo", async (
 
 test("the sudo line says when sudo needs no password or is missing, and commands go in the list's order", async () => {
   for (const [status, line] of [
-    [{ user: "octo", available: true, installed: true, passwordless: true }, /sudo runs without a password for octo here, so the Agent can run these sudo commands as root, unless a sudo rule limits/],
+    [{ user: "octo", available: true, installed: true, passwordless: true }, /octo has passwordless sudo here, so the Agent can run these sudo commands as root, unless a sudo rule restricts them/],
     [{ user: "octo", available: false, installed: false, passwordless: false }, /sudo is not installed here/],
   ] as const) {
     stubSudo(200, { sudo: status });

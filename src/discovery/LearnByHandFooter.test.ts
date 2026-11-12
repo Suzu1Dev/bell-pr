@@ -58,7 +58,7 @@ test("an issue whose rule is about AI-generated pull requests keeps the button, 
   assert.match(html, start);
   assert.ok(
     html.includes(
-      "This project closes AI-generated pull requests for issues like this one. BELL PR can publish a learn-by-hand run for it only if the project&#x27;s own text names each kind of help the guide gives, and only after you confirm the quoted rule; the task dialog shows which.",
+      "This project closes AI-generated pull requests for issues like this. To publish a learn-by-hand run, the project&#x27;s own text must name each kind of help the guide gives, and you must confirm the quoted rule (see the task dialog).",
     ),
   );
   // Discovery reads only the evidence, so it never promises the confirm.

@@ -27,7 +27,7 @@ test("missing setup becomes a checklist of commands to verify and copy, and noth
   assert.match(html, /<code>sudo apt install libglib2\.0-dev<\/code>/);
   assert.match(html, /aria-label="複製指令：sudo apt install libglib2\.0-dev"/);
   assert.match(html, /回報者：Teammate 1、Teammate 2/);
-  assert.match(html, /執行前請對照專案文件確認/);
+  assert.match(html, /建議指令請先對照專案文件/);
   assert.equal(render([]), "");
 });
 
@@ -115,7 +115,7 @@ test("each item shows what the agent reported, an unsafe command says it stays t
   assertNoHan(html);
   assert.match(html, /<p class="setup-outcome" data-outcome="installed">Agent reports: installed \(/);
   assert.match(html, /data-outcome="unreported">The setup turn at .* ended without a result for this item\./);
-  assert.match(html, /BELL PR never hands this command to an Agent: it downloads something and runs or chains it/);
+  assert.match(html, /BELL PR never hands this command to an Agent: it downloads and runs or chains something/);
   assert.match(html, /HAND-OFF/);
   // Without a hand-off the list stays copy-only.
   assert.doesNotMatch(renderEn(createElement(SetupNeeds, { needs })), /never hands this command/);

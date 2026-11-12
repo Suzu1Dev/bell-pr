@@ -63,15 +63,15 @@ test("commits are labelled by where they came from, link to the PR, and open to 
 
 test("an unpublished contribution or the demo explains why there are no commits yet", () => {
   const unpublished = renderToStaticMarkup(createElement(CommitHistory, { run: { ...demoRun, id: "r" }, demo: false }));
-  assert.match(unpublished, /還沒發布 PR，所以修改仍未提交。/);
+  assert.match(unpublished, /還沒發布 PR，變更尚未提交。/);
   const demo = renderToStaticMarkup(createElement(CommitHistory, { run: demoRun, demo: true }));
-  assert.match(demo, /示範資料還沒有發布 PR/);
+  assert.match(demo, /示範沒有 PR，也就沒有 commit/);
 });
 
 test("the sample shows its own history, labelled as a sample, with every commit's files", () => {
   const html = renderEn(createElement(CommitHistory, { run: getDemo("en").run, demo: true }));
   assertNoHan(html);
-  assert.match(html, /The sample has not published a PR, so it has no commits yet\./);
+  assert.match(html, /The sample has no PR, so no commits yet\./);
   for (const label of ["First push", "Review round 1", "Merged the target branch"])
     assert.match(html, new RegExp(label));
   // The sample links nowhere: its PR exists on no server.

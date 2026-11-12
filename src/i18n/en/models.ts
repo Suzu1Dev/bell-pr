@@ -46,7 +46,7 @@ const models = {
   providerDefault: ({ provider }: { provider: string }) =>
     `${provider} default`,
   sourceReported: ({ provider }: { provider: string }) =>
-    `These are the settings ${product.name} sent to ${provider}. The model is the one the ${provider} CLI reported. It does not come from your provider's billing.`,
+    `These are the settings ${product.name} sent to ${provider}. The model is what the ${provider} CLI reported, not your provider's billing.`,
   sourceUnreported: ({ provider }: { provider: string }) =>
     `These are the settings ${product.name} sent to ${provider}. The CLI did not report which model was used.`,
 };

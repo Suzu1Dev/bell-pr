@@ -52,7 +52,7 @@ const m: Translation<typeof en> = {
     preview: "預覽建議草稿",
     apply: {
       appliedNote:
-        "上方編輯區就是這份建議的原文。說明會原樣送到 GitHub，請用自己的話確認後再發布。",
+        "編輯區是這份建議的原文。說明會原樣發布，請先改成自己的話。",
       note: "套用後仍可編輯，儲存後才更新草稿。",
       applied: "已套用",
       apply: "套用建議草稿",
@@ -65,10 +65,10 @@ const m: Translation<typeof en> = {
         subject: "type(scope): 說明",
         signOff: "Signed-off-by: 姓名 <email>",
       },
-      note: "這份建議只整理規範要求的格式。簽署是你本人的聲明，請在「提交訊息」欄位自行輸入，模型不會代填。",
+      note: "這只列出規範要求的格式。簽署是你本人的聲明，請自己填入提交訊息；模型不會代填。",
       whyTitle: ({ typeScope }) => `為什麼專案會要求 ${typeScope} 或 sign-off？`,
       why: ({ subject, signOff }) =>
-        `採用 Conventional Commits 的專案靠主旨的 ${subject} 自動產生變更日誌並決定版本號。commitlint 會在 CI 擋下不符格式的 commit。採用 DCO 的專案要求每個 commit 附上 ${signOff}，表示你有權依專案的授權貢獻這段程式碼。DCO bot 檢查的是 commit trailer，不是 PR 說明。`,
+        `Conventional Commits 專案依主旨的 ${subject} 產生變更日誌與版本號。commitlint 會在 CI 擋下其他格式。DCO 專案要求每個 commit 附 ${signOff}，聲明你有權依專案授權貢獻這段程式碼。DCO bot 看的是 commit trailer，不是 PR 說明。`,
     },
     meta: {
       base: ({ commit }) => `基準版本 ${commit}`,
@@ -170,7 +170,7 @@ const m: Translation<typeof en> = {
     },
     linux: {
       note: ({ guide }) =>
-        `以 ${guide} 中的動機、變更與驗證原則作為備用依據，調整成 GitHub PR 格式。Signed-off-by 等簽署資訊需由本人確認，不會自動填入。`,
+        `備用依據：${guide} 中的動機、變更與驗證原則，套用到 GitHub PR。Signed-off-by 等簽署請自己加，不會自動填入。`,
       guide: "Linux 官方提交指引",
     },
     readOnly: "這個 PR 已發布，以下指引保留供參考。",
@@ -216,7 +216,7 @@ const m: Translation<typeof en> = {
       "very-large": "非常大",
     },
     band: ({ band }) => `${band} · ${product.name} 預設`,
-    bandHelp: `${product.name} 的規模分級是自己的預設值，不是這個專案的規範：小為 100 行以內，中為 400 行以內，大為 1,000 行以內，超過 1,000 行或 20 個檔案為非常大。其中 100 行與 1,000 行出自 Google 的小型變更指引。這個專案自己合併過的 Pull Request 才是真正的參考。`,
+    bandHelp: `${product.name} 的預設，非本專案規範：小為 100 行內，中為 400 行內，大為 1,000 行內，超過 1,000 行或 20 個檔案為非常大。100 與 1,000 行依 Google 小型變更指引。本專案合併過的 PR 才是真正參考。`,
     lines: "變更行數",
     files: "檔案",
     tests: "有變更的測試檔",
@@ -232,7 +232,7 @@ const m: Translation<typeof en> = {
     splitLead: "維護者能一次看完的變更，會比較快得到審查。如果這份變更做了好幾件事，可以問問怎麼拆開。",
     askSplit: "問問怎麼拆開",
     splitNow: "拆成獨立的貢獻",
-    parts: ({ count }) => `計畫有 ${fmt.number(count)} 組彼此不相依的檔案。若每一組各是一項獨立的修正，就可以各自成為一份貢獻。`,
+    parts: ({ count }) => `計畫有 ${fmt.number(count)} 組互不相依的檔案。若每組是獨立修正，可各自成為一份貢獻。`,
     weakened: "被削弱的測試",
     weakenedLead: "每一個被跳過、刪除或放寬的測試，發布前都需要一行理由：為什麼這樣改是對的？",
     weakenedCount: ({ count }) => `有 ${fmt.number(count)} 處被削弱的測試需要理由。`,
@@ -288,7 +288,7 @@ const m: Translation<typeof en> = {
     title: "目標分支",
     intro: {
       published: ({ branch, commit }) =>
-        `以 ${branch} 的 ${commit} 為基準。同步會把最新的 ${branch} 合併進 PR。你審閱後推送一個合併 commit；不會 force push，PR 說明也不變。`,
+        `以 ${branch} 的 ${commit} 為基準。同步把最新的 ${branch} 合併進 PR：審閱後推送一個合併 commit，不 force push，說明不變。`,
       unpublished: ({ branch, commit }) =>
         `以 ${branch} 的 ${commit} 為基準。同步會把你的修改移到最新的 ${branch} 上。${branch} 改過的檔案需要重新審閱。同步可以復原。`,
     },
@@ -310,18 +310,18 @@ const m: Translation<typeof en> = {
         : `${total} 個檔案中有 ${open} 個仍有衝突標記。`,
     conflictHelp: {
       published: ({ latest, ours }) =>
-        `檔案裡標示 ${latest} 的一邊是目標分支現在的內容，標示 ${ours} 的一邊是這個 PR。衝突標記全部移除前不能核准；可以在工作目錄自己改，改完到「程式碼變更」重新整理差異，或請 Agent 解決。改過的檔案仍要逐檔審閱。`,
+        `${latest} 標示目標分支現在的內容，${ours} 標示這個 PR。衝突標記全移除才能核准。在工作目錄修改後到「程式碼變更」重新整理差異，或請 Agent 解決。再逐檔審閱改過的檔案。`,
       unpublished: ({ latest, ours }) =>
-        `檔案裡標示 ${latest} 的一邊是目標分支現在的內容，標示 ${ours} 的一邊是這次的貢獻。衝突標記全部移除前不能核准；可以在工作目錄自己改，改完到「程式碼變更」重新整理差異，或請 Agent 解決。改過的檔案仍要逐檔審閱。`,
+        `${latest} 標示目標分支現在的內容，${ours} 標示這次的貢獻。衝突標記全移除才能核准。在工作目錄修改後到「程式碼變更」重新整理差異，或請 Agent 解決。再逐檔審閱改過的檔案。`,
     },
     allResolved: "衝突標記都已移除；改過的檔案仍要逐檔審閱。",
     resolving: "Agent 正在解衝突…",
     resolve: "請 Agent 解決衝突",
     byHand: {
       published: ({ latest, ours }) =>
-        `檔案裡標示 ${latest} 的一邊是目標分支現在的內容，標示 ${ours} 的一邊是這個 PR。衝突標記全部移除前不能核准。請親手解決衝突標記；你到「程式碼變更」重新整理差異時，${product.name} 會再檢查一次。改過的檔案仍要逐檔審閱。`,
+        `${latest} 標示目標分支現在的內容，${ours} 標示這個 PR。衝突標記全移除才能核准。請親手解決，再重新整理「程式碼變更」的差異以重新檢查。再逐檔審閱改過的檔案。`,
       unpublished: ({ latest, ours }) =>
-        `檔案裡標示 ${latest} 的一邊是目標分支現在的內容，標示 ${ours} 的一邊是這次的貢獻。衝突標記全部移除前不能核准。請親手解決衝突標記；你到「程式碼變更」重新整理差異時，${product.name} 會再檢查一次。改過的檔案仍要逐檔審閱。`,
+        `${latest} 標示目標分支現在的內容，${ours} 標示這次的貢獻。衝突標記全移除才能核准。請親手解決，再重新整理「程式碼變更」的差異以重新檢查。再逐檔審閱改過的檔案。`,
     },
     heldChanges: "你佔用範圍內的變更",
     heldChangesNote:
@@ -331,7 +331,7 @@ const m: Translation<typeof en> = {
   followUps: {
     title: "依回饋修正的紀錄",
     intro:
-      "每一輪經你審閱、核准後，會成為 PR 分支上的一個新 commit；PR 標題與說明維持原樣，回覆 reviewer 仍由你在 GitHub 上處理。",
+      "每一輪核准後成為 PR 分支的一個新 commit。標題與說明不變。回覆 reviewer 請自己到 GitHub。",
     status: {
       running: "修正中",
       review: "等待審閱與推送",

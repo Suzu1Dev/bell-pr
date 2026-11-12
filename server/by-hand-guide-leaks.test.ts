@@ -218,6 +218,6 @@ test("BELL's own timeout message stays whole in a Learn-by-hand turn's error", a
   });
   await assert.rejects(
     withLocale("en", () => chat(f.ctx, f.run, "src/retry.js", "How do I back off?", new AbortController().signal)),
-    (error: unknown) => error instanceof AppError && error.statusCode === 504 && /raise BELLPR_AGENT_TIMEOUT_SCALE\.$/.test(error.message),
+    (error: unknown) => error instanceof AppError && error.statusCode === 504 && /BELLPR_AGENT_TIMEOUT_SCALE; large projects need more time\.$/.test(error.message),
   );
 });
