@@ -20,7 +20,7 @@ const pages = {
       teammates: {
         name: "Teammates",
         role: "Separate contexts, parallel work",
-        text: "Each teammate has its own worktree; dependencies finish first, and work that does not conflict runs at the same time.",
+        text: "Each teammate has its own working directory; dependencies finish first, and work that does not conflict runs at the same time.",
         scope: "2 to 4 teammates · Shared task board",
       },
       inbox: {
@@ -32,7 +32,7 @@ const pages = {
       review: {
         name: "Review & tests",
         role: "Independent review after integration",
-        text: "Changes kept within their file scopes are integrated in order, then an independent reviewer and test analyst check the result.",
+        text: "Changes kept within their file scopes are integrated in order, then an independent Reviewer and Test analyst check the result.",
         scope: "Quality checks · You submit",
       },
     },

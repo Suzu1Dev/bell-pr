@@ -11,7 +11,7 @@ const en = {
   unclean: ({ reason }: { reason: string }) => `${product.name} makes no Learn-by-hand claim for this run: ${reason}.`,
   reasons: {
     "agent-writes": "an Agent tried to change files",
-    agents: "Agents other than the guide, the reviewer and the test analyst joined it",
+    agents: "Agents other than the guide, the Reviewer and the Test analyst joined it",
     tasks: "it was planned as team tasks",
     rounds: "an AI follow-up round ran on it",
     resolutions: "an Agent resolved its merge conflicts",

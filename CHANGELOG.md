@@ -176,7 +176,10 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   strings that were never shown are removed. One word now names one thing
   in both languages: for example "publish" (發布) for sending the PR,
   "working directory" (工作目錄) for where a run works, "repository" in
-  Chinese text too (no longer 儲存庫), and "Agent" with a capital letter. Several buttons and tabs were renamed: "Activity",
+  Chinese text too (no longer 儲存庫), and "Agent" with a capital letter.
+  The roles keep their English names, capitalised in both languages
+  ("the Lead", "Reviewer", "Test analyst"), and Chinese text calls the
+  command deny rules 指令 deny 規則, as the full access notice does. Several buttons and tabs were renamed: "Activity",
   "Overview", "Explain it back now", "Approve and preview the PR",
   "Publish Draft PR", "Check again" and "Code changes" among them. Saved
   runs and stored messages keep the wording they were saved with.

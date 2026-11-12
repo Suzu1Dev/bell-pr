@@ -72,7 +72,7 @@ export default {
     revisionLimit: ({ max }: { max: number }) =>
       `The plan was already revised ${count(max, "time", "times")}; approve the current plan, or cancel and start a new run with an adjusted request.`,
     planSentBack: ({ revision, max }: { revision: number; max: number }) =>
-      `Sent the plan back with feedback (revision ${revision} of ${max}); the lead will plan again.`,
+      `Sent the plan back with feedback (revision ${revision} of ${max}); the Lead will plan again.`,
     cancelNotAllowed:
       "Only runs that are queued, running or waiting for plan approval can be cancelled.",
     cancelRequested:
@@ -127,7 +127,7 @@ export default {
     noReport: ({ cli }: { cli: string }) => `${cli} returned no report.`,
     noTeam: "This run has no Agent team.",
     messageTargetClosed:
-      "This teammate or task has finished and cannot take messages; send it to the lead.",
+      "This teammate or task has finished and cannot take messages; send it to the Lead.",
     messageLength: "Team messages must be 1 to 4000 characters.",
     messageLimit: "This run has reached its limit of 200 team messages.",
     messageQueued: ({ to }: { to: string }) =>
@@ -137,7 +137,7 @@ export default {
     messageNotQueued: ({ reason }: { reason: string }) =>
       `Coordination message not queued: ${reason}`,
     turnLimit:
-      "Reached the limit of 3 turns per task; undelivered messages stay in the team inbox for the lead to review during integration.",
+      "Reached the limit of 3 turns per task; undelivered messages stay in the team inbox for the Lead to review during integration.",
     taskIntegrated: ({ title, files }: { title: string; files: string[] }) =>
       files.length
         ? `${title} is done; integrated ${count(files.length, "file", "files")} that passed the scope check: ${list(files)}.`

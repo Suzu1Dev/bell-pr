@@ -249,7 +249,7 @@ test("a run whose history withdrew the claim says why instead of the in-run line
   // The record's own words (src/byhand/record), so the run says it one way everywhere.
   assert.ok(text.includes("BELL PR makes no Learn-by-hand claim for this run: an Agent tried to change files."));
   assert.ok(html(guide({}, {}, { agents: [{ id: "a1", name: "Ada", role: "teammate", status: "complete", detail: "" }] as Run["agents"] })).includes(
-    "BELL PR makes no Learn-by-hand claim for this run: Agents other than the guide, the reviewer and the test analyst joined it.",
+    "BELL PR makes no Learn-by-hand claim for this run: Agents other than the guide, the Reviewer and the Test analyst joined it.",
   ));
   assert.ok(renderZh(guide({ agentWrites: 1 })).includes("BELL PR 不為這個任務做親手學的聲明：有 Agent 試圖修改檔案。"));
 });
