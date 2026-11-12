@@ -371,7 +371,13 @@ export interface DraftCheck {
     // The person's other contributions (server/group-local.ts): another one
     // changes the same files, or a split part this one builds on is not merged.
     | "group-own-overlap"
-    | "split-order";
+    | "split-order"
+    // Group work (server/hold-guard.ts): the change meets a file someone
+    // else in the group holds, group work stopped and cannot say, or commits
+    // on the target branch changed files under the person's own hold.
+    | "held-by-other"
+    | "holds-unknown"
+    | "held-changed-upstream";
   /** block stops approval and publishing; confirm needs the person's acknowledgement before publishing. */
   kind: "block" | "confirm";
   message: string;

@@ -165,17 +165,15 @@ function NoteCard({
     : { heading: "", body: "" };
   return (
     <article className="note-card">
-      <span className="note-number">{note.repoName}</span>
       <div className="note-tags">
-        <span className="note-tag">{demo ? t.demoTag : note.runTitle}</span>
         {!demo && note.explanation && (
           <span className="note-ai-label">{t.aiGenerated}</span>
         )}
       </div>
       {/* Focused after "Load more" brings this note in. */}
-      <h2 tabIndex={-1}>
+      <h3 tabIndex={-1}>
         {heading ? <InlineCode text={heading} /> : note.path}
-      </h2>
+      </h3>
       {note.explanation && (
         <>
           <Suspense fallback={<p>{body}</p>}>
@@ -197,8 +195,6 @@ function NoteCard({
       )}
       <code>{note.path}</code>
       <dl className="learning-note-meta">
-        <dt>{t.noteRun}</dt>
-        <dd>{note.runTitle}</dd>
         <dt>{note.explanation || demo ? t.generatedAt : t.noteSaved}</dt>
         <dd>
           {demo
@@ -264,7 +260,7 @@ export function LearningNotes({
         setStatus("failed");
       },
     );
-    return () => controller.abort();
+      return () => controller.abort();
   }, [hasInitial, attempt]);
 
   const moreRequest = useRef<AbortController | undefined>(undefined);
@@ -309,7 +305,7 @@ export function LearningNotes({
     if (from === undefined || loadingMore) return;
     focusFrom.current = undefined;
     const headings = grid.current?.querySelectorAll<HTMLElement>(
-      ".note-card h2",
+      ".note-card h3",
     );
     // Without a new visible note, the count says what the page brought.
     if (headings && headings.length > from) headings[from].focus();
@@ -327,7 +323,7 @@ export function LearningNotes({
       if (controller.signal.aborted) return;
       // Counted now, not when the click came: the filters may have changed.
       focusFrom.current =
-        grid.current?.querySelectorAll(".note-card h2").length ?? 0;
+        grid.current?.querySelectorAll(".note-card h3").length ?? 0;
       setRecord((previous) => [
         ...previous,
         ...page.runs.filter(
@@ -341,6 +337,13 @@ export function LearningNotes({
     } finally {
       if (!controller.signal.aborted) setLoadingMore(false);
     }
+  }
+
+  const noteGroups = new Map<string, LearningNote[]>();
+  for (const note of visible) {
+    const group = noteGroups.get(note.runId) ?? [];
+    group.push(note);
+    noteGroups.set(note.runId, group);
   }
 
   if (view !== "notes")
@@ -398,7 +401,7 @@ export function LearningNotes({
                       total: notes.length,
                     })
                   : t.noteCount({ visible: visible.length, total: notes.length })
-                : t.noRealNotes}
+                : ""}
         </span>
       </div>
       {status === "ready" && (
@@ -432,14 +435,15 @@ export function LearningNotes({
           <p>{t.noMatches}</p>
         </div>
       ) : (
-        <div className="learning-grid" ref={grid}>
-          {visible.map((note) => (
-            <NoteCard
-              key={`${note.runId}:${note.path}`}
-              note={note}
-              demo={false}
-              onOpen={onOpen}
-            />
+        <div className="learning-note-groups" ref={grid}>
+          {Array.from(noteGroups, ([id, entries]) => (
+            <section className="learning-note-group" key={id}>
+              <h2>{entries[0].runTitle}</h2>
+              <p>{entries[0].repoName}</p>
+              <div className="learning-grid">
+                {entries.map((note) => <NoteCard key={note.path} note={note} demo={false} onOpen={onOpen} />)}
+              </div>
+            </section>
           ))}
         </div>
       )}
@@ -465,18 +469,18 @@ export function LearningNotes({
         </div>
       )}
       {visibleDemo.length > 0 && (
-        <section className="learning-demo" aria-labelledby="learning-demo-title">
-          <h2 id="learning-demo-title">
+        <details className="learning-demo" aria-labelledby="learning-demo-title">
+          <summary><h2 id="learning-demo-title">
             {t.demoTitle}
             <span className="learning-demo-label">{t.demoTag}</span>
-          </h2>
+          </h2></summary>
           <p>{t.demoIntro}</p>
           <div className="learning-grid">
             {visibleDemo.map((note) => (
               <NoteCard key={note.path} note={note} demo onOpen={onOpen} />
             ))}
           </div>
-        </section>
+        </details>
       )}
     </>
   );

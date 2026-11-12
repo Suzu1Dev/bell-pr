@@ -27,7 +27,7 @@ test("the repository list reads in English with no Chinese left", () => {
     setExploreRepoId() {},
   });
   const html = renderEn(element);
-  assert.match(html, /<h1 tabindex="-1">Your next contribution starts here\.<\/h1>/);
+  assert.match(html, /<h1 tabindex="-1">Projects<\/h1>/);
   assert.match(html, /<span class="demo-pill">Sample project<\/span>/);
   assert.match(html, /Explore the demo workbench/);
   assert.match(html, /Explore the project and directions/);
@@ -67,7 +67,7 @@ test("an imported repository can be deleted, the sample cannot, and paths mask w
   );
   assert.doesNotMatch(html, /pro-badge/);
   assertNoHan(html);
-  assert.match(renderZh(element), /aria-label="刪除 Repository：octo\/widgets"/);
+  assert.match(renderZh(element), /aria-label="刪除專案：octo\/widgets"/);
 });
 
 test("the import dialog reads in English with no Chinese left", () => {
@@ -80,7 +80,7 @@ test("the import dialog reads in English with no Chinese left", () => {
     closeModal() {},
   };
   const html = renderEn(createElement(ImportRepoModal, props));
-  assert.match(html, /<h2 id="modal-title">Bring in your next contribution\.<\/h2>/);
+  assert.match(html, /<h2 id="modal-title">Import a project<\/h2>/);
   assert.match(html, /<label class="field-label" for="repo-source">Repository source<\/label>/);
   assert.match(html, /placeholder="owner\/repository or https:\/\/github\.com\/owner\/repository"/);
   assert.match(html, /Local Git projects work too: paste the path, such as ~\/projects\/repository<\/p>/);

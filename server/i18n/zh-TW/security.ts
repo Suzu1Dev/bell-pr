@@ -22,6 +22,7 @@ const m: Translation<typeof en> = {
   },
   invalidOrigins:
     "BELLPR_ALLOWED_ORIGINS 必須是以逗號分隔的來源（origin），不可含帳號密碼、路徑、查詢字串、片段或萬用字元；只有本機回送位址可以使用純 HTTP。",
+  suiteLinksInvalid: `BELLPR_SUITE_LINKS 必須是以逗號分隔的 explain=<origin> 或 personal=<origin>，每個產品最多一筆。origin 不可含帳號密碼、路徑（含結尾的 /）、查詢字串、片段、萬用字元或埠 0；只接受這台電腦的位址（localhost、127.x.x.x、[::1]），或與 BELLPR_PUBLIC_URL、BELLPR_ALLOWED_ORIGINS 同一個 tailnet 的 https *.ts.net 名稱，且不可指向這個 ${product.name} 自己。`,
   gitConfigUnsafe: ({ keys }) =>
     `這個儲存庫的 Git 設定含有 ${list(keys)}，可能讓 Git 執行其他程式或把憑證送到別處。${product.name} 不會在其中執行 Git。請從它的 .git/config 移除這些設定，或重新匯入專案。`,
   worktreeForged:

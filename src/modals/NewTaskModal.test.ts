@@ -92,7 +92,7 @@ const submit = (html: string) =>
 
 test("the new-task dialog asks for the repository, the goal and the team settings", () => {
   const html = render();
-  assert.match(html, /<h2 id="modal-title">把想法交給你的 Agent team。<\/h2>/);
+  assert.match(html, /<h2 id="modal-title">新增貢獻<\/h2>/);
   assert.match(html, /描述你想改善什麼，以及完成後應該有的行為。/);
   assert.match(html, /<option value="repo-1" selected="">octo\/widgets<\/option>/);
   assert.match(html, /<option value="demo-repo">openfetch-sample\/open-fetch（示範）<\/option>/);
@@ -101,7 +101,7 @@ test("the new-task dialog asks for the repository, the goal and the team setting
   assert.match(html, /儲存為預設設定/);
   assert.match(html, /任務名稱 <span>選填<\/span>/);
   assert.match(html, /這次想完成什麼？/);
-  assert.match(html, /<span>3 位 Teammates<\/span>/);
+  assert.match(html, /3 位協作成員/);
   assert.match(html, /會使用本機 Codex 帳號執行任務/);
   assert.doesNotMatch(html, /示範設定可以自由調整/);
 });
@@ -122,13 +122,13 @@ test("the start button names what happens next and waits for a long enough goal"
       provider: "claude",
     },
   });
-  assert.match(direct, />啟動 Agent team<\/button>/);
+  assert.match(direct, />開始任務<\/button>/);
   assert.match(direct, /會使用本機 Claude Code 帳號執行任務/);
 });
 
 test("the demo repository plays the sample team again instead of starting agents", () => {
   const html = render({ taskRepoId: "demo-repo" });
-  assert.match(html, /示範設定可以自由調整；不會啟動真實 agent。示範團隊會從頭重新播放它的工作。/);
+  assert.match(html, /示範設定可以自由調整；不會啟動真實 AI。示範團隊會從頭重新播放它的工作。/);
   assert.match(html, />播放示範團隊<\/button>/);
 });
 
@@ -145,10 +145,10 @@ test("loading or failed settings keep the form locked and say why", () => {
 
 test("the new-task dialog reads in English with no Chinese left", () => {
   const html = renderEn(element({ prompt: "Add timeout retries and tests to widgets" }));
-  assert.match(html, /<h2 id="modal-title">Hand your idea to your agent team\.<\/h2>/);
+  assert.match(html, /<h2 id="modal-title">New contribution<\/h2>/);
   assert.match(html, /<option value="demo-repo">openfetch-sample\/open-fetch \(demo\)<\/option>/);
   assert.match(html, /Task name <span>Optional<\/span>/);
-  assert.match(html, /<span>3 teammates<\/span>/);
+  assert.match(html, /3 teammates/);
   assert.match(html, /The task runs with the Codex CLI signed in on this computer/);
   assert.match(html, />Generate the team plan<\/button>/);
   assert.match(html, />Cancel<\/button>/);
@@ -176,7 +176,7 @@ test("the new-task dialog reads in English with no Chinese left", () => {
       },
     }),
   );
-  assert.match(solo, /<span>2 teammates<\/span>/);
+  assert.match(solo, /2 teammates/);
   assert.match(solo, /the Claude Code CLI signed in/);
   assert.match(solo, />Start the agent team<\/button>/);
 });
@@ -248,7 +248,7 @@ test("under the request the dialog asks who writes the code; the sample shows th
   assert.ok(goal > 0 && mode > goal, "the choice comes after the request");
   assert.match(html, /<input type="radio" name="[^"]+-mode" checked=""\/><svg[\s\S]*?<strong>The agent team writes it<\/strong>/);
   // The team runs by default, so its preview and Start stay as they were.
-  assert.ok(html.includes('class="task-team-preview"'));
+  assert.ok(html.includes("AI and team settings"));
   const sample = renderEn(element({ taskRepoId: getDemo("en").repo.id }));
   assert.ok(sample.includes("The sample shows the agent team. Learn by hand works on your own projects."));
   const hand = sample.match(/(<input type="radio"[^>]*-mode"[^>]*\/>)<svg(?:(?!<input)[\s\S])*?<strong>You write it/)?.[1];

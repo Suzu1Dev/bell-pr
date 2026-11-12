@@ -6,7 +6,9 @@ import {
   type SetStateAction,
 } from "react";
 import { api, send } from "../../api";
+import { participantHeaders } from "../../collab/participant";
 import { useT } from "../../i18n";
+import type { HeldUpstreamChange } from "../../../shared/sync";
 import type { DiffFile, Run } from "../../types";
 import type { Notify, Tab } from "../AppShell";
 import { readRunFiles } from "./useRunActions";
@@ -66,21 +68,29 @@ export function useRunRounds({
   async function syncToLatest() {
     setBusy(true);
     try {
-      const result = await api<{ run: Run; updated: boolean; conflicts: string[] }>(
-        `/runs/${run.id}/sync`,
-        send("POST"),
-      );
+      const result = await api<{
+        run: Run;
+        updated: boolean;
+        conflicts: string[];
+        heldChanges?: HeldUpstreamChange[];
+      }>(`/runs/${run.id}/sync`, {
+        ...send("POST"),
+        headers: participantHeaders(),
+      });
       if (runIdRef.current !== result.run.id) return;
       setRun(result.run);
       await refreshFiles(result.run.id);
+      const heldCount = result.heldChanges?.length ?? 0;
       notify(
-        !result.updated
-          ? t.syncCurrent({ branch: run.baseBranch })
-          : result.conflicts.length
-            ? t.syncConflicts({ count: result.conflicts.length })
-            : result.run.prUrl
-              ? t.syncedPr
-              : t.synced,
+        result.conflicts.length
+          ? t.syncConflicts({ count: result.conflicts.length })
+          : heldCount
+            ? t.syncHeldChanges({ count: heldCount })
+            : !result.updated
+              ? t.syncCurrent({ branch: run.baseBranch })
+              : result.run.prUrl
+                ? t.syncedPr
+                : t.synced,
         result.conflicts.length ? "error" : "success",
       );
     } catch (error) {

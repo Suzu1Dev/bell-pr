@@ -26,4 +26,27 @@ export default {
   apiTokenRequired: `This request needs the API token for this ${product.name}. On this computer, run \`${bin} open\` to open the app with it. Send it as Authorization: Bearer <token>, or as the X-Bell-Token header.`,
   /** An agent provider the server does not know (400). */
   unsupportedProvider: "This agent type is not supported.",
+  /**
+   * What BELL PR tells the other BELL products (docs/bell-suite.md). Their
+   * contract caps `summary` at 40 characters and each `detail` at 80.
+   */
+  suite: {
+    summary: "Contributions and review",
+    /** The title of a run that has none. */
+    untitled: "Untitled run",
+    /** A run's state in the Today feed. */
+    detail: {
+      followUpRunning: "Follow-up in progress",
+      followUpReady: "Follow-up ready for you",
+      byHandPlan: "Your turn: write the plan",
+      planReady: "Plan ready for your approval",
+      byHandChange: "Your turn: make the change",
+      review: "Ready for your review",
+      publishing: "Publishing",
+      approved: "Approved, not published yet",
+      failed: "Failed",
+      queued: "Queued",
+      running: "In progress",
+    },
+  },
 };

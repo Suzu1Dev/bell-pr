@@ -4,10 +4,10 @@
 // check-off dialog open, the Practice view, the rules card, the Draft
 // tab's maintainer checklist, the sample's code walkthrough with a range
 // marked in the diff, its commit history with a commit open on a file's
-// diff, the brief of a real run whose premise was refuted, and the publish
-// dialog's groups of checks on a real run. Each view opens its route, then
-// drive() takes it to the state; `include` names the part of the page the
-// view is about.
+// diff, the product switcher's dialog, the brief of a real run whose premise
+// was refuted, and the publish dialog's groups of checks on a real run. Each
+// view opens its route, then drive() takes it to the state; `include` names
+// the part of the page the view is about.
 import { expect, type Page } from "@playwright/test";
 import type { Locale } from "../../shared/i18n/locale";
 import { getDemo } from "../../src/demo/all";
@@ -133,7 +133,7 @@ export const stateViews: StateView[] = [
     route: "#/runs/demo-run/draft",
     include: ".draft-checklist",
     async drive(page) {
-      await expect(page.locator(".draft-checklist-row")).toHaveCount(8);
+      await expect(page.locator(".draft-checklist-row")).toHaveCount(7);
     },
   },
   {
@@ -162,8 +162,27 @@ export const stateViews: StateView[] = [
     },
   },
   {
-    // A real run whose premise check refuted the request's assumption: the
-    // brief's motivation and after card carry the tag, at every width.
+    // The product switcher, open. The shared server links no other BELL
+    // product, so the manifest is answered here: one link shows a linked
+    // row, a row that is not linked and this product's own row.
+    name: "suite-switcher",
+    route: "#/home",
+    include: ".suite-switcher",
+    async drive(page, locale) {
+      const t = messages[locale].app.suite;
+      await page.route("**/api/suite/manifest", (route) =>
+        route.fulfill({ json: { links: { explain: "http://localhost:5173" } } }),
+      );
+      await page.reload();
+      await page.getByRole("button", { name: t.open }).click();
+      await expect(page.getByRole("dialog", { name: t.title })).toBeVisible();
+    },
+  },
+  {
+    // A real run whose premise check refuted the request's assumption.
+    // The notice states the refutation. The hoped-for outcome is written,
+    // so the after card is drawn and carries the refuted-premise tag, at
+    // every width.
     name: "premise-refuted",
     route: `#/runs/${runId}/overview`,
     include: ".mission-contribution",
@@ -171,6 +190,9 @@ export const stateViews: StateView[] = [
       run: {
         // Short enough for the sidebar's run list at 768 and 1024 px.
         title: "Greet by language",
+        contributionSettings: {
+          outcome: "Each person is greeted in their own language.",
+        },
         team: {
           config: { maxTeammates: 2, requirePlanApproval: true, provider: "codex", protocol: "bell-shared-tasks", messageDelivery: "between-turns" },
           phase: "complete",
@@ -190,8 +212,12 @@ export const stateViews: StateView[] = [
       { width: 1024, height: 768 },
     ],
     async drive(page, locale) {
-      const t = messages[locale].mission.brief;
-      await expect(page.locator(".mission-after .mission-premise-tag")).toHaveText(t.premiseRefuted);
+      const premise = messages[locale].workspace.premise;
+      const brief = messages[locale].mission.brief;
+      const notice = page.locator(".mission-contribution .premise-notice");
+      await expect(notice.getByRole("heading", { name: premise.heading({ verdict: premise.verdicts.refuted }) })).toBeVisible();
+      await expect(notice.locator(".premise-statement")).toHaveText("Greetings are always in English today.");
+      await expect(page.locator(".mission-after .mission-premise-tag")).toHaveText(brief.premiseRefuted);
     },
   },
   {

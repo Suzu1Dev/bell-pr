@@ -81,7 +81,8 @@ async function axeProblems(page: Page) {
 test("the learning page shows the sample notes", async ({ page }) => {
   await page.goto("/#/learning?locale=en");
   await expect(page.getByRole("heading", { level: 1 })).toHaveText(learning.title);
-  const sample = page.locator("section.learning-demo");
+  const sample = page.locator("details.learning-demo");
+  await sample.locator("summary").click();
   await expect(sample.getByRole("heading", { level: 2, name: learning.demoTitle })).toBeVisible();
   const explained = demo.files.filter((file) => file.explanation);
   expect(explained.length).toBeGreaterThan(0);
@@ -145,7 +146,7 @@ test("seeded notes load from /api/learning, 20 contributions at a time", async (
       expect(run).not.toHaveProperty("notes");
     }
 
-    const own = page.locator(".learning-grid").first();
+    const own = page.locator(".learning-note-groups");
     const cards = own.locator(".note-card");
     const loadMore = page.getByRole("button", { name: learning.loadMore, exact: true });
     // The newest 20 contributions first.
@@ -390,7 +391,7 @@ test("the notes show each contribution's own explanation and mark runs approved 
       await expect(off.locator(".learning-check-off")).toHaveText(learning.runs.checkOff);
       await expect(off).toContainText(learning.runs.checkOffText);
       // The file notes still follow.
-      await expect(page.locator(".learning-grid").first().locator(".note-card")).toHaveCount(2);
+      await expect(page.locator(".learning-note-groups").locator(".note-card")).toHaveCount(2);
       expect(await axeProblems(page)).toEqual([]);
     },
   );
