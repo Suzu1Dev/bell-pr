@@ -42,6 +42,7 @@ import fs from "node:fs";
 import http from "node:http";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { publishedInstallVersion } from "../scripts/published-version.mjs";
 
 const siteDir = path.dirname(fileURLToPath(import.meta.url));
 const repoDir = path.dirname(siteDir);
@@ -331,6 +332,8 @@ async function checkBrowser(files, { port, screenshots }) {
       expect(command, `${method} has a readable install command`).not.toBe("");
       if (method === "npx") expect(command).toBe(`npx ${packageName}`);
       if (method === "npm") expect(command).toBe(`npm install -g ${packageName}`);
+      if (method === "bun") expect(command).toBe(`bun add --global ${packageName}`);
+      if (method === "mise") expect(command).toBe(`MISE_NPM_PACKAGE_MANAGER=npm mise use -g node@24 npm:${packageName}@${publishedInstallVersion}`);
       if (method === "brew" || method === "powershell") expect(command).toContain("\n");
       if (!noScript) {
         const button = widget.locator(`button[data-copy="install-command-${method}"]`);

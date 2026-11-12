@@ -112,5 +112,5 @@ test("the quick switch keeps its zh-TW labels", () => {
   assert.match(html, />切換專案與貢獻<\/h2>/);
   assert.match(html, /aria-label="octo\/widgets，2 項貢獻，目前專案"/);
   assert.match(html, /<span>2 項<\/span>/);
-  assert.match(html, /等待你的審查<small title="fix\/run-1">/);
+  assert.match(html, /等待你的審閱<small title="fix\/run-1">/);
 });

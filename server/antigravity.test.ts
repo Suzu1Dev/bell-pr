@@ -214,6 +214,8 @@ test("a write turn runs in agy's sandbox when the kernel allows it, and is refus
     assert.ok(error instanceof AppError);
     assert.equal(error.code, "antigravity_sandbox_unavailable");
     assert.equal(error.statusCode, 503);
+    // Switching to Claude Code may meet the same Ubuntu setting, so it is not offered.
+    assert.ok(!error.fixes?.some((fix) => fix.command === "claude auth login"));
     return true;
   });
   // Read-only turns run no commands, so they need no sandbox.

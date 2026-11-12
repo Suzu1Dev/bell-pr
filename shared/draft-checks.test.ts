@@ -370,7 +370,7 @@ test("a stored reason code is worded in the reader's language; older stored word
   const zh = draftPreflight({ body, ...stored }, "zh-TW").find((value) => value.id === "facts-unknown");
   assert.deepEqual(zh?.details.slice(1), [
     "無法確認是否接受你開的 Pull Request：GitHub 回應了錯誤。",
-    "無法確認你在這裡開著的 Pull Request：已達 GitHub 的速率上限。請等幾分鐘，再檢查一次。",
+    "無法確認你在這裡開著的 Pull Request：已達 GitHub 的速率上限。請等幾分鐘，然後重新檢查。",
     "無法確認專案的規則：無法在專案目前的 commit 讀取它的檔案。",
     "無法確認帳號預設的貢獻檔案：GitHub answered with an error.",
   ]);

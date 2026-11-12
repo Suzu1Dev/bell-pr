@@ -2196,10 +2196,6 @@ button {
   margin: 0;
   font-size: var(--text-sm);
 }
-.split-hint {
-  font-size: var(--text-2xs);
-  color: var(--color-text-muted);
-}
 .split-badge {
   display: grid;
   flex-shrink: 0;

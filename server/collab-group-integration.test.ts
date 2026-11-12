@@ -576,7 +576,7 @@ test("parallel non-overlapping holds: two members run write turns concurrently, 
   assert.equal(cannotTake(benSecretTitle, freeAnswer), false);
   assert.match(
     renderEn(createElement(HoldAnswer, { answer: freeAnswer })),
-    /Nothing in the way, in what BELL checked/,
+    /No one holds these paths, as far as BELL PR checked/,
   );
 
   // Ben takes `src/web`; Ada's live GroupPage store receives both holds in order without reload.

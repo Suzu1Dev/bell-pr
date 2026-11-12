@@ -67,16 +67,6 @@
   align-items: center;
   gap: 20px;
 }
-.mission-kicker {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  font-size: var(--text-xs);
-  line-height: 1.4;
-  letter-spacing: 1.3px;
-  font-weight: 600;
-  color: var(--color-text-muted);
-}
 .mission-overview-heading h2 {
   font-size: 25px;
   line-height: 1.45;
@@ -243,7 +233,8 @@
   margin: 6px 0;
   letter-spacing: -0.25px;
 }
-.mission-section-heading h2 svg {
+.mission-section-heading h2 svg,
+.rules-card-head h2 svg {
   color: var(--color-text-muted);
 }
 .mission-section-icon {
@@ -312,6 +303,109 @@
   font-size: var(--text-md);
   line-height: 1.85;
   color: var(--color-text-secondary);
+}
+/* The main flow drawn as steps: stacked with downward arrows, side by side
+   when the figure is wide and has at most four steps. */
+.mission-flow {
+  margin: 0 0 14px;
+  container-type: inline-size;
+}
+.mission-flow ol {
+  display: flex;
+  flex-direction: column;
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.mission-flow li {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.mission-flow-step {
+  display: grid;
+  grid-template-columns: 2rem minmax(0, 1fr);
+  align-items: baseline;
+  gap: 2px 8px;
+  padding: 10px 14px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 8px;
+  background: var(--color-surface);
+}
+.mission-flow-step strong {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  line-height: 1.6;
+  color: var(--color-text);
+  overflow-wrap: anywhere;
+}
+.mission-flow-step strong svg {
+  margin-right: 5px;
+  vertical-align: -2px;
+  color: var(--color-text-muted);
+}
+.mission-flow-step code {
+  grid-column: 2;
+  font: 500 var(--text-xs)/1.6 var(--font-mono);
+  color: var(--color-accent-700);
+  overflow-wrap: anywhere;
+}
+/* A step outside the repository: the person, a browser, another service. */
+.mission-flow-outside {
+  border-style: dashed;
+  background: var(--color-surface-sunken);
+}
+.mission-flow-link {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 0 5px 14px;
+  font-size: var(--text-xs);
+  line-height: 1.5;
+  color: var(--color-text-muted);
+  overflow-wrap: anywhere;
+}
+.mission-flow-link svg {
+  flex-shrink: 0;
+  color: var(--color-accent-600);
+}
+.mission-flow figcaption {
+  margin: 12px 0 0;
+  font-size: var(--text-md);
+  line-height: 1.85;
+  color: var(--color-text-secondary);
+}
+@container (min-width: 820px) {
+  .mission-flow-few ol {
+    flex-direction: row;
+  }
+  /* Each step but the last also holds its arrow, so the nodes share the rest evenly. */
+  .mission-flow-few li {
+    flex: 1 1 5rem;
+    flex-direction: row;
+  }
+  .mission-flow-few li:last-child {
+    flex-basis: 0;
+  }
+  .mission-flow-few .mission-flow-step {
+    flex: 1 1 0;
+    min-width: 0;
+    grid-template-columns: minmax(0, 1fr);
+    align-content: start;
+  }
+  .mission-flow-few .mission-flow-step code {
+    grid-column: auto;
+  }
+  .mission-flow-few .mission-flow-link {
+    flex: 0 0 5rem;
+    flex-direction: column;
+    justify-content: center;
+    padding: 0 6px;
+    text-align: center;
+  }
+  .mission-flow-few .mission-flow-link svg {
+    transform: rotate(-90deg);
+  }
 }
 .mission-reading-steps {
   margin: 0;
@@ -1889,6 +1983,9 @@
   flex: 1 1 320px;
 }
 .rules-card-head h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   font-size: 19px;
   line-height: 1.5;
   margin: 6px 0 4px;

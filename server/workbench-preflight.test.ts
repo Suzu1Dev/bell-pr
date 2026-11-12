@@ -704,6 +704,7 @@ const analysisAnswer = {
     { path: "hello.ts", why: "It holds the greeting.", lookFor: "The exported constant." },
   ],
   howItFitsTogether: "The command prints the constant that hello.ts exports.",
+  flow: [],
   evidence: [{ path: "README.md", note: "Describes the tool." }],
   recommendations: [],
 };

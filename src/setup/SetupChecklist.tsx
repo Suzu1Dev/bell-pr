@@ -34,7 +34,7 @@ export interface SetupChecklistProps {
   checking?: boolean;
   /** Why the last request failed, shown above the rows. */
   error?: string;
-  /** Probes again; without it there is no Re-check button. */
+  /** Probes again; without it there is no Check again button. */
   refresh?: () => unknown;
   /**
    * Masks the GitHub login, the agent CLIs' account details and the Git
@@ -60,7 +60,7 @@ const needsAttention = (check: DoctorCheck) =>
 
 /**
  * The environment checklist: a row per check with its state, what it found
- * and the commands that fix it, and a Re-check button. Pass the fields of
+ * and the commands that fix it, and a Check again button. Pass the fields of
  * useDoctor(); the maskers hide personal details in presentations.
  */
 export function SetupChecklist({

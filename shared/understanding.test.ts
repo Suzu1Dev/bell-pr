@@ -17,6 +17,7 @@ import {
   reportMentionCount,
   synchronizeUnderstandingRecord,
   understandingStatus,
+  validSummary,
   type CheckFile,
   type FileAttempt,
   type RunUnderstanding,
@@ -420,6 +421,19 @@ test("copy detection finds a copied part of a Chinese sentence, one character pe
     cards: [{ ...card("Q?", "A."), reason: reference }],
   });
   assert.deepEqual(status.missing, [{ part: "summary" }]);
+});
+
+test("a summary pasted from the example's step labels is a near-copy", () => {
+  const steps = (labels: string[]) => labels.map((label) => ({ label, changed: true }));
+  const beforeSteps = steps(["請求失敗", "固定等 1 秒", "大家同時再試"]);
+  const afterSteps = steps(["請求失敗", "先判斷值不值得重試", "在逐輪變大的上限內隨機等待", "請求錯開送出"]);
+  const pasted = [...beforeSteps, ...afterSteps].map((step) => step.label).join("，") + "。";
+  const example = { scenario: "Q", before: "B", after: "A" };
+  assert.equal(validSummary(pasted, [{ ...card("Q?", "A."), example }]), true);
+  assert.equal(
+    validSummary(pasted, [{ ...card("Q?", "A."), example: { ...example, beforeSteps, afterSteps } }]),
+    false,
+  );
 });
 
 test("a summary written for an older version of the change is stale and needs confirming", () => {

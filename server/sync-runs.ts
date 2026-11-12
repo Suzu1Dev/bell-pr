@@ -557,11 +557,7 @@ async function runConflictResolution(
       const moved = await restoreSyncHead(run, head);
       const open = await filesWithConflictMarkers(run.worktreePath, holder.conflicts);
       resolved = !open.length;
-      holder.report = [
-        result.summary,
-        moved ? sm().run.sync.agentCommitted : "",
-        open.length ? sm().run.sync.markersLeft({ files: open }) : "",
-      ]
+      holder.report = [result.summary, moved ? sm().run.sync.agentCommitted : ""]
         .filter(Boolean)
         .join("\n");
       holder.resolutions = result.resolutions;

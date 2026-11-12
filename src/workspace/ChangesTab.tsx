@@ -192,7 +192,6 @@ export function ChangesTab({
 }: ChangesTabProps) {
   const workspace = useT("workspace");
   const t = workspace.changes;
-  const notices = workspace.runNotices;
   const fileStatus = useT("common").fileStatus;
   const {
     messages,
@@ -461,13 +460,9 @@ export function ChangesTab({
                 }}
               />
             </div>
-            <small>
-              {!allReviewed
-                ? t.reviewHint
-                : checkOpen && understanding?.required && !understanding.passed
-                  ? t.allReviewed
-                  : t.allReviewedDone}
-            </small>
+            {!allReviewed
+              ? <small>{t.reviewHint}</small>
+              : checkOpen && understanding?.required && !understanding.passed && <small>{t.allReviewed}</small>}
           </div>}
         </aside>
       )}
@@ -489,7 +484,7 @@ export function ChangesTab({
               {...toolbar.itemProps(0)}
               className="icon-button"
               aria-label={showFiles ? t.hideFiles : t.showFiles}
-              title={t.toggleFiles}
+              title={showFiles ? t.hideFiles : t.showFiles}
               onClick={() => setShowFiles(!showFiles)}
             >
               <PanelLeftClose size={16} />
@@ -519,7 +514,7 @@ export function ChangesTab({
               aria-label={
                 showExplanation ? t.hideExplanation : t.showExplanation
               }
-              title={t.toggleExplanation}
+              title={showExplanation ? t.hideExplanation : t.showExplanation}
               onClick={() => setShowExplanation(!showExplanation)}
             >
               {showExplanation ? (
@@ -532,7 +527,7 @@ export function ChangesTab({
               {...toolbar.itemProps(4)}
               className="icon-button"
               aria-label={focusMode ? t.exitFocus : t.enterFocus}
-              title={t.focus}
+              title={focusMode ? t.exitFocus : t.enterFocus}
               onClick={() => setFocusMode(!focusMode)}
             >
               {focusMode ? (
@@ -610,15 +605,13 @@ export function ChangesTab({
                   ? t.filesRemoved
                   : t.noChanges}
             </h3>
-            <p>
+            {(run.error || !run.workspaceRemovedAt) && <p>
               {run.error ? (
                 <FailureText text={run.error} />
-              ) : run.workspaceRemovedAt ? (
-                notices.workspaceRemoved
               ) : (
                 run.learnByHand ? workspace.byHand.planFirst : t.noChangesHint
               )}
-            </p>
+            </p>}
             <button
               className="button secondary"
               onClick={() => setTab("activity")}

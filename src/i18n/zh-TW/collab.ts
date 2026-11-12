@@ -26,7 +26,7 @@ const m: Translation<typeof en> = {
   onePerLine: "每行一個",
   takeHold: "佔用",
   pathsHelp: "佔用一個資料夾，就包含裡面的所有內容。不分大小寫。",
-  free: "在 BELL 檢查的範圍內，目前沒有人佔用這些路徑",
+  free: `在 ${product.name} 檢查的範圍內，目前沒有人佔用這些路徑`,
   holds: ({ name, paths, title, time }) =>
     `${name} ${time ? `自 ${time} 起` : ""}佔用 ${paths}：${title}`,
   youHold: ({ name, paths, title, time }) =>
@@ -39,11 +39,10 @@ const m: Translation<typeof en> = {
   gone: "已不再佔用",
   dependsOn: {
     label: "前置任務",
-    help: "勾選此專案中需要先完成的任務，等它們完成後再開始。",
+    help: "勾選此專案中需要先完成的任務（最多 50 項），等它們完成後再開始。",
     empty: "此專案目前沒有其他任務，可以直接開始。",
     selectedCount: ({ count }) => `已選 ${count} 項`,
     clear: "清除",
-    limitNote: "最多可勾選 50 項任務。",
     cardNote: ({ titles }) => `在 ${titles} 完成後開始`,
   },
   release: {
@@ -60,7 +59,7 @@ const m: Translation<typeof en> = {
   keep: "保留",
   nothingHeld: ({ time }) => `截至 ${time}，沒有任何路徑被佔用。`,
   honesty:
-    `${product.name} 會拒絕重疊的佔用、不會發布改到他人佔用路徑的變更，並在 Agent 改到被佔用的路徑時停止該項工作；改動仍留在工作目錄裡。它無法攔截編輯器、終端機工具或直接 git push。`,
+    `${product.name} 會拒絕重疊的佔用、不會發布改到他人佔用路徑的變更，並在 Agent 改到被佔用的路徑時停止該任務；變更仍留在工作目錄裡。它無法攔截編輯器、終端機工具或直接 git push。`,
   join: {
     title: "加入這個小組",
     body: "請向這個小組的管理員索取邀請碼。邀請碼只能用一次，10 分鐘內有效。",

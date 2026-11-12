@@ -23,7 +23,7 @@ test("missing setup becomes a checklist of commands to verify and copy, and noth
       { from: "Teammate 2", needs: [glib("同上。")] },
     ]),
   );
-  assert.match(html, /需要你在這台機器準備的環境/);
+  assert.match(html, /需要你在這台電腦準備的環境/);
   assert.match(html, /<code>sudo apt install libglib2\.0-dev<\/code>/);
   assert.match(html, /aria-label="複製指令：sudo apt install libglib2\.0-dev"/);
   assert.match(html, /回報者：Teammate 1、Teammate 2/);
@@ -65,7 +65,7 @@ test("the checklist reads in English and names teammates and follow-up rounds", 
   assert.deepEqual(needs.map((need) => need.from), [["Teammate 1 (member-1)", "Follow-up round 1"]]);
   const html = renderEn(createElement(SetupNeeds, { needs }));
   assertNoHan(html);
-  assert.match(html, /Setup this machine needs from you/);
+  assert.match(html, /Setup this computer needs from you/);
   assert.match(html, /Reported by Teammate 1 \(member-1\), Follow-up round 1/);
   assert.match(html, /aria-label="Copy the command: rustup component add rustfmt"/);
 });
@@ -115,7 +115,7 @@ test("each item shows what the agent reported, an unsafe command says it stays t
   assertNoHan(html);
   assert.match(html, /<p class="setup-outcome" data-outcome="installed">Agent reports: installed \(/);
   assert.match(html, /data-outcome="unreported">The setup turn at .* ended without a result for this item\./);
-  assert.match(html, /BELL PR never hands this command to an agent: it downloads something and runs or chains it/);
+  assert.match(html, /BELL PR never hands this command to an Agent: it downloads something and runs or chains it/);
   assert.match(html, /HAND-OFF/);
   // Without a hand-off the list stays copy-only.
   assert.doesNotMatch(renderEn(createElement(SetupNeeds, { needs })), /never hands this command/);
@@ -132,8 +132,8 @@ test("a setup turn's results read in both languages, with the outcome in words",
   ];
   const html = renderEn(createElement(SetupResults, { results }));
   assertNoHan(html);
-  assert.match(html, /Setup results \(the agent&#x27;s report\)/);
-  assert.match(html, /<li data-outcome="installed"><span class="setup-result-outcome">installed<\/span> <strong>GLib headers<\/strong> <code>sudo apt-get install -y libglib2\.0-dev<\/code><p>The agent&#x27;s account: Installed with apt-get\.<\/p><\/li>/);
+  assert.match(html, /Setup results \(the Agent&#x27;s report\)/);
+  assert.match(html, /<li data-outcome="installed"><span class="setup-result-outcome">installed<\/span> <strong>GLib headers<\/strong> <code>sudo apt-get install -y libglib2\.0-dev<\/code><p>The Agent&#x27;s note: Installed with apt-get\.<\/p><\/li>/);
   assert.match(html, /<span class="setup-result-outcome">needs you<\/span>/);
   assert.match(renderZh(createElement(SetupResults, { results })), /環境準備結果（Agent 回報）.*已安裝.*需要你處理/);
 });

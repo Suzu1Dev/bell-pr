@@ -3,8 +3,6 @@ import { product } from "../../../shared/product";
 
 const about = {
   title: `About ${product.name}`,
-  subtitle:
-    "The versions, where your data lives, and where to find help, the license and the notices.",
   appVersion: "App version",
   serverVersion: "Server version",
   checking: "Checking…",

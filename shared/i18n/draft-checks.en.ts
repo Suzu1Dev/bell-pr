@@ -67,7 +67,7 @@ const messages = {
       factsUnknown: `${product.name} never counts an unknown as a pass, so check these facts on GitHub yourself before you publish.`,
     },
     prClosed: `This repository does not take pull requests from you right now, so ${product.name} will not publish this one. You can keep practising on the change locally.`,
-    aiBan: `The project's rules do not accept AI-assisted contributions, and AI agents wrote this change. ${product.name} will not publish it; you can keep practising on it locally.`,
+    aiBan: `The project's rules do not accept AI-assisted contributions, and AI Agents wrote this change. ${product.name} will not publish it; you can keep practising on it locally.`,
     aiDisclosure:
       "The project asks contributors to disclose AI assistance, and the description does not say so yet. Write it in your own words, or turn on the AI-assistance line.",
     ownWordsRequired: `The project asks for descriptions in the contributor's own words, and this one is still ${product.name}'s suggested text. Rewrite it before you publish.`,

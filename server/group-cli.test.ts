@@ -184,7 +184,7 @@ test("bell-pr group says when BELL PR is not running, runs without group work, o
       assert.equal(result.stdout, "");
       assert.equal(
         result.stderr,
-        "Group work has stopped (reason: sideMissing). docs/troubleshooting.md explains each reason. Fix the cause, then restart BELL PR.\n",
+        'Group work has stopped (reason: sideMissing). Look the reason up under "Group work has stopped" in docs/troubleshooting.md, fix the cause, then restart BELL PR.\n',
       );
     }
     const zh = await cli(["group", "status", ...at], "zh-TW");

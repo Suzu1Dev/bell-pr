@@ -12,7 +12,6 @@ import type { AgentTeam } from "../../../shared/team";
 const fmt = formatters("en");
 
 const discovery = {
-  eyebrow: "FIND YOUR NEXT CONTRIBUTION",
   /** The page heading in two lines; the second line is emphasized. */
   title: {
     lead: "Find a project",
@@ -26,10 +25,9 @@ const discovery = {
     lead: "Search GitHub for projects that match your interests. ",
     rest: "AI checks contribution rules and suggests a starting task.",
   },
-  heroCaption: "GitHub → your next step",
   form: {
-    heading: "Where do you want to start?",
-    hint: "You can leave everything blank; we'll suggest a direction first.",
+    heading: "What are you interested in?",
+    hint: "Interests and language can be left blank.",
     interests: "Areas of interest",
     interestsPlaceholder: "For example: accessibility, developer tools",
     interestsHint:
@@ -45,21 +43,21 @@ const discovery = {
     sort: "Sort search by",
     sortHelp: "About sorting",
     sortHint:
-      "Recently updated: reflects recent activity, but the results change as projects are updated. Relevance: GitHub's best match. It can include projects that have not been maintained for a while; archived projects are left out and the last push date is shown. Stars: well-known projects, with more competition and a higher review bar.",
+      "Recently updated: active projects; results change often. Relevance: GitHub's best match; may include projects not maintained for a while (archived ones are left out, and the last push date is shown). Stars: well-known projects, more competition, a higher review bar.",
     minStars: "Minimum stars",
     advanced: "Model and efficiency settings",
-    agent: "Agent",
+    agent: "AI provider",
     model: "Analysis model",
     defaultModel: ({ provider }: { provider: string }) =>
       `Use the ${provider} default model`,
     /** A saved model that the provider's catalog does not list. */
     modelNotInCatalog: ({ model }: { model: string }) =>
-      `${model} (not in the catalog)`,
+      `${model} (not in the list)`,
     reasoningEffort: "Reasoning effort",
     modelDefault: "Model default",
     /** A saved effort that the selected model's catalog entry does not list. */
     effortNotInCatalog: ({ effort }: { effort: string }) =>
-      `${effort} (saved, not in the catalog)`,
+      `${effort} (saved, not in the list)`,
     ponytailMode: "Efficiency mode",
     ponytailCredit: "Efficiency mode is based on Ponytail by DietrichGebert (MIT).",
     ponytailModes: {
@@ -68,10 +66,10 @@ const discovery = {
       off: "Off",
     } satisfies Record<PonytailMode, string>,
     accountHint: ({ provider }: { provider: string }) =>
-      `The analysis uses your ${provider} sign-in and counts against your model usage. The catalog lists models that exist; your account may not have access to all of them.`,
+      `The analysis uses your ${provider} sign-in and counts against your own account. Your account may not have access to every model listed.`,
     publicDataOnly:
       "Reads public data only. Planning starts after you choose an item.",
-    submit: "Recommend contributions",
+    submit: "Find contributions",
   },
   sorts: {
     updated: "Recently updated",
@@ -81,7 +79,7 @@ const discovery = {
   /** The labelled sample results shown in the sample project. */
   sample: {
     title: "Sample results — not live",
-    body: "These fictional projects show what discovery finds. Nothing here comes from GitHub or an AI, and they cannot be imported.",
+    body: "These projects are fictional. Nothing here comes from GitHub or an AI, and they cannot be imported.",
   },
   /** Language names, in the UI language. */
   languages: {
@@ -97,7 +95,6 @@ const discovery = {
   loading: "Loading your discovery history…",
   progress: {
     label: "Discovery progress",
-    eyebrow: "RESEARCH IN PROGRESS",
     stop: "Stop discovery",
     phases: {
       searching: {
@@ -120,42 +117,22 @@ const discovery = {
   limitations: ({ count }: { count: number }) =>
     `Scope and limits of this search · ${fmt.number(count)}`,
   empty: {
-    title: "No search results yet",
-    body: "Set your interests above, then choose Recommend contributions.",
+    title: "Nothing searched yet",
+    body: "Set your interests above, then choose Find contributions.",
     /** After a discovery that found nothing suitable. */
     retryTitle: "Change the criteria and look for the next opportunity.",
     retryBody:
       "There isn't enough evidence for a suitable item yet. Try fewer keywords, a wider difficulty or a lower minimum star count.",
-    angles: {
-      rules: {
-        title: "Project rules",
-        detail: "Learn how to take part first",
-      },
-      activity: {
-        title: "Popularity and activity",
-        detail: "See signs of active maintenance",
-      },
-      needs: {
-        title: "User needs",
-        detail: "Check who the change helps",
-      },
-      barrier: {
-        title: "Barrier to entry",
-        detail: "Find a first step you can manage",
-      },
-    },
   },
   results: {
     label: "Recommended contributions",
-    eyebrow: "YOUR CONTRIBUTION SHORTLIST",
-    previousEyebrow: "PREVIOUS RESULTS",
     title: "Suggested contributions",
     previousTitle: "Your previous recommendations are still here.",
     note: ({ sort }: { sort: string }) =>
-      `We took 12 candidates in the "${sort}" order you chose and kept at most 6 after checking them. The order comes from the analysis, not from a GitHub-wide ranking. Before you start, check the issue's latest status and whether the maintainers want the change.`,
+      `12 candidates in "${sort}" order, at most 6 kept after checking. The order comes from the analysis, not a GitHub ranking. Before you start, check the issue's latest status and whether the maintainers want the change.`,
     /** Above the sample results, which no search produced. */
     sampleNote:
-      "A live search takes 12 candidates in the order you choose and keeps at most 6 after checking them, like these.",
+      "A live search takes 12 candidates in the order you choose and keeps at most 6 after checking them.",
     previousNote: ({ date }: { date?: string }) =>
       date
         ? `These results are from ${date} and do not reflect your latest search.`
@@ -185,16 +162,14 @@ const discovery = {
     risks: "Check before you commit",
     evidence: ({ count }: { count: number }) =>
       `Evidence and quoted sources · ${fmt.number(count)}`,
-    chooseHint:
-      "Choosing it imports the project and fills in contribution settings you can edit.",
-    sampleHint:
-      "A sample cannot be chosen. Live discovery finds real projects you can import.",
-    choose: "Choose this opportunity",
+    chooseHint: "The settings are filled in for you and can be edited.",
+    sampleHint: "A sample cannot be imported.",
+    choose: "Import project and set up task",
     importing: "Importing the project…",
     /** An opportunity whose issue is labelled for newcomers: practice for the person, not work for the agent team. */
     learnByHand: "Learn by hand: write this one yourself",
     learnByHandHint:
-      "The issue is labelled for newcomers. Writing the fix yourself is how you learn the project, so the agent team does not take it. Read the plan and the sources, then open the issue.",
+      "The issue is labelled for newcomers. Writing the fix yourself is how you learn the project, so the Agent team does not take it. Read the plan and the sources, then open the issue.",
     openIssue: "Open the issue",
     /** Learn by hand (DESIGN v1.2 F1, F12): the task dialog then shows the project's case. */
     startByHand: "Start learning by hand",
@@ -209,10 +184,10 @@ const discovery = {
    */
   byHand: {
     legend: "Who writes the code?",
-    agents: "The agent team writes it",
+    agents: "The Agent team writes it",
     hand: "You write it (Learn by hand)",
-    handText: `The guide plans with you, gives hints and reviews your change when you ask. ${product.name}'s agents can't edit your files in this run. You'll explain the change back without help before you send it.`,
-    sample: "The sample shows the agent team. Learn by hand works on your own projects.",
+    handText: `The guide plans with you, gives hints and reviews your change when you ask. ${product.name}'s Agents can't edit your files in this run. You'll explain the change back without help before you publish it.`,
+    sample: "The sample shows the Agent team. Learn by hand works on your own projects.",
     start: "Plan with the guide",
     fit: "Fit the guide to the project's rules",
     full: "Every kind of help, practise locally",
@@ -231,7 +206,7 @@ const discovery = {
       `${product.name} can publish a learn-by-hand run here only if the guide stays within what the project's own text says is fine (${kinds}: "${quote}"), and only after you confirm the project's quoted rule. The maintainers decide whether your change fits.`,
     /** A rule from BELL's owner-signed list of rules projects publish outside their repositories (F14). */
     registry: ({ date }: { date: string }) => `From ${product.name}'s checked list · checked on ${date}`,
-    /** The Agent activity tab's plan heading in a Learn-by-hand run, by team phase (no agent team works in it). */
+    /** The Activity tab's plan heading in a Learn-by-hand run, by team phase (no agent team works in it). */
     board: {
       planning: "The guide is reading the code",
       awaiting_approval: "Your turn: write your plan",
