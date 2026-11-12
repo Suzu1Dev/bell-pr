@@ -276,14 +276,14 @@ test("the same failure three times is checked in once per step and failing run, 
     await expect.poll(() => posts.length).toBe(expected);
     if (expected) expect(posts[0]).toEqual({ stepId: "s2", signal: "repeat-failure" });
     // The panel mounts again (another tab, then back; a reload): no second check-in for the same failing run.
+    const testCommand = (response: { url(): string }) => new URL(response.url()).pathname === `/api/runs/${runs.repeat}/by-hand/test-command`;
     await page.locator("#workspace-tab-overview").click();
-    await page.locator("#workspace-tab-changes").click();
+    // Finish this read before arming the reload's waiter, or the tab switch's answer can satisfy it.
+    await Promise.all([page.waitForResponse(testCommand), page.locator("#workspace-tab-changes").click()]);
     await expect(guide).toBeVisible();
-    // Commit first, so a test-command read still open from the tab switch cannot satisfy the waiter. The check-in effect runs in the same flush as that read.
-    await page.reload({ waitUntil: "commit" });
-    const settled = page.waitForResponse(
-      (response) => new URL(response.url()).pathname === `/api/runs/${runs.repeat}/by-hand/test-command`,
-    );
+    // Armed before reload: on a fast loopback the read can finish before a listener attached after commit.
+    const settled = page.waitForResponse(testCommand);
+    await page.reload();
     await expect(guide).toBeVisible();
     await settled;
     expect(posts).toHaveLength(expected);
