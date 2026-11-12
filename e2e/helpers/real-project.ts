@@ -242,6 +242,13 @@ function reviewRun(
   prints: Record<string, string>,
   extra: Record<string, unknown>,
 ) {
+  const { contributionSettings, ...rest } = extra;
+  const settingsOverride =
+    contributionSettings !== null &&
+    typeof contributionSettings === "object" &&
+    !Array.isArray(contributionSettings)
+      ? (contributionSettings as Record<string, unknown>)
+      : {};
   const at = "2026-10-14T09:00:00.000Z";
   return {
     id: runId,
@@ -278,6 +285,8 @@ function reviewRun(
       model: "",
       reasoningEffort: "",
       issueUrl,
+      // A spec may set one field, such as the hoped-for outcome, and keep the rest.
+      ...settingsOverride,
     },
     explanations: Object.fromEntries(
       Object.entries(explanations).map(([file, content]) => [
@@ -285,7 +294,7 @@ function reviewRun(
         { fingerprint: prints[file], status: "ready", generatedAt: at, content },
       ]),
     ),
-    ...extra,
+    ...rest,
   };
 }
 

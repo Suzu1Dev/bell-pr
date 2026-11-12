@@ -11,7 +11,7 @@ const fmt = formatters("en");
 
 const learning = {
   eyebrow: "LEARN BY CONTRIBUTING",
-  title: "Turn the code you understood into experience.",
+  title: "Learning notes",
   intro:
     "Every explanation generated while you review a contribution stays here, so you can revisit a concept across contributions.",
   /** Under the intro: who wrote the explanations, and that they can be wrong. */

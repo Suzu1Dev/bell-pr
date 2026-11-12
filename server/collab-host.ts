@@ -1,7 +1,8 @@
 /**
  * Group work's host: this data directory's coordinator (coordination.ts)
  * and the side file beside it, `collab.json`, which keeps what the
- * coordinator does not: the group's id and people's names.
+ * coordinator does not: the group's id, people's names, the repositories'
+ * names and the tasks' titles.
  *
  * startServer makes one when BELL PR starts with --group, once the strict
  * lock is held. It is `notSetUp` until the person at the host sets group
@@ -13,13 +14,13 @@ import { randomBytes } from "node:crypto";
 import { readFile, stat } from "node:fs/promises";
 import { z } from "zod";
 import type { CollabState, CollabStatus } from "../shared/collab.js";
+import { reasonOf, refuse } from "./collab-refusal.js";
 import { dataPaths } from "./config.js";
-import { Coordinator } from "./coordination.js";
+import { Coordinator, type CoordinatorOptions } from "./coordination.js";
 import { writeDurable } from "./fs-atomic.js";
 import { log } from "./log.js";
 import { lenientRead } from "./persisted-schema.js";
 import { AppError } from "./types.js";
-import type { WriterLock } from "./writer-lock.js";
 
 const stamp = z.string().max(40).optional();
 /** collab.json as written. Every field is optional, for older and newer builds. */
@@ -41,6 +42,38 @@ const sideSchema = z.strictObject({
       }),
     )
     .optional(),
+  /** The group's repositories, by project id. The name stays when BELL PR forgets the repository. */
+  projects: z
+    .record(
+      z.string().max(64),
+      z.strictObject({
+        name: z.string().max(200).optional(),
+        repoId: z.string().max(64).optional(),
+        addedAt: stamp,
+      }),
+    )
+    .optional(),
+  /**
+   * What the coordinator does not keep of a task, by "<project id>/<task id>":
+   * its title, the tasks it waited for, and when its holder said it is done.
+   */
+  tasks: z
+    .record(
+      z.string().max(140),
+      z.strictObject({
+        title: z.string().max(120).optional(),
+        dependsOn: z.array(z.string().max(64)).max(50).optional(),
+        doneAt: stamp,
+      }),
+    )
+    .optional(),
+  /**
+   * The repository's default-branch commit when each active hold was taken,
+   * by "<project id>/<task id>", removed when the hold ends, so the holder's
+   * sync and publish can report commits on the target branch since then that
+   * touch held paths (S4).
+   */
+  holds: z.record(z.string().max(140), z.string().max(64)).optional(),
 });
 const sideReadSchema = lenientRead(sideSchema);
 export type CollabSide = z.infer<typeof sideSchema>;
@@ -57,7 +90,10 @@ export interface CollabHost {
   setUp(): Promise<void>;
   /** Runs a change; close() waits for it, and listeners hear of it once it has landed. */
   run<T>(work: () => Promise<T>, projectId?: string): Promise<T>;
-  /** Called after each change, with its project when it has one. Returns how to stop listening. */
+  /**
+   * Called after each change, with its project when it has one, and once
+   * when group work stops. Returns how to stop listening.
+   */
   onChange(listener: (projectId?: string) => void): () => void;
   /** Refuses new work, tells the listeners, and waits for the work in flight. */
   close(): Promise<void>;
@@ -65,16 +101,16 @@ export interface CollabHost {
 
 /** The refusal of a group request while group work is not ready. */
 export function collabNotReady(state: Exclude<CollabState, "ready">) {
-  return new AppError((m) => m.collab[state], 503, { details: { reason: state } });
+  return refuse(503, state, (m) => m.collab[state]);
+}
+
+/** A side-file record's entry for an id; own keys only, so no id reaches Object.prototype. */
+export function sideEntry<T>(record: Record<string, T> | undefined, id: string): T | undefined {
+  return record && Object.hasOwn(record, id) ? record[id] : undefined;
 }
 
 /** A generated id the coordinator accepts: a person (`m-`), a project (`p-`) or a task (`t-`). */
 export const collabId = (prefix: "m" | "p" | "t") => `${prefix}-${randomBytes(5).toString("hex")}`;
-
-const reasonOf = (error: unknown) =>
-  error instanceof AppError && typeof error.details?.reason === "string"
-    ? error.details.reason
-    : undefined;
 
 /** The side file: undefined when there is none, "damaged" when it cannot be used. */
 async function readSide(file: string): Promise<CollabSide | "damaged" | undefined> {
@@ -91,10 +127,8 @@ async function readSide(file: string): Promise<CollabSide | "damaged" | undefine
   }
 }
 
-export async function openCollabHost(options: {
-  dataDir: string;
-  lock: WriterLock;
-}): Promise<CollabHost> {
+/** `options` are the coordinator's: the data directory and its lock; tests also lower its limits. */
+export async function openCollabHost(options: CoordinatorOptions): Promise<CollabHost> {
   const paths = dataPaths(options.dataDir);
   let side: CollabSide = {};
   let coordinator: Coordinator | undefined;
@@ -105,10 +139,22 @@ export async function openCollabHost(options: {
   const inFlight = new Set<Promise<void>>();
   const listeners = new Set<(projectId?: string) => void>();
 
+  const notify = (projectId?: string) => {
+    for (const listener of listeners) {
+      try {
+        listener(projectId);
+      } catch (error) {
+        log.warn("A group work listener failed", { error });
+      }
+    }
+  };
+
   const stop = (reason: string, error?: unknown) => {
     if (stopped !== undefined) return;
     stopped = reason;
     log.warn("Group work stopped", { reason, error });
+    // Once whoever found out is done: a listener asks for the state itself.
+    queueMicrotask(() => notify());
   };
 
   const read = await readSide(paths.collab);
@@ -161,16 +207,6 @@ export async function openCollabHost(options: {
     side = next;
   };
 
-  const notify = (projectId?: string) => {
-    for (const listener of listeners) {
-      try {
-        listener(projectId);
-      } catch (error) {
-        log.warn("A group work listener failed", { error });
-      }
-    }
-  };
-
   return {
     status,
     coordinator() {
@@ -192,11 +228,8 @@ export async function openCollabHost(options: {
       serialize(async () => {
         const { state } = status();
         if (state === "ready")
-          throw new AppError((m) => m.coordination.store.exists, 409, {
-            details: { reason: "exists" },
-          });
-        if (state === "stopped")
-          throw new AppError((m) => m.collab.stopped, 409, { details: { reason: "missing" } });
+          throw refuse(409, "exists", (m) => m.coordination.store.exists);
+        if (state === "stopped") throw refuse(409, "missing", (m) => m.collab.stopped);
         const created = await Coordinator.create(options);
         try {
           await writeSide({

@@ -5,7 +5,8 @@
  * Learn-by-hand run's confirmed plan starts the person's own turn instead.
  */
 import { maxPlanRevisions } from "../shared/team.js";
-import { planOverlaps } from "./group-local.js";
+import { planOverlaps, planScopes } from "./group-local.js";
+import { assertNotHeld, heldNotice } from "./hold-guard.js";
 import { sm } from "./i18n/index.js";
 import { redact } from "./process.js";
 import { enterPhase, logRunQueued } from "./run-events.js";
@@ -54,6 +55,16 @@ async function confirmedOverlaps(ctx: WorkbenchContext, run: Run, digest?: strin
 }
 
 /**
+ * Refuses a plan that covers files someone else in the group holds
+ * (hold-guard.ts, S2): 409 `heldByOther`, or 503 `holdsUnknown` when group
+ * work stopped. Without group work, nothing is checked.
+ */
+function assertPlanNotHeld(ctx: WorkbenchContext, run: Run) {
+  const held = assertNotHeld(ctx.holds, run, planScopes(run), "plan");
+  if (held.length) ctx.log(run, "user", heldNotice(held), { kind: "notice" });
+}
+
+/**
  * Approves an agent team's plan, or confirms a Learn-by-hand run's plan.
  * When other contributions of the project change files the plan covers,
  * the person approves with the digest of the overlaps they saw.
@@ -68,6 +79,7 @@ export async function approvePlan(
     if (run.learnByHand) return confirmByHandPlan(ctx, run, options.overlapDigest);
     const waiting = () => run.status === "awaiting_plan" && !!run.team?.tasks.length;
     if (!waiting()) throw new AppError((m) => m.run.queue.noPlanToApprove, 409);
+    assertPlanNotHeld(ctx, run);
     const titles = await confirmedOverlaps(ctx, run, options.overlapDigest);
     // A Stop does not take the run lock, so it may have come during the check.
     if (!waiting() || !run.team) throw new AppError((m) => m.run.queue.noPlanToApprove, 409);
@@ -96,6 +108,7 @@ async function confirmByHandPlan(ctx: WorkbenchContext, run: Run, overlapDigest?
     throw new AppError((m) => m.run.queue.noPlanToApprove, 409);
   if (!run.byHand?.plan?.steps.length)
     throw new AppError((m) => m.byHand.flow.stepFirst, 409);
+  assertPlanNotHeld(ctx, run);
   const titles = await confirmedOverlaps(ctx, run, overlapDigest);
   // A Stop does not take the run lock, so it may have come during the check.
   const team = run.team;

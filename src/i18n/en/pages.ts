@@ -12,7 +12,7 @@ const pages = {
   },
   team: {
     eyebrow: "BUILT TO COLLABORATE",
-    title: "One goal, one agent team.",
+    title: "How the AI team works",
     intro:
       "From breaking down the problem to cross-review, specialized roles fit into how you already work.",
     assign: "Assign a new task",

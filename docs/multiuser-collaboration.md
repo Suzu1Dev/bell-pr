@@ -2,11 +2,21 @@
 
 Status: design, and its first phase in code. A BELL PR started with
 `--group` ([Group work](group-work.md)) now opens the core: it takes the
-strict lock, creates the coordination file at set-up and adds a participant
-for each person who joins. Tasks, claims and integration are still not
-reachable from the app, the CLI or any listener, so BELL PR still has no
-protection between people working on one project. Overlap warnings for one
-person's own contributions (group mode) are unchanged.
+strict lock, creates the coordination file at set-up, adds a participant
+for each person who joins and a project for each repository an admin adds
+to the group. Through group work's API a person defines a task and claims
+paths for it, the holder releases the claim and an admin revokes it; group
+work calls a claim a hold. Group work keeps its own dependencies between
+tasks: the holder says a task is done, and work that waits for a task not
+done is refused before any task is made. The core's dependencies, which
+wait for an integration, are not used. Widening, failing and reopening a
+task, `authorize` and integration are still not reachable from the app,
+the CLI or any listener, and the core checks no write against a claim.
+Group work checks BELL PR's own publishes and agent turns against holds
+([What a hold does not do](group-work.md#what-a-hold-does-not-do)); an
+editor, a tool or a push outside BELL PR is not checked.
+Overlap warnings for one person's own contributions (group mode) are
+unchanged.
 
 ## Decision
 
@@ -325,8 +335,9 @@ with the group-mode overlap check.
    - Mount the router in `createApp` behind the existing app authentication.
      Done in part, without the router: a start with `--group` registers
      group work's own routes under `/api/collab` behind that
-     authentication. They call the coordinator directly, so far only to
-     create its file, add participants and tell who is asking.
+     authentication. They call the coordinator directly, so far to
+     create its file, add participants and projects, tell who is asking,
+     define tasks, and claim, release and revoke.
    - Give admins participant management in the CLI. Done in part, for the
      person at the host: `bell-pr group setup` and `bell-pr group invite`.
    - Make each managed write call `authorize` and carry the fence:

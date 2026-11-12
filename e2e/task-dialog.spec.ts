@@ -79,7 +79,7 @@ test("a link typed the moment the saved settings unlock the form is kept when th
     release();
     await expect(issue).toBeEnabled();
     // The saved team size shows, and the link and the goal are still there.
-    await expect(dialog.locator(".task-team-preview")).toContainText(modals.newTask.teammates({ count: 3 }));
+    await expect(dialog.locator(".mission-form-details > summary").last()).toContainText(mission.settings.team.summary({ count: 3 }));
     await expect(issue).toHaveValue(issueUrl);
     await expect(dialog.locator("#task-prompt")).toHaveValue("Keep focus on the trigger after the dialog closes.");
   } finally {
@@ -99,12 +99,14 @@ test("the team size is a plain choice of two, three or four teammates", async ({
     await page.goto(`/#/repos/${repo.id}?locale=en`);
     await page.getByRole("button", { name: repos.explore.chooseDirection }).click();
     const dialog = page.getByRole("dialog", { name: modals.newTask.title });
+    const execution = dialog.locator(".mission-form-details").last();
+    if (await execution.getAttribute("open") === null) await execution.locator("summary").first().click();
     const choices = dialog.getByRole("group", { name: mission.settings.team.legend }).locator("label.mission-team-choice");
     await expect(choices).toHaveCount(3);
     for (const [index, count] of [2, 3, 4].entries()) {
       await choices.nth(index).click();
       await expect(choices.nth(index)).toHaveClass(/selected/);
-      await expect(dialog.locator(".task-team-preview")).toContainText(modals.newTask.teammates({ count }));
+      await expect(dialog.locator(".mission-form-details > summary").last()).toContainText(mission.settings.team.summary({ count }));
     }
   } finally {
     await context.close();

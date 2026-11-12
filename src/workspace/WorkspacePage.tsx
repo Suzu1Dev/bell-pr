@@ -47,6 +47,7 @@ import { checkFooter } from "./checkFooter";
 import { DraftTab } from "./DraftTab";
 import { OverviewTab } from "./OverviewTab";
 import { RunNotices, showsCheckOff, UnderstandingOffBadge, UnsandboxedBadge } from "./RunNotices";
+import { HoldRecoveryNotice } from "./HoldRecoveryNotice";
 import "./workspace.css";
 import { limitationsRequest } from "../session/limitations";
 import { sessionAwaitsAnswer, sessionTurnBlock, setupHandOffShown, showSessionTab } from "../session/state";
@@ -346,6 +347,7 @@ export function WorkspacePage({
         </div>
       </section>
       <RunNotices run={run} queued={queued} />
+      <HoldRecoveryNotice run={run} busy={demo || busy || active || reviewRerunning} actions={actions} />
       <SplitNotices run={run} onOpen={actions.chooseRun} />
       <section className="workflow-strip" aria-label={t.progress}>
         {[
@@ -643,7 +645,7 @@ export function WorkspacePage({
             <span className="footer-spark">
               <Sparkles size={15} />
             </span>
-            <span>{published ? t.footer.publishedChanges : t.footer[footer.status]}</span>
+            {(published || footer.status !== "learning") && <span>{published ? t.footer.publishedChanges : t.footer[footer.status]}</span>}
             {prTextMissing && !byHand.writing && !reviewing && run.status !== "published" ? (
               <button type="button" className="mission-text-button" onClick={() => setTab("draft")}>{t.byHand.writePr}</button>
             ) : <span className="footer-hint">{run.learnByHand ? t.footer.hintByHand : t.footer.hint}</span>}

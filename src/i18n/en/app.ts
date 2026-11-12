@@ -24,6 +24,7 @@ const app = {
     explore: "Project overview",
     discovery: "Explore contributions",
     team: "Agent team",
+    group: "Group",
     learning: "Learning notes",
     settings: "Settings",
   },

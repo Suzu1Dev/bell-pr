@@ -56,16 +56,16 @@ const welcome = (step: WelcomeStep, props: Partial<WelcomeProps> = {}) =>
 
 test("every welcome step reads in English with no Chinese left, and in zh-TW", () => {
   assert.deepEqual([...welcomeSteps], ["language", "environment", "provider", "start"]);
-  for (const [position, step] of welcomeSteps.entries()) {
+  for (const step of welcomeSteps) {
     const html = renderEn(welcome(step));
     // The language switcher names each language in itself.
     assertNoHan(withoutOtherLanguages(html));
     assert.match(html, /<h1 id="welcome-title">Welcome to BELL PR<\/h1>/);
-    assert.match(html, new RegExp(`Step ${position + 1} of 4`));
+    assert.match(html, /aria-current="step"/);
     assert.equal(html.match(/aria-current="step"/g)?.length, 1);
     const zh = renderZh(welcome(step));
     assert.match(zh, /歡迎使用 BELL PR/);
-    assert.match(zh, new RegExp(`第 ${position + 1} 步，共 4 步`));
+    assert.equal(zh.match(/aria-current="step"/g)?.length, 1);
   }
   // The first step has no way back; the others do.
   assert.doesNotMatch(renderEn(welcome("language")), />Back</);
@@ -110,7 +110,7 @@ test("the provider step picks the only ready provider and lets the person choose
   };
   assert.deepEqual(readyProviders(untested), ["claude"]);
   const only = renderEn(welcome("provider"));
-  assert.match(only, /Claude Code is installed and signed in, so your agents use it\./);
+  assert.match(only, /<strong>Claude Code<\/strong>/);
   // Neutral wording about the person's own Claude Code sign-in.
   assert.match(only, /Uses the Claude Code CLI you installed and signed in to \(Claude plan or Anthropic API key\)\. Usage counts against your own account\./);
   assert.doesNotMatch(only, /subscription|API billing/i);

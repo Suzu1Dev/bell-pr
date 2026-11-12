@@ -45,7 +45,11 @@
 // with Node.js 22.22.1: all JS 479.4 kB in 53 files, 481.4 kB on CI's
 // Node.js 24. The hand-off added 4.0 kB: its dialog and the en and zh-TW
 // texts it must show (no sandbox, your account, sudo, what Stop leaves),
-// so the all-JS budget rose from 480 kB to 490 kB.
+// so the all-JS budget rose from 480 kB to 490 kB. Measured with the Group
+// page (group work, part 3) with Node.js 22.22.1: all JS 489.7 kB in 54
+// files, 491.7 kB on CI's Node.js 24. The page added 9.2 kB: its own chunk
+// (6.6 kB) and its en and zh-TW texts, so the all-JS budget rose from
+// 490 kB to 500 kB.
 //
 // Exit status: 0 when every check passes, 1 when one fails, 2 on a usage or
 // setup error.
@@ -69,7 +73,7 @@ const budgets = {
   entries: 150,
   woff2: 12,
   largestJsGzip: 116 * kB,
-  totalJsGzip: 490 * kB,
+  totalJsGzip: 500 * kB,
   totalCssGzip: 45 * kB,
 };
 const required = [

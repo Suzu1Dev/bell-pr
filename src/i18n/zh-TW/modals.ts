@@ -36,11 +36,12 @@ const m: Translation<typeof en> = {
     submitting: "拆分中…",
   },
   help: {
-    title: "從想法，到你的下一個 PR。",
+    teamGuide: "AI 團隊如何分工",
+    title: "如何完成一次貢獻",
     subtitle: "四個步驟，把開發、審查與學習串在一起。",
     steps: {
       import: {
-        title: "帶入 Repository",
+        title: "匯入專案",
         text: "匯入 GitHub 連結或本機路徑，選擇要貢獻的專案。",
       },
       team: {
@@ -60,7 +61,7 @@ const m: Translation<typeof en> = {
     about: `關於 ${product.name}`,
   },
   runs: {
-    title: "每一個想法，都有進度。",
+    title: "貢獻任務",
     subtitle: "切換任務以查看開發狀態、程式碼變更與 PR 草稿。",
     demo: "互動示範",
     newContribution: "新增貢獻",
@@ -80,15 +81,15 @@ const m: Translation<typeof en> = {
     deleted: "已刪除這項貢獻。",
   },
   newTask: {
-    title: "把想法交給你的 Agent team。",
+    title: "新增貢獻",
     subtitle: "描述你想改善什麼，以及完成後應該有的行為。",
-    repo: "目標 Repository",
-    chooseRepo: "選擇 Repository",
+    repo: "目標專案",
+    chooseRepo: "選擇專案",
     demoRepo: ({ name }) => `${name}（示範）`,
     importOther: "匯入其他專案",
     recommendations: "先看 AI 推薦方向",
     demoNote:
-      "示範設定可以自由調整；不會啟動真實 agent。示範團隊會從頭重新播放它的工作。請匯入你的 repository 開始開發。",
+      "示範設定可以自由調整；不會啟動真實 AI。示範團隊會從頭重新播放它的工作。請匯入你的專案開始開發。",
     loadingSettings: "正在載入這個專案的貢獻設定…",
     reloadSettings: "重新載入專案設定",
     saveDefault: "儲存為預設設定",
@@ -103,7 +104,7 @@ const m: Translation<typeof en> = {
       `會使用本機 ${provider} 帳號執行任務，消耗對應用量。完成後等待你審查。`,
     saveDemo: "播放示範團隊",
     planFirst: "產生團隊計畫",
-    start: "啟動 Agent team",
+    start: "開始任務",
   },
 };
 
