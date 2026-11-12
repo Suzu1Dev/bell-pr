@@ -3,7 +3,7 @@ export default {
   busy: "Passwordless sudo is being configured. Please wait.",
   invalidUser: "This account name cannot safely be written to a sudoers rule.",
   invalidRule: "The sudoers rule failed visudo validation and was not installed.",
-  overridden: "Another sudoers rule may override this rule: sudo still asks for a password, so the new rule was removed.",
+  overridden: "The rule was written, but sudo still asks for a password (another sudoers rule may override it), so the rule was removed.",
   removeManually: ({ file }: { file: string }) => `Removal needs a password. In a terminal, run sudo rm ${file}`,
   locked: ({ minutes }: { minutes: number }) => `After three incorrect passwords, setup is paused. Try again in ${minutes} minutes.`,
   forbidden: "This account cannot use sudo, so passwordless sudo cannot be enabled.",

@@ -111,7 +111,7 @@ test("sync, follow-up and clone update routes validate input and answer refusals
 
   const missing = await call(port, "POST", "/api/runs/nope/sync", {});
   assert.equal(missing.status, 404);
-  assert.equal(missing.json.error, "找不到工作。");
+  assert.equal(missing.json.error, "找不到任務。");
   const running = await call(port, "POST", "/api/runs/running/sync", {});
   assert.equal(running.status, 409);
   assert.match(String(running.json.error), /只有審閱中/);
@@ -153,7 +153,7 @@ test("sync, follow-up and clone update routes validate input and answer refusals
     note: "Rename it.",
   });
   assert.equal(unpublished.status, 409);
-  assert.match(String(unpublished.json.error), /只有已送出 PR 的工作/);
+  assert.match(String(unpublished.json.error), /只有已發布 PR 的任務/);
   const discard = await call(port, "POST", "/api/runs/review/follow-ups/discard", {});
   assert.equal(discard.status, 409);
   assert.match(String(discard.json.error), /沒有可以放棄的修正/);

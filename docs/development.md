@@ -96,8 +96,8 @@ builds, tests and packs on Linux with Node.js 22.
 | `BELLPR_E2E_PORT=<port> npm run test:e2e` | The Playwright tests against a real server |
 | `node scripts/check-i18n.mjs` | No user-facing text outside the translation dictionaries |
 | `node scripts/check-personal-info.mjs` (and `--pack`) | No personal details (a real person's home path, tailnet host names, private keys, access tokens) in the repository or the package |
-| `npx tsx scripts/render-generated-regions.ts --check` | The generated product links are current |
-| `node scripts/npm-readme.mjs --check-docs` | Every link in the READMEs and `docs/` resolves, every error code is in the troubleshooting guide, and every `bell-pr@<version>` pin (such as the mise command's) names the version in `package.json` |
+| `npx tsx scripts/render-generated-regions.ts --check` | The generated product links are current, and `publishedInstallVersion` is a stable `MAJOR.MINOR.PATCH` (no leading zeros, prerelease, or build metadata) that is not a lower semver than the stable version in `package.json` or `Formula/bell-pr.rb`. A prerelease in either file is not compared |
+| `node scripts/npm-readme.mjs --check-docs` | Every link in the READMEs and `docs/` resolves, every error code is in the troubleshooting guide, and every hand-written `bell-pr@<version>` pin names the version in `package.json`. A pin inside a generated region, such as the mise install command, comes from `publishedInstallVersion` and is not checked here |
 | `node site/check-site.mjs` | The landing site's links and resources, and its size |
 | `node scripts/sync-installers.mjs --check` | Standalone installer identity and the published Homebrew formula |
 | `node --test scripts/install.test.mjs scripts/install-wsl.test.mjs` | Installer argument, failure and environment behavior with isolated tool fixtures |
@@ -157,7 +157,11 @@ This downloads the published version from `package.json`, verifies npm's SHA-512
 integrity, and records the tarball's SHA-256 in `Formula/bell-pr.rb`. Do not hash a
 local repack: npm's published bytes are what Homebrew downloads. Normal `--check`
 is offline and keeps the last published formula version while a new release is
-being prepared. The formula installs Node.js, Git and GitHub CLI; AI CLIs and
+being prepared. `publishedInstallVersion` may lead that formula. A prerelease
+formula version is not compared; the check fails when a stable formula version
+is a higher semver, so bump `scripts/published-version.mjs` and regenerate
+before the formula moves ahead.
+The formula installs Node.js, Git and GitHub CLI; AI CLIs and
 account sign-in remain user setup steps.
 
 ## Packaging
@@ -238,6 +242,9 @@ How the code stays within them:
 - `vite.config.ts` gives React, the icons, the sample project's shared
   data and the Markdown stack (loaded on demand) chunks of their own, and
   builds for the browsers the stylesheets already require.
+  The app needs Chrome 111, Edge 111, Firefox 113 or Safari 16.2 or later,
+  because the stylesheets use `color-mix()`; those versions are `build.target`
+  in `vite.config.ts`.
 - The CSS ships as one file: split per lazy view, each small file was
   compressed on its own and cost more than the whole. To find style rules
   nothing uses, run `node scripts/unused-css.mjs`; with the classes an e2e

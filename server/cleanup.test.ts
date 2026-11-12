@@ -463,7 +463,7 @@ test("retention frees only failed and cancelled runs past the period and never t
   assert.equal(neverStarted.workspaceRemovedAt, undefined);
   assert.deepEqual(neverStarted.logs.map((entry) => entry.message), ["Last activity"]);
   // The log line is in the run's own language.
-  assert.match(eligible[0].logs.at(-1)!.message, /^這個工作結束 30 天後已移除工作檔案/);
+  assert.match(eligible[0].logs.at(-1)!.message, /^這個任務結束 30 天後已移除工作檔案/);
   // An invalid source falls back to the environment, then 14 days.
   setRetentionDaysSource(() => 0);
   assert.equal(retentionDays(), 60);

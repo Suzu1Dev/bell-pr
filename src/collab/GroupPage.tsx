@@ -796,7 +796,7 @@ function Board(props: BoardProps) {
             <p className="field-help" id="hold-help">
               {t.pathsHelp}
             </p>
-            <fieldset className="group-dependencies" aria-describedby="depends-help depends-limit">
+            <fieldset className="group-dependencies" aria-describedby="depends-help">
               <legend className="field-label">{t.dependsOn.label}</legend>
               <p className="field-help" id="depends-help">
                 {t.dependsOn.help}
@@ -843,9 +843,6 @@ function Board(props: BoardProps) {
                   </button>
                 </div>
               )}
-              <p className="field-help" id="depends-limit">
-                {t.dependsOn.limitNote}
-              </p>
             </fieldset>
             <HoldAnswer answer={answer} />
             {refusal && (

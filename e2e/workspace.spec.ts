@@ -325,7 +325,7 @@ test("an open follow-up round asks for its commit message and pushes through its
     // Approval waits for the understanding check: explain the round back in
     // the closed-book panel next to the diff.
     const check = workspace.check;
-    await page.getByRole("button", { name: workspace.footer.explainBack }).click();
+    await page.locator(".review-footer").getByRole("button", { name: workspace.footer.explainBack }).click();
     const panel = page.locator(".understanding-check");
     await expect(page.locator(".explain-panel")).toHaveCount(0);
     // A round asks what it changes and which review comment it answers.

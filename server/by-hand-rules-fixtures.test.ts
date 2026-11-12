@@ -261,7 +261,7 @@ test("QEMU, one condition failing alone each time: the block names it", async ()
   assert.ok(byHandPreflight(run, now));
   assert.equal(byHandPreflight({ ...run, byHand: { ...run.byHand, agentWrites: 1 } }, now), undefined);
   assert.deepEqual(row(rules, ["explain", "answer"]).agent, ["ai-ban:block"]);
-  assert.match(message(respectChecks({ body, rules }, "en"), "ai-ban"), /AI agents wrote this change/);
+  assert.match(message(respectChecks({ body, rules }, "en"), "ai-ban"), /AI Agents wrote this change/);
   // (d) Rules read before the run started: blocked at publish, still the confirm at approve.
   const early = { ...rules, checkedAt: "2026-10-20T08:00:00.000Z" };
   const lock = fitted.lock!;

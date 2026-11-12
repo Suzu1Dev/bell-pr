@@ -155,7 +155,7 @@ test("only an unfinished local publish offers recovery, with a save-first and bu
     prUrl: undefined, publishedBranch: undefined, headRepository: undefined, followUps: undefined,
   };
   const available = render({ run: interrupted });
-  assert.match(available, /恢復未完成的發佈/);
+  assert.match(available, /恢復未完成的發布/);
   assert.match(available, /檢查遠端，保留程式碼與草稿/);
   assert.doesNotMatch(tag(available, /aria-describedby="publish-recovery-help"/), /disabled=""/);
   const dirty = render({ run: interrupted }, { draftDirty: true });
@@ -176,7 +176,7 @@ test("only an unfinished local publish offers recovery, with a save-first and bu
     { run: { ...interrupted, headRepository: "acme/widgets" } },
     { run: { ...interrupted, followUps: [open] } },
     { run: { ...interrupted, status: "running" as const } },
-  ]) assert.doesNotMatch(render({ run: interrupted, ...props }), /恢復未完成的發佈/);
+  ]) assert.doesNotMatch(render({ run: interrupted, ...props }), /恢復未完成的發布/);
   const english = renderEn(element({ run: interrupted }));
   assert.match(english, /Recover unfinished publish/);
   assert.match(english, /checks the remote, keeps your code and draft/);
@@ -195,22 +195,22 @@ test("an open follow-up round keeps the PR text as published and asks for this r
   // The target branch panel and the round history lead the tab; the draft
   // guide is not offered, since the round never changes the description.
   assert.match(html, /目標分支/);
-  assert.match(html, /依 review 修正的紀錄/);
-  assert.match(html, /放棄這輪修改/);
+  assert.match(html, /依回饋修正的紀錄/);
+  assert.match(html, /放棄這一輪/);
   assert.doesNotMatch(html, /正在載入草稿規範/);
-  assert.match(html, /這輪修正只會在 PR 分支加上一個新的 commit/);
+  assert.match(html, /這一輪只會在 PR 分支加上一個新的 commit/);
   assert.match(tag(html, /id="pr-title"/), /disabled=""/);
   assert.match(tag(html, /aria-label="PR 說明"/), /disabled=""/);
   assert.match(tag(html, /id="pr-publish-branch"/), /disabled=""/);
   // The field shows this round's own message, never the title as a fallback.
-  assert.match(html, /這輪修正的提交訊息/);
+  assert.match(html, /這一輪的提交訊息/);
   const message = tag(html, /id="pr-commit-message"/);
   assert.match(message, /maxLength="4000"/);
   assert.doesNotMatch(message, /disabled=""/);
   assert.match(html, /id="pr-commit-message"[^>]*><\/textarea>/);
-  assert.match(html, /這輪的提交訊息已填好<small>請寫下這輪處理了哪些 review 意見<\/small>/);
+  assert.match(html, /這一輪的提交訊息已填好<small>請寫下這一輪處理了哪些 review 意見<\/small>/);
   assert.match(html, /推送到同一個 PR/);
-  assert.doesNotMatch(html, /以 Draft PR 送出/);
+  assert.doesNotMatch(html, /以 Draft PR 發布/);
   assert.doesNotMatch(html, /說明沒有待填寫的內容/);
 
   const sync = render(
@@ -221,7 +221,7 @@ test("an open follow-up round keeps the PR text as published and asks for this r
     },
   );
   assert.match(sync, /這次同步會在 PR 分支加上一個合併 commit/);
-  assert.match(sync, /checklist-item checked[^>]*>.*?這輪的提交訊息已填好<small><\/small>/);
+  assert.match(sync, /checklist-item checked[^>]*>.*?這一輪的提交訊息已填好<small><\/small>/);
 });
 
 test("maintainer feedback on a published PR can be picked for the next round, up to the limit", () => {
@@ -378,7 +378,7 @@ test("maintainer feedback and the next round's form read in English with no Chin
   assert.match(draft, /There is no PR description yet\./);
   assert.match(draft, /0 \/ 0 files/);
   assert.match(draft, /There are unsaved edits/);
-  assert.match(draft, /Submit as a Draft PR/);
+  assert.match(draft, /Publish as a Draft PR/);
   assertNoHan(draft);
 });
 
@@ -401,7 +401,7 @@ test("the feedback summary formats the time, the checks and the labels for the l
     english,
     /Read at [^<]*2026[^<]* · CI 2 checks: 1 passed, 0 in progress, 1 failed \(overall FAILURE\) · Labels: needs: tests, docs</,
   );
-  assert.match(english, /The PR has a label that starts with “needs:”/);
+  assert.match(english, /A “needs:” label usually means/);
   assert.match(english, /No reviews or comments yet\./);
   assertNoHan(english);
   const chinese = render({ run: withChecks });
@@ -474,11 +474,11 @@ test("the sample shows its fictional feedback, starts no round and links to noth
   assert.doesNotMatch(html, /View pull request/);
   assert.doesNotMatch(html, /Open on GitHub/);
   assert.doesNotMatch(html, /href="#demo-pr/);
-  // The sample starts no round: its controls are off, and it says why.
+  // The sample project starts no round: its controls are off, and it says why.
   for (const box of html.match(/<input type="checkbox"[^>]*aria-label="Include[^>]*>/g) ?? [])
     assert.match(box, /disabled=""/);
   assert.match(tag(html, /aria-describedby="follow-up-limit"/), /disabled=""/);
-  assert.match(html, /The sample starts no round\./);
+  assert.match(html, /The sample project starts no round\./);
   assertNoHan(html);
 });
 
@@ -631,7 +631,7 @@ test("SyncPanel lists upstream changes under your hold for unpublished runs, no-
 
   const zhSynced = renderZh(element({ run: unpublishedSynced }));
   assert.match(zhSynced, /你佔用範圍內的變更/);
-  assert.match(zhSynced, /在你佔用期間，<code>main<\/code> 上有提交改到這些檔案；發布前請先確認。/);
+  assert.match(zhSynced, /在你佔用期間，<code>main<\/code> 上有 commit 改到這些檔案；發布前請先確認。/);
   assert.match(zhSynced, /<code>src\/api\/users\.ts<\/code>\s*<span>（abc1234、def5678）<\/span>/);
 
   const noOpRun: Run = {

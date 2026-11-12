@@ -42,7 +42,7 @@ const stored: ContributionRules = {
 
 test("the sample card quotes its 3 rules with path:line and what publishing does", () => {
   const html = english({ demo: true });
-  assert.match(html, /<h2 id="rules-card-title">Before you contribute<\/h2>/);
+  assert.match(html, /<h2 id="rules-card-title"><svg[\s\S]*?<\/svg>Before you contribute<\/h2>/);
   assert.match(html, /Sample: the project and its CONTRIBUTING\.md are fictional/);
   assert.match(html, /<p class="rules-card-door is-ok"><svg[\s\S]*?<\/svg>Pull requests: open to you<\/p>/);
   assert.equal(html.match(/<figure>/g)?.length, 3);
@@ -53,8 +53,8 @@ test("the sample card quotes its 3 rules with path:line and what publishing does
     "If you used AI tools, say so in the PR description.",
   ])
     assert.ok(html.includes(`<blockquote>${quote}</blockquote>`), quote);
-  assert.match(html, /<code>CONTRIBUTING\.md:\d+<\/code><span class="rules-card-effect is-block">[\s\S]*?Blocks publishing<\/span><span>Publishing waits until the description says that AI helped\.<\/span>/);
-  assert.match(html, /<span class="rules-card-effect is-confirm">[\s\S]*?Asks you to confirm<\/span><span>Publishing asks you to confirm when no issue is linked\.<\/span>/);
+  assert.match(html, /<code>CONTRIBUTING\.md:\d+<\/code><span class="rules-card-effect is-block">[\s\S]*?Blocks publishing<\/span><span>Until the description says that AI helped\.<\/span>/);
+  assert.match(html, /<span class="rules-card-effect is-confirm">[\s\S]*?Asks you to confirm<\/span><span>When no issue is linked\.<\/span>/);
   assert.match(html, /<span class="rules-card-effect is-info">[\s\S]*?For your information<\/span><span>Your understanding check covers it\./);
   // The sample has nothing to check again, and no date that means anything.
   assert.doesNotMatch(html, /Check again|Checked /);
@@ -66,8 +66,8 @@ test("stored rules are grouped by kind, each with the effect publishing has", ()
   const groups = [...html.matchAll(/<section class="rules-card-group"><h3>([^<]+)<\/h3>/g)].map((match) => match[1]);
   assert.deepEqual(groups, ["AI-assisted contributions", "Saying that AI helped", "Notes addressed to AI agents"]);
   assert.match(html, /4 rules quoted from the 3 files BELL PR read\./);
-  assert.match(html, /BELL PR&#x27;s agents write every change, so it won&#x27;t publish one here\./);
-  assert.match(html, /Publishing asks you to decide whether it covers AI-assisted contributions\./);
+  assert.match(html, /BELL PR&#x27;s Agents write every change, so it won&#x27;t publish one here\./);
+  assert.match(html, /Asks you to confirm<\/span><span>You decide whether it covers AI-assisted contributions\.<\/span>/);
   assert.match(html, /<code>docs\/AI_POLICY\.md:12<\/code>/);
   assert.match(html, /Files BELL PR read · 3/);
   assert.match(html, /<li><code>\.github\/PULL_REQUEST_TEMPLATE\.md<\/code><\/li>/);
@@ -170,7 +170,7 @@ test("rules stored with the repository need no request; a missing set is read on
   stubFetch(() => ({ status: 200, body: {} }));
   const empty = await mount(card());
   try {
-    assert.ok(empty.text().includes("Couldn't check: BELL PR hasn't read this project's rules yet."), empty.text());
+    assert.ok(empty.text().includes("Couldn't check: the rules have not been read yet. Choose Check again to read them."), empty.text());
   } finally {
     await empty.unmount();
   }
@@ -264,7 +264,7 @@ test("in a Learn-by-hand run, a contribution ban never says that agents write ev
   const lock = { kinds: ["explain", "answer"] as HelpKind[], at, rulesCheckedAt: at, rules: [{ kind: "ban", path: ban.path, line: ban.line, quote: ban.quote, allows: ban.allows! }] };
   const run = (byHand: Run["byHand"], agents = ["lead", "reviewer", "tester"]) =>
     ({ id: "run-1", learnByHand: true, agents: agents.map((id) => ({ id, name: id, role: id, status: "complete", detail: "" })), byHand }) as unknown as Run;
-  const agentLine = /agents write every change/;
+  const agentLine = /Agents write every change/;
   // Fitted to the rule when it started: publishing can ask for the quoted confirm.
   const fitted = english({ rules, byHandRun: run({ helpLock: lock }) });
   assert.doesNotMatch(fitted, agentLine);
@@ -277,7 +277,7 @@ test("in a Learn-by-hand run, a contribution ban never says that agents write ev
   const assistance = english({ rules: { ...rules, findings: [{ ...ban, reach: "assistance", allows: undefined }] }, byHandRun: run({}) });
   assert.match(assistance, /won&#x27;t publish a learn-by-hand run here: the project&#x27;s rules restrict AI help itself, not only AI-written code\./);
   // Rules that aren't about who writes keep their line; an unclean run (a teammate joined) and an agent run keep the agent line.
-  assert.match(fitted, /Publishing waits until the description says that AI helped\./);
+  assert.match(fitted, /Until the description says that AI helped\./);
   assert.match(english({ rules, byHandRun: run({ helpLock: lock }, ["lead", "member-1"]) }), agentLine);
   assert.match(english({ rules }), agentLine);
   assert.match(renderZh(card({ rules, byHandRun: run({ helpLock: lock }) })), /這個任務開始時就配合了這條規則/);

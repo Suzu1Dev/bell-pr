@@ -5,7 +5,6 @@ import type en from "../en/about";
 
 const m: Translation<typeof en> = {
   title: `關於 ${product.name}`,
-  subtitle: "版本、資料存放的位置，以及說明、授權與聲明在哪裡。",
   appVersion: "App 版本",
   serverVersion: "伺服器版本",
   checking: "正在確認…",
