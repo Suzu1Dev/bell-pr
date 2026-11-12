@@ -57,7 +57,6 @@ test("the switches show what is saved, and wait while the settings load", () => 
   assertNoHan(off);
   assert.doesNotMatch(checkbox(off, checkLabel), /checked/);
   assert.doesNotMatch(checkbox(off, tryFirstLabel), /checked/);
-
   const loading = renderEn(section(null));
   assert.match(checkbox(loading, checkLabel), /disabled=""/);
   assert.match(checkbox(loading, tryFirstLabel), /disabled=""/);

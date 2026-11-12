@@ -4,9 +4,13 @@
  * does, and says who is asking within the group with a participant token
  * (`bpc_…`) in the `x-bell-participant` header.
  */
+import type { RunStatus } from "./types.js";
 
 /** Where group work stands on this instance. Never persisted. */
 export type CollabState = "notSetUp" | "ready" | "stopped";
+
+/** At most this many people are saved as one run's owners (`Run.owners`); a device rarely has more than a few. */
+export const maxRunOwners = 100;
 
 /** `collab` in GET /api/status; absent when BELL PR runs without --group. */
 export interface CollabStatus {
@@ -91,6 +95,14 @@ export interface CollabHold {
   fence: number;
   /** ISO 8601. */
   since: string;
+  /** The tasks this work waited for, all done when it was held; absent when none. */
+  dependsOn?: CollabDependency[];
+}
+
+/** A task that other work depends on. */
+export interface CollabDependency {
+  taskId: string;
+  title: string;
 }
 
 /** One repository's board: who holds what. */
@@ -100,6 +112,11 @@ export interface CollabBoard {
   people: { id: string; name: string; admin?: true; removed?: true }[];
   /** Oldest first. */
   held: CollabHold[];
+}
+
+/** GET /api/collab/projects/:project/tasks → 200. */
+export interface CollabTasksResponse {
+  tasks: (CollabDependency & { status: "held" | "done" })[];
 }
 
 /**
@@ -138,6 +155,17 @@ export interface CollabMeeting {
   holder: string;
 }
 
+/** Another unfinished run of this repository whose files or plan meet an asked path. */
+export interface CollabChanging {
+  runId: string;
+  title: string;
+  status: RunStatus;
+  /** Names of the group's people who own the run; empty when none of them started it. */
+  owners: string[];
+  /** The changed or planned paths of the run that meet the asked paths, sorted. */
+  paths: string[];
+}
+
 /** POST /api/collab/projects/:project/check → 200. Changes nothing. */
 export interface CollabCheckResponse {
   /** ISO 8601. */
@@ -145,17 +173,23 @@ export interface CollabCheckResponse {
   /** The asked paths that cannot be held, as they were sent. */
   invalid: string[];
   meets: CollabMeeting[];
+  /** Other people's unfinished runs whose files or plans already meet the asked paths. */
+  changing: CollabChanging[];
 }
 
 /** POST /api/collab/projects/:project/work. */
 export interface CollabWorkRequest {
   title: string;
   scopes: string[];
+  /** Tasks of this repository that must be done first: at most 50 ids. */
+  dependsOn?: string[];
 }
 
 /** POST /api/collab/projects/:project/work → 201. */
 export interface CollabWorkResponse {
   hold: CollabHold;
+  /** Other people's unfinished runs whose files or plans already meet the new hold. */
+  changing: CollabChanging[];
 }
 
 /** In a 409 `conflict`: a held path that is in the way. */
@@ -171,6 +205,8 @@ export interface CollabConflict {
 /** POST /api/collab/projects/:project/holds/:claim/release. */
 export interface CollabReleaseRequest {
   fence: number;
+  /** The task is finished: work that depends on it may start. */
+  done?: boolean;
 }
 
 /** POST …/release and …/revoke → 200. */
@@ -191,4 +227,12 @@ export interface CollabRefusal {
   retryAfter?: number;
   /** With 400 `invalidScope`: the paths that cannot be held. */
   invalid?: string[];
+  /** With 400 `dependencyUnknown`: the asked ids that are no task of this repository. */
+  unknown?: string[];
+  /**
+   * With 409 `dependencyPending`: the tasks not done yet. `held` is false
+   * for one that was never held or whose hold ended without being done; it
+   * is never done now.
+   */
+  pending?: (CollabDependency & { held: boolean })[];
 }
