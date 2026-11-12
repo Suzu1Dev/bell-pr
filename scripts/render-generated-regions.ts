@@ -29,9 +29,10 @@
  *   when set, otherwise the public GitHub repository. Empty publicRepoUrl
  *   hides the block. HTML callers provide the surrounding <code> element.
  *   mise pins `publishedInstallVersion` from scripts/published-version.mjs.
- *   The pin may lead package.json and the Homebrew formula while a release
- *   is still open. --check and --write fail when it is a lower semver than
- *   either of those versions. npx, npm and bun stay unpinned.
+ *   The pin is a stable MAJOR.MINOR.PATCH and may lead package.json and the
+ *   Homebrew formula while a release is still open. --check and --write fail
+ *   when it is a lower semver than a stable version in either file. A
+ *   prerelease in those files is not compared. npx, npm and bun stay unpinned.
  *
  * Layout: when the opening comment stands alone on its line, the content
  * goes on the lines between the comments, at the comment's indentation.
@@ -44,8 +45,9 @@
  * (paths relative to the current directory).
  *
  * Exit status: 0 when every region is current (or was written), 1 when
- * --check finds a stale region, publishedInstallVersion is a lower semver
- * than package.json or the formula, or the self-test fails, 2 on a usage
+ * --check finds a stale region, publishedInstallVersion is not a stable
+ * MAJOR.MINOR.PATCH or is a lower semver than the stable version in
+ * package.json or the formula, or the self-test fails, 2 on a usage
  * error or a malformed region.
  */
 import assert from "node:assert/strict";
@@ -429,6 +431,8 @@ interface Semver {
   pre: string[] | undefined;
 }
 
+const stableInstallVersion = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/;
+
 function parseSemver(value: string): Semver | undefined {
   const match = /^(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?(?:\+[0-9A-Za-z.-]+)?$/.exec(value);
   if (!match) return undefined;
@@ -462,6 +466,7 @@ function compareSemver(left: string, right: string): number | undefined {
 
 function publishedVersionDrift(published: string, compared: { file: string; version: string }[]): string[] {
   return compared.flatMap(({ file, version }) => {
+    if (parseSemver(version)?.pre) return [];
     const order = compareSemver(published, version);
     if (order === undefined)
       return [`publishedInstallVersion ${published} and ${file} ${version} must both be semver. Update scripts/published-version.mjs.`];
@@ -497,6 +502,11 @@ function releaseVersions(root: string): { file: string; version: string }[] | un
 }
 
 function publishedVersionProblems(root: string, published = publishedInstallVersion): string[] {
+  if (!stableInstallVersion.test(published)) {
+    return [
+      `publishedInstallVersion ${published} must be a stable MAJOR.MINOR.PATCH with no leading zeros, prerelease, or build metadata. Update scripts/published-version.mjs.`,
+    ];
+  }
   const compared = releaseVersions(root);
   return compared ? publishedVersionDrift(published, compared) : [];
 }
@@ -818,6 +828,23 @@ function selfTest(): number {
     assert.deepEqual(publishedVersionProblems(versions, "1.1.1"), []);
     writeVersions("1.1.0", "1.0.0");
     assert.deepEqual(publishedVersionProblems(versions, "1.1.1"), []);
+    writeVersions("1.2.0-beta.1", "1.1.0");
+    assert.deepEqual(publishedVersionProblems(versions, "1.1.1"), []);
+    writeVersions("1.1.0", "1.2.0-beta.1");
+    assert.deepEqual(publishedVersionProblems(versions, "1.1.1"), []);
+    writeVersions("1.2.0", "1.1.1");
+    assert.deepEqual(publishedVersionProblems(versions, "1.1.1"), [
+      `publishedInstallVersion 1.1.1 is lower than package.json 1.2.0. ${update}`,
+    ]);
+    writeVersions("1.1.1", "1.2.0");
+    assert.deepEqual(publishedVersionProblems(versions, "1.1.1"), [
+      `publishedInstallVersion 1.1.1 is lower than ${formulaRel} 1.2.0. ${update}`,
+    ]);
+    const invalid = (value: string) =>
+      `publishedInstallVersion ${value} must be a stable MAJOR.MINOR.PATCH with no leading zeros, prerelease, or build metadata. Update scripts/published-version.mjs.`;
+    for (const value of ["01.1.1", "1.1.1+build.5", "1.2.0-beta.1"]) {
+      assert.deepEqual(publishedVersionProblems(versions, value), [invalid(value)]);
+    }
   } finally {
     fs.rmSync(versions, { recursive: true, force: true });
   }
