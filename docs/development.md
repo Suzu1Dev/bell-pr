@@ -231,7 +231,7 @@ commit message body.
 | `server/run-executor.ts` | 900 lines |
 | Largest JS chunk | 116 kB gzip |
 | All JS, lazily loaded chunks included | 500 kB gzip |
-| All CSS | 45 kB gzip |
+| All CSS | 46 kB gzip |
 
 How the code stays within them:
 
