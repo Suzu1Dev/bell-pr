@@ -206,7 +206,8 @@ what agents may do beyond the limits below, or add to their instructions:
   but the file tools of writable roles follow your `Read(...)` and
   `Edit(...)` allow rules, and `Edit(...)` paths are also writable for
   sandboxed commands.
-- `sandbox.filesystem.allowWrite` and `allowRead`, and
+- [`sandbox.filesystem.allowWrite`](https://code.claude.com/docs/en/sandboxing#configure-sandboxing)
+  and `allowRead`, and
   `sandbox.network.allowedDomains`, widen the sandbox of writable roles.
 - `sandbox.network.httpProxyPort` and `socksProxyPort` send the traffic of
   sandboxed commands to your own proxy instead of the filtering proxy

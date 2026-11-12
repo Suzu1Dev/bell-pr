@@ -143,8 +143,8 @@ git config --global user.email "you@example.com"
 The address is published with every commit. To keep yours private, use
 your GitHub no-reply address, which the environment check suggests once
 the GitHub CLI is signed in (`<id>+<login>@users.noreply.github.com`). See
-GitHub's guide to
-[setting your commit e-mail address](https://docs.github.com/en/account-and-profile/how-tos/email-preferences/setting-your-commit-email-address).
+GitHub's reference for
+[your no-reply e-mail address](https://docs.github.com/en/account-and-profile/reference/email-addresses-reference#your-noreply-email-address).
 Before it publishes an address that is not a GitHub no-reply address, BELL
 PR asks you to confirm it once.
 
@@ -174,8 +174,9 @@ gh auth login
 ### `gh_workflow_scope`
 
 "This change edits GitHub Actions workflows (.github/workflows), and your
-GitHub sign-in is not allowed to push them." Add the permission, then
-publish again:
+GitHub sign-in is not allowed to push them." Add the permission (GitHub's
+[`workflow` scope](https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/scopes-for-oauth-apps#available-scopes)),
+then publish again:
 
 ```sh
 gh auth refresh -h github.com -s workflow
@@ -231,7 +232,7 @@ npm install -g @anthropic-ai/claude-code
 claude auth login
 ```
 
-See the [Claude Code documentation](https://code.claude.com/docs/en/overview)
+See the [Claude Code setup page](https://code.claude.com/docs/en/setup)
 for other ways to install it. BELL PR uses the Claude Code CLI you installed
 and signed in to (Claude plan or Anthropic API key). Usage counts against
 your own account.
@@ -317,18 +318,22 @@ log. BELL PR reads the same settings. Pick one:
   `sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0` (until
   the next restart; a file in `/etc/sysctl.d/` keeps it). Then press
   **Re-check** in **Settings → Environment**.
-- **Use Claude Code or Codex** for this work: choose it in the model
-  settings. Claude Code's bubblewrap has its own AppArmor profile on
-  Ubuntu, and Codex brings its own sandbox.
 - **Allow unsandboxed agents** under **Settings → Agent safety**, or start
   BELL PR with `BELLPR_ALLOW_UNSANDBOXED_AGENTS=1`. Antigravity's commands
   then run with your full user rights, as described for
   `claude_sandbox_unavailable` above, and every such run carries a "Ran
   without sandbox" badge.
 
+Choosing Claude Code or Codex in the model settings may not help: their
+sandboxes can need the same Ubuntu setting. Claude Code documents that
+[Ubuntu's AppArmor restriction can keep its sandbox from starting](https://code.claude.com/docs/en/sandboxing#apparmor-restriction-stops-bubblewrap).
+Codex's sandboxing documentation says that on Ubuntu 24.04 Codex may still
+warn that it cannot create the needed user namespace after bubblewrap is
+installed.
+
 `bell-pr doctor` shows the state as "Antigravity sandbox". macOS needs
-`sandbox-exec`, which it has built in; other platforms have no sandbox for
-Antigravity.
+`sandbox-exec`, which it has built in; on other platforms BELL PR reports
+the sandbox as not available.
 
 ### `antigravity_workspace_config`
 

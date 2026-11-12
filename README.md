@@ -126,8 +126,14 @@ and limits, or follow [Getting started](docs/getting-started.md) for a full walk
   operations use your GitHub account. The CLIs have their own data policies.
 - **Sandbox limits.** Agents use their CLI's sandbox by default. Import
   only projects whose code you are willing to run. Your Claude Code settings
-  can widen its sandbox, and GitHub credentials in the system keyring are
+  [can widen its sandbox](https://code.claude.com/docs/en/sandboxing#configure-sandboxing),
+  and GitHub credentials in the system keyring are
   not protected by its file restrictions; use a token with minimal permissions.
+  [GitHub documents](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens#personal-access-tokens-classic)
+  that only classic personal access tokens have write access to public
+  repositories that you or your organizations do not own. If publishing fails
+  with a fine-grained token, use a classic token with the `repo` or
+  `public_repo` permission.
 - **Broader access is optional.** Full access or allowing unsandboxed agents
   gives writable agents your user permissions. Linux's optional passwordless
   sudo grants root access to every process under that user. Use these options

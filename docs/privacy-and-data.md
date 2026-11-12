@@ -97,11 +97,15 @@ that CLI needs, plus these opt-outs when they are set in the environment
 BELL PR runs in:
 
 - `DO_NOT_TRACK`, passed to every CLI;
-- for Claude Code, the variables it documents: `DISABLE_TELEMETRY`,
+- for Claude Code, the variables
+  [it documents](https://code.claude.com/docs/en/data-usage): `DISABLE_TELEMETRY`,
   `DISABLE_ERROR_REPORTING`, `DISABLE_BUG_COMMAND`,
   `CLAUDE_CODE_DISABLE_FEEDBACK_SURVEY`, and
   `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC`, which turns off all of its
-  non-essential traffic.
+  non-essential traffic. The current name of `DISABLE_BUG_COMMAND` is
+  `DISABLE_FEEDBACK_COMMAND`. Claude Code
+  [also accepts the older name](https://code.claude.com/docs/en/env-vars),
+  and the older name is the one BELL PR passes on.
 
 BELL PR starts each Codex agent with `codex exec --ignore-user-config`, which
 does not load `$CODEX_HOME/config.toml` (sign-in still uses `CODEX_HOME`). This

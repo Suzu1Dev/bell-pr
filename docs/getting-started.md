@@ -21,21 +21,29 @@ You need:
 - **The GitHub CLI** (`gh`), signed in with `gh auth login`, to import from
   GitHub, publish pull requests and find projects
   ([cli.github.com](https://cli.github.com/)).
-  To check, run `gh auth status`. Tokens in your system keyring are not covered:
+  To check, run `gh auth status`. Tokens in your system keyring
+  ([where `gh` stores them](https://cli.github.com/manual/gh_auth_login)) are not covered:
   the agent can still read your GitHub token via `gh auth token`. Your main
   protection is a fine-grained token with the minimum permissions you need.
+  [GitHub documents](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens#personal-access-tokens-classic)
+  that only classic personal access tokens have write access to public
+  repositories that you or your organizations do not own. If publishing fails
+  with a fine-grained token, use a classic token with the `repo` or
+  `public_repo` permission.
 - **An AI coding CLI**, installed and signed in, as the same user that runs
   BELL PR. Either one is enough:
   - the Codex CLI: `npm install -g @openai/codex`, then `codex login`.
     BELL PR uses the Codex CLI you installed and signed in to. Usage counts
     against your own account.
-  - Claude Code: `npm install -g @anthropic-ai/claude-code`, then
+  - [Claude Code](https://code.claude.com/docs/en/setup): `npm install -g @anthropic-ai/claude-code`, then
     `claude auth login`. BELL PR uses the Claude Code CLI you installed and
     signed in to (Claude plan or Anthropic API key). Usage counts against
     your own account.
 - **On Linux, bubblewrap and socat**, so Claude Code agents that edit files
-  run in the operating-system sandbox (`sudo apt-get install bubblewrap
-  socat` on Debian and Ubuntu). macOS has its sandbox built in.
+  run in the
+  [operating-system sandbox](https://code.claude.com/docs/en/sandboxing#set-up-linux-and-wsl2)
+  (`sudo apt-get install bubblewrap socat` on Debian and Ubuntu). macOS has
+  its sandbox built in.
 
 BELL PR runs on macOS and Linux. Windows uses WSL2, with every tool above
 installed and signed in inside the same distribution; native Windows is not

@@ -135,7 +135,8 @@ it has no model of its own and no BELL PR cloud.
 
 BELL PR uses the sign-in your CLI already has. With the Codex CLI: BELL PR
 uses the Codex CLI you installed and signed in to, and usage counts
-against your own account. With Claude Code: BELL PR uses the Claude Code
+against your own account. With
+[Claude Code](https://code.claude.com/docs/en/setup#authenticate): BELL PR uses the Claude Code
 CLI you installed and signed in to (Claude plan or Anthropic API key), and
 usage counts against your own account. Your provider's prices and usage
 limits apply. Agent teams run several agents at once, which uses your
@@ -184,9 +185,16 @@ or paths, excluded commands, plugin language servers; see
 Claude Code is denied the GitHub CLI config files,
 `~/.git-credentials` and credential-store files, `~/.netrc`, and `~/.ssh/`.
 `GH_TOKEN`/`GITHUB_TOKEN` are removed from the agent's environment. Tokens
-in your system keyring are not covered: the agent can still read your GitHub
+in your system keyring
+([where `gh` stores them](https://cli.github.com/manual/gh_auth_login)) are
+not covered: the agent can still read your GitHub
 token via `gh auth token`. Your main protection is a fine-grained token with
-the minimum permissions you need. Claude Code is also denied BELL PR's own
+the minimum permissions you need.
+[GitHub documents](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens#personal-access-tokens-classic)
+that only classic personal access tokens have write access to public
+repositories that you or your organizations do not own. If publishing fails
+with a fine-grained token, use a classic token with the `repo` or
+`public_repo` permission. Claude Code is also denied BELL PR's own
 data outside its checkout. The project's own agent instructions and settings
 are never loaded. If you allow unsandboxed Claude Code agents, they have your
 full user rights, and those runs are marked. The

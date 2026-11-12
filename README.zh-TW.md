@@ -78,7 +78,7 @@ Homebrew、Bun、mise 與 Windows 安裝腳本等方式，請見[安裝指南](d
 ## 隱私與安全
 
 - **本機儲存，外部 AI。** BELL PR 沒有雲端服務或遙測。Agent 讀取的程式碼與提問會送到你選擇的 AI 服務商；GitHub 操作使用你的帳戶。各 CLI 另有自己的資料政策。
-- **沙箱的限制。** Agent 預設使用各 CLI 的沙箱。請只匯入你願意在這台電腦上執行的專案。你的 Claude Code 設定可能放寬沙箱，系統 keyring 中的 GitHub 憑證也不受其檔案限制保護；請使用權限最小的 token。
+- **沙箱的限制。** Agent 預設使用各 CLI 的沙箱。請只匯入你願意在這台電腦上執行的專案。你的 Claude Code 設定[可能放寬沙箱](https://code.claude.com/docs/en/sandboxing#configure-sandboxing)，系統 keyring 中的 GitHub 憑證也不受其檔案限制保護；請使用權限最小的 token。[GitHub 的文件說明](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens#personal-access-tokens-classic)，只有 classic personal access token 能寫入不屬於你、也不屬於你所屬組織的公開 Repository。如果用 fine-grained token 發布失敗，請改用具備 `repo` 或 `public_repo` 權限的 classic token。
 - **擴大權限需自行開啟。**「完整權限」或允許無沙箱執行，會讓可寫入的 Agent 取得你的使用者權限。Linux 的免密碼 sudo 會讓該使用者的所有程序取得 root 權限。這些選項只適合在用完即丟的 VM 或容器中使用。
 - **網路存取。** Agent 網路存取預設關閉；Antigravity 的網路搜尋無法關閉，是例外。專案若附帶 Antigravity 的 hooks、MCP 伺服器、外掛、Agent 或技能，BELL PR 會拒絕在其中啟動 Antigravity。
 - **私人連線。** 預設只在 `127.0.0.1` 監聽，API 需要憑證。其他裝置請依[自架與配對指南](docs/self-hosting.md)，透過私人連線與 `bell-pr pair` 使用。請勿暴露到公網；含 token 的網址應視為密碼。`bell-pr token rotate` 會更換安裝權杖並撤銷所有配對裝置。
