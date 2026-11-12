@@ -33,9 +33,7 @@ type DroppedPathField = NonNullable<
 const mission = {
   overview: {
     background: "Project background and other contribution ideas",
-    kicker: "PROJECT CONTEXT",
     title: "Project background",
-    lead: "See the reason behind every contribution from the user's side.",
     update: "Update to the latest version",
     updating: "Updating…",
     /** `updatedAt` arrives formatted for the locale. */
@@ -46,7 +44,7 @@ const mission = {
       branch: string;
       updatedAt?: string;
     }) =>
-      `Fetches the latest ${branch} from GitHub, and the overview and analysis follow it. New contributions always start from the latest version.${updatedAt ? ` Last updated: ${updatedAt}` : ""}`,
+      `Fetches the latest ${branch} from GitHub for the overview and analysis. New contributions start from the latest version either way.${updatedAt ? ` Last updated: ${updatedAt}` : ""}`,
     analyze: "Analyze the project",
     reanalyze: "Re-analyze",
     analyzing: "Analyzing the project…",
@@ -54,9 +52,8 @@ const mission = {
   empty: {
     loadingTitle: "Turning the code into a project overview.",
     title: "Your next contribution starts with understanding.",
-    loadingLead:
-      "The Agent reads the project's docs and main modules, then sums up its purpose, how people use it, and improvements backed by evidence.",
-    lead: "Let the Agent read this repository and answer three questions first, then decide where your effort is worth it.",
+    loadingLead: "The Agent is reading the project's docs and main modules.",
+    lead: "Let the Agent read this project and answer three questions.",
     questions: {
       problem: "What problem does it solve?",
       users: "Who uses it?",
@@ -81,7 +78,7 @@ const mission = {
       `try ${n(attempt)} of ${n(attempts)}`,
     /** `elapsed` arrives as a clock time such as "3:05". */
     elapsed: ({ elapsed }: { elapsed: string }) => `Running for ${elapsed}`,
-    note: "The bar fills with the time used against the most this step may take, not with how much of the work is done. While it only moves, there is no such time to show.",
+    note: "The bar shows the time used against this step's time limit, not how much of the work is done. When a step has no time limit to show, the bar only moves.",
   },
   project: {
     sourceDemo: "Sample analysis",
@@ -154,13 +151,11 @@ const mission = {
     reanalyze: ({ language }: { language: string }) => `Re-analyze in ${language}`,
   },
   journey: {
-    kicker: "THE USER JOURNEY",
     title: "How do people use this project?",
   },
   reading: {
-    kicker: "WHERE TO START READING",
     title: "New to this project? Read it in this order",
-    lead: "Ordered from the sampled files the Agent read; each step says why to read it first and what to look for.",
+    lead: "Ordered from the sampled files the Agent read. Each step says why to read it first and what to look for.",
     flow: "How the modules fit together",
     /** Read by screen readers only, on a flow step outside the repository. */
     flowOutside: "Outside this repository",
@@ -188,7 +183,6 @@ const mission = {
     evidence: "Analysis evidence",
   } satisfies Record<DroppedPathField, string>,
   brief: {
-    kicker: "THIS CONTRIBUTION",
     title: "What difference will this change make?",
     problem: "The problem to solve",
     motivation: "Why it is worth improving now",
@@ -209,7 +203,7 @@ const mission = {
     impactRefuted:
       "The premise check found that the assumption does not hold: the problem and impact described above from it do not happen. Go by the check and the lead's integration report.",
     premiseMissing:
-      "This contribution was made before premise checks, so whether the request's assumption holds was not recorded. The lead can check it once against the current code and the review reports; the code walkthroughs, and the explanations you have not answered yet, are then made again with the verdict.",
+      "This contribution was made before premise checks, so whether the request's assumption holds was not recorded. The lead can check it once against the current code and the review reports. The code walkthroughs, and the explanations you have not answered yet, are then made again with the verdict.",
     premiseCheck: "Check the premise against the review",
     premiseRecheck: "Check the premise again",
     premiseChecking: "Checking the premise…",
@@ -227,7 +221,6 @@ const mission = {
     why: "Why this quote",
   },
   ideas: {
-    kicker: "WHERE YOU CAN HELP",
     title: "Contribution directions worth exploring",
     lead: "Look at the problem and its value to users first, then decide whether to hand it to the team.",
     /** Marks the recommendations as written by AI. */
@@ -249,7 +242,7 @@ const mission = {
     moreLimit: ({ max }: { max: number }) =>
       `This analysis has reached its limit of ${n(max)} recommendations. Pick a direction, or re-analyze the project.`,
     moreHint:
-      "The Agent uses the model settings saved for this project to look for different problems and value to users. The existing recommendations stay, and you decide when development starts.",
+      "Uses the saved model settings. Existing recommendations stay.",
     generatingStatus:
       "Reading the project and steering clear of the existing directions. You can keep reading the recommendations below.",
     viewAdded: ({ added, requested }: { added: number; requested?: number }) =>
@@ -286,7 +279,7 @@ const mission = {
     droppedPaths: ({ count }: { count: number }) =>
       `Skipped ${amount(count, "note", "notes")} citing unsampled or missing files`,
     droppedPathsNote:
-      "The model read only the sampled files; of the other paths it only knows that they exist. Evidence must come from files it read, and paths that are not in the tree cannot be checked. The rest of the analysis is saved as usual.",
+      "The model read only the sampled files, so notes that cite other files cannot be checked and were skipped. The rest of the analysis is saved as usual.",
     /** Where a dropped recommendation came from. */
     rounds: {
       analysis: "Project analysis",
@@ -391,18 +384,18 @@ const mission = {
     },
     issue: {
       label: "Related issue link",
-      help: "Only GitHub issue page URLs are accepted. With one, the PR draft can write Fixes or Refs #number and link back to the issue. Before you submit, comment on the issue to say you will work on it.",
+      help: "Only GitHub issue URLs are accepted. With one, the PR draft can write Fixes or Refs #number. Before you submit, comment on the issue to say you will work on it.",
     },
     model: {
-      heading: "Model and reasoning",
+      heading: "Model and reasoning effort",
       note: "Defaults apply to new tasks across projects. Existing tasks keep their settings.",
-      agent: "Agent",
+      agent: "AI provider",
       providerHelp: {
         codex: "Uses the Codex CLI you installed and signed in to.",
         claude:
           "Uses the Claude Code CLI you installed and signed in to (Claude plan or Anthropic API key). Usage counts against your own account. Available models depend on your plan.",
         antigravity:
-          "Uses the Antigravity CLI (agy) you installed and signed in to (Google account, Gemini API key or Google Cloud credentials). Usage counts against your own account, and the models listed depend on it. Its agents can always search the web, and it does not start in a project that ships Antigravity hooks, MCP servers, plugins, agents or skills.",
+          "Uses the Antigravity CLI (agy) you installed and signed in to (Google account, Gemini API key or Google Cloud credentials). Usage counts against your own account, and the models listed depend on it. Antigravity does not start in a project that ships Antigravity hooks, MCP servers, plugins, agents or skills.",
       } satisfies Record<AgentProvider, string>,
       /** A provider in the list with its state, for example "Codex — not signed in". */
       providerOption: ({ provider, state }: { provider: string; state: string }) =>
@@ -434,10 +427,10 @@ const mission = {
         "The saved effort is not in this model's list. Choose again.",
       effortHelp: "Higher reasoning effort takes longer and uses more of your account’s allowance.",
       webAccess: "Let Agents search the web and read pages",
-      webPages: "Allow agents to read web pages",
+      webPages: "Let Agents read web pages",
       antigravityWeb: "Antigravity can always search the web, including during project analysis and discovery. This switch only controls reading web pages.",
       webAccessHelp:
-        "Allows task and follow-up agents to search and read web pages. Project analysis and discovery do not use these tools. Web content is untrusted; command-line network access still follows the chosen permissions.",
+        "Applies to tasks and follow-ups. Project analysis and discovery do not use these tools. Web content is treated as untrusted. Command-line network access still follows the chosen permissions.",
       error: ({ message }: { message: string }) =>
         `${message} Your saved choice is kept.`,
       loadFailed: ({ provider }: { provider: string }) =>
@@ -459,7 +452,7 @@ const mission = {
       summary: ({ count }: { count: number }) => `${count} teammates`,
       legend: "Team size",
       teammates: "teammates",
-      note: "Sets the most teammates the team may use; the run's plan decides the actual split.",
+      note: "The most teammates the team may use; the task's plan decides the actual split.",
     },
     planApproval: {
       label: "Let me approve the plan before development",
@@ -492,7 +485,6 @@ const mission = {
    * project has no rules, only where it looked.
    */
   rules: {
-    kicker: "THE PROJECT'S OWN RULES",
     title: "Before you contribute",
     lead: `What this project asks of contributors, quoted from its own files, and what ${product.name} does about each rule when you publish.`,
     door: {
@@ -523,17 +515,16 @@ const mission = {
       info: "For your information",
     },
     effect: {
-      ban: `${product.name}'s agents write every change, so it won't publish one here. You can still practise locally.`,
-      banAmbiguous:
-        "Publishing asks you to decide whether it covers AI-assisted contributions.",
-      disclose: "Publishing waits until the description says that AI helped.",
+      ban: `${product.name}'s Agents write every change, so it won't publish one here. You can still practise locally.`,
+      banAmbiguous: "You decide whether it covers AI-assisted contributions.",
+      disclose: "Until the description says that AI helped.",
       understand:
         "Your understanding check covers it. With the check turned off, publishing asks you to confirm.",
-      area: "Publishing is blocked when the linked issue carries a label for newcomers.",
+      area: "When the linked issue is labelled for newcomers.",
       agent:
         "It is addressed to AI agents. You are the author, so publishing asks you to decide whether it applies.",
-      "own-words": `Publishing waits while the description is still ${product.name}'s suggested text.`,
-      "issue-first": "Publishing asks you to confirm when no issue is linked.",
+      "own-words": `While the description is still ${product.name}'s suggested text.`,
+      "issue-first": "When no issue is linked.",
     } satisfies Record<PolicyKind | "banAmbiguous", string>,
     found: ({ count, files }: { count: number; files: number }) =>
       `${amount(count, "rule", "rules")} quoted from the ${amount(files, "file", "files")} ${product.name} read.`,
@@ -542,7 +533,7 @@ const mission = {
     noFiles:
       "No contributing guide, policy or pull request template was there to read. Some projects publish their rules on a website or wiki; check before you publish.",
     couldntCheck: ({ reason }: { reason: string }) => `Couldn't check: ${reason}`,
-    notRead: `${product.name} hasn't read this project's rules yet. It reads them when the project is imported or updated, and when you check again.`,
+    notRead: "the rules have not been read yet. Choose Check again to read them.",
     filesRead: ({ count }: { count: number }) =>
       `Files ${product.name} read · ${n(count)}`,
     orgDefaults: ({ repository }: { repository: string }) =>
@@ -568,8 +559,8 @@ const mission = {
    */
   start: {
     title: "Before you start",
-    lead: "Read once for this issue link. Nothing here stops you from practising; publishing checks again.",
-    noIssue: `Link the issue you will work on, and ${product.name} checks whether it is still open and whether someone else is already on it.`,
+    lead: "Read once for this issue link. Nothing here stops you from practising. Publishing checks again.",
+    noIssue: `With a link, ${product.name} checks whether the issue is still open and whether someone else is already on it.`,
     notGitHub:
       "Issue facts are read for GitHub issue links, such as https://github.com/owner/repo/issues/123.",
     oneIssue:
@@ -603,8 +594,8 @@ const mission = {
       `Labelled for newcomers: ${fmt.list(labels)}`,
     pacing: ({ open, budget }: { open: number; budget: number }) =>
       `Your open PRs here: ${n(open)} of ${n(budget)}`,
-    pacingHelp: `The budget is a ${product.name} default: 1 open pull request before your first one is merged in a repository, 2 after.`,
-    pacingExempt: "You can write to this repository, so publishing isn't paced here",
+    pacingHelp: `The limit is a ${product.name} default: 1 open pull request in a repository until your first one is merged, then 2.`,
+    pacingExempt: "You can write to this repository, so the open-PR limit doesn't apply here",
     doorClosed: "This repository doesn't take pull requests from you",
     ban: "The project's rules don't accept AI-assisted contributions",
     unknown: ({ part, reason }: { part: "door" | "issue" | "pacing" | "other"; reason?: string }) => {
@@ -624,17 +615,17 @@ const mission = {
   startConfirm: {
     title: "Before the team starts",
     practise: {
-      "issue-closed": `You can practise this locally; ${product.name} won't publish it while the linked issue is closed.`,
-      door: `You can practise this locally; ${product.name} won't publish it while this repository doesn't take pull requests from you.`,
-      ban: `You can practise this locally; ${product.name} won't publish it while the project's rules don't accept AI-assisted contributions.`,
-      area: `You can practise this locally; ${product.name} won't publish it while the project keeps issues labelled for newcomers for people learning without AI tools.`,
+      "issue-closed": `${product.name} won't publish this while the linked issue is closed.`,
+      door: `${product.name} won't publish this while this repository doesn't take pull requests from you.`,
+      ban: `${product.name} won't publish this while the project's rules don't accept AI-assisted contributions.`,
+      area: `${product.name} won't publish this: the project keeps issues labelled for newcomers for people learning without AI tools.`,
     },
     otherPr: ({ author, number }: { author: string; number: number }) =>
-      `You can practise this locally; ${product.name} won't publish it while @${author}'s pull request #${number} would close the same issue, unless you give your reason when you publish.`,
+      `${product.name} won't publish this while @${author}'s pull request #${number} would close the same issue, unless you give your reason when you publish.`,
     pacing: ({ open, budget }: { open: number; budget: number }) =>
-      `You can practise this locally; ${product.name} won't publish it while you have ${n(open)} open pull requests here, at least twice your budget of ${n(budget)}.`,
+      `${product.name} won't publish this while you have ${n(open)} open pull requests here, at least twice your limit of ${n(budget)}.`,
     lesson:
-      "Issues labelled for newcomers are how people learn a project by writing the fix themselves. When an agent team takes one, the next newcomer loses that chance. Consider a help-wanted issue instead.",
+      "Issues labelled for newcomers are how people learn a project by writing the fix themselves. When an Agent team takes one, the next newcomer loses that chance. Consider a help-wanted issue instead.",
     practiseLocally: "Start and practise locally",
     startAnyway: "Start anyway",
     back: "Back",

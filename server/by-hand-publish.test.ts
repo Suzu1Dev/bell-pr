@@ -57,7 +57,7 @@ const ban: PolicyFinding = {
   contribution: true,
   allows: [carveOut],
 };
-const agentCopy = /^The project's rules do not accept AI-assisted contributions, and AI agents wrote this change\./;
+const agentCopy = /^The project's rules do not accept AI-assisted contributions, and AI Agents wrote this change\./;
 const byHandCopy = /^The project's rules decline AI-generated content\. BELL PR's agents had no write access and gave you no code for this change\./;
 
 async function fixture(t: TestContext) {

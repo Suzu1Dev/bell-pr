@@ -18,7 +18,7 @@ const understanding: Translation<typeof en> = {
     error: "無法執行",
   },
   walkthroughFull: `這個檔案的逐段解說作答已達 ${product.name} 保留的上限。`,
-  notOpen: "工作等待你審閱或核准時才能進行理解檢查；執行中或發布中不行。",
+  notOpen: "任務等待你審閱或核准時才能進行理解檢查；執行中或發布中不行。",
   changed: "你打開檢查後，變更又更新了。請重新載入，看看最新版本的問題。",
   unknownQuestion: "有一個答案不屬於目前檢查的問題。請重新載入檢查後再回答。",
   alreadyLocked: "你的答案已經鎖定。要重新回答，請重新開始檢查。",
@@ -41,15 +41,14 @@ const understanding: Translation<typeof en> = {
   attemptAnswered: "你的答案已經儲存，會維持你在看到參考答案前的回答。請重新載入查看。",
   attemptSkipped: "略過的作答沒有答案。",
   attemptEmpty: "請送出測驗答案或做法選擇。",
-  notImplemented: "這個版本的 BELL PR 還沒有這項功能。",
-  feedbackTagUnpublished: "送出 PR 並讀取維護者回饋後，才能標記回饋。",
-  feedbackTagEmpty: "請送出一個品味面向、「早就料到」或「出乎意料」，或一句教訓。",
+  feedbackTagUnpublished: "發布 PR 並讀取維護者回饋後，才能標記回饋。",
+  feedbackTagEmpty: "請送出一個品味面向、「有預料到」或「出乎意料」，或一句教訓。",
   feedbackTagUnknown: "這則留言不在最近一次讀取的回饋裡。請重新讀取回饋後再標記。",
-  practiceKeyUnknown: "這個練習項目已經不屬於這份工作。請重新載入練習。",
+  practiceKeyUnknown: "這個練習項目已經不屬於這個任務。請重新載入練習。",
   restatementRequired: ({ min, max }) =>
     `請用自己的話，替每則選取的留言寫一行維護者要求的內容：每則至少 ${min} 個字、最多 ${max} 個字元。`,
   debriefNoRecords:
-    "還沒有可以回顧的內容。請先在這個專案的工作上完成理解檢查，或讀取並標記維護者回饋。",
+    "還沒有可以回顧的內容。請先在這個專案的任務上完成理解檢查，或讀取並標記維護者回饋。",
   debriefInvalid: "教練的回覆不完整或格式不符，所以沒有儲存。請再試一次。",
   debriefRunning: "這個專案的教練回顧正在撰寫中。",
   practiceFeedbackFileQuestion: ({ path, title }) =>

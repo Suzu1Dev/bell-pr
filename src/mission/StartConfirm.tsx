@@ -11,8 +11,8 @@ export const startReasonsKey = (reasons: readonly StartReason[]) =>
 
 /**
  * The confirm shown in the task dialog when Start is pressed: one sentence
- * per reason ("You can practise this locally; BELL won't publish it while
- * …"), or the good-first-issue lesson, then Back or Start.
+ * per reason ("BELL won't publish this while …"), or the
+ * good-first-issue lesson, then Back or Start.
  */
 export function StartConfirm({
   reasons,

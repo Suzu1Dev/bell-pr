@@ -561,7 +561,7 @@ test("bell-pr start explains a data directory it cannot create, then frees the p
       path.join(readOnly, "data"),
     ], { startOptions: { handleExit: false } });
     assert.equal(result.code, 1);
-    assert.match(result.stderr, /Warning: --force skips the readiness check/);
+    assert.match(result.stderr, /Warning: --force skipped the readiness check/);
     assert.match(result.stderr, /BELL PR did not start: EACCES: permission denied, mkdir/);
     // A system error needs no stack trace.
     assert.doesNotMatch(result.stderr, /\n\s+at /);
@@ -622,7 +622,7 @@ test("bell-pr start exits 1 before it listens when doctor is not ready", async (
       ),
     );
     assert.equal(zhCode, 1);
-    const zhSample = "還沒有 AI 服務？先看範例導覽：bell-pr start --force";
+    const zhSample = "還沒有 AI 服務？先看示範導覽：bell-pr start --force";
     const zhHeadlineAt = zh.indexOf("尚未就緒");
     const zhSampleAt = zh.indexOf(zhSample);
     const zhFixAt = zh.indexOf("\n        npm install -g @openai/codex\n");
@@ -649,7 +649,7 @@ test("bell-pr start --force starts when doctor is not ready, so the sample tour 
     );
     try {
       assert.equal(result.code, undefined, result.stderr);
-      assert.match(result.stderr, /Warning: --force skips the readiness check/);
+      assert.match(result.stderr, /Warning: --force skipped the readiness check/);
       assert.match(result.stderr, /sample tour/);
       assert.match(result.stdout, new RegExp(`→ http://127\\.0\\.0\\.1:${port}\\n`));
       assert.equal(running?.url, `http://127.0.0.1:${port}`);

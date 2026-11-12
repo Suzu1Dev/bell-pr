@@ -593,7 +593,7 @@ test("a queued run resumes after a restart, oldest first, while a started one fa
   );
   assert.deepEqual(order, [older.id, newer.id]);
   assert.equal(byId(orphaned.id).status, "failed");
-  assert.equal(byId(orphaned.id).error, "Repository not found.");
+  assert.equal(byId(orphaned.id).error, "Project not found.");
   const resumed = byId(older.id);
   assert.equal(resumed.baseSha, f.baseSha);
   assert.equal(resumed.team?.tasks.length, 1);
@@ -889,7 +889,7 @@ test("a restart during a conflict resolution reopens the run in review and the c
   assert.equal(loaded.sync?.resolving, false);
   assert.equal(
     loaded.sync?.report,
-    "The service restarted, so resolving the conflicts stopped; the edited files are kept, and you can finish yourself or ask the agent again.",
+    "The service restarted, so resolving the conflicts stopped; the edited files are kept, and you can finish yourself or ask the Agent again.",
   );
   assert.equal(loaded.agents[0].status, "failed");
   const workbench = new Workbench(store);

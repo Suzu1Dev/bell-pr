@@ -36,13 +36,13 @@ const efficiency = {
   /** The credit behind the mode chip: its tooltip and the panel it opens. */
   credit: {
     text: ({ version }: { version: string }) =>
-      `The efficiency modes build on Ponytail ${version} by DietrichGebert (MIT license). Lean gives the agents a short adaptation of its principles, Full gives them its complete rules, and Off adds neither.`,
+      `The efficiency modes build on Ponytail ${version} by DietrichGebert (MIT license). Lean gives the Agents a short adaptation of its principles, Full gives them its complete rules, and Off adds neither.`,
     link: "Ponytail upstream project",
   },
   inputTokens: "Input tokens",
   cachedInputTokens: "Of which cached",
   outputTokens: "Output tokens",
-  agentTime: "Total agent time",
+  agentTime: "Total Agent time",
   running: "Running",
   /** A count the CLI did not report; never shown as zero. */
   notReported: "Not reported",
@@ -65,8 +65,7 @@ const efficiency = {
   /** A role's call count when only some calls reported their usage. */
   partialCalls: ({ calls, measured }: { calls: number; measured: number }) =>
     `${fmt.number(calls)} (${fmt.number(measured)} reported)`,
-  byRoleNote:
-    "Like the totals above, this lists only the tokens and calls the CLI reported. Teammates is the total of all members.",
+  byRoleNote: "Teammates is the total of all members.",
   noMeasurement:
     "No measurements yet. Reported usage and time appear after a run.",
   noMeasurementSample: "No measurements yet. The sample did not call AI.",

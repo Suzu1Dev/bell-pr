@@ -177,7 +177,7 @@ async function fixture(t: TestContext, options: { status?: Run["status"]; helpLo
 
 test("hints come in order, each after an attempt: a rung skipped, no attempt, a junk or repeated 'what I tried' are refused", async (t) => {
   const f = await fixture(t);
-  await assert.rejects(f.ask({ kind: "hint", stepId: "s1", rung: 2 }), refused(409, "Ask for the hints of this step in order, one rung at a time."));
+  await assert.rejects(f.ask({ kind: "hint", stepId: "s1", rung: 2 }), refused(409, "Ask for the hints of this step in order, one at a time."));
   await f.ask({ kind: "hint", stepId: "s1", rung: 1 });
   assert.equal(f.calls.length, 1);
   const attemptFirst = refused(409, "Try something first: change the code, run the tests, or say what you tried.");
@@ -229,7 +229,7 @@ test("an attempt is an edit, a BELL test run after the hint, or a new 'what I tr
   await f.ask({ kind: "hint", stepId: "s1", rung: 4 });
   assert.deepEqual(f.run.byHand?.thread?.map((entry) => entry.rung), [1, 2, 3, 4]);
   // No hint past R4: the exits.
-  await assert.rejects(f.ask({ kind: "ask", entry: "change", stepId: "s1", question: "Now what?" }), refused(409, /^There is no hint after an example in this project\./));
+  await assert.rejects(f.ask({ kind: "ask", entry: "change", stepId: "s1", question: "Now what?" }), refused(409, /^"An example in this project" is the last hint\./));
 });
 
 test("one guide turn per run: a second request while one runs is refused, and Stop ends it without changing the run", async (t) => {
@@ -780,7 +780,7 @@ test("over HTTP, a guide turn answers 202 and a refusal is a 409 with its messag
   assert.equal(f.run.byHand?.thread?.length, 1);
   const skipped = await post("by-hand/guide", { kind: "hint", stepId: "s1", rung: 3 });
   assert.equal(skipped.status, 409);
-  assert.equal(skipped.body.error, "Ask for the hints of this step in order, one rung at a time.");
+  assert.equal(skipped.body.error, "Ask for the hints of this step in order, one at a time.");
   const tooLate = await post("by-hand/plan/questions", {});
   assert.equal(tooLate.status, 409);
   assert.equal(tooLate.body.error, "The guide asks about your plan before you confirm it.");

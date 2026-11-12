@@ -19,11 +19,11 @@ const workspace = {
   progress: "Contribution progress",
   steps: {
     define: { title: "Define the task", description: "Set your contribution goal" },
-    build: { title: "Build together", description: "The agent team splits the work" },
+    build: { title: "Build together", description: "The Agent team splits the work" },
     /** A Learn-by-hand run's second step. */
     buildByHand: { title: "Write it yourself", description: "The guide plans with you and gives hints" },
     review: { title: "Understand and review", description: "Read it, then explain it back" },
-    submit: { title: "Submit", description: "Your next pull request" },
+    submit: { title: "Publish", description: "Approve, then open a Draft PR" },
   },
   /** A workflow step's tooltip: its number, name and what happens in it. */
   stepTooltip: ({ n, title, description }: { n: string; title: string; description: string }) =>
@@ -31,9 +31,9 @@ const workspace = {
   tabsLabel: "Task content",
   tabs: {
     session: "Collaborate",
-    overview: "Overview & motivation",
+    overview: "Overview",
     changes: "Code changes",
-    activity: "Agent activity",
+    activity: "Activity",
     draft: "PR draft",
     commits: "Commit history",
   },
@@ -41,7 +41,7 @@ const workspace = {
   unsandboxed: {
     label: "Ran without sandbox",
     tooltip:
-      "You allowed agents to run without the operating system's sandbox, so an agent of this run could read or change files outside its working folder. Check its changes with extra care. The safety settings turn this off for new runs.",
+      "You allowed Agents to run without the operating system's sandbox, so an Agent of this run could read or change files outside its working directory. Check its changes with extra care. The safety settings turn this off for new runs.",
   },
   /**
    * The badge of a run approved without the understanding check, or one
@@ -66,32 +66,19 @@ const workspace = {
     waiting: ({ date }: { date: string }) =>
       `A maintainer asked for changes on ${date}. Answer on GitHub in your own words, or start a follow-up round.`,
     /** The run waits for a free slot: the limit of runs at once is reached. */
-    queued: "Queued: the limit of runs at once is reached; this one starts when another finishes",
+    queued: "Queued: the limit of runs at once is reached. This one starts when another finishes.",
     workspaceRemoved:
       "Files for this run were cleaned up to free disk space. Reports and notes are kept.",
   },
   holdStop: {
     heading: ({ count }: { count: number }) =>
       plural(count) === "one"
-        ? "Stopped because a file is held"
-        : "Stopped because files are held",
+        ? "Stopped: this run changed a file someone else holds"
+        : "Stopped: this run changed files someone else holds",
     body:
-      "The last turn changed files someone else holds; edits stay in the working directory. Put these files back, or check again once released or revoked.",
+      "The edits are still in the working directory. Put the files back, or check again after the holder releases the hold or a group admin revokes it.",
     legacyBody:
-      "This run stopped earlier because it changed files someone else held. Put these files back, or check current holds again.",
-    legacyTaskStopped:
-      "This subtask touched files someone else held, so its edits weren't added. Retry once the hold is released or revoked.",
-    item: ({
-      path,
-      holder,
-      title,
-      since,
-    }: {
-      path: string;
-      holder: string;
-      title: string;
-      since: string;
-    }) => `${path}: held by ${holder} for “${title}” (since ${since})`,
+      "Put these files back, or check current holds again.",
     itemMeta: ({
       holder,
       title,
@@ -110,14 +97,15 @@ const workspace = {
     restoreConfirmTitle: "Put held files back?",
     restoreConfirmBody: ({ count }: { count: number }) =>
       plural(count) === "one"
-        ? `Put ${count} held file back to this run's base version? Edits to that file will be removed, while any other changed files stay as they are.`
-        : `Put ${count} held files back to this run's base version? Edits to those files will be removed, while any other changed files stay as they are.`,
-    restoreConfirmAction: "Put these files back",
+        ? `This puts ${count} held file back to this run's base version. Its edits are removed; other changed files stay as they are.`
+        : `This puts ${count} held files back to this run's base version. Their edits are removed; other changed files stay as they are.`,
+    /** The dialog of a run stopped by an older build, which recorded no file list. */
+    restoreConfirmLegacyBody:
+      "This puts the held files back to this run's base version. Their edits are removed; other changed files stay as they are.",
+    restoreConfirmAction: "Put back",
     restoreCancelAction: "Cancel",
     restoreFailed:
-      "Couldn't finish putting these files back. Reload to see what changed, then try again or restore them by hand.",
-    restoreStale:
-      "The working directory changed, so nothing was restored. Refresh the file list and try again.",
+      "Couldn't finish putting these files back; some may already be back. Reload to check, then try again or put them back by hand in the working directory.",
     recheckFailed: ({ name }: { name: string }) =>
       `Couldn't check file holds right now. Try again in a moment, or fix group work on the host and restart ${name} if it has stopped.`,
   },
@@ -163,19 +151,17 @@ const workspace = {
     writeFirst: "Write a change first",
     /** Code changes before the first change: the guide's first read, then the person's own plan (DESIGN v1.2 F3). */
     reading: "The guide is reading the code",
-    planFirst: "Write your own plan in Agent activity first; then you write the change.",
+    planFirst: "Write your own plan in “Activity” first; then you write the change.",
     /** The footer while the PR title or description is empty: approval needs both, in the person's words (DESIGN v1.2 F11). */
     writePr: "Write the PR title and description first",
     reviewing: "The guide is reviewing",
     changed: "You changed the code after marking it ready. The review and the check wait until you mark it ready again.",
   },
   footer: {
-    allReviewed: "Every file reviewed.",
     passed: "You explained it back. Ready to approve.",
     checkOff:
-      "Every file reviewed · Understanding check off. Approval needs your reviewed ticks only.",
-    learning: "Not just a review: a lesson in code, too.",
-    hint: "Select code to ask the agent about it.",
+      "Understanding check off: approval needs only your reviewed ticks.",
+    hint: "Select code to ask the Agent about it.",
     hintByHand: "Select code to ask the guide about it.",
     reviewed: ({ reviewed, total }: { reviewed: number; total: number }) =>
       `${reviewed} / ${total} reviewed`,
@@ -191,10 +177,8 @@ const workspace = {
     needsCommitMessage: "Write this round's commit message first",
     needsFacts:
       "The PR description still has parts to fill in. Replace them with facts or delete them first.",
-    previewPush: "Approve this round and preview the push",
-    previewSubmit: "Approve the changes and preview the PR",
-    approvePush: "Approve and prepare the push",
-    approvePr: "Approve and prepare the PR",
+    approvePush: "Approve and preview the push",
+    approvePr: "Approve and preview the PR",
   },
   /** Shared by the draft editor and the publish dialog. */
   loadingPreview: "Loading the preview…",
@@ -209,66 +193,62 @@ const workspace = {
     closeSearch: "Close the file search",
     onlyUnreviewed: "Only unreviewed",
     suggestedOrderTitle:
-      "Sort by the reading order in the Lead's integration summary; files it does not mention follow in git order",
+      "Sort by the reading order in the Lead's integration summary. Files it does not mention follow in their original order.",
     suggestedOrder: "Suggested order",
     repositoryFallback: "repository",
-    waitingForChanges: "Waiting for the agents' changes",
+    waitingForChanges: "Waiting for the Agents' changes",
     noMatches: "No matching files",
     progress: "Review progress",
-    allReviewed: "Every file reviewed. Next: explain it back.",
-    allReviewedDone: "Every file reviewed.",
+    allReviewed: "Next: explain it back.",
     reviewHint: "Once you have read a file and its explanation, mark it as reviewed.",
     /** Opens the check before every file is ticked; the ticks stay required. */
-    takeCheck: "Take the check now",
-    openCheck: "Open your check",
+    takeCheck: "Explain it back now",
+    openCheck: "Open your answers",
     closedBookAsk:
-      "Closed book: questions to the agent wait until you close the check.",
+      "Closed book: questions to the Agent wait until you close the check.",
     hideFiles: "Hide the file list",
     showFiles: "Show the file list",
-    toggleFiles: "Toggle the file list",
     smallerCode: "Smaller code font",
     largerCode: "Larger code font",
     hideExplanation: "Hide the explanation panel",
     showExplanation: "Show the explanation panel",
-    toggleExplanation: "Toggle the explanation panel",
     exitFocus: "Leave focus mode",
     enterFocus: "Enter focus mode",
-    focus: "Focused reading",
     refresh: "Refresh the diff",
     /** The row of buttons above the diff, one tab stop. */
     toolbar: "Diff tools",
     viewMode: "Diff view mode",
     unified: "Unified view",
     split: "Split view",
-    preparing: "The agent team is preparing your changes",
+    preparing: "The Agent team is preparing your changes",
     noChanges: "No code changes yet",
     filesRemoved: "The changed files were cleaned up",
     noChangesHint:
-      "Follow the run in Agent activity; once it finishes, you can review it here.",
-    viewActivity: "View agent activity",
+      "Follow the run in “Activity”; once it finishes, you can review it here.",
+    viewActivity: "View activity",
     resize: "Resize the explanation panel",
     loadingPanel: "Preparing the reading panel…",
-    emptyTitle: "Understanding starts with the changes.",
-    emptyText: "Select a changed file to ask about its design and trade-offs.",
+    emptyTitle: "Select a changed file",
+    emptyText: "Then ask about its design and trade-offs.",
   },
   diffRounds: {
     label: "Changes to view",
     current: "Current PR changes",
-    currentRound: "This review round",
+    currentRound: "This round",
     currentSync: "Current PR changes after sync",
     initial: "Initial contribution",
-    published: ({ number }: { number: number }) => `Review round ${number} (pushed)`,
+    published: ({ number }: { number: number }) => `Follow-up round ${number} (pushed)`,
     sync: ({ number }: { number: number }) => `Round ${number}: target branch sync (pushed)`,
     adopted: ({ number }: { number: number }) => `Round ${number}: changes taken over from GitHub`,
     all: "All changes (cumulative)",
     readOnly: "Read-only changes",
-    notice: "This view is read-only. Return to the current changes to mark files as reviewed, ask questions or approve.",
+    notice: "Read-only view. To mark files as reviewed, ask questions or approve, go back to the current changes.",
     back: "Back to current changes",
     loading: "Loading the selected changes…",
     retry: "Try loading again",
     workingTree: "Working files",
     empty: "No files changed in this comparison.",
-    noText: "This change has no text patch to display.",
+    noText: "This change has no text diff to display.",
   },
   /**
    * The Explain-it-back check next to the diff (UnderstandingCheck). The
@@ -277,15 +257,15 @@ const workspace = {
   check: {
     title: "Explain it back",
     intro:
-      "Closed book: the explanations, notes and questions to the agent stay hidden while you answer; the diff and the file list stay. You grade yourself against the AI-written references. It is a commitment, not a test.",
+      "Closed book. Hidden while you answer: the explanations, notes and questions to the Agent. Still visible: the diff and the file list. You grade yourself against the AI-written references. It is a commitment, not a test.",
     /** A Learn-by-hand run (DESIGN v1.2 F10): the references are the person's own words and the guide's review. */
     introByHand:
-      "Closed book: the guide, the explanations and your notes stay hidden while you answer; the diff and the file list stay. You grade yourself against your own earlier words and the guide's review. It is a commitment, not a test.",
+      "Closed book. Hidden while you answer: the guide, the explanations and your notes. Still visible: the diff and the file list. You grade yourself against your own earlier words and the guide's review. It is a commitment, not a test.",
     off: "The understanding check is off, so approval does not wait for it. You can still take it.",
     close: "Close the check",
     loading: "Loading the check…",
     notOpen:
-      "The check opens once the agents are done and the run waits for your review.",
+      "The check opens once the Agents are done and the run waits for your review.",
     loadFailed: ({ message }: { message: string }) =>
       `Could not load the check: ${message}`,
     retry: "Try again",
@@ -299,7 +279,6 @@ const workspace = {
       "In 2 to 4 sentences: what problem does this solve, what does the change do, and what could break?",
     roundPrompt:
       "What does this round change, and which review comment does it answer?",
-    summaryLabel: "Your explanation",
     words: ({ count, min }: { count: number; min: number }) =>
       `${count} of at least ${min} words`,
     moved:
@@ -318,10 +297,11 @@ const workspace = {
     lock: "Lock my answers",
     lockNote: "Locked answers cannot be edited; Start over clears the check.",
     gradeTitle: "3. Compare and grade",
-    gradeIntro: "Put each answer beside its reference and grade yourself.",
+    gradeIntro:
+      "Put each answer beside its reference and grade yourself. Where a reference differs from the diff, the diff is right.",
     yourAnswer: "Your answer",
-    reference: "Reference, AI-written: the diff is the authority",
-    testerReference: "The Test analyst's report, AI-written: the diff is the authority",
+    reference: "Reference (AI-written)",
+    testerReference: "The Test analyst's report (AI-written)",
     noReference: "No reference: compare with the diff yourself.",
     ownWords: "Your own words",
     guideReview: "The guide's review",
@@ -353,7 +333,7 @@ const workspace = {
       worth: "Worth the review time",
     },
     forecastNote:
-      "It stays on this computer, beside the maintainers' review once you read it.",
+      "It stays on this computer. Once you read the maintainers' review, the two are shown side by side.",
     saveForecast: "Save my prediction",
     skip: "Skip",
     forecast: ({ dimension }: { dimension: string }) => `Your prediction: ${dimension}`,
@@ -381,17 +361,12 @@ const workspace = {
   },
   activity: {
     runTitle: "How it ran",
-    runText:
-      "The task board is above; the full log, error messages and the stop button stay here. Development runs in a separate Git worktree, and after the review you decide when to submit.",
-    teamTitle: "Your agent team",
-    teamText:
-      "Each role has its own job, and everything happens here. Development runs in a separate Git worktree, and after the review you decide when to submit.",
+    teamTitle: "Your Agent team",
     stopReview: "Stop the re-review",
     stopTask: "Stop the task",
     log: "Run log",
     demoLog: "Sample log",
     live: "Updates every 2.5 s",
-    taskLog: "Task log",
     filterLabel: "Filter the run log by role",
     all: "All",
     emptyLog: "The log appears here once the task starts.",
@@ -399,11 +374,7 @@ const workspace = {
   },
   draft: {
     publishOptions: "Commit message and branch",
-    loadingGuide: "Loading the draft guidelines…",
     heading: "PR title and description",
-    subheading:
-      "Polish the draft so maintainers can understand your contribution easily.",
-    label: "DRAFT PR",
     recoverPublish: "Recover unfinished publish",
     recoveryHelp: "The last publish attempt left a local commit. Recovery checks the remote, keeps your code and draft, and returns this contribution to review.",
     recoveryNeedsSave: "Save your draft edits before recovering the publish attempt.",
@@ -411,9 +382,9 @@ const workspace = {
       "This sync adds one merge commit to the PR branch and keeps the PR title and description as they are. Review the files the target branch changed in “Code changes” first, then check the commit message below.",
     roundNotice:
       "This round adds one new commit to the PR branch and keeps the PR title and description as they are. Review the files this round changed in “Code changes” first, then check the commit message below.",
-    proposalNotice: `The description below is the suggestion ${product.name} wrote from the project's rules, and you have not edited it yet. It goes to GitHub exactly as it is: confirm it in your own words before submitting, and keep to-dos in the checklist of the guide below, not in the description.`,
+    proposalNotice: `The description below is ${product.name}'s suggestion from the project's rules. You have not edited it yet. It goes to GitHub exactly as written: check it and put it in your own words before publishing. Keep to-dos in the guide's checklist below, not in the description.`,
     emptyNotice:
-      "There is no PR description yet. Generate and apply a suggested draft below, or write in your own words what changed, why, and which checks you actually ran. The agents' full reports are in the explanation panel next to the code.",
+      "There is no PR description yet. Generate and apply a suggested draft below, or write in your own words what changed, why, and which checks you actually ran. The Agents' full reports are in “Code changes”, under “Reviews”.",
     /** A Learn-by-hand run, while its PR title or description is empty: it starts with neither (DESIGN v1.2 F11). */
     emptyNoticeByHand: `Write the pull request's title and description in your own words: in Learn by hand, ${product.name} doesn't draft them, and approval needs both.`,
     titleLabel: "Pull request title",
@@ -425,7 +396,7 @@ const workspace = {
     commitLabel: "Commit message",
     commitLabelRound: "This round's commit message",
     commitHelp: `The first line is the subject, then a blank line and the body, with trailers last. Left empty, the PR title becomes a one-line commit message. Add sign-offs such as Signed-off-by yourself; ${product.name} and the model never fill them in.`,
-    commitHelpRound: `This message becomes the new commit on the PR branch, so it is required: make sure it says which review comments this round addresses. The first line is the subject, then a blank line and the body, with trailers last. Add sign-offs such as Signed-off-by yourself; ${product.name} and the model never fill them in.`,
+    commitHelpRound: `Required: say which review comments this round addresses. The first line is the subject, then a blank line and the body, with trailers last. Add sign-offs such as Signed-off-by yourself; ${product.name} and the model never fill them in.`,
     branchLabel: "GitHub branch",
     /** `{branch}` marks where the run's own branch name is shown. */
     branchHelp:
@@ -435,18 +406,17 @@ const workspace = {
     suggestionTitle: "Commit message suggested by the project's rules",
     suggestionNote: "This only fills in the field; you still add the sign-off yourself.",
     useSuggestion: "Use suggestion",
-    savedInBrowser: "The demo draft is saved in this browser",
-    savedLocally: "The draft is saved in your local workspace",
+    savedInBrowser: "Save keeps the demo draft in this browser",
+    savedLocally: "Save keeps the draft in your local workspace",
     save: "Save draft",
   },
   checklist: {
-    open: "View publishing checklist",
-    understandingAction: "Explain the change",
+    open: "Go to “Before you publish”",
+    understandingAction: "Explain it back",
     completed: "Completed checks",
     reviewAction: "Review changes",
     editAction: "Edit draft",
     title: "Before you publish",
-    text: "A clear PR is the start of a good collaboration.",
     allReviewed: "All files reviewed",
     files: ({ reviewed, total }: { reviewed: number; total: number }) =>
       plural(total) === "one"
@@ -454,22 +424,18 @@ const workspace = {
         : `${reviewed} / ${total} files`,
     saved: "PR draft saved",
     unsaved: "There are unsaved edits",
-    canAdjust: "You can come back and adjust it any time",
     commitReady: "This round's commit message is written",
     commitMissing: "Write which review comments this round addresses",
-    commitBecomes: "Pushing makes it a new commit on the PR branch",
     noPlaceholders: "Nothing left to fill in in the description",
     noDescription: "No description yet",
-    placeholdersStay: "TODOs and blanks to fill in never reach GitHub",
     taskItems: "Checkboxes in the description",
-    taskItemsHelp: `Only tick what you really finished or checked. ${product.name} and the model never tick them for you; ticking rewrites the description above, so remember to save.`,
+    taskItemsHelp: `Only tick what you really finished or checked. ${product.name} and the model never tick them for you. Ticking rewrites the description above, so remember to save.`,
     noSection: "No section",
     samePr: "Push to the same PR",
-    samePrHelp:
-      "Only adds a new commit: nothing is force-pushed, and the PR title and description stay.",
-    draftPr: "Submit as a Draft PR",
+    samePrHelp: "Nothing is force-pushed.",
+    draftPr: "Publish as a Draft PR",
     draftPrHelp:
-      "You can keep editing on GitHub afterwards; the project's automated checks run on Draft PRs too.",
+      "You can keep editing on GitHub afterwards; the project's automated checks usually run on Draft PRs too.",
     understanding: "Understanding check",
     understandingPassed: "Passed: you explained the change back",
     understandingRequired: "Required: explain the change back before approval",
@@ -483,7 +449,7 @@ const workspace = {
   },
   feedback: {
     title: "Maintainer feedback",
-    intro: `Reviews, comments and CI results on the PR are read only when you press the button. ${product.name} only reads them; reply on GitHub.`,
+    intro: `Reviews, comments and CI results on the PR are read once each time you press the button and never update on their own. ${product.name} only reads them; reply on GitHub.`,
     viewPullRequest: "View pull request",
     fetchAgain: "Read feedback again",
     fetch: "Read feedback",
@@ -506,13 +472,13 @@ const workspace = {
       return state ? `${summary} (overall ${state})` : summary;
     },
     noChecks: ({ state }: { state?: string }) =>
-      state ? `CI no checks yet (overall ${state})` : "CI no checks yet",
+      state ? `CI: no checks yet (overall ${state})` : "CI: no checks yet",
     labels: ({ labels }: { labels: string }) => `Labels: ${labels}`,
     needsLabel:
-      "The PR has a label that starts with “needs:”, which usually means the project's automated checks think something is still missing, even when CI shows success. Read the bot's comments below and edit the description on GitHub.",
+      "A “needs:” label usually means the project's automated checks still find something missing, even when CI passes. Read the bot's comments below, then edit the description on GitHub.",
     details: "Details",
     noItems:
-      "No reviews or comments yet. Maintainers often take days or weeks to respond; you can prepare your replies in the meantime.",
+      "No reviews or comments yet. Maintainers often take days or weeks to respond.",
     general: "Overall review and conversation",
     openInChanges: "Open in Code changes",
     include: ({
@@ -534,15 +500,14 @@ const workspace = {
     line: ({ line }: { line: number }) => `Line ${line}`,
     resolved: "Resolved",
     openOnGitHub: "Open on GitHub",
-    notFetched:
-      "Not read yet. “Read feedback” asks GitHub once and never updates on its own.",
+    notFetched: "Not read yet.",
     cantContinue:
       "Can't continue? Close the pull request yourself on GitHub, with a short note in your own words.",
   },
   followUp: {
     title: "Keep fixing from feedback",
     intro:
-      "Tick the feedback above that you want handled, and add a note if needed. An agent edits the existing worktree; when it finishes, you review each file, confirm the commit message, and push it as a new commit to the same PR. The PR title and description stay as they are; reply to reviewers on GitHub yourself.",
+      "Tick the feedback above that you want handled; add a note if needed. An Agent makes the changes. You then review each file, confirm the commit message and push one new commit to the same PR. The PR title and description stay as they are. Reply to reviewers on GitHub yourself.",
     limit: ({ limit, selected }: { limit: number; selected: number }) =>
       `Up to ${limit} comments per round; ${selected} selected.`,
     note: "Note",
@@ -554,17 +519,17 @@ const workspace = {
         : `Fix the ${count} selected comments`,
     startNote: "Fix from the note",
     demoNote:
-      "The sample starts no round. Import your own project to fix a real PR from its feedback.",
+      "The sample project starts no round. Import your own project to fix a real PR from its feedback.",
     restatement: ({ author }: { author: string }) =>
       `In your words: what is ${author} asking for?`,
     restatementHelp:
-      "At least 3 words. The agent gets your words as its task and the maintainer's comment only as context.",
+      "At least 3 words. The Agent gets your words as its task and the maintainer's comment only as context.",
   },
   publish: {
     titleDemo: "Your demo contribution is ready.",
     titleSync: "Push the sync to the PR.",
     titleRound: "Push this round to the PR.",
-    title: "Send this contribution to GitHub.",
+    title: "Publish this contribution to GitHub.",
     subtitleDemo: "You reviewed every file. Here is a preview of the PR.",
     subtitleSync:
       "This adds one merge commit to the PR branch that brings in the latest target branch. The PR title and description stay, and nothing is force-pushed.",
@@ -585,22 +550,14 @@ const workspace = {
       author: ({ author }: { author: string }) => `Commit author: ${author}`,
       login: ({ login }: { login: string }) => `Pushing as @${login}`,
     },
-    titlePreview: "PR title sent to GitHub",
+    titlePreview: "PR title",
     titlePreviewDemo: "PR title",
-    commitPreview: "Commit message sent to GitHub",
+    commitPreview: "Commit message",
     commitPreviewDemo: "Commit message",
-    bodyPreview: "PR description sent to GitHub",
-    bodyPreviewWords: ({ count }: { count: number }) =>
-      plural(count) === "one"
-        ? `PR description sent to GitHub (about ${count} word)`
-        : `PR description sent to GitHub (about ${count} words)`,
+    bodyPreview: "PR description",
     /** The demo sends nothing to GitHub. */
     bodyPreviewDemo: "PR description preview",
-    bodyPreviewDemoWords: ({ count }: { count: number }) =>
-      plural(count) === "one"
-        ? `PR description preview (about ${count} word)`
-        : `PR description preview (about ${count} words)`,
-    confirmLegend: "Confirm each item before submitting",
+    confirmLegend: "Confirm each item before publishing",
     checksTitle: "Before it reaches the maintainers",
     allClear: "Every check passes.",
     groups: {
@@ -616,23 +573,24 @@ const workspace = {
     blocked: ({ message }: { message: string }) => `Blocks publishing: ${message}`,
     checkOff: "Understanding check: off",
     pacing: ({ open, budget, first }: { open: number; budget: number; first: boolean }) =>
-      `Your open PRs here: ${open} of ${budget}${first ? " (first contribution here)" : ""}`,
+      `Your open PRs here: ${open} of ${budget} (${product.name} default${first ? "; first contribution here" : ""})`,
     pacingExempt: "Your open PRs here: not paced, since you can write to this repository",
-    factsLoading: "Reading the GitHub facts…",
+    factsLoading: "Checking GitHub…",
     couldntCheck: ({ reason }: { reason: string }) => `Couldn't check: ${reason}`,
-    factsMissing: "this build cannot read the GitHub facts yet",
-    overrideLabel: "Why publish anyway? Saved on this run, 20 to 200 characters",
-    overrideCount: ({ count }: { count: number }) => `${count} of 20 to 200 characters`,
-    closeLoop: ({ title }: { title: string }) => `Close the loop first: read the feedback on “${title}”`,
+    factsMissing: `this version of ${product.name} cannot check GitHub yet`,
+    overrideLabel: "Why publish anyway? Saved on this run.",
+    overrideCount: ({ count }: { count: number }) => `${count} / 20–200 characters`,
+    closeLoop: ({ title }: { title: string }) => `First read the feedback on “${title}”`,
     /** A pull request a maintainer has waited on, which BELL has no run for: it opens on GitHub. */
     waitingPr: ({ number }: { number: string }) =>
-      `Close the loop first: read the review on pull request #${number} (opens GitHub)`,
-    confirmNote: `Ticking only means you know these items are still open and want to submit the description as it is. ${product.name} never changes the description or ticks anything for you, and these confirmations are not written into the PR. To change something first, choose “Back to the draft”.`,
+      `First read the review on pull request #${number} (opens GitHub)`,
+    confirmNote: `Ticking only means you know these items are still open and want to publish the description as it is. ${product.name} never changes the description or ticks anything for you. These confirmations are not written into the PR. To change something first, choose “Back to the draft”.`,
     back: "Back to the draft",
     finishDemo: "Open the sample Draft PR",
-    sending: "Submitting…",
+    sending: "Publishing…",
+    pushing: "Pushing…",
     pushRound: "Push this round",
-    submit: "Submit Draft PR",
+    submit: "Publish Draft PR",
   },
   /** Toasts and confirmations from the run hooks. */
   notices: {
@@ -641,14 +599,14 @@ const workspace = {
       `Premise checked: ${verdict}. If the verdict changed, the code walkthroughs, and the explanations you have not answered yet, are made again with it.`,
     premiseNone: "The request states no assumption to check.",
     stopResolving:
-      "Stopped resolving conflicts. The files already changed are kept; finish them yourself or ask the agent again.",
+      "Stopped resolving conflicts. The files already changed are kept; finish them yourself or ask the Agent again.",
     stopRoundKept:
-      "This round was stopped. The worktree keeps some of its changes: review them, write a commit message and push, or discard the round.",
+      "This round was stopped. The working directory keeps some of its changes: review them, write a commit message and push, or discard the round.",
     stopRoundEmpty: "This round was stopped before it changed any file; the PR stays as it is.",
     stopReview: "Stopped the re-review; the earlier reports and review status are kept.",
     stopTeam:
-      "The task was stopped. Its worktree and the isolated folders of failed subtasks are kept, so you can retry the failed subtasks.",
-    stopTask: "The task was stopped; its worktree is kept.",
+      "The task was stopped. Its working directory and the failed subtasks' own working directories are kept, so you can retry the failed subtasks.",
+    stopTask: "The task was stopped; its working directory is kept.",
     retryAwaitingPlan: "The plan is not approved yet, so the task is back to waiting for approval.",
     retryQueued:
       "Queued again: integrated subtasks are not rerun, and failed subtasks start over.",
@@ -662,10 +620,10 @@ const workspace = {
     demoRerun:
       "This is sample data. Import your own repository to run the review again.",
     rerunStarted:
-      "Re-review started on the current diff. The report appears in the explanation panel when it is done.",
+      "Re-review started on the current diff. The report appears under “Reviews” when it is done.",
     imported: ({ name }: { name: string }) => `Imported ${name}`,
     demoPlaybackStarted:
-      "The sample team is starting: a prewritten run plays here, with no agent and nothing sent to GitHub.",
+      "The sample team is starting: a prewritten run plays here, with no Agent and nothing sent to GitHub.",
     demoStopped:
       "The sample team stopped. Start it again from New contribution.",
     /** A chat turn that failed; `ChatMessage.failed` marks it. */
@@ -708,11 +666,11 @@ const workspace = {
     heldFilesRestored: ({ count, keptOtherChanges = true }: { count: number; keptOtherChanges?: boolean }) =>
       keptOtherChanges
         ? plural(count) === "one"
-          ? `${count} file restored. Other changes were kept.`
-          : `${count} files restored. Other changes were kept.`
+          ? `${count} file put back. Other changes were kept.`
+          : `${count} files put back. Other changes were kept.`
         : plural(count) === "one"
-          ? `${count} file restored.`
-          : `${count} files restored.`,
+          ? `${count} file put back.`
+          : `${count} files put back.`,
     holdCleared: "No holds remain on these files. You can continue.",
     holdStillActiveBy: ({ who, paths, pathCount }: { who: string; paths: string; pathCount: number }) =>
       plural(pathCount) === "one"
@@ -721,14 +679,14 @@ const workspace = {
     holdStillActiveMulti: ({ count, holders, paths }: { count: number; holders: string; paths: string }) =>
       `${count} files are still held by ${holders} (${paths}). Wait for release, ask a group admin to revoke the holds, or put these files back.`,
     resolvingConflicts:
-      "An agent is resolving the conflicts. Review each file when it finishes.",
+      "An Agent is resolving the conflicts. Review each file when it finishes.",
     undoSyncConfirm:
-      "Undo the sync? The work goes back to its content and base from before the sync, and changes made in the worktree since then are removed.",
+      "Undo the sync? The work goes back to its content and base from before the sync, and changes made in the working directory since then are removed.",
     syncUndone: "Sync undone.",
     followUpStarted:
       "Started fixing from the feedback. You will be asked to review this round's changes when it finishes.",
     discardRoundConfirm:
-      "Discard this round? Its changes in the worktree are removed, and the content goes back to the pushed PR.",
+      "Discard this round? Its changes in the working directory are removed, and the content goes back to the pushed PR.",
     roundDiscarded: "Discarded this round.",
     modelSettingsSaved:
       "Saved. Every project's tasks and analyses use these settings from now on.",

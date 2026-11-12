@@ -67,16 +67,6 @@
   align-items: center;
   gap: 20px;
 }
-.mission-kicker {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  font-size: var(--text-xs);
-  line-height: 1.4;
-  letter-spacing: 1.3px;
-  font-weight: 600;
-  color: var(--color-text-muted);
-}
 .mission-overview-heading h2 {
   font-size: 25px;
   line-height: 1.45;
@@ -243,7 +233,8 @@
   margin: 6px 0;
   letter-spacing: -0.25px;
 }
-.mission-section-heading h2 svg {
+.mission-section-heading h2 svg,
+.rules-card-head h2 svg {
   color: var(--color-text-muted);
 }
 .mission-section-icon {
@@ -1985,6 +1976,9 @@
   flex: 1 1 320px;
 }
 .rules-card-head h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   font-size: 19px;
   line-height: 1.5;
   margin: 6px 0 4px;

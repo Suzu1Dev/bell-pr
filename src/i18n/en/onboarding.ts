@@ -3,11 +3,8 @@ import { product } from "../../../shared/product";
 
 export default {
   title: `Welcome to ${product.name}`,
-  intro:
-    "A few steps get you ready: your language, the tools on this computer and the AI provider your agents use.",
+  intro: "A few steps get you ready.",
   progress: "Setup steps",
-  stepOf: ({ step, total }: { step: number; total: number }) =>
-    `Step ${step} of ${total}`,
   steps: {
     language: "Language",
     environment: "Environment",
@@ -18,7 +15,7 @@ export default {
   back: "Back",
   language: {
     title: "Choose your language",
-    text: `${product.name} shows its pages, explanations and agent reports in this language. You can change it any time in Settings.`,
+    text: `${product.name} shows its pages, explanations and Agent reports in this language. You can change it any time in Settings.`,
     label: "Language",
   },
   environment: {
@@ -28,16 +25,14 @@ export default {
   },
   provider: {
     title: "Your AI provider",
-    text: "Agents use the provider you choose here for runs and project analysis. You can change it later in the model settings.",
-    auto: ({ provider }: { provider: string }) =>
-      `${provider} is installed and signed in, so your agents use it.`,
-    choose: "More than one provider is ready. Which one should your agents use?",
-    none: "No provider is ready yet. Install and sign in to the Codex CLI, Claude Code or the Antigravity CLI (see the previous step), then check again. You can still take the sample tour.",
-    checking: "Checking which providers are ready…",
+    text: "Agents use the AI provider you choose here for runs and project analysis. You can change it later in the model settings.",
+    choose: "More than one AI provider is ready. Which one should your Agents use?",
+    none: "No AI provider is ready yet. Install and sign in to the Codex CLI, Claude Code or the Antigravity CLI (see the previous step), then check again. You can still take the sample tour.",
+    checking: "Checking which AI providers are ready…",
     saving: "Saving…",
-    saved: ({ provider }: { provider: string }) => `Your agents use ${provider}.`,
+    saved: ({ provider }: { provider: string }) => `Your Agents use ${provider}.`,
     saveFailed: ({ message }: { message: string }) =>
-      `The provider could not be saved: ${message}`,
+      `The AI provider could not be saved: ${message}`,
     codexNote:
       "Uses the Codex CLI you installed and signed in to. Usage counts against your own account.",
     claudeNote:
@@ -49,7 +44,7 @@ export default {
     title: "Where do you want to start?",
     tour: "Take the 2-minute sample tour",
     tourText: "See a finished contribution on a sample project, with no setup.",
-    import: "Import a repository",
+    import: "Import a project",
     /**
      * Also says that every contribution ends with the understanding check:
      * the step has no line of its own under its title.

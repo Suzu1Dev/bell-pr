@@ -22,7 +22,7 @@ dependencies and statuses. No new endpoint or persisted field is needed.
   label instead of implying that it has finished.
 - Label a ready task in a failed or cancelled run "Ready after retry", on its
   card and in dependency lists, because nothing claims it until the person
-  retries. Ready tasks in an active run keep "Ready to claim". The label
+  retries. Ready tasks in an active run keep "Ready to start". The label
   comes from the run's phase; the task's status stays `ready`.
 - Wrap long titles and descriptions inside the card, including words with no
   space to break at, so a narrow lane never scrolls sideways.

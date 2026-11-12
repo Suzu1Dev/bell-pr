@@ -231,7 +231,7 @@ export function SessionPanel({
             {error}
           </p>
         )}
-        <p className="session-hint">{t.hint}</p>
+        {!block && <p className="session-hint">{t.hint}</p>}
       </div>
     </section>
   );

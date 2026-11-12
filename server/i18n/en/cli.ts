@@ -15,8 +15,8 @@ export default {
       "",
       "Commands:",
       `  start      Start ${name}, or open its running workspace (the default command)`,
-      "  open       Print the address of the running server and open it in the browser",
-      "  doctor     Check git, gh and the agent CLIs (--json for machine output)",
+      "  open       Print the address of the running service and open it in the browser",
+      `  doctor     Check that this computer has what ${name} needs (--json for machine output)`,
       "  token      Replace the API token and sign out paired devices (`token rotate`)",
       "  pair       Make a one-time code to pair a phone or another computer",
       "  devices    List paired devices (`devices list`) or revoke one (`devices revoke <id>`)",
@@ -46,8 +46,6 @@ export default {
       "",
       "Options for group invite:",
       "  --admin             The invited person joins as a group admin",
-      "",
-      `Lost the address? Run \`${bin} open\` on this computer to print and open it again.`,
     ].join("\n"),
   /** A command that does not exist. */
   unknownCommand: ({ command }: { command: string }) =>
@@ -139,9 +137,9 @@ export default {
     failed: ({ reason }: { reason: string }) =>
       `${name} did not start: ${reason}`,
     /** `--force`: the readiness gate is skipped. */
-    forced: `Warning: --force skips the readiness check and starts ${name} anyway. Run \`${bin} doctor\` to see what is missing. The sample tour needs no AI provider; a real agent run still does.`,
+    forced: `Warning: --force skipped the readiness check. Run \`${bin} doctor\` to see what is missing. The sample tour needs no AI provider; a real Agent run does.`,
     /** A required doctor check failed, so start did not listen. */
-    notReady: `${name} did not start. The checklist above names each failed required check and the command that fixes it. To start anyway and take the sample tour, run \`${bin} start --force\`.`,
+    notReady: `${name} did not start. The checklist above names each failed required check and the command that fixes it.`,
     /** Right under the Not ready headline, before the fix commands. */
     sampleTour: `No AI provider yet? See the sample tour: ${bin} start --force`,
     uiMissing: ({ path }: { path: string }) =>
@@ -205,7 +203,7 @@ export default {
     ready: "Group work is set up and ready.",
     /** `reason` is the stable word the server gives, such as sideMissing. */
     stopped: ({ reason }: { reason: string }) =>
-      `Group work has stopped (reason: ${reason}). docs/troubleshooting.md explains each reason. Fix the cause, then restart ${name}.`,
+      `Group work has stopped (reason: ${reason}). Look the reason up under "Group work has stopped" in docs/troubleshooting.md, fix the cause, then restart ${name}.`,
     setUp: `Group work is set up. Invite the first admin with \`${bin} group invite <name> --admin\`.`,
     alreadySetUp: "Group work is already set up.",
     invited: ({

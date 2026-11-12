@@ -101,8 +101,8 @@ test("the new-task dialog asks for the repository, the goal and the team setting
   assert.match(html, /儲存為預設設定/);
   assert.match(html, /任務名稱 <span>選填<\/span>/);
   assert.match(html, /這次想完成什麼？/);
-  assert.match(html, /3 位協作成員/);
-  assert.match(html, /會使用本機 Codex 帳號執行任務/);
+  assert.match(html, /3 位隊友/);
+  assert.match(html, /任務會使用本機已登入的 Codex CLI 執行/);
   assert.doesNotMatch(html, /示範設定可以自由調整/);
 });
 
@@ -123,7 +123,7 @@ test("the start button names what happens next and waits for a long enough goal"
     },
   });
   assert.match(direct, />開始任務<\/button>/);
-  assert.match(direct, /會使用本機 Claude Code 帳號執行任務/);
+  assert.match(direct, /任務會使用本機已登入的 Claude Code CLI 執行/);
 });
 
 test("the demo repository plays the sample team again instead of starting agents", () => {
@@ -155,7 +155,7 @@ test("the new-task dialog reads in English with no Chinese left", () => {
   assertNoHan(html);
 
   const demo = renderEn(element({ taskRepoId: "demo-repo" }));
-  assert.match(demo, /Demo settings can be changed freely; no real agent starts\./);
+  assert.match(demo, /Demo settings can be changed freely; no real Agent starts\./);
   assert.match(demo, />Play the sample team<\/button>/);
   assertNoHan(demo);
 
@@ -178,7 +178,7 @@ test("the new-task dialog reads in English with no Chinese left", () => {
   );
   assert.match(solo, /2 teammates/);
   assert.match(solo, /the Claude Code CLI signed in/);
-  assert.match(solo, />Start the agent team<\/button>/);
+  assert.match(solo, />Start the Agent team<\/button>/);
 });
 
 test("a run waits for a ready AI provider and shows the fix; the sample does not", () => {
@@ -246,11 +246,11 @@ test("under the request the dialog asks who writes the code; the sample shows th
   const goal = html.indexOf('id="task-prompt"');
   const mode = html.indexOf("Who writes the code?");
   assert.ok(goal > 0 && mode > goal, "the choice comes after the request");
-  assert.match(html, /<input type="radio" name="[^"]+-mode" checked=""\/><svg[\s\S]*?<strong>The agent team writes it<\/strong>/);
+  assert.match(html, /<input type="radio" name="[^"]+-mode" checked=""\/><svg[\s\S]*?<strong>The Agent team writes it<\/strong>/);
   // The team runs by default, so its preview and Start stay as they were.
   assert.ok(html.includes("AI and team settings"));
   const sample = renderEn(element({ taskRepoId: getDemo("en").repo.id }));
-  assert.ok(sample.includes("The sample shows the agent team. Learn by hand works on your own projects."));
+  assert.ok(sample.includes("The sample shows the Agent team. Learn by hand works on your own projects."));
   const hand = sample.match(/(<input type="radio"[^>]*-mode"[^>]*\/>)<svg(?:(?!<input)[\s\S])*?<strong>You write it/)?.[1];
   assert.match(hand ?? "", /disabled=""/);
 });

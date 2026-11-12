@@ -16,6 +16,6 @@ test("the agent team page reads in English with no Chinese left", () => {
   );
   assert.match(
     renderZh(createElement(TeamPage, { beginContribution() {} })),
-    /2 至 4 位 Teammates · 共享任務板/,
+    /2 至 4 位隊友 · 共享任務板/,
   );
 });

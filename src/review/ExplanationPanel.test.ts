@@ -156,7 +156,7 @@ test("maintainer thread comments add the response preset and a read-only section
   assert.match(reports, /第 4 行/);
   // Comment text is escaped plain text, never interpreted as markup.
   assert.match(reports, /Use a named constant &lt;here&gt;\./);
-  assert.match(reports, /這次工作還沒有審查報告/);
+  assert.match(reports, /這個貢獻還沒有審查報告/);
 });
 
 test("saved answers about an older diff are marked instead of dropped", () => {
@@ -193,7 +193,7 @@ test("the reports tab renders demo reports with the static-review label and per-
   assert.match(html, /Lead 整合摘要/);
   assert.match(html, /Lens · Reviewer/);
   assert.match(html, /Scout · Test analyst/);
-  assert.equal(html.match(/獨立靜態審查，非執行結果/g)?.length, 3);
+  assert.equal(html.match(/class="explain-report-badge">靜態審查</g)?.length, 3);
   assert.match(html, /本報告提到此檔 \d+ 處/);
   // Markdown is rendered, not shown as raw asterisks.
   assert.match(html, /<strong>正確性<\/strong>/);
@@ -230,7 +230,7 @@ test("the reports tab renders demo reports with the static-review label and per-
   const empty = renderZh(
     createElement(ReviewReports, { file: demoFiles[0], reports: {}, demo: false }),
   );
-  assert.match(empty, /這次工作還沒有審查報告/);
+  assert.match(empty, /這個貢獻還沒有審查報告/);
   assert.equal(reportMentionCount("a\n\nsrc/a.ts here\n\nand a.ts\n\nnope", "src/a.ts"), 2);
 });
 
@@ -330,12 +330,12 @@ test("the note editor renders with the saved text and flags a note written for a
   assert.match(current, /我的理解/);
   assert.match(current, /我的筆記內容<\/textarea>/);
   assert.match(current, /maxLength="2000"/i);
-  assert.doesNotMatch(current, /diff 已更新/);
+  assert.doesNotMatch(current, /差異已更新/);
   // The save button stays disabled until the text changes.
   assert.match(current, /儲存筆記/);
   assert.match(current, /<button[^>]*class="explain-note-save"[^>]*disabled/);
   const stale = withNote("a".repeat(64));
-  assert.match(stale, /diff 已更新/);
+  assert.match(stale, /差異已更新/);
   assert.match(stale, /我的筆記內容<\/textarea>/);
   // A stale note can be re-saved as is to refresh its fingerprint.
   assert.doesNotMatch(stale, /<button[^>]*class="explain-note-save"[^>]*disabled/);
@@ -560,7 +560,7 @@ test("every explanation state renders English text without Han", () => {
         file: { ...withoutExample, explanationStatus: "failed" },
         onRetryExplanation() {},
       },
-      /example isn&#x27;t ready yet[\s\S]*Prepare the example again/,
+      /example couldn&#x27;t be prepared[\s\S]*Prepare the example again/,
     ],
     [
       {
@@ -579,7 +579,7 @@ test("every explanation state renders English text without Han", () => {
         file: { ...file, explanation: undefined, explanationStatus: "failed" },
         onRetryExplanation() {},
       },
-      /explanation isn&#x27;t ready yet[\s\S]*Prepare the explanation again/,
+      /explanation couldn&#x27;t be prepared[\s\S]*Prepare the explanation again/,
     ],
     [
       { file: { ...file, explanation: undefined, explanationStatus: "generating" } },
@@ -621,7 +621,7 @@ test("an English render of the reports tab has no Han in its own text", () => {
       "Atlas · Team lead",
       "Code review",
       "Test analysis",
-      "Independent static review, not an execution result",
+      "explain-report-badge\">Static review<",
       "Mentions this file in 1 paragraph<",
       "This report doesn&#x27;t mention this file directly",
     ])
@@ -644,7 +644,7 @@ test("an English render of the reports tab has no Han in its own text", () => {
     }),
   );
   assertNoHan(busy);
-  assert.match(busy, /No review reports for this run yet/);
+  assert.match(busy, /No review reports for this contribution yet/);
   assert.match(busy, /Running the review again…/);
 });
 
@@ -658,7 +658,7 @@ test("an English render of the chat tab has no Han in its own text", () => {
   for (const preset of Object.values(en.review.presets))
     assert.ok(welcome.includes(preset.replace(/'/g, "&#x27;")), preset);
   assert.match(welcome, /Take your understanding further/);
-  assert.match(welcome, /aria-label="Question for the agent"/);
+  assert.match(welcome, /aria-label="Question for the Agent"/);
   assert.match(welcome, /placeholder="Which part do you want to explore\?"/);
   assert.match(welcome, /Enter to send · Shift \+ Enter for a new line/);
   const file = { ...englishFile("src/utils/retry.ts"), fingerprint: "new" };

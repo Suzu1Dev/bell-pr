@@ -22,6 +22,6 @@ test("a missing API token shows how to open bell-pr, not the request header", ()
       createElement(ApiTokenEmptyState),
     ),
   );
-  assert.match(chinese, /請在執行 BELL PR 的電腦上執行 `bell-pr`，重新開啟工作台。/);
+  assert.match(chinese, /請在執行 BELL PR 的電腦上執行 `bell-pr`，重新開啟你的工作空間。/);
   assert.doesNotMatch(chinese, /Bearer|X-Bell-Token/);
 });

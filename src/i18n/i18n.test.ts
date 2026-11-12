@@ -133,7 +133,7 @@ test("a zh-TW provider renders the zh-TW dictionary and formatters", async () =>
   const html = renderToStaticMarkup(
     createElement(LocaleProvider, { locale: "zh-TW" }, createElement(Probe)),
   );
-  assert.equal(html, '<p lang="zh-TW">等待你的審查 | 取消 | a和b</p>');
+  assert.equal(html, '<p lang="zh-TW">等待你的審閱 | 取消 | a和b</p>');
   // The app's provider makes its locale the active one for code outside React.
   assert.equal(getCurrentLocale(), "zh-TW");
   assert.equal(getCurrentMessages().common.actions.cancel, "取消");
@@ -147,7 +147,7 @@ test("a provider with its own dictionary leaves the active locale alone", () => 
       createElement(Probe),
     ),
   );
-  assert.equal(html, '<p lang="zh-TW">等待你的審查 | 取消 | a和b</p>');
+  assert.equal(html, '<p lang="zh-TW">等待你的審閱 | 取消 | a和b</p>');
   assert.equal(getCurrentLocale(), "en");
 });
 
