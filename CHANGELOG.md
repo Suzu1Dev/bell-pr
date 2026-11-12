@@ -195,6 +195,18 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **npmjs.com shows the English README.** `npm publish` takes any root
+  file named `README` or `README.*` as the package's README, in no fixed
+  order, so npmjs.com showed the Traditional Chinese README for 1.0.0 and
+  1.1.0. It is now `README-zh-TW.md`, in the repository and in the package,
+  and `node scripts/check-pack.mjs` fails when npm could send another README
+  than `README.md`.
+
+- **A local import uses the origin URL saved in the checkout.** A global
+  `url.*.insteadOf` rewrite no longer hides a GitHub project, and an origin
+  whose URL contains userinfo is imported as a local project. That address
+  is not stored or logged.
+
 - **Sandbox messages name the real Settings section.** They pointed to
   "Settings → Models", which does not exist; they now say "Settings → AI
   provider". When Ubuntu's restriction on user namespaces stops the

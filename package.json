@@ -42,7 +42,7 @@
     "THIRD_PARTY_NOTICES.md",
     "SECURITY.md",
     "CHANGELOG.md",
-    "README.zh-TW.md",
+    "README-zh-TW.md",
     "README.md"
   ],
   "scripts": {
