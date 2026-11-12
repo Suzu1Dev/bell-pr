@@ -130,6 +130,18 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   product can read the feed yet, because BELL PR has no read-only
   credential to give one. [BELL Suite link](docs/bell-suite.md) has the
   details.
+- **Diagrams in the project analysis and the change explanations.** The
+  analysis also returns its main flow as up to six short steps, and the
+  reading section draws them as a diagram through the modules, under "How
+  the modules fit together", with the flow's prose as its caption; a step
+  whose path is not in the repository is drawn as outside it. Each file's
+  plain-language example also returns its before and after as up to five
+  steps each, drawn in the Before and After boxes with the steps that
+  differ marked by border, icon and text for screen readers. The learning
+  record export lists the same steps. BELL PR draws both from the
+  agent's short fields with its own HTML and CSS; the agent writes no
+  drawing. Analyses and explanations saved earlier load as before and show
+  no diagram, and an explanation is not made again for it.
 
 ### Changed
 

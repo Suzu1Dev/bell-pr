@@ -200,7 +200,9 @@ ever counted as a pass.
 
 Open the project and choose **Analyze the project**. An agent reads a
 sample of the source code, read-only, and writes what the project does,
-who uses it, how its parts fit together and where to start reading. It
+who uses it, how its parts fit together and where to start reading. When
+the agent traces a main flow through the modules, it is also drawn as a
+diagram, step by step, with that prose as its caption. It
 also suggests up to five contribution directions. Each one quotes the code
 or documents it is based on, and BELL PR checks that every quote really is
 in the files the agent read; a recommendation whose quotes do not match is
@@ -382,7 +384,8 @@ When the team is done, the run waits for your review in **Code changes**:
 - Beside it, an **explanation** of the file in plain language: a concrete
   example of the behavior before and after, what changed and why, the
   concepts involved, what to check, another way it could have been done and
-  a question to test yourself.
+  a question to test yourself. When the example is a sequence, its before
+  and after are also drawn as steps, with the steps that differ marked.
 - **Ask**: click a line (Shift for several) and ask the agent about it.
   Answers are saved with the run.
 - **Reviews**: the Lead's summary and the Reviewer's and Test analyst's

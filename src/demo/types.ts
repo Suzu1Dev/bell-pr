@@ -33,6 +33,7 @@ import type {
   DemoExtraRecommendationId,
   DemoFeedbackItemId,
   DemoFilePath,
+  DemoFlowPaths,
   DemoLogKey,
   DemoMessageId,
   DemoModulePath,
@@ -42,6 +43,11 @@ import type {
   DemoRecommendationId,
   DemoTaskId,
 } from "./shared";
+
+/** One label and hand-off per flow step, as many as the paths in shared.ts. */
+type FlowCopy<Paths extends readonly string[]> = {
+  [K in keyof Paths]: { label: string; passes: string };
+};
 
 export type DemoAnswerTopic = "test" | "jitter" | "risk" | "why" | "generic";
 
@@ -220,6 +226,8 @@ export interface DemoCopy {
     modules: Record<DemoModulePath, string>;
     readingPath: Record<DemoReadingPath, { why: string; lookFor: string }>;
     howItFitsTogether: string;
+    /** The words of each flow step in shared.ts, in its order. */
+    flow: FlowCopy<DemoFlowPaths>;
     evidence: Record<DemoEvidencePath, string>;
     recommendations: Record<DemoRecommendationId, DemoRecommendationCopy>;
   };

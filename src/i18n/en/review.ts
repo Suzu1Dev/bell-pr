@@ -197,6 +197,8 @@ const review = {
     exampleScenario: "Picture this",
     exampleBefore: "Before the change",
     exampleAfter: "After the change",
+    /** Read by screen readers only, before an example step that differs. */
+    exampleStepChanged: "This step differs:",
     exampleFailed:
       "The plain-language example couldn't be prepared. You can keep reading the rest of the explanation.",
     retryBusy: "Preparing other explanations…",

@@ -157,6 +157,10 @@ const mission = {
     title: "New to this project? Read it in this order",
     lead: "Ordered from the sampled files the Agent read. Each step says why to read it first and what to look for.",
     flow: "How the modules fit together",
+    /** Read by screen readers only, on a flow step outside the repository. */
+    flowOutside: "Outside this repository",
+    /** Read by screen readers only, before what one flow step passes to the next. */
+    flowPasses: "Passes on:",
     unsampled: "Not sampled; content not read",
     lookFor: "Look for",
     context: "More about this file in the analysis",

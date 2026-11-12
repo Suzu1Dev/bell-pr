@@ -111,6 +111,7 @@ const m: Translation<typeof en> = {
     exampleScenario: "想像這個情境",
     exampleBefore: "修改前",
     exampleAfter: "修改後",
+    exampleStepChanged: "這一步不同：",
     exampleFailed: "白話例子沒有產生成功，其他解說可以繼續閱讀。",
     retryBusy: "其他解說整理中…",
     retryExample: "重新整理白話例子",
