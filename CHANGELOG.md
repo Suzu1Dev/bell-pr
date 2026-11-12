@@ -198,6 +198,11 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **A local import uses the origin URL saved in the checkout.** A global
+  `url.*.insteadOf` rewrite no longer hides a GitHub project, and an origin
+  whose URL contains userinfo is imported as a local project. That address
+  is not stored or logged.
+
 - **Sandbox messages name the real Settings section.** They pointed to
   "Settings → Models", which does not exist; they now say "Settings → AI
   provider". When Ubuntu's restriction on user namespaces stops the
