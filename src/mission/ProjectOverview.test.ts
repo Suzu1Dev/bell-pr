@@ -336,7 +336,7 @@ test("the English overview words counts, dates and the update help in English", 
   assert.match(html, />Update to the latest version<\/button>/);
   assert.ok(
     html.includes(
-      `Fetches the latest main from GitHub, and the overview and analysis follow it. New contributions always start from the latest version. Last updated: ${en.dateTime("2026-10-13T00:00:00.000Z")}`,
+      `Fetches the latest main from GitHub for the overview and analysis. New contributions start from the latest version either way. Last updated: ${en.dateTime("2026-10-13T00:00:00.000Z")}`,
     ),
   );
   const analyzed = en.dateTime("2026-10-07T08:00:00.000Z", {
@@ -416,12 +416,12 @@ test("Generate 5 more is always open on a real analysis, with no chip and no upg
   assertNoHan(html);
   assert.match(moreButton(html), /Generate 5 more<\/button>$/);
   assert.doesNotMatch(moreButton(html), /disabled|pro-badge/);
-  assert.match(moreReason(html) ?? "", /^The Agent uses the model settings saved for this project/);
+  assert.match(moreReason(html) ?? "", /^Uses this project&#x27;s saved model settings\./);
   assert.doesNotMatch(html, /pro-badge|mission-upgrade-button|See what Pro adds/);
   const zh = render({ insights: analyzed });
   assert.match(moreButton(zh), /產出 5 個新建議<\/button>$/);
   assert.doesNotMatch(moreButton(zh), /disabled|pro-badge/);
-  assert.match(moreReason(zh) ?? "", /^Agent 會沿用這個專案已儲存的模型設定/);
+  assert.match(moreReason(zh) ?? "", /^沿用這個專案已儲存的模型設定。/);
 });
 
 test("Generate 5 more waits for a newer analysis, and stops at 30 recommendations per project", () => {

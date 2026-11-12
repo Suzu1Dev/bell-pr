@@ -68,9 +68,9 @@ test("a failed real run offers the retry form, opens failure reasons and marks c
   };
   const html = renderZh(board(run, false, async () => {}));
   assert.match(html, /重試失敗的子任務/);
-  assert.match(html, /1 個已整合的子任務不會重跑；1 個失敗或被阻擋的子任務/);
+  assert.match(html, /1 個已整合的子任務不會重跑。1 個失敗或受阻的子任務/);
   assert.match(html, /aria-label="給重試子任務的補充說明"/);
-  assert.match(html, /獨立 worktree 已清理/);
+  assert.match(html, /獨立工作目錄已清理/);
   assert.match(html, /查看失敗原因/);
   assert.match(html, /aria-expanded="true"/);
   assert.match(html, /Teammate 修改了未分配的檔案 c.ts/);
@@ -341,7 +341,7 @@ test("English plan revisions and retries use whole sentences with English plural
   assert.match(approval, /The previous plan had 2 tasks: Do it all, Ship it/);
   assert.match(approval, /<b>Your feedback: <\/b>Split the tests out\./);
   assert.match(approval, /The lead did not describe the changes/);
-  assert.match(approval, /Revised 1\/3\. Each revision is one read-only planning turn/);
+  assert.match(approval, /Revised 1\/3\. Each revision makes the lead plan once more, without writing code\./);
   assert.match(approval, /aria-label="Feedback on the plan"/);
   const retry = renderEn(
     board(
@@ -360,7 +360,7 @@ test("English plan revisions and retries use whole sentences with English plural
   );
   assert.match(
     retry,
-    /1 subtask already integrated will not run again\. 1 subtask that failed or was blocked will discard its old isolated directory/,
+    /1 subtask already integrated will not run again\. 1 subtask that failed or was blocked will discard its old working directory/,
   );
   assert.match(retry, /View the failure reason/);
   assert.match(retry, /Retry failed subtasks/);
@@ -480,17 +480,17 @@ test("stopped runs label ready tasks and their dependencies as ready after retry
   for (const phase of ["failed", "cancelled"] as const) {
     const zh = render(withReadyDependency(demoRunZh, phase), false);
     assert.equal(zh.match(/重試後可執行/g)?.length, 2, phase);
-    assert.doesNotMatch(zh, /可認領/, phase);
+    assert.doesNotMatch(zh, /可開始/, phase);
     const en = english(withReadyDependency(englishRun, phase));
     assert.equal(en.match(/Ready after retry/g)?.length, 2, phase);
-    assert.doesNotMatch(en, /Ready to claim/, phase);
+    assert.doesNotMatch(en, /Ready to start/, phase);
   }
 
   const zh = render(withReadyDependency(demoRunZh, "developing"), false);
-  assert.equal(zh.match(/可認領/g)?.length, 2);
+  assert.equal(zh.match(/可開始/g)?.length, 2);
   assert.doesNotMatch(zh, /重試後可執行/);
   const en = english(withReadyDependency(englishRun, "developing"));
-  assert.equal(en.match(/Ready to claim/g)?.length, 2);
+  assert.equal(en.match(/Ready to start/g)?.length, 2);
   assert.doesNotMatch(en, /Ready after retry/);
 });
 
@@ -620,7 +620,7 @@ test("the protocol note sits in a How it works disclosure", () => {
   const html = english(englishRun);
   assert.match(
     html,
-    /<details class="team-how"><summary><svg[^>]*>[\s\S]*?<\/svg>How it works<svg[^>]*>[\s\S]*?<\/svg><\/summary><p class="team-protocol-note"><svg[^>]*>[\s\S]*?<\/svg>BELL PR coordinates the team[^<]*it is not Claude Code&#x27;s native Agent Teams\.<\/p><\/details>/,
+    /<details class="team-how"><summary><svg[^>]*>[\s\S]*?<\/svg>How it works<svg[^>]*>[\s\S]*?<\/svg><\/summary><p class="team-protocol-note"><svg[^>]*>[\s\S]*?<\/svg>BELL PR coordinates the team[^<]*It is not Claude Code&#x27;s native Agent Teams\.<\/p><\/details>/,
   );
   assert.match(renderZh(board(demoRunZh, true)), /<summary>[\s\S]*?運作方式[\s\S]*?並非 Claude Code 原生 Agent Teams/);
 });

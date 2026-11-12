@@ -48,7 +48,7 @@ const m: Translation<typeof en> = {
   runNotices: {
     waiting: ({ date }) =>
       `維護者在 ${date} 要求修改。請在 GitHub 上用自己的話回覆，或開始一輪修正。`,
-    queued: "排隊中：同時執行的任務數已達上限，其他任務完成後才會開始",
+    queued: "排隊中：同時執行的任務數已達上限。其他任務完成後，這次任務才會開始。",
     workspaceRemoved: "為了釋放磁碟空間，這次任務的檔案已清除；報告與筆記仍會保留。",
   },
   holdStop: {
@@ -124,7 +124,7 @@ const m: Translation<typeof en> = {
   },
   footer: {
     passed: "你已用自己的話講過一遍，可以核准了。",
-    checkOff: "每一個檔案都已審閱 · 理解檢查已關閉。核准只需要你的審閱勾選。",
+    checkOff: "理解檢查已關閉：核准只需要你的審閱勾選。",
     learning: "不只是 review，也是一次 code learning。",
     hint: "選取程式碼，就能向 Agent 追問。",
     hintByHand: "選取程式碼，就能向嚮導提問。",
@@ -151,7 +151,7 @@ const m: Translation<typeof en> = {
     closeSearch: "關閉檔案搜尋",
     onlyUnreviewed: "只看未審閱",
     suggestedOrderTitle:
-      "依 Lead 整合摘要建議的閱讀順序排列；未提到的檔案維持 git 順序排在後面",
+      "依 Lead 整合摘要建議的閱讀順序排列。未提到的檔案照原本的順序排在後面。",
     suggestedOrder: "依建議順序",
     repositoryFallback: "repository",
     waitingForChanges: "等待 Agent 產生變更",
@@ -207,9 +207,9 @@ const m: Translation<typeof en> = {
   check: {
     title: "用自己的話講一遍",
     intro:
-      "不看解說作答：作答時會隱藏解說、筆記與向 Agent 提問，差異與檔案清單仍在。你對照 AI 寫的參考答案替自己評分。這是一個承諾，不是考試。",
+      "不看解說作答。作答時隱藏：解說、筆記、向 Agent 提問。仍看得到：差異與檔案清單。你對照 AI 寫的參考答案替自己評分。這是一個承諾，不是考試。",
     introByHand:
-      "不看解說作答：作答時會隱藏嚮導、解說與筆記，差異與檔案清單仍在。你對照自己先前寫下的話和嚮導的審查替自己評分。這是一個承諾，不是考試。",
+      "不看解說作答。作答時隱藏：嚮導、解說、筆記。仍看得到：差異與檔案清單。你對照自己先前寫下的話和嚮導的審查替自己評分。這是一個承諾，不是考試。",
     off: "理解檢查已關閉，核准不需要等它；你仍然可以做。",
     close: "關閉檢查",
     loading: "正在載入檢查…",
@@ -239,10 +239,10 @@ const m: Translation<typeof en> = {
     lock: "鎖定我的答案",
     lockNote: "鎖定後不能修改；「重新開始」會清除這次檢查。",
     gradeTitle: "3. 對照並評分",
-    gradeIntro: "把每個答案和參考答案放在一起，替自己評分。",
+    gradeIntro: "把每個答案和參考答案放在一起，替自己評分。參考答案與差異內容不一致時，以差異內容為準。",
     yourAnswer: "你的答案",
-    reference: "參考答案，由 AI 撰寫：以差異內容為準",
-    testerReference: "Test analyst 的報告，由 AI 撰寫：以差異內容為準",
+    reference: "參考答案（AI 撰寫）",
+    testerReference: "Test analyst 的報告（AI 撰寫）",
     noReference: "沒有參考答案：請自己對照差異內容。",
     ownWords: "你自己的話",
     guideReview: "嚮導的審查",
@@ -323,7 +323,7 @@ const m: Translation<typeof en> = {
       "這次同步會在 PR 分支加上一個合併 commit，PR 標題與說明維持原樣。請先在「程式碼變更」審閱目標分支改到的檔案，再確認下方的提交訊息。",
     roundNotice:
       "這一輪只會在 PR 分支加上一個新的 commit，PR 標題與說明維持原樣。請先在「程式碼變更」審閱這一輪改到的檔案，再確認下方的提交訊息。",
-    proposalNotice: `下方說明是 ${product.name} 依專案規範產生的建議原文，你還沒有修改。這段文字會原樣送到 GitHub：發布前請用自己的話確認內容，待辦事項留在下方規範區的核對清單，不要寫進說明。`,
+    proposalNotice: `下方說明是 ${product.name} 依專案規範產生的建議。你還沒有修改。它會原樣送到 GitHub：發布前請確認內容，並改成你自己的話。待辦事項請留在下方規範區的核對清單，不要寫進說明。`,
     emptyNotice:
       "還沒有 PR 說明。可以在下方產生並套用建議草稿，或用自己的話寫下改了什麼、為什麼，以及實際執行過哪些檢查。Agent 的完整報告在「程式碼變更」的「審查者怎麼看」。",
     emptyNoticeByHand: `請用自己的話寫下 PR 標題與說明：在親手學中，${product.name} 不會替你起草，而核准需要兩者都填好。`,
@@ -367,7 +367,7 @@ const m: Translation<typeof en> = {
     noDescription: "還沒有說明",
     placeholdersStay: "TODO 與待填空格不會送到 GitHub",
     taskItems: "說明中的勾選項目",
-    taskItemsHelp: `只勾你真正完成或確認的項目。${product.name} 和模型不會替你勾；勾選會直接改寫上方說明，記得儲存。`,
+    taskItemsHelp: `只勾你真正完成或確認的項目。${product.name} 和模型不會替你勾。勾選會直接改寫上方說明，記得儲存。`,
     noSection: "未分段",
     samePr: "推送到同一個 PR",
     samePrHelp: "不會 force push。",
@@ -471,14 +471,14 @@ const m: Translation<typeof en> = {
     pacing: ({ open, budget, first }) =>
       `你在這裡開著的 PR：${open} / ${budget}（${product.name} 預設值${first ? "；第一次在這裡貢獻" : ""}）`,
     pacingExempt: "你在這裡開著的 PR：不受節奏限制，因為你可以寫入這個 repository",
-    factsLoading: "正在讀取 GitHub 資訊…",
+    factsLoading: "正在向 GitHub 確認…",
     couldntCheck: ({ reason }) => `無法確認：${reason}`,
-    factsMissing: "這個版本還無法讀取 GitHub 資訊",
+    factsMissing: `這個版本的 ${product.name} 還無法向 GitHub 確認`,
     overrideLabel: "為什麼仍要發布？會記錄在這次任務上。",
     overrideCount: ({ count }) => `${count} / 20–200 個字元`,
-    closeLoop: ({ title }) => `先完成上一份：讀取「${title}」的回饋`,
-    waitingPr: ({ number }) => `先完成上一份：閱讀 PR #${number} 的審查意見（開啟 GitHub）`,
-    confirmNote: `勾選只代表你知道這些項目還沒處理、願意照目前的說明發布。${product.name} 不會因此改動說明或替你勾選任何項目，這些確認也不會寫進 PR。想先修改，請按「返回編輯草稿」。`,
+    closeLoop: ({ title }) => `先讀取「${title}」的回饋`,
+    waitingPr: ({ number }) => `先閱讀 PR #${number} 的審查意見（開啟 GitHub）`,
+    confirmNote: `勾選只代表你知道這些項目還沒處理、願意照目前的說明發布。${product.name} 不會因此改動說明或替你勾選任何項目。這些確認也不會寫進 PR。想先修改，請按「返回編輯草稿」。`,
     back: "返回編輯草稿",
     finishDemo: "開啟範例 Draft PR",
     sending: "正在發布…",

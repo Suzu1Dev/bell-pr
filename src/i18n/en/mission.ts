@@ -46,7 +46,7 @@ const mission = {
       branch: string;
       updatedAt?: string;
     }) =>
-      `Fetches the latest ${branch} from GitHub, and the overview and analysis follow it. New contributions always start from the latest version.${updatedAt ? ` Last updated: ${updatedAt}` : ""}`,
+      `Fetches the latest ${branch} from GitHub for the overview and analysis. New contributions start from the latest version either way.${updatedAt ? ` Last updated: ${updatedAt}` : ""}`,
     analyze: "Analyze the project",
     reanalyze: "Re-analyze",
     analyzing: "Analyzing the project…",
@@ -157,7 +157,7 @@ const mission = {
   },
   reading: {
     title: "New to this project? Read it in this order",
-    lead: "Ordered from the sampled files the Agent read; each step says why to read it first and what to look for.",
+    lead: "Ordered from the sampled files the Agent read. Each step says why to read it first and what to look for.",
     flow: "How the modules fit together",
     unsampled: "Not sampled; content not read",
     lookFor: "Look for",
@@ -202,7 +202,7 @@ const mission = {
     impactRefuted:
       "The premise check found that the assumption does not hold: the problem and impact described above from it do not happen. Go by the check and the lead's integration report.",
     premiseMissing:
-      "This contribution was made before premise checks, so whether the request's assumption holds was not recorded. The lead can check it once against the current code and the review reports; the code walkthroughs, and the explanations you have not answered yet, are then made again with the verdict.",
+      "This contribution was made before premise checks, so whether the request's assumption holds was not recorded. The lead can check it once against the current code and the review reports. The code walkthroughs, and the explanations you have not answered yet, are then made again with the verdict.",
     premiseCheck: "Check the premise against the review",
     premiseRecheck: "Check the premise again",
     premiseChecking: "Checking the premise…",
@@ -241,7 +241,7 @@ const mission = {
     moreLimit: ({ max }: { max: number }) =>
       `This analysis has reached its limit of ${n(max)} recommendations. Pick a direction, or re-analyze the project.`,
     moreHint:
-      "The Agent uses the model settings saved for this project to look for different problems and value to users. The existing recommendations stay, and you decide when development starts.",
+      "Uses this project's saved model settings. Existing recommendations stay.",
     generatingStatus:
       "Reading the project and steering clear of the existing directions. You can keep reading the recommendations below.",
     viewAdded: ({ added, requested }: { added: number; requested?: number }) =>
@@ -278,7 +278,7 @@ const mission = {
     droppedPaths: ({ count }: { count: number }) =>
       `Skipped ${amount(count, "note", "notes")} citing unsampled or missing files`,
     droppedPathsNote:
-      "The model read only the sampled files; of the other paths it only knows that they exist. Evidence must come from files it read, and paths that are not in the tree cannot be checked. The rest of the analysis is saved as usual.",
+      "The model read only the sampled files, so notes that cite other files cannot be checked and were skipped. The rest of the analysis is saved as usual.",
     /** Where a dropped recommendation came from. */
     rounds: {
       analysis: "Project analysis",
@@ -429,7 +429,7 @@ const mission = {
       webPages: "Let Agents read web pages",
       antigravityWeb: "Antigravity can always search the web, including during project analysis and discovery. This switch only controls reading web pages.",
       webAccessHelp:
-        "Allows task and follow-up agents to search and read web pages. Project analysis and discovery do not use these tools. Web content is untrusted; command-line network access still follows the chosen permissions.",
+        "Applies to tasks and follow-ups. Project analysis and discovery do not use these tools. Web content is treated as untrusted. Command-line network access still follows the chosen permissions.",
       error: ({ message }: { message: string }) =>
         `${message} Your saved choice is kept.`,
       loadFailed: ({ provider }: { provider: string }) =>
@@ -558,7 +558,7 @@ const mission = {
    */
   start: {
     title: "Before you start",
-    lead: "Read once for this issue link. Nothing here stops you from practising; publishing checks again.",
+    lead: "Read once for this issue link. Nothing here stops you from practising. Publishing checks again.",
     noIssue: `With a link, ${product.name} checks whether the issue is still open and whether someone else is already on it.`,
     notGitHub:
       "Issue facts are read for GitHub issue links, such as https://github.com/owner/repo/issues/123.",
@@ -593,8 +593,8 @@ const mission = {
       `Labelled for newcomers: ${fmt.list(labels)}`,
     pacing: ({ open, budget }: { open: number; budget: number }) =>
       `Your open PRs here: ${n(open)} of ${n(budget)}`,
-    pacingHelp: `The limit is a ${product.name} default: 1 open pull request before your first one is merged in a repository, 2 after.`,
-    pacingExempt: "You can write to this repository, so publishing isn't paced here",
+    pacingHelp: `The limit is a ${product.name} default: 1 open pull request in a repository until your first one is merged, then 2.`,
+    pacingExempt: "You can write to this repository, so the open-PR limit doesn't apply here",
     doorClosed: "This repository doesn't take pull requests from you",
     ban: "The project's rules don't accept AI-assisted contributions",
     unknown: ({ part, reason }: { part: "door" | "issue" | "pacing" | "other"; reason?: string }) => {

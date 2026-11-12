@@ -1737,7 +1737,7 @@ test("a Claude Code turn that lost the OAuth refresh lock and exited non-zero is
     const refreshRace =
       "Failed to refresh OAuth token: another Claude Code process is refreshing it or exited mid-refresh. This is usually transient; retry in a minute, and if it persists close other Claude Code processes or sign in again";
     const notice =
-      "Claude Code 正在更新登入憑證（其他行程持有更新鎖），15 秒後重試（第 2/3 次）。";
+      "Claude Code 正在等另一個行程更新完登入狀態，15 秒後重試（第 2/3 次）。";
     type Options = NonNullable<Parameters<typeof command>[2]>;
     const emit = (options: Options, event: unknown) =>
       options.onLine?.(JSON.stringify(event), "stdout");

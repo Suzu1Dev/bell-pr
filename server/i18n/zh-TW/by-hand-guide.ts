@@ -4,7 +4,7 @@ import type en from "../en/by-hand-guide.js";
 
 const guide: Translation<typeof en> = {
   aboutYourChange: "這是關於你的變更；下一步請用「提示」。",
-  rungTooHigh: "請依序一階一階地要這個步驟的提示。",
+  rungTooHigh: "請依序要這一步的提示，一次一個。",
   canBeWrong: "嚮導也可能出錯。請拿程式碼與你的測試核對它指出的地方。",
   notNow: "嚮導會在你寫變更的期間給提示、回答問題；任務在規劃或發布時不會。",
   planOnly: "嚮導會在你確認計畫之前問你計畫的事。",
@@ -16,7 +16,7 @@ const guide: Translation<typeof en> = {
   noRungLeft: ({ kind }) =>
     `這個任務裡，嚮導對這一步已經沒有提示了：它配合的專案原文沒有提到${kind}。請改走其他出口：問問專案的人、把這一步拆小，或說說看。`,
   lastRungGiven: "「專案裡的例子」是最後一個提示。請改走其他出口：問問專案的人、把這一步拆小，或說說看。",
-  nothingLeft: `${product.name} 從這個回答裡移除了程式碼，之後什麼都不剩。請換個說法再問一次，或要下一階提示。`,
+  nothingLeft: `${product.name} 從這個回答裡移除了程式碼，之後什麼都不剩。請換個說法再問一次，或要下一個提示。`,
   ranCommand: "嚮導執行了一個唯讀指令。",
   removedFromAnswer: `${product.name} 在你看到這個回答之前，從裡面移除了程式碼。`,
   fromBase: ({ place }) => `出自專案原本的程式碼，${place}：`,

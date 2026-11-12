@@ -27,7 +27,7 @@ const en = {
     noIdea: "I don't know where to start",
     names: "Show the guide's step names",
     early: "Shown before your first draft, at your request.",
-    closed: "The project's text this run is fitted to doesn't name planning help: the guide's outline stays closed.",
+    closed: "This run is fitted to the project's rules, and they don't name planning help, so the guide's outline stays closed.",
     confirm: "This is my plan",
   },
   questions: {
@@ -149,7 +149,7 @@ const en = {
     reviewText: "The guide reads your change and your last test run and points out up to three problems with evidence. It never writes the fix.",
     testFirst: "Run your tests on this version first; the tests are the judge.",
     aiRules: "This project has rules about AI use. Check them before asking for an AI review.",
-    noReview: "The project's text this run is fitted to doesn't name AI review, so the guide doesn't review here; your tests are the judge.",
+    noReview: "This run is fitted to the project's rules, and they don't name AI review, so the guide doesn't review here. Your tests are the judge.",
     cost: "The review takes about 2 agent turns.",
     quiet: "Nothing is explained or reviewed until you say it's ready.",
     confirm: "Mark it ready",

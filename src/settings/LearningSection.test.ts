@@ -27,7 +27,7 @@ function checkbox(html: string, label: string) {
 }
 
 const checkLabel = "Ask me to explain each change back before approval";
-const tryFirstLabel = "Try-first prompts during review";
+const tryFirstLabel = "Ask me to answer before the answers show";
 
 test("Learning shows the understanding check on by default, and the try-first prompts", () => {
   const html = renderEn(section({ settings: {}, lockedBy: {} }));
@@ -47,7 +47,7 @@ test("Learning shows the understanding check on by default, and the try-first pr
   const zh = renderZh(section({ settings: {}, lockedBy: {} }));
   assert.match(zh, /<h3>理解檢查<\/h3>/);
   assert.match(zh, /核准前，請我用自己的話講一遍每個變更/);
-  assert.match(zh, /審閱時先試著答/);
+  assert.match(zh, /先請我作答，再顯示答案/);
 });
 
 test("the switches show what is saved, and wait while the settings load", () => {

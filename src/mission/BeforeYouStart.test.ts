@@ -32,7 +32,7 @@ test("the sample shows issue #42 without a link, green chips and the maintainer'
     ["info", "A maintainer said: “PRs welcome for the retry cap.” (Oct 2, 2026)"],
     ["ok", "Your open PRs here: 0 of 1"],
   ]);
-  assert.match(html, /title="The limit is a BELL PR default: 1 open pull request before your first one is merged in a repository, 2 after\./);
+  assert.match(html, /title="The limit is a BELL PR default: 1 open pull request in a repository until your first one is merged, then 2\./);
   assert.match(renderZh(view({ demo: true })), /#42（示範）/);
 });
 

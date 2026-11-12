@@ -47,11 +47,10 @@ const collab = {
   gone: "No longer held",
   dependsOn: {
     label: "Must finish first",
-    help: "Choose tasks in this project that must finish before yours starts.",
+    help: "Choose up to 50 tasks in this project that must finish before yours starts.",
     empty: "No other tasks in this project yet. You can start right away.",
     selectedCount: ({ count }: { count: number }) => `${count} selected`,
     clear: "Clear",
-    limitNote: "You can choose up to 50 tasks.",
     cardNote: ({ titles }: { titles: string }) => `Started after ${titles}`,
   },
   release: {

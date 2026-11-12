@@ -83,18 +83,18 @@ const team = {
   },
   revise: {
     action: "Send back with feedback",
-    hint: "If the split does not make sense, the scope is too large, a test task is missing or the dependencies look odd, write down why so the lead re-plans. It is a chance to practice how to split work into tasks.",
+    hint: "If the split does not make sense, the scope is too large, a test task is missing or the dependencies look odd, write down why. The lead then re-plans. It is a chance to practice splitting work into tasks.",
     label: "Feedback on the plan",
     placeholder:
       "For example: split the API and the UI into two tasks, and add a task that only writes tests.",
     limitReached:
       "The revision limit is reached. Approve the current plan or cancel the run.",
     counter: ({ count, max }: { count: number; max: number }) =>
-      `Revised ${count}/${max}. Each revision is one read-only planning turn for the lead.`,
+      `Revised ${count}/${max}. Each revision makes the lead plan once more, without writing code.`,
   },
   retry: {
     partial: ({ kept, retried }: { kept: number; retried: number }) =>
-      `${subtaskCount(kept)} already integrated will not run again. ${subtaskCount(retried)} that failed or ${retried === 1 ? "was blocked will discard its old isolated directory" : "were blocked will discard their old isolated directories"} and start again from a fresh snapshot.`,
+      `${subtaskCount(kept)} already integrated will not run again. ${subtaskCount(retried)} that failed or ${retried === 1 ? "was blocked will discard its old working directory" : "were blocked will discard their old working directories"} and start again from a fresh snapshot.`,
     integrationOnly:
       "All subtasks are integrated; a retry only runs the lead's integration and the independent review again.",
     notStarted:
@@ -121,8 +121,8 @@ const team = {
   laneEmptyAwaiting: "Subtasks start once you approve the plan.",
   task: {
     details: "Assignment and files",
-    worktree: "Isolated worktree",
-    worktreeRemoved: "Isolated worktree cleaned up",
+    worktree: "Own working directory",
+    worktreeRemoved: "Working directory removed",
     filesPending: "Being planned",
     dependsOn: "Depends on",
     dependencyUnknown: "Unknown",
@@ -134,7 +134,7 @@ const team = {
     showError: "View the failure reason",
     showReport: "View the work report",
     checks: ({ count }: { count: number }) =>
-      `The app saw ${count === 1 ? "1 command" : `${count} commands`} run (exit codes only, no output captured; compare them with the checks the report describes)`,
+      `The app saw ${count === 1 ? "1 command" : `${count} commands`} run (exit codes only, no output captured). Compare them with the checks the report describes.`,
   },
   mailbox: {
     title: "Team conversation",
@@ -142,10 +142,10 @@ const team = {
       planning:
         "The lead is planning. Once the plan is ready, you can send the members more instructions.",
       leadDuringApproval: ({ action }: { action: string }) =>
-        `To change the plan, use “${action}” above so the lead re-plans; messages here are only read in the integration turn.`,
-      lead: "The lead reads messages in the next integration turn and does not re-plan; send development instructions to everyone or to a specific teammate.",
+        `To change the plan, use “${action}” above so the lead re-plans. Messages here are only read in the integration turn.`,
+      lead: "The lead reads messages in the next integration turn and does not re-plan. Send development instructions to everyone or to a specific teammate.",
       members:
-        "Messages arrive at the next work turn; a turn in progress is not interrupted.",
+        "Messages arrive at the next work turn. A turn in progress is not interrupted.",
     },
     you: "You",
     everyone: "Everyone",
@@ -189,7 +189,7 @@ const team = {
   setupNeeds: {
     title: "Setup this computer needs from you",
     intro:
-      "The checks below could not finish with the permissions and environment available to the agent. In full-access mode, the agent can attempt required installation first; a password prompt or other unresolved requirement still needs you. Each command is an agent's suggestion: check it against the project's documentation before you run it. Once it is installed, you can rerun these checks in the working directory yourself, and later contributions can run them directly.",
+      "The agent could not finish these checks with the permissions and environment it had. Each command is an agent's suggestion: check it against the project's documentation before you run it. After installing, you can rerun the checks in the working directory, and later contributions can run them directly. With Full access, the agent can try the installs first; a password prompt or anything else it cannot resolve still needs you.",
     reportedBy: ({ names }: { names: string }) => `Reported by ${names}`,
     /** Who reported a need: a follow-up round, by its number among the run's rounds. */
     round: ({ number }: { number: number }) => `Follow-up round ${number}`,
@@ -224,13 +224,13 @@ const team = {
       sudoPasswordless: ({ user }: { user: string }) =>
         `sudo runs without a password for ${user} here, so the agent can run these sudo commands as root, unless a sudo rule limits which commands may run that way.`,
       sudoPassword: ({ user }: { user: string }) =>
-        `sudo asks ${user} for a password here, and the agent never enters one, so an item that needs sudo comes back to you, unless a sudo rule lets that command run without a password; then the agent runs it as root. Run them yourself, or turn on Passwordless sudo in the model settings; that lets every process under your account run any command as root.`,
+        `sudo asks ${user} for a password here, and the agent never enters one. So an item that needs sudo comes back to you. If a sudo rule lets a command run without a password, the agent runs that command as root instead. Run the rest yourself, or turn on Passwordless sudo in the model settings; that lets every process under your account run any command as root.`,
       sudoMissing: "sudo is not installed here, so items that need it come back to you.",
       sudoUnknown: `${product.name} could not tell whether sudo needs a password here. The agent runs sudo only as sudo -n, so a password prompt stops that item and it comes back to you.`,
       runs: "The agent runs without the sandbox, with your account. Usage counts against your own account.",
       review:
-        "The agent is told not to change code. A file it does change, such as a lockfile an install step rewrites, loses its review mark, and a change to the files or to the PR draft's Validation and Limitations returns an approved contribution to review.",
-      stop: "Follow and stop it on the Collaborate tab. Stopping does not undo what was installed, and an install already started through sudo may finish anyway.",
+        "The agent is told not to change code. A file it does change, such as a lockfile an install step rewrites, loses its review mark. A change to the files or to the PR draft's Validation and Limitations returns an approved contribution to review.",
+      stop: "Follow and stop it on the Collaborate tab. Stopping does not undo what was installed. An install already started through sudo may finish anyway.",
       confirm: ({ count }: { count: number }) =>
         `Start the agent (${count === 1 ? "1 command" : `${count} commands`})`,
       starting: "Starting the agent…",
@@ -241,7 +241,7 @@ const team = {
   guide: "The guide",
   howItWorks: "How it works",
   protocolNote: ({ provider }: { provider: string }) =>
-    `${product.name} coordinates the team with shared tasks, separate working directories and messages between turns. This is ${product.name}'s own implementation, driven turn by turn by ${provider}; it is not Claude Code's native Agent Teams.`,
+    `${product.name} coordinates the team with shared tasks, separate working directories and messages between turns. This is ${product.name}'s own implementation, driven turn by turn by ${provider}. It is not Claude Code's native Agent Teams.`,
 };
 
 export default team;

@@ -974,7 +974,7 @@ test("discovery retries a Claude Code analysis that lost the OAuth refresh lock 
     assert.equal(calls, 2);
     assert.deepEqual(waits, [15_000]);
     assert.deepEqual(messages, [
-      "Claude Code 正在更新登入憑證（其他行程持有更新鎖），15 秒後重試（第 2/3 次）。",
+      "Claude Code 正在等另一個行程更新完登入狀態，15 秒後重試（第 2/3 次）。",
     ]);
     assert.equal(job.modelExecution?.provider, "claude");
     assert.equal(job.efficiency?.calls, 2);

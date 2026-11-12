@@ -291,7 +291,7 @@ test("in English, the issue facts, source titles, warnings and errors carry no H
   );
   assert.ok(
     result.warnings.some((warning) =>
-      warning.startsWith("At most 6 projects were sampled (most stars first)"),
+      warning.startsWith("Sampled: at most 6 projects (most stars first)"),
     ),
   );
   assert.deepEqual(progress, [

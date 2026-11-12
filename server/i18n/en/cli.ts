@@ -137,7 +137,7 @@ export default {
     failed: ({ reason }: { reason: string }) =>
       `${name} did not start: ${reason}`,
     /** `--force`: the readiness gate is skipped. */
-    forced: `Warning: --force skips the readiness check and starts ${name} anyway. Run \`${bin} doctor\` to see what is missing. The sample tour needs no AI provider; a real agent run still does.`,
+    forced: `Warning: --force skipped the readiness check. Run \`${bin} doctor\` to see what is missing. The sample tour needs no AI provider; a real agent run does.`,
     /** A required doctor check failed, so start did not listen. */
     notReady: `${name} did not start. The checklist above names each failed required check and the command that fixes it.`,
     /** Right under the Not ready headline, before the fix commands. */

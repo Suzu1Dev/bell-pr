@@ -152,7 +152,7 @@ test("a queued run says why it waits; the sample's playback does not", () => {
   const queued = { ...realRun, status: "queued" as const };
   assert.match(
     renderEn(element({ run: queued, active: true })),
-    /Queued: the limit of runs at once is reached; this one starts when another finishes/,
+    /Queued: the limit of runs at once is reached\. This one starts when another finishes\./,
   );
   // The sample's playback is queued for a moment behind no other run.
   assert.doesNotMatch(
@@ -209,7 +209,7 @@ test("once every file is ticked, the footer asks to explain the change back firs
   assert.match(button, /Explain it back/);
   assert.doesNotMatch(button, /disabled=""/);
   assert.match(button, /title="Explain the change back in your own words: a short, closed-book check next to the code"/);
-  assert.doesNotMatch(html, /Every file reviewed/);
+  assert.doesNotMatch(html, /Understanding check off:/);
   assert.match(html, /Read it, then explain it back/);
   assertNoHan(html);
   // Before every file is ticked, the tooltip names both remaining steps.
@@ -217,7 +217,7 @@ test("once every file is ticked, the footer asks to explain the change back firs
   assert.match(partial, /disabled=""/);
   assert.match(partial, /title="Mark every file as reviewed, then explain the change back in your own words"/);
   assert.match(partial, /Approve and preview the PR/);
-  assert.doesNotMatch(renderZh(element({ run: ticked, files })), /每一個檔案都已審閱/);
+  assert.doesNotMatch(renderZh(element({ run: ticked, files })), /理解檢查已關閉：/);
 });
 
 test("a path reviewed in an older round does not count toward approving the current diff", () => {
@@ -248,7 +248,7 @@ test("with the check turned off, approval needs the ticks only, and the run says
     assert.match(primary(html), /Approve and preview the PR/);
     assert.match(
       html,
-      /<span>Every file reviewed · Understanding check off\. Approval needs your reviewed ticks only\.<\/span>/,
+      /<span>Understanding check off: approval needs only your reviewed ticks\.<\/span>/,
     );
     assert.match(html, /class="unsandboxed-badge check-off-badge"/);
     assert.match(html, /The understanding check is off, so you can approve without explaining the change back\./);

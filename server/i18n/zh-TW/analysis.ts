@@ -9,9 +9,9 @@ const m: Translation<typeof en> = {
     citesUnsampledFile: ({ path }) => `引用了未抽樣的檔案 ${path}`,
     citesUnsuppliedFile: ({ path }) => `引用了未提供的檔案 ${path}`,
     quotePathNotInEvidence: ({ path, quote }) =>
-      `引文路徑 ${path} 不在這項建議的 evidence 清單：「${quote}」`,
+      `引文路徑 ${path} 不在這項建議的依據清單：「${quote}」`,
     quoteNotFound: ({ path, quote }) => `引文在 ${path} 找不到：「${quote}」`,
-    evidenceWithoutQuote: ({ path }) => `evidence 路徑 ${path} 缺對應引文`,
+    evidenceWithoutQuote: ({ path }) => `依據路徑 ${path} 缺對應引文`,
     incompleteAnswer: "AI 分析格式不完整，請重新分析；原有結果已保留。",
     sensitiveAnswer: "AI 回應疑似包含敏感內容，結果未儲存。",
     unsuppliedCitation: ({ field, path }) =>
@@ -104,15 +104,15 @@ const m: Translation<typeof en> = {
       "GitHub 搜尋未成功完成，可能受到權限、連線或 API 限制影響；尚不能判定沒有符合條件的專案。",
     partialResults: "GitHub 回傳部分搜尋結果，這次探索不是完整清單。",
     noRepositories:
-      "這次有界搜尋未找到符合條件的公開專案；可減少關鍵字、降低 stars 門檻或調整難度。",
+      "這次搜尋只看 GitHub 前 12 筆結果，未找到符合條件的公開專案；可減少關鍵字、降低 stars 門檻或調整難度。",
     samplingScope: ({ sort }) =>
-      `最多取樣 6 個${
+      `取樣：最多 6 個${
         {
           relevance: "GitHub 相關度（best match）最高",
           updated: "最近更新",
           stars: "星數最多",
         }[sort]
-      }的專案，每個最多 3 個開啟中的 issue 與每則最後 3 則留言；標籤不保證實際難度或仍可認領。文件僅讀取 GitHub community profile 識別的根目錄、.github、docs 內 README、CONTRIBUTING 與 PR 模板，未讀取帳號共用規範、多模板目錄及外部連結。`,
+      }的專案，每個專案最多 3 個開放中的 issue，每個 issue 最後 3 則留言。標籤不保證實際難度，也不保證工作仍可認領。讀取：僅 GitHub community profile 在根目錄、.github、docs 找到的 README、CONTRIBUTING 與 PR 範本。未讀取：帳號共用規範、多範本目錄、外部連結。`,
     screening: ({ repository }) =>
       `正在檢查 ${repository} 的 issue、貢獻文件與維護者回應。`,
     repositoryUnconfirmed: ({ repository }) =>
@@ -157,7 +157,7 @@ const m: Translation<typeof en> = {
     documentLimit: "文件取樣達到 16 份或 80 KB 上限；尚未完整檢查所有規範。",
     readFailed: ({ label }) => `${label} 讀取失敗，尚未確認其規範。`,
     searchScope:
-      "本機規範搜尋範圍為基準版本的根目錄、.github、docs 與 documentation 內常見貢獻指南、README、維護者文件及 PR 模板，根目錄的 AGENTS.md／CLAUDE.md，以及 .github/workflows 中會自動檢查 PR 的流程；未追蹤文件中的外部連結。",
+      "本機規範搜尋範圍（基準版本）：根目錄、.github、docs 與 documentation 內常見的貢獻指南、README、維護者文件及 PR 範本；根目錄的 AGENTS.md／CLAUDE.md；.github/workflows 中會自動檢查 PR 的流程。文件中連往其他位置的連結未讀取。",
     automationLimit: ({ max, remaining }) =>
       `自動檢查流程最多收錄 ${max} 份；其餘 ${remaining} 個 workflow 尚未檢查。`,
     workflowScanLimit: ({ total, max }) =>

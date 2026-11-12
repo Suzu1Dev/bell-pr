@@ -61,14 +61,14 @@ const m: Translation<typeof en> = {
       `已退回計畫並補充意見（第 ${revision}/${max} 次），Lead 將依意見重新規劃。`,
     cancelNotAllowed: "只有排隊、等待計畫核准或執行中的任務可取消。",
     cancelRequested:
-      "已要求取消；失敗或取消任務的隔離工作目錄保留，已整合任務的目錄已自動移除。可用「重試失敗的子任務」接續。",
+      "已要求取消；失敗或取消的子任務保留獨立工作目錄。可用「重試失敗的子任務」接續。",
   },
   team: {
     guideName: "嚮導",
     started: ({ name, cli, model, effort, web, timeout, inbox }) =>
       `${name} 開始工作。模型：${model ?? `${cli} CLI 預設（未記錄模型）`}；思考強度：${effort ?? "模型預設"}${web ? "；已允許上網" : ""}${timeout ? `；${timeout}` : ""}。${inbox ? ` 已在回合起點收到 ${inbox} 則團隊訊息。` : ""}`,
     waitingForSlot: ({ queued }) => `等待其他 Agent 完成（${queued} 個排隊中）。`,
-    structuredResult: "結構化結果已回傳，正在驗證來源與內容。",
+    structuredResult: "已收到回覆，正在檢查來源與內容。",
     checkFinished: ({ outcome }) => `執行檢查完成（${outcome}）。`,
     fileUpdated: ({ path }) => `已更新 ${path}。`,
     filesUpdated: "已更新工作目錄中的檔案。",
@@ -165,7 +165,7 @@ const m: Translation<typeof en> = {
     deniedTool: ({ tool, reason }) =>
       `工具 ${tool} 被權限設定拒絕${reason ? `：${reason}` : "。"}`,
     authRetry: ({ seconds, attempt, total }) =>
-      `Claude Code 正在更新登入憑證（其他行程持有更新鎖），${seconds} 秒後重試（第 ${attempt}/${total} 次）。`,
+      `Claude Code 正在等另一個行程更新完登入狀態，${seconds} 秒後重試（第 ${attempt}/${total} 次）。`,
     timeoutLimit: ({ minutes }) => `最多等待 ${minutes} 分鐘`,
     timedOut: ({ executable, minutes }) =>
       `${executable} 執行逾時（已等待 ${minutes} 分鐘）。較高的思考強度或大型專案需要更久；可降低思考強度、改用較快的模型，或提高 BELLPR_AGENT_TIMEOUT_SCALE。`,
@@ -237,7 +237,7 @@ const m: Translation<typeof en> = {
   integration: {
     snapshotBlocked: "整合快照含有無法審閱的檔案，已停止派工。",
     noWorktree: "子任務沒有獨立工作目錄。",
-    gitStateChanged: "Teammate 改動 Git 提交狀態，已停止整合。",
+    gitStateChanged: "隊友自行建立了 commit 或切到別的 commit，已停止整合。",
     outOfScope: ({ path }) =>
       `隊友修改了未分配的檔案 ${path}；變更保留在該子任務的獨立工作目錄，未整合。`,
     needsManualHandling: ({ path }) => `隊友的 ${path} 需要人工處理，未整合。`,
@@ -253,7 +253,7 @@ const m: Translation<typeof en> = {
       `${path}：應為 ${expected}，收到 ${received}`,
     badFormat: ({ path }) => `${path}：格式不正確`,
     other: ({ path, reason }) => `${path}：${reason}`,
-    notJson: "Lead 未回傳有效的任務計畫 JSON，請調整需求後重試。",
+    notJson: "Lead 沒有回傳可用的計畫；請調整需求後重試。",
     invalid: ({ problem }) =>
       `Lead 回傳的計畫不符合格式（${problem}）；請調整需求後重試。`,
     duplicateIds: "Lead 計畫包含重複或保留的子任務 ID；請調整需求後重試。",
@@ -300,7 +300,7 @@ const m: Translation<typeof en> = {
     cancelled: "PR 草稿產生已取消。",
     stale: "程式碼變更已更新；請重新產生符合目前變更的 PR 草稿建議。",
     applied:
-      "已把 PR 草稿建議放進編輯區。這是模型寫的原文，送出前請用自己的話確認內容，並處理核對清單與勾選項目。",
+      "已把 PR 草稿建議放進編輯區。這是模型寫的原文。發布前請改成自己的話，並處理核對清單與勾選項目。",
     ready: "PR 草稿建議已準備完成，現有草稿保留；可在 PR 草稿區檢視並套用。",
     stopped:
       "PR 草稿建議產生已停止；現有草稿與已完成變更仍保留，可重新產生。",
@@ -311,9 +311,9 @@ const m: Translation<typeof en> = {
     partlyPublished:
       "先前的發布已建立 commit，可能已推送到 GitHub，因此不能再同步或復原同步；請從最新版本建立新任務。",
     unmarkedRun: ({ files }) =>
-      `這些檔案的衝突無法用衝突標記表示（一邊刪除、另一邊修改，或兩邊都改了二進位檔），${product.name} 不會替你選邊：${list(files)}。工作沒有變動；可以先把這次對它們的修改或刪除還原，同步後再重做。`,
+      `這些檔案的衝突無法用衝突標記表示：${list(files)}。原因是一邊刪除、另一邊修改，或兩邊都改了二進位檔。${product.name} 不會替你選邊，所以任務沒有變動。請先還原這次對這些檔案的修改或刪除，同步後再重做。`,
     unmarkedPr: ({ files, branch }) =>
-      `這些檔案的衝突無法用衝突標記表示（一邊刪除、另一邊修改，或兩邊都改了二進位檔），${product.name} 不會替你選邊：${list(files)}。PR 沒有變動；請在本機用 git 把 ${branch} 合併進 PR 分支並推送，${product.name} 之後會接續這些提交。`,
+      `這些檔案的衝突無法用衝突標記表示：${list(files)}。原因是一邊刪除、另一邊修改，或兩邊都改了二進位檔。${product.name} 不會替你選邊，所以 PR 沒有變動。請在本機用 git 把 ${branch} 合併進 PR 分支並推送，${product.name} 之後會接續這些 commit。`,
     notAllowed:
       "只有審閱中、已核准或等待計畫核准的任務可以同步到最新目標分支。",
     busy: "這個任務還有 Agent、審查或解說在進行；請等它完成再同步。",

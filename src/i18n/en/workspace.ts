@@ -66,7 +66,7 @@ const workspace = {
     waiting: ({ date }: { date: string }) =>
       `A maintainer asked for changes on ${date}. Answer on GitHub in your own words, or start a follow-up round.`,
     /** The run waits for a free slot: the limit of runs at once is reached. */
-    queued: "Queued: the limit of runs at once is reached; this one starts when another finishes",
+    queued: "Queued: the limit of runs at once is reached. This one starts when another finishes.",
     workspaceRemoved:
       "Files for this run were cleaned up to free disk space. Reports and notes are kept.",
   },
@@ -175,7 +175,7 @@ const workspace = {
   footer: {
     passed: "You explained it back. Ready to approve.",
     checkOff:
-      "Every file reviewed · Understanding check off. Approval needs your reviewed ticks only.",
+      "Understanding check off: approval needs only your reviewed ticks.",
     learning: "Not just a review: a lesson in code, too.",
     hint: "Select code to ask the Agent about it.",
     hintByHand: "Select code to ask the guide about it.",
@@ -209,7 +209,7 @@ const workspace = {
     closeSearch: "Close the file search",
     onlyUnreviewed: "Only unreviewed",
     suggestedOrderTitle:
-      "Sort by the reading order in the Lead's integration summary; files it does not mention follow in git order",
+      "Sort by the reading order in the Lead's integration summary. Files it does not mention follow in their original order.",
     suggestedOrder: "Suggested order",
     repositoryFallback: "repository",
     waitingForChanges: "Waiting for the Agents' changes",
@@ -273,10 +273,10 @@ const workspace = {
   check: {
     title: "Explain it back",
     intro:
-      "Closed book: the explanations, notes and questions to the Agent stay hidden while you answer; the diff and the file list stay. You grade yourself against the AI-written references. It is a commitment, not a test.",
+      "Closed book. Hidden while you answer: the explanations, notes and questions to the Agent. Still visible: the diff and the file list. You grade yourself against the AI-written references. It is a commitment, not a test.",
     /** A Learn-by-hand run (DESIGN v1.2 F10): the references are the person's own words and the guide's review. */
     introByHand:
-      "Closed book: the guide, the explanations and your notes stay hidden while you answer; the diff and the file list stay. You grade yourself against your own earlier words and the guide's review. It is a commitment, not a test.",
+      "Closed book. Hidden while you answer: the guide, the explanations and your notes. Still visible: the diff and the file list. You grade yourself against your own earlier words and the guide's review. It is a commitment, not a test.",
     off: "The understanding check is off, so approval does not wait for it. You can still take it.",
     close: "Close the check",
     loading: "Loading the check…",
@@ -314,10 +314,11 @@ const workspace = {
     lock: "Lock my answers",
     lockNote: "Locked answers cannot be edited; Start over clears the check.",
     gradeTitle: "3. Compare and grade",
-    gradeIntro: "Put each answer beside its reference and grade yourself.",
+    gradeIntro:
+      "Put each answer beside its reference and grade yourself. Where a reference differs from the diff, the diff is right.",
     yourAnswer: "Your answer",
-    reference: "Reference, AI-written: the diff is the authority",
-    testerReference: "The Test analyst's report, AI-written: the diff is the authority",
+    reference: "Reference (AI-written)",
+    testerReference: "The Test analyst's report (AI-written)",
     noReference: "No reference: compare with the diff yourself.",
     ownWords: "Your own words",
     guideReview: "The guide's review",
@@ -406,7 +407,7 @@ const workspace = {
       "This sync adds one merge commit to the PR branch and keeps the PR title and description as they are. Review the files the target branch changed in “Code changes” first, then check the commit message below.",
     roundNotice:
       "This round adds one new commit to the PR branch and keeps the PR title and description as they are. Review the files this round changed in “Code changes” first, then check the commit message below.",
-    proposalNotice: `The description below is the suggestion ${product.name} wrote from the project's rules, and you have not edited it yet. It goes to GitHub exactly as it is: confirm it in your own words before publishing, and keep to-dos in the checklist of the guide below, not in the description.`,
+    proposalNotice: `The description below is ${product.name}'s suggestion from the project's rules. You have not edited it yet. It goes to GitHub exactly as written: check it and put it in your own words before publishing. Keep to-dos in the guide's checklist below, not in the description.`,
     emptyNotice:
       "There is no PR description yet. Generate and apply a suggested draft below, or write in your own words what changed, why, and which checks you actually ran. The Agents' full reports are in “Code changes”, under “Reviews”.",
     /** A Learn-by-hand run, while its PR title or description is empty: it starts with neither (DESIGN v1.2 F11). */
@@ -457,7 +458,7 @@ const workspace = {
     noDescription: "No description yet",
     placeholdersStay: "TODOs and blanks to fill in never reach GitHub",
     taskItems: "Checkboxes in the description",
-    taskItemsHelp: `Only tick what you really finished or checked. ${product.name} and the model never tick them for you; ticking rewrites the description above, so remember to save.`,
+    taskItemsHelp: `Only tick what you really finished or checked. ${product.name} and the model never tick them for you. Ticking rewrites the description above, so remember to save.`,
     noSection: "No section",
     samePr: "Push to the same PR",
     samePrHelp: "Nothing is force-pushed.",
@@ -611,16 +612,16 @@ const workspace = {
     pacing: ({ open, budget, first }: { open: number; budget: number; first: boolean }) =>
       `Your open PRs here: ${open} of ${budget} (${product.name} default${first ? "; first contribution here" : ""})`,
     pacingExempt: "Your open PRs here: not paced, since you can write to this repository",
-    factsLoading: "Reading the GitHub facts…",
+    factsLoading: "Checking GitHub…",
     couldntCheck: ({ reason }: { reason: string }) => `Couldn't check: ${reason}`,
-    factsMissing: "this build cannot read the GitHub facts yet",
+    factsMissing: `this version of ${product.name} cannot check GitHub yet`,
     overrideLabel: "Why publish anyway? Saved on this run.",
     overrideCount: ({ count }: { count: number }) => `${count} / 20–200 characters`,
-    closeLoop: ({ title }: { title: string }) => `Close the loop first: read the feedback on “${title}”`,
+    closeLoop: ({ title }: { title: string }) => `First read the feedback on “${title}”`,
     /** A pull request a maintainer has waited on, which BELL has no run for: it opens on GitHub. */
     waitingPr: ({ number }: { number: string }) =>
-      `Close the loop first: read the review on pull request #${number} (opens GitHub)`,
-    confirmNote: `Ticking only means you know these items are still open and want to publish the description as it is. ${product.name} never changes the description or ticks anything for you, and these confirmations are not written into the PR. To change something first, choose “Back to the draft”.`,
+      `First read the review on pull request #${number} (opens GitHub)`,
+    confirmNote: `Ticking only means you know these items are still open and want to publish the description as it is. ${product.name} never changes the description or ticks anything for you. These confirmations are not written into the PR. To change something first, choose “Back to the draft”.`,
     back: "Back to the draft",
     finishDemo: "Open the sample Draft PR",
     sending: "Publishing…",

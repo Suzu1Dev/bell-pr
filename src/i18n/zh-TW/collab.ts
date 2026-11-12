@@ -39,11 +39,10 @@ const m: Translation<typeof en> = {
   gone: "已不再佔用",
   dependsOn: {
     label: "前置任務",
-    help: "勾選此專案中需要先完成的任務，等它們完成後再開始。",
+    help: "勾選此專案中需要先完成的任務（最多 50 項），等它們完成後再開始。",
     empty: "此專案目前沒有其他任務，可以直接開始。",
     selectedCount: ({ count }) => `已選 ${count} 項`,
     clear: "清除",
-    limitNote: "最多可勾選 50 項任務。",
     cardNote: ({ titles }) => `在 ${titles} 完成後開始`,
   },
   release: {

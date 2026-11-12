@@ -64,7 +64,7 @@ const settings = {
     },
     language: {
       title: "Language",
-      text: "The language of the interface, and of new contributions, analyses and answers to your questions. A contribution that already started keeps working in the language it started in, and existing text is not translated.",
+      text: "Used for the interface and for new contributions, analyses and answers to your questions. Contributions already started keep their language. Existing text is not translated.",
       label: "Language",
     },
     sample: {
@@ -114,7 +114,7 @@ const settings = {
       "Agents run the project's code on this computer. These settings decide what they may reach.",
     sandbox: {
       title: "Claude Code sandbox",
-      text: "Claude Code agents that edit files run every command in the operating-system sandbox: writes stay in the run's working directory and Claude Code's temporary folders, and the network is closed. Your own Claude Code user settings can widen it (proxy ports, allowed domains or paths, excluded commands, plugin language servers). The Codex CLI uses its own sandbox. Antigravity agents that edit files run their commands in the Antigravity CLI's terminal sandbox, which keeps writes in the working directory and closes the network.",
+      text: "Claude Code agents that edit files run every command in the operating-system sandbox. Writes stay in the run's working directory and Claude Code's temporary folders. The network is closed. Your own Claude Code user settings can widen the sandbox (proxy ports, allowed domains or paths, excluded commands, plugin language servers). The Codex CLI uses its own sandbox. Antigravity agents that edit files run their commands in the Antigravity CLI's terminal sandbox. Writes stay in the working directory. The network is closed.",
     },
     unsandboxed: {
       label: "Allow unsandboxed Claude Code and Antigravity agents",
@@ -178,8 +178,8 @@ const settings = {
     },
     tryFirst: {
       title: "Try first",
-      label: "Try-first prompts during review",
-      help: "On by default: in each file's explanation you answer its question and guess another way to make the change, and in its code walkthrough you answer each Check yourself question, before the answers and the alternatives show. When this is off, they show behind a plain reveal, with nothing to fill in.",
+      label: "Ask me to answer before the answers show",
+      help: "On by default. You answer first: each file's question, a guess at another way to make the change, and each Check yourself question in the code walkthrough. Then the answers and the alternatives show. When this is off, they sit behind a plain reveal, with nothing to fill in.",
     },
   },
   performance: {
@@ -218,7 +218,7 @@ const settings = {
     },
     advanced: {
       summary: "Advanced: environment variables",
-      text: `A variable set before ${product.name} starts wins over the setting here, which then shows as set by the environment. Restart ${product.name} after changing one.`,
+      text: `A variable set before ${product.name} starts wins over the setting here. The setting then shows as set by the environment. Restart ${product.name} after changing one.`,
       /** The documentation link; hidden while the product has no docs URL. */
       documentation: "See the documentation.",
       variables: {

@@ -59,17 +59,17 @@ const m: Translation<typeof en> = {
   },
   revise: {
     action: "退回並補充意見",
-    hint: "拆解不合理、範圍太大、少了測試子任務或相依奇怪時，寫下原因讓 Lead 重擬；這是練習「怎麼拆任務」的機會。",
+    hint: "拆解不合理、範圍太大、少了測試子任務或相依奇怪時，寫下原因，Lead 會重擬。這是練習「怎麼拆任務」的機會。",
     label: "退回計畫的意見",
     placeholder:
       "例如：把 API 與 UI 拆成兩個子任務，並加一個只負責測試的子任務。",
     limitReached: "已達重擬上限，請核准目前計畫或取消任務。",
     counter: ({ count, max }) =>
-      `已重擬 ${count}/${max}；每次重擬是一次 Lead 唯讀規劃回合`,
+      `已重擬 ${count}/${max}。每次重擬會讓 Lead 再規劃一次，不會寫入程式碼。`,
   },
   retry: {
     partial: ({ kept, retried }) =>
-      `${kept} 個已整合的子任務不會重跑；${retried} 個失敗或被阻擋的子任務會丟棄舊的隔離目錄，從新的快照重新開始。`,
+      `${kept} 個已整合的子任務不會重跑。${retried} 個失敗或受阻的子任務會丟棄舊的工作目錄，從新的快照重新開始。`,
     integrationOnly:
       "所有子任務都已整合；重試只會重新執行 Lead 整合與獨立審查。",
     notStarted: "尚有未開始的子任務；若計畫尚未核准，重試會先回到等待核准。",
@@ -91,8 +91,8 @@ const m: Translation<typeof en> = {
   laneEmptyAwaiting: "你核准計畫後，子任務才會開始。",
   task: {
     details: "分工與檔案",
-    worktree: "獨立 worktree",
-    worktreeRemoved: "獨立 worktree 已清理",
+    worktree: "獨立工作目錄",
+    worktreeRemoved: "獨立工作目錄已清理",
     filesPending: "規劃中",
     dependsOn: "相依",
     dependencyUnknown: "未知",
@@ -103,16 +103,16 @@ const m: Translation<typeof en> = {
     showError: "查看失敗原因",
     showReport: "查看工作報告",
     checks: ({ count }) =>
-      `應用程式觀察到 ${count} 次指令執行（只有結束碼，未擷取輸出；可與報告自述的檢查對照）`,
+      `應用程式觀察到 ${count} 次指令執行（只有結束碼，未擷取輸出）。可與報告自述的檢查對照。`,
   },
   mailbox: {
     title: "團隊對話",
     delivery: {
       planning: "Lead 正在規劃。計畫產生後，即可向隊友補充指示。",
       leadDuringApproval: ({ action }) =>
-        `要調整計畫，請用上方「${action}」讓 Lead 重擬；這裡的訊息只會在整合回合被讀到。`,
-      lead: "Lead 會在下一次整合回合讀取訊息，不會重排計畫；開發指示請傳給全體成員或指定隊友。",
-      members: "訊息在下一個工作回合送達；執行中的回合不會即時中斷。",
+        `要調整計畫，請用上方「${action}」讓 Lead 重擬。這裡的訊息只會在整合回合被讀到。`,
+      lead: "Lead 會在下一次整合回合讀取訊息，不會重排計畫。開發指示請傳給全體成員或指定隊友。",
+      members: "訊息在下一個工作回合送達。執行中的回合不會即時中斷。",
     },
     you: "你",
     everyone: "全體成員",
@@ -144,7 +144,7 @@ const m: Translation<typeof en> = {
   setupNeeds: {
     title: "需要你在這台電腦準備的環境",
     intro:
-      "Agent 在目前權限與環境下仍無法完成下列檢查。完整權限模式允許 Agent 先嘗試必要的安裝；需要密碼或其他無法完成的設定仍由你處理。指令是 Agent 的建議，執行前請對照專案文件確認；裝好後可以自己在工作目錄重跑這些檢查，之後的貢獻也能直接執行。",
+      "Agent 以當時的權限與環境無法完成下列檢查。指令是 Agent 的建議，執行前請對照專案文件確認。裝好後，你可以在工作目錄重跑這些檢查，之後的貢獻也能直接執行。使用完整權限時，Agent 可以先嘗試安裝；需要密碼或它無法完成的項目仍由你處理。",
     reportedBy: ({ names }) => `回報者：${names}`,
     round: ({ number }) => `修正第 ${number} 輪`,
     agent: ({ name, id }) => `${name}（${id}）`,
@@ -175,13 +175,13 @@ const m: Translation<typeof en> = {
       sudoPasswordless: ({ user }) =>
         `${user} 在這台電腦使用 sudo 不需要密碼，Agent 可以用 root 權限執行這些 sudo 指令；但若 sudo 規則限制了可以免密碼執行的指令，則以規則為準。`,
       sudoPassword: ({ user }) =>
-        `${user} 在這台電腦使用 sudo 需要密碼，Agent 不會輸入密碼，因此需要 sudo 的項目會交回給你；若 sudo 規則允許某個指令免密碼執行，Agent 就會以 root 執行它。請自行執行，或在模型設定開啟「免密碼 sudo」；開啟後，你帳號下的每個程式都能以 root 執行任何指令。`,
+        `${user} 在這台電腦使用 sudo 需要密碼，而 Agent 不會輸入密碼，因此需要 sudo 的項目會交回給你。若 sudo 規則允許某個指令免密碼執行，Agent 會改以 root 執行該指令。其餘請自行執行，或在模型設定開啟「免密碼 sudo」；開啟後，你帳號下的每個程式都能以 root 執行任何指令。`,
       sudoMissing: "這台電腦沒有安裝 sudo，需要 sudo 的項目會交回給你。",
       sudoUnknown: `${product.name} 無法確認這台電腦的 sudo 是否需要密碼。Agent 只會用 sudo -n 執行，遇到密碼提示就會停下，該項目交回給你。`,
-      runs: "Agent 會在沒有沙箱的情況下用你的帳號執行；用量計入你自己的帳號。",
+      runs: "Agent 會在沒有沙箱的情況下用你的帳號執行。用量計入你自己的帳號。",
       review:
-        "Agent 被要求不修改程式碼；它若變更檔案（例如安裝步驟改寫的 lockfile），該檔案會取消已審閱標記；檔案或 PR 草稿的 Validation、Limitations 有變動時，已核准的貢獻會退回審閱。",
-      stop: "可以在「協作」分頁查看進度並停止。停止不會還原已安裝的內容，已經透過 sudo 開始的安裝也可能繼續完成。",
+        "Agent 被要求不修改程式碼。它若變更檔案（例如安裝步驟改寫的 lockfile），該檔案會取消已審閱標記。檔案或 PR 草稿的 Validation、Limitations 有變動時，已核准的貢獻會退回審閱。",
+      stop: "可以在「協作」分頁查看進度並停止。停止不會還原已安裝的內容。已經透過 sudo 開始的安裝也可能繼續完成。",
       confirm: ({ count }) => `開始處理（${count} 項）`,
       starting: "正在啟動 Agent…",
     },

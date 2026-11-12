@@ -193,16 +193,16 @@ export default {
     partialResults:
       "GitHub returned partial search results, so this discovery is not a complete list.",
     noRepositories:
-      "This bounded search found no public project that matches. Try fewer keywords, a lower stars threshold or another difficulty.",
+      "This search reads only GitHub's first 12 results and found no public project that matches. Try fewer keywords, a lower stars threshold or another difficulty.",
     /** What discovery sampled, in the GitHub search order the person chose. */
     samplingScope: ({ sort }: { sort: DiscoverySort }) =>
-      `At most 6 projects were sampled (${
+      `Sampled: at most 6 projects (${
         {
           relevance: "GitHub's best matches first",
           updated: "most recently updated first",
           stars: "most stars first",
         }[sort]
-      }), with up to 3 open issues each and the last 3 comments on each issue. Labels do not guarantee the actual difficulty or that the work is still available. Only the README, CONTRIBUTING and PR template that GitHub's community profile finds in the root, .github or docs were read; account-wide defaults, folders of several templates and external links were not.`,
+      }), up to 3 open issues each, the last 3 comments per issue. Labels do not guarantee the actual difficulty or that the work is still available. Read: only the README, CONTRIBUTING and PR template that GitHub's community profile finds in the root, .github or docs. Not read: account-wide defaults, folders of several templates, external links.`,
     screening: ({ repository }: { repository: string }) =>
       `Checking the issues, contribution documents and maintainer replies of ${repository}.`,
     repositoryUnconfirmed: ({ repository }: { repository: string }) =>
@@ -279,7 +279,7 @@ export default {
     readFailed: ({ label }: { label: string }) =>
       `${label} could not be read; its rules were not checked.`,
     searchScope:
-      "The local rule search covers the common contribution guides, READMEs, maintainer documents and PR templates in the base commit's root, .github, docs and documentation folders, AGENTS.md and CLAUDE.md in the root, and the .github/workflows files that check pull requests automatically. Links to other places in those documents are not followed.",
+      "Rules were searched locally in the base commit: the common contribution guides, READMEs, maintainer documents and PR templates in the root, .github, docs and documentation folders; AGENTS.md and CLAUDE.md in the root; the .github/workflows files that check pull requests automatically. Links in those documents were not followed.",
     automationLimit: ({ max, remaining }: { max: number; remaining: number }) =>
       fmt.plural(remaining) === "one"
         ? `At most ${max} pull request check workflows are included; 1 more workflow was not checked.`

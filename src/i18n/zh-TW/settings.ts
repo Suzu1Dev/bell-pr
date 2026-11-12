@@ -57,7 +57,7 @@ const m: Translation<typeof en> = {
     },
     language: {
       title: "語言",
-      text: "介面的語言，也是之後新的貢獻、專案分析與問答使用的語言；已開始的貢獻沿用開始時的語言，已經產生的內容不會翻譯。",
+      text: "介面與之後新的貢獻、專案分析、問答都使用這個語言。已開始的貢獻沿用原本的語言。已經產生的內容不會翻譯。",
       label: "語言",
     },
     sample: {
@@ -78,11 +78,11 @@ const m: Translation<typeof en> = {
     needOne: "你至少需要一個 AI 服務。請安裝並登入其中一個，指令列在下方。",
     readyWith: ({ providers }) => `已可使用 ${fmt.list(providers)}。`,
     description: {
-      codex: "使用你已安裝並登入的 Codex CLI，用量計入你自己的帳號。",
+      codex: "使用你已安裝並登入的 Codex CLI。用量計入你自己的帳號。",
       claude:
-        "使用你已安裝並登入的 Claude Code CLI（Claude 方案或 Anthropic API 金鑰），用量計入你自己的帳號。",
+        "使用你已安裝並登入的 Claude Code CLI（Claude 方案或 Anthropic API 金鑰）。用量計入你自己的帳號。",
       antigravity:
-        "使用你已安裝並登入的 Antigravity CLI（agy；Google 帳號、Gemini API 金鑰或 Google Cloud 憑證），用量計入你自己的帳號。",
+        "使用你已安裝並登入的 Antigravity CLI（agy；Google 帳號、Gemini API 金鑰或 Google Cloud 憑證）。用量計入你自己的帳號。",
     },
     fixesTitle: "請執行以下指令完成設定：",
     models: {
@@ -98,7 +98,7 @@ const m: Translation<typeof en> = {
     intro: "Agent 會在這台電腦上執行專案的程式碼，這些設定決定它們能接觸到哪些東西。",
     sandbox: {
       title: "Claude Code 沙箱",
-      text: "會修改檔案的 Claude Code Agent 在作業系統沙箱裡執行每個指令：寫入只限於該工作的工作目錄與 Claude Code 的暫存資料夾，網路也是關閉的。你自己的 Claude Code 使用者設定可能放寬沙箱（proxy 連接埠、允許的網域或路徑、排除的指令、外掛的語言伺服器）。Codex CLI 使用它自己的沙箱。會修改檔案的 Antigravity Agent 在 Antigravity CLI 的終端機沙箱裡執行指令，寫入限於工作目錄，網路也是關閉的。",
+      text: "會修改檔案的 Claude Code Agent 在作業系統沙箱裡執行每個指令。寫入只限於該工作的工作目錄與 Claude Code 的暫存資料夾。網路是關閉的。你自己的 Claude Code 使用者設定可能放寬沙箱（proxy 連接埠、允許的網域或路徑、排除的指令、外掛的語言伺服器）。Codex CLI 使用它自己的沙箱。會修改檔案的 Antigravity Agent 在 Antigravity CLI 的終端機沙箱裡執行指令。寫入只限於工作目錄。網路是關閉的。",
     },
     unsandboxed: {
       label: "允許 Claude Code 與 Antigravity Agent 在沙箱外執行",
@@ -151,8 +151,8 @@ const m: Translation<typeof en> = {
     },
     tryFirst: {
       title: "先試著答",
-      label: "審閱時先試著答",
-      help: "預設開啟：每個檔案的解說會先請你回答它的問題、猜猜另一種改法，程式碼解說也會先請你回答每段的「考考自己」，再顯示答案與其他做法。關閉後，它們會收在單純的顯示按鈕或摺疊後面，不需要填寫。",
+      label: "先請我作答，再顯示答案",
+      help: "預設開啟。你先作答：每個檔案的問題、猜猜另一種改法，以及程式碼解說裡每段的「考考自己」。之後才顯示答案與其他做法。關閉後，它們會收在單純的顯示按鈕或摺疊後面，不需要填寫。",
     },
   },
   performance: {
@@ -188,7 +188,7 @@ const m: Translation<typeof en> = {
     },
     advanced: {
       summary: "進階：環境變數",
-      text: `${product.name} 啟動前設定的環境變數優先於這裡的設定，該設定會顯示為由環境設定。修改後請重新啟動 ${product.name}。`,
+      text: `${product.name} 啟動前設定的環境變數優先於這裡的設定。該設定會顯示為由環境設定。修改後請重新啟動 ${product.name}。`,
       documentation: "詳見說明文件。",
       variables: {
         BELLPR_DATA_DIR: "資料目錄的位置（也可用 --data-dir）。預設是家目錄中的 .bellpr 資料夾。",

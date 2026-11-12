@@ -460,7 +460,7 @@ const review = {
       plural(count) === "one"
         ? "1 more file is past the display limit; see the full diff on GitHub."
         : `${count} more files are past the display limit; see the full diff on GitHub.`,
-    unpublished: `This contribution has not sent its PR yet. ${product.name} keeps the changes uncommitted until you publish and makes the first commit then; every review round and every sync with the target branch adds one more commit here.`,
+    unpublished: `No PR yet, so the changes are still uncommitted. ${product.name} makes the first commit when you publish. Each review round and each sync with the target branch then adds one more commit here.`,
     unpublishedDemo:
       "The sample has not published a PR, so it has no commits yet. Below is the sample's history as it looks after the first push, one review round and a merge of the target branch.",
     publishedDemo:

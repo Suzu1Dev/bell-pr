@@ -73,7 +73,7 @@ const learning = {
   practice: {
     title: "Practice",
     intro:
-      "Questions from your own contributions come back after 1, 3, 7 and 21 days, mixed across projects: answers you missed while sure of them, maintainer comments that surprised you, and questions you never tried. Answer from memory, then compare and grade yourself.",
+      "Questions from your own contributions come back after 1, 3, 7 and 21 days, mixed across projects. They come from answers you missed while sure, maintainer comments that surprised you, and questions you never tried. Answer from memory, then compare and grade yourself.",
     loading: "Loading your practice items…",
     loadFailed: ({ error }: { error: string }) =>
       `Your practice items could not be loaded: ${error}`,
@@ -141,7 +141,7 @@ const learning = {
   debrief: {
     title: "Coach debrief",
     intro:
-      "A model reads your own records for one project: your explanations, misses and corrections, the approaches you chose, your forecasts and the maintainers' comments. It names what maintainers raised most, quoting your records, builds up to 3 drills from your own changes and suggests one next step. It describes the work, never you, and its drills join your practice.",
+      "A model reads your own records for one project: your explanations, misses and corrections, chosen approaches, forecasts and the maintainers' comments. It quotes them to name what maintainers raised most, builds up to 3 drills from your own changes and suggests one next step. It describes the work, never you. The drills join your practice.",
     project: "Project",
     loadingProjects: "Loading your projects…",
     noProjects:

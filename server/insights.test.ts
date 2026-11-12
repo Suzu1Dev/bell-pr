@@ -1003,8 +1003,8 @@ test("recommendations whose quotes do not match are dropped and reported while t
         reasons: [
           /^引文在 hello\.ts 找不到：「Export const hello =」$/,
           /^引文在 hello\.ts 找不到：「export const hello ==」$/,
-          /^evidence 路徑 README\.md 缺對應引文$/,
-          /^引文路徑 README\.md 不在這項建議的 evidence 清單：「A command-line greeting tool\.」$/,
+          /^依據路徑 README\.md 缺對應引文$/,
+          /^引文路徑 README\.md 不在這項建議的依據清單：「A command-line greeting tool\.」$/,
         ],
       },
     ];

@@ -131,7 +131,7 @@ test("an English render of a finished discovery has no Han", () => {
   assert.match(html, /<summary>Scope and limits of this search · 1<\/summary>/);
   assert.match(html, /aria-label="Recommended contributions"/);
   assert.match(html, /<h2>Suggested contributions<\/h2>/);
-  assert.match(html, /in the &quot;Stars&quot; order you chose/);
+  assert.match(html, /12 candidates in &quot;Stars&quot; order, at most 6 kept after checking\./);
   assert.match(html, /<span class="discovery-count">1 opportunity<\/span>/);
   // The opportunity card
   assert.match(html, /<span class="discovery-difficulty">Beginner<\/span>/);
@@ -251,14 +251,14 @@ test("saved settings missing from the catalog are labelled in English", () => {
     },
   });
   assert.match(html, /<option value="">Use the Claude Code default model<\/option>/);
-  assert.match(html, /retired-model \(not in the catalog\)/);
-  assert.match(html, /Extra high \(saved, not in the catalog\)/);
+  assert.match(html, /retired-model \(not in the list\)/);
+  assert.match(html, /Extra high \(saved, not in the list\)/);
 });
 
 test("the zh-TW render keeps the original copy and formats numbers", () => {
   const html = renderZh(createElement(DiscoveryPanel, props(job, live)));
   assert.match(html, /尋找可貢獻的 <em>專案<\/em>/);
-  assert.match(html, /依你選的「星數」排序取 12 個候選/);
+  assert.match(html, /依「星數」排序取 12 個候選/);
   assert.match(html, /<span class="discovery-count">1 個項目<\/span>/);
   assert.match(html, /<span class="discovery-difficulty">初學者<\/span>/);
   assert.match(html, /12,345/);

@@ -46,12 +46,12 @@ const m: Translation<typeof en> = {
   reasoningEffortWithId: ({ effort }) =>
     `${m.reasoningEffort[effort]} · ${effort}`,
   teamTaskStatus: {
-    pending: "等待相依",
-    ready: "可認領",
+    pending: "等待前置子任務",
+    ready: "可開始",
     running: "進行中",
     complete: "已整合",
     failed: "失敗",
-    blocked: "已阻擋",
+    blocked: "受阻",
   },
   actions: {
     cancel: "取消",

@@ -22,14 +22,14 @@ const m: Translation<typeof en> = {
   webAccessAllowed: "已允許上網",
   defaultModelUnreported: ({ provider }) => `${provider} 預設（型號未回報）`,
   passedAndReported: ({ passed, reported }) =>
-    `傳入 ${passed} → 回報 ${reported}`,
-  defaultAndReported: ({ reported }) => `未傳入 --model → 回報 ${reported}`,
+    `指定 ${passed} · CLI 回報 ${reported}`,
+  defaultAndReported: ({ reported }) => `預設模型 · CLI 回報 ${reported}`,
   withCliVersion: ({ model, version }) => `${model}（CLI ${version}）`,
   providerDefault: ({ provider }) => `${provider} 預設`,
   sourceReported: ({ provider }) =>
-    `這是 ${product.name} 傳入 ${provider} 的設定與 ${provider} CLI 回報的實際模型；回報值來自 CLI 事件，不是供應端帳單。`,
+    `這是 ${product.name} 傳給 ${provider} 的設定。模型是 ${provider} CLI 回報的，不是服務提供者的帳單資料。`,
   sourceUnreported: ({ provider }) =>
-    `這是 ${product.name} 傳入 ${provider} 的設定；服務端實際使用的模型未另外回報。`,
+    `這是 ${product.name} 傳給 ${provider} 的設定。CLI 沒有回報實際使用的模型。`,
 };
 
 export default m;

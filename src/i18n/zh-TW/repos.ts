@@ -41,7 +41,7 @@ const m: Translation<typeof en> = {
       `貼上 GitHub 連結、owner/repository，或本機 Git 專案的完整路徑，例如 ${example}`,
     wslPathHint: `若 ${product.name} 在這台電腦的 WSL2 中執行，請使用 Linux 發行版中的路徑：Windows 的資料夾位於 /mnt/c/ 底下，例如 /mnt/c/projects/repository。`,
     callout:
-      "GitHub 專案會下載至本機；後續開發使用獨立 worktree，保留原專案狀態。",
+      "GitHub 專案會下載到這台電腦。之後的開發在獨立的工作目錄（Git worktree）進行，原專案維持原狀。",
     later: "稍後再說",
     importing: "正在匯入…",
     import: "匯入專案",

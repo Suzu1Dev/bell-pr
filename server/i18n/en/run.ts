@@ -76,7 +76,7 @@ export default {
     cancelNotAllowed:
       "Only runs that are queued, running or waiting for plan approval can be cancelled.",
     cancelRequested:
-      "Cancellation requested. The isolated working directories of failed or cancelled tasks are kept; those of integrated tasks were removed. Use “Retry failed subtasks” to continue.",
+      "Cancellation requested. Failed or cancelled tasks keep their own working directories. Use “Retry failed subtasks” to continue.",
   },
   /** The team's turns, tasks and phases in a run's log. */
   team: {
@@ -105,7 +105,7 @@ export default {
     waitingForSlot: ({ queued }: { queued: number }) =>
       `Waiting for other agents to finish (${queued} queued).`,
     structuredResult:
-      "Structured result returned; checking its sources and content.",
+      "Answer received; checking its sources and content.",
     checkFinished: ({ outcome }: { outcome: string }) =>
       `Check finished (${outcome}).`,
     fileUpdated: ({ path }: { path: string }) => `Updated ${path}.`,
@@ -279,7 +279,7 @@ export default {
       attempt: number;
       total: number;
     }) =>
-      `Claude Code is refreshing its sign-in while another process holds the refresh lock; next try in ${count(seconds, "second", "seconds")} (attempt ${attempt} of ${total}).`,
+      `Claude Code is waiting for another process to finish refreshing its sign-in; next try in ${count(seconds, "second", "seconds")} (attempt ${attempt} of ${total}).`,
     /** Added to "started" lines when a turn may take longer than usual. */
     timeoutLimit: ({ minutes }: { minutes: number }) =>
       `waits up to ${count(minutes, "minute", "minutes")}`,
@@ -383,7 +383,7 @@ export default {
       "The integration snapshot contains files that cannot be reviewed, so no more tasks are assigned.",
     noWorktree: "The task has no working directory of its own.",
     gitStateChanged:
-      "A teammate changed the Git commit state, so integration stopped.",
+      "A teammate made its own commit or moved to another commit, so integration stopped.",
     outOfScope: ({ path }: { path: string }) =>
       `A teammate changed ${path}, which its task does not own; the change stays in the task's own working directory and was not integrated.`,
     needsManualHandling: ({ path }: { path: string }) =>
@@ -428,7 +428,7 @@ export default {
     other: ({ path, reason }: { path: string; reason: string }) =>
       `${path}: ${reason}`,
     notJson:
-      "The lead did not return a valid task plan in JSON; adjust the request and try again.",
+      "The lead did not return a usable plan; adjust the request and try again.",
     invalid: ({ problem }: { problem: string }) =>
       `The lead's plan does not match the required format (${problem}); adjust the request and try again.`,
     duplicateIds:
@@ -502,7 +502,7 @@ export default {
     stale:
       "The code changes were updated; generate a new PR draft suggestion that matches them.",
     applied:
-      "Put the PR draft suggestion in the editor. This is the model's own text: before you send it, check it in your own words and work through the checklist and checkboxes.",
+      "The PR draft suggestion is now in the editor. It is the model's text. Put it in your own words before you publish, and work through the checklist and checkboxes.",
     ready:
       "The PR draft suggestion is ready and your current draft is kept; review and apply it in the PR draft area.",
     stopped:
@@ -515,9 +515,9 @@ export default {
     partlyPublished:
       "An earlier publish already made a commit that may be on GitHub, so this run can no longer be synced or have a sync undone; start a new run from the latest version.",
     unmarkedRun: ({ files }: { files: string[] }) =>
-      `These files conflict in a way conflict markers cannot show (deleted on one side and changed on the other, or a binary file changed on both), and ${product.name} does not pick a side for you: ${list(files)}. The run is unchanged; you can first undo this run's changes to them or deletions of them, sync, and then make those changes again.`,
+      `These files conflict in a way conflict markers cannot show: ${list(files)}. One side deleted the file and the other changed it, or both changed a binary file. ${product.name} does not pick a side, so the run is unchanged. Undo this run's changes to these files or its deletions of them, sync, then make the changes again.`,
     unmarkedPr: ({ files, branch }: { files: string[]; branch: string }) =>
-      `These files conflict in a way conflict markers cannot show (deleted on one side and changed on the other, or a binary file changed on both), and ${product.name} does not pick a side for you: ${list(files)}. The PR is unchanged; merge ${branch} into the PR branch with git on your machine and push, and ${product.name} takes over those commits afterwards.`,
+      `These files conflict in a way conflict markers cannot show: ${list(files)}. One side deleted the file and the other changed it, or both changed a binary file. ${product.name} does not pick a side, so the PR is unchanged. Merge ${branch} into the PR branch with git on your machine and push; ${product.name} takes over those commits afterwards.`,
     notAllowed:
       "Only runs in review, approved or waiting for plan approval can sync to the latest target branch.",
     busy: "Agents, a review or explanations are still working on this run; wait for them to finish before you sync.",

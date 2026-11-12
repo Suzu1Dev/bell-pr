@@ -275,7 +275,7 @@ test("task ids are normalised before validation and format problems name the fie
     () => parseTeamPlan(JSON.stringify(plan), 2),
     /（summary：應為 string，收到 undefined）/,
   );
-  assert.throws(() => parseTeamPlan("invented prose", 2), /JSON/);
+  assert.throws(() => parseTeamPlan("invented prose", 2), /沒有回傳可用的計畫/);
 });
 
 test("lead plan problems and member reports are worded in the locale in effect", () => {
@@ -339,7 +339,7 @@ test("lead plan problems and member reports are worded in the locale in effect",
     () => withLocale("en", () => parseTeamPlan("invented prose", 2)),
     {
       message:
-        "The lead did not return a valid task plan in JSON; adjust the request and try again.",
+        "The lead did not return a usable plan; adjust the request and try again.",
     },
   );
 
@@ -409,7 +409,7 @@ test("team plans validate DAGs, concrete scopes, and preserve literal bracket fi
       () => parseTeamPlan(makePlan([{ id: "a", files: [invalid] }]), 2),
       /範圍/,
     );
-  assert.throws(() => parseTeamPlan("invented prose", 2), /JSON/);
+  assert.throws(() => parseTeamPlan("invented prose", 2), /沒有回傳可用的計畫/);
   // revisionNotes is required-but-nullable in the CLI schema and optional for zod.
   const first = JSON.parse(makePlan([{ id: "a", files: ["a.ts"] }]));
   assert.equal(

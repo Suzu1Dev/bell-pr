@@ -184,7 +184,7 @@ test("the demo previews its PR body and needs neither Git nor the GitHub CLI", (
   assert.doesNotMatch(html, /Commit 作者/);
   // Its checks load with the sample's rules; until then nothing is "sent".
   assert.match(html, /<button class="button primary" disabled="">.*開啟範例 Draft PR<\/button>/);
-  assert.doesNotMatch(html, /正在讀取 GitHub 資訊/);
+  assert.doesNotMatch(html, /正在向 GitHub 確認/);
 });
 
 test("publishing waits for Git's identity and the GitHub CLI, and says how to fix them", () => {
@@ -489,9 +489,9 @@ test("a typed reason lifts someone else's PR; without one, Send stays off", () =
 });
 
 test("the facts line: reading, couldn't check, the pace here, and the check off", () => {
-  assert.match(renderEn(checksElement({ facts: { loading: true } })), /role="status">.*Reading the GitHub facts…/);
-  const unknown = renderEn(checksElement({ facts: { loading: false, error: "this build cannot read the GitHub facts yet" } }));
-  assert.match(unknown, /Couldn&#x27;t check: this build cannot read the GitHub facts yet/);
+  assert.match(renderEn(checksElement({ facts: { loading: true } })), /role="status">.*Checking GitHub…/);
+  const unknown = renderEn(checksElement({ facts: { loading: false, error: "this version of BELL PR cannot check GitHub yet" } }));
+  assert.match(unknown, /Couldn&#x27;t check: this version of BELL PR cannot check GitHub yet/);
   // Unknown is never a pass: no "all clear" claim without checks, or while
   // the facts are read or could not be read.
   assert.doesNotMatch(renderEn(checksElement({ checks: undefined })), /Every check passes/);
@@ -533,7 +533,7 @@ test("close the loop first links each pull request a maintainer is waiting on", 
   for (const [index, url] of waiting.entries())
     assert.match(
       html,
-      new RegExp(`<a class="run-notice-link" href="${url}" target="_blank" rel="noreferrer">Close the loop first: read the review on pull request #${[2, 5][index]} \\(opens GitHub\\)</a>`),
+      new RegExp(`<a class="run-notice-link" href="${url}" target="_blank" rel="noreferrer">First read the review on pull request #${[2, 5][index]} \\(opens GitHub\\)</a>`),
     );
   assertNoHan(html);
   assert.match(renderZh(createElement(LoopRuns, { run, waiting, closeModal() {} })), /閱讀 PR #2 的審查意見/);

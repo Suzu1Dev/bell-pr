@@ -45,7 +45,7 @@ const discovery = {
     sort: "Sort search by",
     sortHelp: "About sorting",
     sortHint:
-      "Recently updated: reflects recent activity, but the results change as projects are updated. Relevance: GitHub's best match. It can include projects that have not been maintained for a while; archived projects are left out and the last push date is shown. Stars: well-known projects, with more competition and a higher review bar.",
+      "Recently updated: active projects; results change often. Relevance: GitHub's best match; may include projects not maintained for a while (archived ones are left out, and the last push date is shown). Stars: well-known projects, more competition, a higher review bar.",
     minStars: "Minimum stars",
     advanced: "Model and efficiency settings",
     agent: "AI provider",
@@ -54,12 +54,12 @@ const discovery = {
       `Use the ${provider} default model`,
     /** A saved model that the provider's catalog does not list. */
     modelNotInCatalog: ({ model }: { model: string }) =>
-      `${model} (not in the catalog)`,
+      `${model} (not in the list)`,
     reasoningEffort: "Reasoning effort",
     modelDefault: "Model default",
     /** A saved effort that the selected model's catalog entry does not list. */
     effortNotInCatalog: ({ effort }: { effort: string }) =>
-      `${effort} (saved, not in the catalog)`,
+      `${effort} (saved, not in the list)`,
     ponytailMode: "Efficiency mode",
     ponytailCredit: "Efficiency mode is based on Ponytail by DietrichGebert (MIT).",
     ponytailModes: {
@@ -68,7 +68,7 @@ const discovery = {
       off: "Off",
     } satisfies Record<PonytailMode, string>,
     accountHint: ({ provider }: { provider: string }) =>
-      `The analysis uses your ${provider} sign-in and counts against your model usage. The catalog lists models that exist; your account may not have access to all of them.`,
+      `The analysis uses your ${provider} sign-in and counts against your own account. Your account may not have access to every model listed.`,
     publicDataOnly:
       "Reads public data only. Planning starts after you choose an item.",
     submit: "Find contributions",
@@ -149,7 +149,7 @@ const discovery = {
     title: "Suggested contributions",
     previousTitle: "Your previous recommendations are still here.",
     note: ({ sort }: { sort: string }) =>
-      `We took 12 candidates in the "${sort}" order you chose and kept at most 6 after checking them. The order comes from the analysis, not from a GitHub-wide ranking. Before you start, check the issue's latest status and whether the maintainers want the change.`,
+      `12 candidates in "${sort}" order, at most 6 kept after checking. The order comes from the analysis, not a GitHub ranking. Before you start, check the issue's latest status and whether the maintainers want the change.`,
     /** Above the sample results, which no search produced. */
     sampleNote:
       "A live search takes 12 candidates in the order you choose and keeps at most 6 after checking them.",

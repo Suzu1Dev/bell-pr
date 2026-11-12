@@ -158,7 +158,7 @@ test("the English panel explains the base, the conflicts and why it waits, witho
   const html = renderEn(panel({ ...base, sync }));
   assert.match(
     html,
-    /This contribution is based on <code>main<\/code> at <code>aaaaaaa<\/code>\. Syncing moves these changes/,
+    /Based on <code>main<\/code> at <code>aaaaaaa<\/code>\. Syncing moves your changes onto the latest <code>main<\/code>\./,
   );
   assert.match(html, /Last sync: <code>bbbbbbb<\/code> to <code>aaaaaaa<\/code>, /);
   // Each file says its state in words; the count is announced politely.

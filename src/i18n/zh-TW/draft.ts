@@ -72,8 +72,10 @@ const m: Translation<typeof en> = {
         subject: "type(scope): 說明",
         signOff: "Signed-off-by: 姓名 <email>",
       },
-      why: ({ typeScope, subject, signOff }) =>
-        `為什麼專案會要求 ${typeScope} 或 sign-off？採用 Conventional Commits 的專案靠主旨的 ${subject} 自動產生變更日誌並決定版本號，commitlint 會在 CI 擋下不符格式的提交；採用 DCO 的專案要求每個 commit 附上 ${signOff}，表示你有權以該授權貢獻這段程式碼，DCO bot 檢查的是 commit trailer，不是 PR 說明。這份建議只整理規範要求的格式；簽署是你本人的聲明，請在「提交訊息」欄位自行輸入，模型不會代填。`,
+      note: "這份建議只整理規範要求的格式。簽署是你本人的聲明，請在「提交訊息」欄位自行輸入，模型不會代填。",
+      whyTitle: ({ typeScope }) => `為什麼專案會要求 ${typeScope} 或 sign-off？`,
+      why: ({ subject, signOff }) =>
+        `採用 Conventional Commits 的專案靠主旨的 ${subject} 自動產生變更日誌並決定版本號。commitlint 會在 CI 擋下不符格式的 commit。採用 DCO 的專案要求每個 commit 附上 ${signOff}，表示你有權依專案的授權貢獻這段程式碼。DCO bot 檢查的是 commit trailer，不是 PR 說明。`,
     },
     meta: {
       base: ({ commit }) => `基準版本 ${commit}`,
@@ -297,9 +299,9 @@ const m: Translation<typeof en> = {
     title: "目標分支",
     intro: {
       published: ({ branch, commit }) =>
-        `這個貢獻以 ${branch} 的 ${commit} 為基準。同步會把最新版本合併進 PR：審閱後推送一個合併 commit，不會 force push，PR 說明也不變。`,
+        `以 ${branch} 的 ${commit} 為基準。同步會把最新的 ${branch} 合併進 PR。你審閱後推送一個合併 commit；不會 force push，PR 說明也不變。`,
       unpublished: ({ branch, commit }) =>
-        `這個貢獻以 ${branch} 的 ${commit} 為基準。同步會把這次的修改移到最新版本上；目標分支改過的檔案需要重新審閱，可以復原。`,
+        `以 ${branch} 的 ${commit} 為基準。同步會把你的修改移到最新的 ${branch} 上。${branch} 改過的檔案需要重新審閱。同步可以復原。`,
     },
     lastSync: ({ from, to, date }) => `上次同步：${from} 到 ${to}，${date}`,
     waitConflicts: "上一次同步的衝突解決前不能再同步。",

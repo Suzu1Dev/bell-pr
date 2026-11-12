@@ -298,7 +298,7 @@ const m: Translation<typeof en> = {
     loadingDetail: "讀取這個 commit 的變更…",
     omitted: ({ count }) => `另外 ${count} 個檔案超過顯示上限，請到 GitHub 查看完整差異。`,
     unpublished:
-      `這個貢獻還沒送出 PR。${product.name} 在送出前把修改保留為未提交的變更，送出時才建立第一個 commit；之後每一輪依 review 修正、同步目標分支，都會在這裡多一個 commit。`,
+      `還沒發布 PR，所以修改仍未提交。${product.name} 會在發布時建立第一個 commit。之後每一輪修正、每次同步目標分支，都會在這裡多一個 commit。`,
     unpublishedDemo:
       "示範資料還沒有發布 PR，所以還沒有 commit。下面是示範 PR 在初次發布、一輪修正與同步目標分支之後的歷程。",
     publishedDemo: "示範 PR 的 commit：初次發布、一輪修正與同步目標分支。沒有送出任何內容到 GitHub。",

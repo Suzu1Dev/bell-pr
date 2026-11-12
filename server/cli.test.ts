@@ -561,7 +561,7 @@ test("bell-pr start explains a data directory it cannot create, then frees the p
       path.join(readOnly, "data"),
     ], { startOptions: { handleExit: false } });
     assert.equal(result.code, 1);
-    assert.match(result.stderr, /Warning: --force skips the readiness check/);
+    assert.match(result.stderr, /Warning: --force skipped the readiness check/);
     assert.match(result.stderr, /BELL PR did not start: EACCES: permission denied, mkdir/);
     // A system error needs no stack trace.
     assert.doesNotMatch(result.stderr, /\n\s+at /);
@@ -649,7 +649,7 @@ test("bell-pr start --force starts when doctor is not ready, so the sample tour 
     );
     try {
       assert.equal(result.code, undefined, result.stderr);
-      assert.match(result.stderr, /Warning: --force skips the readiness check/);
+      assert.match(result.stderr, /Warning: --force skipped the readiness check/);
       assert.match(result.stderr, /sample tour/);
       assert.match(result.stdout, new RegExp(`→ http://127\\.0\\.0\\.1:${port}\\n`));
       assert.equal(running?.url, `http://127.0.0.1:${port}`);

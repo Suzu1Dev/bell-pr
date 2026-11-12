@@ -19,7 +19,7 @@ const m: Translation<typeof en> = {
     update: "更新到最新版本",
     updating: "正在更新…",
     updateHelp: ({ branch, updatedAt }) =>
-      `從 GitHub 取得 ${branch} 的最新版本，專案全貌與分析會以它為準；新的貢獻本來就從最新版本開始。${updatedAt ? ` 上次更新：${updatedAt}` : ""}`,
+      `從 GitHub 取得 ${branch} 的最新版本，供專案全貌與分析使用。不論是否更新，新的貢獻都從最新版本開始。${updatedAt ? ` 上次更新：${updatedAt}` : ""}`,
     analyze: "分析專案全貌",
     reanalyze: "重新分析",
     analyzing: "正在分析專案…",
@@ -94,7 +94,7 @@ const m: Translation<typeof en> = {
   },
   reading: {
     title: "第一次讀這個專案，建議這樣讀",
-    lead: "依 Agent 讀過的抽樣檔案排出順序；每一步說明為什麼先看它、看什麼。",
+    lead: "依 Agent 讀過的抽樣檔案排出順序。每一步說明為什麼先看它、看什麼。",
     flow: "模組怎麼串起來",
     unsampled: "未抽樣，內容未讀",
     lookFor: "看什麼",
@@ -134,7 +134,7 @@ const m: Translation<typeof en> = {
     impactRefuted:
       "前提查核顯示這個假設不成立：上面依假設描述的問題與影響實際上不會發生，請以查核結果與 Lead 的整合摘要為準。",
     premiseMissing:
-      "這個貢獻建立時還沒有前提查核，需求裡的假設是否成立沒有記錄下來。可以請 Lead 依目前的程式碼與審查報告補做一次；完成後，程式碼解說與你還沒作答的變更解說會依結論重新產生。",
+      "這個貢獻建立時還沒有前提查核，需求裡的假設是否成立沒有記錄下來。可以請 Lead 依目前的程式碼與審查報告補做一次。完成後，程式碼解說與你還沒作答的變更解說會依結論重新產生。",
     premiseCheck: "依審查結果查核前提",
     premiseRecheck: "重新查核前提",
     premiseChecking: "正在查核前提…",
@@ -166,7 +166,7 @@ const m: Translation<typeof en> = {
     moreLimit: ({ max }) =>
       `已累積 ${n(max)} 個建議，達到這份分析的上限。可先挑選方向，或重新分析專案。`,
     moreHint:
-      "Agent 會沿用這個專案已儲存的模型設定，尋找不同的改善問題與使用者價值。既有建議會保留，由你決定何時開始開發。",
+      "沿用這個專案已儲存的模型設定。既有建議會保留。",
     generatingStatus:
       "正在閱讀專案、避開既有方向，你可以繼續閱讀下方建議。",
     viewAdded: ({ added, requested }) =>
@@ -191,7 +191,7 @@ const m: Translation<typeof en> = {
     droppedPaths: ({ count }) =>
       `因引用未抽樣／不存在的檔案而略過 ${n(count)} 項說明`,
     droppedPathsNote:
-      "模型只讀過抽樣檔案的內容，其餘路徑只知道存在；依據必須來自讀過的檔案，不在清單中的路徑則無法核對。其餘分析結果照常儲存。",
+      "模型只讀過抽樣的檔案，引用其他檔案的說明無法核對，因此略過。其餘分析結果照常儲存。",
     rounds: {
       analysis: "專案分析",
       expansion: "最近一次追加",
@@ -312,7 +312,7 @@ const m: Translation<typeof en> = {
       webPages: "允許 Agent 讀取網頁",
       antigravityWeb: "Antigravity 的網路搜尋無法關閉，包含專案分析與探索。這個選項只控制是否允許讀取網頁。",
       webAccessHelp:
-        "允許任務與追問中的 AI 搜尋及讀取網頁；專案分析與探索不使用這些工具。網頁內容不視為可信指令，終端機網路存取仍受所選權限限制。",
+        "適用於任務與追問。專案分析與探索不使用這些工具。網頁內容一律視為不可信。終端機的網路存取仍受所選權限限制。",
       error: ({ message }) => `${message} 已儲存的選擇會保留。`,
       loadFailed: ({ provider }) => `暫時無法讀取 ${provider} 模型清單。`,
       reload: "重新載入",
@@ -414,7 +414,7 @@ const m: Translation<typeof en> = {
   },
   start: {
     title: "開始之前",
-    lead: "每個 issue 連結只讀取一次。這裡的內容不會阻止你練習；發布時會重新檢查。",
+    lead: "每個 issue 連結只讀取一次。這裡的內容不會阻止你練習。發布時會重新檢查。",
     noIssue: `填了連結，${product.name} 會確認 issue 是否仍開放中，以及是否已有人在做。`,
     notGitHub:
       "只有 GitHub issue 連結會讀取 issue 資訊，例如 https://github.com/owner/repo/issues/123。",
@@ -442,8 +442,8 @@ const m: Translation<typeof en> = {
     maintainer: ({ quote, date }) => `維護者說：「${quote}」（${date}）`,
     learning: ({ labels }) => `新手標籤：${fmt.list(labels)}`,
     pacing: ({ open, budget }) => `你在這裡開放中的 PR：${n(open)} / ${n(budget)}`,
-    pacingHelp: `這個上限是 ${product.name} 的預設值：在一個 repository 第一次被合併前為 1 個，之後為 2 個。`,
-    pacingExempt: "你可以寫入這個 repository，所以在這裡發布不受節奏限制",
+    pacingHelp: `這個上限是 ${product.name} 的預設值：在一個 repository，第一個 PR 被合併前為 1 個，之後為 2 個。`,
+    pacingExempt: "你可以寫入這個 repository，所以這裡不受開放中 PR 數量上限限制",
     doorClosed: "這個 repository 不接受你開的 Pull Request",
     ban: "專案規範不接受 AI 協助的貢獻",
     unknown: ({ part, reason }) => {

@@ -1298,8 +1298,8 @@ test("retryTransientAuth reruns a retryable attempt up to twice with the product
   );
   assert.deepEqual(waits, [15_000, 45_000]);
   assert.deepEqual(notices, [
-    "Claude Code 正在更新登入憑證（其他行程持有更新鎖），15 秒後重試（第 2/3 次）。",
-    "Claude Code 正在更新登入憑證（其他行程持有更新鎖），45 秒後重試（第 3/3 次）。",
+    "Claude Code 正在等另一個行程更新完登入狀態，15 秒後重試（第 2/3 次）。",
+    "Claude Code 正在等另一個行程更新完登入狀態，45 秒後重試（第 3/3 次）。",
   ]);
   // A third retryable result is returned as is; the caller turns it into the final failure.
   attempts = 0;
@@ -1466,7 +1466,7 @@ test("agent CLI notices, outcomes and failures follow the locale in effect", asy
       error.message === "The operation was cancelled.",
   );
   assert.deepEqual(notices, [
-    "Claude Code is refreshing its sign-in while another process holds the refresh lock; next try in 15 seconds (attempt 2 of 3).",
+    "Claude Code is waiting for another process to finish refreshing its sign-in; next try in 15 seconds (attempt 2 of 3).",
   ]);
 });
 

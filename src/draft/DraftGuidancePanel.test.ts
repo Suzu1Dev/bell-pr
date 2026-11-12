@@ -199,7 +199,8 @@ test("the English panel renders every state, label and source kind without Han",
   assert.match(html, /Apply the suggested draft/);
   assert.match(html, /Suggested commit message/);
   assert.match(html, /Based on:<a /);
-  assert.match(html, /Why do projects ask for <code>type\(scope\)<\/code> or a sign-off\?/);
+  assert.match(html, /<p class="draft-guidance-commit-why">This suggestion only lays out the format the rules ask for\. The sign-off is your own statement: type it into the commit message field yourself; the model never fills it in\.<\/p>/);
+  assert.match(html, /<summary>Why do projects ask for <code>type\(scope\)<\/code> or a sign-off\?<\/summary>/);
   assert.match(html, /<code>Signed-off-by: Your Name &lt;email&gt;<\/code>/);
   assert.match(html, /Base <code>0123456<\/code>/);
   assert.match(html, /Checked <time dateTime="2026-10-03T01:36:00.000Z">/);

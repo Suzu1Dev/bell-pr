@@ -63,7 +63,7 @@ test("commits are labelled by where they came from, link to the PR, and open to 
 
 test("an unpublished contribution or the demo explains why there are no commits yet", () => {
   const unpublished = renderToStaticMarkup(createElement(CommitHistory, { run: { ...demoRun, id: "r" }, demo: false }));
-  assert.match(unpublished, /這個貢獻還沒送出 PR/);
+  assert.match(unpublished, /還沒發布 PR，所以修改仍未提交。/);
   const demo = renderToStaticMarkup(createElement(CommitHistory, { run: demoRun, demo: true }));
   assert.match(demo, /示範資料還沒有發布 PR/);
 });

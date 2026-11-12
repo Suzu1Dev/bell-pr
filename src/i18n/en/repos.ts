@@ -50,7 +50,7 @@ const repos = {
      */
     wslPathHint: `If ${product.name} runs inside WSL2 on this computer, use the path in your Linux distribution: a Windows folder is under /mnt/c/, for example /mnt/c/projects/repository.`,
     callout:
-      "GitHub projects are downloaded to this computer; development then uses separate worktrees and leaves the original checkout as it is.",
+      "GitHub projects are downloaded to this computer. Development then happens in separate working directories (Git worktrees), and the original stays as it is.",
     later: "Not now",
     importing: "Importing…",
     import: "Import project",

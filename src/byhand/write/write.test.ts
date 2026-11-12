@@ -110,7 +110,7 @@ test("after a first draft the guide's step names can be shown, and an early reve
 
 test("a run fitted to rules that don't name planning help keeps the outline closed", () => {
   const fitted = html(plan({ guidePlan, helpLock: lock }, {}, { status: "awaiting_plan" }));
-  assert.ok(fitted.includes(apostrophes("doesn't name planning help: the guide's outline stays closed.")));
+  assert.ok(fitted.includes(apostrophes("they don't name planning help, so the guide's outline stays closed.")));
   assert.doesNotMatch(fitted, /I don&#x27;t know where to start|step names/);
   // Nothing on the panel promises the outline later.
   assert.doesNotMatch(fitted, /folded until/i);
@@ -360,7 +360,7 @@ test("a second review waits for a test run at the new version, and a fitted run 
   assert.match(html(ready({ ready: { at, changeFingerprint: fingerprint, review: true } })), /<input type="checkbox" checked=""\/>/);
   const fitted = html(ready({ helpLock: lock }));
   assert.doesNotMatch(fitted, /Ask the guide to review it/);
-  assert.ok(fitted.includes(apostrophes("doesn't name AI review, so the guide doesn't review here; your tests are the judge.")));
+  assert.ok(fitted.includes(apostrophes("they don't name AI review, so the guide doesn't review here. Your tests are the judge.")));
 });
 
 test("an answer's own text stays plain text: an open code fence in it swallows nothing BELL renders after it", () => {

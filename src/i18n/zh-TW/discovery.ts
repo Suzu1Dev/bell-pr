@@ -32,16 +32,16 @@ const m: Translation<typeof en> = {
     sort: "搜尋排序",
     sortHelp: "排序方式說明",
     sortHint:
-      "最近更新：反映近期活動，但結果隨專案更新而變動。相關度：GitHub best match，可能含久未維護的專案，已排除封存專案並顯示最近推送時間。星數：知名度高，競爭與審查門檻也較高。",
+      "最近更新：近期有活動的專案，結果常變動。相關度：GitHub 的最佳符合，可能含久未維護的專案（已排除封存專案，並顯示最近推送時間）。星數：知名專案，競爭多、審查門檻高。",
     minStars: "最低星數",
     advanced: "模型與效率設定",
     agent: "AI 服務",
     model: "分析模型",
     defaultModel: ({ provider }) => `使用 ${provider} 預設模型`,
-    modelNotInCatalog: ({ model }) => `${model}（目錄未提供）`,
+    modelNotInCatalog: ({ model }) => `${model}（不在清單中）`,
     reasoningEffort: "思考強度",
     modelDefault: "模型預設",
-    effortNotInCatalog: ({ effort }) => `${effort}（已儲存，目錄未提供）`,
+    effortNotInCatalog: ({ effort }) => `${effort}（已儲存，不在清單中）`,
     ponytailMode: "效率模式",
     ponytailCredit: "效率模式以 DietrichGebert 的 Ponytail（MIT）為基礎。",
     ponytailModes: {
@@ -50,7 +50,7 @@ const m: Translation<typeof en> = {
       off: "關閉",
     },
     accountHint: ({ provider }) =>
-      `分析會沿用你的 ${provider} 登入，使用模型用量。模型目錄不代表帳號具有所有模型的使用權限。`,
+      `分析會使用你的 ${provider} 登入，用量計入你自己的帳號。清單中的模型，你的帳號不一定都能使用。`,
     publicDataOnly: "只讀取公開資料；選定項目後才開始規劃。",
     submit: "尋找貢獻項目",
   },
@@ -111,7 +111,7 @@ const m: Translation<typeof en> = {
     title: "推薦貢獻項目",
     previousTitle: "上一份推薦，仍在這裡。",
     note: ({ sort }) =>
-      `依你選的「${sort}」排序取 12 個候選、驗證後最多 6 個；順序由分析整理，不是 GitHub 全站排名。實作前仍需確認 issue 最新狀態與維護者意願。`,
+      `依「${sort}」排序取 12 個候選，檢查後最多保留 6 個。順序來自分析，不是 GitHub 排名。動工前請確認 issue 最新狀態與維護者意願。`,
     sampleNote: "即時搜尋會依你選的排序取 12 個候選，檢查後最多保留 6 個。",
     previousNote: ({ date }) =>
       date
