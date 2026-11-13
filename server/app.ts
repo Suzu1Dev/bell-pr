@@ -135,6 +135,8 @@ export interface AppOptions {
   tailscaleAuth?: boolean;
   /** The other BELL products' origins (BELLPR_SUITE_LINKS); none by default. */
   suiteLinks?: SuiteLinks;
+  /** Run the BELL Suite edition frame (`--suite` or `BELLPR_EDITION=suite`). */
+  suite?: boolean;
 }
 
 export function createApp(workbench: Workbench, options: AppOptions = {}) {

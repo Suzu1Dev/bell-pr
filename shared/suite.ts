@@ -10,7 +10,9 @@
  * Where the other BELL products are, as origins: BELLPR_SUITE_LINKS. The
  * contract knows three products; BELL PR itself is `pr`.
  */
-export type SuiteLinks = Partial<Record<"explain" | "personal" | "reader" | "campaign", string>>;
+export type SuiteSiblingId = "explain" | "personal" | "reader" | "campaign";
+export type SuiteAppId = SuiteSiblingId | "pr";
+export type SuiteLinks = Partial<Record<SuiteSiblingId, string>>;
 
 /** The contract's limits that apply to what BELL PR sends; lengths are code points. */
 export const suiteLimits = {
@@ -20,10 +22,23 @@ export const suiteLimits = {
   summary: 40,
   items: 5,
   countMax: 100_000,
+  handoffText: 2000,
+  handoffTitle: 120,
+  back: 512,
 } as const;
 
 /** The route of a run in BELL PR; the feed's `href` fills in the run id. */
 export const suiteRunRoute = "#/runs/{id}";
+/** Entry route where BELL PR accepts zero-write task drafts from sibling BELL apps. */
+export const suiteHandoffRoute = "#/discover";
+
+export const SUITE_ROUTES: Record<SuiteAppId, readonly string[]> = {
+  explain: ["#/", "#/explain", "#/library", "#/graph", "#/favorites", "#/repositories", "#/review", "#/note/{id}"],
+  personal: ["#/today", "#/tasks", "#/tasks/{id}", "#/events", "#/events/{id}", "#/ideas", "#/ideas/{id}", "#/inbox", "#/inbox/{id}"],
+  pr: ["#/", "#/home", "#/demo", "#/repos", "#/repos/{id}", "#/discover", "#/team", "#/group", "#/learning", "#/settings", "#/runs/{id}"],
+  reader: ["#/", "#/read", "#/library", "#/topics", "#/page/{id}"],
+  campaign: ["#/", "#/schedule", "#/tasks", "#/partners", "#/forms", "#/files", "#/meetings", "#/inspirations", "#/notes", "#/bot"],
+};
 
 export interface SuiteManifest {
   schemaVersion: 1;
@@ -34,6 +49,7 @@ export interface SuiteManifest {
   capabilities: (
     | { id: string; kind: "today-feed"; api: string }
     | { id: string; kind: "object-route"; route: string }
+    | { id: string; kind: "accept-handoff"; route: string; accepts: ["text"]; maxChars: number }
   )[];
   links: SuiteLinks;
 }

@@ -25,6 +25,8 @@ export type Status = {
   version?: string;
   /** Where group work stands; absent when BELL PR runs without --group. */
   collab?: CollabStatus;
+  /** True when BELL PR runs in BELL Suite edition (--suite, BELLPR_EDITION=suite, or BELLPR_SUITE_LINKS). */
+  suite?: true;
 };
 
 /** The first load's requests; each one answers on its own. */

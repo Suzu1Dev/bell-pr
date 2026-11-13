@@ -281,14 +281,21 @@ function stripComments(css) {
 }
 
 /**
- * The custom properties of the `:root` blocks in tokens.css, with aliases
- * (`var(--other)`) resolved. Opaque hex values also get `rgb` and `lab`.
+ * The custom properties of the `:root` blocks in tokens.css (plus
+ * `:root[data-theme="dark"]` when `dark` is true), with aliases (`var(--other)`)
+ * resolved. Opaque hex values also get `rgb` and `lab`.
  */
-export function parseTokens(css) {
+export function parseTokens(css, { dark = false } = {}) {
   const raw = new Map();
-  for (const block of stripComments(css).matchAll(/:root\s*\{([^}]*)\}/g))
+  const stripped = stripComments(css);
+  for (const block of stripped.matchAll(/:root\s*\{([^}]*)\}/g))
     for (const [, name, value] of block[1].matchAll(/(--[\w-]+)\s*:\s*([^;]+);/g))
       raw.set(name, value.trim().replace(/\s+/g, " "));
+  if (dark) {
+    for (const block of stripped.matchAll(/:root\[data-theme="dark"\]\s*\{([^}]*)\}/g))
+      for (const [, name, value] of block[1].matchAll(/(--[\w-]+)\s*:\s*([^;]+);/g))
+        raw.set(name, value.trim().replace(/\s+/g, " "));
+  }
   const resolve = (name, seen = new Set()) => {
     if (seen.has(name)) throw new Error(`Token alias cycle at ${name}.`);
     seen.add(name);
@@ -312,8 +319,8 @@ export function parseTokens(css) {
   return tokens;
 }
 
-export function loadTokens(file = path.join(root, tokensPath)) {
-  const tokens = parseTokens(readFileSync(file, "utf8"));
+export function loadTokens(file = path.join(root, tokensPath), options = {}) {
+  const tokens = parseTokens(readFileSync(file, "utf8"), options);
   for (const pool of Object.values(pools))
     for (const name of pool)
       if (!tokens.get(`--color-${name}`)?.lab)
@@ -849,7 +856,7 @@ function printContrast(tokens, json) {
 }
 
 function main(args) {
-  const tokens = loadTokens();
+  const tokens = loadTokens(undefined, { dark: args.includes("--dark") });
   if (args.includes("--check-contrast")) {
     printContrast(tokens, args.includes("--json"));
     return 0;

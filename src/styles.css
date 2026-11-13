@@ -140,6 +140,15 @@ button {
 .brand-mark {
   display: none;
 }
+.brand-wordmark path:nth-child(1),
+.brand-wordmark path:nth-child(3),
+.brand-mark path,
+.suite-trigger-mark path {
+  fill: var(--color-brand-600);
+}
+.brand-wordmark path:nth-child(2) {
+  fill: var(--color-text);
+}
 @media (min-width: 761px) {
   .is-sidebar-collapsed .brand-row {
     justify-content: center;
@@ -320,6 +329,17 @@ button {
   display: flex;
   align-items: center;
   justify-content: space-between;
+}
+@media (min-width: 761px) {
+  .is-suite-edition .topbar {
+    height: 48px;
+    padding: 0 24px;
+  }
+}
+@media (max-width: 640px) {
+  .topbar .theme-toggle {
+    display: none;
+  }
 }
 .breadcrumb {
   display: flex;

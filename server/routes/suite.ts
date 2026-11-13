@@ -7,7 +7,13 @@
 import type { Express } from "express";
 import { locales, type Locale } from "../../shared/i18n/locale.js";
 import { product } from "../../shared/product.js";
-import { suiteRunRoute, type SuiteLinks, type SuiteManifest } from "../../shared/suite.js";
+import {
+  suiteHandoffRoute,
+  suiteLimits,
+  suiteRunRoute,
+  type SuiteLinks,
+  type SuiteManifest,
+} from "../../shared/suite.js";
 import { currentLocale, sm, withLocale } from "../i18n/index.js";
 import { log } from "../log.js";
 import { suiteFeedSchema, suiteManifestSchema } from "../suite-contract.js";
@@ -24,6 +30,13 @@ function buildManifest(links: SuiteLinks): SuiteManifest {
     capabilities: [
       { id: "runs.today", kind: "today-feed", api: "/api/suite/today" },
       { id: "run.open", kind: "object-route", route: suiteRunRoute },
+      {
+        id: "task.handoff",
+        kind: "accept-handoff",
+        route: suiteHandoffRoute,
+        accepts: ["text"],
+        maxChars: suiteLimits.handoffText,
+      },
     ],
     links,
   });

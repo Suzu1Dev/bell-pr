@@ -112,4 +112,54 @@ test.describe("with BELLPR_SUITE_LINKS", () => {
       await context.close();
     }
   });
+
+  test("suite frame, 5-app search, zero-write incoming handoff, and light/dark theme toggle work end-to-end", async ({ browser }) => {
+    const context = await browser.newContext({
+      extraHTTPHeaders: e2eApiHeaders,
+      baseURL: server!.baseURL,
+      locale: "en-US",
+    });
+    try {
+      const page = await context.newPage();
+      await page.goto(
+        "/#/discover?draft=Add%20dark%20mode%20contrast%20audit&title=Dark%20mode%20audit&from=explain&back=%23%2Fexplain",
+      );
+      await expect(page.locator(".app-shell")).toHaveClass(/is-suite-edition/);
+      await expect(page.locator("html")).toHaveAttribute("data-edition", "suite");
+
+      // Handoff parameters are stripped immediately from the URL and shown in a zero-write banner.
+      await expect.poll(() => page.evaluate(() => window.location.hash)).toBe("#/discover");
+      const banner = page.locator(".suite-handoff-banner");
+      await expect(banner).toContainText("Dark mode audit — Add dark mode contrast audit");
+      await expect(banner.locator(".suite-handoff-back")).toHaveAttribute(
+        "href",
+        "http://localhost:5173/#/explain",
+      );
+
+      // Search filtering inside the 5-product Suite switcher.
+      await page.getByRole("button", { name: t.open }).click();
+      const dialog = page.getByRole("dialog", { name: t.title });
+      await expect(dialog.locator("ul > li")).toHaveCount(5);
+      await dialog.getByRole("searchbox", { name: t.searchPlaceholder }).fill("campaign");
+      await expect(dialog.locator("ul > li")).toHaveCount(1);
+      await expect(dialog.locator("ul > li")).toContainText(t.campaign.name);
+      await page.keyboard.press("Escape");
+
+      // Light <-> Dark mode toggle updates data-theme and persists in localStorage.
+      await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+      await page.locator(".topbar .theme-toggle").click();
+      await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+      expect(await page.evaluate(() => localStorage.getItem("bell.theme"))).toBe("dark");
+      await page.reload();
+      await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+
+      // Applying the stored handoff opens the New Task modal prefilled and clears the banner.
+      await expect(banner).toBeVisible();
+      await banner.locator(".suite-handoff-apply").click();
+      await expect(banner).toHaveCount(0);
+      await expect(page.locator('[role="dialog"]')).toBeVisible();
+    } finally {
+      await context.close();
+    }
+  });
 });

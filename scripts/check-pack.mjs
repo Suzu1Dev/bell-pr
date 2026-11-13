@@ -69,7 +69,13 @@
 // 3-column grid, synthesized pipeline fallback, and uncovered subsystem
 // module grid, after consolidating 8 repeated details/summary blocks in
 // mission.css): all CSS 47.6 kB on Node.js 24, so the all-CSS budget rose
-// from 47.5 kB to 48.2 kB.
+// from 47.5 kB to 48.2 kB. Measured with Dark Mode (:root[data-theme="dark"]
+// obsidian + luminous mint tokens and theme toggles) plus the BELL Suite
+// edition (Direction C brand switcher, 5-app searchable dialog, and
+// bidirectional zero-write Suite handoffs with en and zh-TW strings): all JS
+// 515.9 kB in 54 files and all CSS 49.2 kB on Node.js 24, so the all-JS
+// budget rose from 515 kB to 518 kB and the all-CSS budget rose from 48.2 kB
+// to 49.8 kB.
 //
 // Exit status: 0 when every check passes, 1 when one fails, 2 on a usage or
 // setup error.
@@ -93,8 +99,8 @@ const budgets = {
   entries: 150,
   woff2: 12,
   largestJsGzip: 116 * kB,
-  totalJsGzip: 515 * kB,
-  totalCssGzip: 48.2 * kB,
+  totalJsGzip: 518 * kB,
+  totalCssGzip: 49.8 * kB,
 };
 const required = [
   "package.json",

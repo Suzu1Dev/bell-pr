@@ -21,6 +21,7 @@ import "../models/models.css";
 import "../mission/mission.css";
 import "../team/team.css";
 import type { AppSettingsView } from "../../shared/app-settings";
+import { product } from "../../shared/product";
 import { summarizeRun } from "../../shared/runs";
 import { dropSplitLinks } from "../../shared/split";
 import { ApiTokenEmptyState } from "./ApiTokenEmptyState";
@@ -51,7 +52,7 @@ import { useDoctor, type DoctorState } from "../setup/useDoctor";
 import { WorkspacePage } from "../workspace/WorkspacePage";
 import { ErrorBoundary, listenForPreloadErrors } from "./ErrorBoundary";
 import { Sidebar } from "./Sidebar";
-import { SuiteSwitcher, SuiteTrigger } from "./SuiteSwitcher";
+import { SuiteBrandButton, SuiteSwitcher, SuiteTrigger } from "./SuiteSwitcher";
 import { Toasts, type Toast } from "./Toasts";
 import { Topbar } from "./Topbar";
 import { usePresentation } from "./presentation";
@@ -63,9 +64,20 @@ import { useRepoUpdate } from "./hooks/useRepoUpdate";
 import { useRunActions } from "./hooks/useRunActions";
 import { useRunPolling } from "./hooks/useRunPolling";
 import { useRunRounds } from "./hooks/useRunRounds";
-import { useSuiteLinks } from "./hooks/useSuiteLinks";
+import { useSuiteState } from "./hooks/useSuiteLinks";
 import { useTaskSetup } from "./hooks/useTaskSetup";
 import { useWalkthroughs } from "./hooks/useWalkthroughs";
+import { safeLink } from "../review/MarkdownContent";
+import { SuiteHandoffBanner } from "../suite/SuiteHandoffBanner";
+import {
+  clearPrHandoff,
+  hasPrHandoffParams,
+  parsePrHandoff,
+  readPrHandoff,
+  stripPrHandoffHash,
+  writePrHandoff,
+  type StoredPrHandoff,
+} from "../suite/handoff";
 
 export type Page =
   | "home"
@@ -491,12 +503,27 @@ function AppShell({
   }, []);
   const [toast, setToast] = useState<Toast | null>(null);
   const [commandOpen, setCommandOpen] = useState(false);
-  // The product switcher: a button once another BELL product is linked.
-  const suiteLinks = useSuiteLinks();
+  // The product switcher & Suite frame: enabled when linked or started in Suite edition.
+  const { links: suiteLinks, settled: suiteSettled } = useSuiteState();
   const [suiteOpen, setSuiteOpen] = useState(false);
-  const suiteTrigger = suiteLinks && (
+  const isSuiteEdition =
+    Boolean(status?.suite) ||
+    product.defaultEdition === "suite" ||
+    Boolean(presentation.suite) ||
+    Boolean(suiteLinks);
+  const effectiveSuiteLinks = suiteLinks ?? (isSuiteEdition ? {} : undefined);
+  const sidebarSuiteTrigger = effectiveSuiteLinks && (
+    <SuiteBrandButton open={suiteOpen} onOpen={() => setSuiteOpen(true)} />
+  );
+  const topbarSuiteTrigger = effectiveSuiteLinks && (
     <SuiteTrigger open={suiteOpen} onOpen={() => setSuiteOpen(true)} />
   );
+  const [handoff, setHandoff] = useState<StoredPrHandoff | undefined>(() =>
+    typeof sessionStorage === "undefined" ? undefined : readPrHandoff(sessionStorage),
+  );
+  useEffect(() => {
+    document.documentElement.dataset.edition = isSuiteEdition ? "suite" : "standalone";
+  }, [isSuiteEdition]);
   const mainContent = useRef<HTMLElement>(null);
   const [modal, setModal] = useState<ModalName>(initialModal);
   const exploreRepoId = route?.name === "repo" ? route.repoId : undefined;
@@ -643,6 +670,53 @@ function AppShell({
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, [toggleCommandPalette, suiteOpen]);
+
+  useEffect(() => {
+    if (!effectiveSuiteLinks) return;
+    const handler = (event: KeyboardEvent) => {
+      if (event.defaultPrevented || event.isComposing || event.repeat) return;
+      if (!(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey) return;
+      const typing = (event.target as Element | null)?.closest(
+        "input, textarea, select, [contenteditable]",
+      );
+      if (typing || modal || commandOpen || suiteOpen) return;
+      const targets = [
+        effectiveSuiteLinks.personal,
+        effectiveSuiteLinks.explain,
+        "",
+        effectiveSuiteLinks.reader,
+        effectiveSuiteLinks.campaign,
+      ];
+      const index = Number(event.key) - 1;
+      if (!Number.isInteger(index) || index < 0 || index > 4) return;
+      if (index === 2) {
+        event.preventDefault();
+        setSuiteOpen(true);
+        return;
+      }
+      const href = safeLink(targets[index]);
+      if (href) {
+        event.preventDefault();
+        window.location.href = href;
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [effectiveSuiteLinks, modal, commandOpen, suiteOpen]);
+
+  useEffect(() => {
+    if (!suiteSettled) return;
+    const rawHash = window.location.hash;
+    if (!hasPrHandoffParams(rawHash)) return;
+    const parsed = parsePrHandoff(rawHash, suiteLinks ?? {});
+    window.history.replaceState(window.history.state, "", stripPrHandoffHash(rawHash));
+    window.dispatchEvent(new Event("popstate"));
+    if (parsed && !("rejected" in parsed)) {
+      setHandoff(writePrHandoff(sessionStorage, parsed));
+    } else if (parsed && "rejected" in parsed && parsed.rejected !== "from") {
+      setToast({ message: t.suite.handoffRejected, tone: "error" });
+    }
+  }, [suiteSettled, suiteLinks, route, t.suite.handoffRejected]);
 
   useEffect(() => {
     if (reading) window.scrollTo({ top: 0, behavior: "instant" });
@@ -1049,7 +1123,7 @@ function AppShell({
 
   return (
     <div
-      className={`app-shell ${reading ? "is-reading" : ""} ${reading && focusMode ? "is-focused" : ""} ${sidebarCollapsed ? "is-sidebar-collapsed" : ""}`}
+      className={`app-shell ${isSuiteEdition ? "is-suite-edition" : ""} ${reading ? "is-reading" : ""} ${reading && focusMode ? "is-focused" : ""} ${sidebarCollapsed ? "is-sidebar-collapsed" : ""}`}
       style={
         {
           "--code-size": `${codeFont}px`,
@@ -1076,7 +1150,7 @@ function AppShell({
         openModal={openModal}
         beginContribution={beginContribution}
         chooseRun={chooseRun}
-        suiteTrigger={suiteTrigger}
+        suiteTrigger={sidebarSuiteTrigger}
       />
       <main className="main-shell" id="main-content" ref={mainContent} tabIndex={-1}>
         <Topbar
@@ -1093,7 +1167,7 @@ function AppShell({
           repoUrl={titleRepo && titleRepo !== sample.repo ? titleRepo.url : undefined}
           githubUser={status?.githubUser ?? ""}
           sampleBadge={presentation.present && showingSample}
-          suiteTrigger={suiteTrigger}
+          suiteTrigger={topbarSuiteTrigger}
         />
         {apiError && (
           <div role="alert" className="connection-banner">
@@ -1106,6 +1180,23 @@ function AppShell({
               <X size={15} />
             </button>
           </div>
+        )}
+        {handoff && (
+          <SuiteHandoffBanner
+            handoff={handoff}
+            onApply={(item) => {
+              clearPrHandoff(sessionStorage);
+              setHandoff(undefined);
+              beginContribution(undefined, {
+                title: item.title ?? "",
+                prompt: item.text,
+              });
+            }}
+            onDismiss={() => {
+              clearPrHandoff(sessionStorage);
+              setHandoff(undefined);
+            }}
+          />
         )}
         {page === "home" ? (
           <HomePage
@@ -1195,6 +1286,7 @@ function AppShell({
                 : undefined
             }
             updatingRepo={updatingRepo}
+            suiteLinks={suiteLinks}
           />
         ) : page === "explore" && exploreRepo ? (
           <ExplorePage
@@ -1209,6 +1301,7 @@ function AppShell({
                 : undefined
             }
             updatingRepo={updatingRepo}
+            suiteLinks={suiteLinks}
           />
         ) : page === "discovery" ? (
           <DiscoveryPage chooseOpportunity={chooseOpportunity} />
@@ -1285,8 +1378,8 @@ function AppShell({
           </Suspense>
         </ErrorBoundary>
       )}
-      {suiteOpen && suiteLinks && (
-        <SuiteSwitcher links={suiteLinks} onClose={() => setSuiteOpen(false)} />
+      {suiteOpen && effectiveSuiteLinks && (
+        <SuiteSwitcher links={effectiveSuiteLinks} onClose={() => setSuiteOpen(false)} />
       )}
       <Toasts toast={toast} setToast={setToast} />
       {modal === "import" && (

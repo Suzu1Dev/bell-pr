@@ -92,7 +92,16 @@ function encodeValue(text: string): string {
  * (`panel=check`). navigate() never carries them to the next address; a
  * route that wants one names it.
  */
-export const pageFlags: readonly string[] = ["file", "view", "panel"];
+export const pageFlags: readonly string[] = [
+  "file",
+  "view",
+  "panel",
+  "text",
+  "title",
+  "draft",
+  "from",
+  "back",
+];
 
 /** `a=1&b=x%20y` as `{a: "1", b: "x y"}`; a repeated name keeps its last value. */
 export function parseQuery(query: string): Record<string, string> {

@@ -25,6 +25,7 @@ export function registerStatusRoutes(
       limits: workbench.limits,
       ...(recovery ? { recovery } : {}),
       ...(collab ? { collab } : {}),
+      ...(options.suite ? { suite: true } : {}),
       version: options.version ?? version,
     });
   });

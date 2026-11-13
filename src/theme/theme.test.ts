@@ -218,6 +218,20 @@ test("text tokens meet WCAG AA on every light background token", () => {
   assert.ok(muted("bg") >= 4.5 && muted("surface") >= 4.5);
 });
 
+test("dark theme tokens meet WCAG AA on every dark background and inverse fill", () => {
+  const darkTokens = tokenizer.loadTokens(undefined, { dark: true });
+  const pairs: { fg: string; bg: string; ratio: number }[] =
+    tokenizer.contrastReport(darkTokens);
+  const failing = pairs.filter((pair) => pair.ratio < 4.5);
+  assert.deepEqual(failing, []);
+  const typed = darkTokens.get("--color-text").rgb;
+  const hint = darkTokens.get("--color-text-muted").rgb;
+  assert.ok(
+    tokenizer.luminance(typed) > tokenizer.luminance(hint) &&
+      tokenizer.contrastRatio(typed, hint) >= 2,
+  );
+});
+
 test("typed text stays clearly darker than the placeholder in every field", () => {
   // A placeholder as dark as the typed text makes an empty field look filled.
   const minimum = 2;

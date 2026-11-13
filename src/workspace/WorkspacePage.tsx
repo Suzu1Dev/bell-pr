@@ -31,6 +31,7 @@ import { useTeamCollaboration } from "../collab/useTeamCollaboration";
 import type { DiffFile, Repo, Run } from "../types";
 import type { useProjectInsights } from "../mission/useProjectInsights";
 import type { ContributionRecommendation } from "../../shared/insights";
+import type { SuiteLinks } from "../../shared/suite";
 import type { Tab } from "../app/AppShell";
 import type { DraftEditor } from "../app/hooks/useDraftEditor";
 import { runPath, type RunActions } from "../app/hooks/useRunActions";
@@ -50,6 +51,7 @@ import { DraftTab } from "./DraftTab";
 import { OverviewTab } from "./OverviewTab";
 import { RunNotices, showsCheckOff, UnderstandingOffBadge, UnsandboxedBadge } from "./RunNotices";
 import { HoldRecoveryNotice } from "./HoldRecoveryNotice";
+import { SuiteHandoffMenu } from "../suite/SuiteHandoffMenu";
 import "./workspace.css";
 import { limitationsRequest } from "../session/limitations";
 import { sessionAwaitsAnswer, sessionTurnBlock, setupHandOffShown, showSessionTab } from "../session/state";
@@ -146,6 +148,7 @@ interface WorkspacePageProps {
   /** Updates BELL's clone to the latest default branch; absent for local imports and the demo. */
   onUpdateRepo?: () => void;
   updatingRepo: boolean;
+  suiteLinks?: SuiteLinks;
 }
 
 /**
@@ -203,6 +206,7 @@ export function WorkspacePage({
   rounds,
   onUpdateRepo,
   updatingRepo,
+  suiteLinks,
 }: WorkspacePageProps) {
   const t = useT("workspace");
   const format = useFormat();
@@ -322,12 +326,19 @@ export function WorkspacePage({
             <span>{t.eyebrow}</span>
             {demo && <span className="demo-pill">{t.demoPill}</span>}
           </div>
-          <button
-            className="button secondary new-task-button"
-            onClick={() => beginContribution()}
-          >
-            <Plus size={15} /> <span className="new-task-label">{t.newContribution}</span>
-          </button>
+          <div className="heading-top-actions">
+            <SuiteHandoffMenu
+              links={suiteLinks}
+              title={run.title}
+              text={run.draft?.body || run.prompt || run.title}
+            />
+            <button
+              className="button secondary new-task-button"
+              onClick={() => beginContribution()}
+            >
+              <Plus size={15} /> <span className="new-task-label">{t.newContribution}</span>
+            </button>
+          </div>
         </div>
         <div className="title-row">
           <h1 tabIndex={-1}>{run.title}</h1>

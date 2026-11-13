@@ -43,6 +43,8 @@ export interface PresentationFlags {
   cursor: boolean;
   /** `capture=1`: the capture tooling is recording. */
   capture: boolean;
+  /** `suite=1`: preview the BELL Suite edition frame. */
+  suite?: boolean;
 }
 
 /** On for `1`, `true` or a bare name (`?present`); off for anything else. */
@@ -65,6 +67,7 @@ export function parsePresentationFlags(hash: string): PresentationFlags {
         : minPlaybackSpeed,
     cursor: isOn(query.cursor),
     capture: isOn(query.capture),
+    ...(isOn(query.suite) ? { suite: true } : {}),
   };
 }
 

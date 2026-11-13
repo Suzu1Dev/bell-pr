@@ -24,6 +24,19 @@
 .sidebar-language-select:hover {
   border-color: var(--color-accent-300);
 }
+.sidebar-theme-btn {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+}
+.sidebar-theme-btn:hover {
+  border-color: var(--color-brand-300);
+  color: var(--color-brand-700);
+}
 @media (min-width: 761px) {
   /* The collapsed rail keeps icons only; the settings page has the switcher. */
   .is-sidebar-collapsed .sidebar-language {

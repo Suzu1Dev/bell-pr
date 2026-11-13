@@ -4,8 +4,10 @@ import { useT, withMessages } from "../i18n";
 import type { Repo } from "../types";
 import type { useProjectInsights } from "../mission/useProjectInsights";
 import type { ContributionRecommendation } from "../../shared/insights";
+import type { SuiteLinks } from "../../shared/suite";
 import type { Tab } from "../app/AppShell";
 import { ErrorBoundary } from "../app/ErrorBoundary";
+import { SuiteHandoffMenu } from "../suite/SuiteHandoffMenu";
 
 // The overview is the largest view in the app; it loads with its first visit.
 const ProjectOverview = lazy(() =>
@@ -23,6 +25,7 @@ interface ExplorePageProps {
   /** Updates BELL's clone to the latest default branch; absent for local imports and the demo. */
   onUpdateRepo?: () => void;
   updatingRepo: boolean;
+  suiteLinks?: SuiteLinks;
 }
 
 /** One repository's users, problems and recommended contribution directions. */
@@ -34,6 +37,7 @@ export function ExplorePage({
   setTab,
   onUpdateRepo,
   updatingRepo,
+  suiteLinks,
 }: ExplorePageProps) {
   const t = useT("repos").explore;
   return (
@@ -43,13 +47,20 @@ export function ExplorePage({
           <h1 tabIndex={-1}>{exploreRepo.fullName}</h1>
           <p>{t.intro}</p>
         </div>
-        <button
-          className="button primary"
-          onClick={() => beginContribution(exploreRepo.id)}
-        >
-          <Target size={16} />
-          {t.chooseDirection}
-        </button>
+        <div className="page-title-actions">
+          <SuiteHandoffMenu
+            links={suiteLinks}
+            title={exploreRepo.fullName}
+            text={intelligence.insights?.purpose || exploreRepo.fullName}
+          />
+          <button
+            className="button primary"
+            onClick={() => beginContribution(exploreRepo.id)}
+          >
+            <Target size={16} />
+            {t.chooseDirection}
+          </button>
+        </div>
       </div>
       <ErrorBoundary resetKey={exploreRepo.id}>
       <Suspense fallback={null}>

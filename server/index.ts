@@ -808,6 +808,7 @@ export async function startServer(
       ...(collab ? { collab } : {}),
       ...(config.trustVpn ? { trustVpn: true } : {}),
       ...(config.tailscaleAuth ? { tailscaleAuth: true } : {}),
+      ...(config.suite ? { suite: true } : {}),
       suiteLinks: config.suiteLinks,
     });
     handler = app;

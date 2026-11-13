@@ -285,6 +285,7 @@ async function start(args: string[], ctx: Context): Promise<number | undefined> 
     dev: { type: "boolean" },
     force: { type: "boolean" },
     group: { type: "boolean" },
+    suite: { type: "boolean" },
     "trust-vpn": { type: "boolean" },
     "tailscale-auth": { type: "boolean" },
   });
@@ -297,6 +298,7 @@ async function start(args: string[], ctx: Context): Promise<number | undefined> 
       dev: values.dev,
       open: values["no-open"] ? false : undefined,
       group: values.group,
+      suite: values.suite,
       trustVpn: values["trust-vpn"],
       tailscaleAuth: values["tailscale-auth"],
     },

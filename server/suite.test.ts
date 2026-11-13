@@ -212,6 +212,13 @@ test("the manifest names BELL PR, its feed and its links in the request's langua
     capabilities: [
       { id: "runs.today", kind: "today-feed", api: "/api/suite/today" },
       { id: "run.open", kind: "object-route", route: "#/runs/{id}" },
+      {
+        id: "task.handoff",
+        kind: "accept-handoff",
+        route: "#/discover",
+        accepts: ["text"],
+        maxChars: 2000,
+      },
     ],
     links,
   });

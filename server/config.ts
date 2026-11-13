@@ -34,6 +34,8 @@ export interface StartFlags {
   trustVpn?: boolean;
   /** --tailscale-auth: trust verified local Tailscale identity headers. */
   tailscaleAuth?: boolean;
+  /** --suite: run the BELL Suite edition frame. */
+  suite?: boolean;
 }
 
 /** How much agent work runs at once and how long turns may take. */
@@ -74,6 +76,8 @@ export interface Config {
   trustVpn?: true;
   /** --tailscale-auth or BELLPR_TAILSCALE_AUTH=1: trust loopback Tailscale identity headers. */
   tailscaleAuth?: true;
+  /** --suite, BELLPR_SUITE=1, BELLPR_EDITION=suite, or configured BELLPR_SUITE_LINKS. */
+  suite?: true;
   /**
    * ./.bellpr in the working directory when it holds data from an older
    * version and is not the data directory in use. Only a hint is printed.
@@ -350,6 +354,12 @@ export function resolveConfig(
     ...(flags.group === true || envFlag(env.BELLPR_GROUP) ? { collab: true as const } : {}),
     ...(trustVpn ? { trustVpn: true as const } : {}),
     ...(tailscaleAuth ? { tailscaleAuth: true as const } : {}),
+    ...(flags.suite === true ||
+    envFlag(env.BELLPR_SUITE) ||
+    env.BELLPR_EDITION?.trim().toLowerCase() === "suite" ||
+    Object.keys(suiteLinks).length > 0
+      ? { suite: true as const }
+      : {}),
     ...(legacyDataDir ? { legacyDataDir } : {}),
   };
 }

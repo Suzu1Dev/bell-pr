@@ -13,8 +13,11 @@ import {
 import { loadDemo } from "./locales";
 import { adoptViewSearch } from "./navigation/view-url";
 import { defaultLocale, type Locale } from "../shared/i18n/locale";
+import { initTheme } from "./theme/useTheme";
 import "./styles.css";
 import "./workspace-v2.css";
+
+initTheme(window);
 
 // The address from `bell-pr open` carries the API token in the fragment.
 // Store it and drop it from the address before the router reads the hash.

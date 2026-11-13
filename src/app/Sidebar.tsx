@@ -9,9 +9,11 @@ import {
   Info,
   Languages,
   LayoutDashboard,
+  Moon,
   Plus,
   Search,
   Settings2,
+  Sun,
   UserRound,
   Users,
   type LucideIcon,
@@ -22,6 +24,7 @@ import { useLocale, useT } from "../i18n";
 import { LanguageSwitcher } from "../i18n/LanguageSwitcher";
 import { PracticeReadyChip } from "../learning/PracticeReadyChip";
 import { usePracticeReady } from "../learning/practiceReady";
+import { useTheme } from "../theme/useTheme";
 import type { Run, RunSummary } from "../types";
 import type { ModalName, Page } from "./AppShell";
 import type { Status } from "./hooks/useAppData";
@@ -78,6 +81,8 @@ export function Sidebar({
   const t = useT("app");
   const byHand = useT("workspace").byHand.badge;
   const [locale] = useLocale();
+  const [theme, , toggleTheme] = useTheme();
+  const nextThemeLabel = theme === "dark" ? t.topbar.themeLight : t.topbar.themeDark;
   const demoRun = getDemo(locale).run;
   const login = status?.githubUser ?? "";
   const { play } = usePresentation();
@@ -210,6 +215,19 @@ export function Sidebar({
           <div className="sidebar-language">
             <Languages size={16} aria-hidden="true" />
             <LanguageSwitcher className="sidebar-language-select" />
+            <button
+              type="button"
+              className="icon-button sidebar-theme-btn"
+              onClick={toggleTheme}
+              aria-label={nextThemeLabel}
+              title={nextThemeLabel}
+            >
+              {theme === "dark" ? (
+                <Sun size={15} aria-hidden="true" />
+              ) : (
+                <Moon size={15} aria-hidden="true" />
+              )}
+            </button>
           </div>
           <div className="profile">
             <span className="profile-avatar" aria-hidden="true">

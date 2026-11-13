@@ -9,8 +9,10 @@ import { safeLink } from "../../review/MarkdownContent";
  * the answer is not a manifest and when it holds no address the switcher
  * can link to: the product switcher only shows for a link.
  */
-export function useSuiteLinks(): SuiteLinks | undefined {
-  const [links, setLinks] = useState<SuiteLinks>();
+export function useSuiteState(): { links: SuiteLinks | undefined; settled: boolean } {
+  const [state, setState] = useState<{ links?: SuiteLinks; settled: boolean }>({
+    settled: false,
+  });
   useEffect(() => {
     let mounted = true;
     // A proxy or another build may answer with something else than a manifest.
@@ -21,14 +23,24 @@ export function useSuiteLinks(): SuiteLinks | undefined {
           const origin = manifest?.links?.[id];
           if (typeof origin === "string" && safeLink(origin)) usable[id] = origin;
         }
-        if (mounted && Object.keys(usable).length) setLinks(usable);
+        if (mounted) {
+          setState({
+            links: Object.keys(usable).length ? usable : undefined,
+            settled: true,
+          });
+        }
       })
       .catch(() => {
         // No switcher: BELL PR works the same without it.
+        if (mounted) setState({ settled: true });
       });
     return () => {
       mounted = false;
     };
   }, []);
-  return links;
+  return { links: state.links, settled: state.settled };
+}
+
+export function useSuiteLinks(): SuiteLinks | undefined {
+  return useSuiteState().links;
 }

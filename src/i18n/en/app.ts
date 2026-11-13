@@ -75,6 +75,10 @@ const app = {
     /** A text link to the open project's repository on GitHub. */
     openOnGitHub: "Open on GitHub",
     profile: "Settings",
+    themeLight: "Switch to light mode",
+    themeDark: "Switch to dark mode",
+    themeLightShort: "Light",
+    themeDarkShort: "Dark",
   },
   /** Presentation mode (present=1). */
   presentation: {
@@ -144,15 +148,32 @@ const app = {
   /** The switcher between BELL products; it shows once BELLPR_SUITE_LINKS names one. */
   suite: {
     open: "Switch BELL product",
-    title: "BELL products",
-    personal: { name: "BELL Personal", summary: "Today and inbox" },
-    explain: { name: "BELL Explain", summary: "Understanding and review" },
+    title: "BELL Suite",
+    searchPlaceholder: "Switch to a BELL tool…",
+    noMatch: "No matching BELL product",
+    personal: { name: "BELL Personal", summary: "Today, calendar and inbox" },
+    explain: { name: "BELL Explain", summary: "Concept breakdown and spaced review" },
     /** What this product is for; its name comes from shared/product.ts. */
-    prSummary: "Contributions and review",
-    reader: { name: "BELL Web Reader", summary: "Web reading and markup" },
-    campaign: { name: "BELL Campaign", summary: "Event timeline and collaboration" },
+    prSummary: "Open-source contributions and code review",
+    reader: { name: "BELL Web Reader", summary: "Web capture and margin notes" },
+    campaign: { name: "BELL Campaign", summary: "Countdown timeline and team coordination" },
     current: "Current",
     notLinked: "Not linked",
+    footerNavigate: "↑↓ Navigate",
+    footerOpen: "Enter Open",
+    footerClose: "Esc Close",
+    sendToSuite: "Send to BELL",
+    sendTargets: {
+      explain: "Break down in BELL Explain",
+      personal: "Add to BELL Personal tasks",
+      reader: "Read in BELL Web Reader",
+      campaign: "Track in BELL Campaign",
+    },
+    handoffFrom: ({ app }: { app: string }) => `From ${app}`,
+    handoffBack: ({ app }: { app: string }) => `Back to ${app}`,
+    handoffTruncated: "Clipped to 2,000 characters",
+    handoffApply: "Start contribution with draft",
+    handoffRejected: "That Suite handoff link was incomplete and could not be imported.",
   },
 };
 

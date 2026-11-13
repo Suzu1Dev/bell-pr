@@ -130,6 +130,79 @@
      clip an outer ring. */
   --focus-ring: 0 0 0 2px var(--color-bg), 0 0 0 4px var(--color-brand-600);
   --focus-ring-inset: inset 0 0 0 2px var(--color-brand-600);
+  color-scheme: light;
+}
+
+/* Architectural obsidian dark theme: zero muddy grey tints, opaque surfaces,
+   luminous botanical mint accents, and full WCAG AA (4.5:1) contrast across
+   every text/background and inverse button pair. */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --color-bg: #0b0e0d;
+  --color-surface: #121715;
+  --color-surface-sunken: #0e1210;
+  --color-surface-muted: #181f1c;
+  --color-surface-inverse: var(--color-text);
+
+  --color-border-subtle: var(--color-surface-muted);
+  --color-border: #242e29;
+  --color-border-strong: #34423b;
+
+  --color-text: #eef3f0;
+  --color-text-secondary: #bcc9c2;
+  --color-text-muted: #96a89f;
+  --color-text-inverse: #08120d;
+  --color-text-inverse-muted: #182e24;
+
+  --color-brand-700: #6ee7b0;
+  --color-brand-600: #3dd68c;
+  --color-brand-500: #27a368;
+  --color-brand-300: #1f704c;
+  --color-brand-200: #194935;
+  --color-brand-100: #142b21;
+  --color-brand-50: #10211a;
+
+  --color-accent-700: #bde09e;
+  --color-accent-600: #9dcc78;
+  --color-accent-500: #6b944c;
+  --color-accent-300: #3f592d;
+  --color-accent-200: #2c3e20;
+  --color-accent-100: #1a2615;
+  --color-accent-50: #141d11;
+
+  --color-success: var(--color-brand-600);
+  --color-success-bg: var(--color-brand-50);
+  --color-warning: #f0c362;
+  --color-warning-500: #c99a3e;
+  --color-warning-border: #4a3b18;
+  --color-warning-bg: #211b0f;
+  --color-danger: #f78c80;
+  --color-danger-border: #542622;
+  --color-danger-bg: #241312;
+  --color-info: #7cc0f5;
+  --color-info-border: #224059;
+  --color-info-bg: #111d27;
+  --color-violet: #c4aff7;
+  --color-violet-border: #3c3059;
+  --color-violet-bg: #1a1626;
+
+  --color-diff-add-bg: #10261b;
+  --color-diff-add-fg: var(--color-brand-600);
+  --color-diff-del-bg: #261314;
+  --color-diff-del-fg: var(--color-danger);
+  --color-diff-selected: #163024;
+
+  --color-syntax-keyword: var(--color-violet);
+  --color-syntax-string: var(--color-warning);
+  --color-syntax-number: #f2a36b;
+  --color-syntax-comment: var(--color-text-muted);
+
+  --color-selection: #1d4d38;
+  --color-overlay: rgb(3 7 5 / 68%);
+
+  --shadow-1: 0 1px 2px rgb(0 0 0 / 38%);
+  --shadow-2: 0 6px 20px rgb(0 0 0 / 42%);
+  --shadow-3: 0 24px 80px rgb(0 0 0 / 64%), 0 8px 24px rgb(0 0 0 / 44%);
 }
 
 /* Traditional Chinese uses the platform's CJK font; no CJK webfont ships.

@@ -58,6 +58,15 @@ export const suiteManifestSchema = z
             route: z.string().regex(routeTemplate).refine(noDoubleSlash),
           })
           .strict(),
+        z
+          .object({
+            id: z.string().regex(capabilityId),
+            kind: z.literal("accept-handoff"),
+            route: z.string().regex(routeTemplate).refine(noDoubleSlash),
+            accepts: z.tuple([z.literal("text")]),
+            maxChars: z.number().int().min(1).max(suiteLimits.handoffText),
+          })
+          .strict(),
       ]),
     ),
     links: z

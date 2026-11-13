@@ -4,13 +4,16 @@ import {
   ChevronRight,
   ExternalLink,
   Menu,
+  Moon,
   PanelLeftClose,
   PanelLeftOpen,
   Search,
+  Sun,
   UserRound,
 } from "lucide-react";
 import type { DoctorReport } from "../../shared/doctor";
 import { useT } from "../i18n";
+import { useTheme } from "../theme/useTheme";
 import type { Page } from "./AppShell";
 import { initialsOf } from "./labels";
 
@@ -88,6 +91,8 @@ export function Topbar({
   suiteTrigger,
 }: TopbarProps) {
   const t = useT("app");
+  const [theme, , toggleTheme] = useTheme();
+  const nextThemeLabel = theme === "dark" ? t.topbar.themeLight : t.topbar.themeDark;
   const commandShortcut = /Mac|iPhone|iPad|iPod/.test(navigator.platform) ? "⌘ K" : "Ctrl K";
   const readiness = presenting ? undefined : environmentReadiness(report);
   const readinessText =
@@ -177,6 +182,19 @@ export function Topbar({
             <span className="topbar-repo-text">{t.topbar.openOnGitHub}</span>
           </WebLink>
         )}
+        <button
+          type="button"
+          className="icon-button theme-toggle"
+          onClick={toggleTheme}
+          aria-label={nextThemeLabel}
+          title={nextThemeLabel}
+        >
+          {theme === "dark" ? (
+            <Sun size={16} aria-hidden="true" />
+          ) : (
+            <Moon size={16} aria-hidden="true" />
+          )}
+        </button>
         <button
           className="top-avatar"
           onClick={() => navigate("settings")}
