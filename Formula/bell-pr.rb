@@ -2,9 +2,9 @@
 class BellPr < Formula
   desc "Local workbench for AI-assisted open-source contributions"
   homepage "https://github.com/Suzu1Dev/bell-pr"
-  url "https://registry.npmjs.org/bell-pr/-/bell-pr-1.1.0.tgz"
-  version "1.1.0"
-  sha256 "ade03347aa075016436a56004f7684b7a93221eb01f52edc0d930b2c351bfec9"
+  url "https://registry.npmjs.org/bell-pr/-/bell-pr-1.2.1.tgz"
+  version "1.2.1"
+  sha256 "b8ea5fa7338cbc102b7b48856898d87547f23cad0a6c9576960816a2a17ac173"
   license "Apache-2.0"
 
   depends_on "node"
