@@ -38,13 +38,19 @@ export function TeamPage({
           { id: "review", ...t.roles.review, icon: Activity },
         ].map((agent, index) => (
           <article key={agent.id} className="team-role">
-            <span className="role-number">0{index + 1}</span>
-            <div className={`agent-avatar color-${index}`}>
-              <agent.icon size={26} />
+            <div className="team-role-lead">
+              <span className="role-number">0{index + 1}</span>
+              <div className={`agent-avatar color-${index}`}>
+                <agent.icon size={22} />
+              </div>
             </div>
-            <h2>{agent.name}</h2>
-            <strong>{agent.role}</strong>
-            <p>{agent.text}</p>
+            <div className="team-role-body">
+              <div className="team-role-head">
+                <h2>{agent.name}</h2>
+                <strong>{agent.role}</strong>
+              </div>
+              <p>{agent.text}</p>
+            </div>
             <span className="role-scope">{agent.scope}</span>
           </article>
         ))}

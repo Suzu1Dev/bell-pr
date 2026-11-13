@@ -225,6 +225,7 @@ function showSection(target: HTMLElement) {
 function SectionNav({ sections }: { sections: OverviewSection[] }) {
   const t = useT("mission").sections;
   const [current, setCurrent] = useState<OverviewSection>();
+  const picked = useRef<OverviewSection>(undefined);
   const list = useRef<HTMLUListElement>(null);
   const sectionKey = sections.join(" ");
   // On a narrow screen the links scroll sideways; keep the current one shown.
@@ -246,7 +247,12 @@ function SectionNav({ sections }: { sections: OverviewSection[] }) {
       const target = anchor.startsWith("overview-")
         ? document.getElementById(anchor)
         : null;
-      if (target) showSection(target);
+      if (target) {
+        const name = anchor.slice("overview-".length) as OverviewSection;
+        picked.current = name;
+        setCurrent(name);
+        showSection(target);
+      }
     };
     follow();
     window.addEventListener("hashchange", follow);
@@ -261,6 +267,16 @@ function SectionNav({ sections }: { sections: OverviewSection[] }) {
         for (const entry of entries)
           if (entry.isIntersecting) inView.add(entry.target.id);
           else inView.delete(entry.target.id);
+        if (picked.current) {
+          const rect = document
+            .getElementById(sectionAnchor(picked.current))
+            ?.getBoundingClientRect();
+          if (rect && rect.bottom > 72 && rect.top < window.innerHeight) {
+            setCurrent(picked.current);
+            return;
+          }
+          picked.current = undefined;
+        }
         const first = shown.find((section) => inView.has(sectionAnchor(section)));
         if (first) setCurrent(first);
       },
@@ -285,6 +301,7 @@ function SectionNav({ sections }: { sections: OverviewSection[] }) {
                 const target = document.getElementById(sectionAnchor(section));
                 if (!target) return;
                 event.preventDefault();
+                picked.current = section;
                 setCurrent(section);
                 showSection(target);
               }}

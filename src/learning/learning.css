@@ -59,19 +59,28 @@
   border: 0;
 }
 .learning-note-tip {
+  grid-column: 2;
+  grid-row: 2 / span 2;
   min-height: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 8px;
+  background: var(--color-surface-sunken);
 }
 .learning-note-tip strong {
   display: block;
+  margin-bottom: 4px;
   font-size: var(--text-2xs);
   letter-spacing: 1px;
   color: var(--color-accent-600);
 }
 .learning-note-meta {
-  display: grid;
-  grid-template-columns: auto 1fr;
+  grid-column: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   gap: 4px 10px;
-  margin-top: 12px;
+  margin: 0;
   font-size: var(--text-2xs);
   color: var(--color-text-muted);
 }
@@ -127,11 +136,17 @@
   color: var(--color-text-muted);
 }
 .note-card .note-tags {
+  grid-column: 2;
+  grid-row: 1;
+  justify-self: end;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 6px;
-  margin: 30px 0 12px;
+  margin: 0;
+}
+.note-card .note-tags:empty {
+  display: none;
 }
 .note-card .note-tags .note-tag {
   margin: 0;
@@ -153,6 +168,13 @@
   border-left: 3px solid var(--color-accent-300);
   background: var(--color-surface-sunken);
   border-radius: 0 6px 6px 0;
+}
+.note-card > .learning-own-note {
+  grid-column: 2;
+  margin: 0;
+}
+.note-card:not(:has(.learning-note-tip)) > .learning-own-note {
+  grid-column: 1 / -1;
 }
 .learning-own-note strong {
   display: block;
@@ -241,17 +263,17 @@
   font-weight: 550;
 }
 .practice-head p {
-  max-width: 760px;
+  max-width: 860px;
   margin-top: var(--space-2);
   font-size: var(--text-sm);
   line-height: 1.7;
   color: var(--color-text-muted);
 }
 .practice-card {
-  max-width: 760px;
-  padding: var(--space-6);
-  border: 1px solid var(--color-border);
-  border-radius: 9px;
+  max-width: 100%;
+  padding: var(--space-5) var(--space-6);
+  border: 1px solid var(--color-border-strong);
+  border-radius: 10px;
   background: var(--color-surface);
 }
 .practice-card-meta {
@@ -490,7 +512,7 @@
 
 /* The coach debrief: the request, the stored debriefs and the sample. */
 .debrief-request {
-  max-width: 760px;
+  max-width: 100%;
   margin-bottom: var(--space-5);
 }
 .debrief-request-row {
@@ -528,10 +550,10 @@
   gap: var(--space-4);
 }
 .debrief-card {
-  max-width: 760px;
-  padding: var(--space-6);
-  border: 1px solid var(--color-border);
-  border-radius: 9px;
+  max-width: 100%;
+  padding: var(--space-5) var(--space-6);
+  border: 1px solid var(--color-border-strong);
+  border-radius: 10px;
   background: var(--color-surface);
 }
 .debrief-meta {
@@ -626,25 +648,43 @@
 }
 .learning-run-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 19px;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 14px;
 }
 .learning-run-card {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.85fr) minmax(0, 1.4fr);
+  gap: 6px 24px;
+  align-items: start;
   min-width: 0;
-  padding: var(--space-5) var(--space-6);
-  border: 1px solid var(--color-border);
-  border-radius: 9px;
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--color-border-strong);
+  border-radius: 10px;
   background: var(--color-surface);
 }
+.learning-run-card:not(:has(> :nth-child(3):not(.learning-check-off), > :nth-child(4))) {
+  grid-template-columns: minmax(0, 1fr);
+}
+.learning-run-card > .note-number,
+.learning-run-card > h3,
+.learning-run-card > .learning-check-off {
+  grid-column: 1;
+  justify-self: start;
+}
+.learning-run-card > :not(.note-number, h3, .learning-check-off) {
+  grid-column: 2;
+  grid-row: 1 / span 3;
+  margin: 0;
+}
 .learning-run-card h3 {
-  margin: var(--space-2) 0 0;
+  margin: 0;
   font-size: var(--text-lg);
-  font-weight: 550;
+  font-weight: 600;
   overflow-wrap: anywhere;
 }
 .learning-check-off {
   display: inline-flex;
-  margin-top: var(--space-2);
+  margin-top: 2px;
   padding: 3px var(--space-2);
   border: 1px solid var(--color-warning-border);
   border-radius: var(--radius-pill);
@@ -662,13 +702,17 @@
   overflow-wrap: anywhere;
 }
 .learning-run-text {
-  margin: var(--space-3) 0 0;
+  margin: 0;
   font-size: var(--text-sm);
   color: var(--color-text-muted);
 }
-@media (max-width: 900px) {
-  .learning-run-grid {
+@media (max-width: 760px) {
+  .learning-run-card {
     grid-template-columns: minmax(0, 1fr);
+  }
+  .learning-run-card > :not(.note-number, h3, .learning-check-off) {
+    grid-column: 1;
+    grid-row: auto;
   }
 }
 

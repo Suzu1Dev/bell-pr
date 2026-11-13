@@ -103,85 +103,56 @@ export function ReposPage({
           const sample = repo.id === demoRepo.id;
           return (
             <article className="repository-card" key={repo.id}>
-              <div className="repository-card-top">
-                <span className="repo-icon">
-                  <FolderGit2 size={24} />
-                </span>
+              <span className="repo-icon" aria-hidden="true">
+                <FolderGit2 size={22} />
+              </span>
+              <div className="repository-card-main">
+                <div className="repository-card-top">
+                  <h2>{repo.name}</h2>
+                  <span className="repo-owner">{repo.owner}</span>
+                  {sample ? (
+                    <span className="demo-pill">{t.demoBadge}</span>
+                  ) : (
+                    <span className="repo-ready">
+                      <Check size={13} />
+                      {t.imported}
+                    </span>
+                  )}
+                  <div className="repository-meta">
+                    <span>
+                      <span className="language-dot" />
+                      {repo.language || t.languageFallback}
+                    </span>
+                    <span>
+                      <GitBranch size={13} />
+                      {repo.defaultBranch}
+                    </span>
+                  </div>
+                </div>
                 {sample ? (
-                  <span className="demo-pill">{t.demoBadge}</span>
+                  <p>{t.demoDescription}</p>
                 ) : (
-                  <span className="repo-ready">
-                    <Check size={13} />
-                    {t.imported}
-                  </span>
+                  <p className="repository-path" title={maskPath(repo.path)}>
+                    <span>{maskPath(repo.path)}</span>
+                  </p>
                 )}
               </div>
-              <span className="repo-owner">{repo.owner}</span>
-              <h2>{repo.name}</h2>
-              {sample ? (
-                <p>{t.demoDescription}</p>
-              ) : (
-                <p className="repository-path" title={maskPath(repo.path)}>
-                  <span>{maskPath(repo.path)}</span>
-                </p>
-              )}
-              <div className="repository-meta">
-                <span>
-                  <span className="language-dot" />
-                  {repo.language || t.languageFallback}
-                </span>
-                <span>
-                  <GitBranch size={13} />
-                  {repo.defaultBranch}
-                </span>
-              </div>
-              <button
-                className="button secondary"
-                onClick={() => {
-                  if (sample) chooseRun(demoRun.id);
-                  else {
-                    setExploreRepoId(repo.id);
-                    navigate("explore");
-                  }
-                }}
-              >
-                {sample ? t.openDemo : t.explore}
-                <ArrowUpRight size={15} />
-              </button>
-              {!sample && deleteRepository && (
-                <div className="repository-delete">
-                  {asked === repo.id ? (
-                    <div
-                      className="run-list-confirm"
-                      role="group"
-                      aria-label={t.deleteLabel({ name: repo.fullName })}
-                    >
-                      <p>{t.deleteConfirm({ name: repo.fullName })}</p>
-                      <div>
-                        <button
-                          type="button"
-                          className="button secondary"
-                          disabled={deleting}
-                          autoFocus
-                          onClick={() => {
-                            setAsked("");
-                            setError(null);
-                            focusSoon(`[data-repo-delete="${CSS.escape(repo.id)}"]`);
-                          }}
-                        >
-                          {t.deleteNo}
-                        </button>
-                        <button
-                          type="button"
-                          className="button danger"
-                          disabled={deleting}
-                          onClick={() => void remove(repo)}
-                        >
-                          {deleting ? t.deleting : t.deleteYes}
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
+              <div className="repository-card-actions">
+                <button
+                  className="button secondary"
+                  onClick={() => {
+                    if (sample) chooseRun(demoRun.id);
+                    else {
+                      setExploreRepoId(repo.id);
+                      navigate("explore");
+                    }
+                  }}
+                >
+                  {sample ? t.openDemo : t.explore}
+                  <ArrowUpRight size={15} />
+                </button>
+                {!sample && deleteRepository && asked !== repo.id && (
+                  <div className="repository-delete">
                     <button
                       type="button"
                       className="run-list-action run-list-action-danger"
@@ -196,7 +167,46 @@ export function ReposPage({
                       <Trash2 size={14} aria-hidden="true" />
                       {t.delete}
                     </button>
-                  )}
+                    {error?.id === repo.id && (
+                      <p role="alert" className="inline-error">
+                        {error.message}
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+              {!sample && deleteRepository && asked === repo.id && (
+                <div className="repository-delete">
+                  <div
+                    className="run-list-confirm"
+                    role="group"
+                    aria-label={t.deleteLabel({ name: repo.fullName })}
+                  >
+                    <p>{t.deleteConfirm({ name: repo.fullName })}</p>
+                    <div>
+                      <button
+                        type="button"
+                        className="button secondary"
+                        disabled={deleting}
+                        autoFocus
+                        onClick={() => {
+                          setAsked("");
+                          setError(null);
+                          focusSoon(`[data-repo-delete="${CSS.escape(repo.id)}"]`);
+                        }}
+                      >
+                        {t.deleteNo}
+                      </button>
+                      <button
+                        type="button"
+                        className="button danger"
+                        disabled={deleting}
+                        onClick={() => void remove(repo)}
+                      >
+                        {deleting ? t.deleting : t.deleteYes}
+                      </button>
+                    </div>
+                  </div>
                   {error?.id === repo.id && (
                     <p role="alert" className="inline-error">
                       {error.message}
@@ -211,9 +221,13 @@ export function ReposPage({
           className="repository-add"
           onClick={() => openModal("import")}
         >
-          <Plus size={27} />
-          <strong>{t.addTitle}</strong>
-          <span>{t.addText}</span>
+          <span className="repo-icon" aria-hidden="true">
+            <Plus size={22} />
+          </span>
+          <span className="repository-add-text">
+            <strong>{t.addTitle}</strong>
+            <span>{t.addText}</span>
+          </span>
         </button>
       </div>
     </section>

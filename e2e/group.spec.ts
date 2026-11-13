@@ -145,6 +145,7 @@ test.describe("two people on one group", () => {
     await ben.goto("/#/group?locale=en");
     await ben.locator("#join-code").fill("not-the-code");
     await ben.keyboard.press("Tab");
+    await ben.keyboard.press("Tab");
     const join = ben.getByRole("button", { name: en.join.submit, exact: true });
     await expect(join).toBeFocused();
     await ben.keyboard.press("Space");
