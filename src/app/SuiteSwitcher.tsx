@@ -1,7 +1,8 @@
 import { useEffect, useId, useRef } from "react";
-import { Grip, X } from "lucide-react";
+import { ChevronDown, X } from "lucide-react";
 import { product } from "../../shared/product";
 import type { SuiteLinks } from "../../shared/suite";
+import { Logo } from "../brand/Logo";
 import { useT } from "../i18n";
 import { safeLink } from "../review/MarkdownContent";
 import "./suite-switcher.css";
@@ -18,7 +19,8 @@ export function SuiteTrigger({ open, onOpen }: { open: boolean; onOpen: () => vo
       aria-expanded={open}
       onClick={onOpen}
     >
-      <Grip size={18} aria-hidden="true" />
+      <Logo variant="mark" size={18} title="" className="suite-trigger-mark" />
+      <ChevronDown size={15} aria-hidden="true" />
     </button>
   );
 }
@@ -37,6 +39,8 @@ export function SuiteSwitcher({ links, onClose }: { links: SuiteLinks; onClose: 
     { ...t.personal, href: safeLink(links.personal), current: false },
     { ...t.explain, href: safeLink(links.explain), current: false },
     { name: product.name, summary: t.prSummary, href: "", current: true },
+    { ...t.reader, href: safeLink(links.reader), current: false },
+    { ...t.campaign, href: safeLink(links.campaign), current: false },
   ];
 
   useEffect(() => {

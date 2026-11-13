@@ -60,7 +60,14 @@ export const suiteManifestSchema = z
           .strict(),
       ]),
     ),
-    links: z.object({ explain: origin.optional(), personal: origin.optional() }).strict(),
+    links: z
+      .object({
+        explain: origin.optional(),
+        personal: origin.optional(),
+        reader: origin.optional(),
+        campaign: origin.optional(),
+      })
+      .strict(),
   })
   .strict();
 
@@ -138,7 +145,11 @@ export function parseSuiteLinks(
   ];
   for (const entry of entries.split(",")) {
     const [, app, address] = /^([a-z]+)=(.+)$/.exec(entry.trim()) ?? [];
-    if ((app !== "explain" && app !== "personal") || app in links) throw invalid();
+    if (
+      (app !== "explain" && app !== "personal" && app !== "reader" && app !== "campaign") ||
+      app in links
+    )
+      throw invalid();
     if (
       !/^https?:\/\/[^/?#\\\s@*]+$/i.test(address) ||
       address.endsWith(":") ||

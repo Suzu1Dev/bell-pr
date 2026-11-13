@@ -149,6 +149,8 @@ const app = {
     explain: { name: "BELL Explain", summary: "Understanding and review" },
     /** What this product is for; its name comes from shared/product.ts. */
     prSummary: "Contributions and review",
+    reader: { name: "BELL Web Reader", summary: "Web reading and markup" },
+    campaign: { name: "BELL Campaign", summary: "Event timeline and collaboration" },
     current: "Current",
     notLinked: "Not linked",
   },

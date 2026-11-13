@@ -10,7 +10,7 @@
  * Where the other BELL products are, as origins: BELLPR_SUITE_LINKS. The
  * contract knows three products; BELL PR itself is `pr`.
  */
-export type SuiteLinks = Partial<Record<"explain" | "personal", string>>;
+export type SuiteLinks = Partial<Record<"explain" | "personal" | "reader" | "campaign", string>>;
 
 /** The contract's limits that apply to what BELL PR sends; lengths are code points. */
 export const suiteLimits = {

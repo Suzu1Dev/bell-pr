@@ -1,7 +1,18 @@
 /* The product switcher: its button at the end of the sidebar's logo row, or
    beside the menu button where the sidebar is a drawer. */
+.brand-row .suite-trigger {
+  min-height: 36px;
+}
+.brand-row .suite-trigger-mark {
+  display: none;
+}
 .breadcrumb .suite-trigger {
   display: none;
+  align-items: center;
+  gap: 4px;
+  width: auto;
+  min-height: 36px;
+  padding: 0 6px;
 }
 @media (max-width: 760px) {
   .brand-row .suite-trigger {
@@ -53,9 +64,17 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
+  min-height: 52px;
   gap: 0 var(--space-3);
-  padding: var(--space-2) var(--space-3);
+  padding: 8px 10px;
   border-radius: var(--radius-md);
+}
+:root .suite-switcher input,
+:root .suite-switcher input:focus,
+:root .suite-switcher input:focus-visible {
+  border: 0;
+  outline: none;
+  box-shadow: none;
 }
 .suite-switcher a:hover {
   background: var(--color-accent-50);

@@ -17,7 +17,7 @@ export function useSuiteLinks(): SuiteLinks | undefined {
     api<Partial<SuiteManifest> | undefined>("/suite/manifest")
       .then((manifest) => {
         const usable: SuiteLinks = {};
-        for (const id of ["explain", "personal"] as const) {
+        for (const id of ["explain", "personal", "reader", "campaign"] as const) {
           const origin = manifest?.links?.[id];
           if (typeof origin === "string" && safeLink(origin)) usable[id] = origin;
         }

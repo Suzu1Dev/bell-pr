@@ -108,6 +108,8 @@ const m: Translation<typeof en> = {
     personal: { name: "BELL Personal", summary: "今日與收件匣" },
     explain: { name: "BELL Explain", summary: "理解與複習" },
     prSummary: "貢獻與審查",
+    reader: { name: "BELL Web Reader", summary: "網頁閱讀與標註" },
+    campaign: { name: "BELL Campaign", summary: "活動時程與協作" },
     current: "目前",
     notLinked: "尚未連結",
   },

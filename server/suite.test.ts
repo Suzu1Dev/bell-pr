@@ -194,7 +194,12 @@ test("both endpoints stay behind the request guard and answer GET only", async (
 });
 
 test("the manifest names BELL PR, its feed and its links in the request's language", async (t) => {
-  const links = { explain: "http://localhost:5173", personal: "http://127.0.0.1:4400" };
+  const links = {
+    explain: "http://localhost:5173",
+    personal: "http://127.0.0.1:4400",
+    reader: "http://127.0.0.1:21104",
+    campaign: "http://127.0.0.1:21105",
+  };
   const { send } = await serve(t, [], { suiteLinks: links });
   const manifest = async (locale: string) =>
     JSON.parse((await send("/api/suite/manifest", { "x-bell-locale": locale })).text);

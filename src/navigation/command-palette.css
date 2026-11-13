@@ -201,7 +201,9 @@
 .command-palette-search input::placeholder {
   color: var(--color-text-muted);
 }
+:root .command-palette-search input:focus,
 :root .command-palette-search input:focus-visible {
+  outline: none;
   box-shadow: none;
 }
 .command-palette-search:focus-within {

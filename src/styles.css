@@ -127,14 +127,14 @@ button {
   align-items: center;
   justify-content: space-between;
   gap: var(--space-1) 8px;
-  min-height: 35px;
+  min-height: 36px;
   margin-bottom: 32px;
   padding: 0 2px 0 12px;
 }
 .brand {
   display: flex;
   align-items: center;
-  height: 35px;
+  height: 36px;
   border-radius: 6px;
 }
 .brand-mark {
