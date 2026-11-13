@@ -31,6 +31,8 @@ software. The marks are described in
   modified version of the software.
 - A name or logo that is confusingly similar to ours.
 - Selling or distributing a **modified** version under the BELL PR name.
+- Offering a hosted, managed, or commercial cloud service under the "BELL PR",
+  "BELL", "BELL Suite", or "Bell1Dev" name or logo.
 - Anything that suggests the project endorses, certifies or is affiliated
   with you.
 

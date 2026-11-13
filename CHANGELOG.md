@@ -7,7 +7,23 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.2.1] - 2026-11-13
+
 ### Added
+
+- **BELL Suite edition (`--suite` / `BELLPR_EDITION=suite`) and five-app
+  handoffs.** Runs standalone by default (`bell-pr`) or inside the shared
+  Direction C `Precise` frame (`bell-pr --suite`) with the searchable
+  five-product `SuiteSwitcher` (`⌃1`–`⌃5`) and zero-write cross-tool
+  handoffs across BELL Personal, BELL Explain, BELL PR, BELL Web Reader, and
+  BELL Campaign.
+- **Light and Dark color modes.** Preserves BELL PR's botanical emerald
+  light palette while adding an obsidian-and-mint dark theme (`Follow
+  system`, `Light`, `Dark`) synced across standalone and BELL Suite
+  deployments.
+- **Interactive module architecture flow diagram, horizontal card layout,
+  and email-link member invites.** Redesigned project background module
+  flow, dense prose hierarchy, and member/account management surfaces.
 
 - **A local import whose origin had credentials shows what to do next.**
   The project list and the project page say to replace OWNER and REPO,
