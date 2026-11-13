@@ -7,6 +7,22 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.2.2] - 2026-11-13
+
+### Fixed
+
+- **Reviewability card horizontal alignment in the PR Draft workspace.**
+  Added matching horizontal margins to `.draft-workspace > .reviewability` so
+  "How reviewable is this change?" aligns flush with sibling cards across
+  standalone and BELL Suite editions.
+- **Project background layout, spacing, and heading hierarchy.** Fixed
+  `<details class="mission-context">` child vertical rhythm across the sticky
+  nav, stale-file notice, project card, and section headings; added a
+  `FolderGit2` icon and matched `"Project background"` heading proportions
+  (`19px` desktop / `17px` mobile) to sibling section titles; trimmed redundant
+  repo update helper copy; and fixed `.mission-update-help` CSS specificity
+  so helper text renders at `--text-2xs` (`11px`).
+
 ## [1.2.1] - 2026-11-13
 
 ### Added
