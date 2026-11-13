@@ -17,7 +17,7 @@ const m: Translation<typeof en> = {
     update: "更新到最新版本",
     updating: "正在更新…",
     updateHelp: ({ branch, updatedAt }) =>
-      `從 GitHub 取得 ${branch} 的最新版本，供專案全貌與分析使用。不論是否更新，新的貢獻都從最新版本開始。${updatedAt ? ` 上次更新：${updatedAt}` : ""}`,
+      `同步 ${branch} 供專案分析${updatedAt ? ` · 上次更新：${updatedAt}` : ""}`,
     analyze: "分析專案全貌",
     reanalyze: "重新分析",
     analyzing: "正在分析專案…",

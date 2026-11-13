@@ -13,6 +13,7 @@ import {
   Eye,
   EyeOff,
   FileSearch,
+  FolderGit2,
   FolderTree,
   GitBranch,
   Globe,
@@ -1591,7 +1592,10 @@ export function ProjectOverview({
         <summary>{t.overview.background}</summary>
       <div className="mission-overview-heading">
         <div>
-          <h2>{t.overview.title}</h2>
+          <h2>
+            <FolderGit2 size={20} aria-hidden="true" />
+            {t.overview.title}
+          </h2>
         </div>
         <div className="mission-overview-actions">
           {onUpdateRepo && (

@@ -44,7 +44,7 @@ const mission = {
       branch: string;
       updatedAt?: string;
     }) =>
-      `Fetches the latest ${branch} from GitHub for the overview and analysis. New contributions start from the latest version either way.${updatedAt ? ` Last updated: ${updatedAt}` : ""}`,
+      `Syncs ${branch} for the overview analysis${updatedAt ? ` · Last updated: ${updatedAt}` : ""}`,
     analyze: "Analyze the project",
     reanalyze: "Re-analyze",
     analyzing: "Analyzing the project…",

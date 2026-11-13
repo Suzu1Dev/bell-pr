@@ -67,11 +67,21 @@
   align-items: center;
   gap: 20px;
 }
+.mission-overview-heading {
+  align-items: flex-start;
+}
 .mission-overview-heading h2 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   font-size: 25px;
   line-height: 1.45;
   letter-spacing: -0.6px;
-  margin: 8px 0 6px;
+  margin: 2px 0 0;
+}
+.mission-overview-heading h2 svg {
+  color: var(--color-text-muted);
+  flex-shrink: 0;
 }
 .mission-overview-heading p,
 .mission-section-heading p {
@@ -2579,9 +2589,13 @@
 .mission-context {
   border: 1px solid var(--color-border);
   border-radius: 10px;
+  padding: 16px 20px;
+  margin-block: 0;
+  min-width: 0;
+}
+.mission-form-details {
   padding: 14px 16px;
   margin-block: 16px;
-  min-width: 0;
 }
 .mission-form-details > summary,
 .mission-context > summary {
@@ -2597,8 +2611,52 @@
   color: var(--color-text-secondary);
   overflow-wrap: anywhere;
 }
-.mission-form-details[open] > summary,
-.mission-context[open] > summary { margin-bottom: 16px; }
+.mission-form-details[open] > summary { margin-bottom: 16px; }
+/* <details> wraps non-summary children inside ::details-content, so flex gap on <details> is ignored; use child margins instead. */
+.mission-context[open] {
+  padding-bottom: 24px;
+}
+.mission-context[open] > summary {
+  margin-bottom: 18px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+.mission-context > :not(summary) + :not(summary) {
+  margin-top: 24px;
+}
+.mission-context > .mission-overview-heading {
+  margin-top: 0;
+}
+.mission-context > .mission-section-nav {
+  margin-top: 16px;
+  margin-bottom: 0;
+}
+.mission-context > .mission-alert {
+  margin-top: 16px;
+}
+.mission-context > .mission-alert + .mission-alert {
+  margin-top: 12px;
+}
+.mission-context > :is(.mission-journey, .mission-reading-path, .mission-recommendations) {
+  margin-top: 32px;
+}
+@media (max-width: 560px) {
+  .mission-context {
+    padding: 14px 16px;
+  }
+  .mission-context[open] {
+    padding-bottom: 20px;
+  }
+  .mission-context > :not(summary) + :not(summary) {
+    margin-top: 20px;
+  }
+  .mission-context > .mission-alert {
+    margin-top: 14px;
+  }
+  .mission-context > :is(.mission-journey, .mission-reading-path, .mission-recommendations) {
+    margin-top: 24px;
+  }
+}
 .mission-before-after:has(> article:only-child),
 .mission-contribution-reason:has(> div:only-child) { grid-template-columns: minmax(0, 1fr); }
 
