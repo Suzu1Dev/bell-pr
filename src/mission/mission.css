@@ -73,11 +73,11 @@
 .mission-overview-heading h2 {
   display: flex;
   align-items: center;
-  gap: 10px;
-  font-size: 25px;
-  line-height: 1.45;
-  letter-spacing: -0.6px;
-  margin: 2px 0 0;
+  gap: 8px;
+  font-size: 19px;
+  line-height: 1.5;
+  letter-spacing: -0.25px;
+  margin: 6px 0 0;
 }
 .mission-overview-heading h2 svg {
   color: var(--color-text-muted);
@@ -2070,7 +2070,7 @@
     gap: 16px;
   }
   .mission-overview-heading h2 {
-    font-size: 23px;
+    margin-top: 0;
   }
   .mission-project-card {
     padding: 22px 20px 17px;
@@ -2118,7 +2118,7 @@
     gap: 24px;
   }
   .mission-overview-heading h2 {
-    font-size: 21px;
+    font-size: 17px;
   }
   .mission-overview-heading > .mission-button {
     align-self: flex-start;

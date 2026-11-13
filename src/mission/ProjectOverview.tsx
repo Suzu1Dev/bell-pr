@@ -1593,7 +1593,7 @@ export function ProjectOverview({
       <div className="mission-overview-heading">
         <div>
           <h2>
-            <FolderGit2 size={20} aria-hidden="true" />
+            <FolderGit2 size={18} aria-hidden="true" />
             {t.overview.title}
           </h2>
         </div>
