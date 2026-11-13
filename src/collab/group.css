@@ -11,6 +11,7 @@
 .group-people {
   position: relative;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--space-2);
 }
@@ -75,16 +76,216 @@
 }
 /* A state shown as one card (join, first set-up, stopped, off) stays readable. */
 .group-page > .settings-card {
-  max-width: 30rem;
+  max-width: 34rem;
 }
 /* A card that opens with a field: the card's own padding is enough above it. */
 .group-page .settings-card > .field-label:first-child {
   margin-top: 0;
 }
-/* The invite code in the dialog, in large type. */
-.group-page .modal code {
-  font-size: var(--text-2xl);
+/* Short classic invite/pairing codes only — never member chips or long URLs. */
+.group-invite-code code {
+  font-size: var(--text-xl);
   text-align: center;
+  letter-spacing: 0.04em;
+}
+/* Member & account management dialogs: wide single-line directory and clean 2-column forms. */
+.group-members-modal {
+  width: min(920px, 100%);
+  padding: var(--space-7) var(--space-8);
+}
+.group-account-modal {
+  width: min(560px, 100%);
+}
+.group-panel-card {
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-sunken);
+}
+.group-panel-card + .group-panel-card,
+.group-admin-bar + .group-panel-card {
+  margin-top: var(--space-3);
+}
+.group-card-heading {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-text);
+}
+.group-inline-form {
+  display: flex;
+  align-items: stretch;
+  gap: var(--space-2);
+}
+.group-inline-form .text-input {
+  flex: 1;
+  min-width: 0;
+}
+.group-inline-form .button {
+  flex: none;
+  white-space: nowrap;
+}
+.group-admin-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3) var(--space-4);
+}
+.group-admin-grid .field-label {
+  margin-top: 0;
+}
+.group-account-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+.group-account-meta {
+  min-width: 0;
+  flex: 1;
+  display: grid;
+  gap: var(--space-1);
+}
+.group-account-fields {
+  margin-bottom: var(--space-2);
+}
+.group-admin-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-3);
+  margin-bottom: var(--space-3);
+}
+.group-admin-stats,
+.group-admin-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+.group-create-role,
+.group-edit-actions {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+.group-create-role label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--color-text);
+  cursor: pointer;
+  padding-bottom: var(--space-2);
+}
+.group-edit-actions {
+  justify-content: flex-end;
+}
+.group-member-table {
+  margin: var(--space-3) 0 0;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  overflow: hidden;
+}
+.group-member-head,
+.group-member-line {
+  display: grid;
+  grid-template-columns: 168px minmax(0, 1fr) 112px 232px;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+}
+.group-member-head {
+  padding-block: var(--space-2);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface-sunken);
+  color: var(--color-text-muted);
+  font-size: var(--text-2xs);
+  font-weight: 600;
+}
+.group-member-head > :last-child {
+  text-align: right;
+}
+.group-member-item + .group-member-item {
+  border-top: 1px solid var(--color-border-subtle);
+}
+.group-member-item.is-disabled .group-member-line {
+  background: var(--color-bg);
+}
+.group-member-who {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.group-member-who strong {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.group-member-acct {
+  margin: 0;
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.group-member-acct.is-empty {
+  font-family: var(--font-sans);
+  color: var(--color-text-muted);
+}
+.group-member-badges,
+.group-member-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+.group-member-actions {
+  justify-content: flex-end;
+}
+.group-member-actions .button,
+.group-admin-tools .button {
+  padding: 5px 10px;
+  font-size: var(--text-xs);
+  min-height: 30px;
+}
+.group-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 2px var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-sunken);
+  color: var(--color-text-secondary);
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+.group-pill.is-admin {
+  border-color: var(--color-brand-200);
+  background: var(--color-brand-50);
+  color: var(--color-brand-700);
+}
+.group-pill.is-disabled {
+  border-color: var(--color-danger-border);
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+}
+.group-member-edit {
+  padding: var(--space-4);
+  border-top: 1px solid var(--color-border-subtle);
+  background: var(--color-surface-sunken);
 }
 .group-dependencies {
   min-width: 0;
@@ -127,6 +328,32 @@
   padding: var(--space-3) var(--space-4);
 }
 @media (max-width: 760px) {
+  .group-members-modal {
+    padding: var(--space-5);
+  }
+  .group-admin-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .group-inline-form {
+    flex-direction: column;
+  }
+  .group-member-head {
+    display: none;
+  }
+  .group-member-line {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: var(--space-2);
+  }
+  .group-member-acct {
+    grid-column: 1 / -1;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+  .group-member-actions {
+    grid-column: 1 / -1;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+  }
   .group-hold {
     grid-template-columns: 32px minmax(0, 1fr) auto;
   }

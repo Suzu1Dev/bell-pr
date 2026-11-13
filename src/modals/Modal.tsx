@@ -8,6 +8,7 @@ export function Modal({
   children,
   onClose,
   wide = false,
+  className,
   mark,
 }: {
   title: string;
@@ -15,6 +16,7 @@ export function Modal({
   children: ReactNode;
   onClose: () => void;
   wide?: boolean;
+  className?: string;
   /** The picture above the title; a pull request icon by default. */
   mark?: ReactNode;
 }) {
@@ -71,7 +73,7 @@ export function Modal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="modal-title"
-        className={`modal ${wide ? "modal-wide" : ""}`}
+        className={["modal", wide && "modal-wide", className].filter(Boolean).join(" ")}
       >
         <button
           className="icon-button modal-close"

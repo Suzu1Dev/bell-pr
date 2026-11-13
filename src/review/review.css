@@ -657,12 +657,6 @@
   background: var(--color-surface-sunken);
   box-shadow: var(--shadow-2);
 }
-.explain-panel .explain-example-intro {
-  margin: -4px 0 18px;
-  color: var(--color-text-muted);
-  font-size: var(--text-2xs);
-  line-height: 1.8;
-}
 .explain-example-label {
   display: block;
   margin-bottom: 6px;

@@ -269,32 +269,50 @@ export function PairPage({
                   autoCapitalize="off"
                   onChange={(event) => setEmail(event.target.value)}
                 />
-                <label htmlFor="pair-member-name">{t.team.displayName}</label>
+                <div className="pair-grid">
+                  <div>
+                    <label htmlFor="pair-member-name">{t.team.displayName}</label>
+                    <input
+                      id="pair-member-name"
+                      value={memberName}
+                      maxLength={40}
+                      autoComplete="name"
+                      onChange={(event) => setMemberName(event.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="pair-username">{t.team.usernameOptional}</label>
+                    <input
+                      id="pair-username"
+                      value={username}
+                      onChange={(event) => setUsername(event.target.value)}
+                      maxLength={32}
+                      placeholder="a-z, 0-9, _, -"
+                      autoComplete="username"
+                      autoCapitalize="off"
+                    />
+                  </div>
+                </div>
+              </>
+            )}
+            {mode === "login" && (
+              <>
+                <label htmlFor="pair-username">{t.team.username}</label>
                 <input
-                  id="pair-member-name"
-                  value={memberName}
-                  maxLength={40}
-                  autoComplete="name"
-                  onChange={(event) => setMemberName(event.target.value)}
+                  id="pair-username"
+                  value={username}
+                  onChange={(event) => setUsername(event.target.value)}
+                  required
+                  minLength={2}
+                  maxLength={160}
+                  placeholder={t.team.usernameHint}
+                  autoComplete="username"
+                  autoCapitalize="off"
                 />
               </>
             )}
             {(mode === "login" || mode === "register") && (
               <>
-                <label htmlFor="pair-username">
-                  {mode === "register" ? t.team.usernameOptional : t.team.username}
-                </label>
-                <input
-                  id="pair-username"
-                  value={username}
-                  onChange={(event) => setUsername(event.target.value)}
-                  required={mode === "login"}
-                  minLength={mode === "login" ? 2 : undefined}
-                  maxLength={mode === "login" ? 160 : 32}
-                  placeholder={t.team.usernameHint}
-                  autoComplete="username"
-                  autoCapitalize="off"
-                />
                 <label htmlFor="pair-password">{t.team.password}</label>
                 <input
                   id="pair-password"

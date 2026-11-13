@@ -679,6 +679,7 @@ export function InviteDialog({
   return (
     <Modal
       key={invite ? "code" : "name"}
+      className="group-account-modal"
       title={
         invite
           ? isLink
@@ -707,11 +708,13 @@ export function InviteDialog({
     >
       {invite ? (
         <>
-          <CopyCommand
-            command={isLink ? shareUrl : invite.code}
-            label={isLink ? words.linkLabel : t.join.code}
-            copyLabel={isLink ? words.copyLink : words.copy}
-          />
+          <div className={isLink ? undefined : "group-invite-code"}>
+            <CopyCommand
+              command={isLink ? shareUrl : invite.code}
+              label={isLink ? words.linkLabel : t.join.code}
+              copyLabel={isLink ? words.copyLink : words.copy}
+            />
+          </div>
           <div className="modal-actions">
             {mailtoHref && (
               <a className="button secondary" href={mailtoHref}>
@@ -725,45 +728,54 @@ export function InviteDialog({
         </>
       ) : (
         <form onSubmit={create}>
-          <div className="group-admin-create">
-            <h3>{words.emailHeading}</h3>
+          <div className="group-panel-card">
+            <h3 className="group-card-heading">{words.emailHeading}</h3>
             <label className="field-label" htmlFor="invite-email">
               {words.email}
             </label>
-            <input
-              className="text-input"
-              id="invite-email"
-              type="email"
-              value={email}
-              maxLength={160}
-              placeholder={words.emailPlaceholder}
-              autoComplete="off"
-              autoCapitalize="off"
-              onChange={(event) => setEmail(event.target.value)}
-            />
+            <div className="group-inline-form">
+              <input
+                className="text-input"
+                id="invite-email"
+                type="email"
+                value={email}
+                maxLength={160}
+                placeholder={words.emailPlaceholder}
+                autoComplete="off"
+                autoCapitalize="off"
+                onChange={(event) => setEmail(event.target.value)}
+              />
+              <button
+                type="button"
+                className="button primary"
+                aria-disabled={request.busy}
+                disabled={Boolean(email.trim() && !email.includes("@"))}
+                onClick={createLink}
+              >
+                {words.createLink}
+              </button>
+            </div>
             <p className="field-help">{words.emailHelp}</p>
-            <button
-              type="button"
-              className="button primary"
-              aria-disabled={request.busy}
-              disabled={Boolean(email.trim() && !email.includes("@"))}
-              onClick={createLink}
-            >
-              {words.createLink}
-            </button>
           </div>
-          <h3>{words.codeHeading}</h3>
-          <label className="field-label" htmlFor="invite-name">
-            {words.name} <span>{t.shownOnBoard}</span>
-          </label>
-          <input
-            className="text-input"
-            id="invite-name"
-            value={name}
-            maxLength={40}
-            autoComplete="off"
-            onChange={(event) => setName(event.target.value)}
-          />
+          <div className="group-panel-card">
+            <h3 className="group-card-heading">{words.codeHeading}</h3>
+            <label className="field-label" htmlFor="invite-name">
+              {words.name} <span>{t.shownOnBoard}</span>
+            </label>
+            <div className="group-inline-form">
+              <input
+                className="text-input"
+                id="invite-name"
+                value={name}
+                maxLength={40}
+                autoComplete="off"
+                onChange={(event) => setName(event.target.value)}
+              />
+              <button className="button secondary" aria-disabled={request.busy} disabled={!name.trim()}>
+                {words.create}
+              </button>
+            </div>
+          </div>
           <div className="draft-task-items">
             <label>
               <input
@@ -785,9 +797,6 @@ export function InviteDialog({
             <button type="button" className="button secondary" onClick={onClose}>
               {actions.cancel}
             </button>
-            <button className="button primary" aria-disabled={request.busy} disabled={!name.trim()}>
-              {words.create}
-            </button>
           </div>
         </form>
       )}
@@ -795,15 +804,40 @@ export function InviteDialog({
   );
 }
 
-/** Member self-service dialog to set or update their own email/username/password. */
-function AccountDialog({ store, me, onClose }: { store: Store; me: Me; onClose: () => void }) {
+/** Member self-service dialog to set or update their own display name, email, username or password. */
+export function AccountDialog({
+  store,
+  me,
+  onClose,
+}: {
+  store: Pick<Store, "call" | "reload">;
+  me: Me;
+  onClose: () => void;
+}) {
   const t = useT("collab");
   const actions = useT("common").actions;
+  const [displayName, setDisplayName] = useState(me.name);
   const [email, setEmail] = useState(me.email ?? "");
   const [username, setUsername] = useState(me.username ?? "");
   const [password, setPassword] = useState("");
   const [saved, setSaved] = useState(false);
   const request = useRequest();
+
+  const accountSummary = [
+    me.email,
+    me.username ? `@${me.username}` : "",
+    me.tailscaleLogin && me.tailscaleLogin !== me.email ? `Tailscale: ${me.tailscaleLogin}` : "",
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
+  const hasChanges =
+    displayName.trim() !== me.name ||
+    email.trim() !== (me.email ?? "") ||
+    (Boolean(username.trim()) && username.trim() !== (me.username ?? "")) ||
+    password.length >= 8;
+
+  const invalidInput = !displayName.trim() || (Boolean(password) && password.length < 8);
 
   const save = (event: FormEvent) => {
     event.preventDefault();
@@ -812,8 +846,13 @@ function AccountDialog({ store, me, onClose }: { store: Store; me: Me; onClose: 
       await store.call(
         `/people/${encodeURIComponent(me.id)}`,
         send("PATCH", {
+          ...(displayName.trim() && displayName.trim() !== me.name
+            ? { name: displayName.trim() }
+            : {}),
           ...(email.trim() !== (me.email ?? "") ? { email: email.trim() || null } : {}),
-          ...(username.trim() ? { username: username.trim() } : {}),
+          ...(username.trim() && username.trim() !== (me.username ?? "")
+            ? { username: username.trim() }
+            : {}),
           ...(password ? { password } : {}),
         }),
       );
@@ -825,54 +864,97 @@ function AccountDialog({ store, me, onClose }: { store: Store; me: Me; onClose: 
 
   return (
     <Modal
+      className="group-account-modal"
       title={t.accountDialog.title}
       subtitle={t.accountDialog.subtitle}
       mark={<KeyRound size={22} />}
       onClose={onClose}
     >
+      <div className="group-panel-card group-account-head">
+        <span className="profile-avatar" aria-hidden="true">
+          {initials(displayName.trim() || me.name)}
+        </span>
+        <div className="group-account-meta">
+          <div className="group-member-who">
+            <strong>{displayName.trim() || me.name}</strong>
+            <span className={`group-pill${me.admin ? " is-admin" : ""}`}>
+              {me.admin ? t.adminDialog.roleAdmin : t.adminDialog.roleMember}
+            </span>
+          </div>
+          <p className={`group-member-acct${accountSummary ? "" : " is-empty"}`}>
+            {accountSummary || t.accountDialog.noLoginYet}
+          </p>
+        </div>
+      </div>
       <form onSubmit={save}>
-        <label className="field-label" htmlFor="my-account-email">
-          {t.auth.email}
-        </label>
-        <input
-          className="text-input"
-          id="my-account-email"
-          type="email"
-          value={email}
-          maxLength={160}
-          placeholder={t.auth.emailPlaceholder}
-          autoComplete="email"
-          autoCapitalize="off"
-          onChange={(event) => setEmail(event.target.value)}
-        />
-        <label className="field-label" htmlFor="my-account-username">
-          {t.auth.username}
-        </label>
-        <input
-          className="text-input"
-          id="my-account-username"
-          value={username}
-          maxLength={32}
-          placeholder={t.auth.usernamePlaceholder}
-          autoComplete="username"
-          autoCapitalize="off"
-          onChange={(event) => setUsername(event.target.value)}
-        />
-        <label className="field-label" htmlFor="my-account-password">
-          {t.auth.password}
-        </label>
-        <input
-          className="text-input"
-          id="my-account-password"
-          type="password"
-          value={password}
-          maxLength={128}
-          placeholder={t.auth.passwordPlaceholder}
-          autoComplete="new-password"
-          onChange={(event) => setPassword(event.target.value)}
-        />
+        <div className="group-admin-grid group-account-fields">
+          <div>
+            <label className="field-label" htmlFor="my-account-name">
+              {t.adminDialog.displayName}
+            </label>
+            <input
+              className="text-input"
+              id="my-account-name"
+              value={displayName}
+              maxLength={40}
+              autoComplete="name"
+              onChange={(event) => setDisplayName(event.target.value)}
+            />
+          </div>
+          <div>
+            <label className="field-label" htmlFor="my-account-username">
+              {t.auth.username}
+            </label>
+            <input
+              className="text-input"
+              id="my-account-username"
+              value={username}
+              maxLength={32}
+              placeholder={t.auth.usernamePlaceholder}
+              autoComplete="username"
+              autoCapitalize="off"
+              onChange={(event) => setUsername(event.target.value)}
+            />
+          </div>
+          <div>
+            <label className="field-label" htmlFor="my-account-email">
+              {t.auth.email}
+            </label>
+            <input
+              className="text-input"
+              id="my-account-email"
+              type="email"
+              value={email}
+              maxLength={160}
+              placeholder={t.auth.emailPlaceholder}
+              autoComplete="email"
+              autoCapitalize="off"
+              onChange={(event) => setEmail(event.target.value)}
+            />
+          </div>
+          <div>
+            <label className="field-label" htmlFor="my-account-password">
+              {t.auth.password}
+            </label>
+            <input
+              className="text-input"
+              id="my-account-password"
+              type="password"
+              value={password}
+              maxLength={128}
+              placeholder={
+                me.email || me.username
+                  ? t.accountDialog.passwordHint
+                  : t.auth.passwordPlaceholder
+              }
+              autoComplete="new-password"
+              onChange={(event) => setPassword(event.target.value)}
+            />
+          </div>
+        </div>
+        <p className="field-help">{t.accountDialog.loginNote}</p>
         {saved && (
-          <p className="field-help" role="status">
+          <p className="settings-feedback" role="status">
             {t.accountDialog.saved}
           </p>
         )}
@@ -888,9 +970,7 @@ function AccountDialog({ store, me, onClose }: { store: Store; me: Me; onClose: 
           <button
             className="button primary"
             aria-disabled={request.busy}
-            disabled={
-              email.trim() === (me.email ?? "") && !username.trim() && password.length < 8
-            }
+            disabled={!hasChanges || invalidInput}
           >
             {t.accountDialog.save}
           </button>
@@ -900,13 +980,26 @@ function AccountDialog({ store, me, onClose }: { store: Store; me: Me; onClose: 
   );
 }
 
-/** Admin dialog to create accounts, assign admin roles, link Tailscale or disable/remove members. */
-function AdminMembersDialog({ store, me, onClose }: { store: Store; me: Me; onClose: () => void }) {
+/** Admin dialog to inspect members on single lines, edit roles/credentials, add accounts or pair devices. */
+export function AdminMembersDialog({
+  store,
+  me,
+  initialMembers = [],
+  onClose,
+}: {
+  store: Pick<Store, "call" | "reload">;
+  me: Me;
+  initialMembers?: CollabMemberRecord[];
+  onClose: () => void;
+}) {
   const t = useT("collab");
   const actions = useT("common").actions;
   const words = t.adminDialog;
-  const [members, setMembers] = useState<CollabMemberRecord[]>([]);
+  const [members, setMembers] = useState<CollabMemberRecord[]>(initialMembers);
+  const [showCreate, setShowCreate] = useState(false);
+  const [showPair, setShowPair] = useState(false);
   const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [tailscaleLogin, setTailscaleLogin] = useState("");
@@ -973,17 +1066,20 @@ function AdminMembersDialog({ store, me, onClose }: { store: Store; me: Me; onCl
         "/people",
         send("POST", {
           name: name.trim(),
-          username: username.trim(),
+          ...(email.trim() ? { email: email.trim() } : {}),
+          ...(username.trim() ? { username: username.trim() } : {}),
           password,
           ...(admin ? { admin: true } : {}),
           ...(tailscaleLogin.trim() ? { tailscaleLogin: tailscaleLogin.trim() } : {}),
         }),
       );
       setName("");
+      setEmail("");
       setUsername("");
       setPassword("");
       setTailscaleLogin("");
       setAdmin(false);
+      setShowCreate(false);
       await load();
       store.reload();
     });
@@ -1003,263 +1099,361 @@ function AdminMembersDialog({ store, me, onClose }: { store: Store; me: Me; onCl
       store.reload();
     });
 
+  const adminCount = members.filter((item) => item.admin && !item.disabled).length;
+  const canCreate =
+    Boolean(name.trim()) &&
+    (Boolean(username.trim()) || email.trim().includes("@")) &&
+    password.length >= 8;
+
   return (
     <Modal
+      wide
+      className="group-members-modal"
       title={words.title}
       subtitle={words.subtitle}
       mark={<Users size={22} />}
       onClose={onClose}
     >
-      <form className="group-admin-create" onSubmit={createMember}>
-        <h3>{words.createHeading}</h3>
-        <div className="group-admin-grid">
-          <div>
-            <label className="field-label" htmlFor="admin-member-name">
-              {words.displayName}
-            </label>
-            <input
-              className="text-input"
-              id="admin-member-name"
-              value={name}
-              maxLength={40}
-              onChange={(event) => setName(event.target.value)}
-            />
-          </div>
-          <div>
-            <label className="field-label" htmlFor="admin-member-username">
-              {t.auth.username}
-            </label>
-            <input
-              className="text-input"
-              id="admin-member-username"
-              value={username}
-              maxLength={32}
-              placeholder={t.auth.usernamePlaceholder}
-              autoCapitalize="off"
-              onChange={(event) => setUsername(event.target.value)}
-            />
-          </div>
-          <div>
-            <label className="field-label" htmlFor="admin-member-password">
-              {t.auth.password}
-            </label>
-            <input
-              className="text-input"
-              id="admin-member-password"
-              type="password"
-              value={password}
-              maxLength={128}
-              placeholder={t.auth.passwordPlaceholder}
-              onChange={(event) => setPassword(event.target.value)}
-            />
-          </div>
-          <div>
-            <label className="field-label" htmlFor="admin-member-ts">
-              {words.tailscaleLabel}
-            </label>
-            <input
-              className="text-input"
-              id="admin-member-ts"
-              value={tailscaleLogin}
-              maxLength={120}
-              placeholder={words.tailscalePlaceholder}
-              autoCapitalize="off"
-              onChange={(event) => setTailscaleLogin(event.target.value)}
-            />
-          </div>
+      <div className="group-admin-bar">
+        <div className="group-admin-stats">
+          <span className="group-pill">
+            {words.summary({ total: members.length, admins: adminCount })}
+          </span>
         </div>
-        <div className="draft-task-items">
-          <label>
-            <input
-              type="checkbox"
-              checked={admin}
-              onChange={(event) => setAdmin(event.target.checked)}
-            />
-            <span>{words.roleAdmin}</span>
-          </label>
+        <div className="group-admin-tools">
+          <button
+            type="button"
+            className={`button ${showPair ? "primary" : "secondary"}`}
+            aria-expanded={showPair}
+            onClick={() => setShowPair((open) => !open)}
+          >
+            {words.togglePair}
+          </button>
+          <button
+            type="button"
+            className={`button ${showCreate ? "primary" : "secondary"}`}
+            aria-expanded={showCreate}
+            onClick={() => setShowCreate((open) => !open)}
+          >
+            <UserPlus size={14} aria-hidden="true" />
+            {words.toggleCreate}
+          </button>
         </div>
-        <button
-          className="button primary"
-          aria-disabled={request.busy}
-          disabled={!name.trim() || !username.trim() || password.length < 8}
-        >
-          {words.createSubmit}
-        </button>
-      </form>
-      <div className="group-admin-members">
-        <h3>{words.membersHeading}</h3>
-        {request.error && (
-          <p className="inline-error" role="alert">
-            {request.error}
-          </p>
-        )}
+      </div>
+
+      {showPair && (
+        <div className="group-panel-card">
+          <div className="group-admin-bar">
+            <div>
+              <h3 className="group-card-heading">{words.pairHeading}</h3>
+              <p className="field-help">{words.pairHelp}</p>
+            </div>
+            <button
+              type="button"
+              className="button secondary"
+              aria-disabled={request.busy}
+              onClick={createPairCode}
+            >
+              {words.pairCreate}
+            </button>
+          </div>
+          {pairCreated && (
+            <div className="group-invite-code">
+              <CopyCommand command={pairCreated.code} />
+            </div>
+          )}
+        </div>
+      )}
+
+      {showCreate && (
+        <form className="group-panel-card" onSubmit={createMember}>
+          <h3 className="group-card-heading">{words.createHeading}</h3>
+          <div className="group-admin-grid">
+            <div>
+              <label className="field-label" htmlFor="admin-member-name">
+                {words.displayName}
+              </label>
+              <input
+                className="text-input"
+                id="admin-member-name"
+                value={name}
+                maxLength={40}
+                onChange={(event) => setName(event.target.value)}
+              />
+            </div>
+            <div>
+              <label className="field-label" htmlFor="admin-member-email">
+                {t.auth.email}
+              </label>
+              <input
+                className="text-input"
+                id="admin-member-email"
+                type="email"
+                value={email}
+                maxLength={160}
+                placeholder={t.auth.emailPlaceholder}
+                autoCapitalize="off"
+                onChange={(event) => setEmail(event.target.value)}
+              />
+            </div>
+            <div>
+              <label className="field-label" htmlFor="admin-member-username">
+                {t.auth.username}
+              </label>
+              <input
+                className="text-input"
+                id="admin-member-username"
+                value={username}
+                maxLength={32}
+                placeholder={t.auth.usernamePlaceholder}
+                autoCapitalize="off"
+                onChange={(event) => setUsername(event.target.value)}
+              />
+            </div>
+            <div>
+              <label className="field-label" htmlFor="admin-member-password">
+                {t.auth.password}
+              </label>
+              <input
+                className="text-input"
+                id="admin-member-password"
+                type="password"
+                value={password}
+                maxLength={128}
+                placeholder={t.auth.passwordPlaceholder}
+                onChange={(event) => setPassword(event.target.value)}
+              />
+            </div>
+            <div>
+              <label className="field-label" htmlFor="admin-member-ts">
+                {words.tailscaleLabel}
+              </label>
+              <input
+                className="text-input"
+                id="admin-member-ts"
+                value={tailscaleLogin}
+                maxLength={120}
+                placeholder={words.tailscalePlaceholder}
+                autoCapitalize="off"
+                onChange={(event) => setTailscaleLogin(event.target.value)}
+              />
+            </div>
+            <div className="group-create-role">
+              <label>
+                <input
+                  type="checkbox"
+                  checked={admin}
+                  onChange={(event) => setAdmin(event.target.checked)}
+                />
+                <span>{words.roleAdmin}</span>
+              </label>
+              <button
+                className="button primary"
+                aria-disabled={request.busy}
+                disabled={!canCreate}
+              >
+                {words.createSubmit}
+              </button>
+            </div>
+          </div>
+        </form>
+      )}
+
+      {request.error && (
+        <p className="inline-error" role="alert">
+          {request.error}
+        </p>
+      )}
+
+      <div className="group-member-table" role="region" aria-label={words.membersHeading}>
+        <div className="group-member-head" aria-hidden="true">
+          <span>{words.colMember}</span>
+          <span>{words.colAccount}</span>
+          <span>{words.colRole}</span>
+          <span>{words.colActions}</span>
+        </div>
         <ul className="group-sublist">
-          {members.map((member) => (
-            <li key={member.id} className="group-subrow">
-              <div>
-                <strong>
-                  {member.id === me.id ? t.you({ name: member.name }) : member.name}
-                </strong>
-                <div className="mission-evidence-paths">
-                  <code>{member.admin ? words.roleAdmin : words.roleMember}</code>
-                  {member.email && <code>{member.email}</code>}
-                  {member.username && <code>@{member.username}</code>}
-                  {member.tailscaleLogin && <code>{member.tailscaleLogin}</code>}
-                  {member.disabled && <code>{words.disabledBadge}</code>}
+          {members.map((member) => {
+            const acctText = [
+              member.email,
+              member.username ? `@${member.username}` : "",
+              member.tailscaleLogin && member.tailscaleLogin !== member.email
+                ? `TS:${member.tailscaleLogin}`
+                : "",
+            ]
+              .filter(Boolean)
+              .join(" · ");
+            const isEditing = editingId === member.id;
+            return (
+              <li
+                key={member.id}
+                className={`group-member-item${member.disabled ? " is-disabled" : ""}`}
+              >
+                <div className="group-member-line">
+                  <div className="group-member-who">
+                    <span className="profile-avatar" aria-hidden="true">
+                      {initials(member.name)}
+                    </span>
+                    <strong title={member.name}>
+                      {member.id === me.id ? t.you({ name: member.name }) : member.name}
+                    </strong>
+                  </div>
+                  <div
+                    className={`group-member-acct${acctText ? "" : " is-empty"}`}
+                    title={acctText || undefined}
+                  >
+                    {acctText || words.noAccount}
+                  </div>
+                  <div className="group-member-badges">
+                    <span className={`group-pill${member.admin ? " is-admin" : ""}`}>
+                      {member.admin ? words.roleAdmin : words.roleMember}
+                    </span>
+                    {member.disabled && (
+                      <span className="group-pill is-disabled">{words.disabledBadge}</span>
+                    )}
+                  </div>
+                  <div className="group-member-actions">
+                    <button
+                      type="button"
+                      className={`button ${isEditing ? "primary" : "secondary"}`}
+                      aria-disabled={request.busy}
+                      aria-expanded={isEditing}
+                      onClick={() => (isEditing ? setEditingId(null) : beginEdit(member))}
+                    >
+                      {words.edit}
+                    </button>
+                    {member.id !== me.id && (
+                      <>
+                        <button
+                          type="button"
+                          className="button secondary"
+                          aria-disabled={request.busy}
+                          onClick={() => updateMember(member.id, { admin: !member.admin })}
+                        >
+                          {member.admin ? words.makeMember : words.makeAdmin}
+                        </button>
+                        <button
+                          type="button"
+                          className="button secondary"
+                          aria-disabled={request.busy}
+                          onClick={() => updateMember(member.id, { disabled: !member.disabled })}
+                        >
+                          {member.disabled ? words.enable : words.disable}
+                        </button>
+                        <button
+                          type="button"
+                          className="button secondary settings-danger-outline"
+                          aria-disabled={request.busy}
+                          onClick={() => removeMember(member.id)}
+                        >
+                          {words.remove}
+                        </button>
+                      </>
+                    )}
+                  </div>
                 </div>
-                {editingId === member.id && (
-                  <div className="group-admin-grid">
-                    <div>
-                      <label className="field-label" htmlFor={`edit-name-${member.id}`}>
-                        {words.displayName}
-                      </label>
-                      <input
-                        className="text-input"
-                        id={`edit-name-${member.id}`}
-                        value={editName}
-                        maxLength={40}
-                        onChange={(event) => setEditName(event.target.value)}
-                      />
-                    </div>
-                    <div>
-                      <label className="field-label" htmlFor={`edit-email-${member.id}`}>
-                        {t.auth.email}
-                      </label>
-                      <input
-                        className="text-input"
-                        id={`edit-email-${member.id}`}
-                        type="email"
-                        value={editEmail}
-                        maxLength={160}
-                        placeholder={t.auth.emailPlaceholder}
-                        autoCapitalize="off"
-                        onChange={(event) => setEditEmail(event.target.value)}
-                      />
-                    </div>
-                    <div>
-                      <label className="field-label" htmlFor={`edit-user-${member.id}`}>
-                        {t.auth.username}
-                      </label>
-                      <input
-                        className="text-input"
-                        id={`edit-user-${member.id}`}
-                        value={editUsername}
-                        maxLength={32}
-                        placeholder={t.auth.usernamePlaceholder}
-                        autoCapitalize="off"
-                        onChange={(event) => setEditUsername(event.target.value)}
-                      />
-                    </div>
-                    <div>
-                      <label className="field-label" htmlFor={`edit-pass-${member.id}`}>
-                        {t.auth.password}
-                      </label>
-                      <input
-                        className="text-input"
-                        id={`edit-pass-${member.id}`}
-                        type="password"
-                        value={editPassword}
-                        maxLength={128}
-                        placeholder={words.newPasswordPlaceholder}
-                        onChange={(event) => setEditPassword(event.target.value)}
-                      />
-                    </div>
-                    <div>
-                      <label className="field-label" htmlFor={`edit-ts-${member.id}`}>
-                        {words.tailscaleLabel}
-                      </label>
-                      <input
-                        className="text-input"
-                        id={`edit-ts-${member.id}`}
-                        value={editTailscale}
-                        maxLength={120}
-                        placeholder={words.tailscalePlaceholder}
-                        autoCapitalize="off"
-                        onChange={(event) => setEditTailscale(event.target.value)}
-                      />
+                {isEditing && (
+                  <div className="group-member-edit">
+                    <div className="group-admin-grid">
+                      <div>
+                        <label className="field-label" htmlFor={`edit-name-${member.id}`}>
+                          {words.displayName}
+                        </label>
+                        <input
+                          className="text-input"
+                          id={`edit-name-${member.id}`}
+                          value={editName}
+                          maxLength={40}
+                          onChange={(event) => setEditName(event.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <label className="field-label" htmlFor={`edit-email-${member.id}`}>
+                          {t.auth.email}
+                        </label>
+                        <input
+                          className="text-input"
+                          id={`edit-email-${member.id}`}
+                          type="email"
+                          value={editEmail}
+                          maxLength={160}
+                          placeholder={t.auth.emailPlaceholder}
+                          autoCapitalize="off"
+                          onChange={(event) => setEditEmail(event.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <label className="field-label" htmlFor={`edit-user-${member.id}`}>
+                          {t.auth.username}
+                        </label>
+                        <input
+                          className="text-input"
+                          id={`edit-user-${member.id}`}
+                          value={editUsername}
+                          maxLength={32}
+                          placeholder={t.auth.usernamePlaceholder}
+                          autoCapitalize="off"
+                          onChange={(event) => setEditUsername(event.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <label className="field-label" htmlFor={`edit-pass-${member.id}`}>
+                          {t.auth.password}
+                        </label>
+                        <input
+                          className="text-input"
+                          id={`edit-pass-${member.id}`}
+                          type="password"
+                          value={editPassword}
+                          maxLength={128}
+                          placeholder={words.newPasswordPlaceholder}
+                          onChange={(event) => setEditPassword(event.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <label className="field-label" htmlFor={`edit-ts-${member.id}`}>
+                          {words.tailscaleLabel}
+                        </label>
+                        <input
+                          className="text-input"
+                          id={`edit-ts-${member.id}`}
+                          value={editTailscale}
+                          maxLength={120}
+                          placeholder={words.tailscalePlaceholder}
+                          autoCapitalize="off"
+                          onChange={(event) => setEditTailscale(event.target.value)}
+                        />
+                      </div>
+                      <div className="group-edit-actions">
+                        <button
+                          type="button"
+                          className="button secondary"
+                          onClick={() => setEditingId(null)}
+                        >
+                          {words.cancelEdit}
+                        </button>
+                        <button
+                          type="button"
+                          className="button primary"
+                          aria-disabled={request.busy}
+                          disabled={
+                            !editName.trim() ||
+                            (Boolean(editPassword) && editPassword.length < 8)
+                          }
+                          onClick={() => saveEdit(member)}
+                        >
+                          {words.saveEdit}
+                        </button>
+                      </div>
                     </div>
                   </div>
                 )}
-              </div>
-              <div className="group-release">
-                {editingId === member.id ? (
-                  <>
-                    <button
-                      type="button"
-                      className="button primary"
-                      aria-disabled={request.busy}
-                      disabled={
-                        !editName.trim() ||
-                        (Boolean(editPassword) && editPassword.length < 8)
-                      }
-                      onClick={() => saveEdit(member)}
-                    >
-                      {words.saveEdit}
-                    </button>
-                    <button
-                      type="button"
-                      className="button secondary"
-                      onClick={() => setEditingId(null)}
-                    >
-                      {words.cancelEdit}
-                    </button>
-                  </>
-                ) : (
-                  <button
-                    type="button"
-                    className="button secondary"
-                    aria-disabled={request.busy}
-                    onClick={() => beginEdit(member)}
-                  >
-                    {words.edit}
-                  </button>
-                )}
-                {member.id !== me.id && (
-                  <>
-                    <button
-                      type="button"
-                      className="button secondary"
-                      aria-disabled={request.busy}
-                      onClick={() => updateMember(member.id, { admin: !member.admin })}
-                    >
-                      {member.admin ? words.makeMember : words.makeAdmin}
-                    </button>
-                    <button
-                      type="button"
-                      className="button secondary"
-                      aria-disabled={request.busy}
-                      onClick={() => updateMember(member.id, { disabled: !member.disabled })}
-                    >
-                      {member.disabled ? words.enable : words.disable}
-                    </button>
-                    <button
-                      type="button"
-                      className="button danger"
-                      aria-disabled={request.busy}
-                      onClick={() => removeMember(member.id)}
-                    >
-                      {words.remove}
-                    </button>
-                  </>
-                )}
-              </div>
-            </li>
-          ))}
+              </li>
+            );
+          })}
         </ul>
       </div>
-      <div className="group-admin-members">
-        <h3>{words.pairHeading}</h3>
-        <p className="field-help">{words.pairHelp}</p>
-        <button
-          type="button"
-          className="button secondary"
-          aria-disabled={request.busy}
-          onClick={createPairCode}
-        >
-          {words.pairCreate}
-        </button>
-        {pairCreated && <CopyCommand command={pairCreated.code} />}
-      </div>
+
       <div className="modal-actions">
         <button type="button" className="button secondary" onClick={onClose}>
           {actions.close}
@@ -2198,28 +2392,35 @@ export function AddProjectDialog({
   };
 
   return (
-    <Modal title={t.addARepository} mark={<FolderGit2 size={22} />} onClose={onClose}>
+    <Modal
+      className="group-account-modal"
+      title={t.addARepository}
+      mark={<FolderGit2 size={22} />}
+      onClose={onClose}
+    >
       {addable && addable.length > 0 && (
-        <form className="group-admin-create" onSubmit={addExisting}>
+        <form className="group-panel-card" onSubmit={addExisting}>
           <label className="field-label" htmlFor="dialog-add-repo">
             {t.repository}
           </label>
-          <select
-            className="text-input"
-            id="dialog-add-repo"
-            value={selectedRepoId}
-            aria-disabled={request.busy}
-            onChange={(event) => setSelectedRepoId(event.target.value)}
-          >
-            {addable.map((repo) => (
-              <option key={repo.repoId} value={repo.repoId}>
-                {repo.name}
-              </option>
-            ))}
-          </select>
-          <button className="button primary" aria-disabled={request.busy} disabled={!selectedRepoId}>
-            {t.addRepository}
-          </button>
+          <div className="group-inline-form">
+            <select
+              className="text-input"
+              id="dialog-add-repo"
+              value={selectedRepoId}
+              aria-disabled={request.busy}
+              onChange={(event) => setSelectedRepoId(event.target.value)}
+            >
+              {addable.map((repo) => (
+                <option key={repo.repoId} value={repo.repoId}>
+                  {repo.name}
+                </option>
+              ))}
+            </select>
+            <button className="button primary" aria-disabled={request.busy} disabled={!selectedRepoId}>
+              {t.addRepository}
+            </button>
+          </div>
         </form>
       )}
       <form onSubmit={importAndAdd}>

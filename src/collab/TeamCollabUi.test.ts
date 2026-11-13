@@ -251,3 +251,70 @@ test("BootstrapAdminCard renders remote admin setup with auto-detected Tailscale
   assert.match(zh, /從遠端啟用團隊協作並成為管理員/);
   assert.match(zh, /owner@example\.com/);
 });
+
+test("AdminMembersDialog and AccountDialog render wide single-line member rows and 2-column account cards in en and zh-TW", async () => {
+  const { AdminMembersDialog, AccountDialog } = await import("./GroupPage");
+  const me = {
+    id: "m-1",
+    name: "Ada Lovelace",
+    admin: true as const,
+    email: "ada@example.test",
+    username: "ada",
+  };
+  const members = [
+    { ...me, joinedAt: "2026-11-10T09:00:00.000Z", heldCount: 1 },
+    {
+      id: "m-2",
+      name: "Ben Lin",
+      email: "ben@example.test",
+      username: "ben",
+      tailscaleLogin: "ben@tailnet.test",
+      disabled: true as const,
+      joinedAt: "2026-11-10T10:00:00.000Z",
+      heldCount: 0,
+    },
+  ];
+  const fakeStore = {
+    async call<T>() {
+      return { people: members } as T;
+    },
+    reload() {},
+  };
+
+  const enAdmin = renderEn(
+    createElement(AdminMembersDialog, {
+      store: fakeStore,
+      me,
+      initialMembers: members,
+      onClose() {},
+    }),
+  );
+  assertNoHan(enAdmin);
+  assert.match(enAdmin, /modal-wide group-members-modal/);
+  assert.match(enAdmin, /2 members · 1 admin/);
+  assert.match(enAdmin, /ben@example\.test · @ben · TS:ben@tailnet\.test/);
+
+  const zhAdmin = renderZh(
+    createElement(AdminMembersDialog, {
+      store: fakeStore,
+      me,
+      initialMembers: members,
+      onClose() {},
+    }),
+  );
+  assert.match(zhAdmin, /共 2 位成員 · 1 位管理員/);
+  assert.match(zhAdmin, /已停用/);
+
+  const enAccount = renderEn(
+    createElement(AccountDialog, { store: fakeStore, me, onClose() {} }),
+  );
+  assertNoHan(enAccount);
+  assert.match(enAccount, /group-account-head/);
+  assert.match(enAccount, /ada@example\.test · @ada/);
+
+  const zhAccount = renderZh(
+    createElement(AccountDialog, { store: fakeStore, me, onClose() {} }),
+  );
+  assert.match(zhAccount, /我的團隊帳號/);
+  assert.match(zhAccount, /留空則維持原密碼/);
+});

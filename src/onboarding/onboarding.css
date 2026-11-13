@@ -60,11 +60,6 @@
   background: var(--color-surface);
   box-shadow: var(--shadow-1);
 }
-.welcome-step-of {
-  margin: 0;
-  font-size: var(--text-2xs);
-  color: var(--color-text-muted);
-}
 .welcome-card h2 {
   display: flex;
   align-items: center;

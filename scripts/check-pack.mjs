@@ -56,7 +56,11 @@
 // sign-in, team accounts & admin management, line-range holds, cross-file
 // dependency guards, live member presence, and the review Team tab with
 // en and zh-TW texts): all JS 507.4 kB in 54 files on Node.js 24, all CSS
-// <= 45.0 kB, so the all-JS budget rose from 500 kB to 515 kB.
+// <= 45.0 kB, so the all-JS budget rose from 500 kB to 515 kB. Measured
+// with the wide single-line Member Management table, 2-column Account &
+// Invite cards, and PairPage card layout (after removing 8 unused CSS
+// selectors): all JS 509.8 kB, all CSS 45.6 kB on Node.js 24, so the
+// all-CSS budget rose from 45 kB to 46.5 kB.
 //
 // Exit status: 0 when every check passes, 1 when one fails, 2 on a usage or
 // setup error.
@@ -81,7 +85,7 @@ const budgets = {
   woff2: 12,
   largestJsGzip: 116 * kB,
   totalJsGzip: 515 * kB,
-  totalCssGzip: 45 * kB,
+  totalCssGzip: 46.5 * kB,
 };
 const required = [
   "package.json",
