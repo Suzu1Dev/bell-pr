@@ -2204,13 +2204,13 @@
   gap: 8px;
   max-width: 420px;
 }
-.mission-update-help {
+.mission-overview-heading .mission-update-help {
   flex-basis: 100%;
   margin: 0;
   text-align: right;
   color: var(--color-text-muted);
-  font-size: var(--text-xs);
-  line-height: 1.7;
+  font-size: var(--text-2xs);
+  line-height: 1.5;
 }
 @media (max-width: 760px) {
   .mission-overview-actions {
