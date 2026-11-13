@@ -168,7 +168,7 @@ test("BELL's own clone offers an update to the latest default branch, which paus
     onUpdateRepo() {},
   });
   assert.match(updatable, /aria-describedby="mission-update-help">.*更新到最新版本<\/button>/);
-  assert.match(updatable, /從 GitHub 取得 main 的最新版本/);
+  assert.match(updatable, /同步 main 供專案分析/);
   assert.match(updatable, /上次更新：/);
   const updating = render({ onUpdateRepo() {}, updatingRepo: true });
   assert.match(updating, /disabled="" aria-describedby="mission-update-help">.*正在更新…<\/button>/);
@@ -368,7 +368,7 @@ test("the English overview words counts, dates and the update help in English", 
   assert.match(html, />Update to the latest version<\/button>/);
   assert.ok(
     html.includes(
-      `Fetches the latest main from GitHub for the overview and analysis. New contributions start from the latest version either way. Last updated: ${en.dateTime("2026-10-13T00:00:00.000Z")}`,
+      `Syncs main for the overview analysis · Last updated: ${en.dateTime("2026-10-13T00:00:00.000Z")}`,
     ),
   );
   const analyzed = en.dateTime("2026-10-07T08:00:00.000Z", {

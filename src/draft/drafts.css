@@ -717,8 +717,11 @@
   }
 }
 @media (max-width: 700px) {
-  .draft-guidance-panel {
+  .draft-guidance-panel,
+  .draft-workspace > .reviewability {
     margin: 14px 14px 0;
+  }
+  .draft-guidance-panel {
     padding: 18px 16px;
   }
   .draft-checklist-row {
@@ -1348,4 +1351,6 @@
 .draft-completed-checks .checklist-item > span { flex: 1; }
 .draft-pending-checks .button { flex-shrink: 0; }
 .draft-round-checklist { margin: 24px 28px; }
+/* Match sibling .draft-workspace cards' horizontal inset so Reviewability aligns cleanly. */
+.draft-workspace > .reviewability { margin: 24px 28px 0; }
 .reviewability-reference { margin-block: 12px; }
