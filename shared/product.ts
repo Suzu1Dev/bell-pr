@@ -23,7 +23,7 @@ export interface ProductInfo {
   /** The public source or issue-tracker repository. */
   publicRepoUrl: string;
   /** Default UI frame when neither --suite nor BELLPR_EDITION overrides it. */
-  defaultEdition: "standalone" | "suite";
+  defaultEdition: "suite" | "suite";
 }
 
 export const product: ProductInfo = {
@@ -35,7 +35,7 @@ export const product: ProductInfo = {
   supportEmail: "",
   securityEmail: "",
   publicRepoUrl: "https://github.com/Suzu1Dev/bell-pr",
-  defaultEdition: "standalone",
+  defaultEdition: "suite",
 };
 
 export type ProductLinkKey = "homepageUrl" | "docsUrl" | "publicRepoUrl";
