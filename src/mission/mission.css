@@ -196,7 +196,8 @@
   margin: 0;
   line-height: 1.75;
 }
-.mission-prose-blocks :is(ul, ol) {
+.mission-prose-blocks ul,
+.mission-prose-blocks ol {
   margin: 0;
   padding-left: 20px;
   display: grid;
@@ -210,6 +211,7 @@
 .mission-prose-blocks code,
 .mission-flow-lead code,
 .mission-flow-stage-body code,
+.mission-flow-module-card p code,
 .mission-idea-problem code,
 .mission-journey p code,
 .mission-reading-steps p code {
@@ -222,8 +224,21 @@
   color: var(--color-accent-700);
   overflow-wrap: anywhere;
 }
-.mission-flow-stages .mission-flow-stage-body code {
-  background: var(--color-accent-50);
+.mission-flow-lead code,
+.mission-flow-stage-body code,
+.mission-flow-module-card p code {
+  background: var(--color-surface);
+  border-color: var(--color-border);
+}
+.mission-overview details > summary:has(svg) {
+  cursor: pointer;
+  list-style: none;
+}
+.mission-overview details > summary:has(svg)::-webkit-details-marker {
+  display: none;
+}
+.mission-overview details[open] > summary > svg:last-child {
+  transform: rotate(90deg);
 }
 .mission-summary-notes {
   margin-top: 12px;
@@ -241,23 +256,9 @@
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  cursor: pointer;
-  list-style: none;
   font-size: var(--text-xs);
   font-weight: 550;
   color: var(--color-accent-600);
-}
-.mission-summary-notes > summary::-webkit-details-marker,
-.mission-flow-details > summary::-webkit-details-marker,
-.mission-stage-more > summary::-webkit-details-marker,
-.mission-idea-more > summary::-webkit-details-marker {
-  display: none;
-}
-.mission-summary-notes[open] > summary > svg,
-.mission-flow-details[open] > summary > svg,
-.mission-stage-more[open] > summary > svg,
-.mission-idea-more[open] > summary > svg {
-  transform: rotate(90deg);
 }
 .mission-summary-notes > .mission-prose-blocks {
   margin-top: 10px;
@@ -362,90 +363,147 @@
   padding: 3px 0;
 }
 .mission-reading-flow {
-  margin-bottom: 14px;
-  padding: 15px 18px;
-  border: 1px solid var(--color-border);
-  border-radius: 9px;
-  background: var(--color-surface-sunken);
+  container-type: inline-size;
+  margin: 0 0 16px;
+  padding: 20px 22px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-1);
 }
 .mission-reading-flow > span {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--color-brand-200);
+  background: var(--color-brand-50);
   font-size: var(--text-xs);
   font-weight: 600;
-  color: var(--color-accent-600);
+  color: var(--color-brand-700);
 }
-.mission-reading-flow p {
-  margin: 6px 0 0;
+.mission-reading-flow > p {
+  margin: 10px 0 0;
   font-size: var(--text-md);
   line-height: 1.85;
   color: var(--color-text-secondary);
 }
-/* The main flow drawn as steps: stacked with downward arrows, side by side
-   when the figure is wide and has at most four steps. */
+/* Architecture pipeline canvas: stacked timeline on narrow viewports,
+   balanced horizontal pipeline on wide containers for both 2–4 and 5–6 steps. */
 .mission-flow {
-  margin: 0 0 14px;
-  container-type: inline-size;
+  margin: 0 0 16px;
 }
-.mission-flow > ol {
+.mission-flow > ol,
+.mission-flow-synthesized {
   display: flex;
   flex-direction: column;
-  margin: 10px 0 0;
-  padding: 0;
+  margin: 12px 0 0;
+  padding: 14px;
   list-style: none;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-surface-sunken);
 }
-.mission-flow > ol > li {
+.mission-flow-synthesized {
+  margin-top: 0;
+}
+.mission-flow > ol > li,
+.mission-flow-synthesized > li {
   display: flex;
   flex-direction: column;
   min-width: 0;
 }
 .mission-flow-step {
-  display: grid;
-  grid-template-columns: 2rem minmax(0, 1fr);
-  align-items: baseline;
-  gap: 2px 8px;
-  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 12px 14px;
   border: 1px solid var(--color-border-strong);
-  border-radius: 8px;
+  border-top: 3px solid var(--color-brand-500);
+  border-radius: var(--radius-md);
   background: var(--color-surface);
+  box-shadow: var(--shadow-1);
+  min-width: 0;
+}
+.mission-flow-step > .mission-journey-number {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 7px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--color-brand-200);
+  background: var(--color-brand-50);
+  color: var(--color-brand-700);
+  font: 600 var(--text-2xs)/1.5 var(--font-mono);
 }
 .mission-flow-step strong {
   font-size: var(--text-sm);
   font-weight: 600;
-  line-height: 1.6;
+  line-height: 1.45;
   color: var(--color-text);
   overflow-wrap: anywhere;
 }
 .mission-flow-step strong svg {
   margin-right: 5px;
   vertical-align: -2px;
-  color: var(--color-text-muted);
+  color: var(--color-accent-600);
 }
 .mission-flow-step code {
-  grid-column: 2;
-  font: 500 var(--text-xs)/1.6 var(--font-mono);
+  margin-top: auto;
+  padding: 2px 7px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-sunken);
+  font: 500 var(--text-2xs)/1.5 var(--font-mono);
   color: var(--color-accent-700);
   overflow-wrap: anywhere;
 }
 /* A step outside the repository: the person, a browser, another service. */
 .mission-flow-outside {
   border-style: dashed;
-  background: var(--color-surface-sunken);
+  border-color: var(--color-accent-300);
+  border-top: 3px solid var(--color-accent-500);
+  background: var(--color-accent-50);
+  box-shadow: none;
+}
+.mission-flow-outside > .mission-journey-number {
+  border-color: var(--color-accent-200);
+  background: var(--color-surface);
+  color: var(--color-accent-700);
 }
 .mission-flow-link {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 5px 0 5px 14px;
-  font-size: var(--text-xs);
-  line-height: 1.5;
-  color: var(--color-text-muted);
+  gap: 8px;
+  margin-left: 18px;
+  padding: 6px 0 6px 12px;
+  border-left: 2px solid var(--color-brand-300);
+  font-size: var(--text-2xs);
+  line-height: 1.4;
+  color: var(--color-text-secondary);
   overflow-wrap: anywhere;
 }
 .mission-flow-link svg {
   flex-shrink: 0;
-  color: var(--color-accent-600);
+  width: 20px;
+  height: 20px;
+  padding: 2px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--color-brand-300);
+  background: var(--color-surface);
+  color: var(--color-brand-600);
+}
+.mission-flow-link > span {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--color-border-strong);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  font-weight: 500;
 }
 .mission-flow figcaption {
-  margin: 12px 0 0;
+  margin: 14px 0 0;
   font-size: var(--text-md);
   line-height: 1.85;
   color: var(--color-text-secondary);
@@ -453,16 +511,30 @@
 .mission-flow-caption,
 .mission-flow-structured {
   display: grid;
-  gap: 10px;
+  gap: 14px;
 }
 .mission-flow-structured {
-  margin-top: 8px;
+  margin-top: 12px;
 }
 .mission-flow-lead {
   margin: 0;
+  padding: 10px 14px;
+  border-left: 3px solid var(--color-brand-500);
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+  background: var(--color-surface-sunken);
   font-size: var(--text-md);
   line-height: 1.75;
-  color: var(--color-text-secondary);
+  color: var(--color-text);
+}
+.mission-flow-walkthrough,
+.mission-flow-subsystems {
+  display: grid;
+  gap: 8px;
+}
+.mission-flow-sublabel {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--color-accent-700);
 }
 .mission-flow-details > .mission-flow-stages {
   margin-top: 10px;
@@ -474,13 +546,15 @@
   padding: 0;
   list-style: none;
 }
-.mission-flow-stages > li {
+.mission-flow-stages > li,
+.mission-flow-module-card {
   display: grid;
   gap: 6px;
-  padding: 11px 14px;
+  align-content: start;
+  padding: 12px 15px;
   border: 1px solid var(--color-border);
-  border-radius: 8px;
-  background: var(--color-surface);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-sunken);
   min-width: 0;
 }
 .mission-flow-stages > li.is-badge-only {
@@ -505,12 +579,31 @@
   display: grid;
   gap: 6px;
   min-width: 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
 }
-.mission-flow-stage-body > p {
+.mission-flow-stage-body > p,
+.mission-flow-module-card > p {
   margin: 0;
   font-size: var(--text-sm);
   line-height: 1.75;
   color: var(--color-text-secondary);
+  overflow-wrap: anywhere;
+}
+.mission-flow-module-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+}
+.mission-flow-module-card > code {
+  width: fit-content;
+  max-width: 100%;
+  padding: 2px 7px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border-strong);
+  background: var(--color-surface);
+  color: var(--color-brand-700);
+  font: 600 var(--text-xs)/1.5 var(--font-mono);
   overflow-wrap: anywhere;
 }
 .mission-stage-more > .mission-prose-blocks,
@@ -524,36 +617,94 @@
 .mission-idea-more {
   margin-top: 6px;
 }
-@container (min-width: 820px) {
-  .mission-flow-few > ol {
+@container (min-width: 680px) {
+  .mission-flow-module-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@container (min-width: 740px) {
+  .mission-flow > ol > li,
+  .mission-flow-synthesized > li {
     flex-direction: row;
+    align-items: stretch;
   }
-  /* Each step but the last also holds its arrow, so the nodes share the rest evenly. */
-  .mission-flow-few > ol > li {
-    flex: 1 1 5rem;
-    flex-direction: row;
-  }
-  .mission-flow-few > ol > li:last-child {
-    flex-basis: 0;
-  }
-  .mission-flow-few .mission-flow-step {
+  .mission-reading-flow .mission-flow-step {
     flex: 1 1 0;
-    min-width: 0;
-    grid-template-columns: minmax(0, 1fr);
-    align-content: start;
+    min-height: 86px;
   }
-  .mission-flow-few .mission-flow-step code {
-    grid-column: auto;
-  }
-  .mission-flow-few .mission-flow-link {
-    flex: 0 0 5rem;
+  .mission-reading-flow .mission-flow-link {
+    position: relative;
     flex-direction: column;
-    justify-content: center;
-    padding: 0 6px;
+    justify-content: flex-start;
+    gap: 5px;
+    margin-left: 0;
+    padding: 34px 6px 4px;
+    border-left: 0;
     text-align: center;
   }
-  .mission-flow-few .mission-flow-link svg {
+  .mission-reading-flow .mission-flow-link::before {
+    content: "";
+    position: absolute;
+    left: 2px;
+    right: 2px;
+    top: 43px;
+    height: 2px;
+    background: var(--color-brand-300);
+  }
+  .mission-reading-flow .mission-flow-link svg,
+  .mission-reading-flow .mission-flow-link > span {
+    position: relative;
+    z-index: 1;
+  }
+  .mission-reading-flow .mission-flow-link svg {
     transform: rotate(-90deg);
+  }
+  .mission-flow-few > ol,
+  .mission-flow-synthesized.is-few {
+    flex-direction: row;
+    align-items: stretch;
+  }
+  .mission-flow-few > ol > li {
+    flex: 1 1 6.5rem;
+  }
+  .mission-flow-synthesized.is-few > li {
+    flex: 1 1 2.25rem;
+  }
+  .mission-flow-few > ol > li:last-child,
+  .mission-flow-synthesized.is-few > li:last-child {
+    flex-basis: 0;
+  }
+  .mission-flow-few .mission-flow-link {
+    flex: 0 0 6.5rem;
+  }
+  .mission-flow-synthesized .mission-flow-link {
+    flex: 0 0 2.25rem;
+    padding-inline: 2px;
+  }
+  .mission-flow:not(.mission-flow-few) > ol,
+  .mission-flow-synthesized:not(.is-few) {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px 0;
+    align-items: stretch;
+  }
+  .mission-flow:not(.mission-flow-few) .mission-flow-link {
+    flex: 0 0 5.5rem;
+    padding-inline: 4px;
+  }
+  .mission-flow:not(.mission-flow-few) > ol > li:last-child {
+    padding-right: 5.5rem;
+  }
+  .mission-flow-synthesized:not(.is-few) > li:last-child {
+    padding-right: 2.25rem;
+  }
+  .mission-flow:not(.mission-flow-few) > ol > li:nth-child(3n) .mission-flow-link::before,
+  .mission-flow-synthesized:not(.is-few) > li:nth-child(3n) .mission-flow-link::before {
+    right: 50%;
+  }
+  .mission-flow:not(.mission-flow-few) > ol > li:nth-child(3n) .mission-flow-link svg,
+  .mission-flow-synthesized:not(.is-few) > li:nth-child(3n) .mission-flow-link svg {
+    transform: none;
   }
 }
 .mission-reading-steps {
@@ -619,16 +770,8 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  cursor: pointer;
-  list-style: none;
   font-size: var(--text-sm);
   color: var(--color-text-muted);
-}
-.mission-reading-context summary::-webkit-details-marker {
-  display: none;
-}
-.mission-reading-context[open] summary svg {
-  transform: rotate(90deg);
 }
 .mission-reading-context p {
   margin-top: 8px;
@@ -651,12 +794,7 @@
   align-items: center;
   gap: 9px;
   padding: 15px 17px;
-  cursor: pointer;
   font-size: var(--text-md);
-  list-style: none;
-}
-.mission-detail-block summary::-webkit-details-marker {
-  display: none;
 }
 .mission-detail-block summary > svg:first-child {
   color: var(--color-text-muted);
@@ -664,9 +802,6 @@
 .mission-detail-block summary > svg:last-child {
   color: var(--color-text-muted);
   transition: transform 0.15s;
-}
-.mission-detail-block[open] summary > svg:last-child {
-  transform: rotate(90deg);
 }
 .mission-detail-count {
   margin-left: auto;
@@ -926,14 +1061,6 @@
   align-items: center;
   gap: 6px;
   width: fit-content;
-  cursor: pointer;
-  list-style: none;
-}
-.mission-more-provenance > summary::-webkit-details-marker {
-  display: none;
-}
-.mission-more-provenance[open] > summary > svg {
-  transform: rotate(90deg);
 }
 .mission-more-error {
   margin-bottom: 16px;
@@ -952,16 +1079,8 @@
   align-items: center;
   gap: 6px;
   width: fit-content;
-  cursor: pointer;
-  list-style: none;
   font-weight: 550;
   color: var(--color-text-muted);
-}
-.mission-dropped-ideas > summary::-webkit-details-marker {
-  display: none;
-}
-.mission-dropped-ideas[open] > summary > svg {
-  transform: rotate(90deg);
 }
 .mission-dropped-ideas ul {
   list-style: none;
@@ -1003,17 +1122,9 @@
   gap: 8px;
   padding: 10px 13px;
   color: var(--color-brand-600);
-  cursor: pointer;
-  list-style: none;
-}
-.mission-hidden-ideas > summary::-webkit-details-marker {
-  display: none;
 }
 .mission-hidden-ideas > summary > svg:last-child {
   margin-left: auto;
-}
-.mission-hidden-ideas[open] > summary > svg:last-child {
-  transform: rotate(90deg);
 }
 .mission-hidden-ideas ul {
   margin: 0;
@@ -1273,14 +1384,6 @@
   font-size: var(--text-xs);
   line-height: 1.6;
   color: var(--color-accent-600);
-  cursor: pointer;
-  list-style: none;
-}
-.mission-idea-approach summary::-webkit-details-marker {
-  display: none;
-}
-.mission-idea-approach[open] summary svg {
-  transform: rotate(90deg);
 }
 .mission-idea-approach p {
   font-size: var(--text-sm);
@@ -1332,17 +1435,9 @@
   font-size: var(--text-xs);
   line-height: 1.6;
   color: var(--color-accent-600);
-  cursor: pointer;
-  list-style: none;
-}
-.mission-source-quotes > summary::-webkit-details-marker {
-  display: none;
 }
 .mission-source-quotes > summary > span {
   margin-left: auto;
-}
-.mission-source-quotes[open] > summary > svg:last-child {
-  transform: rotate(90deg);
 }
 .mission-source-quotes > .mission-quote-note {
   padding: 0 10px;

@@ -158,11 +158,12 @@ const mission = {
     title: "New to this project? Read it in this order",
     lead: "Ordered from the sampled files the Agent read. Each step says why to read it first and what to look for.",
     flow: "How the modules fit together",
-    flowDetails: ({ count }: { count: number }) =>
-      `Show step-by-step details (${amount(count, "section", "sections")})`,
+    flowStages: "End-to-end flow & stages",
     flowMore: ({ count }: { count: number }) =>
       `Show ${amount(count, "more section", "more sections")}`,
-    stageDetails: "Call details",
+    stageDetails: "Full stage details",
+    subsystems: ({ count }: { count: number }) =>
+      `Other core & supporting modules (${n(count)})`,
     /** Read by screen readers only, on a flow step outside the repository. */
     flowOutside: "Outside this repository",
     /** Read by screen readers only, before what one flow step passes to the next. */

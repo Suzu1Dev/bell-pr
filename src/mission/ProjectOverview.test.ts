@@ -992,28 +992,46 @@ test("the brief's request and direction text render through the Markdown view, a
   assert.match(renderEnglish({ run, brief: undefined }), /<div class="mission-brief-pending">.*<p><strong>Problem<\/strong>: one attempt\.<\/p>/s);
 });
 
-test("multi-paragraph flow prose, bloated summaries and long problems break into scannable stages and disclosures", () => {
+test("multi-paragraph flow prose renders visible stages, synthesized diagram and uncovered subsystems", () => {
   assert.equal(parseFlowProse("Short single-paragraph flow caption."), null);
   const denseHow = [
-    "以下描述主要資料流，依序經過四個階段。",
+    "以下描述主要資料流，依序經過五個階段。",
     "（1）入口：根 package.json 執行 packages/opencode/src/index.ts，載入 @opencode-ai/core。",
-    "（2）伺服器：web/app.js 呼叫 fetch_json()，透過 /api/reports 送出資料。" + "補充呼叫細節說明。".repeat(25),
+    "（2）伺服器：web/app.js 呼叫 fetch_json()，透過 /api/reports 送出資料。" + "補充呼叫細節與錯誤處理說明。".repeat(60),
     "（3）代理端：src/agent/events.rs 以 apply_data_event 分派事件。",
     "（4）持久層：寫入資料庫並回傳狀態。",
     "（5）外掛：runtime hook 攔截操作。",
   ].join("\n\n");
   const parsed = parseFlowProse(denseHow);
   assert.ok(parsed);
-  assert.equal(parsed.lead, "以下描述主要資料流，依序經過四個階段。");
+  assert.equal(parsed.lead, "以下描述主要資料流，依序經過五個階段。");
   assert.equal(parsed.items.length, 5);
   assert.equal(parsed.items[0].badge, "01");
   assert.equal(parsed.items[0].label, "入口");
-  assert.ok(parsed.items[1].more, "long stage splits deep detail into .more");
+  assert.equal(parsed.items[0].primaryPath, "packages/opencode/src/index.ts");
+  assert.ok(parsed.items[1].more, "oversized >720-char stage splits deep tail into .more");
 
-  // With a diagram: lead caption stays visible, stages fold into mission-flow-details.
+  // Single-newline generic "Stage:" prefixes are stripped and split cleanly.
+  const genericStages = parseFlowProse(
+    [
+      "主要資料流：使用者從命令列啟動並執行模擬器。",
+      "Stage: main.c 解析參數並建立 vm_attr_t。",
+      "Stage: src/riscv.h 呼叫 rv_create 與 rv_run。",
+    ].join("\n"),
+  );
+  assert.ok(genericStages);
+  assert.equal(genericStages.lead, "使用者從命令列啟動並執行模擬器。");
+  assert.equal(genericStages.items.length, 2);
+  assert.equal(genericStages.items[0].label, undefined);
+
+  // With a diagram: all stages show visibly alongside uncovered subsystem modules.
   const withDiagram = render({
     insights: {
       ...demoInsights,
+      modules: [
+        ...demoInsights.modules,
+        { path: "src/cache.ts", purpose: "提供快取失效與查詢。" },
+      ],
       summary: "一句話專案摘要。\n\n本次分析範圍有限：\n- 僅抽樣 30 個追蹤檔。\n- 未執行測試。",
       purpose: "提供開發代理工具。\n\n內建模式：\n- build：完整權限。\n- plan：唯讀規劃。",
       howItFitsTogether: denseHow,
@@ -1030,19 +1048,25 @@ test("multi-paragraph flow prose, bloated summaries and long problems break into
   assert.match(withDiagram, /<h3 id="mission-purpose-title">一句話專案摘要。<\/h3>/);
   assert.match(withDiagram, /class="mission-summary-notes"><summary>查看分析範圍與補充說明/);
   assert.match(withDiagram, /<ul><li>僅抽樣 30 個追蹤檔。<\/li>/);
-  assert.match(withDiagram, /<figcaption class="mission-flow-caption">.*展開各階段串接細節（5 段）/s);
+  assert.match(withDiagram, /<figcaption class="mission-flow-caption">.*主線串接與各階段說明/s);
+  assert.match(withDiagram, /其他核心與周邊模組分工（4 個）/);
+  assert.match(withDiagram, /<code>src\/cache\.ts<\/code>/);
   assert.match(withDiagram, /<code>packages\/opencode\/src\/index\.ts<\/code>/);
   assert.match(withDiagram, /<code>@opencode-ai\/core<\/code>/);
   assert.match(withDiagram, /class="mission-idea-more"><summary>看完整問題脈絡/);
 
-  // Without a diagram (flow: []): first 4 stages show immediately, 5th folds under flowMore, and English stays Han-free.
+  // Without a diagram (flow: []): synthesizes a visual stage pipeline and keeps English Han-free.
   const enHow = [
-    "Traces one main request path across five stages.",
+    "Traces the main request path across nine stages.",
     "1. Entry: src/main.rs calls run_web() with --verify.",
     "2. Lobby: web/app.js posts to /api/session.",
     "3. Agent: crates::events::apply_event updates state_map.",
     "4. Storage: saves the report row.",
     "5. Plugins: runs post_save hooks.",
+    "6. Cache: updates in-memory index.",
+    "7. Audit: writes audit trail.",
+    "8. Metrics: increments counters.",
+    "9. Cleanup: flushes pending queues.",
   ].join("\n\n");
   const enStepless = renderEnglish({
     insights: {
@@ -1053,8 +1077,10 @@ test("multi-paragraph flow prose, bloated summaries and long problems break into
     },
   });
   assertNoHan(enStepless);
+  assert.match(enStepless, /class="mission-flow-synthesized"/);
   assert.match(enStepless, /class="mission-flow-structured"/);
   assert.match(enStepless, /Show 1 more section/);
+  assert.match(enStepless, /Other core &amp; supporting modules/);
   assert.match(enStepless, /Analysis scope and notes/);
   assert.equal(splitProseLead("Short.").rest, "");
 });

@@ -64,7 +64,12 @@
 // horizontal-card & bounded-vertical recommendation box layout across 10
 // views (after trimming dead discovery/mission selectors and grouping
 // typography rules): all CSS 46.8 kB on Node.js 24, so the all-CSS budget
-// rose from 46.5 kB to 47.5 kB.
+// rose from 46.5 kB to 47.5 kB. Measured with structured prose blocks, the
+// architectural flow blueprint diagram (2–4 step horizontal track, 5–6 step
+// 3-column grid, synthesized pipeline fallback, and uncovered subsystem
+// module grid, after consolidating 8 repeated details/summary blocks in
+// mission.css): all CSS 47.6 kB on Node.js 24, so the all-CSS budget rose
+// from 47.5 kB to 48.2 kB.
 //
 // Exit status: 0 when every check passes, 1 when one fails, 2 on a usage or
 // setup error.
@@ -89,7 +94,7 @@ const budgets = {
   woff2: 12,
   largestJsGzip: 116 * kB,
   totalJsGzip: 515 * kB,
-  totalCssGzip: 47.5 * kB,
+  totalCssGzip: 48.2 * kB,
 };
 const required = [
   "package.json",

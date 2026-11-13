@@ -589,13 +589,34 @@ function StructuredProse({ text }: { text: string }) {
 export interface FlowStageItem {
   badge?: string;
   label?: string;
+  primaryPath?: string;
   lead: string;
   more?: string;
 }
 
+const genericStageLabel =
+  // i18n-allow: parser
+  /^(?:stage|step|phase|階段)\s*\d*$/i;
+const genericLeadPrefix =
+  // i18n-allow: parser
+  /^(?:主要資料流|資料流|主線流程|Main (?:data )?flow|Data flow|Primary flow)\s*[：:]\s*/i;
+const stageDirPathPattern = /\b(?:[a-z][a-z0-9_.-]*\/)+[A-Za-z0-9_.-]*/;
+const stageFilePattern =
+  /\b[A-Za-z0-9_-]+\.(?:rs|ts|tsx|js|jsx|mjs|cjs|c|h|cpp|py|go|toml|json|yml|yaml|sh|wasm)\b/;
+const rootDocPattern = /^(?:readme|contributing)(?:\.[^/]+)?$/i;
+
+function isStageHeadingLine(line: string): boolean {
+  return (
+    stageNumber.test(line) ||
+    sectionLabel.test(line) ||
+    englishSectionLabel.test(line)
+  );
+}
+
 /**
- * Parses dense multi-paragraph `howItFitsTogether` prose into a concise lead
- * plus structured stage items; returns null for short single-paragraph captions.
+ * Parses multi-paragraph or stage-headed `howItFitsTogether` prose into an
+ * optional overview lead plus complete stage items; returns null for short
+ * single-paragraph captions so simple flows keep their plain markup.
  */
 export function parseFlowProse(
   text: string,
@@ -614,14 +635,15 @@ export function parseFlowProse(
       .split("\n")
       .map((line) => line.trim())
       .filter(Boolean);
-    if (lines.length > 1 && lines.every((line) => stageNumber.test(line))) {
+    if (lines.length > 1 && lines.every((line) => isStageHeadingLine(line))) {
       chunks.push(...lines);
     } else if (
       blockIndex === 0 &&
       lines.length > 1 &&
-      lines[0].length <= 100 &&
-      !stageNumber.test(lines[0]) &&
-      lines.slice(1).every((line) => stageNumber.test(line))
+      lines[0].length <= 160 &&
+      // i18n-allow: parser
+      !/[：:]$/.test(lines[0]) &&
+      lines.slice(1).every((line) => isStageHeadingLine(line))
     ) {
       chunks.push(lines[0], ...lines.slice(1));
     } else {
@@ -631,16 +653,15 @@ export function parseFlowProse(
   let lead: string;
   let stageChunks: string[] = [];
   if (chunks.length === 1) {
-    const split = splitProseLead(chunks[0], 160);
-    lead = split.lead;
+    const split = splitProseLead(chunks[0], 180);
+    lead = split.lead.replace(genericLeadPrefix, "");
     if (split.rest) stageChunks = [split.rest];
   } else if (!stageNumber.test(chunks[0]) && chunks[0].length <= 190) {
-    lead = chunks[0];
+    lead = chunks[0].replace(genericLeadPrefix, "");
     stageChunks = chunks.slice(1);
   } else {
-    const split = splitProseLead(chunks[0], 150);
-    lead = split.lead;
-    stageChunks = [...(split.rest ? [split.rest] : []), ...chunks.slice(1)];
+    lead = "";
+    stageChunks = chunks;
   }
   const items: FlowStageItem[] = stageChunks.map((chunk, index) => {
     let rest = chunk.trim();
@@ -652,21 +673,25 @@ export function parseFlowProse(
     const zhLabel = sectionLabel.exec(rest);
     const enLabel = zhLabel ? null : englishSectionLabel.exec(rest);
     const found = zhLabel ?? enLabel;
-    const label = found ? `${found[1]}${found[2]}`.trim() : undefined;
+    const rawLabel = found ? `${found[1]}${found[2]}`.trim() : undefined;
     if (found) rest = rest.slice(found[0].length).trim();
+    const label =
+      rawLabel && !genericStageLabel.test(rawLabel) ? rawLabel : undefined;
+    const primaryPath =
+      stageDirPathPattern.exec(rest)?.[0] ?? stageFilePattern.exec(rest)?.[0];
     const badge =
       explicitNum !== undefined
         ? String(explicitNum).padStart(2, "0")
         : stageChunks.length > 1
           ? String(index + 1).padStart(2, "0")
           : undefined;
-    if (rest.includes("\n") || rest.length > 210) {
-      const split = splitProseLead(rest, 165);
-      if (split.rest.length >= 35) {
-        return { badge, label, lead: split.lead, more: split.rest };
+    if (rest.length > 720) {
+      const split = splitProseLead(rest, 420);
+      if (split.rest.length >= 60) {
+        return { badge, label, primaryPath, lead: split.lead, more: split.rest };
       }
     }
-    return { badge, label, lead: rest };
+    return { badge, label, primaryPath, lead: rest };
   });
   return { lead, items };
 }
@@ -700,9 +725,13 @@ function FlowStageList({
             </div>
           )}
           <div className="mission-flow-stage-body">
-            <p>
-              <InlineProse text={item.lead} />
-            </p>
+            {item.lead.includes("\n") ? (
+              <StructuredProse text={item.lead} />
+            ) : (
+              <p>
+                <InlineProse text={item.lead} />
+              </p>
+            )}
             {item.more && (
               <details className="mission-stage-more">
                 <summary>
@@ -722,48 +751,76 @@ function FlowStageList({
 function FlowProse({
   text,
   hasDiagram,
+  flowPaths = [],
+  modules = [],
 }: {
   text: string;
   hasDiagram: boolean;
+  flowPaths?: string[];
+  modules?: ProjectInsights["modules"];
 }) {
   const reading = useT("mission").reading;
   const parsed = parseFlowProse(text);
   if (!parsed) {
     return hasDiagram ? <figcaption>{text}</figcaption> : <p>{text}</p>;
   }
-  if (hasDiagram) {
-    return (
-      <figcaption className="mission-flow-caption">
+  const labeledStages = !hasDiagram
+    ? parsed.items.filter((item) => item.label).slice(0, 6)
+    : [];
+  const synthesizedDiagram = labeledStages.length >= 2 ? labeledStages : [];
+  const coveredPaths = new Set(
+    hasDiagram
+      ? flowPaths.filter(Boolean)
+      : synthesizedDiagram
+          .map((item) => item.primaryPath)
+          .filter((value): value is string => Boolean(value)),
+  );
+  const uncoveredModules = modules.filter(
+    (entry) =>
+      !rootDocPattern.test(entry.path) && !coveredPaths.has(entry.path),
+  );
+  const visible = parsed.items.slice(0, 8);
+  const extra = parsed.items.slice(8);
+  const body = (
+    <>
+      {synthesizedDiagram.length >= 2 && (
+        <ol
+          className={`mission-flow-synthesized${synthesizedDiagram.length <= 4 ? " is-few" : ""}`}
+          aria-hidden="true"
+        >
+          {synthesizedDiagram.map((stage, index) => (
+            <li key={index}>
+              <div className="mission-flow-step">
+                <span className="mission-journey-number">
+                  {stage.badge ?? String(index + 1).padStart(2, "0")}
+                </span>
+                <strong>{stage.label}</strong>
+                {stage.primaryPath && <code>{stage.primaryPath}</code>}
+              </div>
+              {index < synthesizedDiagram.length - 1 && (
+                <div className="mission-flow-link">
+                  <ArrowDown size={15} aria-hidden="true" />
+                </div>
+              )}
+            </li>
+          ))}
+        </ol>
+      )}
+      {parsed.lead && (
         <p className="mission-flow-lead">
           <InlineProse text={parsed.lead} />
         </p>
-        {parsed.items.length > 0 && (
-          <details className="mission-flow-details">
-            <summary>
-              {reading.flowDetails({ count: parsed.items.length })}
-              <ChevronRight size={14} aria-hidden="true" />
-            </summary>
-            <FlowStageList
-              items={parsed.items}
-              stageDetailsLabel={reading.stageDetails}
-            />
-          </details>
-        )}
-      </figcaption>
-    );
-  }
-  const visible = parsed.items.slice(0, 4);
-  const extra = parsed.items.slice(4);
-  return (
-    <div className="mission-flow-structured">
-      <p className="mission-flow-lead">
-        <InlineProse text={parsed.lead} />
-      </p>
+      )}
       {visible.length > 0 && (
-        <FlowStageList
-          items={visible}
-          stageDetailsLabel={reading.stageDetails}
-        />
+        <div className="mission-flow-walkthrough">
+          {hasDiagram && (
+            <span className="mission-flow-sublabel">{reading.flowStages}</span>
+          )}
+          <FlowStageList
+            items={visible}
+            stageDetailsLabel={reading.stageDetails}
+          />
+        </div>
       )}
       {extra.length > 0 && (
         <details className="mission-flow-details">
@@ -777,7 +834,32 @@ function FlowProse({
           />
         </details>
       )}
-    </div>
+      {uncoveredModules.length > 0 && (
+        <div className="mission-flow-subsystems">
+          <span className="mission-flow-sublabel">
+            {reading.subsystems({ count: uncoveredModules.length })}
+          </span>
+          <div className="mission-flow-module-grid">
+            {uncoveredModules.map((mod, index) => (
+              <div
+                key={`${mod.path}-${index}`}
+                className="mission-flow-module-card"
+              >
+                <code>{mod.path}</code>
+                <p>
+                  <InlineProse text={mod.purpose} />
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </>
+  );
+  return hasDiagram ? (
+    <figcaption className="mission-flow-caption">{body}</figcaption>
+  ) : (
+    <div className="mission-flow-structured">{body}</div>
   );
 }
 
@@ -1320,7 +1402,12 @@ export function ProjectOverview({
                 ))}
               </ol>
               {insights.howItFitsTogether && (
-                <FlowProse text={insights.howItFitsTogether} hasDiagram />
+                <FlowProse
+                  text={insights.howItFitsTogether}
+                  hasDiagram
+                  flowPaths={insights.flow.map((step) => step.path)}
+                  modules={insights.modules}
+                />
               )}
             </figure>
           ) : (
@@ -1330,6 +1417,7 @@ export function ProjectOverview({
                 <FlowProse
                   text={insights.howItFitsTogether}
                   hasDiagram={false}
+                  modules={insights.modules}
                 />
               </div>
             )
