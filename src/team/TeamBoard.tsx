@@ -51,6 +51,17 @@ const flowSteps: Partial<
   reviewing: "integrate",
 };
 
+/** Breaks dense single-line AI plans and task specs at section brackets and step numbers. */
+export function formatDensePlan(text: string): string {
+  if (!text || text.includes("\n") || text.length <= 120) return text;
+  return text
+    // i18n-allow: parser
+    .replace(/\s*(?=【[^】\n]{1,24}】)/g, "\n\n")
+    // i18n-allow: parser
+    .replace(/([。；;：:])\s*(?=(?:\(\d{1,2}\)|（\d{1,2}）))/g, "$1\n")
+    .trim();
+}
+
 export function TeamBoard({
   run,
   demo,
@@ -279,7 +290,7 @@ export function TeamBoard({
           )}
         </div>
         <p className={foldPlan && !planOpen ? "team-plan-folded" : undefined}>
-          {team.planSummary ||
+          {formatDensePlan(team.planSummary) ||
             (queued
               ? t.plan.queued
               : ["failed", "cancelled"].includes(team.phase)
@@ -524,7 +535,7 @@ export function TeamBoard({
                           : undefined
                       }
                     >
-                      {task.description}
+                      {formatDensePlan(task.description)}
                     </p>
                     {task.description.length > longDescription && (
                       <button

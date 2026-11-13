@@ -60,6 +60,7 @@ const m: Translation<typeof en> = {
       `讀取 ${n(sampled)} / ${n(tracked)} 個追蹤檔（約 ${n(kilobytes)} KB${truncated > 0 ? `，${n(truncated)} 檔節錄` : ""}），推論仍需確認`,
     coverageUnknown: "抽樣範圍未記錄，重新分析後顯示，推論仍需確認",
     usageTitle: "這次專案分析用量",
+    summaryNotes: "查看分析範圍與補充說明",
   },
   stale: {
     unknown:
@@ -94,6 +95,9 @@ const m: Translation<typeof en> = {
     title: "第一次讀這個專案，建議這樣讀",
     lead: "依 Agent 讀過的抽樣檔案排出順序。每一步說明為什麼先看它、看什麼。",
     flow: "模組怎麼串起來",
+    flowDetails: ({ count }) => `展開各階段串接細節（${n(count)} 段）`,
+    flowMore: ({ count }) => `展開其餘 ${n(count)} 段與補充說明`,
+    stageDetails: "看呼叫細節",
     flowOutside: "在這個 repository 之外",
     flowPasses: "傳給下一步：",
     unsampled: "未抽樣，內容未讀",
@@ -214,6 +218,7 @@ const m: Translation<typeof en> = {
     hideTitle: "隱藏此建議，可稍後恢復",
     newBadge: "本輪新增",
     userImpact: "對使用者的幫助",
+    problemMore: "看完整問題脈絡",
     approach: "看建議做法與驗收方式",
     choose: "以此方向開始",
     allHidden: ({ count }) =>

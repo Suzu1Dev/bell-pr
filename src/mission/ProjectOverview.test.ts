@@ -9,7 +9,13 @@ import type { PlaybackClock } from "../demo/playback";
 import { assertNoHan, renderEn, renderWith, renderZh } from "../test-utils/render";
 import { MarkdownContent } from "../review/MarkdownContent";
 import { AnalysisProgress } from "./AnalysisProgress";
-import { briefMarkdown, ProjectOverview, type ProjectOverviewProps } from "./ProjectOverview";
+import {
+  briefMarkdown,
+  parseFlowProse,
+  ProjectOverview,
+  splitProseLead,
+  type ProjectOverviewProps,
+} from "./ProjectOverview";
 import { playSampleAnalysis, stopSampleAnalysis } from "./sample-analysis";
 import { mount } from "./test-dom";
 
@@ -984,4 +990,71 @@ test("the brief's request and direction text render through the Markdown view, a
   assert.match(html, /<span>The problem to solve<\/span><div class="mission-brief-text"><div class="markdown-content"><p><strong>Problem<\/strong>: x<\/p>/);
   assert.doesNotMatch(renderEnglish({ run, brief: { ...brief, problem: "Short." } }), /is-stacked/);
   assert.match(renderEnglish({ run, brief: undefined }), /<div class="mission-brief-pending">.*<p><strong>Problem<\/strong>: one attempt\.<\/p>/s);
+});
+
+test("multi-paragraph flow prose, bloated summaries and long problems break into scannable stages and disclosures", () => {
+  assert.equal(parseFlowProse("Short single-paragraph flow caption."), null);
+  const denseHow = [
+    "以下描述主要資料流，依序經過四個階段。",
+    "（1）入口：根 package.json 執行 packages/opencode/src/index.ts，載入 @opencode-ai/core。",
+    "（2）伺服器：web/app.js 呼叫 fetch_json()，透過 /api/reports 送出資料。" + "補充呼叫細節說明。".repeat(25),
+    "（3）代理端：src/agent/events.rs 以 apply_data_event 分派事件。",
+    "（4）持久層：寫入資料庫並回傳狀態。",
+    "（5）外掛：runtime hook 攔截操作。",
+  ].join("\n\n");
+  const parsed = parseFlowProse(denseHow);
+  assert.ok(parsed);
+  assert.equal(parsed.lead, "以下描述主要資料流，依序經過四個階段。");
+  assert.equal(parsed.items.length, 5);
+  assert.equal(parsed.items[0].badge, "01");
+  assert.equal(parsed.items[0].label, "入口");
+  assert.ok(parsed.items[1].more, "long stage splits deep detail into .more");
+
+  // With a diagram: lead caption stays visible, stages fold into mission-flow-details.
+  const withDiagram = render({
+    insights: {
+      ...demoInsights,
+      summary: "一句話專案摘要。\n\n本次分析範圍有限：\n- 僅抽樣 30 個追蹤檔。\n- 未執行測試。",
+      purpose: "提供開發代理工具。\n\n內建模式：\n- build：完整權限。\n- plan：唯讀規劃。",
+      howItFitsTogether: denseHow,
+      recommendations: [
+        {
+          ...demoInsights.recommendations[0],
+          problem:
+            "src/cache.c 的雜湊桶大小存在全域變數，建立第二個快取時會覆寫設定。" +
+            "進一步追蹤 HASH_FUNC_IMPL 展開邏輯可發現較小快取可能發生越界讀取。".repeat(7),
+        },
+      ],
+    },
+  });
+  assert.match(withDiagram, /<h3 id="mission-purpose-title">一句話專案摘要。<\/h3>/);
+  assert.match(withDiagram, /class="mission-summary-notes"><summary>查看分析範圍與補充說明/);
+  assert.match(withDiagram, /<ul><li>僅抽樣 30 個追蹤檔。<\/li>/);
+  assert.match(withDiagram, /<figcaption class="mission-flow-caption">.*展開各階段串接細節（5 段）/s);
+  assert.match(withDiagram, /<code>packages\/opencode\/src\/index\.ts<\/code>/);
+  assert.match(withDiagram, /<code>@opencode-ai\/core<\/code>/);
+  assert.match(withDiagram, /class="mission-idea-more"><summary>看完整問題脈絡/);
+
+  // Without a diagram (flow: []): first 4 stages show immediately, 5th folds under flowMore, and English stays Han-free.
+  const enHow = [
+    "Traces one main request path across five stages.",
+    "1. Entry: src/main.rs calls run_web() with --verify.",
+    "2. Lobby: web/app.js posts to /api/session.",
+    "3. Agent: crates::events::apply_event updates state_map.",
+    "4. Storage: saves the report row.",
+    "5. Plugins: runs post_save hooks.",
+  ].join("\n\n");
+  const enStepless = renderEnglish({
+    insights: {
+      ...getDemo("en").insights,
+      flow: [],
+      summary: "Single-binary interview simulator.\n\nScope limits:\n- Read 25 of 700 files.",
+      howItFitsTogether: enHow,
+    },
+  });
+  assertNoHan(enStepless);
+  assert.match(enStepless, /class="mission-flow-structured"/);
+  assert.match(enStepless, /Show 1 more section/);
+  assert.match(enStepless, /Analysis scope and notes/);
+  assert.equal(splitProseLead("Short.").rest, "");
 });

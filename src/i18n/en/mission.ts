@@ -103,6 +103,7 @@ const mission = {
     coverageUnknown:
       "What was sampled was not recorded; re-analyze to see it. The inferences still need checking",
     usageTitle: "Usage of this project analysis",
+    summaryNotes: "Analysis scope and notes",
   },
   /**
    * How far the repository moved from the analyzed version. Every variant
@@ -157,6 +158,11 @@ const mission = {
     title: "New to this project? Read it in this order",
     lead: "Ordered from the sampled files the Agent read. Each step says why to read it first and what to look for.",
     flow: "How the modules fit together",
+    flowDetails: ({ count }: { count: number }) =>
+      `Show step-by-step details (${amount(count, "section", "sections")})`,
+    flowMore: ({ count }: { count: number }) =>
+      `Show ${amount(count, "more section", "more sections")}`,
+    stageDetails: "Call details",
     /** Read by screen readers only, on a flow step outside the repository. */
     flowOutside: "Outside this repository",
     /** Read by screen readers only, before what one flow step passes to the next. */
@@ -313,6 +319,7 @@ const mission = {
     hideTitle: "Hide this recommendation; you can show it again later",
     newBadge: "New in this batch",
     userImpact: "How it helps users",
+    problemMore: "Read full problem context",
     approach: "See the suggested approach and acceptance checks",
     choose: "Start with this direction",
     allHidden: ({ count }: { count: number }) =>

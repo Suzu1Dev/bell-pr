@@ -435,6 +435,352 @@ function BriefText({ text }: { text: string }) {
   );
 }
 
+/** Splits dense multi-paragraph or multi-sentence prose at a clean sentence or line break. */
+export function splitProseLead(
+  text: string,
+  maxChars = 180,
+): { lead: string; rest: string } {
+  const trimmed = text.trim();
+  if (!trimmed || (!trimmed.includes("\n") && trimmed.length <= maxChars)) {
+    return { lead: trimmed, rest: "" };
+  }
+  const [firstBlock, ...restBlocks] = trimmed.split(/\n\s*\n+/);
+  const [firstLine, ...restLines] = firstBlock.split("\n");
+  const tail = [restLines.join("\n").trim(), restBlocks.join("\n\n").trim()]
+    .filter(Boolean)
+    .join("\n\n");
+  const line = firstLine.trim();
+  if (line.length <= maxChars) return { lead: line, rest: tail };
+  // i18n-allow: parser
+  const sentenceEnd = /[。！？!?]+|(?<!\b[A-Z0-9])\.(?=\s+[A-Z\p{Script=Han}(（])/gu;
+  let cut = 0;
+  for (const match of line.matchAll(sentenceEnd)) {
+    const end = match.index! + match[0].length;
+    if (end <= maxChars && end >= 20) cut = end;
+    else if (end > maxChars) {
+      if (!cut) cut = end;
+      break;
+    }
+  }
+  if (!cut || cut >= line.length) return { lead: line, rest: tail };
+  const leftover = line.slice(cut).trim();
+  return {
+    lead: line.slice(0, cut).trim(),
+    rest: [leftover, tail].filter(Boolean).join("\n\n"),
+  };
+}
+
+const inlineCodeToken =
+  // i18n-allow: parser
+  /(`[^`\n]+`|(?:https?:\/\/|www\.)[^\s<]*|<[^>]+>|@[a-z0-9-]+\/[a-z0-9._/-]+|\.\.?\/[A-Za-z0-9_./*-]+|(?:\/[a-z][A-Za-z0-9_.-]*)+(?:\/[A-Za-z0-9_.*-]*)?|\b[a-z][a-z0-9_.-]*\/[A-Za-z0-9_./*-]+|\.[a-z0-9_-]+\.[a-z0-9]+|\b[A-Za-z0-9_-]+\.(?:rs|ts|tsx|js|jsx|mjs|cjs|c|h|cpp|py|go|toml|json|md|yml|yaml|sh|wasm|mk|expect)\b|\b[A-Za-z_][A-Za-z0-9_]*(?:::[A-Za-z_][A-Za-z0-9_]*)+(?:\([^)\n]{0,24}\))?|\b[A-Za-z_][A-Za-z0-9_]*(?:(?:->|\.)[A-Za-z_][A-Za-z0-9_]*)+\b|\b[A-Za-z_][A-Za-z0-9_]*\([^)\n]{0,24}\)|\b[A-Z][A-Z0-9]*_[A-Z0-9_*]+|\b[A-Za-z]+_[A-Za-z0-9_]+\b|(?<=^|[\s（(，、])--?[A-Za-z0-9][A-Za-z0-9_-]*)/g;
+
+/** Highlights inline code spans, file paths, symbols and CLI flags without async Markdown chunks. */
+function InlineProse({ text }: { text: string }) {
+  const parts = text.split(inlineCodeToken);
+  return (
+    <>
+      {parts.map((part, index) => {
+        if (!part) return null;
+        if (index % 2 === 1) {
+          if (part.startsWith("`") && part.endsWith("`") && part.length > 2) {
+            return <code key={index}>{part.slice(1, -1)}</code>;
+          }
+          if (/^(?:https?:\/\/|www\.|<)/.test(part)) return part;
+          return <code key={index}>{part}</code>;
+        }
+        return part;
+      })}
+    </>
+  );
+}
+
+const bulletLine = /^[-*•]\s+(.*)$/;
+const stageNumber =
+  // i18n-allow: parser
+  /^(?:[（(](\d{1,2})[）)]\s*|(\d{1,2})[.)]\s+)/;
+
+/** Renders multi-line AI prose into semantic paragraphs, lists and inline code chips. */
+function StructuredProse({ text }: { text: string }) {
+  const blocks = text
+    .trim()
+    .split(/\n\s*\n+/)
+    .map((block) => block.trim())
+    .filter(Boolean);
+  return (
+    <div className="mission-prose-blocks">
+      {blocks.map((block, blockIndex) => {
+        const lines = block
+          .split("\n")
+          .map((line) => line.trim())
+          .filter(Boolean);
+        const groups: Array<
+          | { kind: "ul"; items: string[] }
+          | { kind: "ol"; items: string[] }
+          | { kind: "p"; line: string }
+        > = [];
+        for (const line of lines) {
+          const bullet = bulletLine.exec(line);
+          const numbered = bullet ? null : stageNumber.exec(line);
+          if (bullet) {
+            const last = groups[groups.length - 1];
+            if (last?.kind === "ul") last.items.push(bullet[1]);
+            else groups.push({ kind: "ul", items: [bullet[1]] });
+          } else if (numbered) {
+            const item = line.slice(numbered[0].length).trim();
+            const last = groups[groups.length - 1];
+            if (last?.kind === "ol") last.items.push(item);
+            else groups.push({ kind: "ol", items: [item] });
+          } else {
+            groups.push({ kind: "p", line });
+          }
+        }
+        return groups.map((group, groupIndex) => {
+          const key = `${blockIndex}-${groupIndex}`;
+          if (group.kind === "ul") {
+            return (
+              <ul key={key}>
+                {group.items.map((item, i) => (
+                  <li key={i}>
+                    <InlineProse text={item} />
+                  </li>
+                ))}
+              </ul>
+            );
+          }
+          if (group.kind === "ol") {
+            return (
+              <ol key={key}>
+                {group.items.map((item, i) => (
+                  <li key={i}>
+                    <InlineProse text={item} />
+                  </li>
+                ))}
+              </ol>
+            );
+          }
+          const zh = sectionLabel.exec(group.line);
+          const en = zh ? null : englishSectionLabel.exec(group.line);
+          const found = zh ?? en;
+          if (found) {
+            // i18n-allow: parser
+            const colon = zh ? "：" : ":";
+            return (
+              <p key={key}>
+                <strong>
+                  {found[1]}
+                  {found[2]}
+                  {colon}
+                </strong>
+                <InlineProse text={group.line.slice(found[0].length)} />
+              </p>
+            );
+          }
+          return (
+            <p key={key}>
+              <InlineProse text={group.line} />
+            </p>
+          );
+        });
+      })}
+    </div>
+  );
+}
+
+export interface FlowStageItem {
+  badge?: string;
+  label?: string;
+  lead: string;
+  more?: string;
+}
+
+/**
+ * Parses dense multi-paragraph `howItFitsTogether` prose into a concise lead
+ * plus structured stage items; returns null for short single-paragraph captions.
+ */
+export function parseFlowProse(
+  text: string,
+): { lead: string; items: FlowStageItem[] } | null {
+  const trimmed = text.trim();
+  if (!trimmed || (!trimmed.includes("\n") && trimmed.length <= 360)) {
+    return null;
+  }
+  const blocks = trimmed
+    .split(/\n\s*\n+/)
+    .map((block) => block.trim())
+    .filter(Boolean);
+  const chunks: string[] = [];
+  blocks.forEach((block, blockIndex) => {
+    const lines = block
+      .split("\n")
+      .map((line) => line.trim())
+      .filter(Boolean);
+    if (lines.length > 1 && lines.every((line) => stageNumber.test(line))) {
+      chunks.push(...lines);
+    } else if (
+      blockIndex === 0 &&
+      lines.length > 1 &&
+      lines[0].length <= 100 &&
+      !stageNumber.test(lines[0]) &&
+      lines.slice(1).every((line) => stageNumber.test(line))
+    ) {
+      chunks.push(lines[0], ...lines.slice(1));
+    } else {
+      chunks.push(block);
+    }
+  });
+  let lead: string;
+  let stageChunks: string[] = [];
+  if (chunks.length === 1) {
+    const split = splitProseLead(chunks[0], 160);
+    lead = split.lead;
+    if (split.rest) stageChunks = [split.rest];
+  } else if (!stageNumber.test(chunks[0]) && chunks[0].length <= 190) {
+    lead = chunks[0];
+    stageChunks = chunks.slice(1);
+  } else {
+    const split = splitProseLead(chunks[0], 150);
+    lead = split.lead;
+    stageChunks = [...(split.rest ? [split.rest] : []), ...chunks.slice(1)];
+  }
+  const items: FlowStageItem[] = stageChunks.map((chunk, index) => {
+    let rest = chunk.trim();
+    const numMatch = stageNumber.exec(rest);
+    const explicitNum = numMatch
+      ? Number(numMatch[1] ?? numMatch[2])
+      : undefined;
+    if (numMatch) rest = rest.slice(numMatch[0].length).trim();
+    const zhLabel = sectionLabel.exec(rest);
+    const enLabel = zhLabel ? null : englishSectionLabel.exec(rest);
+    const found = zhLabel ?? enLabel;
+    const label = found ? `${found[1]}${found[2]}`.trim() : undefined;
+    if (found) rest = rest.slice(found[0].length).trim();
+    const badge =
+      explicitNum !== undefined
+        ? String(explicitNum).padStart(2, "0")
+        : stageChunks.length > 1
+          ? String(index + 1).padStart(2, "0")
+          : undefined;
+    if (rest.includes("\n") || rest.length > 210) {
+      const split = splitProseLead(rest, 165);
+      if (split.rest.length >= 35) {
+        return { badge, label, lead: split.lead, more: split.rest };
+      }
+    }
+    return { badge, label, lead: rest };
+  });
+  return { lead, items };
+}
+
+function FlowStageList({
+  items,
+  stageDetailsLabel,
+}: {
+  items: FlowStageItem[];
+  stageDetailsLabel: string;
+}) {
+  return (
+    <ol className="mission-flow-stages">
+      {items.map((item, index) => (
+        <li
+          key={index}
+          className={
+            !item.label && !item.badge
+              ? "is-plain"
+              : !item.label
+                ? "is-badge-only"
+                : undefined
+          }
+        >
+          {(item.badge || item.label) && (
+            <div className="mission-flow-stage-head">
+              {item.badge && (
+                <span className="mission-journey-number">{item.badge}</span>
+              )}
+              {item.label && <strong>{item.label}</strong>}
+            </div>
+          )}
+          <div className="mission-flow-stage-body">
+            <p>
+              <InlineProse text={item.lead} />
+            </p>
+            {item.more && (
+              <details className="mission-stage-more">
+                <summary>
+                  {stageDetailsLabel}
+                  <ChevronRight size={13} aria-hidden="true" />
+                </summary>
+                <StructuredProse text={item.more} />
+              </details>
+            )}
+          </div>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+function FlowProse({
+  text,
+  hasDiagram,
+}: {
+  text: string;
+  hasDiagram: boolean;
+}) {
+  const reading = useT("mission").reading;
+  const parsed = parseFlowProse(text);
+  if (!parsed) {
+    return hasDiagram ? <figcaption>{text}</figcaption> : <p>{text}</p>;
+  }
+  if (hasDiagram) {
+    return (
+      <figcaption className="mission-flow-caption">
+        <p className="mission-flow-lead">
+          <InlineProse text={parsed.lead} />
+        </p>
+        {parsed.items.length > 0 && (
+          <details className="mission-flow-details">
+            <summary>
+              {reading.flowDetails({ count: parsed.items.length })}
+              <ChevronRight size={14} aria-hidden="true" />
+            </summary>
+            <FlowStageList
+              items={parsed.items}
+              stageDetailsLabel={reading.stageDetails}
+            />
+          </details>
+        )}
+      </figcaption>
+    );
+  }
+  const visible = parsed.items.slice(0, 4);
+  const extra = parsed.items.slice(4);
+  return (
+    <div className="mission-flow-structured">
+      <p className="mission-flow-lead">
+        <InlineProse text={parsed.lead} />
+      </p>
+      {visible.length > 0 && (
+        <FlowStageList
+          items={visible}
+          stageDetailsLabel={reading.stageDetails}
+        />
+      )}
+      {extra.length > 0 && (
+        <details className="mission-flow-details">
+          <summary>
+            {reading.flowMore({ count: extra.length })}
+            <ChevronRight size={14} aria-hidden="true" />
+          </summary>
+          <FlowStageList
+            items={extra}
+            stageDetailsLabel={reading.stageDetails}
+          />
+        </details>
+      )}
+    </div>
+  );
+}
+
 function Brief({
   run,
   brief,
@@ -901,7 +1247,13 @@ export function ProjectOverview({
                 <span className="mission-journey-number">
                   {String(index + 1).padStart(2, "0")}
                 </span>
-                <p>{step}</p>
+                <p>
+                  {step.length > 90 || step.includes("`") ? (
+                    <InlineProse text={step} />
+                  ) : (
+                    step
+                  )}
+                </p>
               </li>
             ))}
           </ol>
@@ -968,14 +1320,17 @@ export function ProjectOverview({
                 ))}
               </ol>
               {insights.howItFitsTogether && (
-                <figcaption>{insights.howItFitsTogether}</figcaption>
+                <FlowProse text={insights.howItFitsTogether} hasDiagram />
               )}
             </figure>
           ) : (
             insights.howItFitsTogether && (
               <div className="mission-reading-flow">
                 <span>{t.reading.flow}</span>
-                <p>{insights.howItFitsTogether}</p>
+                <FlowProse
+                  text={insights.howItFitsTogether}
+                  hasDiagram={false}
+                />
               </div>
             )
           )}
@@ -1004,7 +1359,11 @@ export function ProjectOverview({
                   <p>{step.why}</p>
                   <p>
                     <strong>{t.reading.lookFor}</strong>
-                    {step.lookFor}
+                    {step.lookFor.includes("`") ? (
+                      <InlineProse text={step.lookFor} />
+                    ) : (
+                      step.lookFor
+                    )}
                   </p>
                   {(module || evidence) && (
                     <details className="mission-reading-context">
@@ -1346,8 +1705,33 @@ export function ProjectOverview({
                   : t.project.sourceAi}
               </span>
             </div>
-            <h3 id="mission-purpose-title">{insights.summary}</h3>
-            <p className="mission-project-purpose">{insights.purpose}</p>
+            {(() => {
+              const splitSummary =
+                insights.summary.includes("\n") || insights.summary.length > 200
+                  ? splitProseLead(insights.summary, 180)
+                  : { lead: insights.summary, rest: "" };
+              return (
+                <>
+                  <h3 id="mission-purpose-title">{splitSummary.lead}</h3>
+                  {insights.purpose.includes("\n") ? (
+                    <div className="mission-project-purpose">
+                      <StructuredProse text={insights.purpose} />
+                    </div>
+                  ) : (
+                    <p className="mission-project-purpose">{insights.purpose}</p>
+                  )}
+                  {splitSummary.rest && (
+                    <details className="mission-summary-notes">
+                      <summary>
+                        {t.project.summaryNotes}
+                        <ChevronRight size={14} aria-hidden="true" />
+                      </summary>
+                      <StructuredProse text={splitSummary.rest} />
+                    </details>
+                  )}
+                </>
+              );
+            })()}
             {insights.audience.length > 0 && (
               <div className="mission-audience">
                 <span>
@@ -1755,7 +2139,28 @@ export function ProjectOverview({
                         )}
                       </div>
                       <h3 id={`${ideaAnchor(idea.id)}-title`}>{idea.title}</h3>
-                      <p className="mission-idea-problem">{idea.problem}</p>
+                      {(() => {
+                        const splitProblem =
+                          idea.problem.includes("\n") || idea.problem.length > 200
+                            ? splitProseLead(idea.problem, 155)
+                            : { lead: idea.problem, rest: "" };
+                        return splitProblem.rest.length >= 40 ? (
+                          <div className="mission-idea-problem">
+                            <p>
+                              <InlineProse text={splitProblem.lead} />
+                            </p>
+                            <details className="mission-idea-more">
+                              <summary>
+                                {t.ideas.problemMore}
+                                <ChevronRight size={13} aria-hidden="true" />
+                              </summary>
+                              <StructuredProse text={splitProblem.rest} />
+                            </details>
+                          </div>
+                        ) : (
+                          <p className="mission-idea-problem">{idea.problem}</p>
+                        );
+                      })()}
                       <div className="mission-idea-impact">
                         <Users size={15} />
                         <p>
@@ -1768,7 +2173,11 @@ export function ProjectOverview({
                           {t.ideas.approach}
                           <ChevronRight size={14} />
                         </summary>
-                        <p>{idea.approach}</p>
+                        {idea.approach.includes("\n") ? (
+                          <StructuredProse text={idea.approach} />
+                        ) : (
+                          <p>{idea.approach}</p>
+                        )}
                         {idea.acceptance.length > 0 && (
                           <ul>
                             {idea.acceptance.map((item, itemIndex) => (

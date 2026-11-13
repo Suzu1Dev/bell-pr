@@ -9,7 +9,7 @@ import { LocaleProvider } from "../i18n";
 import en from "../i18n/en";
 import { assertNoHan, renderEn, renderZh } from "../test-utils/render";
 import type { Run } from "../types";
-import { TeamBoard } from "./TeamBoard";
+import { formatDensePlan, TeamBoard } from "./TeamBoard";
 
 const { run: demoRun, team: demoTeam } = getDemo("zh-TW");
 
@@ -914,4 +914,6 @@ test("a learn-by-hand board turns only while the guide or BELL works, and names 
     }),
   );
   assert.match(heading(agents), /class="[^"]*spin/);
+  const jammed = `【專案目的】${"說明文字。".repeat(30)}【實作步驟】(1) 修改設定；(2) 補上測試。`;
+  assert.match(formatDensePlan(jammed), /【專案目的】[\s\S]*\n\n【實作步驟】\(1\) 修改設定；\n\(2\) 補上測試。/);
 });
