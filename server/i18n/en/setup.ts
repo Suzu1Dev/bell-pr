@@ -56,9 +56,12 @@ export default {
       agentTimeoutScale: "Agent time limit scale",
       allowUnsandboxedAgents: "Allow unsandboxed Claude Code and Antigravity Agents",
       retentionDays: "Days to keep a finished run's files",
+      groupWork: `${product.name} Group`,
     },
     locked: ({ setting, variable }: { setting: string; variable: string }) =>
-      `The setting "${setting}" comes from the ${variable} environment variable. Change or remove the variable, then restart ${product.name}.`,
+      variable.startsWith("--")
+        ? `The setting "${setting}" comes from the ${variable} startup flag. Restart ${product.name} without ${variable} to change it here.`
+        : `The setting "${setting}" comes from the ${variable} environment variable. Change or remove the variable, then restart ${product.name}.`,
   },
   /** Deleting while a project analysis runs. */
   busy: {
@@ -95,6 +98,7 @@ export default {
   fixes: {
     installGit: "Install Git",
     useWsl: `Install WSL2 and run ${product.name} inside it`,
+    removeSudoRule: `Remove ${product.name}'s sudo rule`,
     installGh: "Install the GitHub CLI",
     signInGh: "Sign in to GitHub",
     addWorkflowScope: "Allow pushing workflow changes",
@@ -176,6 +180,8 @@ export default {
     fullAccessDisclosure,
     sudoDisclosure,
     passwordlessSudoInstalled: `BELL PR's passwordless sudo rule is installed. ${sudoDisclosure}`,
+    passwordlessSudoExpired: "BELL PR's passwordless sudo rule is past its expiry time but still present. Remove it.",
+    passwordlessSudoNoExpiry: "BELL PR's passwordless sudo rule has no valid expiry time. Remove it.",
     passwordlessSudoExternal: `Passwordless sudo is available through another rule. ${sudoDisclosure}`,
     providersReady: ({ providers }: { providers: string[] }) =>
       `Ready: ${fmt.list(providers)}.`,
@@ -237,7 +243,7 @@ export default {
     dataDir: ({ path }: { path: string }) => `Data directory: ${path}`,
     /** The line above a fix command. */
     fix: ({ label }: { label: string }) => `${label}:`,
-    usage: `Usage: ${product.binNames[0]} doctor [--json] [--data-dir <dir>]`,
+    usage: `Usage: ${product.binNames[0]} doctor [--json] [--data-dir <dir>] [--sudoers-path <file>]`,
     unknownArgument: ({ argument }: { argument: string }) =>
       `Unknown argument "${argument}".`,
   },

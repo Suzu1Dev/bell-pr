@@ -418,6 +418,7 @@ export async function importRepository(
       defaultBranch,
       url: remote?.url ?? "",
       language: metadata?.primaryLanguage?.name,
+      ...(ignoredUserinfo ? { originUserinfoIgnored: true } : {}),
     };
     if (ignoredUserinfo) log.warn("repo.origin_userinfo", { repoId: repo.id });
     // The project's own rules from its files; GitHub's facts (the door)

@@ -42,11 +42,11 @@ BELL PR 是讓你透過開源貢獻學習的本機工作台。它使用你的 Co
 npx bell-pr
 ```
 
-BELL PR 會檢查環境，再於瀏覽器開啟 `http://127.0.0.1:4311`。依歡迎畫面選擇語言與 AI 服務，接著匯入專案或探索貢獻方向。必要檢查未通過時，啟動會停止並列出修正指令。
+BELL PR 會檢查環境，再於瀏覽器開啟 `http://127.0.0.1:4311`。依歡迎畫面選擇語言與 AI 服務，接著匯入專案或探索貢獻方向。只有 AI 服務這項必要檢查失敗時，啟動仍會開啟。第一次啟動時，歡迎畫面會說明如何安裝，範例導覽就在那個畫面。其他必要檢查失敗時，啟動會停止並列出修正指令。
 
 ### 用示範專案試試看
 
-只要已安裝 Node.js，就能在設定 GitHub 或 AI 服務前體驗審閱流程：
+只要已安裝 Node.js，就能在設定 GitHub 或 AI 服務前體驗審閱流程。只有 AI 服務這項必要檢查失敗時，`npx bell-pr` 仍會開啟。第一次啟動時，歡迎畫面會說明如何安裝，範例導覽就在那個畫面。其他必要檢查失敗時，請用：
 
 ```sh
 npx bell-pr start --force
@@ -87,7 +87,7 @@ Homebrew、Bun、mise 與 Windows 安裝腳本等方式，請見[安裝指南](d
 
 ## 設定與資料
 
-在「設定」調整語言、模型、學習選項與同時執行的任務數。連接埠、環境變數與 CLI 選項請見[設定說明](docs/configuration.md)及 [.env.example](.env.example)。
+在「設定」調整語言、**BELL PR Group** 團隊協作、模型、學習選項與同時執行的任務數。連接埠、環境變數與 CLI 選項請見[設定說明](docs/configuration.md)、[團隊協作](docs/group-work.md)及 [.env.example](.env.example)。
 
 專案、worktree、筆記與設定預設存於 `~/.bellpr`，可用 `--data-dir` 或 `BELLPR_DATA_DIR` 指定其他目錄。備份前請先停止 BELL PR，再複製整個目錄；紀錄含有絕對路徑，還原時需使用相同路徑。更新、復原與版本相容性請見[升級說明](docs/upgrading.md)。
 

@@ -47,6 +47,7 @@ import { useFormat, useT, type Messages } from "../i18n";
 import { parseInviteInput } from "../PairPage";
 import { participantToken } from "./participant";
 import { Modal } from "../modals/Modal";
+import { serializeRoute, useHashRoute } from "../navigation/route";
 import { CopyCommand } from "../setup/CopyCommand";
 import { createGroupStore, reasonOf, type GroupState } from "./store";
 import "./group.css";
@@ -2494,6 +2495,12 @@ export function GroupPage({ status }: { status: Status | null }) {
   };
 
   let card: ReactNode = null;
+  const route = useHashRoute();
+  const settingsHref = serializeRoute({
+    name: "settings",
+    section: "group",
+    ...(route?.flags ? { flags: route.flags } : {}),
+  });
   if (!on) {
     card = status && (
       <div className="settings-card">
@@ -2502,6 +2509,11 @@ export function GroupPage({ status }: { status: Status | null }) {
             <h2>{t.off.title}</h2>
             <p>{t.off.body}</p>
           </div>
+        </div>
+        <div className="settings-actions">
+          <a className="button primary" href={settingsHref}>
+            {t.off.openSettings}
+          </a>
         </div>
         <CopyCommand command={`${product.binNames[0]} start --group`} />
       </div>

@@ -104,6 +104,7 @@ export function SettingSwitch({
   help,
   checked,
   loading = false,
+  disabled = false,
   saving = false,
   lockedBy,
   lockedHint,
@@ -114,6 +115,8 @@ export function SettingSwitch({
   checked: boolean;
   /** The setting is not known yet: the control is disabled. */
   loading?: boolean;
+  /** Read-only on this browser, such as a host-only switch viewed from a paired device. */
+  disabled?: boolean;
   /**
    * A change is being saved: further clicks wait for it. The control stays
    * enabled, so it keeps the keyboard focus (a dialog gives it back).
@@ -132,7 +135,7 @@ export function SettingSwitch({
         id={id}
         type="checkbox"
         checked={checked}
-        disabled={loading || !!lockedBy}
+        disabled={loading || disabled || !!lockedBy}
         aria-busy={saving || undefined}
         aria-describedby={describedBy(help && `${id}-help`, lockedBy && `${id}-lock`)}
         onChange={(event) => {

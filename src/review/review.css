@@ -835,8 +835,7 @@
   font-size: var(--text-xs) !important;
   cursor: pointer;
 }
-.explain-answer-toggle:hover,
-.explain-note-save:hover:not(:disabled) {
+.explain-answer-toggle:hover {
   background: var(--color-violet-bg);
 }
 .explain-answer {

@@ -36,6 +36,7 @@
         <a class="brand" href="index.html"><img src="assets/brand/logo-wordmark.svg" alt="BELL PR" width="104" height="34"></a>
         <nav class="site-nav" aria-label="Main">
           <ul>
+            <li><a href="#group">Group</a></li>
             <li><a href="#demo">Demo</a></li>
             <li><a href="#how-it-works">How it works</a></li>
             <li><a href="install.html">Install</a></li>
@@ -52,6 +53,11 @@
     <main id="main">
       <section class="hero">
         <div class="wrap">
+          <a class="release-callout" href="#group">
+            <span class="release-pill">Major update</span>
+            <span class="release-brand"><span>BELL PR</span> <span class="group-dream-inline">Group</span></span>
+            <span class="release-copy">Turn on live team path holds and task order right in Settings →</span>
+          </a>
           <p class="eyebrow">Open source · Local-first · You explain it back · No telemetry</p>
           <h1>From vibe coding to knowing why.</h1>
           <p class="lead">Your AI agent team does the legwork. You understand every change, explain it back, and send only what a maintainer is glad to review. BELL PR runs on your own machine with the AI coding CLI and the GitHub CLI you already use, and it only ever opens Draft pull requests that you approved.</p>
@@ -174,6 +180,75 @@ brew install suzu1dev/bell-pr/bell-pr<!-- /generated:install-commands --></code>
             </div>
           </div>
           <p class="hero-note">Free and open source under Apache-2.0, with no BELL PR account. Real contributions need Git and a signed-in GitHub CLI plus Codex CLI, Claude Code or Antigravity CLI.</p>
+        </div>
+      </section>
+
+      <section class="section section-group" id="group" aria-labelledby="group-title">
+        <div class="wrap">
+          <div class="section-head">
+            <p class="eyebrow group-eyebrow">New in this release · Team collaboration</p>
+            <div class="group-lockup" aria-hidden="true">
+              <img class="group-wordmark" src="assets/brand/logo-wordmark.svg" alt="" width="136" height="44">
+              <span class="group-dream-badge">Group</span>
+            </div>
+            <h2 id="group-title">Meet <span class="group-brand-text">BELL PR</span> <span class="group-dream-word">Group</span>: coordinate with your team, right from Settings.</h2>
+            <p>Working on the same repository with classmates or teammates? Turn BELL PR Group on in Settings → BELL PR Group (or with <code>bell-pr <wbr>start <wbr>--group</code>). Your computer hosts a shared live board—no cloud account, no extra server—so everyone sees who holds which paths before an Agent or pull request touches them.</p>
+          </div>
+          <div class="group-showcase">
+            <div class="group-preview" aria-label="BELL PR Group live board preview">
+              <div class="group-preview-top">
+                <span class="group-preview-setting">Settings → BELL PR Group</span>
+                <span class="group-preview-on">On · Active</span>
+              </div>
+              <div class="group-preview-bar">
+                <code>suzu1dev/bell-pr</code>
+                <div class="group-preview-people">
+                  <span class="group-avatar">SL</span>
+                  <span class="group-avatar">YC</span>
+                  <span class="group-avatar">MK</span>
+                  <span class="group-live-pill">Live</span>
+                </div>
+              </div>
+              <ul class="group-hold-list">
+                <li class="group-hold-item">
+                  <div class="group-hold-meta">
+                    <strong>Sora</strong>
+                    <span>Held now</span>
+                  </div>
+                  <div class="group-hold-paths">
+                    <code>src/settings/</code>
+                    <code>server/index.ts</code>
+                  </div>
+                  <p class="group-hold-title">Enable BELL PR Group in Settings &amp; strict lock</p>
+                </li>
+                <li class="group-hold-item">
+                  <div class="group-hold-meta">
+                    <strong>Yuna</strong>
+                    <span>After: Enable BELL PR Group</span>
+                  </div>
+                  <div class="group-hold-paths">
+                    <code>site/</code>
+                  </div>
+                  <p class="group-hold-title">Dreamy Group release showcase on the website</p>
+                </li>
+              </ul>
+              <p class="group-preview-guard">Write guard active: overlapping holds, Agent edits to teammates&#39; held paths, and conflicting pull request publishes are stopped automatically.</p>
+            </div>
+            <ul class="group-cards">
+              <li class="card">
+                <h3>Turn on in Settings, stays on</h3>
+                <p>Flip one switch in Settings → BELL PR Group. BELL PR upgrades its data-directory lock in place, opens the Group board right away, and remembers your choice across restarts.</p>
+              </li>
+              <li class="card">
+                <h3>Live path holds &amp; task order</h3>
+                <p>Claim folders or files before starting work and pick prerequisite tasks that must finish first. Choosing Finish &amp; release unblocks waiting teammates right away.</p>
+              </li>
+              <li class="card">
+                <h3>Protected Agent runs &amp; Draft PRs</h3>
+                <p>Pair teammates&#39; browsers with <code>bell-pr <wbr>pair</code> and one-time invite codes. BELL PR stops an Agent run if it edits another person&#39;s held path and refuses overlapping publishes.</p>
+              </li>
+            </ul>
+          </div>
         </div>
       </section>
 
@@ -406,6 +481,10 @@ brew install suzu1dev/bell-pr/bell-pr<!-- /generated:install-commands --></code>
               <p>Only if you choose, or if the project requires it. The draft can end with an editable line saying that AI coding agents helped prepare the change and that you reviewed it. The line is off unless you turn it on, or the project&#39;s own rules ask for a disclosure. When they require one, BELL PR does not publish until the description has it. Follow each project&#39;s rules on AI-assisted contributions; <code>docs/contributing-responsibly.md</code> in the source repository explains what responsible use means.</p>
             </details>
             <details>
+              <summary>How do I use BELL PR Group with teammates?</summary>
+              <p>Open Settings → BELL PR Group on the host computer and turn it on (or start with <code>bell-pr <wbr>start <wbr>--group</code>). Pair each teammate&#39;s browser with <code>bell-pr <wbr>pair</code>, then create a 10-minute single-use invite code on the Group board. Once joined, teammates claim paths and mark prerequisite tasks before starting work, and BELL PR guards those paths during Agent runs and Draft PR publishing.</p>
+            </details>
+            <details>
               <summary>Can I turn the understanding check off?</summary>
               <p>Yes, in Settings → Learning, after a confirmation that says what changes. Every file still has to be reviewed and you still approve the pull request; every project-rule, issue and pacing check still applies, and runs approved without the check are marked for good.</p>
             </details>
@@ -425,6 +504,7 @@ brew install suzu1dev/bell-pr/bell-pr<!-- /generated:install-commands --></code>
           <nav class="footer-col" aria-labelledby="footer-product">
             <h2 id="footer-product">Product</h2>
             <ul>
+              <li><a href="index.html#group">BELL PR Group</a></li>
               <li><a href="index.html#how-it-works">How it works</a></li>
               <li><a href="install.html">Install</a></li>
             </ul>

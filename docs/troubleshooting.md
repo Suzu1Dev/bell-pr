@@ -24,6 +24,10 @@ versions BELL PR supports (2.1.292 or later, before 2.2); agents still
 start, and the [security model](security-model.md#claude-code) says why
 the version matters.
 
+On Linux, the Passwordless sudo line fails when BELL PR's sudo rule is past
+its expiry time or has none; run the `sudo rm` command it prints. Add
+`--sudoers-path <file>` to inspect another file; the check only reads it.
+
 Contents:
 
 - [I lost the address](#i-lost-the-address)
@@ -565,12 +569,14 @@ there, then publish again.
 ## BELL PR does not start
 
 - **"Not ready: fix the required check…"**: `bell-pr doctor` failed a
-  required check, so `bell-pr start` exited before it listened. The message
-  is the doctor's checklist: each failed check and the command that fixes
-  it, under a line that points to the sample tour. `bell-pr start --force`
-  starts and prints a warning. The sample tour needs no AI provider; a
-  real agent run still waits until Codex CLI, Claude Code or the
-  Antigravity CLI is installed and signed in.
+  required check other than the AI provider alone, so `bell-pr start`
+  exited before it listened. If only the provider check fails, start still
+  listens. The first time, Welcome shows how to install Codex CLI, Claude
+  Code or the Antigravity CLI. The message is the doctor's checklist: each
+  failed check and the command that fixes it, under a line that points to
+  the sample tour. `bell-pr start --force` starts and prints a warning. The
+  sample tour needs no AI provider; a real agent run still waits until
+  Codex CLI, Claude Code or the Antigravity CLI is installed and signed in.
 - **"BELL PR needs Node.js 22 or later"**: install the current Node.js LTS
   from [nodejs.org](https://nodejs.org/en) (or `nvm install 22`).
 - **"Port 4311 is already in use by another program"**: start on a free

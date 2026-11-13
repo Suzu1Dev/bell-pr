@@ -230,7 +230,8 @@ const collab = {
   },
   off: {
     title: `Group work is off for this ${product.name}.`,
-    body: `To turn it on, start ${product.name} with this line on the computer that runs it.`,
+    body: `Turn ${product.name} Group on in Settings, or start ${product.name} with this line on the computer that runs it.`,
+    openSettings: "Turn on in Settings",
   },
   inviteDialog: {
     title: "Invite someone",

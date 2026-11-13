@@ -343,6 +343,26 @@ test("the sample project switch saves showSampleProject", async ({ browser }) =>
   });
 });
 
+test("the BELL PR Group switch enables Group live without a restart", async ({ browser }) => {
+  await onServer(browser, {}, async (page) => {
+    await page.goto("/#/settings/group");
+    const toggle = page.getByRole("checkbox", { name: settings.group.label });
+    await expect(toggle).toBeEnabled();
+    await expect(toggle).not.toBeChecked();
+    await expect(page.locator('a[href="#/group"]')).toHaveCount(0);
+    await toggle.click();
+    await expect(toggle).toBeChecked();
+    expect((await appSettings(page)).settings.groupWork).toBe(true);
+    await expect(page.locator('a[href="#/group"]').first()).toBeVisible();
+    await page.getByRole("link", { name: settings.group.openBoard }).click();
+    await expect(page).toHaveURL(/#\/group$/);
+    await page.goto("/#/settings/group");
+    await toggle.click();
+    await expect(toggle).not.toBeChecked();
+    await expect(page.locator('a[href="#/group"]')).toHaveCount(0);
+  });
+});
+
 test("the retention period saves and survives a reload", async ({ browser }) => {
   await onServer(browser, {}, async (page) => {
     await page.goto("/#/settings/data");

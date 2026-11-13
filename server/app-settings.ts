@@ -21,6 +21,7 @@ import type { Locale } from "../shared/i18n/locale.js";
 import { parseActiveRunLimit, parseAgentProcessLimit } from "./agent-slots.js";
 import { parseAgentTimeoutScale } from "./agent-timeouts.js";
 import { setRetentionDaysSource } from "./cleanup.js";
+import { envFlag } from "./config.js";
 import { setAlwaysDiscloseAiSource } from "./drafts.js";
 import { writeDurable } from "./fs-atomic.js";
 import { setDefaultLocaleSource, type ServerMessages } from "./i18n/index.js";
@@ -76,6 +77,10 @@ const environmentLocks = {
         throw new RangeError(`${requireUnderstandingVariable} only accepts 1.`);
       return false;
     },
+  },
+  groupWork: {
+    variable: "BELLPR_GROUP",
+    parse: (value: string) => envFlag(value),
   },
 } satisfies Partial<
   Record<SettingKey, { variable: string; parse: (value: string) => unknown }>
@@ -139,16 +144,20 @@ export class AppSettingsService {
   private saved: AppSettings;
   private writes: Promise<unknown> = Promise.resolve();
   private readonly env: NodeJS.ProcessEnv;
+  private readonly cliGroup: boolean;
 
   constructor(
     readonly dataDir: string,
     options: {
       /** Where locks come from; process.env by default. */
       env?: NodeJS.ProcessEnv;
+      /** True when `bell-pr start --group` fixed groupWork on for this process. */
+      cliGroup?: boolean;
     } = {},
   ) {
     this.file = path.join(dataDir, "app-settings.json");
     this.env = options.env ?? process.env;
+    this.cliGroup = options.cliGroup === true;
     this.saved = this.read();
     // Nothing is silent: a value that cannot lock the check says so.
     const requireCheck = this.env[requireUnderstandingVariable]?.trim();
@@ -191,6 +200,7 @@ export class AppSettingsService {
         // invalid limit; the constructor warns about the understanding lock.
       }
     }
+    if (this.cliGroup) locks.groupWork = { variable: "--group", value: true };
     return locks;
   }
 

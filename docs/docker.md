@@ -37,12 +37,13 @@ docker run -d --name bell-pr \
   bell-pr
 ```
 
-- The image's command is `bell-pr start`. If a required doctor check fails
-  (no Codex or Claude Code sign-in yet), the process exits before it
-  listens and prints each failed check with its fix command. Sign in as
-  below, or open the sample tour with `docker run ... bell-pr start --force`
-  (that replaces the image command). A real agent run is still refused
-  until a provider is signed in.
+- The image's command is `bell-pr start`. With no Codex or Claude Code
+  sign-in yet, and no other required check failing, it still listens. The
+  first time, Welcome shows how to install one. If another required check
+  fails, the process exits before it listens and prints each failed check
+  with its fix command. Sign in as below, or start anyway with
+  `docker run ... bell-pr start --force` (that replaces the image command).
+  A real agent run is still refused until a provider is signed in.
 - `-p 127.0.0.1:4311:4311` publishes BELL PR on this computer only. The
   image listens on `0.0.0.0` inside the container (an explicit setting; BELL
   PR prints a warning) and still requires the API token in `/data/api-token`.
@@ -182,8 +183,9 @@ Docker stays **beta** because the agent sandbox needs the three
 29.7) with an image built from 1.0.1:
 
 - the image builds; with `bell-pr start --force` it reports healthy within
-  seconds and prints its address (without a provider signed in, plain
-  `bell-pr start` exits, as [Run it](#run-it) says);
+  seconds and prints its address. On that 1.0.1 image, plain `bell-pr start`
+  exited when no provider was signed in. Current behavior is in
+  [Run it](#run-it);
 - git, the GitHub CLI, the Codex CLI, bubblewrap and socat are in the
   image, and `bell-pr doctor` runs in it;
 - the sandbox probe in the table above: it fails with the default options

@@ -905,6 +905,81 @@ test("with --group a start takes the strict lock under its real address, reports
   }
 });
 
+test("groupWork in app-settings toggles BELL PR Group live, persists across restarts, and refuses paired devices", async () => {
+  const { DeviceTokens } = await import("./device-tokens.js");
+  const box = await sandbox();
+  try {
+    const first = await startedHere(box);
+    try {
+      assert.equal("strict" in first.lock, false);
+      const token = readFileSync(path.join(box.data, "api-token"), "utf8").trim();
+      const paired = await new DeviceTokens(box.data).add("Teammate laptop", token);
+      const putSettings = (body: unknown, bearer = token) =>
+        fetch(`${first.running.url}/api/app-settings`, {
+          method: "PUT",
+          headers: {
+            authorization: `Bearer ${bearer}`,
+            "content-type": "application/json",
+            origin: first.running.url,
+          },
+          body: JSON.stringify(body),
+        });
+
+      // A paired device may not toggle BELL PR Group on the host.
+      const denied = await putSettings({ groupWork: true }, paired.token);
+      assert.equal(denied.status, 403);
+      assert.equal((await denied.json()).reason, "hostOnly");
+
+      // Turning groupWork on upgrades bellpr.lock and mounts /api/collab without a restart.
+      const enabled = await putSettings({ groupWork: true });
+      assert.equal(enabled.status, 200);
+      assert.equal((await enabled.json()).settings.groupWork, true);
+      assert.equal(
+        JSON.parse(readFileSync(path.join(box.data, "bellpr.lock"), "utf8")).strict,
+        true,
+      );
+      const statusOn = await get(`${first.running.url}/api/status`, first.auth);
+      assert.deepEqual(JSON.parse(statusOn.body).collab, { state: "notSetUp" });
+      const collabOn = await get(`${first.running.url}/api/collab`, first.auth);
+      assert.equal(collabOn.status, 200);
+    } finally {
+      await first.running.shutdown();
+    }
+
+    // Next plain start keeps BELL PR Group on from app-settings.json, and can turn it off live.
+    const second = await startedHere(box);
+    try {
+      assert.equal(second.lock.strict, true);
+      const info = await get(`${second.running.url}/api/collab`, second.auth);
+      assert.equal(info.status, 200);
+
+      const disabled = await fetch(`${second.running.url}/api/app-settings`, {
+        method: "PUT",
+        headers: {
+          ...second.auth,
+          "content-type": "application/json",
+          origin: second.running.url,
+        },
+        body: JSON.stringify({ groupWork: false }),
+      });
+      assert.equal(disabled.status, 200);
+      assert.equal(
+        "strict" in JSON.parse(readFileSync(path.join(box.data, "bellpr.lock"), "utf8")),
+        false,
+      );
+      const absent = await get(`${second.running.url}/api/collab`, second.auth);
+      assert.equal(absent.status, 404);
+      const statusOff = await get(`${second.running.url}/api/status`, second.auth);
+      assert.equal("collab" in JSON.parse(statusOff.body), false);
+    } finally {
+      await second.running.shutdown();
+    }
+    assert.deepEqual(lockLitter(box.data), []);
+  } finally {
+    await box.cleanup();
+  }
+});
+
 test("shutdown lets group work in flight land before the server closes and the lock goes", async () => {
   const box = await sandbox();
   try {
@@ -1818,6 +1893,120 @@ test("SIGHUP and SIGTERM shut down cleanly and remove the lock file", async () =
       assert.equal(code, 0, `${signal}: ${server.stderr()}`);
       assert.equal(existsSync(lock), false, signal);
     }
+  } finally {
+    await box.cleanup();
+  }
+});
+
+/** Waits until the process exits, or fails while it is still running. */
+async function finished(launched: Launched, timeoutMs = 30_000) {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(
+      () =>
+        reject(
+          new Error(
+            `BELL PR was still running.\nstdout: ${launched.stdout()}\nstderr: ${launched.stderr()}`,
+          ),
+        ),
+      timeoutMs,
+    );
+  });
+  try {
+    return await Promise.race([launched.exited, timeout]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+test("a first start listens when the only required failure is the provider", async () => {
+  const box = await sandbox();
+  const port = await freePort();
+  const server = launch(
+    cliEntry,
+    ["start", "--port", String(port), "--data-dir", box.data],
+    box.env,
+  );
+  try {
+    await started(server);
+    assert.match(server.stdout(), new RegExp(`→ http://127\\.0\\.0\\.1:${port}`));
+    assert.doesNotMatch(server.stderr(), /did not start/);
+    assert.equal((await get(`http://127.0.0.1:${port}/`)).status, 200);
+    assert.equal((await stop(server)).code, 0, server.stderr());
+  } finally {
+    if (server.child.exitCode === null && server.child.signalCode === null) await stop(server);
+    await box.cleanup();
+  }
+});
+
+test("a second start also listens when the only required failure is the provider", async () => {
+  const box = await sandbox();
+  const listen = async () => {
+    const port = await freePort();
+    const server = launch(
+      cliEntry,
+      ["start", "--port", String(port), "--data-dir", box.data],
+      box.env,
+    );
+    try {
+      await started(server);
+      assert.match(server.stdout(), new RegExp(`→ http://127\\.0\\.0\\.1:${port}`));
+      assert.doesNotMatch(server.stderr(), /did not start/);
+      assert.equal((await get(`http://127.0.0.1:${port}/`)).status, 200);
+      assert.equal((await stop(server)).code, 0, server.stderr());
+    } finally {
+      if (server.child.exitCode === null && server.child.signalCode === null) await stop(server);
+    }
+  };
+  try {
+    await listen();
+    assert.equal(existsSync(box.data), true);
+    await listen();
+  } finally {
+    await box.cleanup();
+  }
+});
+
+test("a start exits 1 when another required check fails, alone or with the provider", async () => {
+  const box = await sandbox();
+  const bin = path.join(box.directory, "bin");
+  const refuse = async (name: string, dataDir: string) => {
+    const port = await freePort();
+    const server = launch(
+      cliEntry,
+      ["start", "--port", String(port), "--data-dir", dataDir],
+      { ...box.env, PATH: bin },
+    );
+    try {
+      const result = await finished(server);
+      assert.equal(result.code, 1, `${name}\n${server.stderr()}`);
+      assert.match(server.stderr(), /did not start/, name);
+      assert.match(server.stderr(), /✗ Git/, name);
+      assert.doesNotMatch(server.stdout(), /→ http/, name);
+      const probe = createServer();
+      probe.listen(port, "127.0.0.1");
+      await once(probe, "listening");
+      await new Promise<void>((resolve) => probe.close(() => resolve()));
+      return server.stderr();
+    } finally {
+      await stop(server);
+    }
+  };
+  try {
+    assert.match(await refuse("git and the provider", box.data), /✗ AI provider/);
+    writeFileSync(
+      path.join(bin, "codex"),
+      `#!/bin/sh
+case "$1" in
+  --version) echo "codex-cli 0.159.0" ;;
+  login) echo "Logged in using ChatGPT" ;;
+  *) exit 1 ;;
+esac
+`,
+      { mode: 0o755 },
+    );
+    const gitOnly = await refuse("git alone", path.join(box.directory, "git-only"));
+    assert.doesNotMatch(gitOnly, /✗ AI provider/);
   } finally {
     await box.cleanup();
   }

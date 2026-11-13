@@ -8,6 +8,7 @@ import type { SuiteLinks } from "../../shared/suite";
 import type { Tab } from "../app/AppShell";
 import { ErrorBoundary } from "../app/ErrorBoundary";
 import { SuiteHandoffMenu } from "../suite/SuiteHandoffMenu";
+import { OriginIgnoredNotice } from "./OriginIgnoredNotice";
 
 // The overview is the largest view in the app; it loads with its first visit.
 const ProjectOverview = lazy(() =>
@@ -28,6 +29,47 @@ interface ExplorePageProps {
   suiteLinks?: SuiteLinks;
 }
 
+/** The project title, and the origin hint outside that title's text styles. */
+export function ExploreHeading({
+  repo,
+  onChooseDirection,
+  suiteLinks,
+  handoffText,
+}: {
+  repo: Repo;
+  onChooseDirection: () => void;
+  suiteLinks?: SuiteLinks;
+  handoffText?: string;
+}) {
+  const t = useT("repos").explore;
+  return (
+    <>
+      <div className="page-title">
+        <div>
+          <h1 tabIndex={-1}>{repo.fullName}</h1>
+          <p>{t.intro}</p>
+        </div>
+        <div className="page-title-actions">
+          <SuiteHandoffMenu
+            links={suiteLinks}
+            title={repo.fullName}
+            text={handoffText || repo.fullName}
+          />
+          <button className="button primary" onClick={onChooseDirection}>
+            <Target size={16} />
+            {t.chooseDirection}
+          </button>
+        </div>
+      </div>
+      {repo.originUserinfoIgnored ? (
+        <div className="origin-notice-slot">
+          <OriginIgnoredNotice ignored />
+        </div>
+      ) : null}
+    </>
+  );
+}
+
 /** One repository's users, problems and recommended contribution directions. */
 export function ExplorePage({
   exploreRepo,
@@ -39,29 +81,14 @@ export function ExplorePage({
   updatingRepo,
   suiteLinks,
 }: ExplorePageProps) {
-  const t = useT("repos").explore;
   return (
     <section className="page-content explore-page">
-      <div className="page-title">
-        <div>
-          <h1 tabIndex={-1}>{exploreRepo.fullName}</h1>
-          <p>{t.intro}</p>
-        </div>
-        <div className="page-title-actions">
-          <SuiteHandoffMenu
-            links={suiteLinks}
-            title={exploreRepo.fullName}
-            text={intelligence.insights?.purpose || exploreRepo.fullName}
-          />
-          <button
-            className="button primary"
-            onClick={() => beginContribution(exploreRepo.id)}
-          >
-            <Target size={16} />
-            {t.chooseDirection}
-          </button>
-        </div>
-      </div>
+      <ExploreHeading
+        repo={exploreRepo}
+        onChooseDirection={() => beginContribution(exploreRepo.id)}
+        suiteLinks={suiteLinks}
+        handoffText={intelligence.insights?.purpose || exploreRepo.fullName}
+      />
       <ErrorBoundary resetKey={exploreRepo.id}>
       <Suspense fallback={null}>
       <ProjectOverview

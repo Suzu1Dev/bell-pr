@@ -75,7 +75,10 @@
 // bidirectional zero-write Suite handoffs with en and zh-TW strings): all JS
 // 515.9 kB in 54 files and all CSS 49.2 kB on Node.js 24, so the all-JS
 // budget rose from 515 kB to 518 kB and the all-CSS budget rose from 48.2 kB
-// to 49.8 kB.
+// to 49.8 kB. Measured after merging main (OriginIgnoredNotice, GroupSection
+// settings toggle, and host-scoped timed sudo lockdown): all JS 519.3 kB in
+// 54 files and all CSS 49.4 kB on Node.js 24, so the all-JS budget rose from
+// 518 kB to 522 kB.
 //
 // Exit status: 0 when every check passes, 1 when one fails, 2 on a usage or
 // setup error.
@@ -99,7 +102,7 @@ const budgets = {
   entries: 150,
   woff2: 12,
   largestJsGzip: 116 * kB,
-  totalJsGzip: 518 * kB,
+  totalJsGzip: 522 * kB,
   totalCssGzip: 49.8 * kB,
 };
 const required = [

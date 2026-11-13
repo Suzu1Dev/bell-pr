@@ -113,7 +113,7 @@ test("the publish dialog summarises the reviewed branch before sending a Draft P
   assert.match(html, /<b>\+12 −3<\/b>/);
   assert.match(html, /<strong>PR 標題<\/strong><pre>Add retry backoff<\/pre>/);
   assert.match(html, /<pre>Add retry backoff\n<\/pre>/);
-  assert.match(html, /<pre>## Summary\n\nRetries GET requests\.<\/pre>/);
+  assert.match(html, /<pre role="group" tabindex="0" aria-labelledby="publish-body-label">## Summary\n\nRetries GET requests\.<\/pre>/);
   assert.match(html, /<button class="button primary">.*發布 Draft PR<\/button>/);
   assert.match(html, />返回編輯草稿<\/button>/);
 });
@@ -178,7 +178,7 @@ test("the demo previews its PR body and needs neither Git nor the GitHub CLI", (
   assert.match(html, /這是互動示範，不會推送任何內容，也不會在 GitHub 建立 PR/);
   assert.match(html, /開啟示範 Draft PR/);
   assert.match(html, /<strong>PR 標題<\/strong><pre>Add retry backoff<\/pre>/);
-  assert.match(html, /<strong>PR 說明預覽<\/strong><pre>## Summary\n\nRetries GET requests\.<\/pre>/);
+  assert.match(html, /<strong id="publish-body-label">PR 說明預覽<\/strong><pre role="group" tabindex="0" aria-labelledby="publish-body-label">## Summary\n\nRetries GET requests\.<\/pre>/);
   assert.doesNotMatch(html, /會送到 GitHub/);
   assert.doesNotMatch(html, /readiness-notice/);
   assert.doesNotMatch(html, /Commit 作者/);
@@ -309,7 +309,7 @@ test("a follow-up round previews its commit and pushes to the PR branch instead 
     /<strong>提交訊息<\/strong><pre>Rename the option\n\nAddress the review on retry\.ts\.\n<\/pre>/,
   );
   assert.match(html, /<strong>PR 標題<\/strong><pre>Add retry backoff<\/pre>/);
-  assert.match(html, /<pre>## Summary\n\nRetries GET requests\.<\/pre>/);
+  assert.match(html, /<pre role="group" tabindex="0" aria-labelledby="publish-body-label">## Summary\n\nRetries GET requests\.<\/pre>/);
   assert.match(html, /<button class="button primary">.*推送這一輪<\/button>/);
   assert.match(render({ run: roundRun, busy: true }, { followUp: round }), /正在推送…/);
 
@@ -342,7 +342,7 @@ test("the publish dialog reads in English with no Chinese left", () => {
   assert.ok(html.includes(`${demoFiles.length} files reviewed`));
   assert.match(html, /<strong>PR title<\/strong><pre>Add retry backoff<\/pre>/);
   assert.match(html, /<strong>Commit message<\/strong>/);
-  assert.match(html, /<strong>PR description<\/strong><pre>## Summary\n\nRetries GET requests\.<\/pre>/);
+  assert.match(html, /<strong id="publish-body-label">PR description<\/strong><pre role="group" tabindex="0" aria-labelledby="publish-body-label">## Summary\n\nRetries GET requests\.<\/pre>/);
   assert.match(html, /<button class="button primary">.*Publish Draft PR<\/button>/);
   assert.match(html, />Back to the draft<\/button>/);
   assert.match(html, /aria-label="Close dialog"/);
@@ -368,7 +368,7 @@ test("the publish dialog reads in English with no Chinese left", () => {
   // Nothing reaches GitHub from the demo, so the preview says only that.
   assert.match(demo, /<strong>PR title<\/strong><pre>Add retry backoff<\/pre>/);
   assert.match(demo, /<strong>Commit message<\/strong>/);
-  assert.match(demo, /<strong>PR description preview<\/strong><pre>## Summary\n\nRetries GET requests\.<\/pre>/);
+  assert.match(demo, /<strong id="publish-body-label">PR description preview<\/strong><pre role="group" tabindex="0" aria-labelledby="publish-body-label">## Summary\n\nRetries GET requests\.<\/pre>/);
   assert.doesNotMatch(demo, /sent to GitHub/);
   assertNoHan(demo);
 });
@@ -378,7 +378,7 @@ test("an open round's publish dialog reads in English with no Chinese left", () 
   assert.match(html, /<h2 id="modal-title">Push this round to the PR\.<\/h2>/);
   assert.match(html, /<strong>Commit message<\/strong><pre>Rename the option\n<\/pre>/);
   assert.match(html, /<strong>PR title<\/strong><pre>Add retry backoff<\/pre>/);
-  assert.match(html, /<pre>## Summary\n\nRetries GET requests\.<\/pre>/);
+  assert.match(html, /<pre role="group" tabindex="0" aria-labelledby="publish-body-label">## Summary\n\nRetries GET requests\.<\/pre>/);
   assert.match(html, /<button class="button primary">.*Push this round<\/button>/);
   assertNoHan(html);
 

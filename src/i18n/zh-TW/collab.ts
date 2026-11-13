@@ -214,7 +214,8 @@ const m: Translation<typeof en> = {
   },
   off: {
     title: `這個 ${product.name} 沒有開啟小組協作。`,
-    body: `要開啟，請在執行 ${product.name} 的電腦上用這一行啟動。`,
+    body: `請前往「設定」開啟 ${product.name} Group，或在執行 ${product.name} 的電腦上用這一行啟動。`,
+    openSettings: "前往設定開啟",
   },
   inviteDialog: {
     title: "邀請組員",

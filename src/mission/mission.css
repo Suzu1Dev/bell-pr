@@ -1237,8 +1237,8 @@
 }
 .mission-idea:focus-visible {
   outline: 2px solid transparent;
-  outline-offset: 2px;
-  box-shadow: var(--focus-ring);
+  outline-offset: 0;
+  box-shadow: var(--focus-ring-inset);
 }
 .mission-idea-new {
   border-color: var(--color-brand-300);
@@ -2550,9 +2550,6 @@
   font-style: normal;
   font-weight: 500;
 }
-.mission-premise-recheck {
-  margin: -8px 0 18px;
-}
 .mission-premise-missing {
   padding: var(--space-3) 14px;
   border: 1px dashed var(--color-border);
@@ -2570,6 +2567,7 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 6px var(--space-3);
+  margin: -8px 0 18px;
 }
 .mission-premise-recheck small {
   color: var(--color-text-muted);

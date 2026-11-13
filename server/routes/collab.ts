@@ -15,7 +15,7 @@
  * and a sentence of group work's own, and nothing the coordinator or git
  * wrote.
  */
-import type { Express, Request, RequestHandler, Response } from "express";
+import type { Express, IRouter, Request, RequestHandler, Response } from "express";
 import { z } from "zod";
 import type {
   CollabAuthStatus,
@@ -194,7 +194,7 @@ export function collabParticipant(host: CollabHost): RequestHandler {
 }
 
 export function registerCollabRoutes(
-  app: Express,
+  app: IRouter,
   host: CollabHost,
   {
     store,
@@ -215,7 +215,9 @@ export function registerCollabRoutes(
   const invites = new CollabInvites();
   const authLimiter = new AuthRateLimiter();
   const hub = registerCollabBoardRoutes(app, host, { store, participant: collabParticipant(host) });
-  app.locals.collabHub = hub;
+  if ("locals" in app && (app as Express).locals) {
+    (app as Express).locals.collabHub = hub;
+  }
   /** The person at the host: the install token, not a paired device. */
   const atHost = (res: Response) => res.locals.deviceId === undefined;
   const identity = ({ actor, person }: { actor: Actor; person: Person }) => ({
@@ -1402,4 +1404,5 @@ export function registerCollabRoutes(
   );
 
   app.use("/api/collab", collabErrors);
+  return hub;
 }

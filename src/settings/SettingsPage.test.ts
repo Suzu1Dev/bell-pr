@@ -14,6 +14,7 @@ import { AboutSection } from "./AboutSection";
 import { DataSection } from "./DataSection";
 import { EnvironmentSection } from "./EnvironmentSection";
 import { GeneralSection } from "./GeneralSection";
+import { GroupSection } from "./GroupSection";
 import { LearningSection } from "./LearningSection";
 import { PerformanceSection } from "./PerformanceSection";
 import { ProviderSection } from "./ProviderSection";
@@ -154,6 +155,7 @@ test("the settings page lists its sections, each at its own address, and opens o
   );
   assert.deepEqual(links, [
     ["#/settings/general", "general"],
+    ["#/settings/group", "group"],
     ["#/settings/provider", "provider"],
     ["#/settings/safety", "safety"],
     ["#/settings/learning", "learning"],
@@ -557,10 +559,56 @@ test("a plain click on the About link opens the dialog over Settings; a modified
   }
 });
 
+test("BELL PR Group shows off, active and locked states and links to the Group board", () => {
+  const off = renderEn(
+    createElement(GroupSection, {
+      settings: appSettings({ settings: {}, lockedBy: {} }),
+      groupHref: "#/group",
+      generalHref: "#/settings/general",
+      onSaved() {},
+    }),
+  );
+  assertNoHan(off);
+  assert.match(off, /<h2 id="settings-group-title">BELL PR Group<\/h2>/);
+  assert.match(off, />Off<\/span>/);
+  assert.doesNotMatch(off, /href="#\/group"/);
+
+  const active = renderEn(
+    createElement(GroupSection, {
+      settings: appSettings({ settings: { groupWork: true }, lockedBy: { groupWork: "--group" } }),
+      collab: { state: "ready" },
+      groupHref: "#/group",
+      generalHref: "#/settings/general",
+      onSaved() {},
+    }),
+  );
+  assert.match(active, />Active<\/span>/);
+  assert.match(active, /href="#\/group"[^>]*>Open Group board<\/a>/);
+  assert.match(active, /Started with --group\./);
+  assert.match(
+    renderZh(
+      createElement(GroupSection, {
+        settings: appSettings({ settings: { groupWork: true }, lockedBy: {} }),
+        collab: { state: "notSetUp" },
+        groupHref: "#/group",
+        generalHref: "#/settings/general",
+        onSaved() {},
+      }),
+    ),
+    /開啟小組看板/,
+  );
+});
+
 test("every section reads in English with no Chinese left, and in zh-TW", () => {
   const view = { settings: {}, lockedBy: {} };
   const elements = [
     createElement(GeneralSection, { settings: appSettings(view) }),
+    createElement(GroupSection, {
+      settings: appSettings(view),
+      groupHref: "#/group",
+      generalHref: "#/settings/general",
+      onSaved() {},
+    }),
     createElement(ProviderSection, { doctor: doctor(noProvider), ...plain, showCurrentRun() {} }),
     createElement(SafetySection, {
       doctor: doctor(null),

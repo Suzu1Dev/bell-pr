@@ -149,6 +149,7 @@ jobs:
       - name: Run the installed command outside the checkout
         working-directory: ${{ runner.temp }}
         run: |
+          set -o pipefail
           export PATH="$RUNNER_TEMP/p/bin:$PATH"
           version="$(node -p "require(process.env.GITHUB_WORKSPACE + '/package.json').version")"
           bell-pr --version
@@ -175,9 +176,22 @@ jobs:
       - run: node scripts/check-personal-info.mjs --pack
 
   e2e:
-    name: End-to-end tests
+    name: End-to-end tests (shard ${{ matrix.shard }}/2)
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      PLAYWRIGHT_IMAGE_VERSION: "1.64.1"
+    # uid 1001 is the runner; bash is required because the image's shell is sh.
+    container:
+      image: mcr.microsoft.com/playwright:v1.64.1-noble@sha256:2f05f8a734509a7b3f26a912639488ee08f58a7b292d14d62271bcff9038768f
+      options: --user 1001 --ipc=host
+    defaults:
+      run:
+        shell: bash
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -188,24 +202,72 @@ jobs:
           cache: npm
       - name: Pin npm 11.21.1
         run: |
+          node --version
+          id
           npm install -g npm@11.21.1
           node -e "if (process.versions.node !== '24.22.1') { console.error(process.versions.node); process.exit(1); }"
           test "$(npm --version)" = "11.21.1"
+          test "$(id -u)" != "0"
+      - name: Read the Playwright version from the lockfile
+        id: playwright-version
+        run: echo "version=$(node -p "require('./package-lock.json').packages['node_modules/playwright'].version")" >> "$GITHUB_OUTPUT"
+      - name: Check the image tag matches the lockfile
+        run: |
+          test "${{ steps.playwright-version.outputs.version }}" = "$PLAYWRIGHT_IMAGE_VERSION"
+          image="$(node -p "JSON.parse(require('fs').readFileSync('/ms-playwright/.docker-info','utf8')).dockerImageName")"
+          echo "image ${image}"
+          test "$image" = "mcr.microsoft.com/playwright:v${PLAYWRIGHT_IMAGE_VERSION}-noble"
       - run: npm ci
-      - run: npx playwright install --with-deps chromium
-      - name: Check bilingual landing pages and installation controls
-        run: node site/check-site.mjs --browser
+      - name: Check the installed Playwright version
+        run: |
+          installed="$(node -p "require('playwright/package.json').version")"
+          test "$installed" = "$PLAYWRIGHT_IMAGE_VERSION"
+          test "$installed" = "${{ steps.playwright-version.outputs.version }}"
       - name: Run the end-to-end tests (builds, then starts bell-pr on port 4599)
         env:
           BELLPR_E2E_PORT: "4599"
-        run: npm run test:e2e
+          SHARD: ${{ matrix.shard }}
+        run: |
+          set -o pipefail
+          # Cut at a file boundary to balance the shards; see test-cli docs.
+          cut=e2e/responsive.spec.ts
+          files=()
+          while IFS= read -r file; do
+            if [[ "$file" < "$cut" ]]; then
+              [[ "$SHARD" == 1 ]] && files+=("$file")
+            else
+              [[ "$SHARD" == 2 ]] && files+=("$file")
+            fi
+          done < <(LC_ALL=C find e2e -name '*.spec.ts' -type f | LC_ALL=C sort)
+          [[ ${#files[@]} -gt 0 ]]
+          # Shard 1's test step is shorter in this image, so the site check runs there.
+          if [[ "$SHARD" == 1 ]]; then
+            node site/check-site.mjs --browser
+          fi
+          npm run test:e2e -- "${files[@]}" | tee "$RUNNER_TEMP/e2e-shard.log" && status=0 || status=$?
+          summary=$(grep -E '^[[:space:]]+[0-9]+ (passed|failed|flaky|skipped)' "$RUNNER_TEMP/e2e-shard.log" | sed 's/^[[:space:]]*//' | paste -sd ' ' - || true)
+          echo "shard ${SHARD}: ${#files[@]} files; ${summary}"
+          exit "$status"
       - name: Upload the traces and the report
         if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: e2e-traces
+          name: e2e-traces-shard-${{ matrix.shard }}
           path: e2e/output/
           retention-days: 14
+
+  e2e-summary:
+    name: End-to-end tests
+    needs: e2e
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require every shard to succeed
+        run: |
+          result="${{ needs.e2e.result }}"
+          echo "e2e shard result: ${result}"
+          test "$result" = "success"
 
   pack-list:
     name: Pack expected file list

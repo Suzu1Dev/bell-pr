@@ -213,7 +213,8 @@ privileges:
 > "Full access" is off by default. It turns off the OS sandbox and the credential deny rules for roles that write files, so those agents can read `~/.git-credentials` and `~/.ssh` and run `gh`, `git push`, and `curl`. Read-only roles keep their limits. Only the removal of `GH_TOKEN`/`GITHUB_TOKEN` from the environment still applies. Use it only in a throwaway VM or container.
 
 The optional Linux sudo setup grants the user account that runs BELL PR
-passwordless root commands; see [Full access](security-model.md#explicit-full-access).
+passwordless root commands for a set time of up to 8 hours. It can be turned
+on only in BELL PR on that computer, with the sudo password each time; see [Full access](security-model.md#explicit-full-access).
 
 ### Who can reach my BELL PR, from my computer or my phone?
 

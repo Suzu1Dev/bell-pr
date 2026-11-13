@@ -34,9 +34,12 @@ const m: Translation<typeof en> = {
       agentTimeoutScale: "Agent 時間上限倍數",
       allowUnsandboxedAgents: "允許 Claude Code 與 Antigravity Agent 不用沙箱",
       retentionDays: "已結束任務的檔案保留天數",
+      groupWork: `${product.name} Group`,
     },
     locked: ({ setting, variable }) =>
-      `「${setting}」這項設定來自環境變數 ${variable}。請修改或移除這個變數，再重新啟動 ${product.name}。`,
+      variable.startsWith("--")
+        ? `「${setting}」這項設定來自啟動參數 ${variable}。請在不帶 ${variable} 的情況下重新啟動 ${product.name}，才能在這裡修改。`
+        : `「${setting}」這項設定來自環境變數 ${variable}。請修改或移除這個變數，再重新啟動 ${product.name}。`,
   },
   busy: {
     analysisRunning: "這個專案正在分析中。請等分析完成後再刪除專案。",
@@ -65,6 +68,7 @@ const m: Translation<typeof en> = {
   fixes: {
     installGit: "安裝 Git",
     useWsl: `安裝 WSL2，並在其中執行 ${product.name}`,
+    removeSudoRule: `移除 ${product.name} 的 sudo 規則`,
     installGh: "安裝 GitHub CLI",
     signInGh: "登入 GitHub",
     addWorkflowScope: "允許推送工作流程的修改",
@@ -152,6 +156,8 @@ const m: Translation<typeof en> = {
     fullAccessDisclosure,
     sudoDisclosure,
     passwordlessSudoInstalled: `已安裝 BELL PR 的免密碼 sudo 規則。${sudoDisclosure}`,
+    passwordlessSudoExpired: "BELL PR 的免密碼 sudo 規則已過期，但檔案仍在。請移除它。",
+    passwordlessSudoNoExpiry: "BELL PR 的免密碼 sudo 規則沒有有效的到期時間。請移除它。",
     passwordlessSudoExternal: `免密碼 sudo 來自其他規則。${sudoDisclosure}`,
     providersReady: ({ providers }) => `已就緒：${fmt.list(providers)}。`,
     noProvider: `請安裝並登入 Codex CLI、Claude Code 或 Antigravity CLI：${product.name} 至少需要其中一個。`,
@@ -185,7 +191,7 @@ const m: Translation<typeof en> = {
       `尚未就緒：請修正標示 ✗ 的必要檢查（${fmt.list(checks)}），再重新檢查一次。`,
     dataDir: ({ path }) => `資料目錄：${path}`,
     fix: ({ label }) => `${label}：`,
-    usage: `用法：${product.binNames[0]} doctor [--json] [--data-dir <目錄>]`,
+    usage: `用法：${product.binNames[0]} doctor [--json] [--data-dir <目錄>] [--sudoers-path <檔案>]`,
     unknownArgument: ({ argument }) => `沒有「${argument}」這個參數。`,
   },
 };

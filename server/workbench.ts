@@ -406,11 +406,11 @@ export class Workbench {
 
   /**
    * Gives agent turns, teammates and plans the group's holds
-   * (hold-guard.ts, S2). createApp calls it when BELL PR runs with --group;
-   * without it, none of them is checked.
+   * (hold-guard.ts, S2). createApp sets or clears it when BELL PR Group
+   * starts or stops; without it, none of them is checked.
    */
-  guardHolds(host: CollabHost) {
-    this.context.holds = runHolds(host);
+  guardHolds(host?: CollabHost) {
+    this.context.holds = host ? runHolds(host) : undefined;
   }
 
   /** Appends to the run's own log through the context (see appendRunLog). */

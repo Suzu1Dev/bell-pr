@@ -127,12 +127,14 @@ export interface AppOptions {
    * and device tokens next to it under the data directory.
    */
   apiTokenFile?: string;
-  /** Group work's host (collab-host.ts), when BELL PR was started with --group. */
+  /** Group work's host (collab-host.ts), when BELL PR Group is on. */
   collab?: CollabHost;
   /** Trust private VPN / Tailscale HTTP hosts (`--trust-vpn`). */
   trustVpn?: boolean;
   /** Trust verified loopback Tailscale identity headers (`--tailscale-auth`). */
   tailscaleAuth?: boolean;
+  /** Called by PUT /api/app-settings when `groupWork` changes at runtime. */
+  onGroupWorkChange?: (enabled: boolean) => Promise<void>;
   /** The other BELL products' origins (BELLPR_SUITE_LINKS); none by default. */
   suiteLinks?: SuiteLinks;
   /** Run the BELL Suite edition frame (`--suite` or `BELLPR_EDITION=suite`). */
@@ -248,19 +250,34 @@ export function createApp(workbench: Workbench, options: AppOptions = {}) {
           ? participantOf(options.collab, req.get(participantHeader))?.actor.role === "admin"
           : false,
     });
-  if (options.collab) {
-    app.locals.collab = options.collab;
-    registerCollabRoutes(app, options.collab, {
-      store: workbench.store,
-      devices,
-      tokenFile,
-      publicUrl: options.publicUrl,
-      tailscaleAuth: options.tailscaleAuth,
-      remoteBootstrap: Boolean(options.trustVpn || options.tailscaleAuth),
-    });
-    // Agent turns, teammates and plans respect the group's holds too.
-    workbench.guardHolds(options.collab);
-  }
+  let collabRouter: express.Router | undefined;
+  const setCollab = (host?: CollabHost) => {
+    options.collab = host;
+    if (host) {
+      const router = express.Router();
+      const hub = registerCollabRoutes(router, host, {
+        store: workbench.store,
+        devices,
+        tokenFile,
+        publicUrl: options.publicUrl,
+        tailscaleAuth: options.tailscaleAuth,
+        remoteBootstrap: Boolean(options.trustVpn || options.tailscaleAuth),
+      });
+      collabRouter = router;
+      app.locals.collab = host;
+      app.locals.collabHub = hub;
+      // Agent turns, teammates and plans respect the group's holds too.
+      workbench.guardHolds(host);
+    } else {
+      collabRouter = undefined;
+      delete app.locals.collab;
+      delete app.locals.collabHub;
+      workbench.guardHolds(undefined);
+    }
+  };
+  app.locals.setCollab = setCollab;
+  if (options.collab) setCollab(options.collab);
+  app.use((req, res, next) => (collabRouter ? collabRouter(req, res, next) : next()));
   if ((options.platform ?? process.platform) === "linux") registerSudoRoutes(app, deps);
   app.use("/api", (_req, res) => {
     res.status(404).json({ error: sm().common.notFound });

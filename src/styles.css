@@ -67,7 +67,14 @@ a {
 }
 /* Diff rows sit in a scroll container that would clip an outer ring. Same
    specificity as the rule above, so it has to come after it. */
-:root .rv-line:focus-visible {
+:root .rv-line:focus-visible,
+:root .review-toolbar:focus-visible,
+:root .review-tabs > [role="tab"]:focus-visible,
+:root .file-tree:focus-visible,
+:root .mission-idea-list:focus-visible,
+:root .mission-section-nav ul:focus-visible,
+:root .publish-body-preview pre:focus-visible {
+  outline-offset: 0;
   box-shadow: var(--focus-ring-inset);
 }
 a {
@@ -464,15 +471,6 @@ button {
     display: none;
   }
 }
-@media (max-width: 600px) {
-  .workspace-command kbd {
-    display: none;
-  }
-  .workspace-command {
-    min-width: 32px;
-    padding: 5px;
-  }
-}
 /* Below 360 px, such as on a 320 px phone, present=1's sample badge
    shrinks and the actions move closer together, so the quick switch and
    the profile button stay on screen beside the page name. */
@@ -531,11 +529,16 @@ button {
   text-decoration: underline;
 }
 @media (max-width: 600px) {
+  .workspace-command kbd,
   .breadcrumb-root,
   .breadcrumb-separator,
   .readiness-text,
   .topbar-repo-text {
     display: none;
+  }
+  .workspace-command {
+    min-width: 32px;
+    padding: 5px;
   }
   .readiness-pill {
     padding: 6px;
@@ -801,17 +804,22 @@ button {
   display: flex;
   align-items: stretch;
   justify-content: space-between;
+  height: 58px;
+  gap: 24px;
   padding: 0 19px;
   border-bottom: 1px solid var(--color-border);
 }
 .review-tabs {
   display: flex;
   align-items: stretch;
+  gap: 23px;
 }
 .review-tabs > button {
   display: flex;
   align-items: center;
   gap: 7px;
+  font-size: var(--text-sm);
+  white-space: nowrap;
   color: var(--color-text-muted);
   padding: 0 2px;
   border-bottom: 2px solid transparent;
@@ -1437,9 +1445,6 @@ button {
   margin-left: 8px;
   color: var(--color-text-muted);
 }
-.log-status p {
-  color: var(--color-text-muted);
-}
 .callout {
   display: flex;
   gap: 10px;
@@ -1453,6 +1458,26 @@ button {
 .callout p {
   line-height: 1.8;
   color: var(--color-accent-600);
+}
+.origin-ignored {
+  flex-direction: column;
+  align-items: stretch;
+  min-width: 0;
+}
+.origin-ignored .copy-command {
+  min-width: 0;
+}
+.origin-ignored .copy-command-row code {
+  overflow-wrap: break-word;
+}
+@media (min-width: 601px) {
+  .origin-ignored .copy-command-row {
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .origin-ignored .copy-command-row code {
+    flex: 1 1 16rem;
+  }
 }
 .draft-layout {
   display: grid;
@@ -1724,19 +1749,6 @@ button {
   font-size: var(--text-sm);
   font-weight: 600;
   white-space: nowrap;
-}
-@media (max-width: 760px) {
-  .discovery-entry {
-    flex-wrap: wrap;
-    padding: 18px;
-  }
-  .discovery-entry-action {
-    margin-left: 62px;
-  }
-  .discovery-entry > span:nth-child(2) {
-    flex: 1;
-    min-width: 160px;
-  }
 }
 .repository-grid {
   display: grid;
@@ -2377,38 +2389,11 @@ button {
   gap: 9px;
   margin-left: auto;
 }
-@media (max-width: 760px) {
-  /* The modal's own padding shrinks here; the footer keeps reaching its edges. */
-  .split-footer {
-    bottom: -26px;
-    margin: var(--space-5) -23px -26px;
-    padding: var(--space-3) 23px;
-  }
-  .split-member {
-    grid-template-columns: minmax(0, 1fr) auto;
-  }
-  .split-move {
-    grid-column: 1 / -1;
-    width: 100%;
-  }
-}
 .task-prompt {
   min-height: 130px;
   resize: vertical;
   font-size: var(--text-xs);
   line-height: 1.8;
-}
-.task-team-preview {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  border: 1px solid var(--color-accent-200);
-  background: var(--color-accent-50);
-  padding: 12px;
-  border-radius: 5px;
-  margin-top: 15px;
-  font-size: var(--text-2xs);
-  color: var(--color-accent-600);
 }
 .publish-summary {
   border: 1px solid var(--color-border-subtle);
@@ -2525,10 +2510,39 @@ button {
 .draft-task-items span {
   overflow-wrap: anywhere;
 }
+.publish-outgoing > div:first-child pre {
+  max-width: 100%;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
 .publish-body-preview {
   margin-top: 16px;
   border: 1px solid var(--color-border-subtle);
   border-radius: 8px;
+}
+.publish-body-preview pre {
+  margin: 0;
+  padding: 12px 14px;
+  max-width: 100%;
+  overflow: auto;
+  border: 0;
+  background: var(--color-surface-sunken);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  line-height: 1.7;
+  white-space: pre;
+  /* A fade on the side that still has more to scroll. The covers move with
+     the text and hide the fade at each end; nothing sits on top of the text
+     or the focus ring. */
+  background-image:
+    linear-gradient(to right, var(--color-surface-sunken) 45%, transparent),
+    linear-gradient(to left, var(--color-surface-sunken) 45%, transparent),
+    linear-gradient(to right, color-mix(in srgb, var(--color-text) 28%, transparent), transparent),
+    linear-gradient(to left, color-mix(in srgb, var(--color-text) 28%, transparent), transparent);
+  background-repeat: no-repeat;
+  background-size: 28px 100%, 28px 100%, 14px 100%, 14px 100%;
+  background-position: 0 0, 100% 0, 0 0, 100% 0;
+  background-attachment: local, local, scroll, scroll;
 }
 .publish-body-preview summary {
   padding: 10px 14px;
@@ -2862,13 +2876,40 @@ button {
   }
 }
 @media (max-width: 760px) {
+  .discovery-entry {
+    flex-wrap: wrap;
+    padding: 18px;
+  }
+  .discovery-entry-action {
+    margin-left: 62px;
+  }
+  .discovery-entry > span:nth-child(2) {
+    flex: 1;
+    min-width: 160px;
+  }
+  .split-footer {
+    bottom: -26px;
+    margin: var(--space-5) -23px -26px;
+    padding: var(--space-3) 23px;
+  }
+  .split-member {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .split-move {
+    grid-column: 1 / -1;
+    width: 100%;
+  }
   .sidebar {
     transform: translateX(-100%);
     transition: transform 0.2s;
     width: 228px;
+    visibility: hidden;
+    pointer-events: none;
   }
   .sidebar.sidebar-open {
     transform: translateX(0);
+    visibility: visible;
+    pointer-events: auto;
   }
   .sidebar-scrim {
     display: block;
@@ -3192,14 +3233,12 @@ button {
     font-size: var(--text-2xs);
   }
   .modal-actions {
+    flex-wrap: wrap;
     gap: 7px;
   }
   .modal-actions .button {
     font-size: var(--text-2xs);
     padding: 9px 10px;
-  }
-  .task-team-preview {
-    padding: 11px 8px;
   }
   .toast {
     left: 50%;
@@ -3357,6 +3396,7 @@ button {
 }
 @media (max-width: 760px) {
   .rv-file-path,
+  .file-name,
   .rv-line,
   .review-footer .button {
     font-size: var(--text-2xs);
@@ -3505,16 +3545,6 @@ button {
   gap: 4px;
   flex-shrink: 0;
 }
-@media (max-width: 760px) {
-  .sidebar {
-    visibility: hidden;
-    pointer-events: none;
-  }
-  .sidebar.sidebar-open {
-    visibility: visible;
-    pointer-events: auto;
-  }
-}
 .pr-feedback {
   border-top: 1px solid var(--color-border);
   padding: 28px;
@@ -3624,14 +3654,19 @@ button {
   line-height: 1.7;
 }
 /* Spaced like the draft guide below it, so the first panel clears the tab bar. */
-.follow-up-rounds {
+.follow-up-rounds,
+.sync-panel {
   margin: 24px 28px 0;
   padding: 18px 20px;
   border: 1px solid var(--color-border);
   border-radius: 10px;
   background: var(--color-bg);
 }
-.follow-up-rounds h2 {
+.sync-panel {
+  padding: 16px 20px;
+}
+.follow-up-rounds h2,
+.sync-panel h2 {
   margin: 0;
   font-size: 15px;
   font-weight: 550;
@@ -3761,30 +3796,12 @@ button {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
-@media (max-width: 760px) {
-  .follow-up-round-head time {
-    margin-left: 0;
-  }
-}
-
 /* Where the contribution stands against its target branch, and its conflicts. */
-.sync-panel {
-  margin: 24px 28px 0;
-  padding: 16px 20px;
-  border: 1px solid var(--color-border);
-  border-radius: 10px;
-  background: var(--color-bg);
-}
 .sync-panel-head {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
   gap: 16px;
-}
-.sync-panel h2 {
-  margin: 0;
-  font-size: 15px;
-  font-weight: 550;
 }
 .sync-panel p {
   margin: 6px 0 0;
@@ -3834,6 +3851,9 @@ button {
   }
 }
 @media (max-width: 760px) {
+  .follow-up-round-head time {
+    margin-left: 0;
+  }
   .sync-panel-head {
     flex-direction: column;
   }
@@ -3841,7 +3861,6 @@ button {
     justify-content: flex-start;
     max-width: 100%;
   }
-  /* On the narrowest phones a long label wraps instead of running past the panel. */
   .sync-panel-actions .button {
     max-width: 100%;
     white-space: normal;
