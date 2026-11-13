@@ -93,23 +93,41 @@
 }
 .learning-empty {
   text-align: center;
-  padding: 36px 20px;
-  border: 1px dashed var(--color-border);
-  border-radius: 9px;
+  padding: 20px 22px;
+  border: 1px dashed var(--color-border-strong);
+  border-radius: 10px;
+  background: var(--color-surface);
   color: var(--color-text-muted);
 }
 .learning-empty h2 {
-  font-size: 17px;
+  font-size: 16px;
   font-weight: 550;
-  margin: 10px 0 8px;
-  color: inherit;
+  margin: 8px 0 4px;
+  color: var(--color-text-secondary);
 }
 .learning-empty p {
   font-size: var(--text-sm);
-  line-height: 1.8;
+  line-height: 1.7;
+}
+@media (min-width: 761px) {
+  .learning-empty:not(.is-error) {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    column-gap: 16px;
+    row-gap: 2px;
+    align-items: center;
+    text-align: left;
+  }
+  .learning-empty:not(.is-error) > svg {
+    grid-row: 1 / span 2;
+    color: var(--color-accent-600);
+  }
+  .learning-empty:not(.is-error) h2 {
+    margin: 0;
+  }
 }
 .learning-demo {
-  margin-top: 40px;
+  margin-top: 24px;
 }
 .learning-demo > h2 {
   display: flex;
@@ -203,22 +221,25 @@
 }
 /* The plain counts: a short list of facts about the person's records. */
 .learning-counts {
-  margin-bottom: var(--space-6);
-  padding: var(--space-4) var(--space-5);
+  margin-bottom: var(--space-5);
+  padding: var(--space-3) var(--space-5);
   border: 1px solid var(--color-border);
   border-radius: 9px;
   background: var(--color-surface);
 }
 .learning-counts h2 {
-  margin: 0 0 var(--space-2);
+  margin: 0 0 var(--space-1);
   font-size: var(--text-sm);
   font-weight: 600;
 }
 .learning-counts ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 24px;
   margin: 0;
   padding-left: 18px;
   font-size: var(--text-sm);
-  line-height: 1.7;
+  line-height: 1.65;
   color: var(--color-text-secondary);
   overflow-wrap: anywhere;
 }

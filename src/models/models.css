@@ -39,7 +39,8 @@
   margin: 8px 0 0;
 }
 .mission-project-card > .model-summary {
-  margin-top: 16px;
+  margin-top: 14px;
+  background: var(--color-surface);
 }
 .team-board > .model-summary {
   margin: 22px 0 16px;

@@ -1002,9 +1002,6 @@
   .team-flow > span {
     flex-basis: 43%;
   }
-  .team-kanban {
-    grid-template-columns: 1fr;
-  }
   /* Once there are tasks, empty lanes give the space to the others. */
   .team-kanban.has-tasks .team-lane.is-empty {
     display: none;

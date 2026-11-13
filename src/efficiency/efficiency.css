@@ -147,8 +147,8 @@
   white-space: normal;
 }
 .mission-project-card > .efficiency-summary {
-  margin-top: 16px;
-  background: color-mix(in srgb, var(--color-surface) 52%, transparent);
+  margin-top: 14px;
+  background: var(--color-surface);
 }
 @media (max-width: 560px) {
   .efficiency-summary {

@@ -5,8 +5,9 @@ import {
   ArrowUpRight,
   BookOpen,
   Check,
-  ChevronLeft,
+  ChevronDown,
   ChevronRight,
+  ChevronUp,
   Code2,
   Download,
   Eye,
@@ -684,7 +685,7 @@ export function ProjectOverview({
     const id = card.dataset.recommendationId;
     if (!id || id === pointerDrag.current?.id) return null;
     const bounds = card.getBoundingClientRect();
-    return { id, side: x < bounds.left + bounds.width / 2 ? "before" as const : "after" as const };
+    return { id, side: y < bounds.top + bounds.height / 2 ? "before" as const : "after" as const };
   };
   useEffect(() => {
     if (!draggedId) return;
@@ -694,11 +695,11 @@ export function ProjectOverview({
       const rail = ideaRail.current;
       if (!pointer?.active || !rail) return;
       const bounds = rail.getBoundingClientRect();
-      if (pointer.y >= bounds.top && pointer.y <= bounds.bottom) {
-        if (pointer.x >= bounds.left && pointer.x < bounds.left + 60) {
-          rail.scrollBy({ left: -8, behavior: "auto" });
-        } else if (pointer.x <= bounds.right && pointer.x > bounds.right - 60) {
-          rail.scrollBy({ left: 8, behavior: "auto" });
+      if (pointer.x >= bounds.left && pointer.x <= bounds.right) {
+        if (pointer.y >= bounds.top && pointer.y < bounds.top + 52) {
+          rail.scrollBy({ top: -8, behavior: "auto" });
+        } else if (pointer.y <= bounds.bottom && pointer.y > bounds.bottom - 52) {
+          rail.scrollBy({ top: 8, behavior: "auto" });
         }
       }
       const target = dropAtPoint(pointer.x, pointer.y);
@@ -713,17 +714,18 @@ export function ProjectOverview({
     if (!rail) return;
     const updateVisibleIdeas = () => {
       const bounds = rail.getBoundingClientRect();
+      if (bounds.height <= 0) return;
       const visible = Array.from(rail.children).flatMap((card, index) => {
         const rect = card.getBoundingClientRect();
-        return rect.right > bounds.left + 5 && rect.left < bounds.right - 5
+        return rect.bottom > bounds.top + 8 && rect.top < bounds.bottom - 8
           ? [index + 1]
           : [];
       });
       const position = {
         first: visible[0] ?? 1,
-        last: visible.at(-1) ?? 1,
-        previous: rail.scrollLeft > 1,
-        next: rail.scrollLeft + rail.clientWidth < rail.scrollWidth - 1,
+        last: visible[visible.length - 1] ?? 1,
+        previous: rail.scrollTop > 1,
+        next: rail.scrollTop + rail.clientHeight < rail.scrollHeight - 1,
       };
       setVisibleIdeas((current) =>
         current.first === position.first &&
@@ -747,9 +749,9 @@ export function ProjectOverview({
     const rail = ideaRail.current;
     const card = rail?.firstElementChild as HTMLElement | null;
     if (!rail || !card) return;
-    const gap = parseFloat(getComputedStyle(rail).columnGap) || 0;
+    const gap = parseFloat(getComputedStyle(rail).rowGap) || 0;
     rail.scrollBy({
-      left: direction * (card.offsetWidth + gap),
+      top: direction * (card.offsetHeight + gap),
       behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
         ? "auto"
         : "smooth",
@@ -1618,7 +1620,7 @@ export function ProjectOverview({
                     disabled={!visibleIdeas.previous}
                     onClick={() => scrollIdeas(-1)}
                   >
-                    <ChevronLeft size={18} aria-hidden="true" />
+                    <ChevronUp size={18} aria-hidden="true" />
                   </button>
                   <button
                     type="button"
@@ -1627,7 +1629,7 @@ export function ProjectOverview({
                     disabled={!visibleIdeas.next}
                     onClick={() => scrollIdeas(1)}
                   >
-                    <ChevronRight size={18} aria-hidden="true" />
+                    <ChevronDown size={18} aria-hidden="true" />
                   </button>
                 </div>
               </div>
@@ -1642,9 +1644,16 @@ export function ProjectOverview({
                 tabIndex={0}
                 onKeyDown={(event) => {
                   if (event.target !== event.currentTarget) return;
-                  if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+                  if (
+                    event.key === "ArrowUp" ||
+                    event.key === "ArrowDown" ||
+                    event.key === "ArrowLeft" ||
+                    event.key === "ArrowRight"
+                  ) {
                     event.preventDefault();
-                    scrollIdeas(event.key === "ArrowLeft" ? -1 : 1);
+                    scrollIdeas(
+                      event.key === "ArrowUp" || event.key === "ArrowLeft" ? -1 : 1,
+                    );
                   }
                 }}
               >
@@ -1705,7 +1714,7 @@ export function ProjectOverview({
                           aria-label={t.ideas.moveLeftLabel({ title: idea.title })}
                           onClick={() => saveOrder(idea.id, shownIdeas[index - 1].id, "before")}
                         >
-                          <ChevronLeft size={16} aria-hidden="true" />
+                          <ChevronUp size={16} aria-hidden="true" />
                         </button>
                         <button
                           type="button"
@@ -1714,7 +1723,7 @@ export function ProjectOverview({
                           aria-label={t.ideas.moveRightLabel({ title: idea.title })}
                           onClick={() => saveOrder(idea.id, shownIdeas[index + 1].id, "after")}
                         >
-                          <ChevronRight size={16} aria-hidden="true" />
+                          <ChevronDown size={16} aria-hidden="true" />
                         </button>
                         <button
                           type="button"

@@ -183,13 +183,13 @@ test("a click on either side of the split view leaves the keys working from that
   await expect(page.locator('.rv-diff [role=listbox] [tabindex="0"]')).toHaveCount(1);
 });
 
-test("the explanation panel's four tabs share one row at desktop widths, in both languages", async ({ page }) => {
+test("the explanation panel's five tabs share one row at desktop widths, in both languages", async ({ page }) => {
   for (const locale of locales)
     for (const width of [1280, 1440, 1920]) {
       await page.setViewportSize({ width, height: 900 });
       // As the screenshots show it: presentation mode, where the panel is narrowest.
       await page.goto(`/#/runs/demo-run/changes?present=1&capture=1&locale=${locale}`);
-      await expect(page.locator(".explain-tabs [role=tab]")).toHaveCount(4);
+      await expect(page.locator(".explain-tabs [role=tab]")).toHaveCount(5);
       await page.evaluate(() => document.fonts.ready);
       const tops = await page
         .locator(".explain-tabs [role=tab]")
@@ -217,13 +217,13 @@ test("the explanation panel's tabs move with the arrow keys and keep one tab sto
     review.provenance.sample,
   );
   await page.keyboard.press("End");
-  await expect(tab("chat")).toBeFocused();
-  await expect(tab("chat")).toHaveAttribute("aria-selected", "true");
+  await expect(tab("team")).toBeFocused();
+  await expect(tab("team")).toHaveAttribute("aria-selected", "true");
   await page.keyboard.press("ArrowRight");
   await expect(tab("explain")).toBeFocused();
   await expect(tab("explain")).toHaveAttribute("aria-selected", "true");
   await page.keyboard.press("ArrowLeft");
-  await expect(tab("chat")).toHaveAttribute("aria-selected", "true");
+  await expect(tab("team")).toHaveAttribute("aria-selected", "true");
   await page.keyboard.press("Home");
   await expect(tab("explain")).toHaveAttribute("aria-selected", "true");
   // Tab goes from the selected tab into the panel, which can be scrolled.

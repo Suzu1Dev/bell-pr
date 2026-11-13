@@ -1,4 +1,4 @@
-import { ArrowUpRight, CirclePlay, Compass, FolderGit2, GitPullRequest } from "lucide-react";
+import { CirclePlay, Compass, FolderGit2, GitPullRequest } from "lucide-react";
 import { ByHandChip, byHandTurn } from "../app/byHandStatus";
 import { Logo } from "../brand/Logo";
 import { useT } from "../i18n";
@@ -136,14 +136,11 @@ export function HomePage({
               className={`home-choice home-choice-${id}`}
               onClick={onClick}
             >
-              <span className="home-choice-icon" aria-hidden="true">
-                <Icon size={21} />
-              </span>
+              <Icon size={22} aria-hidden="true" />
               <span className="home-choice-text">
                 <strong className="home-choice-title">{title}</strong>
                 <span>{text}</span>
               </span>
-              <ArrowUpRight size={18} className="home-choice-arrow" aria-hidden="true" />
             </button>
           ))}
         </div>
@@ -160,7 +157,6 @@ export function HomePage({
           />
         </section>
       )}
-
     </section>
   );
 }

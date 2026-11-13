@@ -507,17 +507,17 @@
 .explain-tabs {
   display: flex;
   flex-wrap: wrap;
-  gap: 0 16px;
+  gap: 0 12px;
   flex-shrink: 0;
-  padding: 0 18px;
+  padding: 0 14px;
   border-bottom: 1px solid var(--color-border);
   background: var(--color-surface);
 }
 .explain-panel .explain-tabs button {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 10px 0 12px;
+  gap: 5px;
+  padding: 9px 0 11px;
   border: 0;
   border-bottom: 2px solid transparent;
   background: transparent;
@@ -1919,21 +1919,21 @@
   font-size: var(--text-2xs);
 }
 
-/* A narrow panel keeps its four tabs on one row: icons go first, then size.
+/* A narrow panel keeps its five tabs on one row: icons go first, then size.
    Wrapping stays as the last resort. */
-@container (max-width: 440px) {
+@container (max-width: 560px) {
   .explain-tabs {
-    gap: 0 12px;
-    padding: 0 14px;
+    gap: 0 10px;
+    padding: 0 12px;
   }
   .explain-panel .explain-tabs button > svg {
     display: none;
   }
 }
-@container (max-width: 330px) {
+@container (max-width: 440px) {
   .explain-tabs {
-    gap: 0 9px;
-    padding: 0 11px;
+    gap: 0 8px;
+    padding: 0 10px;
   }
   .explain-panel .explain-tabs button {
     font-size: var(--text-2xs);
