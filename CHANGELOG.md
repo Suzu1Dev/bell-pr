@@ -7,6 +7,16 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- **Automatic holds in group work.** After each agent turn that changes a
+  run's checkout (and after a teammate's change joins it), BELL PR holds the
+  lines and files the run changed in the run's name, so teammates see them
+  on the Group board and their agents keep off them without anyone typing a
+  path. The hold grows with later turns, leaves the owner's own holds alone,
+  and is released when the run publishes, is deleted or its working files
+  are freed. See `docs/group-work.md#automatic-holds`.
+
 ## [1.2.2] - 2026-11-13
 
 ### Fixed

@@ -2,6 +2,7 @@ import type { AgentSlots } from "./agent-slots.js";
 import type { TransientSleep } from "./agent-cli.js";
 import type { collectDraftContext } from "./draft-sources.js";
 import type * as drafting from "./draft-jobs.js";
+import type { AutoHolds } from "./auto-hold.js";
 import type { RunHolds } from "./hold-guard.js";
 import type { command } from "./process.js";
 import type { Store } from "./store.js";
@@ -61,6 +62,8 @@ export interface WorkbenchContext {
    * (Workbench.guardHolds).
    */
   holds?: RunHolds;
+  /** Holds what the run's agents changed in its name (server/auto-hold.ts); set with `holds`. */
+  autoHolds?: AutoHolds;
   /** True once shutdown() has begun; no new background work starts. */
   stopping(): boolean;
   /** Throws 429 once queued, running and paused runs reach the cap. */

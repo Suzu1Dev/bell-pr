@@ -731,6 +731,8 @@ export const runReadSchema = loose({
     group: later(loose({ after: later(z.array(text).max(groupAfterLimit)) })),
     // The write guard's S2 (server/hold-guard.ts), optional in the same way.
     owners: later(z.array(text.max(64)).max(maxRunOwners)),
+    // Automatic holds (server/auto-hold.ts), optional in the same way.
+    autoHold: later(loose({ projectId: text.max(64), claimId: text.max(64) })),
     // Team reviews, rationales & handoff TODOs (server/team-records.ts).
     teamRecords: later(teamRecordsSchema),
 });

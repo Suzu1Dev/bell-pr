@@ -11,7 +11,8 @@ the command line and environment), and people can set up, invite, join and
 take holds on [the Group page](#the-group-page) as well as from the command
 line and the API. Once people have joined, an admin adds repositories to
 the group, and each person says which files and folders they are working on
-by taking a [hold](#holds). BELL PR refuses a hold that meets one already
+by taking a [hold](#holds), or leaves it to BELL PR: what its agents change is
+[held automatically](#automatic-holds), line by line. BELL PR refuses a hold that meets one already
 held, and one whose work
 [waits for other work](#work-that-waits-for-other-work) that is not done
 yet. Everyone who follows that repository's
@@ -413,6 +414,51 @@ ignored** (for the letters A to Z): `SRC/API/Users.ts` meets `src/api`.
 A hold has no time limit. It stays, across restarts of BELL PR, until it is
 released or revoked, or the person who holds it is removed.
 
+### Automatic holds
+
+Nobody has to type the paths of work BELL PR's agents do. Once an agent
+turn has changed a run's working directory and the check against
+[other people's holds](#bell-prs-agents-and-someone-elses-hold) has passed,
+BELL PR holds what the run changed, in the run's name:
+
+- **Line by line.** A changed text file is held at the lines the change
+  touches in the run's base (`src/client.ts#L24-L31`); a new, deleted or
+  binary file as a whole. Past 50 paths in one hold, new paths are held as
+  whole files.
+- **For the run's first owner** still in the group (see
+  [owners](#bell-prs-agents-and-someone-elses-hold)), titled with the run's
+  title and "(automatic)". A run nobody in the group owns holds nothing.
+- **After every turn that may change files** in the run's working
+  directory (a **Collaborate** turn, a follow-up round, a turn that
+  resolves sync conflicts, a setup turn) and after a teammate's change
+  joins the contribution. The hold only grows: a later turn widens the same
+  hold in one step, and a turn that changes nothing new leaves it alone.
+- **What the owners already hold is left to them.** A path that meets one
+  of their own holds is not added.
+- **Until the run publishes** its pull request or a follow-up round, is
+  deleted, or its working files are freed. Then the hold is released (not
+  marked done). The pull request's files still count in the others'
+  publish checks until it is merged
+  (`group-own-overlap`). A later follow-up round holds its own changes
+  again.
+
+Everyone sees the hold on the Group board and hears of it in the
+[live feed](#the-live-feed). Other people's agents get its paths as
+read-only, and other people's holds and publishes over it are refused, as
+for any hold. The holder can release it on the Group page and an admin can
+revoke it; the run's next write turn holds what it changed again. The
+run's log says what was held. When a hold cannot be taken (someone took one
+of those lines a moment earlier, the record is full, group work
+stopped), the log says why, and the check at publish still counts.
+
+A hold taken this way says what an agent already changed, not what it is
+about to change: during a long turn nothing is held yet, and two turns that
+end at the same moment are told apart when the later one's hold is refused
+and at publish. Changes made by hand in a working directory, in an editor
+or a terminal, are held only after the run's next agent turn that may
+change files, if it has one. Line numbers are those of the run's base when the hold
+grew; after a sync the old ranges stay held.
+
 ### When a path is already held
 
 BELL PR refuses a hold that meets one already held: 409 `conflict`, with
@@ -648,8 +694,8 @@ once group work is back.
 
 ### What a hold does not do
 
-A hold is a record the group can see, the reason a second hold that meets
-it is refused, the reason BELL PR does not
+A hold, taken by hand or [automatically](#automatic-holds), is a record
+the group can see, the reason a second hold that meets it is refused, the reason BELL PR does not
 [publish a change over it](#publishing-over-someone-elses-hold), and a
 [limit for BELL PR's agents](#bell-prs-agents-and-someone-elses-hold). It
 **does not stop every write as it happens**: an agent's sandbox refuses

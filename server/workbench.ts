@@ -70,6 +70,7 @@ import type { GuardOverride } from "../shared/contribution.js";
 import type { SplitRequest } from "../shared/split.js";
 import type { WorkbenchContext } from "./workbench-context.js";
 import { planOverlaps } from "./group-local.js";
+import { autoHolds } from "./auto-hold.js";
 import type { CollabHost } from "./collab-host.js";
 import { runHolds, type HoldsAsker } from "./hold-guard.js";
 import * as holdRecovery from "./hold-recovery.js";
@@ -411,6 +412,7 @@ export class Workbench {
    */
   guardHolds(host?: CollabHost) {
     this.context.holds = host ? runHolds(host) : undefined;
+    this.context.autoHolds = host ? autoHolds(host) : undefined;
   }
 
   /** Appends to the run's own log through the context (see appendRunLog). */
@@ -750,7 +752,7 @@ export class Workbench {
     holds?: publishing.HoldCheck | publishing.PublishHolds,
   ) {
     const round = activeFollowUp(this.run(id).followUps);
-    return logged(
+    const published = await logged(
       "publish",
       { runId: id, ...(round ? { round: round.id } : {}) },
       () =>
@@ -764,6 +766,13 @@ export class Workbench {
           holds,
         ),
     );
+    // The pull request carries the change now; the publish checks of others still see its files.
+    const run = this.run(id);
+    if (run.autoHold) {
+      await this.context.autoHolds?.end(run);
+      await this.store.save();
+    }
+    return published;
   }
 
   /** Preserves a failed pre-push commit and returns its contribution to review. */

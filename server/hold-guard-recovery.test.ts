@@ -302,6 +302,10 @@ test("session and setup write turns record run.heldPaths (paths only), expose it
   const cleanTurn = await s.session(sessionRun.id, "Clean follow-up edit");
   assert.equal(cleanTurn.failed, undefined, cleanTurn.content);
   assert.equal(s.f.workbench.run(sessionRun.id).heldPaths, undefined);
+  // That turn held Ben's change for the group automatically (auto-hold.ts); Ada, an admin, revokes it.
+  const auto = s.f.workbench.run(sessionRun.id).autoHold!;
+  const revoked = await s.f.post(`/projects/${auto.projectId}/holds/${auto.claimId}/revoke`, s.who.admin, {});
+  assert.equal(revoked.status, 200, revoked.body);
 
   // 2. Setup hand-off turn stopping on a newly held path also records run.heldPaths, and a completed-team
   //    failed run restores its conflicting file and transitions failed -> review when reviewable changes remain.

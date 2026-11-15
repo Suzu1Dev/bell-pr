@@ -765,6 +765,12 @@ export default {
       `A teammate changed files someone else holds, so those changes were not added to the contribution. ${items.join("; ")}. Ask them to release the hold, or ask a group admin to revoke it, then try again.`,
     planHeldByOther: ({ items }: { items: readonly string[] }) =>
       `Can't approve: someone else holds files this plan covers. ${items.join("; ")}. Send the plan back with feedback, or wait for the release.`,
+    /** Automatic holds (server/auto-hold.ts): what the run's log says, and the hold's title on the board. */
+    keptForGroup: ({ scopes }: { scopes: readonly string[] }) =>
+      `Held for the group automatically, so teammates and their agents keep off these lines and files until this run publishes or is deleted: ${scopes.join(", ")}.`,
+    keptForGroupFailed: ({ reason }: { reason: string }) =>
+      `Couldn't hold this run's changes for the group automatically. ${reason} Publishing still checks every changed line against the group's holds.`,
+    keptTitle: ({ title }: { title: string }) => `${title} (automatic)`,
     autoHeld:
       "This plan covers files someone else in the group holds, so it waits for your approval instead of starting on its own.",
     agentsHoldsUnknown: ({ name }: { name: string }) =>

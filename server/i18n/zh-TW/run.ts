@@ -468,6 +468,11 @@ const m: Translation<typeof en> = {
       `隊友改到別人佔用的檔案，所以這些改動沒有加入這份貢獻。${items.join("；")}。請對方釋出，或請小組管理員撤銷佔用，再試一次。`,
     planHeldByOther: ({ items }) =>
       `計畫涵蓋別人佔用的檔案，無法核准。${items.join("；")}。請附上意見退回，或等對方釋出。`,
+    keptForGroup: ({ scopes }) =>
+      `已自動替這項工作佔用以下行號與檔案；在它發布或刪除之前，組員和他們的 Agent 都會避開：${scopes.join("、")}。`,
+    keptForGroupFailed: ({ reason }) =>
+      `無法自動替這項工作佔用改動。${reason} 發布時仍會逐行比對小組的佔用。`,
+    keptTitle: ({ title }) => `${title}（自動佔用）`,
     autoHeld: "這個計畫涵蓋小組裡別人佔用的檔案，所以改為等待你核准，不會自動開始。",
     agentsHoldsUnknown: ({ name }) =>
       `小組協作已停止，無法確認檔案佔用，Agent 不能修改檔案。請在主機修復小組協作後重新啟動 ${name}，或不帶 --group 啟動 ${name}。`,

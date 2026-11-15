@@ -393,6 +393,8 @@ export async function archiveRunWorkspace(
       reason: options.retentionDays ? "retention" : "request",
     });
     invalidateStorageReport(ctx);
+    // Without its checkout the run changes nothing more (auto-hold.ts).
+    await ctx.autoHolds?.end(run);
     await ctx.store.save();
     return run;
   });
@@ -439,6 +441,7 @@ export async function removeRun(ctx: WorkbenchContext, id: string) {
     for (const other of ctx.store.data.runs) dropSplitLinks(other, id, builtOn.get(other.id));
     log.info("run.removed", { runId: id });
     invalidateStorageReport(ctx);
+    await ctx.autoHolds?.end(run);
     await ctx.store.save();
   });
   return { removed: id };

@@ -414,8 +414,10 @@ export async function runAgent(
     // checked when its changes are integrated (integrateTeamTask).
     if (writes && cwd === run.worktreePath) {
       if (ctx.holds) {
-        const held = assertNotHeld(ctx.holds, run, await changedScopes(run), "turn");
+        const scopes = await changedScopes(run);
+        const held = assertNotHeld(ctx.holds, run, scopes, "turn");
         if (held.length) ctx.log(run, role, heldNotice(held), { kind: "notice" });
+        await keepForGroup(ctx, run, role, scopes);
       }
       delete run.heldPaths;
     }
@@ -443,6 +445,19 @@ export async function runAgent(
     recordEfficiency(completed);
     await ctx.store.save();
   }
+}
+
+/**
+ * Holds what the run changed in its name for the group (server/auto-hold.ts),
+ * one call of a run at a time, as teammates' changes may join it together.
+ */
+async function keepForGroup(ctx: WorkbenchContext, run: Run, agent: string, scopes?: string[]) {
+  const auto = ctx.autoHolds;
+  if (!auto) return;
+  const notice = await ctx.lock(`auto-hold:${run.id}`, async () =>
+    auto.keep(run, scopes ?? (await changedScopes(run).catch(() => []))),
+  );
+  if (notice) ctx.log(run, agent, notice, { kind: "notice" });
 }
 
 export function queueTeamMessage(
@@ -662,6 +677,7 @@ async function executeTeamTask(
       sm().run.team.taskIntegrated({ title: task.title, files: integrated }),
       { kind: "file", detail: integrated.join("\n") },
     );
+    await keepForGroup(ctx, run, task.owner);
     // The integrated diff now lives in the run worktree; a leftover checkout
     // would only cost disk. Failed tasks keep theirs so the diff can be read.
     try {

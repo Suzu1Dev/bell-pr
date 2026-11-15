@@ -251,6 +251,12 @@ export interface RunCore {
    */
   owners?: string[];
   /**
+   * The hold BELL PR took in the run's name for the lines and files its
+   * agents changed (server/auto-hold.ts), until the run publishes, is
+   * deleted or its working files are freed.
+   */
+  autoHold?: { projectId: string; claimId: string };
+  /**
    * Team collaboration records on this run: per-file reviewer attribution,
    * developer rationale comments and coordination/handoff TODOs. Absent until
    * a team record is saved.

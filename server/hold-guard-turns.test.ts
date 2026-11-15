@@ -185,7 +185,13 @@ async function scene(t: TestContext, agents: (input: TeamAgentInput) => Promise<
     return run(id).session!.messages.at(-1)!;
   };
   const read = (file: string) => readFile(path.join(folder, file), "utf8");
-  return { ...cast, f, turns, hold, release, start, run, inReview, session, read };
+  /** What the group's board holds now, as Ada reads it. */
+  const board = async () => {
+    const feed = await f.send("GET", `/api/collab/projects/${project}/feed`, cast.who.admin);
+    assert.equal(feed.status, 200, feed.body);
+    return feed.json.board.held as CollabHold[];
+  };
+  return { ...cast, f, turns, hold, release, start, run, inReview, session, read, board, project };
 }
 
 /** Writes `file` in the turn's checkout. */
@@ -194,6 +200,17 @@ const write = async (cwd: string, file: string, text: string) => {
   await writeFile(path.join(cwd, file), text);
 };
 const notices = (run: Run) => run.logs.filter((entry) => entry.kind === "notice").map((entry) => entry.message);
+/** Deletes a run once the PR draft its turns started is written. */
+async function removeWhenIdle(s: { f: { workbench: { removeRun(id: string): Promise<unknown> } } }, id: string) {
+  const end = Date.now() + 15_000;
+  for (;;)
+    try {
+      return await s.f.workbench.removeRun(id);
+    } catch (error) {
+      if (Date.now() > end) throw error;
+      await delay(20);
+    }
+}
 
 test("a run saves who starts it: the participant token, else the people who joined from the device; nobody there, or no group, saves none", async (t) => {
   const s = await scene(t, async (input) => (input.role === "lead" ? plan([{ id: "alpha", files: ["README.md"] }]) : report("Done")));
@@ -285,6 +302,11 @@ test("a plan over Ada's hold does not start on its own, cannot be approved while
   assert.equal(approved.status, 200, approved.body);
   await waitUntil(() => ["review", "failed"].includes(s.run(id).status), "the team");
   assert.equal(s.run(id).status, "review", s.run(id).error);
+  // What the teammates changed is held in Ben's name now, apart from his own docs (auto-hold.ts).
+  assert.deepEqual(
+    (await s.board()).filter((hold) => hold.holder === s.ben.id).map((hold) => hold.scopes),
+    [["docs"], ["src/api/users.ts#L1-L1"]],
+  );
   // The teammates were told Ben's own hold, and nobody else's.
   const told = s.turns.filter((turn) => turn.taskId).map((turn) => turn.prompt);
   assert.equal(told.length, 2);
@@ -489,4 +511,71 @@ test("a reason that ends in a full stop is joined to the kept-edits sentences on
         ])
           assert.doesNotMatch(text, /[.。]{2}|[.。][；;]/u, `${locale}: ${text}`);
     });
+});
+
+test("a write turn holds the lines it changed in the run's name, widens the hold with later turns, and the hold ends with the run", async (t) => {
+  const s = await scene(t, async (input) => {
+    if (input.role !== "session") return "Not used";
+    if (input.prompt.includes("users")) await write(input.cwd, "src/api/users.ts", "export const users = ['ben'];\n");
+    if (input.prompt.includes("readme")) await write(input.cwd, "README.md", "Example, by Ben\n");
+    return "Done.";
+  });
+  // Ada holds other lines of the same file: not in the way.
+  await s.hold(s.who.admin, ["src/api/users.ts#L5-L9"], "Ada's lines");
+  const id = await s.inReview([s.ben.id]);
+  const auto = () => s.board().then((held) => held.filter((hold) => hold.holder === s.ben.id));
+
+  const first = await s.session(id, "List Ben in the users");
+  assert.equal(first.failed, undefined, first.content);
+  const [taken, ...more] = await auto();
+  assert.equal(more.length, 0);
+  assert.deepEqual(taken.scopes, ["src/api/users.ts#L1-L1"]);
+  assert.equal(taken.title, "Change the users API (automatic)");
+  assert.deepEqual(s.run(id).autoHold, { projectId: s.project, claimId: taken.claimId });
+  assert.ok(notices(s.run(id)).some((notice) => notice.startsWith("Held for the group automatically") && notice.endsWith(": src/api/users.ts#L1-L1.")));
+  // Ada cannot take Ben's line now.
+  assert.equal(outcome(await s.f.post(`/projects/${s.project}/work`, s.who.admin, { title: "Mine", scopes: ["src/api/users.ts#L1-L2"] })), "409 conflict");
+
+  // A later turn widens the same hold; one that changes nothing new leaves it.
+  await s.session(id, "Sign the readme");
+  const [wider] = await auto();
+  assert.equal(wider.claimId, taken.claimId);
+  assert.deepEqual(wider.scopes, ["src/api/users.ts#L1-L1", "README.md#L1-L1"]);
+  const said = notices(s.run(id)).length;
+  await s.session(id, "Sign the readme again");
+  assert.equal(notices(s.run(id)).length, said);
+  assert.deepEqual((await auto())[0].scopes, wider.scopes);
+
+  // Deleting the run ends it, and the lines are free again.
+  await removeWhenIdle(s, id);
+  assert.deepEqual(await auto(), []);
+  assert.equal((await s.f.post(`/projects/${s.project}/work`, s.who.admin, { title: "Mine", scopes: ["src/api/users.ts#L1-L2"] })).status, 201);
+});
+
+test("an automatic hold leaves what the owner already holds to them", async (t) => {
+  const s = await scene(t, async (input) => {
+    if (input.role !== "session") return "Not used";
+    await write(input.cwd, "README.md", "Example, by Ben\n");
+    await write(input.cwd, "docs/guide.md", "Guide, by Ben\n");
+    return "Done.";
+  });
+  await s.hold(s.who.member, ["docs"], "Ben's docs");
+  const id = await s.inReview([s.ben.id]);
+  await s.session(id, "Sign both");
+  assert.deepEqual(
+    (await s.board()).filter((hold) => hold.holder === s.ben.id).map((hold) => hold.scopes),
+    [["docs"], ["README.md#L1-L1"]],
+  );
+});
+
+test("a run nobody owns takes no automatic hold", async (t) => {
+  const s = await scene(t, async (input) => {
+    if (input.role === "session") await write(input.cwd, "README.md", "Example, by someone\n");
+    return "Done.";
+  });
+  const id = await s.inReview();
+  const done = await s.session(id, "Sign the readme");
+  assert.equal(done.failed, undefined, done.content);
+  assert.equal(s.run(id).autoHold, undefined);
+  assert.deepEqual(await s.board(), []);
 });

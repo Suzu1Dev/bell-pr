@@ -418,6 +418,43 @@ test("a follow-up round is held to the same rule: its turn stops over Ada's hold
   assert.equal(await s.pushes(), 2);
 });
 
+test("a follow-up round's turn holds what it changed in Ben's name, and the hold ends once the round is pushed", async (t) => {
+  const s = await scene(t, {
+    runner: async (input) => {
+      await writeFile(path.join(input.cwd, "src/api/users.ts"), "export const users = ['ben'];\n");
+      return JSON.stringify({
+        summary: "Listed Ben.",
+        addressed: [{ url: feedbackItem.url, change: "Listed Ben." }],
+        notAddressed: [],
+        checks: [],
+        commitMessage: "List Ben in the users",
+      });
+    },
+  });
+  await s.ready(s.write("README.md", "Example, changed\n"));
+  assert.equal((await s.publish(s.devices.ben)).status, 200);
+  const board = async () => {
+    const feed = await s.f.send("GET", `/api/collab/projects/${s.project}/feed`, s.who.admin);
+    assert.equal(feed.status, 200, feed.body);
+    return (feed.json.board.held as CollabHold[]).map((hold) => ({ holder: hold.holder, scopes: hold.scopes }));
+  };
+  const run = s.current();
+  run.owners = [s.ben.id];
+  run.prFeedback = { fetchedAt: new Date().toISOString(), prNumber: 1, items: [feedbackItem] };
+  await s.f.workbench.startFollowUp(run.id, { feedbackUrls: [feedbackItem.url] });
+  for (let turn = 0; turn < 3000 && s.current().status === "running"; turn += 1)
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  assert.deepEqual(await board(), [{ holder: s.ben.id, scopes: ["src/api/users.ts#L1-L1"] }]);
+
+  await s.reviewAll();
+  await s.f.workbench.approve(run.id, { ...s.current().draft });
+  const reply = await s.publish(s.devices.ben);
+  assert.equal(reply.status, 200, reply.body);
+  assert.equal(s.current().followUps?.at(-1)?.status, "published");
+  assert.equal(s.current().autoHold, undefined);
+  assert.deepEqual(await board(), []);
+});
+
 test("the block cannot be ticked away or overridden", async (t) => {
   const s = await scene(t);
   await s.hold(s.who.admin, ["src/api/users.ts"]);
