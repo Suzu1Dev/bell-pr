@@ -100,7 +100,7 @@ With mise already installed:
 
 <!-- generated:install-commands method=mise -->
 ```sh
-MISE_NPM_PACKAGE_MANAGER=npm mise use -g node@24 npm:bell-pr@1.1.1
+MISE_NPM_PACKAGE_MANAGER=npm mise use -g node@24 npm:bell-pr@1.2.2
 ```
 <!-- /generated:install-commands -->
 

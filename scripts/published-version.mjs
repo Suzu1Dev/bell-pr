@@ -1,2 +1,2 @@
 // Bump on release.
-export const publishedInstallVersion = "1.1.1";
+export const publishedInstallVersion = "1.2.2";
