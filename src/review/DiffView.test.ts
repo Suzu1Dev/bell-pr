@@ -416,3 +416,44 @@ test("in a Learn-by-hand run the selection's button and hint name the guide, nev
   // An agent run keeps the agent's words.
   assert.match(diff({}), /Explain this code.*rv-diff-footer[^>]*>.*Click a line to ask about it/);
 });
+
+test("DiffView renders compact SuiteHandoffMenu in .rv-file-actions when suiteLinks are provided, and omits for unlinked or blocked files", () => {
+  const file = getDemo("en").files[0];
+  const suiteLinks = { explain: "http://127.0.0.1:22102", personal: "http://127.0.0.1:22101" };
+
+  const linked = renderEn(
+    createElement(DiffView, {
+      file,
+      reviewed: false,
+      onReview() {},
+      onAsk() {},
+      view: "unified",
+      suiteLinks,
+    }),
+  );
+  assertNoHan(linked);
+  assert.match(linked, /<div class="rv-file-actions">[\s\S]*suite-handoff-menu suite-handoff-compact/);
+
+  const unlinked = renderEn(
+    createElement(DiffView, {
+      file,
+      reviewed: false,
+      onReview() {},
+      onAsk() {},
+      view: "unified",
+    }),
+  );
+  assert.doesNotMatch(unlinked, /suite-handoff-menu/);
+
+  const blocked = renderEn(
+    createElement(DiffView, {
+      file: { ...file, blocked: "Binary" },
+      reviewed: false,
+      onReview() {},
+      onAsk() {},
+      view: "unified",
+      suiteLinks,
+    }),
+  );
+  assert.doesNotMatch(blocked, /suite-handoff-menu/);
+});

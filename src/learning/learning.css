@@ -140,6 +140,7 @@
   font-size: var(--text-2xs);
   color: var(--color-accent-600);
   background: var(--color-accent-50);
+  border: 1px solid var(--color-accent-200);
   padding: 4px 7px;
   border-radius: 3px;
 }
@@ -313,6 +314,12 @@
   font-size: var(--text-2xs);
   color: var(--color-text-secondary);
 }
+.practice-progress {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  color: var(--color-text-muted);
+}
 .practice-card h3 {
   margin: var(--space-4) 0 0;
   font-size: var(--text-lg);
@@ -377,8 +384,8 @@
   border: 0;
 }
 .practice-choice legend {
-  float: left;
-  margin-right: var(--space-2);
+  width: 100%;
+  margin-bottom: var(--space-1);
   padding: 0;
   font-size: var(--text-xs);
   font-weight: 500;
@@ -427,6 +434,10 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 6px var(--space-2);
+  padding: var(--space-3);
+  border-left: 3px solid var(--color-brand-500);
+  border-radius: 0 6px 6px 0;
+  background: var(--color-surface-sunken);
 }
 .practice-reference strong {
   font-size: var(--text-2xs);
@@ -457,6 +468,10 @@
   padding: 0;
   font-size: var(--text-xs);
   color: var(--color-accent-600);
+}
+.practice-study:hover {
+  color: var(--color-brand-700);
+  text-decoration: underline;
 }
 .practice-grades {
   display: grid;
@@ -491,6 +506,18 @@
   border-color: var(--color-accent-300);
   background: var(--color-accent-50);
 }
+.practice-grade[data-grade="got"]:hover:not(:disabled) {
+  border-color: var(--color-brand-300);
+  background: var(--color-brand-50);
+}
+.practice-grade[data-grade="partly"]:hover:not(:disabled) {
+  border-color: var(--color-warning-border);
+  background: var(--color-warning-bg);
+}
+.practice-grade[data-grade="missed"]:hover:not(:disabled) {
+  border-color: var(--color-danger-border);
+  background: var(--color-danger-bg);
+}
 .practice-grade strong {
   font-size: var(--text-sm);
   font-weight: 600;
@@ -518,7 +545,13 @@
   font-weight: 550;
   color: var(--color-text-secondary);
 }
+.practice-done-box {
+  display: grid;
+  justify-items: start;
+  gap: var(--space-3);
+}
 .practice-done {
+  margin: 0;
   font-size: var(--text-sm);
   color: var(--color-text-muted);
 }

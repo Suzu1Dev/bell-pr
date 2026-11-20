@@ -22,8 +22,11 @@ import {
   UnfoldVertical,
   X,
 } from "lucide-react";
+import type { SuiteLinks } from "../../shared/suite";
 import { useRovingList } from "../a11y/useRovingList";
 import { useT } from "../i18n";
+import { diffHandoffText } from "../suite/handoff";
+import { SuiteHandoffMenu } from "../suite/SuiteHandoffMenu";
 import type { DiffFile } from "../types";
 import {
   expandDiff,
@@ -68,6 +71,7 @@ export interface DiffViewProps {
   teamReviews?: readonly { reviewerId: string; reviewerName: string }[];
   /** Reports the selected line range in the diff for live presence and rationale notes. */
   onSelectLines?: (range?: { start: number; end: number }) => void;
+  suiteLinks?: SuiteLinks;
 }
 
 // Memoized: every arrow key in the list re-renders the diff, and a line's
@@ -116,6 +120,7 @@ export function DiffView({
   guide = false,
   teamReviews,
   onSelectLines,
+  suiteLinks,
 }: DiffViewProps) {
   const t = useT("review");
   const askLabel = guide ? t.diff.askGuide : t.diff.askSelection;
@@ -598,6 +603,17 @@ export function DiffView({
           {showReview && hasNote === false && !reviewed && !file.blocked && (
             <span className="rv-note-hint">{t.diff.noteHint}</span>
           )}
+          {(() => {
+            const handoff = diffHandoffText(file, selectedLines);
+            return (
+              <SuiteHandoffMenu
+                links={suiteLinks}
+                title={handoff.title}
+                text={handoff.text}
+                className="suite-handoff-compact"
+              />
+            );
+          })()}
           {showReview && <label className={`rv-reviewed ${reviewed ? "rv-reviewed-yes" : ""}`}>
             <input
               type="checkbox"

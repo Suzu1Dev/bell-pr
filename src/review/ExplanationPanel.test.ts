@@ -952,3 +952,66 @@ test("the panel opens on the tab the reader last chose and reports each change o
   assert.match(english, /aria-selected="true"[^>]*>(?:(?!<\/button>).)*Walkthrough<\/button>/);
 });
 
+test("ExplanationPanel renders compact SuiteHandoffMenu in .explain-context when suiteLinks are provided, including ReaderView, and omits for blocked or unlinked", () => {
+  const suiteLinks = { explain: "http://127.0.0.1:22102", reader: "http://127.0.0.1:22104" };
+  const retry = getDemo("en").files[0];
+
+  const linked = renderEn(
+    createElement(ExplanationPanel, {
+      file: retry,
+      messages: [],
+      loading: false,
+      onAsk() {},
+      demo: true,
+      suiteLinks,
+    }),
+  );
+  assertNoHan(linked);
+  assert.match(linked, /<div class="explain-context">[\s\S]*suite-handoff-menu suite-handoff-compact/);
+
+  // Learn-by-hand ReaderView (explanation absent) still exposes contextual diff handoff.
+  const readerHtml = renderEn(
+    createElement(ExplanationPanel, {
+      file: { ...retry, explanation: undefined, explanationStatus: "pending" },
+      messages: [],
+      loading: false,
+      onAsk() {},
+      demo: false,
+      byHandReview: {
+        onReviewAgain() {},
+        check: undefined,
+        checkError: undefined,
+        onOpenCheck() {},
+        onRetryCheck() {},
+        run: { byHand: {}, logs: [] },
+      },
+      suiteLinks,
+    }),
+  );
+  assertNoHan(readerHtml);
+  assert.match(readerHtml, /<div class="explain-context">[\s\S]*suite-handoff-menu suite-handoff-compact/);
+
+  const unlinked = renderEn(
+    createElement(ExplanationPanel, {
+      file: retry,
+      messages: [],
+      loading: false,
+      onAsk() {},
+      demo: true,
+    }),
+  );
+  assert.doesNotMatch(unlinked, /suite-handoff-menu/);
+
+  const blocked = renderEn(
+    createElement(ExplanationPanel, {
+      file: { ...retry, blocked: "Generated lockfile" },
+      messages: [],
+      loading: false,
+      onAsk() {},
+      demo: false,
+      suiteLinks,
+    }),
+  );
+  assert.doesNotMatch(blocked, /suite-handoff-menu/);
+});
+

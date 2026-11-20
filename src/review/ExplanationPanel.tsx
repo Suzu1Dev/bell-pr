@@ -35,9 +35,12 @@ import {
   type FileAttempt,
   type FileAttemptInput,
 } from "../../shared/understanding";
+import type { SuiteLinks } from "../../shared/suite";
 import { useTablistKeys } from "../a11y/useTablistKeys";
 import { scrollBehavior } from "../app/presentation";
 import { useFormat, useLocale, useT } from "../i18n";
+import { panelHandoffContext } from "../suite/handoff";
+import { SuiteHandoffMenu } from "../suite/SuiteHandoffMenu";
 import type { ChatMessage, DiffFile, Run } from "../types";
 import { MaintainerFeedback } from "./MaintainerFeedback";
 import { inPanel } from "./focus";
@@ -126,6 +129,7 @@ export interface ExplanationPanelProps {
     TeamCollaboration,
     "signOffFile" | "addRationale" | "removeRationale" | "addTodo" | "toggleTodo" | "removeTodo"
   >;
+  suiteLinks?: SuiteLinks;
 }
 
 /** The learning panel's tabs. */
@@ -675,6 +679,7 @@ export function ExplanationPanel({
   teamMe,
   selectedRange,
   teamActions,
+  suiteLinks,
 }: ExplanationPanelProps) {
   const t = useT("review");
   const panel = usePanelStrings(); // A Learn-by-hand run's Ask tab names the guide, who answers it (DESIGN v1.2 F8).
@@ -917,6 +922,17 @@ export function ExplanationPanel({
       <div className="explain-context">
         <FileCode2 size={13} />
         <span title={file.path}>{file.path}</span>
+        {(() => {
+          const handoff = panelHandoffContext(file, tab, { reports, messages });
+          return (
+            <SuiteHandoffMenu
+              links={suiteLinks}
+              title={handoff.title}
+              text={handoff.text}
+              className="suite-handoff-compact"
+            />
+          );
+        })()}
       </div>
       {fileModule && (
         <p

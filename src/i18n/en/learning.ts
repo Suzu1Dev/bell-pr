@@ -131,6 +131,7 @@ const learning = {
     sampleIntro:
       "Items from the built-in sample contribution, so you can try the deck. Grading them saves nothing.",
     sampleDone: "That was the last sample item.",
+    sampleAgain: "Practice the sample again",
   },
   /**
    * The coach debrief: a model-written reading of the person's own

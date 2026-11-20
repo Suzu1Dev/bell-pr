@@ -46,10 +46,9 @@
   border-radius: var(--radius-lg);
   background: var(--color-surface);
   box-shadow: var(--shadow-1);
-  color: var(--color-text-muted);
+  color: var(--color-text-secondary);
   text-align: left;
-  transition: border-color var(--duration-fast) var(--ease-standard),
-    background var(--duration-fast) var(--ease-standard);
+  transition: border-color 0.15s ease, background 0.15s ease;
 }
 .home-choice > svg {
   flex-shrink: 0;
@@ -63,6 +62,10 @@
 .home-choice-sample {
   border-color: var(--color-brand-200);
   background: var(--color-brand-50);
+}
+.home-choice-sample:hover {
+  border-color: var(--color-brand-500);
+  background: var(--color-brand-100);
 }
 .home-choice-text {
   display: grid;

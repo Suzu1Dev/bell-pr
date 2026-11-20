@@ -556,9 +556,14 @@
   flex-shrink: 0;
 }
 .explain-context > span {
+  flex: 1;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.explain-context .suite-handoff-menu {
+  flex-shrink: 0;
 }
 .explain-panel .explain-module {
   display: flex;
@@ -976,7 +981,10 @@
 }
 .tf-button-primary:hover:not(:disabled) {
   background: var(--tf-ink);
-  box-shadow: var(--shadow-1);
+  box-shadow: var(--shadow-2);
+  filter: brightness(0.92);
+  outline: 1px solid var(--tf-ink);
+  outline-offset: 1px;
 }
 .tf-button-quiet {
   padding-inline: 4px;
@@ -1140,12 +1148,16 @@
   justify-content: space-between;
   gap: 10px;
   flex-wrap: wrap;
+  margin-top: var(--space-3);
 }
 .explain-note-actions > span {
   flex: 1;
   color: var(--color-text-muted);
   font-size: var(--text-2xs);
   line-height: 1.6;
+}
+.explain-note-actions .explain-note-save {
+  margin-top: 0;
 }
 .explain-note-save {
   border-color: var(--color-accent-200);
@@ -1573,7 +1585,7 @@
   width: 65%;
 }
 .explain-panel .markdown-content {
-  color: var(--color-text-muted);
+  color: var(--color-text-secondary);
   font-size: var(--text-sm);
   line-height: 1.9;
   overflow-wrap: anywhere;
@@ -1630,6 +1642,9 @@
   border-radius: 4px;
   padding: 1px 4px;
   color: var(--color-accent-700);
+}
+.explain-card-concept .markdown-content code {
+  background: var(--color-surface);
 }
 .explain-panel .markdown-content pre {
   margin: 13px 0 16px;
@@ -1987,14 +2002,15 @@
 .walkthrough-step-lines {
   margin-bottom: 2px;
   padding: 1px 6px;
-  border-color: transparent;
+  border-color: var(--color-border);
   border-radius: 5px;
-  background: transparent;
+  background: var(--color-surface-sunken);
   font-family: var(--font-mono);
 }
 .walkthrough-step-lines:hover,
 .walkthrough-step-lines:focus-visible {
   border-color: var(--color-border-strong);
+  background: var(--color-accent-50);
 }
 .walkthrough-locate[aria-pressed="true"],
 .walkthrough-step-lines[aria-pressed="true"] {
@@ -2166,5 +2182,15 @@
   overflow: auto;
 }
 
-.explain-card-example > summary { cursor: pointer; font-weight: 600; color: var(--color-text-primary); }
+.explain-card-example > summary {
+  cursor: pointer;
+  font-weight: 600;
+  font-size: var(--text-sm);
+  line-height: 1.6;
+  color: var(--color-accent-700);
+}
+.explain-card-example > summary > svg {
+  vertical-align: -2px;
+  margin-right: 6px;
+}
 .explain-card-example[open] > summary { margin-bottom: 12px; }

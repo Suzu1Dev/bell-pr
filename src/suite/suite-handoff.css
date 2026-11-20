@@ -2,6 +2,8 @@
 .suite-handoff-menu {
   position: relative;
   display: inline-flex;
+  font-family: var(--font-sans);
+  white-space: normal;
 }
 .suite-handoff-trigger {
   display: inline-flex;
@@ -15,6 +17,12 @@
   color: var(--color-text-secondary);
   font-size: var(--text-xs);
   font-weight: 550;
+}
+.suite-handoff-compact .suite-handoff-trigger {
+  min-height: 24px;
+  padding: 2px 7px;
+  font-size: var(--text-2xs);
+  gap: 4px;
 }
 .suite-handoff-trigger:hover {
   background: var(--color-brand-50);
@@ -67,7 +75,11 @@
   .heading-top .suite-handoff-trigger {
     padding: 6px;
   }
-  .heading-top .suite-handoff-trigger > span {
+  .suite-handoff-compact .suite-handoff-trigger {
+    padding: 4px 5px;
+  }
+  .heading-top .suite-handoff-trigger > span,
+  .suite-handoff-compact .suite-handoff-trigger > span {
     position: absolute;
     width: 1px;
     height: 1px;

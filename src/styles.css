@@ -3349,7 +3349,7 @@ button {
 }
 .explain-message-body {
   font-size: var(--text-sm);
-  color: var(--color-text-muted);
+  color: var(--color-text-secondary);
 }
 .rv-diff-footer,
 .rv-gutter,

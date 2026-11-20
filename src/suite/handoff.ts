@@ -11,6 +11,9 @@ import {
   type SuiteLinks,
   type SuiteSiblingId,
 } from "../../shared/suite";
+import type { DiffLine } from "../review/diff";
+import type { PanelTab } from "../review/ExplanationPanel";
+import type { ChatMessage, DiffFile, Run } from "../types";
 
 const OBJECT_ID = /^[A-Za-z0-9._:-]{1,128}$/;
 const HREF = /^#\/[A-Za-z0-9/_\-.~%:]*(?:\?[A-Za-z0-9_\-.~%=&+]*)?$/;
@@ -236,4 +239,98 @@ export function clearPrHandoff(storage: StorageLike | undefined) {
   } catch {
     // Ignore storage errors.
   }
+}
+
+/** Formats a diff file (or selected diff lines) into contextual Suite handoff text. */
+export function diffHandoffText(
+  file: DiffFile,
+  selectedLines?: readonly DiffLine[],
+): { title: string; text: string } {
+  if (file.blocked) return { title: "", text: "" };
+  if (selectedLines?.length) {
+    const lineNumbers = selectedLines
+      .map((line) => line.newLine ?? line.oldLine)
+      .filter((num): num is number => num !== null);
+    const range = lineNumbers.length
+      ? (() => {
+          const start = Math.min(...lineNumbers);
+          const end = Math.max(...lineNumbers);
+          return start === end ? `L${start}` : `L${start}-L${end}`;
+        })()
+      : "";
+    const title = range ? `${file.path}:${range}` : file.path;
+    const excerpt = selectedLines
+      .map((line) => {
+        const prefix = line.kind === "added" ? "+" : line.kind === "removed" ? "-" : " ";
+        return `${prefix}${line.text}`;
+      })
+      .join("\n");
+    return { title, text: `${file.path}\n\n${excerpt}` };
+  }
+  const header = `${file.path} (+${file.additions} −${file.deletions})`;
+  const patch = file.patch.trim();
+  return {
+    title: file.path,
+    text: patch ? `${header}\n\n${patch}` : header,
+  };
+}
+
+/** Builds contextual Suite handoff content for the active ExplanationPanel tab, falling back to diff context. */
+export function panelHandoffContext(
+  file: DiffFile,
+  tab: PanelTab,
+  extras?: { reports?: Run["reports"]; messages?: readonly ChatMessage[] },
+): { title: string; text: string } {
+  if (file.blocked) return { title: "", text: "" };
+  if (tab === "explain" && file.explanation) {
+    const [conceptHeading = ""] = (file.explanation.concept || "").split("\n");
+    const trimmedHeading = conceptHeading.trim();
+    const title =
+      trimmedHeading.length > 0 && trimmedHeading.length <= 100
+        ? trimmedHeading
+        : file.path;
+    const parts = [
+      file.path,
+      file.explanation.summary,
+      file.explanation.reason,
+      file.explanation.concept,
+    ]
+      .map((part) => part?.trim())
+      .filter(Boolean);
+    if (parts.length > 1) return { title, text: parts.join("\n\n") };
+  }
+  if (tab === "walkthrough" && file.walkthrough?.functions?.length) {
+    const sections = file.walkthrough.functions.map((fn) =>
+      [
+        `${fn.name} (${fn.startLine}–${fn.endLine})`,
+        fn.summary,
+        fn.change,
+        fn.analogy,
+      ]
+        .map((part) => part?.trim())
+        .filter(Boolean)
+        .join("\n"),
+    );
+    return { title: file.path, text: [file.path, ...sections].join("\n\n") };
+  }
+  if (tab === "reports" && extras?.reports) {
+    const sections = (["implementer", "reviewer", "tester"] as const)
+      .map((key) => extras.reports?.[key]?.trim())
+      .filter((value): value is string => Boolean(value));
+    if (sections.length) {
+      return { title: file.path, text: [file.path, ...sections].join("\n\n") };
+    }
+  }
+  if (tab === "chat" && extras?.messages?.length) {
+    const lastAssistant = [...extras.messages]
+      .reverse()
+      .find((msg) => msg.role === "assistant" && !msg.failed && msg.content.trim());
+    if (lastAssistant) {
+      return {
+        title: file.path,
+        text: `${file.path}\n\n${lastAssistant.content.trim()}`,
+      };
+    }
+  }
+  return diffHandoffText(file);
 }

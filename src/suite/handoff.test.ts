@@ -3,12 +3,15 @@ import test from "node:test";
 import {
   buildPrOutgoingHandoff,
   clearPrHandoff,
+  diffHandoffText,
+  panelHandoffContext,
   parsePrHandoff,
   prBackRoute,
   readPrHandoff,
   stripPrHandoffHash,
   writePrHandoff,
 } from "./handoff";
+import { getDemo } from "../demo";
 
 const links = {
   explain: "http://127.0.0.1:21111",
@@ -111,4 +114,59 @@ test("writePrHandoff, readPrHandoff and clearPrHandoff round-trip cleanly", () =
   assert.equal(loaded?.backUrl, "http://127.0.0.1:21105/#/tasks");
   clearPrHandoff(storage);
   assert.equal(readPrHandoff(storage), undefined);
+});
+
+test("diffHandoffText formats whole diff or selected lines and suppresses blocked files", () => {
+  const file = getDemo("en").files[0];
+  const full = diffHandoffText(file);
+  assert.equal(full.title, file.path);
+  assert.match(full.text, new RegExp(`^${file.path.replace(/\./g, "\\.")} \\(\\+\\d+ −\\d+\\)`));
+  assert.ok(full.text.includes(file.patch.trim()));
+
+  const selected = diffHandoffText(file, [
+    { id: 1, kind: "context", text: "const wait = delay;", oldLine: 10, newLine: 10 },
+    { id: 2, kind: "added", text: "const jitter = wait * 0.2;", oldLine: null, newLine: 11 },
+  ]);
+  assert.equal(selected.title, `${file.path}:L10-L11`);
+  assert.equal(selected.text, `${file.path}\n\n const wait = delay;\n+const jitter = wait * 0.2;`);
+
+  assert.deepEqual(diffHandoffText({ ...file, blocked: "Binary file" }), { title: "", text: "" });
+});
+
+test("panelHandoffContext picks tab-specific content, falls back to diff when unasked/missing, and hides blocked files", () => {
+  const { files, run } = getDemo("en");
+  const file = files[0];
+  const client = files.find((entry) => entry.walkthrough?.functions.length)!;
+
+  const explain = panelHandoffContext(file, "explain");
+  assert.ok(explain.title.length > 0 && explain.title.length <= 100);
+  assert.ok(explain.text.includes(file.explanation!.summary));
+  assert.ok(explain.text.includes(file.explanation!.reason));
+
+  const walkthrough = panelHandoffContext(client, "walkthrough");
+  assert.equal(walkthrough.title, client.path);
+  assert.ok(walkthrough.text.includes(client.walkthrough!.functions[0].name));
+
+  const reports = panelHandoffContext(file, "reports", { reports: run.reports });
+  assert.equal(reports.title, file.path);
+  assert.ok(reports.text.includes(run.reports!.implementer!.trim()));
+
+  const chat = panelHandoffContext(file, "chat", {
+    messages: [
+      { role: "user", content: "Why?" },
+      { role: "assistant", content: "Because exponential backoff avoids retry storms." },
+      { role: "assistant", content: "Failed", failed: true },
+    ],
+  });
+  assert.equal(chat.title, file.path);
+  assert.equal(chat.text, `${file.path}\n\nBecause exponential backoff avoids retry storms.`);
+
+  // ReaderView / pending / failed / team fallback uses diff context.
+  const fallback = panelHandoffContext({ ...file, explanation: undefined, walkthrough: undefined }, "explain");
+  assert.deepEqual(fallback, diffHandoffText({ ...file, explanation: undefined, walkthrough: undefined }));
+
+  const teamFallback = panelHandoffContext(file, "team");
+  assert.deepEqual(teamFallback, diffHandoffText(file));
+
+  assert.deepEqual(panelHandoffContext({ ...file, blocked: "Too large" }, "explain"), { title: "", text: "" });
 });
