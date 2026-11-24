@@ -102,8 +102,9 @@ const budgets = {
   entries: 150,
   woff2: 12,
   largestJsGzip: 116 * kB,
-  totalJsGzip: 522 * kB,
-  totalCssGzip: 49.8 * kB,
+  // M4+Tier-5 (SuiteHandoffMenu + 320px responsive fix) + ~2 kB Node 24 gzip headroom.
+  totalJsGzip: 524 * kB,
+  totalCssGzip: 50.5 * kB,
 };
 const required = [
   "package.json",

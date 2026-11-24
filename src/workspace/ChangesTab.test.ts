@@ -354,3 +354,22 @@ test("before a learn-by-hand run's first change, Code changes says the guide rea
   assert.match(empty("running", true), /The Agent team is preparing your changes/);
   assert.match(empty("awaiting_plan", false), /once it finishes, you can review it here/);
 });
+
+test("suiteLinks flows through ChangesTab to DiffView and ExplanationPanel, and stays in DiffView when explanation is hidden", async () => {
+  const suiteLinks = { explain: "http://127.0.0.1:22102", reader: "http://127.0.0.1:22104" };
+  // Warm up React.lazy(() => import("../review/ExplanationPanel")) for synchronous renderToStaticMarkup.
+  renderEn(element({ suiteLinks }));
+  await import("../review/ExplanationPanel");
+  await new Promise((resolve) => setTimeout(resolve, 20));
+
+  const both = renderEn(element({ suiteLinks }));
+  assertNoHan(both);
+  assert.equal(both.match(/suite-handoff-menu suite-handoff-compact/g)?.length, 2);
+
+  const diffOnly = renderEn(element({ suiteLinks, showExplanation: false }));
+  assertNoHan(diffOnly);
+  assert.equal(diffOnly.match(/suite-handoff-menu suite-handoff-compact/g)?.length, 1);
+
+  const unlinked = renderEn(element());
+  assert.doesNotMatch(unlinked, /suite-handoff-menu/);
+});

@@ -105,7 +105,7 @@ test("a due item asks first: the question, an answer that is never saved, and ho
   const html = renderEn(deck({ initial: { items: [missed, surprise] } }));
   assertNoHan(html);
   assert.doesNotMatch(html, /Sample practice/);
-  assert.match(html, /<span class="note-tag">From your understanding check<\/span><span class="practice-dimension">Risk<\/span><span class="note-number">openfetch-sample\/open-fetch<\/span>/);
+  assert.match(html, /<span class="note-tag">From your understanding check<\/span><span class="practice-dimension">Risk<\/span><span class="note-number">openfetch-sample\/open-fetch<\/span><span class="practice-progress">1 \/ 2<\/span>/);
   assert.ok(html.includes(`>${missed.question}</h3>`));
   assert.ok(!html.includes(surprise.question), "the next item waits");
   assert.match(html, /<code class="practice-path">src\/retry\.ts<\/code>/);
@@ -174,6 +174,7 @@ test("the demo shows only the sample and asks the server nothing", () => {
   assertNoHan(html);
   assert.doesNotMatch(html, /Loading|Nothing to practise/);
   assert.match(html, /Sample practice/);
+  assert.match(html, new RegExp(`<span class="practice-progress">1 / ${Math.min(5, sample.length)}</span>`));
   assert.ok(html.includes(sample[0].question));
 });
 

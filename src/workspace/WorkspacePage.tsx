@@ -622,6 +622,7 @@ export function WorkspacePage({
               understanding={understanding}
               byHand={byHand}
               team={team}
+              suiteLinks={suiteLinks}
             />
           )}
           {tab === "activity" && (

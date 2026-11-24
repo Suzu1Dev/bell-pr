@@ -102,6 +102,7 @@ export function PracticeCard({
   onOpen,
   onNext,
   last,
+  position,
   focusOnMount = false,
   initial,
 }: {
@@ -113,6 +114,8 @@ export function PracticeCard({
   onNext: () => void;
   /** The session's last item: its button reads Done. */
   last: boolean;
+  /** Current 1-based position in the session. */
+  position?: { current: number; total: number };
   /** Move the focus to the question when the card appears. */
   focusOnMount?: boolean;
   initial?: Partial<PracticeCardState>;
@@ -180,6 +183,11 @@ export function PracticeCard({
           <span className="practice-dimension">{t.dimensions[item.dimension]}</span>
         )}
         <span className="note-number">{repoName}</span>
+        {position && (
+          <span className="practice-progress">
+            {position.current} / {position.total}
+          </span>
+        )}
       </div>
       <h3 id={`${id}-question`} tabIndex={-1} ref={question}>
         {item.question}
@@ -349,6 +357,7 @@ function PracticeSession({
       record={record}
       onOpen={onOpen}
       last={last}
+      position={{ current: index + 1, total: items.length }}
       focusOnMount={index > 0}
       onNext={() => (last ? onFinished() : setIndex(index + 1))}
     />
@@ -374,9 +383,18 @@ function SampleDeck({
       </h2>
       <p>{t.practice.sampleIntro}</p>
       {done ? (
-        <p className="practice-done" role="status">
-          {t.practice.sampleDone}
-        </p>
+        <div className="practice-done-box">
+          <p className="practice-done" role="status">
+            {t.practice.sampleDone}
+          </p>
+          <button
+            type="button"
+            className="button secondary"
+            onClick={() => setDone(false)}
+          >
+            {t.practice.sampleAgain}
+          </button>
+        </div>
       ) : (
         <PracticeSession
           items={practiceSample.slice(0, practiceSessionSize)}

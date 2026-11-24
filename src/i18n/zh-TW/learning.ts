@@ -99,6 +99,7 @@ const m: Translation<typeof en> = {
     sampleTitle: "示範練習",
     sampleIntro: "來自內建示範貢獻的題目，讓你試試練習的方式。評分不會被儲存。",
     sampleDone: "這是最後一題示範題目。",
+    sampleAgain: "再練習一次示範題目",
   },
   debrief: {
     title: "教練回顧",

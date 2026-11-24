@@ -162,4 +162,32 @@ test.describe("with BELLPR_SUITE_LINKS", () => {
       await context.close();
     }
   });
+
+  test("handoff menu closes on Escape from a menu item and restores focus to its trigger", async ({ browser }) => {
+    const context = await browser.newContext({
+      extraHTTPHeaders: e2eApiHeaders,
+      baseURL: server!.baseURL,
+      locale: "en-US",
+    });
+    try {
+      const page = await context.newPage();
+      await page.goto("/#/runs/demo-run/changes?file=src%2Futils%2Fretry.ts&locale=en");
+      const trigger = page.locator(".rv-file-actions .suite-handoff-trigger");
+      const menu = page.locator(".rv-file-actions .suite-handoff-popover");
+      await trigger.focus();
+      await page.keyboard.press("Enter");
+      await expect(trigger).toHaveAttribute("aria-expanded", "true");
+      await expect(menu).toBeVisible();
+
+      await page.keyboard.press("Tab");
+      await expect(menu.locator("a.suite-handoff-item").first()).toBeFocused();
+
+      await page.keyboard.press("Escape");
+      await expect(menu).toHaveCount(0);
+      await expect(trigger).toHaveAttribute("aria-expanded", "false");
+      await expect(trigger).toBeFocused();
+    } finally {
+      await context.close();
+    }
+  });
 });

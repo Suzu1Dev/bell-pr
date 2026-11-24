@@ -38,6 +38,7 @@ import {
   computeFileHoldNotice,
   type TeamCollaboration,
 } from "../collab/useTeamCollaboration";
+import type { SuiteLinks } from "../../shared/suite";
 import type { DiffFile, Repo, Run } from "../types";
 import { applyReviewOrder, parseReviewOrder } from "../../shared/review-order";
 import { DiffView } from "../review/DiffView";
@@ -138,6 +139,7 @@ interface ChangesTabProps {
   byHand?: ByHand;
   /** Live team activity, holds, dependency rules and team review/rationale/todo actions. */
   team?: TeamCollaboration;
+  suiteLinks?: SuiteLinks;
 }
 
 /**
@@ -198,6 +200,7 @@ export function ChangesTab({
   understanding,
   byHand,
   team,
+  suiteLinks,
 }: ChangesTabProps) {
   const workspace = useT("workspace");
   const format = useFormat();
@@ -689,6 +692,7 @@ export function ChangesTab({
               (entry) => !file.fingerprint || entry.fingerprint === file.fingerprint,
             )}
             onSelectLines={team?.reportSelection}
+            suiteLinks={suiteLinks}
           />
         ) : writing && run.worktreePath ? (
           <ErrorBoundary resetKey={`${run.id}:turn`}>
@@ -873,6 +877,7 @@ export function ChangesTab({
                     teamMe={team?.me}
                     selectedRange={team?.selectedRange}
                     teamActions={team}
+                    suiteLinks={suiteLinks}
                   />
                 </Suspense>
               </ErrorBoundary>
