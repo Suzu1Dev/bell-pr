@@ -33,3 +33,4 @@ site/dist/
 
 # Local agent prompts (never ship)
 .codex-prompts/
+.claude/

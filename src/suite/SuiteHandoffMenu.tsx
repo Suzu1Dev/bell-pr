@@ -34,6 +34,7 @@ export function SuiteHandoffMenu({ links, title, text, className = "" }: SuiteHa
   const t = useT("app").suite;
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
 
   const targets = (["explain", "personal", "reader", "campaign"] as const).flatMap((id) => {
     const origin = safeLink(links?.[id]);
@@ -59,7 +60,10 @@ export function SuiteHandoffMenu({ links, title, text, className = "" }: SuiteHa
       if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
     };
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setOpen(false);
+      if (event.key === "Escape") {
+        setOpen(false);
+        triggerRef.current?.focus();
+      }
     };
     window.addEventListener("mousedown", onPointerDown);
     window.addEventListener("keydown", onKeyDown);
@@ -74,6 +78,7 @@ export function SuiteHandoffMenu({ links, title, text, className = "" }: SuiteHa
   return (
     <div ref={rootRef} className={`suite-handoff-menu ${className}`.trim()}>
       <button
+        ref={triggerRef}
         type="button"
         className="suite-handoff-trigger"
         aria-label={t.sendToSuite}

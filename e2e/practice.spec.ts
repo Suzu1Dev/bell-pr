@@ -208,3 +208,21 @@ test("in the demo the sidebar shows the sample's count without asking the server
   await page.waitForLoadState("networkidle");
   expect(asked).toEqual([]);
 });
+
+test("completing the sample practice deck shows the done state and restarts on replay", async ({ page }) => {
+  await stubDeck(page, () => ({ items: [] }));
+  await page.goto("/#/learning?view=practice&locale=en");
+  const deck = page.locator("section.practice-sample");
+  const progress = deck.locator(".practice-progress");
+  for (let i = 0; i < sample.length; i += 1) {
+    await expect(progress).toHaveText(`${i + 1} / ${sample.length}`);
+    await deck.getByRole("radio", { name: p.confidences.think }).check();
+    await deck.getByRole("button", { name: p.show }).click();
+    await deck.getByRole("button", { name: new RegExp(`^${p.grades.got}`) }).click();
+    await deck.getByRole("button", { name: i < sample.length - 1 ? p.next : p.finish }).click();
+  }
+  await expect(deck.locator(".practice-done")).toHaveText(p.sampleDone);
+  await deck.getByRole("button", { name: p.sampleAgain }).click();
+  await expect(progress).toHaveText(`1 / ${sample.length}`);
+  await expect(deck.getByRole("heading", { level: 3, name: sample[0].question })).toBeVisible();
+});

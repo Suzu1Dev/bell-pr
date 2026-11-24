@@ -1017,6 +1017,12 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 4px 10px;
+  max-width: 100%;
+}
+.draft-copy .button {
+  max-width: 100%;
+  white-space: normal;
+  text-align: left;
 }
 .draft-copy-status {
   font-size: var(--text-2xs);
@@ -1129,6 +1135,7 @@
   display: grid;
   gap: 6px;
   justify-items: start;
+  min-width: 0;
   margin-top: 14px;
   padding-top: 12px;
   border-top: 1px solid var(--color-border-subtle);
@@ -1153,6 +1160,7 @@
 .reviewability-weakened li {
   display: grid;
   gap: 4px;
+  min-width: 0;
 }
 .reviewability-weakened-line {
   display: flex;
@@ -1198,6 +1206,7 @@
   display: grid;
   gap: 6px;
   justify-items: start;
+  min-width: 0;
   padding: 8px 12px;
   border-radius: 6px;
   background: var(--color-success-bg);

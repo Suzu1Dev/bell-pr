@@ -28,6 +28,8 @@ export default defineConfig(
     ".local/",
     "output/",
     ".playwright-cli/",
+    ".claude/",
+    "**/.claude/",
   ]),
   {
     files: ["**/*.{ts,tsx,mjs,js}"],
